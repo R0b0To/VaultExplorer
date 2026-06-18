@@ -34,4 +34,7 @@ object VeraCryptEngine {
 
     @JvmStatic
     external fun renameFileNative(fd: Int, password: String, pim: Int, oldPath: String, newPath: String, volId: Int): Boolean
+
+    @JvmStatic
+    external fun getSpaceInfoNative(fd: Int, password: String, pim: Int, volId: Int): LongArray?
 }

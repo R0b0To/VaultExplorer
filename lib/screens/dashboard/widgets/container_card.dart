@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-
 import '../../../models/mounted_container.dart';
 import '../../../services/cryptbridge_api.dart';
 import '../../browser/file_browser_screen.dart';
@@ -14,11 +13,16 @@ class ContainerCard extends StatelessWidget {
     required this.onLocked,
   }) : super(key: key);
 
-  String _timeSince(DateTime dt) {
-    final d = DateTime.now().difference(dt);
-    if (d.inMinutes < 1) return 'just now';
-    if (d.inHours < 1) return '${d.inMinutes}m ago';
-    return '${d.inHours}h ago';
+  String _formatBytes(int bytes) {
+    if (bytes <= 0) return "0 B";
+    const suffixes = ["B", "KB", "MB", "GB", "TB"];
+    double size = bytes.toDouble();
+    int suffixIndex = 0;
+    while (size >= 1024 && suffixIndex < suffixes.length - 1) {
+      size /= 1024;
+      suffixIndex++;
+    }
+    return "${size.toStringAsFixed(size < 10 ? 1 : 0)} ${suffixes[suffixIndex]}";
   }
 
   @override
@@ -66,8 +70,9 @@ class ContainerCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
+                        // Displays the formatted live partition space metrics [5]
                         Text(
-                          'Volume ${container.volId} · mounted ${_timeSince(container.mountedAt)}',
+                          'Volume ${container.volId} · ${_formatBytes(container.freeSpace)} free of ${_formatBytes(container.totalSpace)}',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ],

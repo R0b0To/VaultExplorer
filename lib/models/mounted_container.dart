@@ -6,6 +6,8 @@ class MountedContainer {
   final int pim;
   final List<String> rootFiles;
   final DateTime mountedAt;
+  final int totalSpace; // Added
+  final int freeSpace;  // Added
 
   const MountedContainer({
     required this.uri,
@@ -15,9 +17,15 @@ class MountedContainer {
     required this.pim,
     required this.rootFiles,
     required this.mountedAt,
+    required this.totalSpace,
+    required this.freeSpace,
   });
 
-  MountedContainer copyWith({List<String>? rootFiles}) {
+  MountedContainer copyWith({
+    List<String>? rootFiles,
+    int? totalSpace,
+    int? freeSpace,
+  }) {
     return MountedContainer(
       uri: uri,
       displayName: displayName,
@@ -26,6 +34,8 @@ class MountedContainer {
       pim: pim,
       rootFiles: rootFiles ?? this.rootFiles,
       mountedAt: mountedAt,
+      totalSpace: totalSpace ?? this.totalSpace,
+      freeSpace: freeSpace ?? this.freeSpace,
     );
   }
 }

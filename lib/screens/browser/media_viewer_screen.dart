@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart'; // Added for debugPrint
+import 'dart:async'; 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; 
 import 'package:video_player/video_player.dart';
 import '../../models/mounted_container.dart';
 import '../../services/cryptbridge_api.dart';
@@ -26,6 +28,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   late PageController _pageController;
   late int _currentIndex;
   bool _showUI = true;
+  bool _isLandscape = false; 
 
   _LocalStreamingServer? _streamingServer;
   int? _serverPort;
@@ -54,13 +57,41 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   void dispose() {
     _pageController.dispose();
     _streamingServer?.stop();
+    
+    // Safety Restorations
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
   }
 
-  void _toggleUI() {
+  void _setUIVisibility(bool show) {
+    if (mounted) {
+      setState(() {
+        _showUI = show;
+      });
+      if (show) {
+         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      }
+    }
+  }
+
+  void _toggleOrientation() {
     setState(() {
-      _showUI = !_showUI;
+      _isLandscape = !_isLandscape;
     });
+    if (_isLandscape) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+    }
   }
 
   Future<void> _exportCurrentFile() async {
@@ -122,25 +153,23 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       body: Stack(
         children: [
           // Media Swiper
-          GestureDetector(
-            onTap: _toggleUI,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: total,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              itemBuilder: (context, index) {
-                final streamUrl = 'http://127.0.0.1:$_serverPort/media?file=${widget.mediaFiles[index]}';
-                return _MediaPage(
-                  fileName: widget.mediaFiles[index],
-                  streamUrl: streamUrl,
-                  onTap: _toggleUI,
-                );
-              },
-            ),
+          PageView.builder(
+            controller: _pageController,
+            itemCount: total,
+            onPageChanged: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              final streamUrl = 'http://127.0.0.1:$_serverPort/media?file=${widget.mediaFiles[index]}';
+              return _MediaPage(
+                fileName: widget.mediaFiles[index],
+                streamUrl: streamUrl,
+                showUI: _showUI,
+                onToggleUI: _setUIVisibility, 
+              );
+            },
           ),
 
           // Top Immersive Bar
@@ -155,7 +184,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 top: MediaQuery.of(context).padding.top + 8,
                 bottom: 12,
                 left: 8,
-                right: 16,
+                right: 8,
               ),
               color: Colors.black.withOpacity(0.7),
               child: Row(
@@ -170,7 +199,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          currentName,
+                          currentName.split('/').last,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
@@ -189,40 +218,18 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-
-          // Bottom Bar Actions
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-            bottom: _showUI ? 0 : -100,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: EdgeInsets.only(
-                top: 12,
-                bottom: MediaQuery.of(context).padding.bottom + 12,
-                left: 24,
-                right: 24,
-              ),
-              color: Colors.black.withOpacity(0.7),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton.icon(
-                    onPressed: _exportCurrentFile,
-                    icon: const Icon(Icons.download_outlined, color: Color(0xFF4FC3F7), size: 18),
-                    label: const Text(
-                      'EXPORT',
-                      style: TextStyle(color: Color(0xFF4FC3F7), fontSize: 13, fontWeight: FontWeight.w600),
+                  IconButton(
+                    icon: Icon(
+                      _isLandscape ? Icons.screen_lock_portrait : Icons.screen_rotation,
+                      color: Colors.white,
                     ),
+                    tooltip: 'Toggle Fullscreen Rotation',
+                    onPressed: _toggleOrientation,
                   ),
-                  const Text(
-                    'Direct Stream Memory',
-                    style: TextStyle(color: Color(0xFF4A5568), fontSize: 11, letterSpacing: 0.5),
+                  IconButton(
+                    icon: const Icon(Icons.download_outlined, color: Colors.white),
+                    tooltip: 'Export to Downloads',
+                    onPressed: _exportCurrentFile,
                   ),
                 ],
               ),
@@ -237,13 +244,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 class _MediaPage extends StatelessWidget {
   final String fileName;
   final String streamUrl;
-  final VoidCallback onTap;
+  final bool showUI;
+  final ValueChanged<bool> onToggleUI;
 
   const _MediaPage({
     Key? key,
     required this.fileName,
     required this.streamUrl,
-    required this.onTap,
+    required this.showUI,
+    required this.onToggleUI,
   }) : super(key: key);
 
   @override
@@ -251,12 +260,12 @@ class _MediaPage extends StatelessWidget {
     final ext = fileName.split('.').last.toLowerCase();
     final isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        color: Colors.black,
-        child: isImg
-            ? InteractiveViewer(
+    return Container(
+      color: Colors.black,
+      child: isImg
+          ? GestureDetector(
+              onTap: () => onToggleUI(!showUI), 
+              child: InteractiveViewer(
                 maxScale: 4.0,
                 child: Center(
                   child: Image.network(
@@ -267,19 +276,32 @@ class _MediaPage extends StatelessWidget {
                     ),
                   ),
                 ),
-              )
-            : RealVideoPlayerWidget(
-                streamUrl: streamUrl,
               ),
-      ),
+            )
+          : RealVideoPlayerWidget(
+              streamUrl: streamUrl,
+              showUI: showUI,
+              onToggleUI: onToggleUI,
+            ),
     );
   }
 }
 
+// ─────────────────────────────────────────────
+// Real Video Player with Auto-Hiding Seek Bar
+// ─────────────────────────────────────────────
+
 class RealVideoPlayerWidget extends StatefulWidget {
   final String streamUrl;
+  final bool showUI;
+  final ValueChanged<bool> onToggleUI;
 
-  const RealVideoPlayerWidget({Key? key, required this.streamUrl}) : super(key: key);
+  const RealVideoPlayerWidget({
+    Key? key,
+    required this.streamUrl,
+    required this.showUI,
+    required this.onToggleUI,
+  }) : super(key: key);
 
   @override
   State<RealVideoPlayerWidget> createState() => _RealVideoPlayerWidgetState();
@@ -294,6 +316,9 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
   Duration _duration = Duration.zero;
   double _sliderValue = 0.0;
   bool _isDragging = false;
+
+  Timer? _hideTimer;
+  DateTime _lastSeekTime = DateTime.now();
 
   @override
   void initState() {
@@ -338,6 +363,7 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
           _duration = _controller.value.duration;
         });
         _controller.play();
+        _startHideTimer(); 
       }
     } catch (e) {
       if (mounted) {
@@ -350,10 +376,27 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
 
   @override
   void dispose() {
+    _hideTimer?.cancel();
     if (_initialized) {
       _controller.dispose();
     }
     super.dispose();
+  }
+
+  void _startHideTimer() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _controller.value.isPlaying && widget.showUI) {
+        widget.onToggleUI(false); 
+      }
+    });
+  }
+
+  void _showControlsAndResetTimer() {
+    if (!widget.showUI) {
+      widget.onToggleUI(true); 
+    }
+    _startHideTimer();
   }
 
   String _formatDuration(Duration duration) {
@@ -393,44 +436,73 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
       );
     }
 
-    return Center(
-      child: AspectRatio(
-        aspectRatio: _controller.value.aspectRatio,
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  _controller.value.isPlaying ? _controller.pause() : _controller.play();
-                });
-              },
-              child: VideoPlayer(_controller),
+    final cs = Theme.of(context).colorScheme;
+
+    return ClipRect(
+      // Clips horizontally strictly to the phone's left & right boundaries,
+      // but allows the video to expand vertically all the way to the top and bottom of the screen [1.1.4].
+      child: Stack(
+        clipBehavior: Clip.none, // Allows elements to animate off-screen without clipping the main canvas
+        alignment: Alignment.center,
+        children: [
+          // Full-screen InteractiveViewer for zoom-to-fill capability [5]
+          InteractiveViewer(
+            maxScale: 6.0,
+            minScale: 1.0,
+            clipBehavior: Clip.none, // Allows the video to expand past standard aspect-ratio bounds [1.1.4]
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: _controller.value.aspectRatio,
+                child: GestureDetector(
+                  onTap: () {
+                    widget.onToggleUI(!widget.showUI); 
+                    if (!widget.showUI) {
+                      _startHideTimer();
+                    }
+                  },
+                  child: VideoPlayer(_controller),
+                ),
+              ),
             ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: Colors.black.withOpacity(0.6),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _formatDuration(_position),
-                          style: const TextStyle(color: Colors.white, fontSize: 11),
-                        ),
-                        Text(
-                          _formatDuration(_duration),
-                          style: const TextStyle(color: Color(0xFF7A8899), fontSize: 11),
-                        ),
-                      ],
+          ),
+
+          // Auto-Hiding Seekbar Control Panel (Now positioned relative to the screen bottom)
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+            left: 0,
+            right: 0,
+            bottom: widget.showUI ? 0 : -100, // Moves out of view below the screen boundary
+            child: Container(
+              padding: EdgeInsets.only(
+                top: 8,
+                bottom: MediaQuery.of(context).padding.bottom + 8,
+                left: 16,
+                right: 16,
+              ),
+              color: Colors.black.withOpacity(0.6),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.white,
+                      size: 20,
                     ),
-                    SliderTheme(
+                    onPressed: () {
+                      _showControlsAndResetTimer();
+                      setState(() {
+                        _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatDuration(_position),
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                  ),
+                  Expanded(
+                    child: SliderTheme(
                       data: SliderTheme.of(context).copyWith(
                         activeTrackColor: const Color(0xFF4FC3F7),
                         inactiveTrackColor: const Color(0xFF2A3040),
@@ -442,10 +514,19 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
                       child: Slider(
                         value: _sliderValue.clamp(0.0, 1.0),
                         onChanged: (value) {
+                          _showControlsAndResetTimer();
                           setState(() {
                             _isDragging = true;
                             _sliderValue = value;
                           });
+                          
+                          // Throttled seeking to update video frames instantly while scrubbing
+                          final now = DateTime.now();
+                          if (now.difference(_lastSeekTime).inMilliseconds > 100) {
+                            _lastSeekTime = now;
+                            final targetMs = (value * _duration.inMilliseconds).toInt();
+                            _controller.seekTo(Duration(milliseconds: targetMs));
+                          }
                         },
                         onChangeEnd: (value) {
                           final targetMs = (value * _duration.inMilliseconds).toInt();
@@ -453,36 +534,46 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
                             setState(() {
                               _isDragging = false;
                             });
+                            _startHideTimer();
                           });
                         },
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  Text(
+                    _formatDuration(_duration),
+                    style: const TextStyle(color: Color(0xFF7A8899), fontSize: 11),
+                  ),
+                ],
               ),
             ),
-            IgnorePointer(
-              child: Center(
-                child: AnimatedOpacity(
-                  opacity: _controller.value.isPlaying ? 0.0 : 1.0,
-                  duration: const Duration(milliseconds: 250),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: const BoxDecoration(
-                      color: Colors.black38,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.play_arrow,
-                      color: Colors.white,
-                      size: 36,
-                    ),
+          ),
+
+          // Large Center Play/Pause Indicator
+          if (widget.showUI)
+            Center(
+              child: GestureDetector(
+                onTap: () {
+                  _showControlsAndResetTimer();
+                  setState(() {
+                    _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Colors.black45,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                    color: Colors.white,
+                    size: 40,
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -549,7 +640,7 @@ class _LocalStreamingServer {
         headers.set(HttpHeaders.contentLengthHeader, contentLength.toString());
 
         var currentPosition = start;
-        const chunkSize = 131072; // 128 KB packets
+        const chunkSize = 524288; // 512 KB packets
 
         while (currentPosition <= end) {
           final remaining = end - currentPosition + 1;
@@ -600,7 +691,6 @@ class _LocalStreamingServer {
         }
       }
     } catch (e, stack) {
-      // Print any hidden channel error during playback directly to console diagnostics
       debugPrint('STREAM SERVER EXCEPTION: $e');
       debugPrint('$stack');
     } finally {
@@ -617,6 +707,7 @@ class _LocalStreamingServer {
     switch (ext) {
       case 'mp4':
       case 'm4v': return 'video/mp4';
+      case 'webm': return 'video/webm'; // Added 'webm'
       case 'mkv': return 'video/x-matroska';
       case 'mov': return 'video/quicktime';
       case 'avi': return 'video/x-msvideo';

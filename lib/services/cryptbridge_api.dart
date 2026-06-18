@@ -46,7 +46,25 @@ static Future<bool> openWithApp(MountedContainer container, String fileName) asy
     });
     return result ?? false;
   }
+static Future<bool> importFile(MountedContainer container, String targetPath) async {
+    final result = await _channel.invokeMethod<bool>('importFile', {
+      'filePath': container.uri,
+      'password': container.password,
+      'pim': container.pim,
+      'targetPath': targetPath,
+    });
+    return result ?? false;
+  }
 
+  static Future<bool> exportFileToStorage(MountedContainer container, String sourcePath) async {
+    final result = await _channel.invokeMethod<bool>('exportFileToStorage', {
+      'filePath': container.uri,
+      'password': container.password,
+      'pim': container.pim,
+      'sourcePath': sourcePath,
+    });
+    return result ?? false;
+  }
   static Future<int> getFileSize(MountedContainer container, String fileName) async {
     final result = await _channel.invokeMethod<int>('getFileSize', {
       'filePath': container.uri,
@@ -131,4 +149,14 @@ static Future<bool> openWithApp(MountedContainer container, String fileName) asy
     }
     return writeBackFile(container, fileName, tempFile.path);
   }
+
+  static Future<List<int>?> getSpaceInfo(MountedContainer container) async {
+    final result = await _channel.invokeMethod<List<Object?>>('getSpaceInfo', {
+      'filePath': container.uri,
+      'password': container.password,
+      'pim': container.pim,
+    });
+    return result?.cast<int>();
+  }
 }
+

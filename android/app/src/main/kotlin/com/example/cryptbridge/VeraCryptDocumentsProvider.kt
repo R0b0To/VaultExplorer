@@ -120,6 +120,24 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         }
         val mimeType = if (isDir) DocumentsContract.Document.MIME_TYPE_DIR else getMimeType(displayName)
 
+        // Query the actual file size from JNI when requested [5]
+        val size = if (isDir) {
+            0L
+        } else {
+            try {
+                val session = VeraCryptSession.activeSessions[volId]
+                if (session != null) {
+                    synchronized(VeraCryptSession.locks[volId]) {
+                        VeraCryptEngine.getFileSizeNative(getFd(session.uri, "r"), session.password, session.pim, fatPath, volId)
+                    }
+                } else {
+                    0L
+                }
+            } catch (e: Exception) {
+                0L
+            }
+        }
+
         var flags = DocumentsContract.Document.FLAG_SUPPORTS_DELETE
         if (isDir) {
             flags = flags or DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
@@ -135,7 +153,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             add(DocumentsContract.Document.COLUMN_MIME_TYPE, mimeType)
             add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, displayName)
             add(DocumentsContract.Document.COLUMN_FLAGS, flags)
-            add(DocumentsContract.Document.COLUMN_SIZE, 0)
+            add(DocumentsContract.Document.COLUMN_SIZE, size) // Set real size
         }
         return cursor
     }
@@ -173,7 +191,20 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                     if (file.startsWith("System:")) continue
                     
                     val isDir = file.startsWith("[DIR] ")
-                    val cleanName = if (isDir) file.substringAfter("[DIR] ") else file
+                    // Strip the size metadata from JNI entry for standard filename parsing
+                    val cleanName = if (isDir) {
+                        file.substringAfter("[DIR] ")
+                    } else {
+                        file.substringBefore("|")
+                    }
+                    
+                    // Parse the size bytes directly [5]
+                    val size = if (isDir) {
+                        0L
+                    } else {
+                        file.substringAfter("|", "0").toLongOrNull() ?: 0L
+                    }
+
                     val childFatPath = if (parentFatPath.isEmpty()) cleanName else "$parentFatPath/$cleanName"
                     val childType = if (isDir) "dir" else "file"
                     val childMime = if (isDir) DocumentsContract.Document.MIME_TYPE_DIR else getMimeType(cleanName)
@@ -193,7 +224,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                         add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, cleanName)
                         add(DocumentsContract.Document.COLUMN_MIME_TYPE, childMime)
                         add(DocumentsContract.Document.COLUMN_FLAGS, flags)
-                        add(DocumentsContract.Document.COLUMN_SIZE, 0)
+                        add(DocumentsContract.Document.COLUMN_SIZE, size) // Set real size
                     }
                 }
             }
@@ -418,6 +449,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             fileName.endsWith(".webp", true) -> "image/webp"
             fileName.endsWith(".gif", true) -> "image/gif"
             fileName.endsWith(".mp4", true) || fileName.endsWith(".m4v", true) -> "video/mp4"
+            fileName.endsWith(".webm", true) -> "video/webm" // Added .webm
             fileName.endsWith(".mkv", true) -> "video/x-matroska"
             fileName.endsWith(".txt", true) -> "text/plain"
             fileName.endsWith(".pdf", true) -> "application/pdf"

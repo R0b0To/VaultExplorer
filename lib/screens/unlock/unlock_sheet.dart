@@ -84,6 +84,24 @@ class _UnlockSheetState extends State<UnlockSheet> {
         // Save metadata to persistent internal storage list
         await SavedContainerService.saveContainer(_selectedUri!, name);
 
+        // Build temporary model instance to query container capacity details [5]
+        final tempContainer = MountedContainer(
+          uri: _selectedUri!,
+          displayName: name,
+          volId: result.volId,
+          password: _passwordCtrl.text,
+          pim: pim,
+          rootFiles: result.files,
+          mountedAt: DateTime.now(),
+          totalSpace: 0,
+          freeSpace: 0,
+        );
+
+        // Fetch dynamic storage capacity values [5]
+        final space = await CryptBridgeApi.getSpaceInfo(tempContainer);
+        final total = (space != null && space.isNotEmpty) ? space[0] : 0;
+        final free = (space != null && space.length > 1) ? space[1] : 0;
+
         widget.onMounted(MountedContainer(
           uri: _selectedUri!,
           displayName: name,
@@ -92,6 +110,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
           pim: pim,
           rootFiles: result.files,
           mountedAt: DateTime.now(),
+          totalSpace: total, // Assigned
+          freeSpace: free,   // Assigned
         ));
 
         if (mounted) Navigator.pop(context);

@@ -26,10 +26,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
 
   late List<String> _currentItems = [];
   bool _isLoading = false;
+  late int _freeSpace = 0; // Live available space tracks
 
   // Modern Multi-Selection State
   bool _isSelectionMode = false;
-  final Set<String> _selectedItems = {}; // Holds raw file names (e.g., "[DIR] Documents" or "pic.png")
+  final Set<String> _selectedItems = {}; // Holds raw file names (e.g., "[DIR] Documents" or "pic.png|12345")
 
   // Clipboard State (for Cut/Copy/Paste operations)
   bool _isClipboardMode = false;
@@ -39,7 +40,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   @override
   void initState() {
     super.initState();
-    // Query live FATFS contents directly from container to display dynamic changes
+    _freeSpace = widget.container.freeSpace;
     _loadDirectoryContents('');
   }
 
@@ -55,9 +56,14 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     });
     try {
       final items = await CryptBridgeApi.listDirectory(widget.container, path);
+      final space = await CryptBridgeApi.getSpaceInfo(widget.container);
+      
       if (mounted) {
         setState(() {
           _currentItems = items ?? [];
+          if (space != null && space.length > 1) {
+            _freeSpace = space[1];
+          }
           _isLoading = false;
         });
       }
@@ -74,44 +80,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Folder Navigation Handlers
-  // ---------------------------------------------------------------------------
-
-  void _enterDirectory(String rawDirEntry) {
-    final cleanName = rawDirEntry.replaceFirst('[DIR] ', '');
-    final newPath = _pathStack.last.fatPath.isEmpty
-        ? cleanName
-        : '${_pathStack.last.fatPath}/$cleanName';
-
-    setState(() {
-      _pathStack.add(PathSegment(cleanName, newPath));
-    });
-    _loadDirectoryContents(newPath);
-  }
-
-  void _navigateUp() {
-    if (_atRoot) return;
-    setState(() {
-      _pathStack.removeLast();
-    });
-    _loadDirectoryContents(_pathStack.last.fatPath);
-  }
-
-  void _jumpTo(int index) {
-    if (index == _pathStack.length - 1) return;
-    setState(() {
-      _pathStack.removeRange(index + 1, _pathStack.length);
-    });
-    _loadDirectoryContents(_pathStack.last.fatPath);
-  }
-
-  bool _isSupportedMedia(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
-    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'm4v', 'mov', 'avi', 'mkv'].contains(ext);
-  }
-
-  // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
   // Selection Logic
   // ---------------------------------------------------------------------------
 
@@ -144,7 +113,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     final List<String> sources = [];
 
     for (final item in _selectedItems) {
-      final cleanName = item.replaceFirst('[DIR] ', '');
+      final isDir = item.startsWith('[DIR] ');
+      final cleanName = isDir ? item.replaceFirst('[DIR] ', '') : item.split('|').first;
       final fullPath = currentDir.isEmpty ? cleanName : '$currentDir/$cleanName';
       sources.add(fullPath);
     }
@@ -215,9 +185,45 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
       _loadDirectoryContents(_pathStack.last.fatPath);
     }
   }
+  // ---------------------------------------------------------------------------
+  // Folder Navigation Handlers
+  // ---------------------------------------------------------------------------
+
+  void _enterDirectory(String rawDirEntry) {
+    final cleanName = rawDirEntry.replaceFirst('[DIR] ', '');
+    final newPath = _pathStack.last.fatPath.isEmpty
+        ? cleanName
+        : '${_pathStack.last.fatPath}/$cleanName';
+
+    setState(() {
+      _pathStack.add(PathSegment(cleanName, newPath));
+    });
+    _loadDirectoryContents(newPath);
+  }
+
+  void _navigateUp() {
+    if (_atRoot) return;
+    setState(() {
+      _pathStack.removeLast();
+    });
+    _loadDirectoryContents(_pathStack.last.fatPath);
+  }
+
+  void _jumpTo(int index) {
+    if (index == _pathStack.length - 1) return;
+    setState(() {
+      _pathStack.removeRange(index + 1, _pathStack.length);
+    });
+    _loadDirectoryContents(_pathStack.last.fatPath);
+  }
+
+  bool _isSupportedMedia(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv'].contains(ext);
+  }
 
   // ---------------------------------------------------------------------------
-  // Directory & Empty File Creator Methods
+  // Folder Operations & Decrypt Export / Imports
   // ---------------------------------------------------------------------------
 
   void _showCreateFolderDialog() {
@@ -313,6 +319,52 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     );
   }
 
+  Future<void> _importFileFromDevice() async {
+    final currentDir = _pathStack.last.fatPath;
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final success = await CryptBridgeApi.importFile(widget.container, currentDir);
+      if (success) {
+        _loadDirectoryContents(currentDir);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Import failed: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _exportFileToStorage(String cleanName, String fullPath) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(content: Text('Preparing export for $cleanName…')),
+    );
+
+    try {
+      final success = await CryptBridgeApi.exportFileToStorage(
+        widget.container,
+        fullPath,
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(success ? 'Successfully exported $cleanName' : 'Export cancelled/failed'),
+          backgroundColor: success ? const Color(0xFF1A3A2A) : null,
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Future<void> _batchDelete() async {
     final currentDir = _pathStack.last.fatPath;
     final List<String> toDelete = List.from(_selectedItems);
@@ -333,7 +385,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
 
               try {
                 for (final item in toDelete) {
-                  final cleanName = item.replaceFirst('[DIR] ', '');
+                  final isDir = item.startsWith('[DIR] ');
+                  final cleanName = isDir ? item.replaceFirst('[DIR] ', '') : item.split('|').first;
                   final fullPath = currentDir.isEmpty ? cleanName : '$currentDir/$cleanName';
                   await CryptBridgeApi.deleteFile(widget.container, fullPath);
                 }
@@ -350,8 +403,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // Style and Icon Helpers
+  // Style, Size, and Icon Helpers
   // ---------------------------------------------------------------------------
+
+  String _formatBytes(int bytes) {
+    if (bytes <= 0) return "0 B";
+    const suffixes = ["B", "KB", "MB", "GB", "TB"];
+    double size = bytes.toDouble();
+    int suffixIndex = 0;
+    while (size >= 1024 && suffixIndex < suffixes.length - 1) {
+      size /= 1024;
+      suffixIndex++;
+    }
+    return "${size.toStringAsFixed(size < 10 ? 1 : 0)} ${suffixes[suffixIndex]}";
+  }
 
   IconData _iconFor(String name) {
     final ext = name.split('.').last.toLowerCase();
@@ -412,7 +477,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   AppBar _buildSelectionAppBar(ColorScheme cs) {
     final singleSelected = _selectedItems.length == 1;
     final isSingleFolder = singleSelected && _selectedItems.first.startsWith('[DIR] ');
-    final isSingleFile = singleSelected && !isSingleFolder; // Only files can utilize "Open with..."
+    final isSingleFile = singleSelected && !isSingleFolder;
 
     return AppBar(
       backgroundColor: cs.surfaceVariant,
@@ -468,7 +533,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
             tooltip: 'Rename',
             onPressed: () {
               final rawName = _selectedItems.first;
-              final cleanName = rawName.replaceFirst('[DIR] ', '');
+              final isDir = rawName.startsWith('[DIR] ');
+              final cleanName = isDir ? rawName.replaceFirst('[DIR] ', '') : rawName.split('|').first;
               _showRenameDialog(cleanName);
               _exitSelectionMode();
             },
@@ -489,19 +555,22 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
           onPressed: _batchDelete,
         ),
         
-        // Context-aware Three-Dot Popup Menu (Only shows if exactly 1 FILE is selected) [5]
+        // Context-aware Three-Dot Popup Menu for Single Files [5]
         if (isSingleFile)
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (val) {
+              final rawName = _selectedItems.first;
+              final cleanName = rawName.split('|').first;
+              final path = _pathStack.last.fatPath.isEmpty 
+                  ? cleanName 
+                  : '${_pathStack.last.fatPath}/$cleanName';
+
               if (val == 'open_with') {
-                final rawName = _selectedItems.first;
-                final cleanName = rawName.replaceFirst('[DIR] ', '');
-                final path = _pathStack.last.fatPath.isEmpty 
-                    ? cleanName 
-                    : '${_pathStack.last.fatPath}/$cleanName';
-                
                 CryptBridgeApi.openWithApp(widget.container, path); // Safe streaming launch [5]
+                _exitSelectionMode();
+              } else if (val == 'export') {
+                _exportFileToStorage(cleanName, path); // Export File dialog [5]
                 _exitSelectionMode();
               }
             },
@@ -513,6 +582,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(Icons.open_in_new, size: 18),
                   title: Text('Open with App', style: TextStyle(fontSize: 13)),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'export',
+                // Updated title to standard folder exports [5]
+                child: ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.drive_folder_upload_outlined, size: 18),
+                  title: Text('Export File...', style: TextStyle(fontSize: 13)),
                 ),
               ),
             ],
@@ -607,11 +686,14 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                         _showCreateFolderDialog();
                       } else if (value == 'file') {
                         _showCreateFileDialog();
+                      } else if (value == 'import') {
+                        _importFileFromDevice(); // Trigger device memory import picker [5]
                       }
                     },
                     itemBuilder: (context) => [
                       const PopupMenuItem(value: 'folder', child: ListTile(leading: Icon(Icons.create_new_folder), title: Text('New Folder'))),
                       const PopupMenuItem(value: 'file', child: ListTile(leading: Icon(Icons.insert_drive_file), title: Text('New File'))),
+                      const PopupMenuItem(value: 'import', child: ListTile(leading: Icon(Icons.drive_folder_upload), title: Text('Import File from Device'))),
                     ],
                   ),
                   Padding(
@@ -633,7 +715,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
       body: Column(
         children: [
           if (_pathStack.length > 1) BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-          _StatsBar(dirCount: dirs.length, fileCount: files.length),
+          _StatsBar(dirCount: dirs.length, fileCount: files.length, freeSpaceBytes: _freeSpace), // Live space tracker
           const Divider(),
           Expanded(
             child: _isLoading
@@ -645,11 +727,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                         itemBuilder: (_, index) {
                           final isDir = index < dirs.length;
                           final rawItem = isDir ? dirs[index] : files[index - dirs.length];
-                          final cleanName = isDir ? rawItem.replaceFirst('[DIR] ', '') : rawItem;
+                          
+                          String cleanName;
+                          int fileSize = 0;
+                          if (isDir) {
+                            cleanName = rawItem.replaceFirst('[DIR] ', '');
+                          } else {
+                            final parts = rawItem.split('|');
+                            cleanName = parts.first;
+                            fileSize = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+                          }
+                          
                           final isSelected = _selectedItems.contains(rawItem);
 
                           return Container(
-                            // Highlights the selected items dynamically with zero layout shift [5]
                             color: isSelected ? cs.primaryContainer.withOpacity(0.35) : Colors.transparent,
                             child: ListTile(
                               dense: true,
@@ -660,11 +751,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                                 color: isDir ? const Color(0xFFFFA726) : _colorFor(cleanName),
                               ),
                               title: Text(cleanName, style: Theme.of(context).textTheme.bodyMedium),
+                              subtitle: isDir ? null : Text(_formatBytes(fileSize), style: const TextStyle(fontSize: 11, color: Colors.grey)),
                               trailing: _isSelectionMode
                                   ? (isSelected 
                                       ? Icon(Icons.check_circle, size: 18, color: cs.primary) 
                                       : Icon(Icons.radio_button_unchecked, size: 18, color: cs.outline))
-                                  : null, // Minimalist view with zero trailing icon clutter
+                                  : null, 
                               onTap: () {
                                 if (_isSelectionMode) {
                                   _toggleSelectItem(rawItem);
@@ -673,7 +765,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                                     _enterDirectory(rawItem);
                                   } else {
                                     if (_isSupportedMedia(cleanName)) {
-                                      final mediaList = files.where((f) => _isSupportedMedia(f)).toList();
+                                      final mediaList = files.map((f) => f.split('|').first).where((f) => _isSupportedMedia(f)).toList();
                                       final targetIndex = mediaList.indexOf(cleanName);
 
                                       final resolvedMediaList = mediaList.map((f) {
@@ -691,7 +783,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                                         ),
                                       );
                                     } else {
-                                      // Inform the user how to interact with non-media files
                                       ScaffoldMessenger.of(context).showSnackBar(
                                         SnackBar(
                                           content: Text('Long-press "$cleanName" to select and trigger Open-with options.'),
@@ -726,7 +817,26 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
 class _StatsBar extends StatelessWidget {
   final int dirCount;
   final int fileCount;
-  const _StatsBar({Key? key, required this.dirCount, required this.fileCount}) : super(key: key);
+  final int freeSpaceBytes; // Added
+
+  const _StatsBar({
+    Key? key,
+    required this.dirCount,
+    required this.fileCount,
+    required this.freeSpaceBytes, // Added
+  }) : super(key: key);
+
+  String _formatBytes(int bytes) {
+    if (bytes <= 0) return "0 B";
+    const suffixes = ["B", "KB", "MB", "GB", "TB"];
+    double size = bytes.toDouble();
+    int suffixIndex = 0;
+    while (size >= 1024 && suffixIndex < suffixes.length - 1) {
+      size /= 1024;
+      suffixIndex++;
+    }
+    return "${size.toStringAsFixed(size < 10 ? 1 : 0)} ${suffixes[suffixIndex]}";
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -739,6 +849,9 @@ class _StatsBar extends StatelessWidget {
           _Chip(icon: Icons.folder_outlined, label: '$dirCount folder${dirCount != 1 ? 's' : ''}'),
           const SizedBox(width: 14),
           _Chip(icon: Icons.insert_drive_file_outlined, label: '$fileCount file${fileCount != 1 ? 's' : ''}'),
+          const Spacer(),
+          // Live, dynamic available storage space label inside the file manager stats bar [5]
+          _Chip(icon: Icons.storage_outlined, label: '${_formatBytes(freeSpaceBytes)} free'),
         ],
       ),
     );

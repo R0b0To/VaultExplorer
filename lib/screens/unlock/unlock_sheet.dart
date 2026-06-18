@@ -1,3 +1,7 @@
+// [FIX] Pass _selectedName as `displayName` to CryptBridgeApi.unlockContainer.
+// Previously the named parameter was never sent, so VeraCryptSession stored
+// null and the Documents Provider showed raw URI text as the volume title.
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/cryptbridge_api.dart';
@@ -20,7 +24,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
   bool _obscure = true;
   bool _loading = false;
   String? _error;
-
   List<Map<String, String>> _recentContainers = [];
 
   @override
@@ -31,9 +34,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
   Future<void> _loadRecents() async {
     final list = await SavedContainerService.loadContainers();
-    setState(() {
-      _recentContainers = list;
-    });
+    if (mounted) setState(() => _recentContainers = list);
   }
 
   @override
@@ -47,7 +48,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
     try {
       final uri = await CryptBridgeApi.pickContainer();
       if (uri != null) {
-        final cleanName = Uri.decodeFull(uri.split('/').last.split('%2F').last);
+        final cleanName =
+            Uri.decodeFull(uri.split('/').last.split('%2F').last);
         setState(() {
           _selectedUri = uri;
           _selectedName = cleanName;
@@ -75,16 +77,23 @@ class _UnlockSheetState extends State<UnlockSheet> {
     });
 
     try {
-      final pim = _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0;
-      final result = await CryptBridgeApi.unlockContainer(_selectedUri!, _passwordCtrl.text, pim);
+      final pim =
+          _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0;
+      final name = _selectedName ?? 'Container';
+
+      // [FIX] Pass displayName so the Kotlin session and DocumentsProvider
+      // root title are populated correctly.
+      final result = await CryptBridgeApi.unlockContainer(
+        _selectedUri!,
+        _passwordCtrl.text,
+        pim,
+        displayName: name,
+      );
 
       if (result != null) {
-        final name = _selectedName ?? 'Container';
-        
-        // Save metadata to persistent internal storage list
         await SavedContainerService.saveContainer(_selectedUri!, name);
 
-        // Build temporary model instance to query container capacity details [5]
+        // Fetch space info before building the final model.
         final tempContainer = MountedContainer(
           uri: _selectedUri!,
           displayName: name,
@@ -97,10 +106,11 @@ class _UnlockSheetState extends State<UnlockSheet> {
           freeSpace: 0,
         );
 
-        // Fetch dynamic storage capacity values [5]
         final space = await CryptBridgeApi.getSpaceInfo(tempContainer);
-        final total = (space != null && space.isNotEmpty) ? space[0] : 0;
-        final free = (space != null && space.length > 1) ? space[1] : 0;
+        final total =
+            (space != null && space.isNotEmpty) ? space[0] : 0;
+        final free =
+            (space != null && space.length > 1) ? space[1] : 0;
 
         widget.onMounted(MountedContainer(
           uri: _selectedUri!,
@@ -110,8 +120,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
           pim: pim,
           rootFiles: result.files,
           mountedAt: DateTime.now(),
-          totalSpace: total, // Assigned
-          freeSpace: free,   // Assigned
+          totalSpace: total,
+          freeSpace: free,
         ));
 
         if (mounted) Navigator.pop(context);
@@ -156,13 +166,18 @@ class _UnlockSheetState extends State<UnlockSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-
-              Text('Mount Container', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 17)),
+              Text('Mount Container',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontSize: 17)),
               const SizedBox(height: 12),
 
-              // Saved Containers Dropdown list
+              // Saved Containers
               if (_recentContainers.isNotEmpty && _selectedUri == null) ...[
-                const Text('Saved Containers:', style: TextStyle(color: Color(0xFF7A8899), fontSize: 11)),
+                const Text('Saved Containers:',
+                    style: TextStyle(
+                        color: Color(0xFF7A8899), fontSize: 11)),
                 const SizedBox(height: 6),
                 Container(
                   constraints: const BoxConstraints(maxHeight: 120),
@@ -174,21 +189,24 @@ class _UnlockSheetState extends State<UnlockSheet> {
                       return ListTile(
                         dense: true,
                         contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.history, size: 16, color: Color(0xFF4FC3F7)),
-                        title: Text(item['name']!, style: const TextStyle(fontSize: 13, color: Colors.white)),
+                        leading: const Icon(Icons.history,
+                            size: 16, color: Color(0xFF4FC3F7)),
+                        title: Text(item['name']!,
+                            style: const TextStyle(
+                                fontSize: 13, color: Colors.white)),
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                          icon: const Icon(Icons.delete_outline,
+                              size: 16, color: Colors.red),
                           onPressed: () async {
-                            await SavedContainerService.removeContainer(item['uri']!);
+                            await SavedContainerService.removeContainer(
+                                item['uri']!);
                             _loadRecents();
                           },
                         ),
-                        onTap: () {
-                          setState(() {
-                            _selectedUri = item['uri'];
-                            _selectedName = item['name'];
-                          });
-                        },
+                        onTap: () => setState(() {
+                          _selectedUri = item['uri'];
+                          _selectedName = item['name'];
+                        }),
                       );
                     },
                   ),
@@ -196,45 +214,57 @@ class _UnlockSheetState extends State<UnlockSheet> {
                 const SizedBox(height: 12),
               ],
 
-              // File picker display
+              // File picker row
               GestureDetector(
                 onTap: _pickFile,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 14),
                   decoration: BoxDecoration(
                     color: cs.surfaceVariant,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: _selectedUri != null ? cs.primary.withOpacity(0.5) : cs.outline,
+                      color: _selectedUri != null
+                          ? cs.primary.withOpacity(0.5)
+                          : cs.outline,
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        _selectedUri != null ? Icons.description_outlined : Icons.folder_open,
+                        _selectedUri != null
+                            ? Icons.description_outlined
+                            : Icons.folder_open,
                         size: 18,
-                        color: _selectedUri != null ? cs.primary : cs.outline,
+                        color: _selectedUri != null
+                            ? cs.primary
+                            : cs.outline,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          _selectedName ?? 'Select VeraCrypt container…',
-                          style: TextStyle(color: _selectedUri != null ? cs.onSurface : cs.outline, fontSize: 13),
+                          _selectedName ??
+                              'Select VeraCrypt container…',
+                          style: TextStyle(
+                              color: _selectedUri != null
+                                  ? cs.onSurface
+                                  : cs.outline,
+                              fontSize: 13),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (_selectedUri != null) ...[
                         GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedUri = null;
-                              _selectedName = null;
-                            });
-                          },
-                          child: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                          onTap: () => setState(() {
+                            _selectedUri = null;
+                            _selectedName = null;
+                          }),
+                          child: const Icon(Icons.clear,
+                              size: 16, color: Colors.grey),
                         ),
                         const SizedBox(width: 8),
-                        Icon(Icons.check_circle, size: 16, color: cs.primary),
+                        Icon(Icons.check_circle,
+                            size: 16, color: cs.primary),
                       ],
                     ],
                   ),
@@ -247,10 +277,16 @@ class _UnlockSheetState extends State<UnlockSheet> {
                 obscureText: _obscure,
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  prefixIcon: const Icon(Icons.key_outlined, size: 18),
+                  prefixIcon:
+                      const Icon(Icons.key_outlined, size: 18),
                   suffixIcon: IconButton(
-                    onPressed: () => setState(() => _obscure = !_obscure),
-                    icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
+                    onPressed: () =>
+                        setState(() => _obscure = !_obscure),
+                    icon: Icon(
+                        _obscure
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        size: 18),
                   ),
                 ),
               ),
@@ -272,14 +308,18 @@ class _UnlockSheetState extends State<UnlockSheet> {
                   decoration: BoxDecoration(
                     color: cs.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: cs.error.withOpacity(0.4)),
+                    border:
+                        Border.all(color: cs.error.withOpacity(0.4)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, size: 16, color: cs.error),
+                      Icon(Icons.error_outline,
+                          size: 16, color: cs.error),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
+                        child: Text(_error!,
+                            style: TextStyle(
+                                color: cs.error, fontSize: 12)),
                       ),
                     ],
                   ),
@@ -287,20 +327,26 @@ class _UnlockSheetState extends State<UnlockSheet> {
               ],
 
               const SizedBox(height: 20),
-
               FilledButton(
                 onPressed: _loading ? null : _unlock,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6)),
                 ),
                 child: _loading
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(
+                                Colors.white)),
                       )
-                    : const Text('Unlock', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    : const Text('Unlock',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
               ),
             ],
           ),

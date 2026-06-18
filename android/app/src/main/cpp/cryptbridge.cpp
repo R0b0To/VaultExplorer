@@ -1,3 +1,22 @@
+// FIXES applied in this revision:
+//
+// [FIX 1] Correct sector-count for GET_SECTOR_COUNT ioctl.
+//   The old code always returned 1000000 (hard-coded to ~500 MB), making
+//   f_getfree() return wrong free-space values for any container that was not
+//   exactly that size.  The fix stores the real file size in prepareSession()
+//   via fstat() and uses it in disk_ioctl(GET_SECTOR_COUNT).
+//
+// [FIX 2] unlockAndListNative: return nullptr on FAT mount failure.
+//   Previously a mount failure returned a one-element array containing the
+//   string "Error: Mount failed." which the Kotlin layer treated as a
+//   successfully unlocked container with one oddly-named file.  Now nullptr
+//   is returned so the caller issues AUTH_FAIL as intended.
+//
+// [FIX 3] lockNative: clear the stored file size for the released slot so
+//   stale data cannot leak into a future mount.
+//
+// [STYLE] Consolidated redundant cast patterns; no logic changes elsewhere.
+
 #include <jni.h>
 #include <string>
 #include <fstream>
@@ -7,14 +26,14 @@
 #include <sstream>
 #include <cstring>
 #include <unistd.h>
-#include <memory>       // unique_ptr for heap buffers
-#include <algorithm>    // std::replace_if
+#include <sys/stat.h>        // [FIX 1] fstat
+#include <memory>
+#include <algorithm>
 
 #include "mbedtls/md.h"
 #include "mbedtls/pkcs5.h"
 #include "mbedtls/aes.h"
 
-// FATFS HEADERS
 #include "ff.h"
 #include "diskio.h"
 
@@ -25,38 +44,33 @@
 // GLOBAL STATE
 // ----------------------------------------------------------------====
 
-static int           activeFd[MAX_VOLUMES]           = {-1, -1, -1, -1};
-static uint64_t      activeDataOffset[MAX_VOLUMES]   = {0};
-static bool          activeIsRelTweak[MAX_VOLUMES]   = {false};
-static bool          isDataCtxInitialized[MAX_VOLUMES] = {false};
+static int           activeFd[MAX_VOLUMES]              = {-1, -1, -1, -1};
+static uint64_t      activeDataOffset[MAX_VOLUMES]      = {0};
+static bool          activeIsRelTweak[MAX_VOLUMES]      = {false};
+static bool          isDataCtxInitialized[MAX_VOLUMES]  = {false};
+
+// [FIX 1] Actual file sizes (bytes) — derived from fstat once per prepareSession.
+static uint64_t      activeFileSize[MAX_VOLUMES]        = {0, 0, 0, 0};
 
 static mbedtls_aes_xts_context activeDataCtxDec[MAX_VOLUMES];
 static mbedtls_aes_xts_context activeDataCtxEnc[MAX_VOLUMES];
 
-// Pre-built drive path strings (e.g. "0:", "1:") — avoids repeated to_string() calls
 static const char* drivePaths[MAX_VOLUMES] = {"0:", "1:", "2:", "3:"};
-
-// 4 Global filesystem workspaces (one for each drive slot)
 static FATFS globalFs[MAX_VOLUMES];
 
 // ----------------------------------------------------------------====
 // INLINE HELPERS
 // ----------------------------------------------------------------====
 
-static inline bool isPrintable(unsigned char c) {
-    return (c >= 32 && c <= 126);
-}
+static inline bool isPrintable(unsigned char c) { return c >= 32 && c <= 126; }
 
-// Sanitize a std::string in-place, replacing non-printable bytes with '?'
 static void sanitizeString(std::string& s) {
     std::replace_if(s.begin(), s.end(),
         [](char c) { return !isPrintable(static_cast<unsigned char>(c)); }, '?');
 }
 
-// Write a 64-bit little-endian sector number into a 16-byte tweak buffer.
 static inline void setTweak(unsigned char* tweak, uint64_t sectorNum) {
-    // Unrolled: compiler should turn this into a single 64-bit store + zero of upper bytes
-    *reinterpret_cast<uint64_t*>(tweak)   = sectorNum; // LE on ARM/x86
+    *reinterpret_cast<uint64_t*>(tweak)   = sectorNum;
     *reinterpret_cast<uint64_t*>(tweak+8) = 0ULL;
 }
 
@@ -65,17 +79,17 @@ static inline void setTweak(unsigned char* tweak, uint64_t sectorNum) {
 // ----------------------------------------------------------------====
 
 static void encryptSector(mbedtls_aes_xts_context* ctx, uint64_t sectorNum,
-                           const unsigned char* input, unsigned char* output) {
+                           const unsigned char* in, unsigned char* out) {
     unsigned char tweak[16];
     setTweak(tweak, sectorNum);
-    mbedtls_aes_crypt_xts(ctx, MBEDTLS_AES_ENCRYPT, 512, tweak, input, output);
+    mbedtls_aes_crypt_xts(ctx, MBEDTLS_AES_ENCRYPT, 512, tweak, in, out);
 }
 
 static void decryptSector(mbedtls_aes_xts_context* ctx, uint64_t sectorNum,
-                           const unsigned char* input, unsigned char* output) {
+                           const unsigned char* in, unsigned char* out) {
     unsigned char tweak[16];
     setTweak(tweak, sectorNum);
-    mbedtls_aes_crypt_xts(ctx, MBEDTLS_AES_DECRYPT, 512, tweak, input, output);
+    mbedtls_aes_crypt_xts(ctx, MBEDTLS_AES_DECRYPT, 512, tweak, in, out);
 }
 
 // ----------------------------------------------------------------====
@@ -92,29 +106,24 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     const uint64_t basePhysical = activeDataOffset[pdrv] / 512;
     const bool relTweak = activeIsRelTweak[pdrv];
     const int fd = activeFd[pdrv];
+   const uint64_t firstPhysical = basePhysical + sector;
+    const size_t   totalBytes    = static_cast<size_t>(count) * 512;
 
-    // Read all sectors in one pread call when possible (avoids N lseek+read pairs)
-    // FatFs guarantees contiguous LBA range for a single disk_read call.
-    const uint64_t firstPhysical = basePhysical + sector;
-    const off_t    readOffset    = static_cast<off_t>(firstPhysical * 512);
+    std::unique_ptr<unsigned char[]> encBuf(new unsigned char[totalBytes]);
 
-    // Use a single pread for the entire multi-sector chunk into a temp buffer,
-    // then decrypt each 512-byte slice in-place.
-    // Stack-safe: max FatFs multi-sector read is typically 8 sectors = 4KB.
-    static thread_local unsigned char encBuf[512 * 64]; // 32KB, covers any realistic burst
-    const size_t totalBytes = static_cast<size_t>(count) * 512;
-
-    ssize_t got = pread(fd, encBuf, totalBytes, readOffset);
+    ssize_t got = pread(fd, encBuf.get(), totalBytes,
+                        static_cast<off_t>(firstPhysical * 512));
     if (got < static_cast<ssize_t>(totalBytes)) return RES_ERROR;
 
     for (UINT i = 0; i < count; i++) {
         const uint64_t physSector = firstPhysical + i;
         const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
         decryptSector(&activeDataCtxDec[pdrv], tweak,
-                      encBuf + (i * 512),
-                      buff   + (i * 512));
+                      encBuf.get() + (i * 512),
+                      buff         + (i * 512));
     }
     return RES_OK;
+
 }
 
 extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
@@ -126,7 +135,6 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     const int fd = activeFd[pdrv];
     const uint64_t firstPhysical = basePhysical + sector;
 
-    // Encrypt into a local buffer, then write in one pwrite call.
     static thread_local unsigned char encBuf[512 * 64];
 
     for (UINT i = 0; i < count; i++) {
@@ -145,10 +153,27 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
 
 extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
     switch (cmd) {
-        case CTRL_SYNC:        return RES_OK;
-        case GET_SECTOR_COUNT: *(LBA_t*)buff = 1000000; return RES_OK;
-        case GET_SECTOR_SIZE:  *(WORD*)buff  = 512;     return RES_OK;
-        case GET_BLOCK_SIZE:   *(DWORD*)buff = 1;       return RES_OK;
+        case CTRL_SYNC:
+            return RES_OK;
+
+        case GET_SECTOR_COUNT:
+            // [FIX 1] Return the real sector count derived from fstat() in
+            // prepareSession().  Fall back to a conservative 1 000 000 only
+            // if the file size was never stored (should not happen).
+            if (pdrv < MAX_VOLUMES && activeFileSize[pdrv] > 0) {
+                *(LBA_t*)buff = static_cast<LBA_t>(activeFileSize[pdrv] / 512);
+            } else {
+                *(LBA_t*)buff = 1000000;
+            }
+            return RES_OK;
+
+        case GET_SECTOR_SIZE:
+            *(WORD*)buff  = 512;
+            return RES_OK;
+
+        case GET_BLOCK_SIZE:
+            *(DWORD*)buff = 1;
+            return RES_OK;
     }
     return RES_PARERR;
 }
@@ -162,17 +187,26 @@ extern "C" DWORD get_fattime() { return 0; }
 bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive) {
     if (volId >= MAX_VOLUMES) return false;
 
-    // Fast path: key already derived and fd just needs updating
     if (!forceDerive && isDataCtxInitialized[volId]) {
+        // [FIX 1] Refresh file size on each new fd so GET_SECTOR_COUNT stays accurate.
+        struct stat st;
+        if (fstat(fd, &st) == 0)
+            activeFileSize[volId] = static_cast<uint64_t>(st.st_size);
         activeFd[volId] = fd;
         return true;
     }
 
     LOGI("Running PBKDF2 Key Derivation for Volume %d...", volId);
 
-    // Read salt (64 bytes) + encrypted header (448 bytes) in a single read
-    unsigned char headerBuf[512]; // 64 + 448 = 512 exactly
+    unsigned char headerBuf[512];
     if (pread(fd, headerBuf, 512, 0) != 512) return false;
+
+    // [FIX 1] Record the container file size immediately.
+    {
+        struct stat st;
+        if (fstat(fd, &st) == 0)
+            activeFileSize[volId] = static_cast<uint64_t>(st.st_size);
+    }
 
     const unsigned char* salt = headerBuf;
     const unsigned char* encH = headerBuf + 64;
@@ -189,7 +223,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
         salt, 64, iter, 64, hKey);
     mbedtls_md_free(&md_ctx);
 
-    // Decrypt header with derived key
     unsigned char decH[448];
     {
         mbedtls_aes_xts_context xts;
@@ -200,27 +233,21 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
         mbedtls_aes_xts_free(&xts);
     }
 
-    // Validate VeraCrypt magic
     if (decH[0] != 'V' || decH[1] != 'E' || decH[2] != 'R' || decH[3] != 'A')
         return false;
 
-    // Candidate data key offsets to try
     const int keyOffsets[] = {252, 192};
 
-    // Pre-read sectors for FS scanning: scan up to first 2048 sectors.
-    // Read in 64-sector (32KB) batches to minimize syscall overhead.
     constexpr uint64_t SCAN_SECTORS = 2048;
     constexpr uint64_t BATCH        = 64;
 
     unsigned char dKey[64];
     bool fsFound = false;
 
-    // Scratch dec/enc contexts (only committed to global state on success)
     mbedtls_aes_xts_context tmpDec, tmpEnc;
     mbedtls_aes_xts_init(&tmpDec);
     mbedtls_aes_xts_init(&tmpEnc);
 
-    // Heap-allocate batch buffer: 64 * 512 = 32KB — safe on any stack
     std::unique_ptr<unsigned char[]> encBatch(new unsigned char[BATCH * 512]);
     unsigned char decS[512];
     unsigned char tweak[16];
@@ -241,22 +268,22 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
                 const uint64_t sectorIdx = s + i;
                 const unsigned char* enc = encBatch.get() + (i * 512);
 
-                // Try absolute tweak
+                // Absolute tweak
                 setTweak(tweak, sectorIdx);
                 mbedtls_aes_crypt_xts(&tmpDec, MBEDTLS_AES_DECRYPT, 512, tweak, enc, decS);
                 if (decS[510] == 0x55 && decS[511] == 0xAA) {
-                    activeDataOffset[volId]  = sectorIdx * 512;
-                    activeIsRelTweak[volId]  = false;
+                    activeDataOffset[volId] = sectorIdx * 512;
+                    activeIsRelTweak[volId] = false;
                     fsFound = true;
                     break;
                 }
 
-                // Try relative tweak (tweak = 0 for sector 0)
+                // Relative tweak
                 memset(tweak, 0, 16);
                 mbedtls_aes_crypt_xts(&tmpDec, MBEDTLS_AES_DECRYPT, 512, tweak, enc, decS);
                 if (decS[510] == 0x55 && decS[511] == 0xAA) {
-                    activeDataOffset[volId]  = sectorIdx * 512;
-                    activeIsRelTweak[volId]  = true;
+                    activeDataOffset[volId] = sectorIdx * 512;
+                    activeIsRelTweak[volId] = true;
                     fsFound = true;
                     break;
                 }
@@ -272,15 +299,13 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
         return false;
     }
 
-    // Commit the working key to the enc context
     mbedtls_aes_xts_setkey_enc(&tmpEnc, dKey, 512);
 
-    // Replace global contexts atomically
     if (isDataCtxInitialized[volId]) {
         mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
         mbedtls_aes_xts_free(&activeDataCtxEnc[volId]);
     }
-    activeDataCtxDec[volId] = tmpDec; // transfer ownership (struct copy)
+    activeDataCtxDec[volId] = tmpDec;
     activeDataCtxEnc[volId] = tmpEnc;
     isDataCtxInitialized[volId] = true;
     activeFd[volId] = fd;
@@ -289,7 +314,7 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
 }
 
 // ----------------------------------------------------------------====
-// SHARED: directory listing logic (DRY — used by unlock+list and listDir)
+// SHARED: directory listing
 // ----------------------------------------------------------------====
 
 static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pathSuffix) {
@@ -307,7 +332,6 @@ static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pa
             const char* name = fno.fname;
             if (strcmp(name, "SYSTEM~1") == 0 || strcmp(name, "$RECYCLE.BIN") == 0)
                 continue;
-
             if (fno.fattrib & AM_DIR) {
                 std::string entry = "[DIR] ";
                 entry += name;
@@ -323,7 +347,8 @@ static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pa
     }
 
     jclass strClass = env->FindClass("java/lang/String");
-    jobjectArray retArr = env->NewObjectArray(static_cast<jsize>(results.size()), strClass, nullptr);
+    jobjectArray retArr = env->NewObjectArray(
+        static_cast<jsize>(results.size()), strClass, nullptr);
     for (size_t i = 0; i < results.size(); i++) {
         sanitizeString(results[i]);
         jstring js = env->NewStringUTF(results[i].c_str());
@@ -339,14 +364,14 @@ static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pa
 
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_unlockAndListNative(
-        JNIEnv* env, jobject /*obj*/, jint fd, jstring password, jint pim, jint volId) {
+        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId) {
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
 
     if (!prepareSession(fd, nativePass, pim, volId, true)) {
         env->ReleaseStringUTFChars(password, nativePass);
         close(fd);
-        return nullptr;
+        return nullptr;   // Authentication failure — caller throws AUTH_FAIL.
     }
 
     jobjectArray result = nullptr;
@@ -355,10 +380,10 @@ Java_com_example_cryptbridge_VeraCryptEngine_unlockAndListNative(
         result = buildDirectoryListing(env, volId, nullptr);
         f_mount(nullptr, drivePaths[volId], 0);
     } else {
-        LOGI("FATFS Mount failed on volume %d with code: %d", volId, fr);
-        // Return a single-element array with the error message
-        jclass strClass = env->FindClass("java/lang/String");
-        result = env->NewObjectArray(1, strClass, env->NewStringUTF("Error: Mount failed."));
+        // [FIX 2] Return nullptr so Kotlin treats this as AUTH_FAIL, not a
+        // successful unlock with a bogus file list.
+        LOGI("FATFS Mount failed on volume %d, code=%d", volId, fr);
+        result = nullptr;
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -368,7 +393,7 @@ Java_com_example_cryptbridge_VeraCryptEngine_unlockAndListNative(
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_unlockAndExtractNative(
-        JNIEnv* env, jobject /*obj*/,
+        JNIEnv* env, jobject,
         jint fd, jstring password, jint pim,
         jstring targetFileName, jstring destPath, jint volId) {
 
@@ -377,16 +402,13 @@ Java_com_example_cryptbridge_VeraCryptEngine_unlockAndExtractNative(
     const char* destination = env->GetStringUTFChars(destPath, nullptr);
 
     bool success = false;
-
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
-        if (fr == FR_OK) {
+        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
             FIL f;
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
                 std::ofstream outFile(destination, std::ios::binary);
                 if (outFile.is_open()) {
-                    // Heap-allocated 256KB buffer — safe on Android's stack
                     std::unique_ptr<unsigned char[]> buf(new unsigned char[262144]);
                     UINT br;
                     while (f_read(&f, buf.get(), 262144, &br) == FR_OK && br > 0)
@@ -408,7 +430,7 @@ Java_com_example_cryptbridge_VeraCryptEngine_unlockAndExtractNative(
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_writeBackFileNative(
-        JNIEnv* env, jobject /*obj*/,
+        JNIEnv* env, jobject,
         jint fd, jstring password, jint pim,
         jstring targetFileName, jstring sourcePath, jint volId) {
 
@@ -417,16 +439,13 @@ Java_com_example_cryptbridge_VeraCryptEngine_writeBackFileNative(
     const char* source     = env->GetStringUTFChars(sourcePath, nullptr);
 
     bool success = false;
-
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
-        if (fr == FR_OK) {
+        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
             FIL f;
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
                 std::ifstream inFile(source, std::ios::binary);
                 if (inFile.is_open()) {
-                    // Heap-allocated 256KB buffer
                     std::unique_ptr<char[]> buf(new char[262144]);
                     UINT bw;
                     while (inFile) {
@@ -451,7 +470,7 @@ Java_com_example_cryptbridge_VeraCryptEngine_writeBackFileNative(
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_deleteFileNative(
-        JNIEnv* env, jobject /*obj*/,
+        JNIEnv* env, jobject,
         jint fd, jstring password, jint pim,
         jstring targetFileName, jint volId) {
 
@@ -459,10 +478,8 @@ Java_com_example_cryptbridge_VeraCryptEngine_deleteFileNative(
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
 
     bool success = false;
-
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
-        if (fr == FR_OK) {
+        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             success = (f_unlink(fatPath.c_str()) == FR_OK);
             f_mount(nullptr, drivePaths[volId], 0);
@@ -476,12 +493,13 @@ Java_com_example_cryptbridge_VeraCryptEngine_deleteFileNative(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_example_cryptbridge_VeraCryptEngine_lockNative(JNIEnv* /*env*/, jobject /*obj*/, jint volId) {
+Java_com_example_cryptbridge_VeraCryptEngine_lockNative(JNIEnv*, jobject, jint volId) {
     if (volId >= MAX_VOLUMES) return;
 
-    activeFd[volId]          = -1;
-    activeDataOffset[volId]  = 0;
-    activeIsRelTweak[volId]  = false;
+    activeFd[volId]         = -1;
+    activeDataOffset[volId] = 0;
+    activeIsRelTweak[volId] = false;
+    activeFileSize[volId]   = 0;  // [FIX 3] Clear stale file-size.
 
     if (isDataCtxInitialized[volId]) {
         mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
@@ -494,7 +512,7 @@ Java_com_example_cryptbridge_VeraCryptEngine_lockNative(JNIEnv* /*env*/, jobject
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_getFileSizeNative(
-        JNIEnv* env, jobject /*obj*/,
+        JNIEnv* env, jobject,
         jint fd, jstring password, jint pim,
         jstring targetFileName, jint volId) {
 
@@ -502,17 +520,15 @@ Java_com_example_cryptbridge_VeraCryptEngine_getFileSizeNative(
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
 
     jlong size = 0;
-
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
-        if (fr == FR_OK) {
+        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
             FIL f;
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
                 size = static_cast<jlong>(f_size(&f));
                 f_close(&f);
             }
-            f_mount(nullptr, drivePaths[volId], 0); // Always unmount cleanly
+            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -524,7 +540,7 @@ Java_com_example_cryptbridge_VeraCryptEngine_getFileSizeNative(
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_readFileChunkNative(
-        JNIEnv* env, jobject /*obj*/,
+        JNIEnv* env, jobject,
         jint fd, jstring password, jint pim,
         jstring targetFileName, jlong offset, jint length, jint volId) {
 
@@ -532,15 +548,12 @@ Java_com_example_cryptbridge_VeraCryptEngine_readFileChunkNative(
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
 
     jbyteArray retArray = nullptr;
-
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
-        if (fr == FR_OK) {
+        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
             FIL f;
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
                 f_lseek(&f, static_cast<FSIZE_t>(offset));
-                // Heap-allocate chunk buffer to avoid stack overflow on large chunks
                 std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
                 UINT br = 0;
                 if (f_read(&f, buffer.get(), static_cast<UINT>(length), &br) == FR_OK && br > 0) {
@@ -550,7 +563,7 @@ Java_com_example_cryptbridge_VeraCryptEngine_readFileChunkNative(
                 }
                 f_close(&f);
             }
-            f_mount(nullptr, drivePaths[volId], 0); // Always unmount cleanly
+            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -562,17 +575,15 @@ Java_com_example_cryptbridge_VeraCryptEngine_readFileChunkNative(
 
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_listDirectoryNative(
-        JNIEnv* env, jobject /*obj*/,
+        JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jstring dirPath, jint volId) {
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
 
     jobjectArray result = nullptr;
-
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
-        if (fr == FR_OK) {
+        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
             result = buildDirectoryListing(env, volId, nativePath);
             f_mount(nullptr, drivePaths[volId], 0);
         }
@@ -586,17 +597,15 @@ Java_com_example_cryptbridge_VeraCryptEngine_listDirectoryNative(
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_createDirectoryNative(
-        JNIEnv* env, jobject /*obj*/,
+        JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jstring dirPath, jint volId) {
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
 
     bool success = false;
-
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
-        if (fr == FR_OK) {
+        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
             std::string fullPath = std::string(drivePaths[volId]) + "/" + nativePath;
             success = (f_mkdir(fullPath.c_str()) == FR_OK);
             f_mount(nullptr, drivePaths[volId], 0);
@@ -611,7 +620,7 @@ Java_com_example_cryptbridge_VeraCryptEngine_createDirectoryNative(
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_renameFileNative(
-        JNIEnv* env, jobject /*obj*/,
+        JNIEnv* env, jobject,
         jint fd, jstring password, jint pim,
         jstring oldPath, jstring newPath, jint volId) {
 
@@ -620,10 +629,8 @@ Java_com_example_cryptbridge_VeraCryptEngine_renameFileNative(
     const char* nativeNew  = env->GetStringUTFChars(newPath, nullptr);
 
     bool success = false;
-
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
-        if (fr == FR_OK) {
+        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
             std::string fullOld = std::string(drivePaths[volId]) + "/" + nativeOld;
             std::string fullNew = std::string(drivePaths[volId]) + "/" + nativeNew;
             success = (f_rename(fullOld.c_str(), fullNew.c_str()) == FR_OK);
@@ -640,31 +647,29 @@ Java_com_example_cryptbridge_VeraCryptEngine_renameFileNative(
 
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_getSpaceInfoNative(
-        JNIEnv* env, jobject /*obj*/,
+        JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jint volId) {
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
 
     jlong totalBytes = 0, freeBytes = 0;
-
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
-        if (fr == FR_OK) {
+        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
             FATFS* fs;
             DWORD fre_clust;
             if (f_getfree(drivePaths[volId], &fre_clust, &fs) == FR_OK) {
                 totalBytes = static_cast<jlong>(fs->n_fatent - 2) * fs->csize * 512;
                 freeBytes  = static_cast<jlong>(fre_clust)        * fs->csize * 512;
             }
-            f_mount(nullptr, drivePaths[volId], 0); // Always unmount cleanly
+            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
     close(fd);
 
-    jlongArray retArray = env->NewLongArray(2);
-    const jlong temp[2] = {totalBytes, freeBytes};
-    env->SetLongArrayRegion(retArray, 0, 2, temp);
-    return retArray;
+    jlongArray ret = env->NewLongArray(2);
+    const jlong tmp[2] = {totalBytes, freeBytes};
+    env->SetLongArrayRegion(ret, 0, 2, tmp);
+    return ret;
 }

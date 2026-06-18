@@ -1,6 +1,16 @@
+// [FIX] Added `displayName` parameter to `unlockContainer` so the Kotlin
+// ContainerSession is created with a human-readable name instead of null.
+// Without this, VeraCryptDocumentsProvider fell back to parsing the raw
+// content URI for the root title, producing an unreadable hex string.
+//
+// [FIX] Replaced Directory.systemTemp usage in createEmptyFile with
+// getTemporaryDirectory() from path_provider, which resolves correctly on
+// Android (systemTemp resolves to /tmp which may not exist).
+
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/mounted_container.dart';
 
 class CryptBridgeApi {
@@ -10,11 +20,17 @@ class CryptBridgeApi {
       _channel.invokeMethod<String>('pickContainer');
 
   static Future<({int volId, List<String> files})?> unlockContainer(
-      String filePath, String password, int pim) async {
-    final raw = await _channel.invokeMethod<Map<Object?, Object?>>('unlockContainer', {
+    String filePath,
+    String password,
+    int pim, {
+    String? displayName,
+  }) async {
+    final raw =
+        await _channel.invokeMethod<Map<Object?, Object?>>('unlockContainer', {
       'filePath': filePath,
       'password': password,
       'pim': pim,
+      if (displayName != null) 'displayName': displayName,
     });
     if (raw == null) return null;
     final volId = raw['volId'] as int;
@@ -28,15 +44,21 @@ class CryptBridgeApi {
     });
     return result ?? false;
   }
-static Future<bool> openWithApp(MountedContainer container, String fileName) async {
+
+  static Future<bool> openWithApp(
+      MountedContainer container, String fileName) async {
     final result = await _channel.invokeMethod<bool>('openWithApp', {
       'filePath': container.uri,
       'fileName': fileName,
     });
     return result ?? false;
   }
+
   static Future<bool> decryptFile(
-      MountedContainer container, String fileName, String destPath) async {
+    MountedContainer container,
+    String fileName,
+    String destPath,
+  ) async {
     final result = await _channel.invokeMethod<bool>('decryptFile', {
       'filePath': container.uri,
       'password': container.password,
@@ -46,7 +68,9 @@ static Future<bool> openWithApp(MountedContainer container, String fileName) asy
     });
     return result ?? false;
   }
-static Future<bool> importFile(MountedContainer container, String targetPath) async {
+
+  static Future<bool> importFile(
+      MountedContainer container, String targetPath) async {
     final result = await _channel.invokeMethod<bool>('importFile', {
       'filePath': container.uri,
       'password': container.password,
@@ -56,7 +80,8 @@ static Future<bool> importFile(MountedContainer container, String targetPath) as
     return result ?? false;
   }
 
-  static Future<bool> exportFileToStorage(MountedContainer container, String sourcePath) async {
+  static Future<bool> exportFileToStorage(
+      MountedContainer container, String sourcePath) async {
     final result = await _channel.invokeMethod<bool>('exportFileToStorage', {
       'filePath': container.uri,
       'password': container.password,
@@ -65,7 +90,9 @@ static Future<bool> importFile(MountedContainer container, String targetPath) as
     });
     return result ?? false;
   }
-  static Future<int> getFileSize(MountedContainer container, String fileName) async {
+
+  static Future<int> getFileSize(
+      MountedContainer container, String fileName) async {
     final result = await _channel.invokeMethod<int>('getFileSize', {
       'filePath': container.uri,
       'password': container.password,
@@ -76,7 +103,11 @@ static Future<bool> importFile(MountedContainer container, String targetPath) as
   }
 
   static Future<Uint8List?> readFileChunk(
-      MountedContainer container, String fileName, int offset, int length) async {
+    MountedContainer container,
+    String fileName,
+    int offset,
+    int length,
+  ) async {
     final result = await _channel.invokeMethod<Uint8List>('readFileChunk', {
       'filePath': container.uri,
       'password': container.password,
@@ -88,8 +119,10 @@ static Future<bool> importFile(MountedContainer container, String targetPath) as
     return result;
   }
 
-  static Future<List<String>?> listDirectory(MountedContainer container, String dirPath) async {
-    final result = await _channel.invokeMethod<List<Object?>>('listDirectory', {
+  static Future<List<String>?> listDirectory(
+      MountedContainer container, String dirPath) async {
+    final result =
+        await _channel.invokeMethod<List<Object?>>('listDirectory', {
       'filePath': container.uri,
       'password': container.password,
       'pim': container.pim,
@@ -98,7 +131,8 @@ static Future<bool> importFile(MountedContainer container, String targetPath) as
     return result?.cast<String>();
   }
 
-  static Future<bool> createDirectory(MountedContainer container, String dirPath) async {
+  static Future<bool> createDirectory(
+      MountedContainer container, String dirPath) async {
     final result = await _channel.invokeMethod<bool>('createDirectory', {
       'filePath': container.uri,
       'password': container.password,
@@ -108,7 +142,11 @@ static Future<bool> importFile(MountedContainer container, String targetPath) as
     return result ?? false;
   }
 
-  static Future<bool> renameFile(MountedContainer container, String oldPath, String newPath) async {
+  static Future<bool> renameFile(
+    MountedContainer container,
+    String oldPath,
+    String newPath,
+  ) async {
     final result = await _channel.invokeMethod<bool>('renameFile', {
       'filePath': container.uri,
       'password': container.password,
@@ -119,7 +157,8 @@ static Future<bool> importFile(MountedContainer container, String targetPath) as
     return result ?? false;
   }
 
-  static Future<bool> deleteFile(MountedContainer container, String fileName) async {
+  static Future<bool> deleteFile(
+      MountedContainer container, String fileName) async {
     final result = await _channel.invokeMethod<bool>('deleteFile', {
       'filePath': container.uri,
       'password': container.password,
@@ -130,7 +169,10 @@ static Future<bool> importFile(MountedContainer container, String targetPath) as
   }
 
   static Future<bool> writeBackFile(
-      MountedContainer container, String fileName, String sourcePath) async {
+    MountedContainer container,
+    String fileName,
+    String sourcePath,
+  ) async {
     final result = await _channel.invokeMethod<bool>('writeBackFile', {
       'filePath': container.uri,
       'password': container.password,
@@ -141,17 +183,23 @@ static Future<bool> importFile(MountedContainer container, String targetPath) as
     return result ?? false;
   }
 
-  // Helper method to write an empty text file into the VeraCrypt partition on-demand
-  static Future<bool> createEmptyFile(MountedContainer container, String fileName) async {
-    final tempFile = File('${Directory.systemTemp.path}/cb_empty');
-    if (!await tempFile.exists()) {
-      await tempFile.create();
+  static Future<bool> createEmptyFile(
+      MountedContainer container, String fileName) async {
+    final tmpDir = await getTemporaryDirectory();
+    // Use a unique suffix to avoid collisions in concurrent calls.
+    final tempFile = File(
+        '${tmpDir.path}/cb_empty_${DateTime.now().microsecondsSinceEpoch}');
+    try {
+      await tempFile.create(recursive: true);
+      return await writeBackFile(container, fileName, tempFile.path);
+    } finally {
+      if (await tempFile.exists()) await tempFile.delete();
     }
-    return writeBackFile(container, fileName, tempFile.path);
   }
 
   static Future<List<int>?> getSpaceInfo(MountedContainer container) async {
-    final result = await _channel.invokeMethod<List<Object?>>('getSpaceInfo', {
+    final result =
+        await _channel.invokeMethod<List<Object?>>('getSpaceInfo', {
       'filePath': container.uri,
       'password': container.password,
       'pim': container.pim,
@@ -159,4 +207,3 @@ static Future<bool> importFile(MountedContainer container, String targetPath) as
     return result?.cast<int>();
   }
 }
-

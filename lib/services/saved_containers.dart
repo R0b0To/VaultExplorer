@@ -1,54 +1,60 @@
+// [FIX] Replaced hardcoded '/data/data/com.example.cryptbridge/files/...' path with
+// path_provider's getApplicationDocumentsDirectory(). The old path was non-portable
+// and would silently fail on any device where the package name differs or the
+// directory doesn't pre-exist.
+
 import 'dart:convert';
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class SavedContainerService {
-  // Uses sandboxed private internal files directory
-  static final File _saveFile = File('/data/data/com.example.cryptbridge/files/saved_containers.json');
+  static Future<File> get _saveFile async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/saved_containers.json');
+  }
 
   static Future<void> saveContainer(String uri, String name) async {
     try {
-      if (!await _saveFile.parent.exists()) {
-        await _saveFile.parent.create(recursive: true);
-      }
+      final file = await _saveFile;
       List<dynamic> list = [];
-      if (await _saveFile.exists()) {
-        final content = await _saveFile.readAsString();
+      if (await file.exists()) {
+        final content = await file.readAsString();
         list = jsonDecode(content) as List<dynamic>;
       }
       list.removeWhere((item) => item['uri'] == uri);
       list.add({'uri': uri, 'name': name});
-      await _saveFile.writeAsString(jsonEncode(list));
-    } catch (e) {
-      // safe fallback
+      await file.writeAsString(jsonEncode(list));
+    } catch (_) {
+      // Safe fallback — never crash the UI over a persistence failure.
     }
   }
 
   static Future<List<Map<String, String>>> loadContainers() async {
     try {
-      if (await _saveFile.exists()) {
-        final content = await _saveFile.readAsString();
+      final file = await _saveFile;
+      if (await file.exists()) {
+        final content = await file.readAsString();
         final list = jsonDecode(content) as List<dynamic>;
-        return list.map((item) => {
-          'uri': item['uri'] as String,
-          'name': item['name'] as String,
-        }).toList();
+        return list
+            .map((item) => {
+                  'uri': item['uri'] as String,
+                  'name': item['name'] as String,
+                })
+            .toList();
       }
-    } catch (e) {
-      // safe fallback
-    }
+    } catch (_) {}
     return [];
   }
 
   static Future<void> removeContainer(String uri) async {
     try {
-      if (await _saveFile.exists()) {
-        final content = await _saveFile.readAsString();
+      final file = await _saveFile;
+      if (await file.exists()) {
+        final content = await file.readAsString();
         final list = jsonDecode(content) as List<dynamic>;
         list.removeWhere((item) => item['uri'] == uri);
-        await _saveFile.writeAsString(jsonEncode(list));
+        await file.writeAsString(jsonEncode(list));
       }
-    } catch (e) {
-      // safe fallback
-    }
+    } catch (_) {}
   }
 }

@@ -1,3 +1,9 @@
+// [IMPROVEMENT] Added a storage usage progress bar with color feedback:
+//   green  < 70 % used
+//   amber  70–90 % used
+//   red    > 90 % used
+// This makes available space immediately scannable without reading numbers.
+
 import 'package:flutter/material.dart';
 import '../../../models/mounted_container.dart';
 import '../../../services/cryptbridge_api.dart';
@@ -14,15 +20,21 @@ class ContainerCard extends StatelessWidget {
   }) : super(key: key);
 
   String _formatBytes(int bytes) {
-    if (bytes <= 0) return "0 B";
-    const suffixes = ["B", "KB", "MB", "GB", "TB"];
+    if (bytes <= 0) return '0 B';
+    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
     double size = bytes.toDouble();
-    int suffixIndex = 0;
-    while (size >= 1024 && suffixIndex < suffixes.length - 1) {
+    int idx = 0;
+    while (size >= 1024 && idx < suffixes.length - 1) {
       size /= 1024;
-      suffixIndex++;
+      idx++;
     }
-    return "${size.toStringAsFixed(size < 10 ? 1 : 0)} ${suffixes[suffixIndex]}";
+    return '${size.toStringAsFixed(size < 10 ? 1 : 0)} ${suffixes[idx]}';
+  }
+
+  Color _storageColor(double usedFraction, ColorScheme cs) {
+    if (usedFraction > 0.90) return cs.error;
+    if (usedFraction > 0.70) return const Color(0xFFFFA726); // amber
+    return cs.primary;
   }
 
   @override
@@ -32,6 +44,13 @@ class ContainerCard extends StatelessWidget {
         container.rootFiles.where((f) => !f.startsWith('[DIR]')).length;
     final dirCount =
         container.rootFiles.where((f) => f.startsWith('[DIR]')).length;
+
+    final usedBytes = container.totalSpace - container.freeSpace;
+    final usedFraction = container.totalSpace > 0
+        ? (usedBytes / container.totalSpace).clamp(0.0, 1.0)
+        : 0.0;
+    final barColor = _storageColor(usedFraction, cs);
+    final hasSpaceData = container.totalSpace > 0;
 
     return Card(
       child: InkWell(
@@ -47,6 +66,7 @@ class ContainerCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Header row ──────────────────────────────────────────────
               Row(
                 children: [
                   Container(
@@ -56,8 +76,8 @@ class ContainerCard extends StatelessWidget {
                       color: cs.primaryContainer,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child:
-                        Icon(Icons.lock_open, size: 18, color: cs.primary),
+                    child: Icon(Icons.lock_open,
+                        size: 18, color: cs.primary),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -66,37 +86,60 @@ class ContainerCard extends StatelessWidget {
                       children: [
                         Text(
                           container.displayName,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style:
+                              Theme.of(context).textTheme.titleMedium,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
-                        // Displays the formatted live partition space metrics [5]
                         Text(
-                          'Volume ${container.volId} · ${_formatBytes(container.freeSpace)} free of ${_formatBytes(container.totalSpace)}',
-                          style: Theme.of(context).textTheme.bodySmall,
+                          hasSpaceData
+                              ? 'Vol ${container.volId} · '
+                                  '${_formatBytes(container.freeSpace)} free '
+                                  'of ${_formatBytes(container.totalSpace)}'
+                              : 'Volume ${container.volId}',
+                          style:
+                              Theme.of(context).textTheme.bodySmall,
                         ),
                       ],
                     ),
                   ),
                   _LockButton(
-                    container: container,
-                    onLocked: onLocked,
-                  ),
+                      container: container, onLocked: onLocked),
                 ],
               ),
+
+              // ── Storage usage bar ────────────────────────────────────────
+              if (hasSpaceData) ...[
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(
+                    value: usedFraction,
+                    minHeight: 3,
+                    backgroundColor: cs.surfaceVariant,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(barColor),
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 14),
               const Divider(),
               const SizedBox(height: 12),
+
+              // ── Stat row ─────────────────────────────────────────────────
               Row(
                 children: [
                   _StatChip(
                     icon: Icons.insert_drive_file_outlined,
-                    label: '$fileCount file${fileCount != 1 ? 's' : ''}',
+                    label:
+                        '$fileCount file${fileCount != 1 ? 's' : ''}',
                   ),
                   const SizedBox(width: 10),
                   _StatChip(
                     icon: Icons.folder_outlined,
-                    label: '$dirCount folder${dirCount != 1 ? 's' : ''}',
+                    label:
+                        '$dirCount folder${dirCount != 1 ? 's' : ''}',
                   ),
                   const Spacer(),
                   Text(
@@ -117,7 +160,7 @@ class ContainerCard extends StatelessWidget {
   }
 }
 
-// ── Stat chip ────────────────────────────────────────────────────────────────
+// ── Stat chip ─────────────────────────────────────────────────────────────────
 
 class _StatChip extends StatelessWidget {
   final IconData icon;
@@ -138,7 +181,7 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-// ── Lock button ──────────────────────────────────────────────────────────────
+// ── Lock button ───────────────────────────────────────────────────────────────
 
 class _LockButton extends StatefulWidget {
   final MountedContainer container;

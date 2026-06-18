@@ -18,54 +18,67 @@ class MainActivity: FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
-            if (call.method == "pickContainer") {
-                pendingResultCheck(result)
-                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "*/*"
+            when (call.method) {
+
+                "pickContainer" -> {
+                    pendingResultCheck(result)
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                    }
+                    startActivityForResult(intent, PICK_CONTAINER_REQUEST)
                 }
-                startActivityForResult(intent, PICK_CONTAINER_REQUEST)
 
-            } else if (call.method == "unlockContainer") {
-                val uriString = call.argument<String>("filePath")
-                val password = call.argument<String>("password")
-                val pim = call.argument<Int>("pim") ?: 0
+                "unlockContainer" -> {
+                    val uriString = call.argument<String>("filePath")
+                    val password  = call.argument<String>("password")
+                    val pim       = call.argument<Int>("pim") ?: 0
 
-                if (uriString != null && password != null) {
+                    if (uriString == null || password == null) {
+                        result.error("INVALID_ARGS", "filePath and password are required", null)
+                        return@setMethodCallHandler
+                    }
+
                     Thread {
                         try {
-                            // Find an available slot (0-3)
                             val volId = VeraCryptSession.getFreeVolumeId()
                             if (volId == null) {
-                                runOnUiThread { result.error("LIMIT_REACHED", "Maximum 4 containers mounted", null) }
+                                runOnUiThread {
+                                    result.error("LIMIT_REACHED", "Maximum 4 containers already mounted", null)
+                                }
                                 return@Thread
                             }
 
                             val uri = Uri.parse(uriString)
-                            val pfd = contentResolver.openFileDescriptor(uri, "r") ?: throw Exception("PFD Null")
+                            val pfd = contentResolver.openFileDescriptor(uri, "r")
+                                ?: throw Exception("Could not open file descriptor")
                             val fd = pfd.detachFd()
 
-                            // Pass the assigned volId to C++
                             val files = VeraCryptEngine.unlockAndListNative(fd, password, pim, volId)
 
                             runOnUiThread {
                                 if (files != null) {
-                                    // Save the multi-session map
                                     VeraCryptSession.activeSessions[volId] = ContainerSession(
-                                        uri = uriString,
+                                        uri      = uriString,
                                         password = password,
-                                        pim = pim,
-                                        volId = volId,
+                                        pim      = pim,
+                                        volId    = volId,
                                         cachedFilesList = files.toList()
                                     )
 
-                                    // Notify OS of system sidebar additions!
-                                    val rootsUri = DocumentsContract.buildRootsUri("com.example.cryptbridge.documents")
+                                    // Notify OS sidebar
+                                    val rootsUri = DocumentsContract.buildRootsUri(
+                                        "com.example.cryptbridge.documents"
+                                    )
                                     contentResolver.notifyChange(rootsUri, null)
 
-                                    result.success(files.toList())
+                                    // Return both volId and file list so Flutter can track the slot
+                                    result.success(mapOf(
+                                        "volId" to volId,
+                                        "files" to files.toList()
+                                    ))
                                 } else {
-                                    result.error("AUTH_FAIL", "Incorrect password", null)
+                                    result.error("AUTH_FAIL", "Incorrect password or invalid container", null)
                                 }
                             }
                         } catch (e: Exception) {
@@ -73,73 +86,113 @@ class MainActivity: FlutterActivity() {
                         }
                     }.start()
                 }
-            } else if (call.method == "lockContainer") {
-                val uriString = call.argument<String>("filePath")
-                if (uriString != null) {
+
+                "lockContainer" -> {
+                    val uriString = call.argument<String>("filePath")
+                    if (uriString == null) {
+                        result.error("INVALID_ARGS", "filePath is required", null)
+                        return@setMethodCallHandler
+                    }
+
                     val volId = VeraCryptSession.getVolumeIdByUri(uriString)
                     if (volId != null) {
-                        // 1. Tell C++ to unmount and clear keys for this volume!
                         VeraCryptEngine.lockNative(volId)
-
-                        // 2. Remove from active Kotlin sessions
                         VeraCryptSession.removeSession(volId)
 
-                        // 3. Notify Android file manager to remove the drive!
-                        val rootsUri = DocumentsContract.buildRootsUri("com.example.cryptbridge.documents")
+                        val rootsUri = DocumentsContract.buildRootsUri(
+                            "com.example.cryptbridge.documents"
+                        )
                         contentResolver.notifyChange(rootsUri, null)
-
                         result.success(true)
                     } else {
+                        // Already locked or unknown URI — treat as success
                         result.success(false)
                     }
-                } else {
-                    result.error("INVALID_ARGS", "Path required to lock", null)
                 }
-            } else if (call.method == "decryptFile") {
-                val uriString = call.argument<String>("filePath")
-                val password = call.argument<String>("password")
-                val pim = call.argument<Int>("pim") ?: 0
-                val fileName = call.argument<String>("fileName")
-                val destPath = call.argument<String>("destPath")
 
-                if (uriString != null && password != null && fileName != null && destPath != null) {
+                "decryptFile" -> {
+                    val uriString = call.argument<String>("filePath")
+                    val password  = call.argument<String>("password")
+                    val pim       = call.argument<Int>("pim") ?: 0
+                    val fileName  = call.argument<String>("fileName")
+                    val destPath  = call.argument<String>("destPath")
+
+                    if (uriString == null || password == null ||
+                        fileName == null || destPath == null) {
+                        result.error("INVALID_ARGS", "All arguments are required", null)
+                        return@setMethodCallHandler
+                    }
+
                     Thread {
                         try {
                             val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
                             val uri = Uri.parse(uriString)
-                            val pfd = contentResolver.openFileDescriptor(uri, "r") ?: throw Exception("PFD Null")
+                            val pfd = contentResolver.openFileDescriptor(uri, "r")
+                                ?: throw Exception("Could not open file descriptor")
                             val fd = pfd.detachFd()
 
-                            val success = VeraCryptEngine.unlockAndExtractNative(fd, password, pim, fileName, destPath, volId)
+                            val success = VeraCryptEngine.unlockAndExtractNative(
+                                fd, password, pim, fileName, destPath, volId
+                            )
                             runOnUiThread { result.success(success) }
                         } catch (e: Exception) {
                             runOnUiThread { result.error("C++_CRASH", e.message, null) }
                         }
                     }.start()
                 }
+
+                // ── Future: list a subdirectory ──────────────────────────────
+                // Uncomment and implement listDirectory in VeraCryptEngine + C++
+                // to support in-app subdirectory navigation.
+                //
+                // "listDirectory" -> {
+                //     val uriString = call.argument<String>("filePath")
+                //     val password  = call.argument<String>("password")
+                //     val pim       = call.argument<Int>("pim") ?: 0
+                //     val dirPath   = call.argument<String>("dirPath") ?: ""
+                //
+                //     Thread {
+                //         try {
+                //             val volId = VeraCryptSession.getVolumeIdByUri(uriString!!) ?: 0
+                //             val uri   = Uri.parse(uriString)
+                //             val pfd   = contentResolver.openFileDescriptor(uri, "r")!!
+                //             val fd    = pfd.detachFd()
+                //             val files = VeraCryptEngine.listDirectoryNative(
+                //                 fd, password!!, pim, dirPath, volId
+                //             )
+                //             runOnUiThread { result.success(files?.toList()) }
+                //         } catch (e: Exception) {
+                //             runOnUiThread { result.error("C++_ERROR", e.message, null) }
+                //         }
+                //     }.start()
+                // }
+
+                else -> result.notImplemented()
             }
         }
     }
 
     private fun pendingResultCheck(result: MethodChannel.Result) {
-        pendingFlutterResult?.error("PICK_CANCELLED", "Another picking operation started", null)
+        pendingFlutterResult?.error("PICK_CANCELLED", "Another pick operation started", null)
         pendingFlutterResult = result
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == PICK_CONTAINER_REQUEST) {
-            val result = pendingFlutterResult ?: return
-            pendingFlutterResult = null
+        if (requestCode != PICK_CONTAINER_REQUEST) return
 
-            if (resultCode == Activity.RESULT_OK && data?.data != null) {
-                val uri: Uri = data.data!!
-                val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                contentResolver.takePersistableUriPermission(uri, takeFlags)
-                result.success(uri.toString())
-            } else {
-                result.success(null)
-            }
+        val result = pendingFlutterResult ?: return
+        pendingFlutterResult = null
+
+        if (resultCode == Activity.RESULT_OK && data?.data != null) {
+            val uri = data.data!!
+            val takeFlags =
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            contentResolver.takePersistableUriPermission(uri, takeFlags)
+            result.success(uri.toString())
+        } else {
+            result.success(null)
         }
     }
-}
+} 

@@ -3,11 +3,17 @@ import 'package:flutter/material.dart';
 class FileActionsSheet extends StatelessWidget {
   final String fileName;
   final VoidCallback onExport;
+  final VoidCallback onRename;
+  final VoidCallback onDelete;
+  final VoidCallback onMove; // Added onMove Callback
 
   const FileActionsSheet({
     Key? key,
     required this.fileName,
     required this.onExport,
+    required this.onRename,
+    required this.onDelete,
+    required this.onMove, // Added onMove Callback
   }) : super(key: key);
 
   @override
@@ -64,7 +70,7 @@ class FileActionsSheet extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    fileName,
+                    fileName.split('/').last,
                     style: Theme.of(context).textTheme.titleMedium,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -83,18 +89,25 @@ class FileActionsSheet extends StatelessWidget {
               onTap: onExport,
             ),
             const SizedBox(height: 4),
-            const _ActionItem(
-              icon: Icons.share_outlined,
-              label: 'Export & Share',
-              subtitle: 'Coming soon',
-              onTap: null,
+            _ActionItem(
+              icon: Icons.edit_outlined,
+              label: 'Rename file / folder',
+              subtitle: 'Change the item name inside this container',
+              onTap: onRename,
+            ),
+            const SizedBox(height: 4),
+            _ActionItem(
+              icon: Icons.drive_file_move_outlined,
+              label: 'Move item',
+              subtitle: 'Move this file/folder into another subdirectory',
+              onTap: onMove, // Triggers move callback
             ),
             const SizedBox(height: 4),
             _ActionItem(
               icon: Icons.delete_outline,
               label: 'Delete from container',
-              subtitle: 'Coming soon',
-              onTap: null,
+              subtitle: 'Permanently remove this file from your container',
+              onTap: onDelete,
               color: cs.error,
             ),
           ],

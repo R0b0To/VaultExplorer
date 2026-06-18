@@ -4,7 +4,8 @@
     <application
         android:label="cryptbridge"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -28,15 +29,15 @@
             </intent-filter>
         </activity>
         <provider
-    android:name="com.example.cryptbridge.VeraCryptDocumentsProvider"
-    android:authorities="com.example.cryptbridge.documents"
-    android:exported="true"
-    android:grantUriPermissions="true"
-    android:permission="android.permission.MANAGE_DOCUMENTS">
-    <intent-filter>
-        <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
-    </intent-filter>
-</provider> 
+            android:name="com.example.cryptbridge.VeraCryptDocumentsProvider"
+            android:authorities="com.example.cryptbridge.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider> 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -5,11 +5,14 @@ data class ContainerSession(
     val password: String,
     val pim: Int,
     val volId: Int,
-    var cachedFilesList: List<String>
+    var cachedFilesList: List<String>,
+    val displayName: String? = null
 )
 
 object VeraCryptSession {
-    // Map storing active volume ID as key, and ContainerSession as value
+    // 4 locks corresponding to the 4 volume slots (0 to 3) [2]
+    val locks = Array(4) { Any() }
+
     val activeSessions = mutableMapOf<Int, ContainerSession>()
 
     fun isUnlocked(volId: Int): Boolean {
@@ -20,7 +23,6 @@ object VeraCryptSession {
         return activeSessions.isNotEmpty()
     }
 
-    // Allocate an empty drive slot (0 to 3)
     fun getFreeVolumeId(): Int? {
         for (i in 0..3) {
             if (!activeSessions.containsKey(i)) return i
@@ -37,7 +39,6 @@ object VeraCryptSession {
     }
 
     fun getVolumeIdByDocId(docId: String): Int? {
-        // e.g. "0_file.txt" -> extracts "0"
         return docId.substringBefore("_").toIntOrNull()
     }
 

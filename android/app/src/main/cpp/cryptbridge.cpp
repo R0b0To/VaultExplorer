@@ -133,7 +133,6 @@ extern "C" DWORD get_fattime() {
 bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive) {
     if (volId >= MAX_VOLUMES) return false;
 
-    // FIX: Only bypass PBKDF2 if we aren't explicitly forcing a new key derivation
     if (!forceDerive && isDataCtxInitialized[volId]) {
         activeFd[volId] = fd;
         return true; 
@@ -178,7 +177,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     mbedtls_aes_xts_setkey_enc(&activeDataCtxEnc[volId], dKey, 512);
     isDataCtxInitialized[volId] = true;
 
-    // FIX: Scanner rewritten using 100% POSIX fd commands! No more std::ifstream here.
     int keyOffsets[] = {252, 192};
     unsigned char encS[512], decS[512], tw[16];
     bool fsFound = false;
@@ -216,7 +214,7 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     if (!fsFound) return false;
 
     mbedtls_aes_xts_setkey_enc(&activeDataCtxEnc[volId], dKey, 512);
-    activeFd[volId] = fd; // FIX: Keep track of our system file descriptor instead of paths!
+    activeFd[volId] = fd; 
     return true;
 }
 
@@ -228,7 +226,6 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_example_cryptbridge_VeraCryptEngine_unlockAndListNative(JNIEnv* env, jobject obj, jint fd, jstring password, jint pim, jint volId) {
     const char *nativePass = env->GetStringUTFChars(password, nullptr);
 
-    // FORCE key derivation on first unlock
     if (!prepareSession(fd, nativePass, pim, volId, true)) {
         env->ReleaseStringUTFChars(password, nativePass);
         close(fd);
@@ -293,7 +290,6 @@ Java_com_example_cryptbridge_VeraCryptEngine_unlockAndExtractNative(
     const char *targetName = env->GetStringUTFChars(targetFileName, nullptr);
     const char *destination = env->GetStringUTFChars(destPath, nullptr);
 
-    // Reuse cached keys
     if (!prepareSession(fd, nativePass, pim, volId, false)) {
         env->ReleaseStringUTFChars(password, nativePass);
         env->ReleaseStringUTFChars(targetFileName, targetName);
@@ -314,7 +310,8 @@ Java_com_example_cryptbridge_VeraCryptEngine_unlockAndExtractNative(
         if (fr == FR_OK) {
             std::ofstream outFile(destination, std::ios::binary);
             if (outFile.is_open()) {
-                unsigned char buffer[4096];
+                // Highly optimized 256KB block buffer prevents stream context lags [3]
+                unsigned char buffer[262144]; 
                 UINT br;
                 while (f_read(&f, buffer, sizeof(buffer), &br) == FR_OK && br > 0) {
                     outFile.write((char*)buffer, br);
@@ -345,7 +342,6 @@ Java_com_example_cryptbridge_VeraCryptEngine_writeBackFileNative(
     const char *targetName = env->GetStringUTFChars(targetFileName, nullptr);
     const char *source = env->GetStringUTFChars(sourcePath, nullptr);
 
-    // Reuse cached keys
     if (!prepareSession(fd, nativePass, pim, volId, false)) {
         env->ReleaseStringUTFChars(password, nativePass);
         env->ReleaseStringUTFChars(targetFileName, targetName);
@@ -366,7 +362,8 @@ Java_com_example_cryptbridge_VeraCryptEngine_writeBackFileNative(
         if (fr == FR_OK) {
             std::ifstream inFile(source, std::ios::binary);
             if (inFile.is_open()) {
-                char buffer[4096];
+                // Highly optimized 256KB block copy buffer
+                char buffer[262144];
                 UINT bw;
                 
                 while (inFile) {
@@ -401,7 +398,6 @@ Java_com_example_cryptbridge_VeraCryptEngine_deleteFileNative(
     const char *nativePass = env->GetStringUTFChars(password, nullptr);
     const char *targetName = env->GetStringUTFChars(targetFileName, nullptr);
 
-    // Reuse cached keys
     if (!prepareSession(fd, nativePass, pim, volId, false)) {
         env->ReleaseStringUTFChars(password, nativePass);
         env->ReleaseStringUTFChars(targetFileName, targetName);
@@ -445,4 +441,230 @@ Java_com_example_cryptbridge_VeraCryptEngine_lockNative(JNIEnv* env, jobject obj
 
     std::string drivePath = std::to_string(volId) + ":";
     f_mount(nullptr, drivePath.c_str(), 0); 
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_example_cryptbridge_VeraCryptEngine_getFileSizeNative(
+        JNIEnv* env, jobject obj, 
+        jint fd, jstring password, jint pim, 
+        jstring targetFileName, jint volId) {
+        
+    const char *nativePass = env->GetStringUTFChars(password, nullptr);
+    const char *targetName = env->GetStringUTFChars(targetFileName, nullptr);
+
+    if (!prepareSession(fd, nativePass, pim, volId, false)) {
+        env->ReleaseStringUTFChars(password, nativePass);
+        env->ReleaseStringUTFChars(targetFileName, targetName);
+        close(fd);
+        return 0;
+    }
+
+    std::string drivePath = std::to_string(volId) + ":";
+    FRESULT fr = f_mount(&globalFs[volId], drivePath.c_str(), 1);
+    jlong size = 0;
+
+    if (fr == FR_OK) {
+        FIL f;
+        std::string fatPath = drivePath + "/" + std::string(targetName);
+        
+        fr = f_open(&f, fatPath.c_str(), FA_READ);
+        if (fr == FR_OK) {
+            size = f_size(&f);
+            f_close(&f);
+        }
+        f_mount(nullptr, drivePath.c_str(), 0); 
+    }
+
+    env->ReleaseStringUTFChars(password, nativePass);
+    env->ReleaseStringUTFChars(targetFileName, targetName);
+    close(fd);
+
+    return size;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_example_cryptbridge_VeraCryptEngine_readFileChunkNative(
+        JNIEnv* env, jobject obj, 
+        jint fd, jstring password, jint pim, 
+        jstring targetFileName, jlong offset, jint length, jint volId) {
+        
+    const char *nativePass = env->GetStringUTFChars(password, nullptr);
+    const char *targetName = env->GetStringUTFChars(targetFileName, nullptr);
+
+    if (!prepareSession(fd, nativePass, pim, volId, false)) {
+        env->ReleaseStringUTFChars(password, nativePass);
+        env->ReleaseStringUTFChars(targetFileName, targetName);
+        close(fd);
+        return nullptr;
+    }
+
+    std::string drivePath = std::to_string(volId) + ":";
+    FRESULT fr = f_mount(&globalFs[volId], drivePath.c_str(), 1);
+    jbyteArray retArray = nullptr;
+
+    if (fr == FR_OK) {
+        FIL f;
+        std::string fatPath = drivePath + "/" + std::string(targetName);
+        
+        fr = f_open(&f, fatPath.c_str(), FA_READ);
+        if (fr == FR_OK) {
+            f_lseek(&f, offset); 
+            
+            std::vector<unsigned char> buffer(length);
+            UINT br = 0;
+            fr = f_read(&f, buffer.data(), length, &br);
+            
+            if (fr == FR_OK && br > 0) {
+                retArray = env->NewByteArray(br);
+                env->SetByteArrayRegion(retArray, 0, br, (jbyte*)buffer.data());
+            }
+            f_close(&f);
+        }
+        f_mount(nullptr, drivePath.c_str(), 0); 
+    }
+
+    env->ReleaseStringUTFChars(password, nativePass);
+    env->ReleaseStringUTFChars(targetFileName, targetName);
+    close(fd);
+
+    return retArray;
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_example_cryptbridge_VeraCryptEngine_listDirectoryNative(
+        JNIEnv* env, jobject obj, 
+        jint fd, jstring password, jint pim, jstring dirPath, jint volId) {
+        
+    const char *nativePass = env->GetStringUTFChars(password, nullptr);
+    const char *nativePath = env->GetStringUTFChars(dirPath, nullptr);
+
+    if (!prepareSession(fd, nativePass, pim, volId, false)) {
+        env->ReleaseStringUTFChars(password, nativePass);
+        env->ReleaseStringUTFChars(dirPath, nativePath);
+        close(fd);
+        return nullptr;
+    }
+
+    std::vector<std::string> results;
+    std::string drivePath = std::to_string(volId) + ":";
+    std::string fullPath = drivePath;
+    if (strlen(nativePath) > 0) {
+        fullPath += "/" + std::string(nativePath);
+    }
+
+    FRESULT fr = f_mount(&globalFs[volId], drivePath.c_str(), 1); 
+    
+    if (fr == FR_OK) {
+        DIR dir;
+        FILINFO fno;
+        if (f_opendir(&dir, fullPath.c_str()) == FR_OK) {
+            while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
+                std::string entryName = fno.fname;
+                if (entryName == "SYSTEM~1" || entryName == "$RECYCLE.BIN") continue;
+                
+                if (fno.fattrib & AM_DIR) {
+                    results.push_back("[DIR] " + entryName);
+                } else {
+                    results.push_back(entryName);
+                }
+            }
+            f_closedir(&dir);
+        }
+        f_mount(nullptr, drivePath.c_str(), 0); 
+    }
+
+    jclass strClass = env->FindClass("java/lang/String");
+    jobjectArray retArr = env->NewObjectArray(results.size(), strClass, nullptr);
+    for (size_t i = 0; i < results.size(); i++) {
+        std::string safeStr = "";
+        for (char c : results[i]) {
+            if (isPrintable((unsigned char)c)) {
+                safeStr += c;
+            } else {
+                safeStr += '?'; 
+            }
+        }
+        jstring js = env->NewStringUTF(safeStr.c_str());
+        env->SetObjectArrayElement(retArr, i, js);
+        env->DeleteLocalRef(js);
+    }
+
+    env->ReleaseStringUTFChars(password, nativePass);
+    env->ReleaseStringUTFChars(dirPath, nativePath);
+    close(fd); 
+    return retArr;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_cryptbridge_VeraCryptEngine_createDirectoryNative(
+        JNIEnv* env, jobject obj, 
+        jint fd, jstring password, jint pim, jstring dirPath, jint volId) {
+        
+    const char *nativePass = env->GetStringUTFChars(password, nullptr);
+    const char *nativePath = env->GetStringUTFChars(dirPath, nullptr);
+
+    if (!prepareSession(fd, nativePass, pim, volId, false)) {
+        env->ReleaseStringUTFChars(password, nativePass);
+        env->ReleaseStringUTFChars(dirPath, nativePath);
+        close(fd);
+        return JNI_FALSE;
+    }
+
+    std::string drivePath = std::to_string(volId) + ":";
+    std::string fullPath = drivePath + "/" + std::string(nativePath);
+
+    FRESULT fr = f_mount(&globalFs[volId], drivePath.c_str(), 1);
+    bool success = false;
+    
+    if (fr == FR_OK) {
+        fr = f_mkdir(fullPath.c_str());
+        if (fr == FR_OK) {
+            success = true;
+        }
+        f_mount(nullptr, drivePath.c_str(), 0);
+    }
+
+    env->ReleaseStringUTFChars(password, nativePass);
+    env->ReleaseStringUTFChars(dirPath, nativePath);
+    close(fd);
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_example_cryptbridge_VeraCryptEngine_renameFileNative(
+        JNIEnv* env, jobject obj, 
+        jint fd, jstring password, jint pim, jstring oldPath, jstring newPath, jint volId) {
+        
+    const char *nativePass = env->GetStringUTFChars(password, nullptr);
+    const char *nativeOld = env->GetStringUTFChars(oldPath, nullptr);
+    const char *nativeNew = env->GetStringUTFChars(newPath, nullptr);
+
+    if (!prepareSession(fd, nativePass, pim, volId, false)) {
+        env->ReleaseStringUTFChars(password, nativePass);
+        env->ReleaseStringUTFChars(oldPath, nativeOld);
+        env->ReleaseStringUTFChars(newPath, nativeNew);
+        close(fd);
+        return JNI_FALSE;
+    }
+
+    std::string drivePath = std::to_string(volId) + ":";
+    std::string fullOld = drivePath + "/" + std::string(nativeOld);
+    std::string fullNew = drivePath + "/" + std::string(nativeNew);
+
+    FRESULT fr = f_mount(&globalFs[volId], drivePath.c_str(), 1);
+    bool success = false;
+    
+    if (fr == FR_OK) {
+        fr = f_rename(fullOld.c_str(), fullNew.c_str());
+        if (fr == FR_OK) {
+            success = true;
+        }
+        f_mount(nullptr, drivePath.c_str(), 0);
+    }
+
+    env->ReleaseStringUTFChars(password, nativePass);
+    env->ReleaseStringUTFChars(oldPath, nativeOld);
+    env->ReleaseStringUTFChars(newPath, nativeNew);
+    close(fd);
+    return success ? JNI_TRUE : JNI_FALSE;
 }

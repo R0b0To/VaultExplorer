@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 class FileTile extends StatelessWidget {
   final String name;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress; // Added onLongPress callback
 
   const FileTile({
     Key? key,
     required this.name,
     required this.onTap,
+    this.onLongPress, // Added onLongPress callback
   }) : super(key: key);
 
   static IconData _iconFor(String name) {
@@ -88,6 +90,7 @@ class FileTile extends StatelessWidget {
         color: Theme.of(context).colorScheme.outline,
       ),
       onTap: onTap,
+      onLongPress: onLongPress, // Registers long press event
     );
   }
 }

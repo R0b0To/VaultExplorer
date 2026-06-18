@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-import '/models/mounted_container.dart';
-import '/services/cryptbridge_api.dart';
+import '../../services/cryptbridge_api.dart';
+import '../../services/saved_containers.dart';
+import '../../models/mounted_container.dart';
 
 class UnlockSheet extends StatefulWidget {
   final ValueChanged<MountedContainer> onMounted;
@@ -15,12 +15,26 @@ class UnlockSheet extends StatefulWidget {
 class _UnlockSheetState extends State<UnlockSheet> {
   final _passwordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
-
   String? _selectedUri;
   String? _selectedName;
   bool _obscure = true;
   bool _loading = false;
   String? _error;
+
+  List<Map<String, String>> _recentContainers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecents();
+  }
+
+  Future<void> _loadRecents() async {
+    final list = await SavedContainerService.loadContainers();
+    setState(() {
+      _recentContainers = list;
+    });
+  }
 
   @override
   void dispose() {
@@ -33,9 +47,10 @@ class _UnlockSheetState extends State<UnlockSheet> {
     try {
       final uri = await CryptBridgeApi.pickContainer();
       if (uri != null) {
+        final cleanName = Uri.decodeFull(uri.split('/').last.split('%2F').last);
         setState(() {
           _selectedUri = uri;
-          _selectedName = uri.split('/').last.split('%2F').last;
+          _selectedName = cleanName;
           _error = null;
         });
       }
@@ -60,15 +75,15 @@ class _UnlockSheetState extends State<UnlockSheet> {
     });
 
     try {
-      final pim = int.tryParse(_pimCtrl.text) ?? 0;
-      final result = await CryptBridgeApi.unlockContainer(
-        _selectedUri!,
-        _passwordCtrl.text,
-        pim,
-      );
+      final pim = _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0;
+      final result = await CryptBridgeApi.unlockContainer(_selectedUri!, _passwordCtrl.text, pim);
 
       if (result != null) {
-        final name = Uri.decodeFull(_selectedName ?? 'Container');
+        final name = _selectedName ?? 'Container';
+        
+        // Save metadata to persistent internal storage list
+        await SavedContainerService.saveContainer(_selectedUri!, name);
+
         widget.onMounted(MountedContainer(
           uri: _selectedUri!,
           displayName: name,
@@ -78,6 +93,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
           rootFiles: result.files,
           mountedAt: DateTime.now(),
         ));
+
         if (mounted) Navigator.pop(context);
       } else {
         setState(() => _error = 'Incorrect password or invalid container');
@@ -92,10 +108,10 @@ class _UnlockSheetState extends State<UnlockSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final mq = MediaQuery.of(context);
 
     return Container(
-      margin: EdgeInsets.only(bottom: bottomInset),
+      margin: EdgeInsets.only(bottom: mq.viewInsets.bottom),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -109,21 +125,103 @@ class _UnlockSheetState extends State<UnlockSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _Handle(),
-              const SizedBox(height: 20),
-              Text(
-                'Mount Container',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontSize: 17),
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.outline,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
-              _FilePicker(
-                selectedName: _selectedName,
+
+              Text('Mount Container', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 17)),
+              const SizedBox(height: 12),
+
+              // Saved Containers Dropdown list
+              if (_recentContainers.isNotEmpty && _selectedUri == null) ...[
+                const Text('Saved Containers:', style: TextStyle(color: Color(0xFF7A8899), fontSize: 11)),
+                const SizedBox(height: 6),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _recentContainers.length,
+                    itemBuilder: (context, idx) {
+                      final item = _recentContainers[idx];
+                      return ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.history, size: 16, color: Color(0xFF4FC3F7)),
+                        title: Text(item['name']!, style: const TextStyle(fontSize: 13, color: Colors.white)),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                          onPressed: () async {
+                            await SavedContainerService.removeContainer(item['uri']!);
+                            _loadRecents();
+                          },
+                        ),
+                        onTap: () {
+                          setState(() {
+                            _selectedUri = item['uri'];
+                            _selectedName = item['name'];
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // File picker display
+              GestureDetector(
                 onTap: _pickFile,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceVariant,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: _selectedUri != null ? cs.primary.withOpacity(0.5) : cs.outline,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _selectedUri != null ? Icons.description_outlined : Icons.folder_open,
+                        size: 18,
+                        color: _selectedUri != null ? cs.primary : cs.outline,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _selectedName ?? 'Select VeraCrypt container…',
+                          style: TextStyle(color: _selectedUri != null ? cs.onSurface : cs.outline, fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_selectedUri != null) ...[
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedUri = null;
+                              _selectedName = null;
+                            });
+                          },
+                          child: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.check_circle, size: 16, color: cs.primary),
+                      ],
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 12),
+
               TextField(
                 controller: _passwordCtrl,
                 obscureText: _obscure,
@@ -131,18 +229,13 @@ class _UnlockSheetState extends State<UnlockSheet> {
                   labelText: 'Password',
                   prefixIcon: const Icon(Icons.key_outlined, size: 18),
                   suffixIcon: IconButton(
-                    onPressed: () =>
-                        setState(() => _obscure = !_obscure),
-                    icon: Icon(
-                      _obscure
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      size: 18,
-                    ),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                    icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
                   ),
                 ),
               ),
               const SizedBox(height: 10),
+
               TextField(
                 controller: _pimCtrl,
                 keyboardType: TextInputType.number,
@@ -151,135 +244,47 @@ class _UnlockSheetState extends State<UnlockSheet> {
                   prefixIcon: Icon(Icons.tune, size: 18),
                 ),
               ),
+
               if (_error != null) ...[
                 const SizedBox(height: 12),
-                _ErrorBanner(message: _error!),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: cs.error.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: cs.error.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline, size: 16, color: cs.error),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ),
               ],
+
               const SizedBox(height: 20),
+
               FilledButton(
                 onPressed: _loading ? null : _unlock,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                 ),
                 child: _loading
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation(Colors.white),
-                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
                       )
-                    : const Text(
-                        'Unlock',
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
+                    : const Text('Unlock', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ── Small private sub-widgets ────────────────────────────────────────────────
-
-class _Handle extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 36,
-        height: 4,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.outline,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-  }
-}
-
-class _FilePicker extends StatelessWidget {
-  final String? selectedName;
-  final VoidCallback onTap;
-  const _FilePicker({required this.selectedName, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final hasFile = selectedName != null;
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: cs.surfaceVariant,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: hasFile ? cs.primary.withOpacity(0.5) : cs.outline,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              hasFile ? Icons.description_outlined : Icons.folder_open,
-              size: 18,
-              color: hasFile ? cs.primary : cs.outline,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                selectedName ?? 'Select VeraCrypt container…',
-                style: TextStyle(
-                  color: hasFile ? cs.onSurface : cs.outline,
-                  fontSize: 13,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (hasFile)
-              Icon(Icons.check_circle, size: 16, color: cs.primary),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  final String message;
-  const _ErrorBanner({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: cs.error.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: cs.error.withOpacity(0.4)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, size: 16, color: cs.error),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(color: cs.error, fontSize: 12),
-            ),
-          ),
-        ],
       ),
     );
   }

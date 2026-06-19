@@ -1,0 +1,87 @@
+name: Build & Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'           # triggers on version tags like v1.0.0
+  workflow_dispatch:   # allows manual runs from the Actions tab
+
+jobs:
+  build:
+    name: Build Signed APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Java ────────────────────────────────────────────────────────────────
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # ── Flutter ─────────────────────────────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # ── Keystore ────────────────────────────────────────────────────────────
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
+
+      - name: Create key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=release.keystore
+          EOF
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      - name: Build release APK
+        run: flutter build apk --release
+
+      # ── Rename with version ──────────────────────────────────────────────────
+      - name: Rename APK
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr '+' '-')
+          cp build/app/outputs/flutter-apk/app-release.apk \
+             build/app/outputs/flutter-apk/vaultexplorer-${VERSION}.apk
+          echo "APK_PATH=build/app/outputs/flutter-apk/vaultexplorer-${VERSION}.apk" >> $GITHUB_ENV
+          echo "APK_NAME=vaultexplorer-${VERSION}.apk" >> $GITHUB_ENV
+
+      # ── Upload artifact (always) ──────────────────────────────────────────────
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_NAME }}
+          path: ${{ env.APK_PATH }}
+          retention-days: 30
+
+      # ── Create GitHub Release (tag pushes only) ───────────────────────────────
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: VaultExplorer ${{ github.ref_name }}
+          files: ${{ env.APK_PATH }}
+          generate_release_notes: true   # auto-generates changelog from commits
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Cleanup keystore ─────────────────────────────────────────────────────
+      - name: Remove keystore
+        if: always()
+        run: |
+          rm -f android/app/release.keystore
+          rm -f android/key.properties

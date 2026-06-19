@@ -13,6 +13,7 @@ dependencies:
   permission_handler: ^11.0.0 # To handle storage permissions
   path_provider: ^2.1.3
   video_player: ^2.11.1
+  fvp: ^0.37.2 # FFmpeg-backed drop-in engine replacement for video_player
 
 dev_dependencies:
   flutter_test:

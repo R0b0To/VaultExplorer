@@ -1,7 +1,3 @@
-// [FIX] Pass _selectedName as `displayName` to CryptBridgeApi.unlockContainer.
-// Previously the named parameter was never sent, so VeraCryptSession stored
-// null and the Documents Provider showed raw URI text as the volume title.
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/cryptbridge_api.dart';
@@ -46,13 +42,11 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
   Future<void> _pickFile() async {
     try {
-      final uri = await CryptBridgeApi.pickContainer();
-      if (uri != null) {
-        final cleanName =
-            Uri.decodeFull(uri.split('/').last.split('%2F').last);
+      final result = await CryptBridgeApi.pickContainer();
+      if (result != null) {
         setState(() {
-          _selectedUri = uri;
-          _selectedName = cleanName;
+          _selectedUri = result.uri;
+          _selectedName = result.displayName;
           _error = null;
         });
       }
@@ -81,8 +75,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
           _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0;
       final name = _selectedName ?? 'Container';
 
-      // [FIX] Pass displayName so the Kotlin session and DocumentsProvider
-      // root title are populated correctly.
       final result = await CryptBridgeApi.unlockContainer(
         _selectedUri!,
         _passwordCtrl.text,
@@ -93,7 +85,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
       if (result != null) {
         await SavedContainerService.saveContainer(_selectedUri!, name);
 
-        // Fetch space info before building the final model.
         final tempContainer = MountedContainer(
           uri: _selectedUri!,
           displayName: name,

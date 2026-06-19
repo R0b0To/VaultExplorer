@@ -270,7 +270,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       bool success = false;
 
       try {
-        // Direct physical deletion from the encrypted storage container
         success = await CryptBridgeApi.deleteFile(widget.container, currentFile);
       } catch (e) {
         debugPrint("Error executing API deletion: $e");
@@ -353,7 +352,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       );
     }
 
-    // RangeError Safety Guard: Blocks rebuilding error during transitions
     if (_currentPlaylist.isEmpty) {
       return const Scaffold(
         backgroundColor: Colors.black,
@@ -448,7 +446,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                       ],
                     ),
                   ),
-                  // Filter selection: Current Folder Only OR All (including subfolders)
+                  // Filter selection
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.folder_open, color: Colors.white),
                     tooltip: 'Set Directory Filter',
@@ -513,7 +511,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     tooltip: 'Delete File',
                     onPressed: _deleteCurrentFile,
                   ),
-                  // Unified Settings & General Options Menu
+                  // Settings & General Options Menu
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert, color: Colors.white),
                     tooltip: 'More Actions',
@@ -580,6 +578,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     );
   }
 }
+
+// ─────────────────────────────────────────────
+// _MediaPage — routes images vs videos
+// ─────────────────────────────────────────────
 
 class _MediaPage extends StatefulWidget {
   final String fileName;
@@ -692,7 +694,7 @@ class _MediaPageState extends State<_MediaPage> {
 }
 
 // ─────────────────────────────────────────────
-// Real Video Player with Auto-Hiding Seek Bar
+// Real Video Player with hold-to-speed-up
 // ─────────────────────────────────────────────
 
 class RealVideoPlayerWidget extends StatefulWidget {
@@ -728,9 +730,13 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
   Timer? _hideTimer;
   DateTime _lastSeekTime = DateTime.now();
 
-  // On-Screen skip state flags
+  // On-Screen skip indicators
   bool _showLeftIndicator = false;
   bool _showRightIndicator = false;
+
+  // ── 2× speed-hold state ──────────────────────────────────────────
+  // True while the user is pressing and holding the video area.
+  bool _isSpeedHeld = false;
 
   // Video Zoom State
   final TransformationController _videoTransformationController = TransformationController();
@@ -817,7 +823,29 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
     _startHideTimer();
   }
 
-  // Double-tap zoom logic for Video canvas
+  // ── Speed-hold handlers ──────────────────────────────────────────
+
+  /// Called when the user starts a long-press anywhere on the video canvas.
+  void _onSpeedHoldStart(LongPressStartDetails _) {
+    if (!_initialized) return;
+    setState(() => _isSpeedHeld = true);
+    _controller.setPlaybackSpeed(2.0);
+    // Hide the controls while holding so the indicator has room to breathe.
+    widget.onToggleUI(false);
+    _hideTimer?.cancel();
+  }
+
+  /// Called when the finger is lifted after a long-press.
+  void _onSpeedHoldEnd(LongPressEndDetails _) {
+    if (!_initialized) return;
+    setState(() => _isSpeedHeld = false);
+    _controller.setPlaybackSpeed(1.0);
+    // Restore controls briefly so the user can see the seek bar again.
+    _showControlsAndResetTimer();
+  }
+
+  // ── Zoom logic ───────────────────────────────────────────────────
+
   void _handleVideoDoubleTap() {
     final position = _videoDoubleTapDetails?.localPosition;
     setState(() {
@@ -841,7 +869,8 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
     });
   }
 
-  // Skips backwards/forwards with visual screen feedback
+  // ── Skip ─────────────────────────────────────────────────────────
+
   void _skip({required bool backwards}) {
     _showControlsAndResetTimer();
     final currentPos = _controller.value.position;
@@ -918,6 +947,7 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
         clipBehavior: Clip.none, 
         alignment: Alignment.center,
         children: [
+          // ── Video canvas with zoom ──────────────────────────────────
           InteractiveViewer(
             transformationController: _videoTransformationController,
             maxScale: 6.0,
@@ -945,55 +975,61 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
                   alignment: Alignment.center,
                   children: [
                     VideoPlayer(_controller),
-                    
-                    // Gesture Detector Zones Overlay (Left Skip, Middle Zoom, Right Skip)
+
+                    // ── Gesture zones overlay ─────────────────────────
+                    // GestureDetector is split into three horizontal zones
+                    // (left skip / middle zoom+hold / right skip).
+                    // onLongPressStart/End on all three zones so the user
+                    // can hold anywhere on the frame to trigger 2× speed.
                     Row(
                       children: [
-                        // Left Side Skip Area
+                        // Left zone — double-tap to skip back, hold for 2×
                         Expanded(
                           flex: 3,
                           child: GestureDetector(
                             behavior: HitTestBehavior.translucent,
                             onTap: () {
                               widget.onToggleUI(!widget.showUI); 
-                              if (!widget.showUI) {
-                                _startHideTimer();
-                              }
+                              if (!widget.showUI) _startHideTimer();
                             },
                             onDoubleTap: () => _skip(backwards: true),
+                            onLongPressStart: _onSpeedHoldStart,
+                            onLongPressEnd: _onSpeedHoldEnd,
                             child: Container(),
                           ),
                         ),
-                        // Play/Pause middle toggle area & Double Tap to Zoom Video
+
+                        // Middle zone — double-tap to zoom, hold for 2×
                         Expanded(
                           flex: 4,
                           child: GestureDetector(
                             behavior: HitTestBehavior.translucent,
                             onTap: () {
                               widget.onToggleUI(!widget.showUI); 
-                              if (!widget.showUI) {
-                                _startHideTimer();
-                              }
+                              if (!widget.showUI) _startHideTimer();
                             },
                             onDoubleTapDown: (details) {
                               _videoDoubleTapDetails = details;
                             },
                             onDoubleTap: _handleVideoDoubleTap,
+                            onLongPressStart: _onSpeedHoldStart,
+                            onLongPressEnd: _onSpeedHoldEnd,
                             child: Container(),
                           ),
                         ),
-                        // Right Side Skip Area
+
+                        // Right zone — double-tap to skip forward, hold for 2×
                         Expanded(
                           flex: 3,
                           child: GestureDetector(
                             behavior: HitTestBehavior.translucent,
                             onTap: () {
                               widget.onToggleUI(!widget.showUI); 
-                              if (!widget.showUI) {
-                                _startHideTimer();
-                              }
+                              if (!widget.showUI) _startHideTimer();
                             },
                             onDoubleTap: () => _skip(backwards: false),
+                            onLongPressStart: _onSpeedHoldStart,
+                            onLongPressEnd: _onSpeedHoldEnd,
                             child: Container(),
                           ),
                         ),
@@ -1005,7 +1041,7 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
             ),
           ),
 
-          // Double Tap Seeking Left Pop Animation
+          // ── Left skip indicator ─────────────────────────────────────
           if (_showLeftIndicator)
             Positioned(
               left: 45,
@@ -1021,14 +1057,16 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
                     children: [
                       const Icon(Icons.fast_rewind, color: Colors.white, size: 28),
                       const SizedBox(height: 4),
-                      Text('-${widget.skipSeconds}s', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      Text('-${widget.skipSeconds}s',
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
               ),
             ),
 
-          // Double Tap Seeking Right Pop Animation
+          // ── Right skip indicator ────────────────────────────────────
           if (_showRightIndicator)
             Positioned(
               right: 45,
@@ -1044,14 +1082,52 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
                     children: [
                       const Icon(Icons.fast_forward, color: Colors.white, size: 28),
                       const SizedBox(height: 4),
-                      Text('+${widget.skipSeconds}s', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                      Text('+${widget.skipSeconds}s',
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
               ),
             ),
 
-          // Auto-Hiding Seekbar Control Panel
+          // ── 2× speed indicator (shown while holding) ────────────────
+          if (_isSpeedHeld)
+            Positioned(
+              top: 20,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.65),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: const Color(0xFF4FC3F7).withOpacity(0.6),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.fast_forward_rounded,
+                          color: Color(0xFF4FC3F7), size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        '2× speed',
+                        style: TextStyle(
+                          color: Color(0xFF4FC3F7),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Seekbar control panel ───────────────────────────────────
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
@@ -1077,7 +1153,9 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
                     onPressed: () {
                       _showControlsAndResetTimer();
                       setState(() {
-                        _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                        _controller.value.isPlaying
+                            ? _controller.pause()
+                            : _controller.play();
                       });
                     },
                   ),
@@ -1133,14 +1211,16 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
             ),
           ),
 
-          // Large Center Play/Pause Indicator
+          // ── Centre play/pause button ────────────────────────────────
           if (widget.showUI)
             Center(
               child: GestureDetector(
                 onTap: () {
                   _showControlsAndResetTimer();
                   setState(() {
-                    _controller.value.isPlaying ? _controller.pause() : _controller.play();
+                    _controller.value.isPlaying
+                        ? _controller.pause()
+                        : _controller.play();
                   });
                 },
                 child: Container(
@@ -1162,6 +1242,10 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
     );
   }
 }
+
+// ─────────────────────────────────────────────
+// Local HTTP streaming server
+// ─────────────────────────────────────────────
 
 class _LocalStreamingServer {
   HttpServer? _server;
@@ -1224,7 +1308,7 @@ class _LocalStreamingServer {
         headers.set(HttpHeaders.contentLengthHeader, contentLength.toString());
 
         var currentPosition = start;
-        const chunkSize = 524288; // 512 KB packets
+        const chunkSize = 524288;
 
         while (currentPosition <= end) {
           final remaining = end - currentPosition + 1;
@@ -1237,9 +1321,7 @@ class _LocalStreamingServer {
             currentChunkSize,
           );
 
-          if (bytes == null || bytes.isEmpty) {
-            break; 
-          }
+          if (bytes == null || bytes.isEmpty) break;
 
           request.response.add(bytes);
           await request.response.flush();
@@ -1264,9 +1346,7 @@ class _LocalStreamingServer {
             currentChunkSize,
           );
 
-          if (bytes == null || bytes.isEmpty) {
-            break;
-          }
+          if (bytes == null || bytes.isEmpty) break;
 
           request.response.add(bytes);
           await request.response.flush();
@@ -1280,9 +1360,7 @@ class _LocalStreamingServer {
     } finally {
       try {
         await request.response.close();
-      } catch (e) {
-        // ignore
-      }
+      } catch (_) {}
     }
   }
 
@@ -1290,17 +1368,17 @@ class _LocalStreamingServer {
     final ext = fileName.split('.').last.toLowerCase();
     switch (ext) {
       case 'mp4':
-      case 'm4v': return 'video/mp4';
-      case 'webm': return 'video/webm'; 
-      case 'mkv': return 'video/x-matroska';
-      case 'mov': return 'video/quicktime';
-      case 'avi': return 'video/x-msvideo';
-      case 'png': return 'image/png';
+      case 'm4v':  return 'video/mp4';
+      case 'webm': return 'video/webm';
+      case 'mkv':  return 'video/x-matroska';
+      case 'mov':  return 'video/quicktime';
+      case 'avi':  return 'video/x-msvideo';
+      case 'png':  return 'image/png';
       case 'jpg':
       case 'jpeg': return 'image/jpeg';
       case 'webp': return 'image/webp';
-      case 'gif': return 'image/gif';
-      default: return 'application/octet-stream';
+      case 'gif':  return 'image/gif';
+      default:     return 'application/octet-stream';
     }
   }
 }

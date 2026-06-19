@@ -1,11 +1,3 @@
-// [FIX] Added `displayName` parameter to `unlockContainer` so the Kotlin
-// ContainerSession is created with a human-readable name instead of null.
-// Without this, VeraCryptDocumentsProvider fell back to parsing the raw
-// content URI for the root title, producing an unreadable hex string.
-//
-// [FIX] Replaced Directory.systemTemp usage in createEmptyFile with
-// getTemporaryDirectory() from path_provider, which resolves correctly on
-// Android (systemTemp resolves to /tmp which may not exist).
 
 import 'dart:io';
 import 'dart:typed_data';
@@ -16,8 +8,13 @@ import '../models/mounted_container.dart';
 class CryptBridgeApi {
   static const _channel = MethodChannel('com.example.cryptbridge/engine');
 
-  static Future<String?> pickContainer() =>
-      _channel.invokeMethod<String>('pickContainer');
+  static Future<({String uri, String displayName})?> pickContainer() async {
+    final raw = await _channel.invokeMethod<Map<Object?, Object?>>('pickContainer');
+    if (raw == null) return null;
+    final uri         = raw['uri']         as String;
+    final displayName = raw['displayName'] as String;
+    return (uri: uri, displayName: displayName);
+  }
 
   static Future<({int volId, List<String> files})?> unlockContainer(
     String filePath,
@@ -186,7 +183,6 @@ class CryptBridgeApi {
   static Future<bool> createEmptyFile(
       MountedContainer container, String fileName) async {
     final tmpDir = await getTemporaryDirectory();
-    // Use a unique suffix to avoid collisions in concurrent calls.
     final tempFile = File(
         '${tmpDir.path}/cb_empty_${DateTime.now().microsecondsSinceEpoch}');
     try {

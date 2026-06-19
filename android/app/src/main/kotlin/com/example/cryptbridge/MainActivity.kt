@@ -1,17 +1,10 @@
 package com.example.cryptbridge
 
-// [FIX 1] volId selection: replaced `getVolumeIdByUri(uri) ?: 0` with
-//   getVolumeIdByUri(uri) ?: getFreeVolumeId().
-//   The old code defaulted to slot 0 when a URI was new, silently overwriting
-//   any already-mounted container in slot 0 and corrupting its crypto context.
-//
-// [FIX 2] Added a MAX_CONTAINERS guard: returns an error when all 4 slots are
-//   occupied instead of crashing or silently overwriting existing data.
-
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import androidx.annotation.NonNull
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -424,6 +417,24 @@ class MainActivity : FlutterActivity() {
         pendingFlutterResult = result
     }
 
+    // [FIX 3] Resolve the real filename via OpenableColumns.DISPLAY_NAME and
+    // return both uri + displayName so Flutter never has to parse the URI itself.
+    private fun resolveDisplayName(uri: Uri): String {
+        return try {
+            contentResolver.query(
+                uri,
+                arrayOf(OpenableColumns.DISPLAY_NAME),
+                null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx != -1) cursor.getString(idx) else null
+                } else null
+            } ?: uri.lastPathSegment ?: "Container"
+        } catch (e: Exception) {
+            uri.lastPathSegment ?: "Container"
+        }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
@@ -433,8 +444,14 @@ class MainActivity : FlutterActivity() {
                 val uri = data.data!!
                 contentResolver.takePersistableUriPermission(uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                res.success(uri.toString())
-            } else res.success(null)
+                val displayName = resolveDisplayName(uri)
+                res.success(mapOf(
+                    "uri"         to uri.toString(),
+                    "displayName" to displayName,
+                ))
+            } else {
+                res.success(null)
+            }
             return
         }
 
@@ -452,10 +469,10 @@ class MainActivity : FlutterActivity() {
                         try {
                             var displayName = "imported_file"
                             contentResolver.query(pickedUri,
-                                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                                arrayOf(OpenableColumns.DISPLAY_NAME),
                                 null, null, null)?.use { c ->
                                 if (c.moveToFirst()) {
-                                    val i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                                    val i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                                     if (i != -1) displayName = c.getString(i)
                                 }
                             }

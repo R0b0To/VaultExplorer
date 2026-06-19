@@ -1,13 +1,3 @@
-// [FIX] Replaced Directory.systemTemp with getTemporaryDirectory() from
-// path_provider in the clipboard paste copy-path.  On Android, /tmp does not
-// always exist so Directory.systemTemp.path returned a non-writeable path,
-// silently failing every in-container copy operation.
-//
-// [FIX] Each file in a multi-file copy now gets a unique timestamped temp path
-// so concurrent copies don't overwrite each other.
-//
-// [FIX] Temp file is always deleted in a finally block — previously it was
-// left behind when decryptFile returned false.
 
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -212,6 +202,29 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
   }
 
   // ---------------------------------------------------------------------------
+  // Open with external app
+  // ---------------------------------------------------------------------------
+
+  Future<void> _openFileWithApp(String cleanName, String fullPath) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final ok = await CryptBridgeApi.openWithApp(widget.container, fullPath);
+      if (!ok && mounted) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('No app found that can open this file type'),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text('Could not open "$cleanName": $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // CRUD dialogs
   // ---------------------------------------------------------------------------
 
@@ -364,7 +377,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                 _loadDirectoryContents(currentDir);
               }
             },
-            child: const Text('Delete All', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -435,15 +448,23 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
       title: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           dropdownColor: cs.surface,
+          isExpanded: true,
           value: 'header',
           icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-          selectedItemBuilder: (_) => ['header','all','none']
-              .map<Widget>((_) => Center(
-                    child: Text('${_selectedItems.length} selected',
-                        style: const TextStyle(color: Colors.white,
-                            fontSize: 14, fontWeight: FontWeight.bold)),
-                  ))
-              .toList(),
+          selectedItemBuilder: (_) => ['header', 'all', 'none']
+    .map<Widget>((_) => Center(
+          child: Text(
+            '${_selectedItems.length} selected',
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ))
+    .toList(),
           items: const [
             DropdownMenuItem(value: 'header',
                 child: Text('Selection', style: TextStyle(fontSize: 11, color: Colors.grey))),
@@ -671,15 +692,24 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                               onTap: () {
                                 if (_isSelectionMode) {
                                   _toggleSelectItem(rawItem);
-                                } else if (isDir) {
+                                  return;
+                                }
+
+                                if (isDir) {
                                   _enterDirectory(rawItem);
-                                } else if (_isSupportedMedia(cleanName)) {
+                                  return;
+                                }
+
+                                final dir = _pathStack.last.fatPath;
+                                final fullPath = dir.isEmpty ? cleanName : '$dir/$cleanName';
+
+                                if (_isSupportedMedia(cleanName)) {
+                                  // Open built-in media viewer for images/videos.
                                   final mediaList = files
                                       .map((f) => f.split('|').first)
                                       .where(_isSupportedMedia)
                                       .toList();
                                   final resolved = mediaList.map((f) {
-                                    final dir = _pathStack.last.fatPath;
                                     return dir.isEmpty ? f : '$dir/$f';
                                   }).toList();
                                   Navigator.push(
@@ -693,11 +723,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
                                     ),
                                   );
                                 } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                                    content: Text(
-                                        'Long-press "$cleanName" to select, then use ⋮ → Open with App'),
-                                    duration: const Duration(seconds: 2),
-                                  ));
+                                  // [FIX] For all other file types, attempt to open
+                                  // with an external app immediately on tap instead
+                                  // of showing a hint snackbar.
+                                  _openFileWithApp(cleanName, fullPath);
                                 }
                               },
                               onLongPress: () {

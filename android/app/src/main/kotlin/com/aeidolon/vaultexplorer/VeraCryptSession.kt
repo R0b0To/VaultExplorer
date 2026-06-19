@@ -10,8 +10,10 @@ data class ContainerSession(
 )
 
 object VeraCryptSession {
-    // 4 locks corresponding to the 4 volume slots (0 to 3) [2]
-    val locks = Array(4) { Any() }
+    private const val MAX_VOLUMES = 16
+
+    // One lock per volume slot (0 to MAX_VOLUMES-1)
+    val locks = Array(MAX_VOLUMES) { Any() }
 
     val activeSessions = mutableMapOf<Int, ContainerSession>()
 
@@ -24,7 +26,7 @@ object VeraCryptSession {
     }
 
     fun getFreeVolumeId(): Int? {
-        for (i in 0..3) {
+        for (i in 0 until MAX_VOLUMES) {
             if (!activeSessions.containsKey(i)) return i
         }
         return null

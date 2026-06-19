@@ -19,25 +19,40 @@
 #include "diskio.h"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
-#define MAX_VOLUMES 4
+#define MAX_VOLUMES 16
 
 // ----------------------------------------------------------------====
 // GLOBAL STATE
 // ----------------------------------------------------------------====
 
-static int           activeFd[MAX_VOLUMES]              = {-1, -1, -1, -1};
-static uint64_t      activeDataOffset[MAX_VOLUMES]      = {0};
-static bool          activeIsRelTweak[MAX_VOLUMES]      = {false};
-static bool          isDataCtxInitialized[MAX_VOLUMES]  = {false};
-
-// [FIX 1] Actual file sizes (bytes) — derived from fstat once per prepareSession.
-static uint64_t      activeFileSize[MAX_VOLUMES]        = {0, 0, 0, 0};
+static int           activeFd[MAX_VOLUMES];
+static uint64_t      activeDataOffset[MAX_VOLUMES];
+static bool          activeIsRelTweak[MAX_VOLUMES];
+static bool          isDataCtxInitialized[MAX_VOLUMES];
+static uint64_t      activeFileSize[MAX_VOLUMES];
 
 static mbedtls_aes_xts_context activeDataCtxDec[MAX_VOLUMES];
 static mbedtls_aes_xts_context activeDataCtxEnc[MAX_VOLUMES];
 
-static const char* drivePaths[MAX_VOLUMES] = {"0:", "1:", "2:", "3:"};
+// Drive paths for up to 16 volumes — FatFs uses single-char drive numbers 0–9
+// then letters A–F for 10–15.
+static const char* drivePaths[MAX_VOLUMES] = {
+    "0:", "1:", "2:", "3:", "4:", "5:", "6:", "7:",
+    "8:", "9:", "A:", "B:", "C:", "D:", "E:", "F:"
+};
 static FATFS globalFs[MAX_VOLUMES];
+
+// One-time initialiser so the arrays start in a known state.
+static bool _globalInit = [](){
+    for (int i = 0; i < MAX_VOLUMES; i++) {
+        activeFd[i]               = -1;
+        activeDataOffset[i]       = 0;
+        activeIsRelTweak[i]       = false;
+        isDataCtxInitialized[i]   = false;
+        activeFileSize[i]         = 0;
+    }
+    return true;
+}();
 
 // ----------------------------------------------------------------====
 // INLINE HELPERS
@@ -87,7 +102,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     const uint64_t basePhysical = activeDataOffset[pdrv] / 512;
     const bool relTweak = activeIsRelTweak[pdrv];
     const int fd = activeFd[pdrv];
-   const uint64_t firstPhysical = basePhysical + sector;
+    const uint64_t firstPhysical = basePhysical + sector;
     const size_t   totalBytes    = static_cast<size_t>(count) * 512;
 
     std::unique_ptr<unsigned char[]> encBuf(new unsigned char[totalBytes]);
@@ -104,7 +119,6 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                       buff         + (i * 512));
     }
     return RES_OK;
-
 }
 
 extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
@@ -166,7 +180,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     if (volId >= MAX_VOLUMES) return false;
 
     if (!forceDerive && isDataCtxInitialized[volId]) {
-        // [FIX 1] Refresh file size on each new fd so GET_SECTOR_COUNT stays accurate.
         struct stat st;
         if (fstat(fd, &st) == 0)
             activeFileSize[volId] = static_cast<uint64_t>(st.st_size);
@@ -179,7 +192,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     unsigned char headerBuf[512];
     if (pread(fd, headerBuf, 512, 0) != 512) return false;
 
-    // [FIX 1] Record the container file size immediately.
     {
         struct stat st;
         if (fstat(fd, &st) == 0)
@@ -246,7 +258,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
                 const uint64_t sectorIdx = s + i;
                 const unsigned char* enc = encBatch.get() + (i * 512);
 
-                // Absolute tweak
                 setTweak(tweak, sectorIdx);
                 mbedtls_aes_crypt_xts(&tmpDec, MBEDTLS_AES_DECRYPT, 512, tweak, enc, decS);
                 if (decS[510] == 0x55 && decS[511] == 0xAA) {
@@ -256,7 +267,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
                     break;
                 }
 
-                // Relative tweak
                 memset(tweak, 0, 16);
                 mbedtls_aes_crypt_xts(&tmpDec, MBEDTLS_AES_DECRYPT, 512, tweak, enc, decS);
                 if (decS[510] == 0x55 && decS[511] == 0xAA) {
@@ -349,7 +359,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     if (!prepareSession(fd, nativePass, pim, volId, true)) {
         env->ReleaseStringUTFChars(password, nativePass);
         close(fd);
-        return nullptr;   // Authentication failure — caller throws AUTH_FAIL.
+        return nullptr;
     }
 
     jobjectArray result = nullptr;
@@ -358,8 +368,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
         result = buildDirectoryListing(env, volId, nullptr);
         f_mount(nullptr, drivePaths[volId], 0);
     } else {
-        // [FIX 2] Return nullptr so Kotlin treats this as AUTH_FAIL, not a
-        // successful unlock with a bogus file list.
         LOGI("FATFS Mount failed on volume %d, code=%d", volId, fr);
         result = nullptr;
     }
@@ -477,7 +485,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
     activeFd[volId]         = -1;
     activeDataOffset[volId] = 0;
     activeIsRelTweak[volId] = false;
-    activeFileSize[volId]   = 0;  // [FIX 3] Clear stale file-size.
+    activeFileSize[volId]   = 0;
 
     if (isDataCtxInitialized[volId]) {
         mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
@@ -664,29 +672,22 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
     unsigned char salt[64]              = {0};
     unsigned char combinedMasterKey[64] = {0};
 
-    do { 
-
-        // ── 0. Validate inputs ──────────────────────────────────────────────
-        // VeraCrypt requires at least 512 sectors for headers (256 front, 256 back) + a usable FAT area.
+    do {
         if (sizeBytes < static_cast<jlong>(300 * 1024)) {
             LOGI("createContainer: sizeBytes too small (%lld)", (long long)sizeBytes);
             break;
         }
 
-        // ── 1. Find a free volume slot to avoid clobbering active mounts ────
+        // Find a free volume slot
         int volId = -1;
         for (int i = 0; i < MAX_VOLUMES; i++) {
-            if (activeFd[i] < 0) {
-                volId = i;
-                break;
-            }
+            if (activeFd[i] < 0) { volId = i; break; }
         }
         if (volId == -1) {
             LOGI("createContainer: no free slots available");
             break;
         }
 
-        // ── 2. Generate cryptographically random salt and master keys ────────
         {
             FILE* urnd = fopen("/dev/urandom", "rb");
             if (!urnd) { LOGI("createContainer: cannot open /dev/urandom"); break; }
@@ -696,7 +697,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             if (!ok) { LOGI("createContainer: urandom read failed"); break; }
         }
 
-        // ── 3. Derive the 64-byte header key via PBKDF2-HMAC-SHA-512 ─────────
         const int iter = (pim > 0) ? (15000 + pim * 1000) : 500000;
 
         mbedtls_md_context_t md_ctx;
@@ -716,25 +716,21 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             64, headerKey);
         mbedtls_md_free(&md_ctx);
 
-        // ── 4. Build the 448-byte plaintext VeraCrypt header body ────────────
-        const uint64_t DATA_OFFSET    = 131072ULL;                              // 256 × 512
-        const uint64_t VOLUME_SIZE    = static_cast<uint64_t>(sizeBytes);
-        const uint64_t DATA_SIZE      = VOLUME_SIZE - (2 * DATA_OFFSET);        // Exclude front/back headers
+        const uint64_t DATA_OFFSET = 131072ULL;
+        const uint64_t VOLUME_SIZE = static_cast<uint64_t>(sizeBytes);
+        const uint64_t DATA_SIZE   = VOLUME_SIZE - (2 * DATA_OFFSET);
 
         unsigned char body[448];
         memset(body, 0, sizeof(body));
 
         body[0] = 'V'; body[1] = 'E'; body[2] = 'R'; body[3] = 'A';
-        body[4] = 0x00; body[5] = 0x05;   // version 5
-        body[6] = 0x05; body[7] = 0x00;   // minVer 0x0500
+        body[4] = 0x00; body[5] = 0x05;
+        body[6] = 0x05; body[7] = 0x00;
 
-        for (int i = 7; i >= 0; --i) {
+        for (int i = 7; i >= 0; --i)
             body[36 + (7 - i)] = (DATA_OFFSET >> (i * 8)) & 0xFF;
-        }
-
-        for (int i = 7; i >= 0; --i) {
+        for (int i = 7; i >= 0; --i)
             body[44 + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
-        }
 
         body[56] = 0x00; body[57] = 0x02; body[58] = 0x00; body[59] = 0x00;
         memcpy(&body[252], combinedMasterKey, 64);
@@ -750,26 +746,20 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         };
 
         uint32_t keyCrc = crc32(&body[252], 196);
-        body[ 8] = (keyCrc >> 24) & 0xFF;
-        body[ 9] = (keyCrc >> 16) & 0xFF;
-        body[10] = (keyCrc >>  8) & 0xFF;
-        body[11] = (keyCrc      ) & 0xFF;
+        body[ 8] = (keyCrc >> 24) & 0xFF; body[ 9] = (keyCrc >> 16) & 0xFF;
+        body[10] = (keyCrc >>  8) & 0xFF; body[11] = (keyCrc      ) & 0xFF;
 
         uint32_t hdrCrc = crc32(body, 188);
-        body[188] = (hdrCrc >> 24) & 0xFF;
-        body[189] = (hdrCrc >> 16) & 0xFF;
-        body[190] = (hdrCrc >>  8) & 0xFF;
-        body[191] = (hdrCrc      ) & 0xFF;
+        body[188] = (hdrCrc >> 24) & 0xFF; body[189] = (hdrCrc >> 16) & 0xFF;
+        body[190] = (hdrCrc >>  8) & 0xFF; body[191] = (hdrCrc      ) & 0xFF;
 
-        // ── 5. Encrypt the header body with AES-XTS (tweak = all-zeros) ──────
         unsigned char encBody[448];
         {
             mbedtls_aes_xts_context xtsHdr;
             mbedtls_aes_xts_init(&xtsHdr);
             mbedtls_aes_xts_setkey_enc(&xtsHdr, headerKey, 512);
             const unsigned char zeroTweak[16] = {0};
-            mbedtls_aes_crypt_xts(&xtsHdr, MBEDTLS_AES_ENCRYPT,
-                                  448, zeroTweak, body, encBody);
+            mbedtls_aes_crypt_xts(&xtsHdr, MBEDTLS_AES_ENCRYPT, 448, zeroTweak, body, encBody);
             mbedtls_aes_xts_free(&xtsHdr);
         }
 
@@ -777,27 +767,20 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         memcpy(hdrSector,      salt,    64);
         memcpy(hdrSector + 64, encBody, 448);
 
-        // ── 6. Write primary header (sector 0) ───────────────────────────────
         if (pwrite(fd, hdrSector, 512, 0) != 512) {
-            LOGI("createContainer: primary header write failed");
-            break;
+            LOGI("createContainer: primary header write failed"); break;
+        }
+        if (pwrite(fd, hdrSector, 512, static_cast<off_t>(VOLUME_SIZE - DATA_OFFSET)) != 512) {
+            LOGI("createContainer: backup header write failed"); break;
         }
 
-        // ── 7. Write backup header (exactly 128 KB from end of volume) ───────
-        if (pwrite(fd, hdrSector, 512,
-                   static_cast<off_t>(VOLUME_SIZE - DATA_OFFSET)) != 512) {
-            LOGI("createContainer: backup header write failed");
-            break;
-        }
-
-        // ── 8. Fill the data area with encrypted zeros ───────────────────────
         {
             mbedtls_aes_xts_context xtsData;
             mbedtls_aes_xts_init(&xtsData);
             mbedtls_aes_xts_setkey_enc(&xtsData, combinedMasterKey, 512);
 
-            const uint64_t START_SECTOR = DATA_OFFSET / 512;      // 256
-            const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - DATA_OFFSET) / 512; // Exclude backup area
+            const uint64_t START_SECTOR  = DATA_OFFSET / 512;
+            const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - DATA_OFFSET) / 512;
             const uint64_t BATCH = 64;
 
             const unsigned char ZERO_SECTOR[512] = {0};
@@ -812,9 +795,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
                 for (uint64_t i = 0; i < count; ++i) {
                     setTweak(tweak, s + i);
                     mbedtls_aes_crypt_xts(&xtsData, MBEDTLS_AES_ENCRYPT,
-                                          512, tweak,
-                                          ZERO_SECTOR,
-                                          batch.get() + i * 512);
+                                          512, tweak, ZERO_SECTOR, batch.get() + i * 512);
                 }
 
                 const ssize_t want = static_cast<ssize_t>(count * 512);
@@ -825,14 +806,12 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
                 }
                 s += count;
             }
-
             mbedtls_aes_xts_free(&xtsData);
             if (!writeOk) break;
         }
 
         fsync(fd);
 
-        // ── 9. Format the filesystem inside the encrypted data area ──────────
         {
             if (isDataCtxInitialized[volId]) {
                 mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
@@ -852,23 +831,23 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 
             MKFS_PARM mp;
             memset(&mp, 0, sizeof(mp));
-            mp.fmt    = useExFat ? FM_EXFAT : FM_FAT; // Enables auto-selection of FAT12/16/32
+            mp.fmt    = useExFat ? FM_EXFAT : FM_FAT;
             mp.n_fat  = 1;
             mp.n_root = 512;
             mp.au_size = 0;
             mp.align   = 0;
 
-            alignas(16) unsigned char mkfsBuf[4096]; // Ensure stack buffer is aligned
+            alignas(16) unsigned char mkfsBuf[4096];
             FRESULT fr = f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf));
 
             LOGI("createContainer: f_mkfs result=%d fmt=%d exfat=%d",
                  (int)fr, (int)mp.fmt, (int)useExFat);
 
             f_mount(nullptr, drivePaths[volId], 0);
-            activeFd[volId]             = -1;
-            activeDataOffset[volId]     = 0;
-            activeIsRelTweak[volId]     = false;
-            activeFileSize[volId]       = 0;
+            activeFd[volId]           = -1;
+            activeDataOffset[volId]   = 0;
+            activeIsRelTweak[volId]   = false;
+            activeFileSize[volId]     = 0;
             mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
             mbedtls_aes_xts_free(&activeDataCtxEnc[volId]);
             isDataCtxInitialized[volId] = false;
@@ -885,7 +864,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 
     } while (false);
 
-    // Securely clear keys from the stack (now fully visible in this scope)
     volatile unsigned char* vp = combinedMasterKey;
     for (size_t i = 0; i < sizeof(combinedMasterKey); ++i) vp[i] = 0;
 

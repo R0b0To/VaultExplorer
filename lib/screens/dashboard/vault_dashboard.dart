@@ -5,7 +5,7 @@ import '../../services/saved_containers.dart';
 import '../unlock/unlock_sheet.dart';
 import 'widgets/container_card.dart';
 import 'widgets/empty_state.dart';
-import 'widgets/create_container_sheet.dart'; // Import the new sheet
+import 'widgets/create_container_sheet.dart';
 
 class VaultDashboard extends StatefulWidget {
   const VaultDashboard({Key? key}) : super(key: key);
@@ -63,7 +63,6 @@ class _VaultDashboardState extends State<VaultDashboard> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final atLimit = _mounted.length >= 4;
 
     final displayItems = <dynamic>[];
     displayItems.addAll(_mounted);
@@ -85,44 +84,39 @@ class _VaultDashboardState extends State<VaultDashboard> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: atLimit
-                ? Tooltip(
-                    message: 'Maximum 4 containers mounted',
-                    child: Icon(Icons.add, color: cs.outline),
-                  )
-                : PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'mount') {
-                        _showUnlockSheet();
-                      } else if (value == 'create') {
-                        _showCreateSheet();
-                      }
-                    },
-                    icon: const Icon(Icons.add),
-                    tooltip: 'Container options',
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'mount',
-                        child: Row(
-                          children: [
-                            Icon(Icons.lock_open, size: 18, color: cs.primary),
-                            const SizedBox(width: 12),
-                            const Text('Mount container'),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'create',
-                        child: Row(
-                          children: [
-                            Icon(Icons.add_box_outlined, size: 18, color: cs.primary),
-                            const SizedBox(width: 12),
-                            const Text('Create container'),
-                          ],
-                        ),
-                      ),
+            child: PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'mount') {
+                  _showUnlockSheet();
+                } else if (value == 'create') {
+                  _showCreateSheet();
+                }
+              },
+              icon: const Icon(Icons.add),
+              tooltip: 'Container options',
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'mount',
+                  child: Row(
+                    children: [
+                      Icon(Icons.lock_open, size: 18, color: cs.primary),
+                      const SizedBox(width: 12),
+                      const Text('Mount container'),
                     ],
                   ),
+                ),
+                PopupMenuItem(
+                  value: 'create',
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_box_outlined, size: 18, color: cs.primary),
+                      const SizedBox(width: 12),
+                      const Text('Create container'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

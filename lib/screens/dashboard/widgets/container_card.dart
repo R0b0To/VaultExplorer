@@ -70,7 +70,7 @@ class ContainerCard extends StatelessWidget {
                       color: cs.primaryContainer,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Icon(Icons.lock_open,
+                    child: Icon(Icons.folder_zip,
                         size: 18, color: cs.primary),
                   ),
                   const SizedBox(width: 12),
@@ -87,8 +87,7 @@ class ContainerCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           hasSpaceData
-                              ? 'Vol ${container.volId} · '
-                                  '${_formatBytes(container.freeSpace)} free '
+                              ? '${_formatBytes(container.freeSpace)} free '
                                   'of ${_formatBytes(container.totalSpace)}'
                               : 'Volume ${container.volId}',
                           style:
@@ -221,6 +220,81 @@ class _LockButtonState extends State<_LockButton> {
               size: 20,
               color: Theme.of(context).colorScheme.error,
             ),
+    );
+  }
+}
+
+// ── Saved Container Card ──────────────────────────────────────────────────────
+
+class SavedContainerCard extends StatelessWidget {
+  final String name;
+  final String uri;
+  final VoidCallback onUnlock;
+  final VoidCallback onForget;
+
+  const SavedContainerCard({
+    Key? key,
+    required this.name,
+    required this.uri,
+    required this.onUnlock,
+    required this.onForget,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onUnlock,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: cs.surfaceVariant,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(Icons.folder_zip, size: 18, color: cs.outline),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: Theme.of(context).textTheme.titleMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Locked',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: cs.outline,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: onUnlock,
+                tooltip: 'Unlock container',
+                icon: Icon(Icons.lock_open, color: cs.primary),
+              ),
+              IconButton(
+                onPressed: onForget,
+                tooltip: 'Remove from dashboard',
+                icon: Icon(Icons.close, color: cs.outline),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

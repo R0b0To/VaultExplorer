@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/mounted_container.dart';
+import '../../services/saved_containers.dart';
 import '../unlock/unlock_sheet.dart';
 import 'widgets/container_card.dart';
 import 'widgets/empty_state.dart';
@@ -13,29 +14,55 @@ class VaultDashboard extends StatefulWidget {
 }
 
 class _VaultDashboardState extends State<VaultDashboard> {
-  final List<MountedContainer> _containers = [];
+  final List<MountedContainer> _mounted = [];
+  List<Map<String, String>> _saved = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSaved();
+  }
+
+  Future<void> _loadSaved() async {
+    final saved = await SavedContainerService.loadContainers();
+    if (mounted) setState(() => _saved = saved);
+  }
 
   void _onContainerMounted(MountedContainer container) {
-    setState(() => _containers.add(container));
+    setState(() => _mounted.add(container));
   }
 
   void _onContainerLocked(int volId) {
-    setState(() => _containers.removeWhere((c) => c.volId == volId));
+    setState(() => _mounted.removeWhere((c) => c.volId == volId));
   }
 
-  void _showUnlockSheet() {
-    showModalBottomSheet(
+  Future<void> _showUnlockSheet({String? uri, String? name}) async {
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => UnlockSheet(onMounted: _onContainerMounted),
+      builder: (_) => UnlockSheet(
+        onMounted: _onContainerMounted,
+        initialUri: uri,
+        initialName: name,
+      ),
     );
+    _loadSaved(); // Refresh to catch if a new container was remembered
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final atLimit = _containers.length >= 4;
+    final atLimit = _mounted.length >= 4;
+
+    // Combine mounted and unmounted/saved items for the dashboard
+    final displayItems = <dynamic>[];
+    displayItems.addAll(_mounted);
+    for (final s in _saved) {
+      if (!_mounted.any((m) => m.uri == s['uri'])) {
+        displayItems.add(s);
+      }
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -51,27 +78,46 @@ class _VaultDashboardState extends State<VaultDashboard> {
             padding: const EdgeInsets.only(right: 8),
             child: atLimit
                 ? Tooltip(
-                    message: 'Maximum 4 containers',
+                    message: 'Maximum 4 containers mounted',
                     child: Icon(Icons.add, color: cs.outline),
                   )
                 : IconButton(
-                    onPressed: _showUnlockSheet,
+                    onPressed: () => _showUnlockSheet(),
                     icon: const Icon(Icons.add),
                     tooltip: 'Mount container',
                   ),
           ),
         ],
       ),
-      body: _containers.isEmpty
-          ? EmptyState(onAdd: _showUnlockSheet)
+      body: displayItems.isEmpty
+          ? EmptyState(onAdd: () => _showUnlockSheet())
           : ListView.separated(
               padding: const EdgeInsets.all(16),
-              itemCount: _containers.length,
+              itemCount: displayItems.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (_, i) => ContainerCard(
-                container: _containers[i],
-                onLocked: _onContainerLocked,
-              ),
+              itemBuilder: (_, i) {
+                final item = displayItems[i];
+                if (item is MountedContainer) {
+                  return ContainerCard(
+                    container: item,
+                    onLocked: _onContainerLocked,
+                  );
+                } else {
+                  return SavedContainerCard(
+                    name: item['name'] as String,
+                    uri: item['uri'] as String,
+                    onUnlock: () => _showUnlockSheet(
+                      uri: item['uri'] as String,
+                      name: item['name'] as String,
+                    ),
+                    onForget: () async {
+                      await SavedContainerService.removeContainer(
+                          item['uri'] as String);
+                      _loadSaved();
+                    },
+                  );
+                }
+              },
             ),
     );
   }

@@ -22,11 +22,11 @@ class EmptyState extends StatelessWidget {
             child: Icon(Icons.lock_outline, size: 32, color: cs.primary),
           ),
           const SizedBox(height: 20),
-          Text('No containers mounted',
+          Text('No containers',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
           Text(
-            'Mount a VeraCrypt container to browse its files',
+            'Mount a VeraCrypt container to get started',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 28),

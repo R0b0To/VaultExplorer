@@ -6,7 +6,15 @@ import '../../models/mounted_container.dart';
 
 class UnlockSheet extends StatefulWidget {
   final ValueChanged<MountedContainer> onMounted;
-  const UnlockSheet({Key? key, required this.onMounted}) : super(key: key);
+  final String? initialUri;
+  final String? initialName;
+
+  const UnlockSheet({
+    Key? key, 
+    required this.onMounted, 
+    this.initialUri, 
+    this.initialName,
+  }) : super(key: key);
 
   @override
   State<UnlockSheet> createState() => _UnlockSheetState();
@@ -19,18 +27,17 @@ class _UnlockSheetState extends State<UnlockSheet> {
   String? _selectedName;
   bool _obscure = true;
   bool _loading = false;
+  bool _remember = false;
   String? _error;
-  List<Map<String, String>> _recentContainers = [];
 
   @override
   void initState() {
     super.initState();
-    _loadRecents();
-  }
-
-  Future<void> _loadRecents() async {
-    final list = await SavedContainerService.loadContainers();
-    if (mounted) setState(() => _recentContainers = list);
+    if (widget.initialUri != null) {
+      _selectedUri = widget.initialUri;
+      _selectedName = widget.initialName;
+      _remember = true; // Container is already saved on dashboard
+    }
   }
 
   @override
@@ -41,6 +48,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
   }
 
   Future<void> _pickFile() async {
+    if (widget.initialUri != null) return; // Prevent picking if locked to a saved one
+
     try {
       final result = await vaultexplorerApi.pickContainer();
       if (result != null) {
@@ -83,7 +92,9 @@ class _UnlockSheetState extends State<UnlockSheet> {
       );
 
       if (result != null) {
-        await SavedContainerService.saveContainer(_selectedUri!, name);
+        if (_remember) {
+          await SavedContainerService.saveContainer(_selectedUri!, name);
+        }
 
         final tempContainer = MountedContainer(
           uri: _selectedUri!,
@@ -157,53 +168,14 @@ class _UnlockSheetState extends State<UnlockSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-              Text('Mount Container',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontSize: 17)),
+              Text(
+                widget.initialUri != null ? 'Unlock Container' : 'Mount Container',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontSize: 17)
+              ),
               const SizedBox(height: 12),
-
-              // Saved Containers
-              if (_recentContainers.isNotEmpty && _selectedUri == null) ...[
-                const Text('Saved Containers:',
-                    style: TextStyle(
-                        color: Color(0xFF7A8899), fontSize: 11)),
-                const SizedBox(height: 6),
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 120),
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _recentContainers.length,
-                    itemBuilder: (context, idx) {
-                      final item = _recentContainers[idx];
-                      return ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.history,
-                            size: 16, color: Color(0xFF4FC3F7)),
-                        title: Text(item['name']!,
-                            style: const TextStyle(
-                                fontSize: 13, color: Colors.white)),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline,
-                              size: 16, color: Colors.red),
-                          onPressed: () async {
-                            await SavedContainerService.removeContainer(
-                                item['uri']!);
-                            _loadRecents();
-                          },
-                        ),
-                        onTap: () => setState(() {
-                          _selectedUri = item['uri'];
-                          _selectedName = item['name'];
-                        }),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
 
               // File picker row
               GestureDetector(
@@ -244,7 +216,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (_selectedUri != null) ...[
+                      if (_selectedUri != null && widget.initialUri == null) ...[
                         GestureDetector(
                           onTap: () => setState(() {
                             _selectedUri = null;
@@ -256,6 +228,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
                         const SizedBox(width: 8),
                         Icon(Icons.check_circle,
                             size: 16, color: cs.primary),
+                      ] else if (_selectedUri != null && widget.initialUri != null) ...[
+                        Icon(Icons.lock_outline, size: 16, color: cs.primary),
                       ],
                     ],
                   ),
@@ -266,6 +240,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
               TextField(
                 controller: _passwordCtrl,
                 obscureText: _obscure,
+                autofocus: widget.initialUri != null,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   prefixIcon:
@@ -291,6 +266,24 @@ class _UnlockSheetState extends State<UnlockSheet> {
                   prefixIcon: Icon(Icons.tune, size: 18),
                 ),
               ),
+
+              if (widget.initialUri == null) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _remember,
+                      onChanged: (val) => setState(() => _remember = val ?? false),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => setState(() => _remember = !_remember),
+                      child: const Text('Remember container on dashboard', style: TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                ),
+              ],
 
               if (_error != null) ...[
                 const SizedBox(height: 12),

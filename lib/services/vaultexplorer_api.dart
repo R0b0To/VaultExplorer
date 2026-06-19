@@ -6,7 +6,26 @@ import '../models/mounted_container.dart';
 
 class vaultexplorerApi {
   static const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
-
+  static Future<bool> createContainer({
+  required String displayName,
+  required int sizeBytes,
+  required String password,
+  required int pim,
+  required String fileSystem,
+}) async {
+  try {
+    final bool? success = await _channel.invokeMethod<bool>('createContainer', {
+      'displayName': displayName,
+      'sizeBytes': sizeBytes,
+      'password': password,
+      'pim': pim,
+      'fileSystem': fileSystem,
+    });
+    return success ?? false;
+  } on PlatformException catch (e) {
+    throw e;
+  }
+}
   static Future<({String uri, String displayName})?> pickContainer() async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>('pickContainer');
     if (raw == null) return null;

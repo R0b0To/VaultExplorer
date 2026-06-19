@@ -37,4 +37,7 @@ object VeraCryptEngine {
 
     @JvmStatic
     external fun getSpaceInfoNative(fd: Int, password: String, pim: Int, volId: Int): LongArray?
+
+    @JvmStatic
+    external fun createContainerNative(fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String): Boolean
 }

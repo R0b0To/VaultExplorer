@@ -654,3 +654,28 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfoNative(
     env->SetLongArrayRegion(ret, 0, 2, tmp);
     return ret;
 }
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring password, jint pim, jlong sizeBytes, jstring fileSystem) {
+
+    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativeFS   = env->GetStringUTFChars(fileSystem, nullptr);
+
+    bool success = false;
+
+    // TODO: Write your VeraCrypt container initialization here.
+    // 1. Generate salt and master keys.
+    // 2. Perform PBKDF2 (SHA-512) to encrypt your VeraCrypt headers.
+    // 3. Write empty cryptographically-encrypted blocks conforming to sizeBytes.
+    // 4. Build/format FAT32 or exFAT metadata filesystem boundaries.
+    
+    // For safety, ensure that the file descriptor is closed properly at the end.
+    
+    env->ReleaseStringUTFChars(password, nativePass);
+    env->ReleaseStringUTFChars(fileSystem, nativeFS);
+    close(fd);
+
+    return success ? JNI_TRUE : JNI_FALSE;
+}

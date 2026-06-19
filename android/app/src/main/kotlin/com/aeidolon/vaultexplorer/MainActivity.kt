@@ -10,12 +10,17 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import android.content.ClipboardManager
+import android.content.ClipData
+import android.content.Context
+import android.os.Build
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.aeidolon.vaultexplorer/engine"
     private val PICK_CONTAINER_REQUEST = 1001
     private val IMPORT_FILE_REQUEST = 1002
     private val EXPORT_FILE_REQUEST = 1003
+    private val CREATE_CONTAINER_REQUEST = 1004
     private var pendingFlutterResult: MethodChannel.Result? = null
 
     private var pendingImportContainerUri: String? = null
@@ -29,6 +34,49 @@ class MainActivity : FlutterActivity() {
     private var pendingExportPassword: String? = null
     private var pendingExportPim: Int = 0
     private var pendingExportVolId: Int = 0
+
+    private var pendingCreateName: String? = null
+    private var pendingCreateSize: Long = 0L
+    private var pendingCreatePassword: String? = null
+    private var pendingCreatePim: Int = 0
+    private var pendingCreateFileSystem: String? = null
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            sanitizeClipboard()
+        }
+    }
+
+    private fun sanitizeClipboard() {
+        try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+            if (clipboard.hasPrimaryClip()) {
+                val description = clipboard.primaryClipDescription
+                if (description != null) {
+                    var isCorrupt = false
+                    // Inspect the MIME types for any null values that trigger the Android platform bug
+                    for (i in 0 until description.mimeTypeCount) {
+                        if (description.getMimeType(i) == null) {
+                            isCorrupt = true
+                            break
+                        }
+                    }
+                    if (isCorrupt) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            clipboard.clearPrimaryClip()
+                        } else {
+                            @Suppress("DEPRECATION")
+                            clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Fallback to prevent crashes from clipboard security or permission checks
+        }
+    }
+
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -45,6 +93,22 @@ class MainActivity : FlutterActivity() {
                         }
                         startActivityForResult(intent, PICK_CONTAINER_REQUEST)
                     }
+
+                    "createContainer" -> {
+    pendingResultCheck(result)
+    pendingCreateName       = call.argument<String>("displayName")
+    pendingCreateSize       = call.argument<Number>("sizeBytes")?.toLong() ?: 0L
+    pendingCreatePassword   = call.argument<String>("password")
+    pendingCreatePim        = call.argument<Number>("pim")?.toInt() ?: 0
+    pendingCreateFileSystem = call.argument<String>("fileSystem")
+
+    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = "application/octet-stream"
+        putExtra(Intent.EXTRA_TITLE, pendingCreateName ?: "vault.tc")
+    }
+    startActivityForResult(intent, CREATE_CONTAINER_REQUEST)
+}
 
                     "unlockContainer" -> {
                         val uriString   = call.argument<String>("filePath")
@@ -417,8 +481,7 @@ class MainActivity : FlutterActivity() {
         pendingFlutterResult = result
     }
 
-    // [FIX 3] Resolve the real filename via OpenableColumns.DISPLAY_NAME and
-    // return both uri + displayName so Flutter never has to parse the URI itself.
+
     private fun resolveDisplayName(uri: Uri): String {
         return try {
             contentResolver.query(
@@ -455,6 +518,53 @@ class MainActivity : FlutterActivity() {
             }
             return
         }
+
+        if (requestCode == CREATE_CONTAINER_REQUEST) {
+    val res = pendingFlutterResult ?: return; pendingFlutterResult = null
+    
+    // DIAGNOSTIC LOG 1
+    println("VaultExplorer_Diag: onActivityResult triggered. ResultCode: $resultCode (OK is ${Activity.RESULT_OK}), Uri: ${data?.data}")
+
+    if (resultCode == Activity.RESULT_OK && data?.data != null) {
+        val destUri = data.data!!
+        val size    = pendingCreateSize
+        val pass    = pendingCreatePassword
+        val pim     = pendingCreatePim
+        val fs      = pendingCreateFileSystem ?: "fat"
+
+        if (pass != null && size > 0) {
+            Thread {
+                try {
+                    val pfd = contentResolver.openFileDescriptor(destUri, "rw")
+                        ?: throw Exception("Could not open file descriptor in write mode")
+                    val fd = pfd.detachFd()
+
+                    // DIAGNOSTIC LOG 2
+                    println("VaultExplorer_Diag: Calling C++ Native Create Container...")
+
+                    val success = VeraCryptEngine.createContainerNative(
+                        fd, pass, pim, size, fs
+                    )
+
+                    // DIAGNOSTIC LOG 3
+                    println("VaultExplorer_Diag: C++ Native Create returned: $success")
+
+                    runOnUiThread { res.success(success) }
+                } catch (e: Exception) {
+                    println("VaultExplorer_Diag: Native Exception: ${e.message}")
+                    runOnUiThread { res.error("CREATE_ERROR", e.message, null) }
+                }
+            }.start()
+        } else {
+            println("VaultExplorer_Diag: Validation failed (pass is null or size <= 0)")
+            res.success(false)
+        }
+    } else {
+        println("VaultExplorer_Diag: Intent result was cancelled or data was null")
+        res.success(false)
+    }
+    return
+}
 
         if (requestCode == IMPORT_FILE_REQUEST) {
             val res = pendingFlutterResult ?: return; pendingFlutterResult = null

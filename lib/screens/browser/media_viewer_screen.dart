@@ -28,6 +28,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _showUI = true;
   bool _isLandscape = false; 
 
+  // Stateful Playlist and Settings
+  late List<String> _originalList;
+  late List<String> _currentPlaylist;
+  bool _isShuffled = false;
+  
+  // Default filter mode is strictly "Current Folder Only"
+  String _selectedFolder = 'Current Folder Only';
+  int _doubleTapSkipSeconds = 5; 
+
+  ScrollPhysics _pagePhysics = const ClampingScrollPhysics();
+
   _LocalStreamingServer? _streamingServer;
   int? _serverPort;
   bool _serverReady = false;
@@ -35,9 +46,101 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   @override
   void initState() {
     super.initState();
+    _originalList = List.from(widget.mediaFiles);
+    _currentPlaylist = List.from(widget.mediaFiles);
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
+    
     _startServer();
+    
+    // Background scanning for recursive files in subfolders
+    _loadRecursiveMedia();
+  }
+
+  String _getBaseDir() {
+    final firstFile = widget.mediaFiles.first;
+    if (!firstFile.contains('/')) {
+      return '';
+    }
+    return firstFile.substring(0, firstFile.lastIndexOf('/'));
+  }
+
+  bool _isSupportedMedia(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    return ['jpg','jpeg','png','gif','webp','mp4','m4v','webm','mov','avi','mkv']
+        .contains(ext);
+  }
+
+  // Quiet background scanning for subfolders starting from the current directory
+  Future<void> _loadRecursiveMedia() async {
+    final baseDir = _getBaseDir();
+    final recursiveFiles = await _scanDirectoryRecursively(baseDir);
+    
+    if (recursiveFiles.isEmpty) return;
+
+    if (mounted) {
+      setState(() {
+        final currentFile = _currentPlaylist[_currentIndex];
+        
+        // originalList caches all recursive media files found
+        _originalList = List.from(recursiveFiles);
+
+        // Keep current item playing while updating swiper database
+        _applyFolderFiltering(_selectedFolder, currentFile);
+      });
+    }
+  }
+
+  Future<List<String>> _scanDirectoryRecursively(String baseDir) async {
+    List<String> foundFiles = [];
+    try {
+      final items = await CryptBridgeApi.listDirectory(widget.container, baseDir);
+      if (items != null) {
+        for (final item in items) {
+          if (item.startsWith('[DIR] ')) {
+            final subDirName = item.replaceFirst('[DIR] ', '');
+            final subDirPath = baseDir.isEmpty ? subDirName : '$baseDir/$subDirName';
+            final nested = await _scanDirectoryRecursively(subDirPath);
+            foundFiles.addAll(nested);
+          } else if (!item.startsWith('System:')) {
+            final fileName = item.split('|').first;
+            if (_isSupportedMedia(fileName)) {
+              final fullPath = baseDir.isEmpty ? fileName : '$baseDir/$fileName';
+              foundFiles.add(fullPath);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error walking subdirectories: $e");
+    }
+    return foundFiles;
+  }
+
+  void _applyFolderFiltering(String folder, String currentFile) {
+    final baseDir = _getBaseDir();
+    List<String> filteredList;
+
+    if (folder == 'All') {
+      filteredList = List.from(_originalList);
+    } else {
+      // Current Folder Only: limit files directly to base directory
+      filteredList = _originalList.where((file) {
+        final dir = file.contains('/') ? file.substring(0, file.lastIndexOf('/')) : '';
+        return dir == baseDir;
+      }).toList();
+    }
+
+    int newIndex = filteredList.indexOf(currentFile);
+    if (newIndex == -1) {
+      newIndex = 0;
+    }
+
+    if (filteredList.isNotEmpty) {
+      _currentPlaylist = filteredList;
+      _currentIndex = newIndex;
+      _pageController.jumpToPage(_currentIndex);
+    }
   }
 
   Future<void> _startServer() async {
@@ -56,7 +159,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _pageController.dispose();
     _streamingServer?.stop();
     
-    // Safety Restorations
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
@@ -68,8 +170,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _showUI = show;
       });
       if (show) {
-         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       } else {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       }
@@ -92,8 +194,116 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
+  // Shuffle Playlist logic without losing current item position
+  void _toggleShuffle() {
+    setState(() {
+      final currentFile = _currentPlaylist[_currentIndex];
+      if (!_isShuffled) {
+        final List<String> shuffled = List.from(_currentPlaylist);
+        shuffled.remove(currentFile);
+        shuffled.shuffle();
+        shuffled.insert(0, currentFile); 
+        _currentPlaylist = shuffled;
+        _currentIndex = 0;
+        _pageController.jumpToPage(0);
+        _isShuffled = true;
+      } else {
+        _applyFolderFiltering(_selectedFolder, currentFile);
+        _isShuffled = false;
+      }
+    });
+  }
+
+  // Filter viewport by selection
+  void _filterByFolder(String folder) {
+    setState(() {
+      _selectedFolder = folder;
+      final currentFile = _currentPlaylist[_currentIndex];
+      _applyFolderFiltering(folder, currentFile);
+    });
+  }
+
+  // External launcher bridge
+  Future<void> _openWithApp() async {
+    final currentFile = _currentPlaylist[_currentIndex];
+    try {
+      await CryptBridgeApi.openWithApp(widget.container, currentFile);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open file in external app: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Safe Deletion & Viewport Re-index
+  Future<void> _deleteCurrentFile() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('Delete file?', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'This action is permanent and cannot be undone.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final currentFile = _currentPlaylist[_currentIndex];
+      bool success = false;
+
+      try {
+        // Direct physical deletion from the encrypted storage container
+        success = await CryptBridgeApi.deleteFile(widget.container, currentFile);
+      } catch (e) {
+        debugPrint("Error executing API deletion: $e");
+      }
+
+      if (success && mounted) {
+        setState(() {
+          _currentPlaylist.removeAt(_currentIndex);
+          _originalList.remove(currentFile);
+          
+          if (_currentPlaylist.isEmpty) {
+            Navigator.pop(context);
+            return;
+          }
+          if (_currentIndex >= _currentPlaylist.length) {
+            _currentIndex = _currentPlaylist.length - 1;
+          }
+          _pageController.jumpToPage(_currentIndex);
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File deleted successfully')),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete file'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _exportCurrentFile() async {
-    final fileName = widget.mediaFiles[_currentIndex];
+    final fileName = _currentPlaylist[_currentIndex];
     final publicDownloads = Directory('/storage/emulated/0/Download');
     if (!await publicDownloads.exists()) {
       await publicDownloads.create(recursive: true);
@@ -143,8 +353,21 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       );
     }
 
-    final total = widget.mediaFiles.length;
-    final currentName = widget.mediaFiles[_currentIndex];
+    // RangeError Safety Guard: Blocks rebuilding error during transitions
+    if (_currentPlaylist.isEmpty) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4FC3F7)),
+          ),
+        ),
+      );
+    }
+
+    final total = _currentPlaylist.length;
+    final currentName = _currentPlaylist[_currentIndex];
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -153,6 +376,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           // Media Swiper
           PageView.builder(
             controller: _pageController,
+            physics: _pagePhysics,
             itemCount: total,
             onPageChanged: (index) {
               setState(() {
@@ -160,17 +384,25 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               });
             },
             itemBuilder: (context, index) {
-              final streamUrl = 'http://127.0.0.1:$_serverPort/media?file=${widget.mediaFiles[index]}';
+              final streamUrl = 'http://127.0.0.1:$_serverPort/media?file=${_currentPlaylist[index]}';
               return _MediaPage(
-                fileName: widget.mediaFiles[index],
+                fileName: _currentPlaylist[index],
                 streamUrl: streamUrl,
                 showUI: _showUI,
-                onToggleUI: _setUIVisibility, 
+                onToggleUI: _setUIVisibility,
+                skipSeconds: _doubleTapSkipSeconds,
+                onZoomChanged: (allowSwipe) {
+                  setState(() {
+                    _pagePhysics = allowSwipe 
+                        ? const ClampingScrollPhysics() 
+                        : const NeverScrollableScrollPhysics();
+                  });
+                },
               );
             },
           ),
 
-          // Top Immersive Bar
+          // Top Action Bar
           AnimatedPositioned(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOut,
@@ -216,6 +448,53 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                       ],
                     ),
                   ),
+                  // Filter selection: Current Folder Only OR All (including subfolders)
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.folder_open, color: Colors.white),
+                    tooltip: 'Set Directory Filter',
+                    onSelected: _filterByFolder,
+                    itemBuilder: (context) {
+                      return [
+                        PopupMenuItem<String>(
+                          value: 'Current Folder Only',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.folder_shared,
+                                color: _selectedFolder == 'Current Folder Only' ? const Color(0xFF4FC3F7) : Colors.grey,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text('Current Folder Only'),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'All',
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.all_inclusive,
+                                color: _selectedFolder == 'All' ? const Color(0xFF4FC3F7) : Colors.grey,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text('All (Incl. Subfolders)'),
+                            ],
+                          ),
+                        ),
+                      ];
+                    },
+                  ),
+                  // Shuffle Playlist Toggle
+                  IconButton(
+                    icon: Icon(
+                      Icons.shuffle,
+                      color: _isShuffled ? const Color(0xFF4FC3F7) : Colors.white,
+                    ),
+                    tooltip: 'Shuffle Playlist',
+                    onPressed: _toggleShuffle,
+                  ),
                   IconButton(
                     icon: Icon(
                       _isLandscape ? Icons.screen_lock_portrait : Icons.screen_rotation,
@@ -229,6 +508,69 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     tooltip: 'Export to Downloads',
                     onPressed: _exportCurrentFile,
                   ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                    tooltip: 'Delete File',
+                    onPressed: _deleteCurrentFile,
+                  ),
+                  // Unified Settings & General Options Menu
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert, color: Colors.white),
+                    tooltip: 'More Actions',
+                    onSelected: (value) {
+                      if (value == 'open_with') {
+                        _openWithApp();
+                      } else if (value.startsWith('skip_')) {
+                        final seconds = int.parse(value.split('_')[1]);
+                        setState(() {
+                          _doubleTapSkipSeconds = seconds;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Double-tap skip set to ${seconds}s')),
+                        );
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem<String>(
+                        value: 'open_with',
+                        child: Row(
+                          children: [
+                            Icon(Icons.open_in_new, size: 18),
+                            SizedBox(width: 8),
+                            Text('Open with App'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      PopupMenuItem<String>(
+                        enabled: false,
+                        child: Text(
+                          'Seek Skip Settings',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).disabledColor,
+                          ),
+                        ),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'skip_5',
+                        child: Text('Skip 5s (Default) ${_doubleTapSkipSeconds == 5 ? '✓' : ''}'),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'skip_10',
+                        child: Text('Skip 10s ${_doubleTapSkipSeconds == 10 ? '✓' : ''}'),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'skip_15',
+                        child: Text('Skip 15s ${_doubleTapSkipSeconds == 15 ? '✓' : ''}'),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'skip_30',
+                        child: Text('Skip 30s ${_doubleTapSkipSeconds == 30 ? '✓' : ''}'),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -239,11 +581,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 }
 
-class _MediaPage extends StatelessWidget {
+class _MediaPage extends StatefulWidget {
   final String fileName;
   final String streamUrl;
   final bool showUI;
   final ValueChanged<bool> onToggleUI;
+  final ValueChanged<bool> onZoomChanged; 
+  final int skipSeconds;
 
   const _MediaPage({
     Key? key,
@@ -251,23 +595,83 @@ class _MediaPage extends StatelessWidget {
     required this.streamUrl,
     required this.showUI,
     required this.onToggleUI,
+    required this.onZoomChanged,
+    required this.skipSeconds,
   }) : super(key: key);
 
   @override
+  State<_MediaPage> createState() => _MediaPageState();
+}
+
+class _MediaPageState extends State<_MediaPage> {
+  final TransformationController _transformationController = TransformationController();
+  double _scale = 1.0;
+  TapDownDetails? _doubleTapDetails;
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _handleDoubleTap() {
+    final position = _doubleTapDetails?.localPosition;
+    setState(() {
+      if (_scale == 1.0) {
+        _scale = 2.5;
+        if (position != null) {
+          final x = -position.dx * (_scale - 1);
+          final y = -position.dy * (_scale - 1);
+          _transformationController.value = Matrix4.identity()
+            ..translate(x, y)
+            ..scale(_scale);
+        } else {
+          _transformationController.value = Matrix4.identity()..scale(_scale);
+        }
+        widget.onZoomChanged(false); 
+      } else {
+        _scale = 1.0;
+        _transformationController.value = Matrix4.identity();
+        widget.onZoomChanged(true); 
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ext = fileName.split('.').last.toLowerCase();
+    final ext = widget.fileName.split('.').last.toLowerCase();
     final isImg = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext);
 
     return Container(
       color: Colors.black,
       child: isImg
           ? GestureDetector(
-              onTap: () => onToggleUI(!showUI), 
+              onTap: () => widget.onToggleUI(!widget.showUI), 
+              onDoubleTapDown: (details) {
+                _doubleTapDetails = details;
+              },
+              onDoubleTap: _handleDoubleTap,
               child: InteractiveViewer(
+                transformationController: _transformationController,
                 maxScale: 4.0,
+                onInteractionUpdate: (details) {
+                  final newScale = _transformationController.value.getMaxScaleOnAxis();
+                  if (newScale != _scale) {
+                    setState(() {
+                      _scale = newScale;
+                    });
+                    widget.onZoomChanged(newScale <= 1.01);
+                  }
+                },
+                onInteractionEnd: (details) {
+                  final newScale = _transformationController.value.getMaxScaleOnAxis();
+                  if (newScale <= 1.01) {
+                    widget.onZoomChanged(true);
+                  }
+                },
                 child: Center(
                   child: Image.network(
-                    streamUrl,
+                    widget.streamUrl,
                     fit: BoxFit.contain,
                     errorBuilder: (context, error, stackTrace) => const Center(
                       child: Text('Failed to stream image.', style: TextStyle(color: Colors.red)),
@@ -277,9 +681,11 @@ class _MediaPage extends StatelessWidget {
               ),
             )
           : RealVideoPlayerWidget(
-              streamUrl: streamUrl,
-              showUI: showUI,
-              onToggleUI: onToggleUI,
+              streamUrl: widget.streamUrl,
+              showUI: widget.showUI,
+              onToggleUI: widget.onToggleUI,
+              skipSeconds: widget.skipSeconds,
+              onZoomChanged: widget.onZoomChanged,
             ),
     );
   }
@@ -293,12 +699,16 @@ class RealVideoPlayerWidget extends StatefulWidget {
   final String streamUrl;
   final bool showUI;
   final ValueChanged<bool> onToggleUI;
+  final int skipSeconds;
+  final ValueChanged<bool> onZoomChanged; 
 
   const RealVideoPlayerWidget({
     Key? key,
     required this.streamUrl,
     required this.showUI,
     required this.onToggleUI,
+    required this.skipSeconds,
+    required this.onZoomChanged,
   }) : super(key: key);
 
   @override
@@ -317,6 +727,15 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
 
   Timer? _hideTimer;
   DateTime _lastSeekTime = DateTime.now();
+
+  // On-Screen skip state flags
+  bool _showLeftIndicator = false;
+  bool _showRightIndicator = false;
+
+  // Video Zoom State
+  final TransformationController _videoTransformationController = TransformationController();
+  double _videoScale = 1.0;
+  TapDownDetails? _videoDoubleTapDetails;
 
   @override
   void initState() {
@@ -375,6 +794,7 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _videoTransformationController.dispose();
     if (_initialized) {
       _controller.dispose();
     }
@@ -395,6 +815,65 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
       widget.onToggleUI(true); 
     }
     _startHideTimer();
+  }
+
+  // Double-tap zoom logic for Video canvas
+  void _handleVideoDoubleTap() {
+    final position = _videoDoubleTapDetails?.localPosition;
+    setState(() {
+      if (_videoScale == 1.0) {
+        _videoScale = 2.2;
+        if (position != null) {
+          final x = -position.dx * (_videoScale - 1);
+          final y = -position.dy * (_videoScale - 1);
+          _videoTransformationController.value = Matrix4.identity()
+            ..translate(x, y)
+            ..scale(_videoScale);
+        } else {
+          _videoTransformationController.value = Matrix4.identity()..scale(_videoScale);
+        }
+        widget.onZoomChanged(false); 
+      } else {
+        _videoScale = 1.0;
+        _videoTransformationController.value = Matrix4.identity();
+        widget.onZoomChanged(true); 
+      }
+    });
+  }
+
+  // Skips backwards/forwards with visual screen feedback
+  void _skip({required bool backwards}) {
+    _showControlsAndResetTimer();
+    final currentPos = _controller.value.position;
+    final targetPos = backwards 
+        ? currentPos - Duration(seconds: widget.skipSeconds)
+        : currentPos + Duration(seconds: widget.skipSeconds);
+    
+    final clampedPos = targetPos < Duration.zero 
+        ? Duration.zero 
+        : (targetPos > _duration ? _duration : targetPos);
+        
+    _controller.seekTo(clampedPos);
+
+    setState(() {
+      if (backwards) {
+        _showLeftIndicator = true;
+      } else {
+        _showRightIndicator = true;
+      }
+    });
+
+    Timer(const Duration(milliseconds: 550), () {
+      if (mounted) {
+        setState(() {
+          if (backwards) {
+            _showLeftIndicator = false;
+          } else {
+            _showRightIndicator = false;
+          }
+        });
+      }
+    });
   }
 
   String _formatDuration(Duration duration) {
@@ -434,43 +913,151 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
       );
     }
 
-    final cs = Theme.of(context).colorScheme;
-
     return ClipRect(
-      // Clips horizontally strictly to the phone's left & right boundaries,
-      // but allows the video to expand vertically all the way to the top and bottom of the screen [1.1.4].
       child: Stack(
-        clipBehavior: Clip.none, // Allows elements to animate off-screen without clipping the main canvas
+        clipBehavior: Clip.none, 
         alignment: Alignment.center,
         children: [
-          // Full-screen InteractiveViewer for zoom-to-fill capability [5]
           InteractiveViewer(
+            transformationController: _videoTransformationController,
             maxScale: 6.0,
             minScale: 1.0,
-            clipBehavior: Clip.none, // Allows the video to expand past standard aspect-ratio bounds [1.1.4]
+            clipBehavior: Clip.none, 
+            onInteractionUpdate: (details) {
+              final newScale = _videoTransformationController.value.getMaxScaleOnAxis();
+              if (newScale != _videoScale) {
+                setState(() {
+                  _videoScale = newScale;
+                });
+                widget.onZoomChanged(newScale <= 1.01);
+              }
+            },
+            onInteractionEnd: (details) {
+              final newScale = _videoTransformationController.value.getMaxScaleOnAxis();
+              if (newScale <= 1.01) {
+                widget.onZoomChanged(true);
+              }
+            },
             child: Center(
               child: AspectRatio(
                 aspectRatio: _controller.value.aspectRatio,
-                child: GestureDetector(
-                  onTap: () {
-                    widget.onToggleUI(!widget.showUI); 
-                    if (!widget.showUI) {
-                      _startHideTimer();
-                    }
-                  },
-                  child: VideoPlayer(_controller),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    VideoPlayer(_controller),
+                    
+                    // Gesture Detector Zones Overlay (Left Skip, Middle Zoom, Right Skip)
+                    Row(
+                      children: [
+                        // Left Side Skip Area
+                        Expanded(
+                          flex: 3,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onTap: () {
+                              widget.onToggleUI(!widget.showUI); 
+                              if (!widget.showUI) {
+                                _startHideTimer();
+                              }
+                            },
+                            onDoubleTap: () => _skip(backwards: true),
+                            child: Container(),
+                          ),
+                        ),
+                        // Play/Pause middle toggle area & Double Tap to Zoom Video
+                        Expanded(
+                          flex: 4,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onTap: () {
+                              widget.onToggleUI(!widget.showUI); 
+                              if (!widget.showUI) {
+                                _startHideTimer();
+                              }
+                            },
+                            onDoubleTapDown: (details) {
+                              _videoDoubleTapDetails = details;
+                            },
+                            onDoubleTap: _handleVideoDoubleTap,
+                            child: Container(),
+                          ),
+                        ),
+                        // Right Side Skip Area
+                        Expanded(
+                          flex: 3,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onTap: () {
+                              widget.onToggleUI(!widget.showUI); 
+                              if (!widget.showUI) {
+                                _startHideTimer();
+                              }
+                            },
+                            onDoubleTap: () => _skip(backwards: false),
+                            child: Container(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
 
-          // Auto-Hiding Seekbar Control Panel (Now positioned relative to the screen bottom)
+          // Double Tap Seeking Left Pop Animation
+          if (_showLeftIndicator)
+            Positioned(
+              left: 45,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.55),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.fast_rewind, color: Colors.white, size: 28),
+                      const SizedBox(height: 4),
+                      Text('-${widget.skipSeconds}s', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Double Tap Seeking Right Pop Animation
+          if (_showRightIndicator)
+            Positioned(
+              right: 45,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.55),
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.fast_forward, color: Colors.white, size: 28),
+                      const SizedBox(height: 4),
+                      Text('+${widget.skipSeconds}s', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Auto-Hiding Seekbar Control Panel
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
             left: 0,
             right: 0,
-            bottom: widget.showUI ? 0 : -100, // Moves out of view below the screen boundary
+            bottom: widget.showUI ? 0 : -100, 
             child: Container(
               padding: EdgeInsets.only(
                 top: 8,
@@ -518,7 +1105,6 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
                             _sliderValue = value;
                           });
                           
-                          // Throttled seeking to update video frames instantly while scrubbing
                           final now = DateTime.now();
                           if (now.difference(_lastSeekTime).inMilliseconds > 100) {
                             _lastSeekTime = now;
@@ -705,7 +1291,7 @@ class _LocalStreamingServer {
     switch (ext) {
       case 'mp4':
       case 'm4v': return 'video/mp4';
-      case 'webm': return 'video/webm'; // Added 'webm'
+      case 'webm': return 'video/webm'; 
       case 'mkv': return 'video/x-matroska';
       case 'mov': return 'video/quicktime';
       case 'avi': return 'video/x-msvideo';

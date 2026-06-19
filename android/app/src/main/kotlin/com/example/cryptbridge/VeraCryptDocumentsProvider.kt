@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Point
 import android.net.Uri
+import android.os.Build
 import android.os.CancellationSignal
 import android.os.Handler
 import android.os.ParcelFileDescriptor
@@ -49,9 +50,15 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
     }
 
     override fun queryRoots(projection: Array<out String>?): Cursor {
-        val flags = DocumentsContract.Root.FLAG_SUPPORTS_CREATE or 
+        var flags = DocumentsContract.Root.FLAG_SUPPORTS_CREATE or 
                     DocumentsContract.Root.FLAG_LOCAL_ONLY or
                     DocumentsContract.Root.FLAG_SUPPORTS_EJECT
+                    
+        // Crucial: Tell the system that this provider supports sub-tree validation.
+        // This is what makes it appear in standard app document pickers.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            flags = flags or DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD
+        }
                     
         val cursor = MatrixCursor(projection ?: defaultRootProjection)
 
@@ -61,6 +68,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             
             cursor.newRow().apply {
                 add(DocumentsContract.Root.COLUMN_ROOT_ID, volId.toString())
+                add(DocumentsContract.Root.COLUMN_MIME_TYPES, "*/*") // Map MIME types to enable broad matching
                 add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, "$volId:dir:") // Root ID maps to dir:
                 add(DocumentsContract.Root.COLUMN_TITLE, rootTitle)
                 add(DocumentsContract.Root.COLUMN_SUMMARY, rootSummary)
@@ -69,17 +77,33 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             }
         }
 
-        if (!VeraCryptSession.hasAnyActiveSessions()) {
-            cursor.newRow().apply {
-                add(DocumentsContract.Root.COLUMN_ROOT_ID, "locked")
-                add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, "locked_placeholder")
-                add(DocumentsContract.Root.COLUMN_TITLE, "CryptBridge")
-                add(DocumentsContract.Root.COLUMN_SUMMARY, "Locked - Open App to Unlock")
-                add(DocumentsContract.Root.COLUMN_FLAGS, DocumentsContract.Root.FLAG_LOCAL_ONLY)
-                add(DocumentsContract.Root.COLUMN_ICON, android.R.drawable.ic_lock_idle_lock)
-            }
-        }
         return cursor
+    }
+
+    // Crucial: You must override this function when FLAG_SUPPORTS_IS_CHILD is set.
+    // The picker uses it to verify whether a file belongs within the open tree directory.
+    override fun isChildDocument(parentDocumentId: String?, documentId: String?): Boolean {
+        if (parentDocumentId == null || documentId == null) return false
+        
+        val parentParts = parentDocumentId.split(":")
+        val childParts = documentId.split(":")
+        if (parentParts.size < 2 || childParts.size < 2) return false
+        
+        // Ensure they belong to the same volume slot
+        val parentVolId = parentParts[0]
+        val childVolId = childParts[0]
+        if (parentVolId != childVolId) return false
+        
+        val parentFatPath = parentParts.drop(2).joinToString(":")
+        val childFatPath = childParts.drop(2).joinToString(":")
+        
+        return if (parentFatPath.isEmpty()) {
+            // An empty parent path represents the root directory, making any path a child.
+            true
+        } else {
+            // Check if child's path is a nested descendant of the parent path
+            childFatPath.startsWith("$parentFatPath/")
+        }
     }
 
     override fun ejectRoot(rootId: String?) {
@@ -93,22 +117,11 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
 
     override fun queryDocument(documentId: String?, projection: Array<out String>?): Cursor {
         val cursor = MatrixCursor(projection ?: defaultDocumentProjection)
-        val docId = documentId ?: "locked_placeholder"
-
-        if (docId == "locked_placeholder") {
-            cursor.newRow().apply {
-                add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, "locked_placeholder")
-                add(DocumentsContract.Document.COLUMN_MIME_TYPE, "text/plain")
-                add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, "⚠️ Please unlock container in CryptBridge App")
-                add(DocumentsContract.Document.COLUMN_FLAGS, 0)
-                add(DocumentsContract.Document.COLUMN_SIZE, 0)
-            }
-            return cursor
-        }
+        val docId = documentId ?: throw FileNotFoundException("No document ID")
 
         val parts = docId.split(":")
-        if (parts.size < 2) return cursor
-        val volId = parts[0].toIntOrNull() ?: return cursor
+        if (parts.size < 2) throw FileNotFoundException("Invalid document ID")
+        val volId = parts[0].toIntOrNull() ?: throw FileNotFoundException("Invalid volume ID")
         val type = parts[1]
         val fatPath = parts.drop(2).joinToString(":")
 
@@ -120,7 +133,6 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         }
         val mimeType = if (isDir) DocumentsContract.Document.MIME_TYPE_DIR else getMimeType(displayName)
 
-        // Query the actual file size from JNI when requested [5]
         val size = if (isDir) {
             0L
         } else {
@@ -153,29 +165,18 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             add(DocumentsContract.Document.COLUMN_MIME_TYPE, mimeType)
             add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, displayName)
             add(DocumentsContract.Document.COLUMN_FLAGS, flags)
-            add(DocumentsContract.Document.COLUMN_SIZE, size) // Set real size
+            add(DocumentsContract.Document.COLUMN_SIZE, size)
         }
         return cursor
     }
 
     override fun queryChildDocuments(parentDocumentId: String?, projection: Array<out String>?, sortOrder: String?): Cursor {
         val cursor = MatrixCursor(projection ?: defaultDocumentProjection)
-        val parentId = parentDocumentId ?: "locked_placeholder"
-        
-        if (parentId == "locked_placeholder") {
-            cursor.newRow().apply {
-                add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, "locked_placeholder")
-                add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, "⚠️ Please unlock container in CryptBridge App")
-                add(DocumentsContract.Document.COLUMN_MIME_TYPE, "text/plain")
-                add(DocumentsContract.Document.COLUMN_FLAGS, 0)
-                add(DocumentsContract.Document.COLUMN_SIZE, 0)
-            }
-            return cursor
-        }
+        val parentId = parentDocumentId ?: throw FileNotFoundException("No parent ID")
 
         val parts = parentId.split(":")
-        if (parts.size < 2) return cursor
-        val volId = parts[0].toIntOrNull() ?: return cursor
+        if (parts.size < 2) throw FileNotFoundException("Invalid parent ID")
+        val volId = parts[0].toIntOrNull() ?: throw FileNotFoundException("Invalid volume ID")
         val parentFatPath = parts.drop(2).joinToString(":")
 
         val session = VeraCryptSession.activeSessions[volId] ?: return cursor
@@ -191,14 +192,12 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                     if (file.startsWith("System:")) continue
                     
                     val isDir = file.startsWith("[DIR] ")
-                    // Strip the size metadata from JNI entry for standard filename parsing
                     val cleanName = if (isDir) {
                         file.substringAfter("[DIR] ")
                     } else {
                         file.substringBefore("|")
                     }
                     
-                    // Parse the size bytes directly [5]
                     val size = if (isDir) {
                         0L
                     } else {
@@ -224,7 +223,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                         add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, cleanName)
                         add(DocumentsContract.Document.COLUMN_MIME_TYPE, childMime)
                         add(DocumentsContract.Document.COLUMN_FLAGS, flags)
-                        add(DocumentsContract.Document.COLUMN_SIZE, size) // Set real size
+                        add(DocumentsContract.Document.COLUMN_SIZE, size)
                     }
                 }
             }
@@ -249,7 +248,6 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val cleanPath = if (parentFatPath.isEmpty()) fileName else "$parentFatPath/$fileName"
         val isDirectory = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
 
-        // OPENED IN "rw" (Read-Write) to authorize modifying directory structures [3]
         val success = if (isDirectory) {
             synchronized(VeraCryptSession.locks[volId]) {
                 VeraCryptEngine.createDirectoryNative(getFd(session.uri, "rw"), session.password, session.pim, cleanPath, volId)
@@ -285,7 +283,6 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val session = VeraCryptSession.activeSessions[volId] ?: throw FileNotFoundException("No session")
         val fatPath = parts.drop(2).joinToString(":")
 
-        // OPENED IN "rw" to permit unlinking files
         val success = synchronized(VeraCryptSession.locks[volId]) {
             VeraCryptEngine.deleteFileNative(getFd(session.uri, "rw"), session.password, session.pim, fatPath, volId)
         }
@@ -449,7 +446,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             fileName.endsWith(".webp", true) -> "image/webp"
             fileName.endsWith(".gif", true) -> "image/gif"
             fileName.endsWith(".mp4", true) || fileName.endsWith(".m4v", true) -> "video/mp4"
-            fileName.endsWith(".webm", true) -> "video/webm" // Added .webm
+            fileName.endsWith(".webm", true) -> "video/webm"
             fileName.endsWith(".mkv", true) -> "video/x-matroska"
             fileName.endsWith(".txt", true) -> "text/plain"
             fileName.endsWith(".pdf", true) -> "application/pdf"

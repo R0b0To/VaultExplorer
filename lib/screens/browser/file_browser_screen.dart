@@ -264,63 +264,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     );
   }
 
-  void _showImportSheet() {
-  showModalBottomSheet(
-    context: context,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (_) {
-      final cs = Theme.of(context).colorScheme;
-      return SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36, height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.outline,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text('Import', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.upload_file, color: cs.primary),
-                title: const Text('Files'),
-                subtitle: const Text('Pick one or more individual files'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _importFilesFromDevice();
-                },
-              ),
-              const Divider(),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.drive_folder_upload, color: cs.primary),
-                title: const Text('Folder'),
-                subtitle: const Text('Pick a folder and import its entire contents'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _importFolderFromDevice();
-                },
-              ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
   void _showCreateFileDialog() {
     final ctrl = TextEditingController();
     showDialog(
@@ -441,7 +384,7 @@ Future<void> _importFolderFromDevice() async {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(count > 0
-            ? 'Imported $count file${count != 1 ? 's' : ''} from folder'
+            ? 'Imported $count file${count != 1 ? 's' : ''}'
             : 'No files imported')),
       );
     }
@@ -753,12 +696,13 @@ AppBar _buildClipboardAppBar(ColorScheme cs) => AppBar(
                       _sortMenuItem(_SortBy.extension, 'Type'),
                     ],
                   ),
-                 PopupMenuButton<String>(
+                  PopupMenuButton<String>(
   icon: const Icon(Icons.add),
   onSelected: (v) {
     if (v == 'folder') _showCreateFolderDialog();
     else if (v == 'file') _showCreateFileDialog();
-    else if (v == 'import') _showImportSheet();
+    else if (v == 'import') _importFilesFromDevice();
+    else if (v == 'import_folder') _importFolderFromDevice();
   },
   itemBuilder: (_) => const [
     PopupMenuItem(value: 'folder',
@@ -767,10 +711,12 @@ AppBar _buildClipboardAppBar(ColorScheme cs) => AppBar(
     PopupMenuItem(value: 'file',
         child: ListTile(leading: Icon(Icons.insert_drive_file),
             title: Text('New File'))),
-    PopupMenuDivider(),
     PopupMenuItem(value: 'import',
-    child: ListTile(leading: Icon(Icons.upload_outlined),
-        title: Text('Import…'))),
+        child: ListTile(leading: Icon(Icons.drive_folder_upload),
+            title: Text('Import Files from Device'))),
+    PopupMenuItem(value: 'import_folder',
+        child: ListTile(leading: Icon(Icons.create_new_folder_outlined),
+            title: Text('Import Folder from Device'))),
   ],
 ),
                   

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/mounted_container.dart';
 import '../../../services/vaultexplorer_api.dart';
+import '../../../utils/format_utils.dart';
 import '../../browser/file_browser_screen.dart';
 
 class ContainerCard extends StatelessWidget {
@@ -14,18 +15,6 @@ class ContainerCard extends StatelessWidget {
     required this.onLocked,
     required this.onReturn,
   }) : super(key: key);
-
-  String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    double size = bytes.toDouble();
-    int idx = 0;
-    while (size >= 1024 && idx < suffixes.length - 1) {
-      size /= 1024;
-      idx++;
-    }
-    return '${size.toStringAsFixed(size < 10 ? 1 : 0)} ${suffixes[idx]}';
-  }
 
   Color _storageColor(double usedFraction, ColorScheme cs) {
     if (usedFraction > 0.90) return cs.error;
@@ -52,18 +41,17 @@ class ContainerCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => FileBrowserScreen(container: container)),
-    );
-    onReturn();
-  },
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => FileBrowserScreen(container: container)),
+          );
+          onReturn();
+        },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Header row ──────────────────────────────────────────────
               Row(
                 children: [
                   Container(
@@ -90,8 +78,7 @@ class ContainerCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           hasSpaceData
-                              ? '${_formatBytes(container.freeSpace)} free '
-                                  'of ${_formatBytes(container.totalSpace)}'
+                              ? '${FormatUtils.formatBytes(container.freeSpace)} free of ${FormatUtils.formatBytes(container.totalSpace)}'
                               : 'Volume ${container.volId}',
                           style:
                               Theme.of(context).textTheme.bodySmall,
@@ -103,8 +90,6 @@ class ContainerCard extends StatelessWidget {
                       container: container, onLocked: onLocked),
                 ],
               ),
-
-              // ── Storage usage bar ────────────────────────────────────────
               if (hasSpaceData) ...[
                 const SizedBox(height: 12),
                 ClipRRect(
@@ -118,12 +103,9 @@ class ContainerCard extends StatelessWidget {
                   ),
                 ),
               ],
-
               const SizedBox(height: 14),
               const Divider(),
               const SizedBox(height: 12),
-
-              // ── Stat row ─────────────────────────────────────────────────
               Row(
                 children: [
                   _StatChip(
@@ -156,8 +138,6 @@ class ContainerCard extends StatelessWidget {
   }
 }
 
-// ── Stat chip ─────────────────────────────────────────────────────────────────
-
 class _StatChip extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -177,8 +157,6 @@ class _StatChip extends StatelessWidget {
   }
 }
 
-// ── Lock button ───────────────────────────────────────────────────────────────
-
 class _LockButton extends StatefulWidget {
   final MountedContainer container;
   final ValueChanged<int> onLocked;
@@ -194,7 +172,7 @@ class _LockButtonState extends State<_LockButton> {
   Future<void> _lock() async {
     setState(() => _loading = true);
     try {
-      await vaultexplorerApi.lockContainer(widget.container.uri);
+      await vaultExplorerApi.lockContainer(widget.container.uri);
       widget.onLocked(widget.container.volId);
     } catch (e) {
       if (mounted) {
@@ -226,8 +204,6 @@ class _LockButtonState extends State<_LockButton> {
     );
   }
 }
-
-// ── Saved Container Card ──────────────────────────────────────────────────────
 
 class SavedContainerCard extends StatelessWidget {
   final String name;
@@ -291,7 +267,7 @@ class SavedContainerCard extends StatelessWidget {
               ),
               IconButton(
                 onPressed: onForget,
-                tooltip: 'Remove from dashboard',
+                tooltip: 'Forget container',
                 icon: Icon(Icons.close, color: cs.outline),
               ),
             ],

@@ -16,7 +16,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
   final _pimCtrl = TextEditingController();
   
   String _sizeUnit = 'MB';
-  String _fileSystem = 'FAT'; // FAT (FAT32) or exFAT
+  String _fileSystem = 'FAT'; 
   bool _obscure = true;
   bool _loading = false;
   String? _error;
@@ -45,6 +45,12 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
       return;
     }
 
+    final pim = _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0;
+    if (pim < 0 || pim > 9999) {
+      setState(() => _error = 'PIM must be a positive number up to 9999');
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -53,9 +59,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     try {
       final multiplier = _sizeUnit == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024;
       final sizeBytes = (sizeVal * multiplier).round();
-      final pim = _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0;
 
-      final success = await vaultexplorerApi.createContainer(
+      final success = await vaultExplorerApi.createContainer(
         displayName: _nameCtrl.text,
         sizeBytes: sizeBytes,
         password: _passwordCtrl.text,
@@ -86,7 +91,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     final mq = MediaQuery.of(context);
 
     return Container(
-      margin: EdgeInsets.only(bottom: mq.viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -113,13 +118,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                 ),
                 const SizedBox(height: 20),
                 Text('Create VeraCrypt Container',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontSize: 17)),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 17)),
                 const SizedBox(height: 16),
-
-                // File name
                 TextField(
                   controller: _nameCtrl,
                   decoration: const InputDecoration(
@@ -128,8 +128,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // Size and unit selection
                 Row(
                   children: [
                     Expanded(
@@ -162,8 +160,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                   ],
                 ),
                 const SizedBox(height: 12),
-
-                // Password
                 TextField(
                   controller: _passwordCtrl,
                   obscureText: _obscure,
@@ -181,19 +177,15 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // PIM
                 TextField(
                   controller: _pimCtrl,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    labelText: 'PIM  (leave blank for default)',
+                    labelText: 'PIM (leave blank for default)',
                     prefixIcon: Icon(Icons.tune, size: 18),
                   ),
                 ),
                 const SizedBox(height: 12),
-
-                // File System selection
                 DropdownButtonFormField<String>(
                   value: _fileSystem,
                   decoration: const InputDecoration(
@@ -208,7 +200,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                     if (val != null) setState(() => _fileSystem = val);
                   },
                 ),
-
                 if (_error != null) ...[
                   const SizedBox(height: 12),
                   Container(
@@ -223,32 +214,27 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                         Icon(Icons.error_outline, size: 16, color: cs.error),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(_error!,
-                              style: TextStyle(color: cs.error, fontSize: 12)),
+                          child: Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
                         ),
                       ],
                     ),
                   ),
                 ],
-
                 const SizedBox(height: 20),
                 FilledButton(
                   onPressed: _loading ? null : _create,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                   ),
                   child: _loading
                       ? const SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white)),
+                              strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)),
                         )
-                      : const Text('Create Container',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      : const Text('Create Container', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                 ),
               ],
             ),

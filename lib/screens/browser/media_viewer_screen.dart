@@ -94,7 +94,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   Future<List<String>> _scanDirectoryRecursively(String baseDir) async {
     List<String> foundFiles = [];
     try {
-      final items = await vaultexplorerApi.listDirectory(widget.container, baseDir);
+      final items = await vaultExplorerApi.listDirectory(widget.container, baseDir);
       if (items != null) {
         for (final item in items) {
           if (item.startsWith('[DIR] ')) {
@@ -227,7 +227,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   Future<void> _openWithApp() async {
     final currentFile = _currentPlaylist[_currentIndex];
     try {
-      await vaultexplorerApi.openWithApp(widget.container, currentFile);
+      await vaultExplorerApi.openWithApp(widget.container, currentFile);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -270,7 +270,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       bool success = false;
 
       try {
-        success = await vaultexplorerApi.deleteFile(widget.container, currentFile);
+        success = await vaultExplorerApi.deleteFile(widget.container, currentFile);
       } catch (e) {
         debugPrint("Error executing API deletion: $e");
       }
@@ -314,7 +314,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     );
 
     try {
-      final success = await vaultexplorerApi.decryptFile(
+      final success = await vaultExplorerApi.decryptFile(
         widget.container,
         fileName,
         destPath,
@@ -801,9 +801,9 @@ class _RealVideoPlayerWidgetState extends State<RealVideoPlayerWidget> {
   void dispose() {
     _hideTimer?.cancel();
     _videoTransformationController.dispose();
-    if (_initialized) {
+    try {
       _controller.dispose();
-    }
+    } catch (_) {}
     super.dispose();
   }
 
@@ -1278,7 +1278,7 @@ class _LocalStreamingServer {
         return;
       }
 
-      final fileSize = await vaultexplorerApi.getFileSize(container, fileName);
+      final fileSize = await vaultExplorerApi.getFileSize(container, fileName);
       if (fileSize <= 0) {
         request.response.statusCode = HttpStatus.notFound;
         await request.response.close();
@@ -1314,7 +1314,7 @@ class _LocalStreamingServer {
           final remaining = end - currentPosition + 1;
           final currentChunkSize = remaining < chunkSize ? remaining : chunkSize;
 
-          final bytes = await vaultexplorerApi.readFileChunk(
+          final bytes = await vaultExplorerApi.readFileChunk(
             container,
             fileName,
             currentPosition,
@@ -1339,7 +1339,7 @@ class _LocalStreamingServer {
           final remaining = fileSize - currentPosition;
           final currentChunkSize = remaining < chunkSize ? remaining : chunkSize;
 
-          final bytes = await vaultexplorerApi.readFileChunk(
+          final bytes = await vaultExplorerApi.readFileChunk(
             container,
             fileName,
             currentPosition,

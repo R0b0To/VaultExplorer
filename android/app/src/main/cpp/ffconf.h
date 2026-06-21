@@ -9,6 +9,7 @@
 #define FF_FS_READONLY  0      /* 0:Read/Write or 1:Read-Only */
 #define FF_FS_MINIMIZE  0      /* 0: Fully functional (f_opendir, f_readdir, f_unlink enabled) */
 #define FF_USE_STRFUNC  1      /* 1: Enable string functions */
+#define FF_STRF_ENCODE  3      /* 3: Unicode in UTF-8 (Required when FF_LFN_UNICODE >= 1 and FF_USE_STRFUNC >= 1) */
 #define FF_USE_FIND     0      /* Disable filtered directory search */
 #define FF_USE_MKFS     1      /* 1: Enable f_mkfs formatting functions */
 #define FF_USE_FASTSEEK 0      /* Disable fast seek */
@@ -22,9 +23,9 @@
 /---------------------------------------------------------------------------*/
 
 #define FF_CODE_PAGE    437    /* U.S. English code page */
-#define FF_USE_LFN      2      /* 2: Enable Long File Names with dynamic heap (Solves the LFN garbage issue!) */
+#define FF_USE_LFN      2      /* 2: Enable Long File Names with dynamic heap */
 #define FF_MAX_LFN      255    /* Maximum LFN length */
-#define FF_LFN_UNICODE  0      /* 0: ANSI/OEM code page filenames (easiest for Android JNI) */
+#define FF_LFN_UNICODE  2      /* 2: Unicode in UTF-8 (char) - perfect for Android JNI */
 #define FF_LFN_BUF      255
 #define FF_SFN_BUF      12
 
@@ -34,7 +35,7 @@
 / Drive/Volume Configurations
 /---------------------------------------------------------------------------*/
 
-#define FF_VOLUMES      4      /* We only need 1 active mount volume at a time */
+#define FF_VOLUMES      4     /* 4 slots) */
 #define FF_STR_VOLUME_ID 0     /* Use simple 0-based drive numbers */
 #define FF_MULTI_PARTITION 0   /* 0: Single partition drives */
 #define FF_MIN_SS       512    /* Minimum sector size */
@@ -56,6 +57,6 @@
 #define FF_NORTC_MDAY   17
 
 #define FF_FS_LOCK      0      /* Disable file locking */
-#define FF_FS_REENTRANT 0      /* Disable re-entrancy (We protect this via JNI threads) */
+#define FF_FS_REENTRANT 0      /* Disable re-entrancy (We protect this via locks) */
 
 #endif /* _FFCONF */

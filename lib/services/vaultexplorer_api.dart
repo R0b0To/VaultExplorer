@@ -1,32 +1,35 @@
-
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/mounted_container.dart';
 
-class vaultexplorerApi {
+class VaultExplorerApi {
+  const VaultExplorerApi();
+
   static const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
-  static Future<bool> createContainer({
-  required String displayName,
-  required int sizeBytes,
-  required String password,
-  required int pim,
-  required String fileSystem,
-}) async {
-  try {
-    final bool? success = await _channel.invokeMethod<bool>('createContainer', {
-      'displayName': displayName,
-      'sizeBytes': sizeBytes,
-      'password': password,
-      'pim': pim,
-      'fileSystem': fileSystem,
-    });
-    return success ?? false;
-  } on PlatformException catch (e) {
-    throw e;
+
+  Future<bool> createContainer({
+    required String displayName,
+    required int sizeBytes,
+    required String password,
+    required int pim,
+    required String fileSystem,
+  }) async {
+    try {
+      final bool? success = await _channel.invokeMethod<bool>('createContainer', {
+        'displayName': displayName,
+        'sizeBytes': sizeBytes,
+        'password': password,
+        'pim': pim,
+        'fileSystem': fileSystem,
+      });
+      return success ?? false;
+    } on PlatformException catch (e) {
+      throw e;
+    }
   }
-}
-  static Future<({String uri, String displayName})?> pickContainer() async {
+
+  Future<({String uri, String displayName})?> pickContainer() async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>('pickContainer');
     if (raw == null) return null;
     final uri         = raw['uri']         as String;
@@ -34,7 +37,7 @@ class vaultexplorerApi {
     return (uri: uri, displayName: displayName);
   }
 
-  static Future<({int volId, List<String> files})?> unlockContainer(
+  Future<({int volId, List<String> files})?> unlockContainer(
     String filePath,
     String password,
     int pim, {
@@ -53,14 +56,14 @@ class vaultexplorerApi {
     return (volId: volId, files: files);
   }
 
-  static Future<bool> lockContainer(String filePath) async {
+  Future<bool> lockContainer(String filePath) async {
     final result = await _channel.invokeMethod<bool>('lockContainer', {
       'filePath': filePath,
     });
     return result ?? false;
   }
 
-  static Future<bool> openWithApp(
+  Future<bool> openWithApp(
       MountedContainer container, String fileName) async {
     final result = await _channel.invokeMethod<bool>('openWithApp', {
       'filePath': container.uri,
@@ -69,45 +72,38 @@ class vaultexplorerApi {
     return result ?? false;
   }
 
-  static Future<bool> decryptFile(
+  Future<bool> decryptFile(
     MountedContainer container,
     String fileName,
     String destPath,
   ) async {
     final result = await _channel.invokeMethod<bool>('decryptFile', {
       'filePath': container.uri,
-      'password': container.password,
-      'pim': container.pim,
       'fileName': fileName,
       'destPath': destPath,
     });
     return result ?? false;
   }
 
-
-  static Future<bool> exportFileToStorage(
+  Future<bool> exportFileToStorage(
       MountedContainer container, String sourcePath) async {
     final result = await _channel.invokeMethod<bool>('exportFileToStorage', {
       'filePath': container.uri,
-      'password': container.password,
-      'pim': container.pim,
       'sourcePath': sourcePath,
     });
     return result ?? false;
   }
 
-  static Future<int> getFileSize(
+  Future<int> getFileSize(
       MountedContainer container, String fileName) async {
     final result = await _channel.invokeMethod<int>('getFileSize', {
       'filePath': container.uri,
-      'password': container.password,
-      'pim': container.pim,
       'fileName': fileName,
     });
     return result ?? 0;
   }
 
-  static Future<Uint8List?> readFileChunk(
+  Future<Uint8List?> readFileChunk(
     MountedContainer container,
     String fileName,
     int offset,
@@ -115,8 +111,6 @@ class vaultexplorerApi {
   ) async {
     final result = await _channel.invokeMethod<Uint8List>('readFileChunk', {
       'filePath': container.uri,
-      'password': container.password,
-      'pim': container.pim,
       'fileName': fileName,
       'offset': offset,
       'length': length,
@@ -124,71 +118,61 @@ class vaultexplorerApi {
     return result;
   }
 
-  static Future<List<String>?> listDirectory(
+  Future<List<String>?> listDirectory(
       MountedContainer container, String dirPath) async {
     final result =
         await _channel.invokeMethod<List<Object?>>('listDirectory', {
       'filePath': container.uri,
-      'password': container.password,
-      'pim': container.pim,
       'dirPath': dirPath,
     });
     return result?.cast<String>();
   }
 
-  static Future<bool> createDirectory(
+  Future<bool> createDirectory(
       MountedContainer container, String dirPath) async {
     final result = await _channel.invokeMethod<bool>('createDirectory', {
       'filePath': container.uri,
-      'password': container.password,
-      'pim': container.pim,
       'dirPath': dirPath,
     });
     return result ?? false;
   }
 
-  static Future<bool> renameFile(
+  Future<bool> renameFile(
     MountedContainer container,
     String oldPath,
     String newPath,
   ) async {
     final result = await _channel.invokeMethod<bool>('renameFile', {
       'filePath': container.uri,
-      'password': container.password,
-      'pim': container.pim,
       'oldPath': oldPath,
       'newPath': newPath,
     });
     return result ?? false;
   }
 
-  static Future<bool> deleteFile(
+  Future<bool> deleteFile(
       MountedContainer container, String fileName) async {
     final result = await _channel.invokeMethod<bool>('deleteFile', {
       'filePath': container.uri,
-      'password': container.password,
-      'pim': container.pim,
       'fileName': fileName,
     });
     return result ?? false;
   }
 
-  static Future<bool> writeBackFile(
+  Future<bool> writeBackFile(
     MountedContainer container,
     String fileName,
     String sourcePath,
   ) async {
     final result = await _channel.invokeMethod<bool>('writeBackFile', {
       'filePath': container.uri,
-      'password': container.password,
-      'pim': container.pim,
       'fileName': fileName,
       'sourcePath': sourcePath,
     });
     return result ?? false;
   }
 
-  static Future<bool> createEmptyFile(
+  Future<bool> createEmptyFile(
       MountedContainer container, String fileName) async {
     final tmpDir = await getTemporaryDirectory();
     final tempFile = File(
@@ -201,51 +185,44 @@ class vaultexplorerApi {
     }
   }
 
-  static Future<List<int>?> getSpaceInfo(MountedContainer container) async {
+  Future<List<int>?> getSpaceInfo(MountedContainer container) async {
     final result =
         await _channel.invokeMethod<List<Object?>>('getSpaceInfo', {
       'filePath': container.uri,
-      'password': container.password,
-      'pim': container.pim,
     });
     return result?.cast<int>();
   }
 
-  static Future<int> importFiles(
+  Future<int> importFiles(
     MountedContainer container, String targetPath) async {
-  final result = await _channel.invokeMethod<int>('importFile', {
-    'filePath': container.uri,
-    'password': container.password,
-    'pim': container.pim,
-    'targetPath': targetPath,
-  });
-  return result ?? 0;
-}
+    final result = await _channel.invokeMethod<int>('importFile', {
+      'filePath': container.uri,
+      'targetPath': targetPath,
+    });
+    return result ?? 0;
+  }
 
-static Future<int> exportSelectedToFolder(
-  MountedContainer container,
-  List<Map<String, dynamic>> items, {
-  bool forcePickFolder = false,
-}) async {
-  final result = await _channel.invokeMethod<int>('exportFilesToFolder', {
-    'filePath': container.uri,
-    'password': container.password,
-    'pim': container.pim,
-    'items': items,
-    'forcePickFolder': forcePickFolder,
-  });
-  return result ?? 0;
-}
+  Future<int> exportSelectedToFolder(
+    MountedContainer container,
+    List<Map<String, dynamic>> items, {
+    bool forcePickFolder = false,
+  }) async {
+    final result = await _channel.invokeMethod<int>('exportFilesToFolder', {
+      'filePath': container.uri,
+      'items': items,
+      'forcePickFolder': forcePickFolder,
+    });
+    return result ?? 0;
+  }
 
-static Future<int> importFolder(
+  Future<int> importFolder(
     MountedContainer container, String targetPath) async {
-  final result = await _channel.invokeMethod<int>('importFolder', {
-    'filePath': container.uri,
-    'password': container.password,
-    'pim': container.pim,
-    'targetPath': targetPath,
-  });
-  return result ?? 0;
+    final result = await _channel.invokeMethod<int>('importFolder', {
+      'filePath': container.uri,
+      'targetPath': targetPath,
+    });
+    return result ?? 0;
+  }
 }
 
-}
+const vaultExplorerApi = VaultExplorerApi();

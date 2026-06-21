@@ -19,7 +19,8 @@
 #include "diskio.h"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
-#define MAX_VOLUMES 16
+
+#define MAX_VOLUMES 4
 
 // ----------------------------------------------------------------====
 // GLOBAL STATE
@@ -31,14 +32,14 @@ static bool          activeIsRelTweak[MAX_VOLUMES];
 static bool          isDataCtxInitialized[MAX_VOLUMES];
 static uint64_t      activeFileSize[MAX_VOLUMES];
 
+static bool           fsMounted[MAX_VOLUMES];
+
 static mbedtls_aes_xts_context activeDataCtxDec[MAX_VOLUMES];
 static mbedtls_aes_xts_context activeDataCtxEnc[MAX_VOLUMES];
 
-// Drive paths for up to 16 volumes — FatFs uses single-char drive numbers 0–9
-// then letters A–F for 10–15.
+// Drive paths for up to 4 volumes — FatFs uses single-digit drive numbers.
 static const char* drivePaths[MAX_VOLUMES] = {
-    "0:", "1:", "2:", "3:", "4:", "5:", "6:", "7:",
-    "8:", "9:", "A:", "B:", "C:", "D:", "E:", "F:"
+    "0:", "1:", "2:", "3:"
 };
 static FATFS globalFs[MAX_VOLUMES];
 
@@ -50,24 +51,71 @@ static bool _globalInit = [](){
         activeIsRelTweak[i]       = false;
         isDataCtxInitialized[i]   = false;
         activeFileSize[i]         = 0;
+        fsMounted[i]               = false;
     }
     return true;
 }();
 
 // ----------------------------------------------------------------====
+// MOUNT CACHE HELPERS
+// ----------------------------------------------------------------====
+
+// Mounts the FatFs volume for `volId` only if it isn't already mounted.
+// Must be called *after* prepareSession() so activeFd[volId] (used by the
+// disk_read/disk_write hooks below) is valid at mount time.
+static bool ensureMounted(int volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return false;
+    if (fsMounted[volId]) return true;
+
+    FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
+    if (fr == FR_OK) {
+        fsMounted[volId] = true;
+        return true;
+    }
+    LOGI("ensureMounted: f_mount failed for volume %d, code=%d", volId, (int)fr);
+    return false;
+}
+
+static void unmountVolume(int volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return;
+    if (fsMounted[volId]) {
+        f_mount(nullptr, drivePaths[volId], 0);
+        fsMounted[volId] = false;
+    }
+}
+
+// ----------------------------------------------------------------====
 // INLINE HELPERS
 // ----------------------------------------------------------------====
 
-static inline bool isPrintable(unsigned char c) { return c >= 32 && c <= 126; }
+// Strips only genuinely unsafe control characters (and DEL). Bytes >= 0x80
+// are left untouched because they are valid lead/continuation bytes of
+// multi-byte UTF-8 sequences — FatFs is now configured for native UTF-8
+// long file names (FF_LFN_UNICODE=2 in ffconf.h), so stripping them used to
+// silently corrupt every accented/CJK/emoji file name byte-by-byte
+// (review issue #3).
+static inline bool isUnsafeControlChar(unsigned char c) {
+    return c < 32 || c == 127;
+}
 
 static void sanitizeString(std::string& s) {
-    std::replace_if(s.begin(), s.end(),
-        [](char c) { return !isPrintable(static_cast<unsigned char>(c)); }, '?');
+    std::replace_if(s.begin(), s.end(), isUnsafeControlChar, '?');
 }
 
 static inline void setTweak(unsigned char* tweak, uint64_t sectorNum) {
     *reinterpret_cast<uint64_t*>(tweak)   = sectorNum;
     *reinterpret_cast<uint64_t*>(tweak+8) = 0ULL;
+}
+
+// Clamps a user/JNI-supplied PIM to a sane, bounded range. An unclamped
+// negative or huge PIM either silently fell back to the (already safe)
+// default, or could otherwise be abused to request an absurd number of
+// PBKDF2 iterations; we bound it defensively here regardless of what the
+// Dart layer already validates.
+static inline int clampPim(int pim) {
+    if (pim < 0) return 0;
+    if (pim > 2000) return 2000;
+    return pim;
 }
 
 // ----------------------------------------------------------------====
@@ -201,7 +249,8 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     const unsigned char* salt = headerBuf;
     const unsigned char* encH = headerBuf + 64;
 
-    const int iter = (pim > 0) ? (15000 + (pim * 1000)) : 500000;
+    const int safePim = clampPim(pim);
+    const int iter = (safePim > 0) ? (15000 + (safePim * 1000)) : 500000;
 
     mbedtls_md_context_t md_ctx;
     mbedtls_md_init(&md_ctx);
@@ -363,12 +412,14 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     }
 
     jobjectArray result = nullptr;
-    FRESULT fr = f_mount(&globalFs[volId], drivePaths[volId], 1);
-    if (fr == FR_OK) {
+    if (ensureMounted(volId)) {
+        // Left mounted intentionally — subsequent calls for this volId
+        // (listDirectory, readFileChunk, etc.) reuse the mount instead of
+        // re-parsing the FAT/exFAT volume metadata every time. Only
+        // lockNative() unmounts.
         result = buildDirectoryListing(env, volId, nullptr);
-        f_mount(nullptr, drivePaths[volId], 0);
     } else {
-        LOGI("FATFS Mount failed on volume %d, code=%d", volId, fr);
+        LOGI("FATFS Mount failed on volume %d", volId);
         result = nullptr;
     }
 
@@ -389,7 +440,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndExtractNative(
 
     bool success = false;
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
+        if (ensureMounted(volId)) {
             FIL f;
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
@@ -403,7 +454,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndExtractNative(
                 }
                 f_close(&f);
             }
-            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -426,7 +476,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFileNative(
 
     bool success = false;
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
+        if (ensureMounted(volId)) {
             FIL f;
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
@@ -443,7 +493,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFileNative(
                 }
                 f_close(&f);
             }
-            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -465,10 +514,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFileNative(
 
     bool success = false;
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
+        if (ensureMounted(volId)) {
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             success = (f_unlink(fatPath.c_str()) == FR_OK);
-            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -493,7 +541,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
         isDataCtxInitialized[volId] = false;
     }
 
-    f_mount(nullptr, drivePaths[volId], 0);
+    // Only place a volume actually gets unmounted now that mounts are
+    // cached for the life of the session (see ensureMounted()/issue #6).
+    unmountVolume(volId);
 }
 
 extern "C" JNIEXPORT jlong JNICALL
@@ -507,14 +557,13 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSizeNative(
 
     jlong size = 0;
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
+        if (ensureMounted(volId)) {
             FIL f;
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
                 size = static_cast<jlong>(f_size(&f));
                 f_close(&f);
             }
-            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -535,7 +584,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunkNative(
 
     jbyteArray retArray = nullptr;
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
+        // This is the hot path for video/image streaming — previously every
+        // single chunk read remounted the whole FAT/exFAT volume. Now the
+        // mount is reused for the entire session (issue #6).
+        if (ensureMounted(volId)) {
             FIL f;
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
@@ -549,7 +601,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunkNative(
                 }
                 f_close(&f);
             }
-            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -569,9 +620,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectoryNative(
 
     jobjectArray result = nullptr;
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
+        if (ensureMounted(volId)) {
             result = buildDirectoryListing(env, volId, nativePath);
-            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -591,10 +641,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectoryNative(
 
     bool success = false;
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
+        if (ensureMounted(volId)) {
             std::string fullPath = std::string(drivePaths[volId]) + "/" + nativePath;
             success = (f_mkdir(fullPath.c_str()) == FR_OK);
-            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -616,11 +665,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFileNative(
 
     bool success = false;
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
+        if (ensureMounted(volId)) {
             std::string fullOld = std::string(drivePaths[volId]) + "/" + nativeOld;
             std::string fullNew = std::string(drivePaths[volId]) + "/" + nativeNew;
             success = (f_rename(fullOld.c_str(), fullNew.c_str()) == FR_OK);
-            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -640,14 +688,13 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfoNative(
 
     jlong totalBytes = 0, freeBytes = 0;
     if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (f_mount(&globalFs[volId], drivePaths[volId], 1) == FR_OK) {
+        if (ensureMounted(volId)) {
             FATFS* fs;
             DWORD fre_clust;
             if (f_getfree(drivePaths[volId], &fre_clust, &fs) == FR_OK) {
                 totalBytes = static_cast<jlong>(fs->n_fatent - 2) * fs->csize * 512;
                 freeBytes  = static_cast<jlong>(fre_clust)        * fs->csize * 512;
             }
-            f_mount(nullptr, drivePaths[volId], 0);
         }
     }
 
@@ -697,7 +744,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             if (!ok) { LOGI("createContainer: urandom read failed"); break; }
         }
 
-        const int iter = (pim > 0) ? (15000 + pim * 1000) : 500000;
+        const int safePim = clampPim(pim);
+        const int iter = (safePim > 0) ? (15000 + safePim * 1000) : 500000;
 
         mbedtls_md_context_t md_ctx;
         mbedtls_md_init(&md_ctx);
@@ -843,6 +891,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             LOGI("createContainer: f_mkfs result=%d fmt=%d exfat=%d",
                  (int)fr, (int)mp.fmt, (int)useExFat);
 
+            // This volume slot is not part of the persistent-mount session
+            // cache (fsMounted[] was never set for it via ensureMounted),
+            // so we unmount it directly here regardless of that tracking.
             f_mount(nullptr, drivePaths[volId], 0);
             activeFd[volId]           = -1;
             activeDataOffset[volId]   = 0;

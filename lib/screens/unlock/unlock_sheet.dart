@@ -51,7 +51,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
     if (widget.initialUri != null) return; // Prevent picking if locked to a saved one
 
     try {
-      final result = await vaultexplorerApi.pickContainer();
+      final result = await vaultExplorerApi.pickContainer();
       if (result != null) {
         setState(() {
           _selectedUri = result.uri;
@@ -84,7 +84,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
           _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0;
       final name = _selectedName ?? 'Container';
 
-      final result = await vaultexplorerApi.unlockContainer(
+      final result = await vaultExplorerApi.unlockContainer(
         _selectedUri!,
         _passwordCtrl.text,
         pim,
@@ -100,15 +100,13 @@ class _UnlockSheetState extends State<UnlockSheet> {
           uri: _selectedUri!,
           displayName: name,
           volId: result.volId,
-          password: _passwordCtrl.text,
-          pim: pim,
           rootFiles: result.files,
           mountedAt: DateTime.now(),
           totalSpace: 0,
           freeSpace: 0,
         );
 
-        final space = await vaultexplorerApi.getSpaceInfo(tempContainer);
+        final space = await vaultExplorerApi.getSpaceInfo(tempContainer);
         final total =
             (space != null && space.isNotEmpty) ? space[0] : 0;
         final free =
@@ -118,8 +116,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
           uri: _selectedUri!,
           displayName: name,
           volId: result.volId,
-          password: _passwordCtrl.text,
-          pim: pim,
           rootFiles: result.files,
           mountedAt: DateTime.now(),
           totalSpace: total,

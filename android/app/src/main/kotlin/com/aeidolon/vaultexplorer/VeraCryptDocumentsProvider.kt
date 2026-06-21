@@ -21,16 +21,16 @@ import java.io.IOException
 class VeraCryptDocumentsProvider : DocumentsProvider() {
 
     private val defaultRootProjection: Array<String> = arrayOf(
-    DocumentsContract.Root.COLUMN_ROOT_ID,
-    DocumentsContract.Root.COLUMN_MIME_TYPES,
-    DocumentsContract.Root.COLUMN_FLAGS,
-    DocumentsContract.Root.COLUMN_ICON,
-    DocumentsContract.Root.COLUMN_TITLE,
-    DocumentsContract.Root.COLUMN_SUMMARY,
-    DocumentsContract.Root.COLUMN_DOCUMENT_ID,
-    DocumentsContract.Root.COLUMN_AVAILABLE_BYTES,
-    DocumentsContract.Root.COLUMN_CAPACITY_BYTES
-)
+        DocumentsContract.Root.COLUMN_ROOT_ID,
+        DocumentsContract.Root.COLUMN_MIME_TYPES,
+        DocumentsContract.Root.COLUMN_FLAGS,
+        DocumentsContract.Root.COLUMN_ICON,
+        DocumentsContract.Root.COLUMN_TITLE,
+        DocumentsContract.Root.COLUMN_SUMMARY,
+        DocumentsContract.Root.COLUMN_DOCUMENT_ID,
+        DocumentsContract.Root.COLUMN_AVAILABLE_BYTES,
+        DocumentsContract.Root.COLUMN_CAPACITY_BYTES
+    )
 
     private val defaultDocumentProjection: Array<String> = arrayOf(
         DocumentsContract.Document.COLUMN_DOCUMENT_ID,
@@ -47,7 +47,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
 
     private fun getFd(uriString: String, mode: String): Int {
         val uri = Uri.parse(uriString)
-        val pfd = context?.contentResolver?.openFileDescriptor(uri, mode) ?: throw FileNotFoundException("Could open PFD")
+        val pfd = context?.contentResolver?.openFileDescriptor(uri, mode) ?: throw FileNotFoundException("Could not open PFD")
         return pfd.detachFd()
     }
 
@@ -56,7 +56,6 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                     DocumentsContract.Root.FLAG_LOCAL_ONLY or
                     DocumentsContract.Root.FLAG_SUPPORTS_EJECT
                     
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             flags = flags or DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD
         }
@@ -65,27 +64,24 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
 
         for ((volId, session) in VeraCryptSession.activeSessions) {
             val rootTitle = session.displayName ?: getFileNameFromUri(session.uri)
-        val (totalBytes, freeBytes) = getRealSpace(session)
-        val rootSummary = if (totalBytes > 0) "Volume — ${android.text.format.Formatter.formatFileSize(context, freeBytes)} free" else "Volume"
+            val (totalBytes, freeBytes) = getRealSpace(session)
+            val rootSummary = if (totalBytes > 0) "Volume — ${android.text.format.Formatter.formatFileSize(context, freeBytes)} free" else "Volume"
             
             cursor.newRow().apply {
-            add(DocumentsContract.Root.COLUMN_ROOT_ID, volId.toString())
-            add(DocumentsContract.Root.COLUMN_MIME_TYPES, "*/*")
-            add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, "$volId:dir:")
-            add(DocumentsContract.Root.COLUMN_TITLE, rootTitle)
-            add(DocumentsContract.Root.COLUMN_SUMMARY, rootSummary)
-            add(DocumentsContract.Root.COLUMN_FLAGS, flags)
-            add(DocumentsContract.Root.COLUMN_ICON, android.R.drawable.ic_lock_idle_charging)
-            add(DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, freeBytes)
-            add(DocumentsContract.Root.COLUMN_CAPACITY_BYTES, totalBytes)
+                add(DocumentsContract.Root.COLUMN_ROOT_ID, volId.toString())
+                add(DocumentsContract.Root.COLUMN_MIME_TYPES, "*/*")
+                add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, "$volId:dir:")
+                add(DocumentsContract.Root.COLUMN_TITLE, rootTitle)
+                add(DocumentsContract.Root.COLUMN_SUMMARY, rootSummary)
+                add(DocumentsContract.Root.COLUMN_FLAGS, flags)
+                add(DocumentsContract.Root.COLUMN_ICON, android.R.drawable.ic_lock_idle_charging)
+                add(DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, freeBytes)
+                add(DocumentsContract.Root.COLUMN_CAPACITY_BYTES, totalBytes)
             }
         }
-
         return cursor
     }
 
-    // Crucial: You must override this function when FLAG_SUPPORTS_IS_CHILD is set.
-    // The picker uses it to verify whether a file belongs within the open tree directory.
     override fun isChildDocument(parentDocumentId: String?, documentId: String?): Boolean {
         if (parentDocumentId == null || documentId == null) return false
         
@@ -93,7 +89,6 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val childParts = documentId.split(":")
         if (parentParts.size < 2 || childParts.size < 2) return false
         
-        // Ensure they belong to the same volume slot
         val parentVolId = parentParts[0]
         val childVolId = childParts[0]
         if (parentVolId != childVolId) return false
@@ -102,10 +97,8 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val childFatPath = childParts.drop(2).joinToString(":")
         
         return if (parentFatPath.isEmpty()) {
-            // An empty parent path represents the root directory, making any path a child.
             true
         } else {
-            // Check if child's path is a nested descendant of the parent path
             childFatPath.startsWith("$parentFatPath/")
         }
     }
@@ -144,7 +137,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                 val session = VeraCryptSession.activeSessions[volId]
                 if (session != null) {
                     synchronized(VeraCryptSession.locks[volId]) {
-                        VeraCryptEngine.getFileSizeNative(getFd(session.uri, "r"), session.password, session.pim, fatPath, volId)
+                        VeraCryptEngine.getFileSizeNative(getFd(session.uri, "r"), "", 0, fatPath, volId)
                     }
                 } else {
                     0L
@@ -188,7 +181,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         try {
             val fd = getFd(session.uri, "r")
             val files = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.listDirectoryNative(fd, session.password, session.pim, parentFatPath, volId)
+                VeraCryptEngine.listDirectoryNative(fd, "", 0, parentFatPath, volId)
             }
 
             if (files != null) {
@@ -254,14 +247,15 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
 
         val success = if (isDirectory) {
             synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.createDirectoryNative(getFd(session.uri, "rw"), session.password, session.pim, cleanPath, volId)
+                VeraCryptEngine.createDirectoryNative(getFd(session.uri, "rw"), "", 0, cleanPath, volId)
             }
         } else {
-            val tempFile = File(context?.cacheDir, fileName)
+            val tempFile = File(context?.cacheDir, "vc_new_${volId}_${cleanPath.hashCode()}_$fileName")
             try {
+                if (tempFile.exists()) tempFile.delete()
                 tempFile.createNewFile()
                 synchronized(VeraCryptSession.locks[volId]) {
-                    VeraCryptEngine.writeBackFileNative(getFd(session.uri, "rw"), session.password, session.pim, cleanPath, tempFile.absolutePath, volId)
+                    VeraCryptEngine.writeBackFileNative(getFd(session.uri, "rw"), "", 0, cleanPath, tempFile.absolutePath, volId)
                 }
             } finally {
                 tempFile.delete()
@@ -271,7 +265,6 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         if (!success) throw FileNotFoundException("Creation failed.")
 
         val childType = if (isDirectory) "dir" else "file"
-        
         val childrenUri = DocumentsContract.buildChildDocumentsUri("com.aeidolon.vaultexplorer.documents", parentId)
         context?.contentResolver?.notifyChange(childrenUri, null)
 
@@ -288,7 +281,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val fatPath = parts.drop(2).joinToString(":")
 
         val success = synchronized(VeraCryptSession.locks[volId]) {
-            VeraCryptEngine.deleteFileNative(getFd(session.uri, "rw"), session.password, session.pim, fatPath, volId)
+            VeraCryptEngine.deleteFileNative(getFd(session.uri, "rw"), "", 0, fatPath, volId)
         }
         if (!success) throw FileNotFoundException("Delete failed")
 
@@ -310,27 +303,30 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
 
         val cleanName = fatPath.substringAfterLast("/")
         val isWrite = mode?.contains("w") == true || mode?.contains("r+") == true
-        val tempFile = File(context?.cacheDir, cleanName)
+        val tempFile = File(context?.cacheDir, "vc_${volId}_${fatPath.hashCode()}_$cleanName")
 
         if (isWrite) {
-            if (!tempFile.exists()) {
-                synchronized(VeraCryptSession.locks[volId]) {
-                    VeraCryptEngine.unlockAndExtractNative(getFd(session.uri, "r"), session.password, session.pim, fatPath, tempFile.absolutePath, volId)
-                }
+            if (tempFile.exists()) tempFile.delete()
+            synchronized(VeraCryptSession.locks[volId]) {
+                VeraCryptEngine.unlockAndExtractNative(getFd(session.uri, "r"), "", 0, fatPath, tempFile.absolutePath, volId)
             }
             val handler = Handler(context!!.mainLooper)
             return ParcelFileDescriptor.open(tempFile, ParcelFileDescriptor.MODE_READ_WRITE, handler, ParcelFileDescriptor.OnCloseListener {
                 synchronized(VeraCryptSession.locks[volId]) {
-                    VeraCryptEngine.writeBackFileNative(getFd(session.uri, "rw"), session.password, session.pim, fatPath, tempFile.absolutePath, volId)
+                    VeraCryptEngine.writeBackFileNative(getFd(session.uri, "rw"), "", 0, fatPath, tempFile.absolutePath, volId)
                 }
                 tempFile.delete()
             })
         } else {
+            if (tempFile.exists()) tempFile.delete()
             val success = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.unlockAndExtractNative(getFd(session.uri, "r"), session.password, session.pim, fatPath, tempFile.absolutePath, volId)
+                VeraCryptEngine.unlockAndExtractNative(getFd(session.uri, "r"), "", 0, fatPath, tempFile.absolutePath, volId)
             }
             if (!success || !tempFile.exists()) throw FileNotFoundException("Decrypt failed")
-            return ParcelFileDescriptor.open(tempFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            val handler = Handler(context!!.mainLooper)
+            return ParcelFileDescriptor.open(tempFile, ParcelFileDescriptor.MODE_READ_ONLY, handler, ParcelFileDescriptor.OnCloseListener {
+                tempFile.delete()
+            })
         }
     }
 
@@ -348,41 +344,47 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val fatPath = parts.drop(2).joinToString(":")
 
         val cleanName = fatPath.substringAfterLast("/")
-        val tempFile = File(context?.cacheDir, "thumb_$cleanName")
+        val tempFile = File(context?.cacheDir, "thumb_raw_${volId}_${fatPath.hashCode()}_$cleanName")
+        val thumbFile = File(context?.cacheDir, "thumb_scaled_${volId}_${fatPath.hashCode()}_$cleanName")
 
-        val success = synchronized(VeraCryptSession.locks[volId]) {
-            VeraCryptEngine.unlockAndExtractNative(getFd(session.uri, "r"), session.password, session.pim, fatPath, tempFile.absolutePath, volId)
-        }
-        if (!success || !tempFile.exists()) {
-            throw FileNotFoundException("Failed to decrypt image for thumbnail")
-        }
+        if (tempFile.exists()) tempFile.delete()
+        if (thumbFile.exists()) thumbFile.delete()
 
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(tempFile.absolutePath, options)
-
-        val reqWidth = sizeHint?.x ?: 128
-        val reqHeight = sizeHint?.y ?: 128
-        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
-        options.inJustDecodeBounds = false
-
-        val bitmap = BitmapFactory.decodeFile(tempFile.absolutePath, options)
-        tempFile.delete()
-
-        if (bitmap == null) {
-            throw FileNotFoundException("Failed decoding decrypted thumbnail")
-        }
-
-        val thumbFile = File(context?.cacheDir, "thumb_scaled_$cleanName")
         try {
-            FileOutputStream(thumbFile).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 75, out)
+            val success = synchronized(VeraCryptSession.locks[volId]) {
+                VeraCryptEngine.unlockAndExtractNative(getFd(session.uri, "r"), "", 0, fatPath, tempFile.absolutePath, volId)
             }
-        } finally {
-            bitmap.recycle()
-        }
+            if (!success || !tempFile.exists()) {
+                throw FileNotFoundException("Failed to decrypt image for thumbnail")
+            }
 
-        val pfd = ParcelFileDescriptor.open(thumbFile, ParcelFileDescriptor.MODE_READ_ONLY)
-        return AssetFileDescriptor(pfd, 0, thumbFile.length())
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(tempFile.absolutePath, options)
+
+            val reqWidth = sizeHint?.x ?: 128
+            val reqHeight = sizeHint?.y ?: 128
+            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+            options.inJustDecodeBounds = false
+
+            val bitmap = BitmapFactory.decodeFile(tempFile.absolutePath, options)
+            if (bitmap == null) {
+                throw FileNotFoundException("Failed decoding decrypted thumbnail")
+            }
+
+            try {
+                FileOutputStream(thumbFile).use { out ->
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 75, out)
+                }
+            } finally {
+                bitmap.recycle()
+            }
+
+            val pfd = ParcelFileDescriptor.open(thumbFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            thumbFile.delete() // Safe Unix unlinking on open FD
+            return AssetFileDescriptor(pfd, 0, thumbFile.length())
+        } finally {
+            if (tempFile.exists()) tempFile.delete()
+        }
     }
 
     private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
@@ -398,17 +400,19 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         }
         return inSampleSize
     }
+
     private fun getRealSpace(session: ContainerSession): Pair<Long, Long> {
-    return try {
-        val fd = getFd(session.uri, "r")
-        val space = synchronized(VeraCryptSession.locks[session.volId]) {
-            VeraCryptEngine.getSpaceInfoNative(fd, session.password, session.pim, session.volId)
+        return try {
+            val fd = getFd(session.uri, "r")
+            val space = synchronized(VeraCryptSession.locks[session.volId]) {
+                VeraCryptEngine.getSpaceInfoNative(fd, "", 0, session.volId)
+            }
+            if (space != null && space.size > 1) Pair(space[0], space[1]) else Pair(0L, 0L)
+        } catch (e: Exception) {
+            Pair(0L, 0L)
         }
-        if (space != null && space.size > 1) Pair(space[0], space[1]) else Pair(0L, 0L)
-    } catch (e: Exception) {
-        Pair(0L, 0L)
     }
-}
+
     private fun getFileNameFromUri(uriString: String): String {
         val uri = Uri.parse(uriString)
         if (uri.scheme == "content") {

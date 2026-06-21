@@ -6,7 +6,7 @@ import '../unlock/unlock_sheet.dart';
 import 'widgets/container_card.dart';
 import 'widgets/empty_state.dart';
 import 'widgets/create_container_sheet.dart';
-import '../../../services/vaultexplorer_api.dart';
+import '../../services/vaultexplorer_api.dart';
 
 class VaultDashboard extends StatefulWidget {
   const VaultDashboard({Key? key}) : super(key: key);
@@ -18,6 +18,7 @@ class VaultDashboard extends StatefulWidget {
 class _VaultDashboardState extends State<VaultDashboard> with WidgetsBindingObserver {
   final List<MountedContainer> _mounted = [];
   List<Map<String, String>> _saved = [];
+  bool _actionInFlight = false;
 
   @override
   void initState() {
@@ -25,11 +26,13 @@ class _VaultDashboardState extends State<VaultDashboard> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     _loadSaved();
   }
-   @override
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -38,7 +41,6 @@ class _VaultDashboardState extends State<VaultDashboard> with WidgetsBindingObse
       }
     }
   }
-
 
   Future<void> _loadSaved() async {
     final saved = await SavedContainerService.loadContainers();
@@ -52,12 +54,13 @@ class _VaultDashboardState extends State<VaultDashboard> with WidgetsBindingObse
   void _onContainerLocked(int volId) {
     setState(() => _mounted.removeWhere((c) => c.volId == volId));
   }
+
   Future<void> _refreshContainerSpace(int volId) async {
     final idx = _mounted.indexWhere((c) => c.volId == volId);
     if (idx == -1) return;
     final container = _mounted[idx];
     try {
-      final space = await vaultexplorerApi.getSpaceInfo(container);
+      final space = await vaultExplorerApi.getSpaceInfo(container);
       if (space != null && space.length > 1 && mounted) {
         setState(() {
           _mounted[idx] = container.copyWith(totalSpace: space[0], freeSpace: space[1]);
@@ -65,27 +68,38 @@ class _VaultDashboardState extends State<VaultDashboard> with WidgetsBindingObse
       }
     } catch (_) {}
   }
+
   Future<void> _showUnlockSheet({String? uri, String? name}) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => UnlockSheet(
-        onMounted: _onContainerMounted,
-        initialUri: uri,
-        initialName: name,
-      ),
-    );
-    _loadSaved();
+    if (_actionInFlight) return;
+    setState(() => _actionInFlight = true);
+    try {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => UnlockSheet(
+          onMounted: _onContainerMounted,
+          initialUri: uri,
+          initialName: name,
+        ),
+      );
+      _loadSaved();
+    } finally {
+      setState(() => _actionInFlight = false);
+    }
   }
 
   void _showCreateSheet() {
+    if (_actionInFlight) return;
+    setState(() => _actionInFlight = true);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const CreateContainerSheet(),
-    );
+    ).whenComplete(() {
+      setState(() => _actionInFlight = false);
+    });
   }
 
   @override

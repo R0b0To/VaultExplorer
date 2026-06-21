@@ -2,8 +2,6 @@ package com.aeidolon.vaultexplorer
 
 data class ContainerSession(
     val uri: String,
-    val password: String,
-    val pim: Int,
     val volId: Int,
     var cachedFilesList: List<String>,
     val displayName: String? = null

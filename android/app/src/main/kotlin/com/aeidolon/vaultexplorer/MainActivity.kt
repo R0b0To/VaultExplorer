@@ -29,14 +29,10 @@ class MainActivity : FlutterActivity() {
 
     private var pendingImportContainerUri: String? = null
     private var pendingImportTargetName: String? = null
-    private var pendingImportPassword: String? = null
-    private var pendingImportPim: Int = 0
     private var pendingImportVolId: Int = 0
 
     private var pendingExportContainerUri: String? = null
     private var pendingExportSourcePath: String? = null
-    private var pendingExportPassword: String? = null
-    private var pendingExportPim: Int = 0
     private var pendingExportVolId: Int = 0
 
     private var pendingCreateName: String? = null
@@ -47,14 +43,10 @@ class MainActivity : FlutterActivity() {
 
     private var pendingImportFolderContainerUri: String? = null
     private var pendingImportFolderTargetDir: String? = null
-    private var pendingImportFolderPassword: String? = null
-    private var pendingImportFolderPim: Int = 0
     private var pendingImportFolderVolId: Int = 0
 
     private var pendingExportMultiContainerUri: String? = null
     private var pendingExportMultiItems: List<Map<String, Any?>>? = null
-    private var pendingExportMultiPassword: String? = null
-    private var pendingExportMultiPim: Int = 0
     private var pendingExportMultiVolId: Int = 0
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -71,7 +63,6 @@ class MainActivity : FlutterActivity() {
                 val description = clipboard.primaryClipDescription
                 if (description != null) {
                     var isCorrupt = false
-                    // Inspect the MIME types for any null values that trigger the Android platform bug
                     for (i in 0 until description.mimeTypeCount) {
                         if (description.getMimeType(i) == null) {
                             isCorrupt = true
@@ -93,7 +84,6 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -111,20 +101,20 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "createContainer" -> {
-    pendingResultCheck(result)
-    pendingCreateName       = call.argument<String>("displayName")
-    pendingCreateSize       = call.argument<Number>("sizeBytes")?.toLong() ?: 0L
-    pendingCreatePassword   = call.argument<String>("password")
-    pendingCreatePim        = call.argument<Number>("pim")?.toInt() ?: 0
-    pendingCreateFileSystem = call.argument<String>("fileSystem")
+                        pendingResultCheck(result)
+                        pendingCreateName       = call.argument<String>("displayName")
+                        pendingCreateSize       = call.argument<Number>("sizeBytes")?.toLong() ?: 0L
+                        pendingCreatePassword   = call.argument<String>("password")
+                        pendingCreatePim        = call.argument<Number>("pim")?.toInt() ?: 0
+                        pendingCreateFileSystem = call.argument<String>("fileSystem")
 
-    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-        addCategory(Intent.CATEGORY_OPENABLE)
-        type = "application/octet-stream"
-        putExtra(Intent.EXTRA_TITLE, pendingCreateName ?: "vault.tc")
-    }
-    startActivityForResult(intent, CREATE_CONTAINER_REQUEST)
-}
+                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "application/octet-stream"
+                            putExtra(Intent.EXTRA_TITLE, pendingCreateName ?: "vault.tc")
+                        }
+                        startActivityForResult(intent, CREATE_CONTAINER_REQUEST)
+                    }
 
                     "unlockContainer" -> {
                         val uriString   = call.argument<String>("filePath")
@@ -137,12 +127,11 @@ class MainActivity : FlutterActivity() {
                             return@setMethodCallHandler
                         }
 
-                        // [FIX 1+2] Resolve the target slot before spawning the worker thread.
                         val targetVolId = VeraCryptSession.getVolumeIdByUri(uriString)
                             ?: VeraCryptSession.getFreeVolumeId()
                         if (targetVolId == null) {
                             result.error("MAX_CONTAINERS",
-                                "Maximum 4 containers already mounted", null)
+                                "Maximum 16 containers already mounted", null)
                             return@setMethodCallHandler
                         }
 
@@ -161,8 +150,6 @@ class MainActivity : FlutterActivity() {
                                     if (files != null) {
                                         VeraCryptSession.activeSessions[targetVolId] = ContainerSession(
                                             uri             = uriString,
-                                            password        = password,
-                                            pim             = pim,
                                             volId           = targetVolId,
                                             cachedFilesList = files.toList(),
                                             displayName     = displayName
@@ -208,11 +195,9 @@ class MainActivity : FlutterActivity() {
 
                     "decryptFile" -> {
                         val uriString = call.argument<String>("filePath")
-                        val password  = call.argument<String>("password")
-                        val pim       = call.argument<Number>("pim")?.toInt() ?: 0
                         val fileName  = call.argument<String>("fileName")
                         val destPath  = call.argument<String>("destPath")
-                        if (uriString == null || password == null || fileName == null || destPath == null) {
+                        if (uriString == null || fileName == null || destPath == null) {
                             result.error("INVALID_ARGS", "All arguments are required", null)
                             return@setMethodCallHandler
                         }
@@ -223,7 +208,7 @@ class MainActivity : FlutterActivity() {
                                     ?: throw Exception("Could not open fd")
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
                                     VeraCryptEngine.unlockAndExtractNative(
-                                        pfd.detachFd(), password, pim, fileName, destPath, volId)
+                                        pfd.detachFd(), "", 0, fileName, destPath, volId)
                                 }
                                 runOnUiThread { result.success(success) }
                             } catch (e: Exception) {
@@ -234,11 +219,9 @@ class MainActivity : FlutterActivity() {
 
                     "getFileSize" -> {
                         val uriString = call.argument<String>("filePath")
-                        val password  = call.argument<String>("password")
-                        val pim       = call.argument<Number>("pim")?.toInt() ?: 0
                         val fileName  = call.argument<String>("fileName")
-                        if (uriString == null || password == null || fileName == null) {
-                            result.error("INVALID_ARGS", "filePath, password, and fileName required", null)
+                        if (uriString == null || fileName == null) {
+                            result.error("INVALID_ARGS", "filePath and fileName required", null)
                             return@setMethodCallHandler
                         }
                         Thread {
@@ -248,7 +231,7 @@ class MainActivity : FlutterActivity() {
                                     ?: throw Exception("Could not open fd")
                                 val size = synchronized(VeraCryptSession.locks[volId]) {
                                     VeraCryptEngine.getFileSizeNative(
-                                        pfd.detachFd(), password, pim, fileName, volId)
+                                        pfd.detachFd(), "", 0, fileName, volId)
                                 }
                                 runOnUiThread { result.success(size) }
                             } catch (e: Exception) {
@@ -259,13 +242,11 @@ class MainActivity : FlutterActivity() {
 
                     "readFileChunk" -> {
                         val uriString = call.argument<String>("filePath")
-                        val password  = call.argument<String>("password")
-                        val pim       = call.argument<Number>("pim")?.toInt() ?: 0
                         val fileName  = call.argument<String>("fileName")
                         val offset    = call.argument<Number>("offset")?.toLong() ?: 0L
                         val length    = call.argument<Number>("length")?.toInt() ?: 0
-                        if (uriString == null || password == null || fileName == null) {
-                            result.error("INVALID_ARGS", "filePath, password, and fileName required", null)
+                        if (uriString == null || fileName == null) {
+                            result.error("INVALID_ARGS", "filePath and fileName required", null)
                             return@setMethodCallHandler
                         }
                         Thread {
@@ -275,7 +256,7 @@ class MainActivity : FlutterActivity() {
                                     ?: throw Exception("Could not open fd")
                                 val bytes = synchronized(VeraCryptSession.locks[volId]) {
                                     VeraCryptEngine.readFileChunkNative(
-                                        pfd.detachFd(), password, pim, fileName, offset, length, volId)
+                                        pfd.detachFd(), "", 0, fileName, offset, length, volId)
                                 }
                                 runOnUiThread { result.success(bytes) }
                             } catch (e: Exception) {
@@ -286,11 +267,9 @@ class MainActivity : FlutterActivity() {
 
                     "listDirectory" -> {
                         val uriString = call.argument<String>("filePath")
-                        val password  = call.argument<String>("password")
-                        val pim       = call.argument<Number>("pim")?.toInt() ?: 0
                         val dirPath   = call.argument<String>("dirPath") ?: ""
-                        if (uriString == null || password == null) {
-                            result.error("INVALID_ARGS", "filePath and password required", null)
+                        if (uriString == null) {
+                            result.error("INVALID_ARGS", "filePath is required", null)
                             return@setMethodCallHandler
                         }
                         Thread {
@@ -300,7 +279,7 @@ class MainActivity : FlutterActivity() {
                                     ?: throw Exception("Could not open fd")
                                 val files = synchronized(VeraCryptSession.locks[volId]) {
                                     VeraCryptEngine.listDirectoryNative(
-                                        pfd.detachFd(), password, pim, dirPath, volId)
+                                        pfd.detachFd(), "", 0, dirPath, volId)
                                 }
                                 runOnUiThread { result.success(files?.toList()) }
                             } catch (e: Exception) {
@@ -311,10 +290,8 @@ class MainActivity : FlutterActivity() {
 
                     "createDirectory" -> {
                         val uriString = call.argument<String>("filePath")
-                        val password  = call.argument<String>("password")
-                        val pim       = call.argument<Number>("pim")?.toInt() ?: 0
                         val dirPath   = call.argument<String>("dirPath")
-                        if (uriString == null || password == null || dirPath == null) {
+                        if (uriString == null || dirPath == null) {
                             result.error("INVALID_ARGS", "All arguments are required", null)
                             return@setMethodCallHandler
                         }
@@ -325,7 +302,7 @@ class MainActivity : FlutterActivity() {
                                     ?: throw Exception("Could not open fd")
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
                                     VeraCryptEngine.createDirectoryNative(
-                                        pfd.detachFd(), password, pim, dirPath, volId)
+                                        pfd.detachFd(), "", 0, dirPath, volId)
                                 }
                                 runOnUiThread { result.success(success) }
                             } catch (e: Exception) {
@@ -336,11 +313,9 @@ class MainActivity : FlutterActivity() {
 
                     "renameFile" -> {
                         val uriString = call.argument<String>("filePath")
-                        val password  = call.argument<String>("password")
-                        val pim       = call.argument<Number>("pim")?.toInt() ?: 0
                         val oldPath   = call.argument<String>("oldPath")
                         val newPath   = call.argument<String>("newPath")
-                        if (uriString == null || password == null || oldPath == null || newPath == null) {
+                        if (uriString == null || oldPath == null || newPath == null) {
                             result.error("INVALID_ARGS", "All arguments are required", null)
                             return@setMethodCallHandler
                         }
@@ -351,7 +326,7 @@ class MainActivity : FlutterActivity() {
                                     ?: throw Exception("Could not open fd")
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
                                     VeraCryptEngine.renameFileNative(
-                                        pfd.detachFd(), password, pim, oldPath, newPath, volId)
+                                        pfd.detachFd(), "", 0, oldPath, newPath, volId)
                                 }
                                 runOnUiThread { result.success(success) }
                             } catch (e: Exception) {
@@ -362,11 +337,9 @@ class MainActivity : FlutterActivity() {
 
                     "writeBackFile" -> {
                         val uriString  = call.argument<String>("filePath")
-                        val password   = call.argument<String>("password")
-                        val pim        = call.argument<Number>("pim")?.toInt() ?: 0
                         val fileName   = call.argument<String>("fileName")
                         val sourcePath = call.argument<String>("sourcePath")
-                        if (uriString == null || password == null || fileName == null || sourcePath == null) {
+                        if (uriString == null || fileName == null || sourcePath == null) {
                             result.error("INVALID_ARGS", "All arguments are required", null)
                             return@setMethodCallHandler
                         }
@@ -377,7 +350,7 @@ class MainActivity : FlutterActivity() {
                                     ?: throw Exception("Could not open fd")
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
                                     VeraCryptEngine.writeBackFileNative(
-                                        pfd.detachFd(), password, pim, fileName, sourcePath, volId)
+                                        pfd.detachFd(), "", 0, fileName, sourcePath, volId)
                                 }
                                 runOnUiThread { result.success(success) }
                             } catch (e: Exception) {
@@ -388,10 +361,8 @@ class MainActivity : FlutterActivity() {
 
                     "getSpaceInfo" -> {
                         val uriString = call.argument<String>("filePath")
-                        val password  = call.argument<String>("password")
-                        val pim       = call.argument<Number>("pim")?.toInt() ?: 0
-                        if (uriString == null || password == null) {
-                            result.error("INVALID_ARGS", "filePath and password required", null)
+                        if (uriString == null) {
+                            result.error("INVALID_ARGS", "filePath is required", null)
                             return@setMethodCallHandler
                         }
                         Thread {
@@ -401,7 +372,7 @@ class MainActivity : FlutterActivity() {
                                     ?: throw Exception("Could not open fd")
                                 val space = synchronized(VeraCryptSession.locks[volId]) {
                                     VeraCryptEngine.getSpaceInfoNative(
-                                        pfd.detachFd(), password, pim, volId)
+                                        pfd.detachFd(), "", 0, volId)
                                 }
                                 runOnUiThread { result.success(space?.toList()) }
                             } catch (e: Exception) {
@@ -412,10 +383,8 @@ class MainActivity : FlutterActivity() {
 
                     "deleteFile" -> {
                         val uriString = call.argument<String>("filePath")
-                        val password  = call.argument<String>("password")
-                        val pim       = call.argument<Number>("pim")?.toInt() ?: 0
                         val fileName  = call.argument<String>("fileName")
-                        if (uriString == null || password == null || fileName == null) {
+                        if (uriString == null || fileName == null) {
                             result.error("INVALID_ARGS", "All arguments are required", null)
                             return@setMethodCallHandler
                         }
@@ -426,7 +395,7 @@ class MainActivity : FlutterActivity() {
                                     ?: throw Exception("Could not open fd")
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
                                     VeraCryptEngine.deleteFileNative(
-                                        pfd.detachFd(), password, pim, fileName, volId)
+                                        pfd.detachFd(), "", 0, fileName, volId)
                                 }
                                 runOnUiThread { result.success(success) }
                             } catch (e: Exception) {
@@ -459,52 +428,42 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "importFile" -> {    
-            pendingResultCheck(result)
-            pendingImportContainerUri = call.argument<String>("filePath")
-            pendingImportTargetName   = call.argument<String>("targetPath")
-            pendingImportPassword     = call.argument<String>("password")
-            pendingImportPim          = call.argument<Number>("pim")?.toInt() ?: 0
-            pendingImportVolId        =
-        VeraCryptSession.getVolumeIdByUri(pendingImportContainerUri!!) ?: 0
-    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-        addCategory(Intent.CATEGORY_OPENABLE)
-        type = "*/*"
-        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)   // ← new
-    }, IMPORT_FILE_REQUEST)
-}
+                        pendingResultCheck(result)
+                        pendingImportContainerUri = call.argument<String>("filePath")
+                        pendingImportTargetName   = call.argument<String>("targetPath")
+                        pendingImportVolId        =
+                            VeraCryptSession.getVolumeIdByUri(pendingImportContainerUri!!) ?: 0
+                        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        }, IMPORT_FILE_REQUEST)
+                    }
 
-"exportFilesToFolder" -> {
-    pendingResultCheck(result)
-    pendingExportMultiContainerUri = call.argument<String>("filePath")
-    @Suppress("UNCHECKED_CAST")
-    pendingExportMultiItems = (call.argument<List<*>>("items"))
-        ?.map { it as Map<String, Any?> } ?: emptyList()
-    pendingExportMultiPassword = call.argument<String>("password")
-    pendingExportMultiPim      = call.argument<Number>("pim")?.toInt() ?: 0
-    pendingExportMultiVolId    =
-        VeraCryptSession.getVolumeIdByUri(pendingExportMultiContainerUri!!) ?: 0
-    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), EXPORT_FILES_TREE_REQUEST)
-}
+                    "exportFilesToFolder" -> {
+                        pendingResultCheck(result)
+                        pendingExportMultiContainerUri = call.argument<String>("filePath")
+                        @Suppress("UNCHECKED_CAST")
+                        pendingExportMultiItems = (call.argument<List<*>>("items"))
+                            ?.map { it as Map<String, Any?> } ?: emptyList()
+                        pendingExportMultiVolId    =
+                            VeraCryptSession.getVolumeIdByUri(pendingExportMultiContainerUri!!) ?: 0
+                        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), EXPORT_FILES_TREE_REQUEST)
+                    }
 
-"importFolder" -> {
-    pendingResultCheck(result)
-    pendingImportFolderContainerUri = call.argument<String>("filePath")
-    pendingImportFolderTargetDir    = call.argument<String>("targetPath") ?: ""
-    pendingImportFolderPassword     = call.argument<String>("password")
-    pendingImportFolderPim          = call.argument<Number>("pim")?.toInt() ?: 0
-    pendingImportFolderVolId        =
-        VeraCryptSession.getVolumeIdByUri(pendingImportFolderContainerUri!!) ?: 0
-    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), IMPORT_FOLDER_TREE_REQUEST)
-}
+                    "importFolder" -> {
+                        pendingResultCheck(result)
+                        pendingImportFolderContainerUri = call.argument<String>("filePath")
+                        pendingImportFolderTargetDir    = call.argument<String>("targetPath") ?: ""
+                        pendingImportFolderVolId        =
+                            VeraCryptSession.getVolumeIdByUri(pendingImportFolderContainerUri!!) ?: 0
+                        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), IMPORT_FOLDER_TREE_REQUEST)
+                    }
 
-
-                    "exportFileToStorage" -> 
-                    {
+                    "exportFileToStorage" -> {
                         pendingResultCheck(result)
                         pendingExportContainerUri = call.argument<String>("filePath")
                         pendingExportSourcePath   = call.argument<String>("sourcePath")
-                        pendingExportPassword     = call.argument<String>("password")
-                        pendingExportPim          = call.argument<Number>("pim")?.toInt() ?: 0
                         pendingExportVolId        =
                             VeraCryptSession.getVolumeIdByUri(pendingExportContainerUri!!) ?: 0
                         val fileName = pendingExportSourcePath!!.split("/").last()
@@ -516,7 +475,7 @@ class MainActivity : FlutterActivity() {
                     }
 
                     else -> result.notImplemented()
-        }
+                }
             }
     }
 
@@ -524,7 +483,6 @@ class MainActivity : FlutterActivity() {
         pendingFlutterResult?.error("PICK_CANCELLED", "Another pick operation started", null)
         pendingFlutterResult = result
     }
-
 
     private fun resolveDisplayName(uri: Uri): String {
         return try {
@@ -564,139 +522,119 @@ class MainActivity : FlutterActivity() {
         }
 
         if (requestCode == CREATE_CONTAINER_REQUEST) {
-    val res = pendingFlutterResult ?: return; pendingFlutterResult = null
-    
-    // DIAGNOSTIC LOG 1
-    println("VaultExplorer_Diag: onActivityResult triggered. ResultCode: $resultCode (OK is ${Activity.RESULT_OK}), Uri: ${data?.data}")
+            val res = pendingFlutterResult ?: return; pendingFlutterResult = null
+            if (resultCode == Activity.RESULT_OK && data?.data != null) {
+                val destUri = data.data!!
+                val size    = pendingCreateSize
+                val pass    = pendingCreatePassword
+                val pim     = pendingCreatePim
+                val fs      = pendingCreateFileSystem ?: "fat"
 
-    if (resultCode == Activity.RESULT_OK && data?.data != null) {
-        val destUri = data.data!!
-        val size    = pendingCreateSize
-        val pass    = pendingCreatePassword
-        val pim     = pendingCreatePim
-        val fs      = pendingCreateFileSystem ?: "fat"
-
-        if (pass != null && size > 0) {
-            Thread {
-                try {
-                    val pfd = contentResolver.openFileDescriptor(destUri, "rw")
-                        ?: throw Exception("Could not open file descriptor in write mode")
-                    val fd = pfd.detachFd()
-
-                    // DIAGNOSTIC LOG 2
-                    println("VaultExplorer_Diag: Calling C++ Native Create Container...")
-
-                    val success = VeraCryptEngine.createContainerNative(
-                        fd, pass, pim, size, fs
-                    )
-
-                    // DIAGNOSTIC LOG 3
-                    println("VaultExplorer_Diag: C++ Native Create returned: $success")
-
-                    runOnUiThread { res.success(success) }
-                } catch (e: Exception) {
-                    println("VaultExplorer_Diag: Native Exception: ${e.message}")
-                    runOnUiThread { res.error("CREATE_ERROR", e.message, null) }
+                if (pass != null && size > 0) {
+                    Thread {
+                        try {
+                            val pfd = contentResolver.openFileDescriptor(destUri, "rw")
+                                ?: throw Exception("Could not open file descriptor in write mode")
+                            val fd = pfd.detachFd()
+                            val success = VeraCryptEngine.createContainerNative(
+                                fd, pass, pim, size, fs
+                            )
+                            runOnUiThread { res.success(success) }
+                        } catch (e: Exception) {
+                            runOnUiThread { res.error("CREATE_ERROR", e.message, null) }
+                        }
+                    }.start()
+                } else {
+                    res.success(false)
                 }
-            }.start()
-        } else {
-            println("VaultExplorer_Diag: Validation failed (pass is null or size <= 0)")
-            res.success(false)
+            } else {
+                res.success(false)
+            }
+            return
         }
-    } else {
-        println("VaultExplorer_Diag: Intent result was cancelled or data was null")
-        res.success(false)
-    }
-    return
-}
 
         if (requestCode == IMPORT_FILE_REQUEST) {
-    val res = pendingFlutterResult ?: return; pendingFlutterResult = null
-    if (resultCode == Activity.RESULT_OK && data != null) {
-        val uris = mutableListOf<Uri>()
-        data.clipData?.let { clip ->
-            for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri)
-        } ?: data.data?.let { uris.add(it) }
+            val res = pendingFlutterResult ?: return; pendingFlutterResult = null
+            if (resultCode == Activity.RESULT_OK && data != null) {
+                val uris = mutableListOf<Uri>()
+                data.clipData?.let { clip ->
+                    for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri)
+                } ?: data.data?.let { uris.add(it) }
 
-        val containerUri = pendingImportContainerUri
-        val targetDir    = pendingImportTargetName ?: ""
-        val password     = pendingImportPassword
-        val pim          = pendingImportPim
-        val volId        = pendingImportVolId
+                val containerUri = pendingImportContainerUri
+                val targetDir    = pendingImportTargetName ?: ""
+                val volId        = pendingImportVolId
 
-        if (containerUri != null && password != null && uris.isNotEmpty()) {
-            Thread {
-                var successCount = 0
-                for (pickedUri in uris) {
-                    val srcDoc = DocumentFile.fromSingleUri(this, pickedUri) ?: continue
-                    val name = srcDoc.name ?: "imported_file"
-                    val targetFatPath = if (targetDir.isEmpty()) name else "$targetDir/$name"
-                    successCount += importEntryRecursive(
-                        srcDoc, containerUri, targetFatPath, password, pim, volId)
-                }
-                runOnUiThread { res.success(successCount) }
-            }.start()
-        } else res.success(0)
-    } else res.success(0)
-    return
-}
+                if (containerUri != null && uris.isNotEmpty()) {
+                    Thread {
+                        var successCount = 0
+                        for (pickedUri in uris) {
+                            val srcDoc = DocumentFile.fromSingleUri(this, pickedUri) ?: continue
+                            val name = srcDoc.name ?: "imported_file"
+                            val targetFatPath = if (targetDir.isEmpty()) name else "$targetDir/$name"
+                            successCount += importEntryRecursive(
+                                srcDoc, containerUri, targetFatPath, volId)
+                        }
+                        runOnUiThread { res.success(successCount) }
+                    }.start()
+                } else res.success(0)
+            } else res.success(0)
+            return
+        }
 
-if (requestCode == EXPORT_FILES_TREE_REQUEST) {
-    val res = pendingFlutterResult ?: return; pendingFlutterResult = null
-    if (resultCode == Activity.RESULT_OK && data?.data != null) {
-        val treeUri = data.data!!
-        contentResolver.takePersistableUriPermission(treeUri,
-            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        if (requestCode == EXPORT_FILES_TREE_REQUEST) {
+            val res = pendingFlutterResult ?: return; pendingFlutterResult = null
+            if (resultCode == Activity.RESULT_OK && data?.data != null) {
+                val treeUri = data.data!!
+                contentResolver.takePersistableUriPermission(treeUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
 
-        val containerUri = pendingExportMultiContainerUri
-        val items        = pendingExportMultiItems ?: emptyList()
-        val password     = pendingExportMultiPassword
-        val pim          = pendingExportMultiPim
-        val volId        = pendingExportMultiVolId
+                val containerUri = pendingExportMultiContainerUri
+                val items        = pendingExportMultiItems ?: emptyList()
+                val volId        = pendingExportMultiVolId
 
-        if (containerUri != null && password != null) {
-            Thread {
-                var successCount = 0
-                val destTree = DocumentFile.fromTreeUri(this, treeUri)
-                if (destTree != null) {
-                    for (item in items) {
-                        val path  = item["path"] as? String ?: continue
-                        val isDir = item["isDir"] as? Boolean ?: false
-                        successCount += exportEntryRecursive(
-                            destTree, path, isDir, containerUri, password, pim, volId)
-                    }
-                }
-                runOnUiThread { res.success(successCount) }
-            }.start()
-        } else res.success(0)
-    } else res.success(0)
-    return
-}
-if (requestCode == IMPORT_FOLDER_TREE_REQUEST) {
-    val res = pendingFlutterResult ?: return; pendingFlutterResult = null
-    if (resultCode == Activity.RESULT_OK && data?.data != null) {
-        val treeUri = data.data!!
-        contentResolver.takePersistableUriPermission(treeUri,
-            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                if (containerUri != null) {
+                    Thread {
+                        var successCount = 0
+                        val destTree = DocumentFile.fromTreeUri(this, treeUri)
+                        if (destTree != null) {
+                            for (item in items) {
+                                val path  = item["path"] as? String ?: continue
+                                val isDir = item["isDir"] as? Boolean ?: false
+                                successCount += exportEntryRecursive(
+                                    destTree, path, isDir, containerUri, volId)
+                            }
+                        }
+                        runOnUiThread { res.success(successCount) }
+                    }.start()
+                } else res.success(0)
+            } else res.success(0)
+            return
+        }
 
-        val containerUri = pendingImportFolderContainerUri
-        val targetDir     = pendingImportFolderTargetDir ?: ""
-        val password      = pendingImportFolderPassword
-        val pim           = pendingImportFolderPim
-        val volId         = pendingImportFolderVolId
-        val srcRoot       = DocumentFile.fromTreeUri(this, treeUri)
+        if (requestCode == IMPORT_FOLDER_TREE_REQUEST) {
+            val res = pendingFlutterResult ?: return; pendingFlutterResult = null
+            if (resultCode == Activity.RESULT_OK && data?.data != null) {
+                val treeUri = data.data!!
+                contentResolver.takePersistableUriPermission(treeUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
 
-        if (containerUri != null && password != null && srcRoot != null) {
-            val folderName = srcRoot.name ?: "imported_folder"
-            val targetFatPath = if (targetDir.isEmpty()) folderName else "$targetDir/$folderName"
-            Thread {
-                val count = importEntryRecursive(srcRoot, containerUri, targetFatPath, password, pim, volId)
-                runOnUiThread { res.success(count) }
-            }.start()
-        } else res.success(0)
-    } else res.success(0)
-    return
-}
+                val containerUri = pendingImportFolderContainerUri
+                val targetDir     = pendingImportFolderTargetDir ?: ""
+                val volId         = pendingImportFolderVolId
+                val srcRoot       = DocumentFile.fromTreeUri(this, treeUri)
+
+                if (containerUri != null && srcRoot != null) {
+                    val folderName = srcRoot.name ?: "imported_folder"
+                    val targetFatPath = if (targetDir.isEmpty()) folderName else "$targetDir/$folderName"
+                    Thread {
+                        val count = importEntryRecursive(srcRoot, containerUri, targetFatPath, volId)
+                        runOnUiThread { res.success(count) }
+                    }.start()
+                } else res.success(0)
+            } else res.success(0)
+            return
+        }
 
         if (requestCode == EXPORT_FILE_REQUEST) {
             val res = pendingFlutterResult ?: return; pendingFlutterResult = null
@@ -704,10 +642,8 @@ if (requestCode == IMPORT_FOLDER_TREE_REQUEST) {
                 val destUri      = data.data!!
                 val containerUri = pendingExportContainerUri
                 val sourcePath   = pendingExportSourcePath
-                val password     = pendingExportPassword
-                val pim          = pendingExportPim
                 val volId        = pendingExportVolId
-                if (containerUri != null && sourcePath != null && password != null) {
+                if (containerUri != null && sourcePath != null) {
                     Thread {
                         try {
                             val tempFile = File(cacheDir, "export_temp")
@@ -716,7 +652,7 @@ if (requestCode == IMPORT_FOLDER_TREE_REQUEST) {
                                 ?: throw Exception("Could not open fd")
                             val success = synchronized(VeraCryptSession.locks[volId]) {
                                 VeraCryptEngine.unlockAndExtractNative(
-                                    pfd.detachFd(), password, pim,
+                                    pfd.detachFd(), "", 0,
                                     sourcePath, tempFile.absolutePath, volId)
                             }
                             if (success && tempFile.exists()) {
@@ -739,101 +675,94 @@ if (requestCode == IMPORT_FOLDER_TREE_REQUEST) {
         }
     }
 
-/** Exports a single file or directory (recursively) into destParent. Returns files-written count. */
-private fun exportEntryRecursive(
-    destParent: DocumentFile,
-    fatPath: String,
-    isDir: Boolean,
-    containerUri: String,
-    password: String,
-    pim: Int,
-    volId: Int
-): Int {
-    val name = fatPath.substringAfterLast("/")
+    private fun exportEntryRecursive(
+        destParent: DocumentFile,
+        fatPath: String,
+        isDir: Boolean,
+        containerUri: String,
+        volId: Int
+    ): Int {
+        val name = fatPath.substringAfterLast("/")
 
-    if (!isDir) {
-        return try {
-            val tempFile = File(cacheDir, "export_${System.nanoTime()}")
-            val pfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "r") ?: return 0
-            val ok = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.unlockAndExtractNative(
-                    pfd.detachFd(), password, pim, fatPath, tempFile.absolutePath, volId)
-            }
-            var written = 0
-            if (ok && tempFile.exists()) {
-                destParent.findFile(name)?.delete()
-                val outDoc = destParent.createFile(getMimeType(name), name)
-                if (outDoc != null) {
-                    contentResolver.openOutputStream(outDoc.uri)?.use { out ->
-                        tempFile.inputStream().use { it.copyTo(out) }
-                    }
-                    written = 1
+        if (!isDir) {
+            return try {
+                val tempFile = File(cacheDir, "export_${System.nanoTime()}")
+                val pfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "r") ?: return 0
+                val ok = synchronized(VeraCryptSession.locks[volId]) {
+                    VeraCryptEngine.unlockAndExtractNative(
+                        pfd.detachFd(), "", 0, fatPath, tempFile.absolutePath, volId)
                 }
+                var written = 0
+                if (ok && tempFile.exists()) {
+                    destParent.findFile(name)?.delete()
+                    val outDoc = destParent.createFile(getMimeType(name), name)
+                    if (outDoc != null) {
+                        contentResolver.openOutputStream(outDoc.uri)?.use { out ->
+                            tempFile.inputStream().use { it.copyTo(out) }
+                        }
+                        written = 1
+                    }
+                }
+                tempFile.delete()
+                written
+            } catch (e: Exception) {
+                0
             }
-            tempFile.delete()
-            written
-        } catch (e: Exception) {
-            0
         }
-    }
 
-    // Directory: create it, then recurse over its children.
-    val destDir = destParent.createDirectory(name) ?: return 0
-    val listPfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "r") ?: return 0
-    val children = synchronized(VeraCryptSession.locks[volId]) {
-        VeraCryptEngine.listDirectoryNative(listPfd.detachFd(), password, pim, fatPath, volId)
-    } ?: return 0
+        val destDir = destParent.createDirectory(name) ?: return 0
+        val listPfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "r") ?: return 0
+        val children = synchronized(VeraCryptSession.locks[volId]) {
+            VeraCryptEngine.listDirectoryNative(listPfd.detachFd(), "", 0, fatPath, volId)
+        } ?: return 0
 
-    var count = 0
-    for (entry in children) {
-        if (entry.startsWith("System:")) continue
-        val childIsDir = entry.startsWith("[DIR] ")
-        val childName  = if (childIsDir) entry.substringAfter("[DIR] ") else entry.substringBefore("|")
-        count += exportEntryRecursive(
-            destDir, "$fatPath/$childName", childIsDir, containerUri, password, pim, volId)
-    }
-    return count
-}
-
-/** Imports a single file or directory (recursively) from srcDoc into the container at targetFatPath. */
-private fun importEntryRecursive(
-    srcDoc: DocumentFile,
-    containerUri: String,
-    targetFatPath: String,
-    password: String,
-    pim: Int,
-    volId: Int
-): Int {
-    if (srcDoc.isDirectory) {
-        val mkPfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "rw") ?: return 0
-        synchronized(VeraCryptSession.locks[volId]) {
-            VeraCryptEngine.createDirectoryNative(mkPfd.detachFd(), password, pim, targetFatPath, volId)
-        }
         var count = 0
-        for (child in srcDoc.listFiles()) {
-            val childName = child.name ?: continue
-            count += importEntryRecursive(
-                child, containerUri, "$targetFatPath/$childName", password, pim, volId)
+        for (entry in children) {
+            if (entry.startsWith("System:")) continue
+            val childIsDir = entry.startsWith("[DIR] ")
+            val childName  = if (childIsDir) entry.substringAfter("[DIR] ") else entry.substringBefore("|")
+            count += exportEntryRecursive(
+                destDir, "$fatPath/$childName", childIsDir, containerUri, volId)
         }
         return count
     }
 
-    return try {
-        val tempFile = File(cacheDir, "import_${System.nanoTime()}")
-        contentResolver.openInputStream(srcDoc.uri)?.use { inp ->
-            tempFile.outputStream().use { inp.copyTo(it) }
+    private fun importEntryRecursive(
+        srcDoc: DocumentFile,
+        containerUri: String,
+        targetFatPath: String,
+        volId: Int
+    ): Int {
+        if (srcDoc.isDirectory) {
+            val mkPfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "rw") ?: return 0
+            synchronized(VeraCryptSession.locks[volId]) {
+                VeraCryptEngine.createDirectoryNative(mkPfd.detachFd(), "", 0, targetFatPath, volId)
+            }
+            var count = 0
+            for (child in srcDoc.listFiles()) {
+                val childName = child.name ?: continue
+                count += importEntryRecursive(
+                    child, containerUri, "$targetFatPath/$childName", volId)
+            }
+            return count
         }
-        val writePfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "rw") ?: return 0
-        val ok = synchronized(VeraCryptSession.locks[volId]) {
-            VeraCryptEngine.writeBackFileNative(
-                writePfd.detachFd(), password, pim, targetFatPath, tempFile.absolutePath, volId)
+
+        return try {
+            val tempFile = File(cacheDir, "import_${System.nanoTime()}")
+            contentResolver.openInputStream(srcDoc.uri)?.use { inp ->
+                tempFile.outputStream().use { inp.copyTo(it) }
+            }
+            val writePfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "rw") ?: return 0
+            val ok = synchronized(VeraCryptSession.locks[volId]) {
+                VeraCryptEngine.writeBackFileNative(
+                    writePfd.detachFd(), "", 0, targetFatPath, tempFile.absolutePath, volId)
+            }
+            tempFile.delete()
+            if (ok) 1 else 0
+        } catch (e: Exception) {
+            0
         }
-        tempFile.delete()
-        if (ok) 1 else 0
-    } catch (e: Exception) {
-        0
     }
-}
 
     private fun getMimeType(fileName: String): String = when {
         fileName.endsWith(".png",  true)                                      -> "image/png"

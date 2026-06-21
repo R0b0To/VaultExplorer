@@ -264,6 +264,63 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
     );
   }
 
+  void _showImportSheet() {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (_) {
+      final cs = Theme.of(context).colorScheme;
+      return SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.outline,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('Import', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.upload_file, color: cs.primary),
+                title: const Text('Files'),
+                subtitle: const Text('Pick one or more individual files'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _importFilesFromDevice();
+                },
+              ),
+              const Divider(),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.drive_folder_upload, color: cs.primary),
+                title: const Text('Folder'),
+                subtitle: const Text('Pick a folder and import its entire contents'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _importFolderFromDevice();
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
   void _showCreateFileDialog() {
     final ctrl = TextEditingController();
     showDialog(
@@ -324,30 +381,23 @@ class _FileBrowserScreenState extends State<FileBrowserScreen> {
 
 Future<void> _exportSelectedToStorage() async {
   final currentDir = _pathStack.last.fatPath;
-  final fileItems = _selectedItems.where((i) => !i.startsWith('[DIR] ')).toList();
-  final dirCount = _selectedItems.length - fileItems.length;
 
-  if (fileItems.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Select at least one file to export')),
-    );
-    return;
-  }
-
-  final paths = fileItems.map((item) {
-    final name = item.split('|').first;
-    return currentDir.isEmpty ? name : '$currentDir/$name';
+  final items = _selectedItems.map((item) {
+    final isDir = item.startsWith('[DIR] ');
+    final name = isDir ? item.replaceFirst('[DIR] ', '') : item.split('|').first;
+    final path = currentDir.isEmpty ? name : '$currentDir/$name';
+    return {'path': path, 'isDir': isDir};
   }).toList();
 
+  if (items.isEmpty) return;
+
   final messenger = ScaffoldMessenger.of(context);
-  messenger.showSnackBar(SnackBar(content: Text('Preparing export for ${paths.length} item(s)…')));
+  messenger.showSnackBar(SnackBar(content: Text('Preparing export for ${items.length} item(s)…')));
   setState(() => _isLoading = true);
   try {
-    final count = await vaultexplorerApi.exportFilesToFolder(widget.container, paths);
-    var msg = count > 0 ? 'Exported $count file(s)' : 'Export cancelled or failed';
-    if (dirCount > 0) msg += ' ($dirCount folder(s) skipped)';
+    final count = await vaultexplorerApi.exportSelectedToFolder(widget.container, items);
     messenger.showSnackBar(SnackBar(
-      content: Text(msg),
+      content: Text(count > 0 ? 'Exported $count file(s)' : 'Export cancelled or failed'),
       backgroundColor: count > 0 ? const Color(0xFF1A3A2A) : null,
     ));
   } catch (e) {
@@ -382,6 +432,29 @@ Future<void> _exportSelectedToStorage() async {
   }
 }
 
+Future<void> _importFolderFromDevice() async {
+  final currentDir = _pathStack.last.fatPath;
+  setState(() => _isLoading = true);
+  try {
+    final count = await vaultexplorerApi.importFolder(widget.container, currentDir);
+    if (count > 0) _loadDirectoryContents(currentDir);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(count > 0
+            ? 'Imported $count file${count != 1 ? 's' : ''} from folder'
+            : 'No files imported')),
+      );
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Folder import failed: $e'), backgroundColor: Colors.red),
+      );
+    }
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
+}
   Future<void> _batchDelete() async {
     final currentDir = _pathStack.last.fatPath;
     final toDelete = List<String>.from(_selectedItems);
@@ -580,9 +653,8 @@ AppBar _buildSelectionAppBar(ColorScheme cs) {
           onPressed: () => _initClipboard(cut: false)),
       IconButton(icon: const Icon(Icons.cut_outlined), tooltip: 'Cut',
           onPressed: () => _initClipboard(cut: true)),
-      if (hasFiles)
         IconButton(icon: const Icon(Icons.drive_folder_upload_outlined), tooltip: 'Export',
-            onPressed: _exportSelectedToStorage),
+    onPressed: _exportSelectedToStorage),
       IconButton(icon: Icon(Icons.delete_outline, color: cs.error), tooltip: 'Delete',
           onPressed: _batchDelete),
       if (singleFile)
@@ -681,25 +753,26 @@ AppBar _buildClipboardAppBar(ColorScheme cs) => AppBar(
                       _sortMenuItem(_SortBy.extension, 'Type'),
                     ],
                   ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.add),
-                    onSelected: (v) {
-                      if (v == 'folder') _showCreateFolderDialog();
-                      else if (v == 'file') _showCreateFileDialog();
-                      else if (v == 'import') _importFilesFromDevice();
-                    },
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'folder',
-                          child: ListTile(leading: Icon(Icons.create_new_folder),
-                              title: Text('New Folder'))),
-                      PopupMenuItem(value: 'file',
-                          child: ListTile(leading: Icon(Icons.insert_drive_file),
-                              title: Text('New File'))),
-                      PopupMenuItem(value: 'import',
-                          child: ListTile(leading: Icon(Icons.drive_folder_upload),
-                              title: Text('Import Files from Device'))),
-                    ],
-                  ),
+                 PopupMenuButton<String>(
+  icon: const Icon(Icons.add),
+  onSelected: (v) {
+    if (v == 'folder') _showCreateFolderDialog();
+    else if (v == 'file') _showCreateFileDialog();
+    else if (v == 'import') _showImportSheet();
+  },
+  itemBuilder: (_) => const [
+    PopupMenuItem(value: 'folder',
+        child: ListTile(leading: Icon(Icons.create_new_folder),
+            title: Text('New Folder'))),
+    PopupMenuItem(value: 'file',
+        child: ListTile(leading: Icon(Icons.insert_drive_file),
+            title: Text('New File'))),
+    PopupMenuDivider(),
+    PopupMenuItem(value: 'import',
+    child: ListTile(leading: Icon(Icons.upload_outlined),
+        title: Text('Import…'))),
+  ],
+),
                   
                 ],
               );

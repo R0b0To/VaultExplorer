@@ -23,6 +23,8 @@ class MainActivity : FlutterActivity() {
     private val EXPORT_FILE_REQUEST = 1003
     private val CREATE_CONTAINER_REQUEST = 1004
     private val EXPORT_FILES_TREE_REQUEST = 1006
+    private val IMPORT_FOLDER_TREE_REQUEST = 1007
+    
     private var pendingFlutterResult: MethodChannel.Result? = null
 
     private var pendingImportContainerUri: String? = null
@@ -43,13 +45,17 @@ class MainActivity : FlutterActivity() {
     private var pendingCreatePim: Int = 0
     private var pendingCreateFileSystem: String? = null
 
-    
+    private var pendingImportFolderContainerUri: String? = null
+    private var pendingImportFolderTargetDir: String? = null
+    private var pendingImportFolderPassword: String? = null
+    private var pendingImportFolderPim: Int = 0
+    private var pendingImportFolderVolId: Int = 0
 
-private var pendingExportMultiContainerUri: String? = null
-private var pendingExportMultiSourcePaths: List<String>? = null
-private var pendingExportMultiPassword: String? = null
-private var pendingExportMultiPim: Int = 0
-private var pendingExportMultiVolId: Int = 0
+    private var pendingExportMultiContainerUri: String? = null
+    private var pendingExportMultiItems: List<Map<String, Any?>>? = null
+    private var pendingExportMultiPassword: String? = null
+    private var pendingExportMultiPim: Int = 0
+    private var pendingExportMultiVolId: Int = 0
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
@@ -470,12 +476,25 @@ private var pendingExportMultiVolId: Int = 0
 "exportFilesToFolder" -> {
     pendingResultCheck(result)
     pendingExportMultiContainerUri = call.argument<String>("filePath")
-    pendingExportMultiSourcePaths  = (call.argument<List<*>>("sourcePaths"))?.map { it.toString() }
-    pendingExportMultiPassword     = call.argument<String>("password")
-    pendingExportMultiPim          = call.argument<Number>("pim")?.toInt() ?: 0
-    pendingExportMultiVolId        =
+    @Suppress("UNCHECKED_CAST")
+    pendingExportMultiItems = (call.argument<List<*>>("items"))
+        ?.map { it as Map<String, Any?> } ?: emptyList()
+    pendingExportMultiPassword = call.argument<String>("password")
+    pendingExportMultiPim      = call.argument<Number>("pim")?.toInt() ?: 0
+    pendingExportMultiVolId    =
         VeraCryptSession.getVolumeIdByUri(pendingExportMultiContainerUri!!) ?: 0
     startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), EXPORT_FILES_TREE_REQUEST)
+}
+
+"importFolder" -> {
+    pendingResultCheck(result)
+    pendingImportFolderContainerUri = call.argument<String>("filePath")
+    pendingImportFolderTargetDir    = call.argument<String>("targetPath") ?: ""
+    pendingImportFolderPassword     = call.argument<String>("password")
+    pendingImportFolderPim          = call.argument<Number>("pim")?.toInt() ?: 0
+    pendingImportFolderVolId        =
+        VeraCryptSession.getVolumeIdByUri(pendingImportFolderContainerUri!!) ?: 0
+    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), IMPORT_FOLDER_TREE_REQUEST)
 }
 
 
@@ -609,34 +628,11 @@ private var pendingExportMultiVolId: Int = 0
             Thread {
                 var successCount = 0
                 for (pickedUri in uris) {
-                    try {
-                        var displayName = "imported_file"
-                        contentResolver.query(pickedUri,
-                            arrayOf(OpenableColumns.DISPLAY_NAME),
-                            null, null, null)?.use { c ->
-                            if (c.moveToFirst()) {
-                                val i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                                if (i != -1) displayName = c.getString(i)
-                            }
-                        }
-                        val targetName = if (targetDir.isEmpty()) displayName
-                                         else "$targetDir/$displayName"
-                        val tempFile = File(cacheDir, "import_${System.nanoTime()}")
-                        contentResolver.openInputStream(pickedUri)?.use { inp ->
-                            tempFile.outputStream().use { inp.copyTo(it) }
-                        }
-                        val pfd = contentResolver.openFileDescriptor(
-                            Uri.parse(containerUri), "rw") ?: continue
-                        val ok = synchronized(VeraCryptSession.locks[volId]) {
-                            VeraCryptEngine.writeBackFileNative(
-                                pfd.detachFd(), password, pim,
-                                targetName, tempFile.absolutePath, volId)
-                        }
-                        tempFile.delete()
-                        if (ok) successCount++
-                    } catch (e: Exception) {
-                        // skip this one, continue with the rest
-                    }
+                    val srcDoc = DocumentFile.fromSingleUri(this, pickedUri) ?: continue
+                    val name = srcDoc.name ?: "imported_file"
+                    val targetFatPath = if (targetDir.isEmpty()) name else "$targetDir/$name"
+                    successCount += importEntryRecursive(
+                        srcDoc, containerUri, targetFatPath, password, pim, volId)
                 }
                 runOnUiThread { res.success(successCount) }
             }.start()
@@ -653,42 +649,49 @@ if (requestCode == EXPORT_FILES_TREE_REQUEST) {
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
 
         val containerUri = pendingExportMultiContainerUri
-        val sourcePaths  = pendingExportMultiSourcePaths
+        val items        = pendingExportMultiItems ?: emptyList()
         val password     = pendingExportMultiPassword
         val pim          = pendingExportMultiPim
         val volId        = pendingExportMultiVolId
 
-        if (containerUri != null && sourcePaths != null && password != null) {
+        if (containerUri != null && password != null) {
             Thread {
                 var successCount = 0
                 val destTree = DocumentFile.fromTreeUri(this, treeUri)
-                for (sourcePath in sourcePaths) {
-                    try {
-                        val fileName = sourcePath.substringAfterLast("/")
-                        val tempFile = File(cacheDir, "export_${System.nanoTime()}")
-                        val pfd = contentResolver.openFileDescriptor(
-                            Uri.parse(containerUri), "r") ?: continue
-                        val ok = synchronized(VeraCryptSession.locks[volId]) {
-                            VeraCryptEngine.unlockAndExtractNative(
-                                pfd.detachFd(), password, pim,
-                                sourcePath, tempFile.absolutePath, volId)
-                        }
-                        if (ok && tempFile.exists()) {
-                            destTree?.findFile(fileName)?.delete() // overwrite if present
-                            val outDoc = destTree?.createFile(getMimeType(fileName), fileName)
-                            if (outDoc != null) {
-                                contentResolver.openOutputStream(outDoc.uri)?.use { out ->
-                                    tempFile.inputStream().use { it.copyTo(out) }
-                                }
-                                successCount++
-                            }
-                        }
-                        tempFile.delete()
-                    } catch (e: Exception) {
-                        // skip this one, continue with the rest
+                if (destTree != null) {
+                    for (item in items) {
+                        val path  = item["path"] as? String ?: continue
+                        val isDir = item["isDir"] as? Boolean ?: false
+                        successCount += exportEntryRecursive(
+                            destTree, path, isDir, containerUri, password, pim, volId)
                     }
                 }
                 runOnUiThread { res.success(successCount) }
+            }.start()
+        } else res.success(0)
+    } else res.success(0)
+    return
+}
+if (requestCode == IMPORT_FOLDER_TREE_REQUEST) {
+    val res = pendingFlutterResult ?: return; pendingFlutterResult = null
+    if (resultCode == Activity.RESULT_OK && data?.data != null) {
+        val treeUri = data.data!!
+        contentResolver.takePersistableUriPermission(treeUri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+
+        val containerUri = pendingImportFolderContainerUri
+        val targetDir     = pendingImportFolderTargetDir ?: ""
+        val password      = pendingImportFolderPassword
+        val pim           = pendingImportFolderPim
+        val volId         = pendingImportFolderVolId
+        val srcRoot       = DocumentFile.fromTreeUri(this, treeUri)
+
+        if (containerUri != null && password != null && srcRoot != null) {
+            val folderName = srcRoot.name ?: "imported_folder"
+            val targetFatPath = if (targetDir.isEmpty()) folderName else "$targetDir/$folderName"
+            Thread {
+                val count = importEntryRecursive(srcRoot, containerUri, targetFatPath, password, pim, volId)
+                runOnUiThread { res.success(count) }
             }.start()
         } else res.success(0)
     } else res.success(0)
@@ -735,6 +738,102 @@ if (requestCode == EXPORT_FILES_TREE_REQUEST) {
             return
         }
     }
+
+/** Exports a single file or directory (recursively) into destParent. Returns files-written count. */
+private fun exportEntryRecursive(
+    destParent: DocumentFile,
+    fatPath: String,
+    isDir: Boolean,
+    containerUri: String,
+    password: String,
+    pim: Int,
+    volId: Int
+): Int {
+    val name = fatPath.substringAfterLast("/")
+
+    if (!isDir) {
+        return try {
+            val tempFile = File(cacheDir, "export_${System.nanoTime()}")
+            val pfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "r") ?: return 0
+            val ok = synchronized(VeraCryptSession.locks[volId]) {
+                VeraCryptEngine.unlockAndExtractNative(
+                    pfd.detachFd(), password, pim, fatPath, tempFile.absolutePath, volId)
+            }
+            var written = 0
+            if (ok && tempFile.exists()) {
+                destParent.findFile(name)?.delete()
+                val outDoc = destParent.createFile(getMimeType(name), name)
+                if (outDoc != null) {
+                    contentResolver.openOutputStream(outDoc.uri)?.use { out ->
+                        tempFile.inputStream().use { it.copyTo(out) }
+                    }
+                    written = 1
+                }
+            }
+            tempFile.delete()
+            written
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    // Directory: create it, then recurse over its children.
+    val destDir = destParent.createDirectory(name) ?: return 0
+    val listPfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "r") ?: return 0
+    val children = synchronized(VeraCryptSession.locks[volId]) {
+        VeraCryptEngine.listDirectoryNative(listPfd.detachFd(), password, pim, fatPath, volId)
+    } ?: return 0
+
+    var count = 0
+    for (entry in children) {
+        if (entry.startsWith("System:")) continue
+        val childIsDir = entry.startsWith("[DIR] ")
+        val childName  = if (childIsDir) entry.substringAfter("[DIR] ") else entry.substringBefore("|")
+        count += exportEntryRecursive(
+            destDir, "$fatPath/$childName", childIsDir, containerUri, password, pim, volId)
+    }
+    return count
+}
+
+/** Imports a single file or directory (recursively) from srcDoc into the container at targetFatPath. */
+private fun importEntryRecursive(
+    srcDoc: DocumentFile,
+    containerUri: String,
+    targetFatPath: String,
+    password: String,
+    pim: Int,
+    volId: Int
+): Int {
+    if (srcDoc.isDirectory) {
+        val mkPfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "rw") ?: return 0
+        synchronized(VeraCryptSession.locks[volId]) {
+            VeraCryptEngine.createDirectoryNative(mkPfd.detachFd(), password, pim, targetFatPath, volId)
+        }
+        var count = 0
+        for (child in srcDoc.listFiles()) {
+            val childName = child.name ?: continue
+            count += importEntryRecursive(
+                child, containerUri, "$targetFatPath/$childName", password, pim, volId)
+        }
+        return count
+    }
+
+    return try {
+        val tempFile = File(cacheDir, "import_${System.nanoTime()}")
+        contentResolver.openInputStream(srcDoc.uri)?.use { inp ->
+            tempFile.outputStream().use { inp.copyTo(it) }
+        }
+        val writePfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "rw") ?: return 0
+        val ok = synchronized(VeraCryptSession.locks[volId]) {
+            VeraCryptEngine.writeBackFileNative(
+                writePfd.detachFd(), password, pim, targetFatPath, tempFile.absolutePath, volId)
+        }
+        tempFile.delete()
+        if (ok) 1 else 0
+    } catch (e: Exception) {
+        0
+    }
+}
 
     private fun getMimeType(fileName: String): String = when {
         fileName.endsWith(".png",  true)                                      -> "image/png"

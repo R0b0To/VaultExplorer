@@ -222,14 +222,30 @@ class vaultexplorerApi {
   return result ?? 0;
 }
 
-static Future<int> exportFilesToFolder(
-    MountedContainer container, List<String> sourcePaths) async {
+static Future<int> exportSelectedToFolder(
+  MountedContainer container,
+  List<Map<String, dynamic>> items, {
+  bool forcePickFolder = false,
+}) async {
   final result = await _channel.invokeMethod<int>('exportFilesToFolder', {
     'filePath': container.uri,
     'password': container.password,
     'pim': container.pim,
-    'sourcePaths': sourcePaths,
+    'items': items,
+    'forcePickFolder': forcePickFolder,
   });
   return result ?? 0;
 }
+
+static Future<int> importFolder(
+    MountedContainer container, String targetPath) async {
+  final result = await _channel.invokeMethod<int>('importFolder', {
+    'filePath': container.uri,
+    'password': container.password,
+    'pim': container.pim,
+    'targetPath': targetPath,
+  });
+  return result ?? 0;
+}
+
 }

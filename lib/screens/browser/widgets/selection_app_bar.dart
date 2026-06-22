@@ -53,39 +53,62 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         onPressed: onClose,
       ),
       titleSpacing: 0,
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              '$selectedCount',
-              style: TextStyle(
-                color: cs.primary,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+      title: PopupMenuButton<String>(
+        tooltip: 'Selection options',
+        offset: const Offset(0, 40),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$selectedCount',
+                  style: TextStyle(
+                    color: cs.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Text(
+                'selected',
+                style: TextStyle(fontSize: 13, color: cs.onSurface),
+              ),
+              Icon(Icons.arrow_drop_down, color: cs.onSurface, size: 20),
+            ],
           ),
-          const SizedBox(width: 10),
-          const Text('selected', style: TextStyle(fontSize: 13)),
-          const Spacer(),
-          TextButton(
-            onPressed: onSelectAll,
-            child: const Text('All', style: TextStyle(fontSize: 12)),
+        ),
+        onSelected: (value) {
+          if (value == 'select_all') {
+            onSelectAll();
+          } else if (value == 'clear') {
+            onClose();
+          }
+        },
+        itemBuilder: (context) => [
+          const PopupMenuItem<String>(
+            value: 'select_all',
+            child: Text('Select All'),
+          ),
+          const PopupMenuItem<String>(
+            value: 'clear',
+            child: Text('Clear Selection'),
           ),
         ],
       ),
       actions: [
-        if (singleSelected)
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Rename',
-            onPressed: onRename,
-          ),
+        IconButton(
+          icon: Icon(Icons.delete_outline, color: cs.error),
+          tooltip: 'Delete',
+          onPressed: onDelete,
+        ),
         IconButton(
           icon: const Icon(Icons.copy_outlined),
           tooltip: 'Copy',
@@ -96,22 +119,46 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
           tooltip: 'Cut',
           onPressed: onCut,
         ),
-        IconButton(
-          icon: const Icon(Icons.drive_folder_upload_outlined),
-          tooltip: 'Export',
-          onPressed: onExport,
-        ),
-        IconButton(
-          icon: Icon(Icons.delete_outline, color: cs.error),
-          tooltip: 'Delete',
-          onPressed: onDelete,
-        ),
-        if (singleFileSelected)
+        if (singleSelected)
           IconButton(
-            icon: const Icon(Icons.open_in_new),
-            tooltip: 'Open with App',
-            onPressed: onOpenWithApp,
+            icon: const Icon(Icons.drive_file_rename_outline),
+            tooltip: 'Rename',
+            onPressed: onRename,
           ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          tooltip: 'More options',
+          onSelected: (value) {
+            if (value == 'export') {
+              onExport();
+            } else if (value == 'open_with_app') {
+              onOpenWithApp();
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem<String>(
+              value: 'export',
+              child: Row(
+                children: [
+                  Icon(Icons.drive_folder_upload_outlined, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 12),
+                  const Text('Export'),
+                ],
+              ),
+            ),
+            if (singleFileSelected)
+              PopupMenuItem<String>(
+                value: 'open_with_app',
+                child: Row(
+                  children: [
+                    Icon(Icons.open_in_new, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 12),
+                    const Text('Open with App'),
+                  ],
+                ),
+              ),
+          ],
+        ),
         const SizedBox(width: 4),
       ],
     );

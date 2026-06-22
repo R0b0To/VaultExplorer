@@ -29,7 +29,7 @@ class FileTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Container(
+    return Material(
       color: selected
           ? cs.primaryContainer.withOpacity(0.35)
           : Colors.transparent,

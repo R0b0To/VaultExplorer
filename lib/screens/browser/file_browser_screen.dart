@@ -560,33 +560,45 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                 break;
             }
           },
-          itemBuilder: (_) => const [
+          itemBuilder: (_) => [
             PopupMenuItem(
               value: 'folder',
-              child: ListTile(
-                leading: Icon(Icons.create_new_folder),
-                title: Text('New Folder'),
+              child: Row(
+                children: [
+                  Icon(Icons.create_new_folder, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 12),
+                  const Text('New Folder'),
+                ],
               ),
             ),
             PopupMenuItem(
               value: 'file',
-              child: ListTile(
-                leading: Icon(Icons.insert_drive_file),
-                title: Text('New File'),
+              child: Row(
+                children: [
+                  Icon(Icons.insert_drive_file, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 12),
+                  const Text('New File'),
+                ],
               ),
             ),
             PopupMenuItem(
               value: 'import',
-              child: ListTile(
-                leading: Icon(Icons.drive_folder_upload),
-                title: Text('Import Files from Device'),
+              child: Row(
+                children: [
+                  Icon(Icons.drive_folder_upload, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 12),
+                  const Text('Import Files from Device'),
+                ],
               ),
             ),
             PopupMenuItem(
               value: 'import_folder',
-              child: ListTile(
-                leading: Icon(Icons.create_new_folder_outlined),
-                title: Text('Import Folder from Device'),
+              child: Row(
+                children: [
+                  Icon(Icons.create_new_folder_outlined, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 12),
+                  const Text('Import Folder from Device'),
+                ],
               ),
             ),
           ],

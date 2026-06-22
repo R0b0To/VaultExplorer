@@ -13,10 +13,15 @@ import 'mixins/selection_mixin.dart';
 import 'mixins/sort_mixin.dart';
 import 'widgets/breadcrumb_bar.dart';
 import 'widgets/clipboard_app_bar.dart';
-
 import 'widgets/file_grid_view.dart';
 import 'widgets/file_list_view.dart';
 import 'widgets/selection_app_bar.dart';
+
+// ── Conflict resolution ────────────────────────────────────────────────────────
+
+enum _ConflictResolution { skip, overwrite, keepBoth }
+
+typedef _ConflictResult = ({_ConflictResolution resolution, bool applyToAll});
 
 // ── Layout mode ───────────────────────────────────────────────────────────────
 
@@ -141,7 +146,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _currentDirPath.isEmpty ? name : '$_currentDirPath/$name';
     setState(() {
       _pathStack.add(PathSegment(name, newPath));
-      _clearSearch(); // search resets when entering a subfolder
+      _clearSearch();
     });
     _loadDirectoryContents(newPath);
   }
@@ -246,8 +251,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-
-
   // ── Clipboard ─────────────────────────────────────────────────────────────────
   void _initClipboard({required bool cut}) {
     final sources = selectedItems.map((item) {
@@ -323,20 +326,80 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Future<void> _pasteClipboard() async {
     setState(() => _isLoading = true);
     final tmpDir = await getTemporaryDirectory();
+
+    // Pre-fetch destination listing for conflict detection.
+    final existingRaw =
+        await vaultExplorerApi.listDirectory(widget.container, _currentDirPath) ?? [];
+    final existingNames = <String>{};
+    final existingDirs  = <String>{};
+    for (final item in existingRaw) {
+      if (item.startsWith('[DIR] ')) {
+        final n = item.replaceFirst('[DIR] ', '').toLowerCase();
+        existingNames.add(n);
+        existingDirs.add(n);
+      } else {
+        existingNames.add(item.split('|').first.toLowerCase());
+      }
+    }
+
+    _ConflictResolution? globalResolution;
+
     try {
       for (final src in _clipboardSourceItems) {
-        final srcPath = src['path'] as String;
-        final isDir = src['isDir'] as bool;
+        if (!mounted) break;
+
+        final srcPath  = src['path'] as String;
+        final isDir    = src['isDir'] as bool;
         final fileName = srcPath.split('/').last;
         final destPath = _currentDirPath.isEmpty
             ? fileName
             : '$_currentDirPath/$fileName';
+
         if (srcPath == destPath) continue;
+
+        // ── Conflict handling ───────────────────────────────────────────
+        String finalDestPath = destPath;
+        if (existingNames.contains(fileName.toLowerCase())) {
+          _ConflictResolution? resolution = globalResolution;
+
+          if (resolution == null) {
+            final result = await _showConflictResolutionDialog(
+              fileName,
+              hasMore: _clipboardSourceItems.length > 1,
+            );
+            if (!mounted) break;
+            if (result == null) break; // dialog dismissed unexpectedly
+            if (result.applyToAll) globalResolution = result.resolution;
+            resolution = result.resolution;
+          }
+
+          switch (resolution) {
+            case _ConflictResolution.skip:
+              continue;
+
+            case _ConflictResolution.overwrite:
+              // rename (f_rename) fails if dest exists; delete it first.
+              if (_isCutOperation) {
+                final destIsDir = existingDirs.contains(fileName.toLowerCase());
+                await _deleteItemRecursive(destPath, destIsDir);
+              }
+              // copy path: writeBackFile uses FA_CREATE_ALWAYS, overwrites natively.
+
+            case _ConflictResolution.keepBoth:
+              final uniqueName = _makeUniqueName(fileName, existingNames);
+              existingNames.add(uniqueName.toLowerCase());
+              finalDestPath = _currentDirPath.isEmpty
+                  ? uniqueName
+                  : '$_currentDirPath/$uniqueName';
+          }
+        }
+
+        // ── Execute ─────────────────────────────────────────────────────
         if (_isCutOperation) {
           await vaultExplorerApi.renameFile(
-              widget.container, srcPath, destPath);
+              widget.container, srcPath, finalDestPath);
         } else {
-          await _copyEntryRecursive(srcPath, destPath, isDir, tmpDir);
+          await _copyEntryRecursive(srcPath, finalDestPath, isDir, tmpDir);
         }
       }
     } catch (e) {
@@ -354,6 +417,137 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       });
       _loadDirectoryContents(_currentDirPath);
     }
+  }
+
+  // ── Conflict resolution helpers ───────────────────────────────────────────────
+
+  /// Recursively deletes a file or directory (including all children).
+  Future<bool> _deleteItemRecursive(String fatPath, bool isDir) async {
+    if (!isDir) {
+      return vaultExplorerApi.deleteFile(widget.container, fatPath);
+    }
+    final children =
+        await vaultExplorerApi.listDirectory(widget.container, fatPath) ?? [];
+    for (final entry in children) {
+      if (entry.startsWith('System:')) continue;
+      final childIsDir = entry.startsWith('[DIR] ');
+      final childName  = childIsDir
+          ? entry.replaceFirst('[DIR] ', '')
+          : entry.split('|').first;
+      await _deleteItemRecursive('$fatPath/$childName', childIsDir);
+    }
+    return vaultExplorerApi.deleteFile(widget.container, fatPath);
+  }
+
+  /// Returns a filename that does not collide with any name in [existingNames].
+  static String _makeUniqueName(String fileName, Set<String> existingNames) {
+    if (!existingNames.contains(fileName.toLowerCase())) return fileName;
+    final dotIdx = fileName.lastIndexOf('.');
+    final name   = dotIdx != -1 ? fileName.substring(0, dotIdx) : fileName;
+    final ext    = dotIdx != -1 ? fileName.substring(dotIdx) : '';
+    for (int i = 1; i < 9999; i++) {
+      final candidate = '$name ($i)$ext';
+      if (!existingNames.contains(candidate.toLowerCase())) return candidate;
+    }
+    return '$fileName-${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  /// Shows a dialog asking the user how to resolve a name conflict.
+  /// Returns null only if the context is gone (never in practice).
+  Future<_ConflictResult?> _showConflictResolutionDialog(
+    String fileName, {
+    required bool hasMore,
+  }) {
+    bool applyToAll = false;
+    final cs = Theme.of(context).colorScheme;
+
+    return showDialog<_ConflictResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Already Exists', style: TextStyle(fontSize: 16)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              RichText(
+                text: TextSpan(
+                  style: Theme.of(ctx).textTheme.bodyMedium,
+                  children: [
+                    TextSpan(
+                      text: '"$fileName"',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600, color: cs.primary),
+                    ),
+                    const TextSpan(
+                        text: ' already exists in this location.'),
+                  ],
+                ),
+              ),
+              if (hasMore) ...[
+                const SizedBox(height: 14),
+                GestureDetector(
+                  onTap: () => setLocal(() => applyToAll = !applyToAll),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: applyToAll,
+                        onChanged: (v) =>
+                            setLocal(() => applyToAll = v ?? false),
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      const SizedBox(width: 6),
+                      const Expanded(
+                        child: Text('Apply to all conflicts',
+                            style: TextStyle(fontSize: 13)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(
+                ctx,
+                (
+                  resolution: _ConflictResolution.skip,
+                  applyToAll: applyToAll
+                ),
+              ),
+              child: const Text('Skip'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(
+                ctx,
+                (
+                  resolution: _ConflictResolution.overwrite,
+                  applyToAll: applyToAll
+                ),
+              ),
+              child: Text('Overwrite',
+                  style: TextStyle(color: cs.error)),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                ctx,
+                (
+                  resolution: _ConflictResolution.keepBoth,
+                  applyToAll: applyToAll
+                ),
+              ),
+              style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10)),
+              child: const Text('Keep Both'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ── Import / Export ───────────────────────────────────────────────────────────
@@ -462,7 +656,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             final full = _currentDirPath.isEmpty
                 ? name
                 : '$_currentDirPath/$name';
-            if (!await vaultExplorerApi.deleteFile(widget.container, full)) {
+            if (!await _deleteItemRecursive(full, isDir)) {
               failCount++;
             }
           }
@@ -512,20 +706,40 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             .where((f) => f.split('|').first.toLowerCase().contains(query))
             .toList();
 
-    return Scaffold(
-      appBar: _buildAppBar(context, filteredDirs, filteredFiles),
-      body: Column(
-        children: [
-            BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-          _StatsBar(
-            dirCount: filteredDirs.length,
-            fileCount: filteredFiles.length,
-            freeSpaceBytes: _freeSpace,
-            isFiltered: query.isNotEmpty,
-          ),
-          const Divider(),
-          Expanded(child: _buildBody(filteredDirs, filteredFiles)),
-        ],
+    // Intercept Android back button / gesture to navigate up the folder tree
+    // instead of immediately popping back to the dashboard.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) return;
+        if (isSelectionMode) {
+          exitSelectionMode();
+        } else if (_isClipboardMode) {
+          _cancelClipboard();
+        } else if (_isSearchActive) {
+          setState(() => _clearSearch());
+        } else if (!_atRoot) {
+          _navigateUp();
+        } else {
+          Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: _buildAppBar(context, filteredDirs, filteredFiles),
+        body: Column(
+          children: [
+  
+              BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+            _StatsBar(
+              dirCount: filteredDirs.length,
+              fileCount: filteredFiles.length,
+              freeSpaceBytes: _freeSpace,
+              isFiltered: query.isNotEmpty,
+            ),
+            const Divider(),
+            Expanded(child: _buildBody(filteredDirs, filteredFiles)),
+          ],
+        ),
       ),
     );
   }
@@ -756,12 +970,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           child: CircularProgressIndicator(strokeWidth: 2));
     }
 
-    // Real empty directory (not just an empty search result)
     if (_currentItems.isEmpty) {
       return _EmptyPlaceholder(onBack: _navigateUp, atRoot: _atRoot);
     }
 
-    // Search active but nothing matched
     if (_searchQuery.trim().isNotEmpty &&
         dirs.isEmpty &&
         files.isEmpty) {
@@ -790,7 +1002,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       onDirTap: _handleDirTap,
       onFileTap: _handleFileTap,
       onItemLongPress: _handleItemLongPress,
-
     );
   }
 }
@@ -801,8 +1012,6 @@ class _StatsBar extends StatelessWidget {
   final int dirCount;
   final int fileCount;
   final int freeSpaceBytes;
-
-  /// True when the counts reflect a search filter rather than the full directory.
   final bool isFiltered;
 
   const _StatsBar({
@@ -816,7 +1025,7 @@ class _StatsBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: cs.surface,
       child: Row(
         children: [

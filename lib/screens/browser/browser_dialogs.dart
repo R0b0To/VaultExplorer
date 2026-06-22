@@ -133,6 +133,7 @@ abstract class BrowserDialogs {
     required List<String> toDelete,
     required void Function(List<String> items) onConfirmed,
   }) {
+    final hasDir = toDelete.any((item) => item.startsWith('[DIR] '));
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -140,8 +141,10 @@ abstract class BrowserDialogs {
           'Delete ${toDelete.length} item(s)?',
           style: const TextStyle(fontSize: 16),
         ),
-        content: const Text(
-          'These items will be permanently erased from your encrypted volume.',
+        content: Text(
+          hasDir
+              ? 'These items will be permanently deleted, including all contents of any selected folders.'
+              : 'These items will be permanently erased from your encrypted volume.',
         ),
         actions: [
           TextButton(

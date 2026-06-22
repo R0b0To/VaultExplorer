@@ -94,7 +94,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
       );
 
       if (result != null) {
-        if (_remember) {
+        if (_remember && widget.initialUri == null) {
           await SavedContainerService.saveContainer(_selectedUri!, name);
         }
 
@@ -124,6 +124,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
           freeSpace: free,
         ));
 
+        HapticFeedback.lightImpact();
         if (mounted) Navigator.pop(context);
       } else {
         setState(() => _error = 'Incorrect password or invalid container');

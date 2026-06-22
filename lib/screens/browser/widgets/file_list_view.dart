@@ -4,27 +4,21 @@ import 'directory_tile.dart';
 import 'file_tile.dart';
 
 /// Stateless renderer for a flat list of directory entries.
-///
-/// Receives pre-sorted [dirs] and [files] lists and delegates every
-/// tap / long-press event back to the parent via callbacks — it owns
-/// no business logic.
 class FileListView extends StatelessWidget {
   final List<String> dirs;
   final List<String> files;
   final bool isSelectionMode;
   final Set<String> selectedItems;
 
-  /// Called with the raw [DIR] entry string when a directory row is tapped.
   final ValueChanged<String> onDirTap;
-
-  /// Called with the raw `name|size` entry string when a file row is tapped.
   final ValueChanged<String> onFileTap;
-
-  /// Called for both dirs and files on long-press.
   final ValueChanged<String> onItemLongPress;
 
+  /// Called when the trailing "⋯" icon on a file tile is tapped.
+  final ValueChanged<String>? onFileLongMenu;
+
   const FileListView({
-    Key? key,
+    super.key,
     required this.dirs,
     required this.files,
     required this.isSelectionMode,
@@ -32,22 +26,24 @@ class FileListView extends StatelessWidget {
     required this.onDirTap,
     required this.onFileTap,
     required this.onItemLongPress,
-  }) : super(key: key);
+    this.onFileLongMenu,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final total = dirs.length + files.length;
     return ListView.builder(
-      itemCount: dirs.length + files.length,
+      itemCount: total,
       itemBuilder: (_, index) {
         final isDir = index < dirs.length;
-        final rawItem = isDir ? dirs[index] : files[index - dirs.length];
+        final rawItem =
+            isDir ? dirs[index] : files[index - dirs.length];
         final isSelected = selectedItems.contains(rawItem);
 
         if (isDir) {
-          final cleanName = rawItem.replaceFirst('[DIR] ', '');
           return DirectoryTile(
             key: ValueKey(rawItem),
-            name: cleanName,
+            name: rawItem.replaceFirst('[DIR] ', ''),
             selectionMode: isSelectionMode,
             selected: isSelected,
             onTap: () => onDirTap(rawItem),
@@ -57,7 +53,8 @@ class FileListView extends StatelessWidget {
 
         final parts = rawItem.split('|');
         final cleanName = parts.first;
-        final fileSize = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
+        final fileSize =
+            parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
 
         return FileTile(
           key: ValueKey(rawItem),
@@ -67,6 +64,9 @@ class FileListView extends StatelessWidget {
           selected: isSelected,
           onTap: () => onFileTap(rawItem),
           onLongPress: () => onItemLongPress(rawItem),
+          onMoreTap: isSelectionMode
+              ? null
+              : () => onFileLongMenu?.call(rawItem),
         );
       },
     );

@@ -150,15 +150,28 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
+String? _serverError;
+
   Future<void> _startServer() async {
-    _streamingServer =
-        _LocalStreamingServer(widget.container);
-    final port = await _streamingServer!.start();
-    if (mounted) {
-      setState(() {
-        _serverPort = port;
-        _serverReady = true;
-      });
+    try {
+      _streamingServer = _LocalStreamingServer(widget.container);
+      // FIX: add timeout so a bind failure doesn't freeze the screen
+      final port = await _streamingServer!.start().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw Exception('Streaming server timed out'),
+      );
+      if (mounted) {
+        setState(() {
+          _serverPort = port;
+          _serverReady = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _serverError = 'Could not start media server. Try reopening the file.';
+        });
+      }
     }
   }
 
@@ -332,6 +345,35 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_serverError != null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline,
+                    color: Color(0xFFEF5350), size: 40),
+                const SizedBox(height: 16),
+                Text(
+                  _serverError!,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Go back',
+                      style: TextStyle(color: Color(0xFF4FC3F7))),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     if (!_serverReady || _currentPlaylist.isEmpty) {
       return const Scaffold(
         backgroundColor: Colors.black,

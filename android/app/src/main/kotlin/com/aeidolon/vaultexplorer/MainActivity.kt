@@ -131,7 +131,7 @@ class MainActivity : FlutterActivity() {
                             ?: VeraCryptSession.getFreeVolumeId()
                         if (targetVolId == null) {
                             result.error("MAX_CONTAINERS",
-                                "Maximum 16 containers already mounted", null)
+                                "Maximum 4 containers already mounted", null)
                             return@setMethodCallHandler
                         }
 

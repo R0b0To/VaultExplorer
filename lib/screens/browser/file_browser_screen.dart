@@ -1,15 +1,18 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../models/mounted_container.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../utils/format_utils.dart';
+import '../../utils/temp_file_utils.dart';
 import 'browser_dialogs.dart';
 import 'media_viewer_screen.dart';
 import 'mixins/selection_mixin.dart';
 import 'mixins/sort_mixin.dart';
 import 'widgets/breadcrumb_bar.dart';
 import 'widgets/clipboard_app_bar.dart';
+import 'widgets/file_actions_sheet.dart';
 import 'widgets/file_list_view.dart';
 import 'widgets/selection_app_bar.dart';
 
@@ -21,8 +24,7 @@ class PathSegment {
 
 class FileBrowserScreen extends StatefulWidget {
   final MountedContainer container;
-  const FileBrowserScreen({Key? key, required this.container})
-      : super(key: key);
+  const FileBrowserScreen({super.key, required this.container});
 
   @override
   State<FileBrowserScreen> createState() => _FileBrowserScreenState();
@@ -31,13 +33,13 @@ class FileBrowserScreen extends StatefulWidget {
 class _FileBrowserScreenState extends State<FileBrowserScreen>
     with SelectionMixin<FileBrowserScreen>, SortMixin<FileBrowserScreen> {
 
-  // ── Core state ─────────────────────────────────────────────────────────────
+  // ── Core state ──────────────────────────────────────────────────────────────
   final List<PathSegment> _pathStack = [const PathSegment('Root', '')];
   List<String> _currentItems = [];
   bool _isLoading = false;
   int _freeSpace = 0;
 
-  // ── Clipboard state ────────────────────────────────────────────────────────
+  // ── Clipboard state ─────────────────────────────────────────────────────────
   bool _isClipboardMode = false;
   bool _isCutOperation = false;
   List<Map<String, dynamic>> _clipboardSourceItems = [];
@@ -45,8 +47,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
-
+  // ── Lifecycle ────────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -54,12 +55,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _loadDirectoryContents('');
   }
 
-  // ── Directory loading ──────────────────────────────────────────────────────
-
+  // ── Directory loading ────────────────────────────────────────────────────────
   Future<void> _loadDirectoryContents(String path) async {
     setState(() => _isLoading = true);
     try {
-      final items = await vaultExplorerApi.listDirectory(widget.container, path);
+      final items =
+          await vaultExplorerApi.listDirectory(widget.container, path);
       final space = await vaultExplorerApi.getSpaceInfo(widget.container);
       if (mounted) {
         setState(() {
@@ -72,15 +73,14 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Failed loading folder: $e'),
-          backgroundColor: Colors.red,
+          content: Text('Failed loading folder: ${e.runtimeType}'),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     }
   }
 
-  // ── Navigation ─────────────────────────────────────────────────────────────
-
+  // ── Navigation ───────────────────────────────────────────────────────────────
   void _enterDirectory(String rawDirEntry) {
     final name = rawDirEntry.replaceFirst('[DIR] ', '');
     final newPath =
@@ -101,8 +101,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _loadDirectoryContents(_currentDirPath);
   }
 
-  // ── Item tap / long-press ──────────────────────────────────────────────────
-
+  // ── Item tap / long-press ────────────────────────────────────────────────────
   void _handleDirTap(String rawItem) {
     if (isSelectionMode) {
       toggleSelectItem(rawItem);
@@ -121,12 +120,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _currentDirPath.isEmpty ? cleanName : '$_currentDirPath/$cleanName';
 
     if (_isSupportedMedia(cleanName)) {
-      final mediaNames = _currentItems
+      final mediaEntries = _currentItems
           .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
           .map((f) => f.split('|').first)
           .where(_isSupportedMedia)
           .toList();
-      final resolvedPaths = mediaNames
+      final resolvedPaths = mediaEntries
           .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
           .toList();
       Navigator.push(
@@ -135,7 +134,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           builder: (_) => MediaViewerScreen(
             container: widget.container,
             mediaFiles: resolvedPaths,
-            initialIndex: mediaNames.indexOf(cleanName),
+            initialIndex: mediaEntries.indexOf(cleanName),
           ),
         ),
       );
@@ -145,6 +144,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   void _handleItemLongPress(String rawItem) {
+    HapticFeedback.selectionClick();
     if (!isSelectionMode) {
       setState(() {
         isSelectionMode = true;
@@ -155,35 +155,98 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  // ── Media helpers ──────────────────────────────────────────────────────────
-
+  // ── Media helpers ────────────────────────────────────────────────────────────
   bool _isSupportedMedia(String fileName) {
     final ext = fileName.split('.').last.toLowerCase();
-    return ['jpg', 'jpeg', 'png', 'gif', 'webp',
-            'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv'].contains(ext);
+    return const {
+      'jpg', 'jpeg', 'png', 'gif', 'webp',
+      'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv'
+    }.contains(ext);
   }
 
   Future<void> _openFileWithApp(String cleanName, String fullPath) async {
-    final messenger = ScaffoldMessenger.of(context);
     try {
-      final ok = await vaultExplorerApi.openWithApp(widget.container, fullPath);
+      final ok =
+          await vaultExplorerApi.openWithApp(widget.container, fullPath);
       if (!ok && mounted) {
-        messenger.showSnackBar(const SnackBar(
-          content: Text('No app found that can open this file type'),
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No app found for this file type'),
         ));
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        messenger.showSnackBar(SnackBar(
-          content: Text('Could not open "$cleanName": $e'),
-          backgroundColor: Colors.red,
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Could not open "$cleanName"'),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     }
   }
 
-  // ── Clipboard ──────────────────────────────────────────────────────────────
+  // ── File actions sheet ───────────────────────────────────────────────────────
 
+  /// Shows the quick-action bottom sheet for a single file.
+  void _showFileActions(String rawItem) {
+    final cleanName = rawItem.split('|').first;
+    final fullPath =
+        _currentDirPath.isEmpty ? cleanName : '$_currentDirPath/$cleanName';
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => FileActionsSheet(
+        fileName: cleanName,
+        onExport: () {
+          Navigator.pop(context);
+          setState(() {
+            isSelectionMode = true;
+            selectedItems
+              ..clear()
+              ..add(rawItem);
+          });
+          _exportSelectedToStorage();
+        },
+        onRename: () {
+          Navigator.pop(context);
+          BrowserDialogs.showRename(
+            context,
+            container: widget.container,
+            oldName: cleanName,
+            currentDirPath: _currentDirPath,
+            onSuccess: () => _loadDirectoryContents(_currentDirPath),
+          );
+        },
+        onDelete: () {
+          Navigator.pop(context);
+          BrowserDialogs.showBatchDelete(
+            context,
+            toDelete: [rawItem],
+            onConfirmed: (items) async {
+              setState(() => _isLoading = true);
+              try {
+                await vaultExplorerApi.deleteFile(widget.container, fullPath);
+              } finally {
+                _loadDirectoryContents(_currentDirPath);
+              }
+            },
+          );
+        },
+        onMove: () {
+          Navigator.pop(context);
+          setState(() {
+            isSelectionMode = true;
+            selectedItems
+              ..clear()
+              ..add(rawItem);
+          });
+          _initClipboard(cut: true);
+        },
+      ),
+    );
+  }
+
+  // ── Clipboard ────────────────────────────────────────────────────────────────
   void _initClipboard({required bool cut}) {
     final sources = selectedItems.map((item) {
       final isDir = item.startsWith('[DIR] ');
@@ -194,7 +257,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       return <String, dynamic>{'path': path, 'isDir': isDir};
     }).toList();
 
-    // Merge clipboard + selection reset into one setState.
     setState(() {
       _isClipboardMode = true;
       _isCutOperation = cut;
@@ -216,7 +278,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _clipboardSourceItems.clear();
       });
 
-  /// Recursively copies [srcPath] to [destPath]; handles files and folder trees.
+  /// Recursively copies [srcPath] to [destPath].
   Future<void> _copyEntryRecursive(
     String srcPath,
     String destPath,
@@ -224,8 +286,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     Directory tmpDir,
   ) async {
     if (!isDir) {
-      final tempFile = File(
-          '${tmpDir.path}/cb_${DateTime.now().microsecondsSinceEpoch}_${srcPath.hashCode}');
+      // FIX: use collision-safe unique path instead of hashCode
+      final tempFile =
+          File(TempFileUtils.uniquePath(tmpDir, prefix: 'cb_copy'));
       try {
         final ok = await vaultExplorerApi.decryptFile(
             widget.container, srcPath, tempFile.path);
@@ -239,7 +302,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       return;
     }
 
-    // Directory: create dest, then recurse into children.
     await vaultExplorerApi.createDirectory(widget.container, destPath);
     final children =
         await vaultExplorerApi.listDirectory(widget.container, srcPath) ?? [];
@@ -280,8 +342,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Operation failed: $e'),
-          backgroundColor: Colors.red,
+          content: Text('Operation failed: ${e.runtimeType}'),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     } finally {
@@ -294,8 +356,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  // ── Import / Export ────────────────────────────────────────────────────────
-
+  // ── Import / Export ──────────────────────────────────────────────────────────
   Future<void> _exportSelectedToStorage() async {
     final items = selectedItems.map((item) {
       final isDir = item.startsWith('[DIR] ');
@@ -307,22 +368,26 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }).toList();
     if (items.isEmpty) return;
 
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(SnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Preparing export for ${items.length} item(s)…')));
     setState(() => _isLoading = true);
     try {
       final count = await vaultExplorerApi.exportSelectedToFolder(
           widget.container, items);
-      messenger.showSnackBar(SnackBar(
-        content: Text(count > 0
-            ? 'Exported $count file(s)'
-            : 'Export cancelled or failed'),
-        backgroundColor: count > 0 ? const Color(0xFF1A3A2A) : null,
-      ));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(count > 0
+              ? 'Exported $count file(s)'
+              : 'Export cancelled or failed'),
+        ));
+      }
     } catch (e) {
-      messenger.showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Export error: ${e.runtimeType}'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -345,8 +410,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Import failed: $e'),
-          backgroundColor: Colors.red,
+          content: Text('Import failed: ${e.runtimeType}'),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     } finally {
@@ -363,15 +428,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(count > 0
-              ? 'Imported $count file${count != 1 ? 's' : ''}'
+              ? 'Imported $count item${count != 1 ? 's' : ''}'
               : 'No files imported'),
         ));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Folder import failed: $e'),
-          backgroundColor: Colors.red,
+          content: Text('Folder import failed: ${e.runtimeType}'),
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     } finally {
@@ -379,9 +444,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  // ── Batch delete ───────────────────────────────────────────────────────────
-
+  // ── Batch delete ─────────────────────────────────────────────────────────────
   void _batchDelete() {
+    HapticFeedback.heavyImpact();
     BrowserDialogs.showBatchDelete(
       context,
       toDelete: List<String>.from(selectedItems),
@@ -394,8 +459,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             final name = isDir
                 ? item.replaceFirst('[DIR] ', '')
                 : item.split('|').first;
-            final full =
-                _currentDirPath.isEmpty ? name : '$_currentDirPath/$name';
+            final full = _currentDirPath.isEmpty
+                ? name
+                : '$_currentDirPath/$name';
             if (!await vaultExplorerApi.deleteFile(widget.container, full)) {
               failCount++;
             }
@@ -408,9 +474,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text(failCount == 0
                   ? 'Deleted $successCount item(s)'
-                  : 'Deleted $successCount of ${items.length} — $failCount failed'),
-              backgroundColor:
-                  failCount == 0 ? const Color(0xFF1A3A2A) : Colors.red,
+                  : '$successCount deleted — $failCount failed'),
+              backgroundColor: failCount == 0 ? null : Theme.of(context).colorScheme.error,
             ));
           }
         }
@@ -418,8 +483,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 
-  // ── Build ──────────────────────────────────────────────────────────────────
-
+  // ── Build ─────────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final dirs = _currentItems.where((f) => f.startsWith('[DIR]')).toList()
@@ -430,7 +494,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       ..sort(compareItems);
 
     return Scaffold(
-      appBar: _buildAppBar(context),
+      appBar: _buildAppBar(context, dirs, files),
       body: Column(
         children: [
           if (_pathStack.length > 1)
@@ -447,18 +511,26 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
+  PreferredSizeWidget _buildAppBar(
+      BuildContext context, List<String> dirs, List<String> files) {
     final cs = Theme.of(context).colorScheme;
+    final allSelectable = [
+      ...dirs,
+      ...files,
+    ]; // System: already excluded from files
 
     if (isSelectionMode) {
       final single = selectedItems.length == 1;
-      final singleFile = single && !selectedItems.first.startsWith('[DIR] ');
+      final singleFile =
+          single && !selectedItems.first.startsWith('[DIR] ');
       return SelectionAppBar(
         selectedCount: selectedItems.length,
         singleSelected: single,
         singleFileSelected: singleFile,
         onClose: exitSelectionMode,
-        onSelectAll: () => setState(() => selectedItems.addAll(_currentItems)),
+        // FIX: only select dirs + files, never System: entries
+        onSelectAll: () =>
+            setState(() => selectedItems.addAll(allSelectable)),
         onRename: () {
           final raw = selectedItems.first;
           final isDir = raw.startsWith('[DIR] ');
@@ -497,12 +569,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       );
     }
 
-    // Default navigation bar
     return AppBar(
       leading: _atRoot
           ? null
           : IconButton(
               icon: const Icon(Icons.arrow_back),
+              tooltip: 'Go up',
               onPressed: _navigateUp,
             ),
       title: Column(
@@ -512,12 +584,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               style: const TextStyle(fontSize: 14)),
           if (!_atRoot)
             Text(
-              _pathStack.skip(1).map((s) => s.label).join(' / '),
+              _pathStack.skip(1).map((s) => s.label).join(' › '),
               style: TextStyle(
-                fontSize: 11,
-                color: cs.primary,
-                height: 1.3,
-              ),
+                  fontSize: 11, color: cs.primary, height: 1.3),
             ),
         ],
       ),
@@ -534,6 +603,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ),
         PopupMenuButton<String>(
           icon: const Icon(Icons.add),
+          tooltip: 'New item',
           onSelected: (v) {
             switch (v) {
               case 'folder':
@@ -541,65 +611,60 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   context,
                   container: widget.container,
                   currentDirPath: _currentDirPath,
-                  onSuccess: () => _loadDirectoryContents(_currentDirPath),
+                  onSuccess: () =>
+                      _loadDirectoryContents(_currentDirPath),
                 );
-                break;
               case 'file':
                 BrowserDialogs.showCreateFile(
                   context,
                   container: widget.container,
                   currentDirPath: _currentDirPath,
-                  onSuccess: () => _loadDirectoryContents(_currentDirPath),
+                  onSuccess: () =>
+                      _loadDirectoryContents(_currentDirPath),
                 );
-                break;
               case 'import':
                 _importFilesFromDevice();
-                break;
               case 'import_folder':
                 _importFolderFromDevice();
-                break;
             }
           },
           itemBuilder: (_) => [
             PopupMenuItem(
               value: 'folder',
-              child: Row(
-                children: [
-                  Icon(Icons.create_new_folder, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 12),
-                  const Text('New Folder'),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.create_new_folder_outlined,
+                    color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('New Folder'),
+              ]),
             ),
             PopupMenuItem(
               value: 'file',
-              child: Row(
-                children: [
-                  Icon(Icons.insert_drive_file, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 12),
-                  const Text('New File'),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.insert_drive_file_outlined,
+                    color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('New File'),
+              ]),
             ),
+            const PopupMenuDivider(),
             PopupMenuItem(
               value: 'import',
-              child: Row(
-                children: [
-                  Icon(Icons.drive_folder_upload, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 12),
-                  const Text('Import Files from Device'),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.upload_file_outlined,
+                    color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('Import Files'),
+              ]),
             ),
             PopupMenuItem(
               value: 'import_folder',
-              child: Row(
-                children: [
-                  Icon(Icons.create_new_folder_outlined, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 12),
-                  const Text('Import Folder from Device'),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.drive_folder_upload_outlined,
+                    color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('Import Folder'),
+              ]),
             ),
           ],
         ),
@@ -609,10 +674,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Widget _buildBody(List<String> dirs, List<String> files) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      return const Center(
+          child: CircularProgressIndicator(strokeWidth: 2));
     }
     if (_currentItems.isEmpty) {
-      return _EmptyPlaceholder(onBack: _navigateUp, atRoot: _atRoot);
+      return _EmptyPlaceholder(
+          onBack: _navigateUp, atRoot: _atRoot);
     }
     return FileListView(
       dirs: dirs,
@@ -622,6 +689,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       onDirTap: _handleDirTap,
       onFileTap: _handleFileTap,
       onItemLongPress: _handleItemLongPress,
+      onFileLongMenu: _showFileActions,
     );
   }
 }
@@ -634,34 +702,27 @@ class _StatsBar extends StatelessWidget {
   final int freeSpaceBytes;
 
   const _StatsBar({
-    Key? key,
     required this.dirCount,
     required this.fileCount,
     required this.freeSpaceBytes,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: cs.surface,
       child: Row(
         children: [
-          _Chip(
-            icon: Icons.folder_outlined,
-            label: '$dirCount folder${dirCount != 1 ? 's' : ''}',
-          ),
+          _Chip(icon: Icons.folder_outlined,
+              label: '$dirCount folder${dirCount != 1 ? 's' : ''}'),
           const SizedBox(width: 14),
-          _Chip(
-            icon: Icons.insert_drive_file_outlined,
-            label: '$fileCount file${fileCount != 1 ? 's' : ''}',
-          ),
+          _Chip(icon: Icons.insert_drive_file_outlined,
+              label: '$fileCount file${fileCount != 1 ? 's' : ''}'),
           const Spacer(),
-          _Chip(
-            icon: Icons.storage_outlined,
-            label: '${formatBytes(freeSpaceBytes)} free',
-          ),
+          _Chip(icon: Icons.storage_outlined,
+              label: '${formatBytes(freeSpaceBytes)} free'),
         ],
       ),
     );
@@ -671,8 +732,7 @@ class _StatsBar extends StatelessWidget {
 class _Chip extends StatelessWidget {
   final IconData icon;
   final String label;
-  const _Chip({Key? key, required this.icon, required this.label})
-      : super(key: key);
+  const _Chip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -685,35 +745,36 @@ class _Chip extends StatelessWidget {
   }
 }
 
-// ── Empty placeholder ──────────────────────────────────────────────────────────
-
 class _EmptyPlaceholder extends StatelessWidget {
   final VoidCallback onBack;
   final bool atRoot;
-  const _EmptyPlaceholder(
-      {Key? key, required this.onBack, required this.atRoot})
-      : super(key: key);
+  const _EmptyPlaceholder({required this.onBack, required this.atRoot});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.folder_open, size: 40, color: cs.outline),
-        const SizedBox(height: 12),
-        Text('Empty Folder', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 6),
-        const Text('Tap + to create files or folders.',
-            style: TextStyle(color: Colors.grey, fontSize: 11)),
-        if (!atRoot) ...[
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.folder_open_outlined, size: 48, color: cs.outline),
           const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back, size: 16),
-            label: const Text('Go back'),
-          ),
-        ],
-      ]),
+          Text('Empty Folder',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          Text('Tap + to create files or import from device.',
+              style: TextStyle(color: cs.outline, fontSize: 12),
+              textAlign: TextAlign.center),
+          if (!atRoot) ...[
+            const SizedBox(height: 20),
+            TextButton.icon(
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_upward, size: 16),
+              label: const Text('Go back'),
+            ),
+          ],
+        ]),
+      ),
     );
   }
 }

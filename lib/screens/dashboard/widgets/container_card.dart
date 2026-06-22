@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../models/mounted_container.dart';
 import '../../../services/vaultexplorer_api.dart';
 import '../../../utils/format_utils.dart';
@@ -10,15 +11,15 @@ class ContainerCard extends StatelessWidget {
   final VoidCallback onReturn;
 
   const ContainerCard({
-    Key? key,
+    super.key,
     required this.container,
     required this.onLocked,
     required this.onReturn,
-  }) : super(key: key);
+  });
 
   Color _storageColor(double usedFraction, ColorScheme cs) {
     if (usedFraction > 0.90) return cs.error;
-    if (usedFraction > 0.70) return const Color(0xFFFFA726); // amber
+    if (usedFraction > 0.70) return cs.secondary; // amber
     return cs.primary;
   }
 
@@ -37,113 +38,128 @@ class ContainerCard extends StatelessWidget {
     final barColor = _storageColor(usedFraction, cs);
     final hasSpaceData = container.totalSpace > 0;
 
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => FileBrowserScreen(container: container)),
-          );
-          onReturn();
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header row ──────────────────────────────────────────────
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(6),
+    return Semantics(
+      label: 'Container ${container.displayName}, '
+          '${hasSpaceData ? "${formatBytes(container.freeSpace)} free" : "locked"}',
+      button: true,
+      child: Card(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) =>
+                      FileBrowserScreen(container: container)),
+            );
+            onReturn();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Header ──────────────────────────────────────────────
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.folder_zip_outlined,
+                          size: 20, color: cs.primary),
                     ),
-                    child:
-                        Icon(Icons.folder_zip, size: 18, color: cs.primary),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          container.displayName,
-                          style: Theme.of(context).textTheme.titleMedium,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          hasSpaceData
-                              ? '${formatBytes(container.freeSpace)} free '
-                                  'of ${formatBytes(container.totalSpace)}'
-                              : 'Volume ${container.volId}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            container.displayName,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            hasSpaceData
+                                ? '${formatBytes(container.freeSpace)} free'
+                                    ' of ${formatBytes(container.totalSpace)}'
+                                : 'Vol ${container.volId} • mounted',
+                            style:
+                                Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  _LockButton(
-                      container: container, onLocked: onLocked),
-                ],
-              ),
+                    _LockButton(
+                        container: container, onLocked: onLocked),
+                  ],
+                ),
 
-              // ── Storage usage bar ────────────────────────────────────────
-              if (hasSpaceData) ...[
-                const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(2),
-                  child: LinearProgressIndicator(
-                    value: usedFraction,
-                    minHeight: 3,
-                    backgroundColor: cs.surfaceVariant,
-                    valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                // ── Storage bar ─────────────────────────────────────────
+                if (hasSpaceData) ...[
+                  const SizedBox(height: 10),
+                  Semantics(
+                    label:
+                        '${(usedFraction * 100).round()}% used',
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: usedFraction,
+                        minHeight: 4,
+                        backgroundColor:
+                            cs.surfaceContainerHighest,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(barColor),
+                      ),
+                    ),
                   ),
+                ],
+
+                const SizedBox(height: 14),
+                const Divider(),
+                const SizedBox(height: 10),
+
+                // ── Stats row ───────────────────────────────────────────
+                Row(
+                  children: [
+                    _StatChip(
+                      icon: Icons.insert_drive_file_outlined,
+                      label: '$fileCount file${fileCount != 1 ? 's' : ''}',
+                    ),
+                    const SizedBox(width: 10),
+                    _StatChip(
+                      icon: Icons.folder_outlined,
+                      label:
+                          '$dirCount folder${dirCount != 1 ? 's' : ''}',
+                    ),
+                    const Spacer(),
+                    Row(children: [
+                      Text('Browse',
+                          style: TextStyle(
+                            color: cs.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          )),
+                      const SizedBox(width: 4),
+                      Icon(Icons.arrow_forward,
+                          size: 13, color: cs.primary),
+                    ]),
+                  ],
                 ),
               ],
-
-              const SizedBox(height: 14),
-              const Divider(),
-              const SizedBox(height: 12),
-
-              // ── Stat row ─────────────────────────────────────────────────
-              Row(
-                children: [
-                  _StatChip(
-                    icon: Icons.insert_drive_file_outlined,
-                    label:
-                        '$fileCount file${fileCount != 1 ? 's' : ''}',
-                  ),
-                  const SizedBox(width: 10),
-                  _StatChip(
-                    icon: Icons.folder_outlined,
-                    label:
-                        '$dirCount folder${dirCount != 1 ? 's' : ''}',
-                  ),
-                  const Spacer(),
-                  Text(
-                    'Browse →',
-                    style: TextStyle(
-                      color: cs.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-
-// ── Stat chip ─────────────────────────────────────────────────────────────────
 
 class _StatChip extends StatelessWidget {
   final IconData icon;
@@ -153,18 +169,13 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: cs.outline),
-        const SizedBox(width: 4),
-        Text(label, style: Theme.of(context).textTheme.bodySmall),
-      ],
-    );
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: cs.outline),
+      const SizedBox(width: 4),
+      Text(label, style: Theme.of(context).textTheme.bodySmall),
+    ]);
   }
 }
-
-// ── Lock button ───────────────────────────────────────────────────────────────
 
 class _LockButton extends StatefulWidget {
   final MountedContainer container;
@@ -179,6 +190,7 @@ class _LockButtonState extends State<_LockButton> {
   bool _loading = false;
 
   Future<void> _lock() async {
+    HapticFeedback.mediumImpact();
     setState(() => _loading = true);
     try {
       await vaultExplorerApi.lockContainer(widget.container.uri);
@@ -186,7 +198,7 @@ class _LockButtonState extends State<_LockButton> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lock failed: $e')),
+          SnackBar(content: Text('Lock failed: ${e.runtimeType}')),
         );
       }
     } finally {
@@ -196,20 +208,22 @@ class _LockButtonState extends State<_LockButton> {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: _loading ? null : _lock,
-      tooltip: 'Lock container',
-      icon: _loading
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Icon(
-              Icons.lock_outline,
-              size: 20,
-              color: Theme.of(context).colorScheme.error,
-            ),
+    final cs = Theme.of(context).colorScheme;
+    return Semantics(
+      label: 'Lock ${widget.container.displayName}',
+      button: true,
+      child: IconButton(
+        onPressed: _loading ? null : _lock,
+        tooltip: 'Lock container',
+        icon: _loading
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: cs.error),
+              )
+            : Icon(Icons.lock_outline, size: 20, color: cs.error),
+      ),
     );
   }
 }
@@ -223,65 +237,71 @@ class SavedContainerCard extends StatelessWidget {
   final VoidCallback onForget;
 
   const SavedContainerCard({
-    Key? key,
+    super.key,
     required this.name,
     required this.uri,
     required this.onUnlock,
     required this.onForget,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onUnlock,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: cs.surfaceVariant,
-                  borderRadius: BorderRadius.circular(6),
+    return Semantics(
+      label: 'Locked container $name. Tap to unlock.',
+      button: true,
+      child: Card(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onUnlock,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.folder_zip_outlined,
+                      size: 20, color: cs.outline),
                 ),
-                child: Icon(Icons.folder_zip, size: 18, color: cs.outline),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: Theme.of(context).textTheme.titleMedium,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Locked',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cs.outline,
-                          ),
-                    ),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          style: Theme.of(context).textTheme.titleMedium,
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Row(children: [
+                        Icon(Icons.lock, size: 11, color: cs.outline),
+                        const SizedBox(width: 4),
+                        Text('Locked',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: cs.outline)),
+                      ]),
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                onPressed: onUnlock,
-                tooltip: 'Unlock container',
-                icon: Icon(Icons.lock_open, color: cs.primary),
-              ),
-              IconButton(
-                onPressed: onForget,
-                tooltip: 'Remove from dashboard',
-                icon: Icon(Icons.close, color: cs.outline),
-              ),
-            ],
+                IconButton(
+                  onPressed: onUnlock,
+                  tooltip: 'Unlock container',
+                  icon: Icon(Icons.lock_open_outlined, color: cs.primary),
+                ),
+                IconButton(
+                  onPressed: onForget,
+                  tooltip: 'Remove from dashboard',
+                  icon: Icon(Icons.close, color: cs.outline, size: 18),
+                ),
+              ],
+            ),
           ),
         ),
       ),

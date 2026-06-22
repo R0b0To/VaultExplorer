@@ -172,24 +172,28 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
     if (pdrv >= MAX_VOLUMES || activeFd[pdrv] < 0 || !isDataCtxInitialized[pdrv])
         return RES_NOTRDY;
+    // Sanity-cap: FatFs never legitimately issues > 8192 sectors in one call.
+    if (count == 0 || count > 8192) return RES_PARERR;
 
     const uint64_t basePhysical = activeDataOffset[pdrv] / 512;
-    const bool relTweak = activeIsRelTweak[pdrv];
-    const int fd = activeFd[pdrv];
+    const bool     relTweak     = activeIsRelTweak[pdrv];
+    const int      fd           = activeFd[pdrv];
     const uint64_t firstPhysical = basePhysical + sector;
+    const size_t   totalBytes    = static_cast<size_t>(count) * 512;
 
-    static thread_local unsigned char encBuf[512 * 64];
+    // FIX: replaced static thread_local fixed-size stack buffer (32 KB, overflow for count > 64)
+    // with heap allocation sized exactly to the request.
+    std::unique_ptr<unsigned char[]> encBuf(new unsigned char[totalBytes]);
 
     for (UINT i = 0; i < count; i++) {
         const uint64_t physSector = firstPhysical + i;
         const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
         encryptSector(&activeDataCtxEnc[pdrv], tweak,
-                      buff   + (i * 512),
-                      encBuf + (i * 512));
+                      buff        + (i * 512),
+                      encBuf.get() + (i * 512));
     }
 
-    const size_t totalBytes = static_cast<size_t>(count) * 512;
-    ssize_t written = pwrite(fd, encBuf, totalBytes,
+    ssize_t written = pwrite(fd, encBuf.get(), totalBytes,
                              static_cast<off_t>(firstPhysical * 512));
     return (written == static_cast<ssize_t>(totalBytes)) ? RES_OK : RES_ERROR;
 }
@@ -333,10 +337,17 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     if (!fsFound) {
         mbedtls_aes_xts_free(&tmpDec);
         mbedtls_aes_xts_free(&tmpEnc);
+        mbedtls_platform_zeroize(hKey, sizeof(hKey));
+        mbedtls_platform_zeroize(dKey, sizeof(dKey));
+        mbedtls_platform_zeroize(decH, sizeof(decH));
         return false;
     }
 
     mbedtls_aes_xts_setkey_enc(&tmpEnc, dKey, 512);
+
+    mbedtls_platform_zeroize(hKey, sizeof(hKey));
+    mbedtls_platform_zeroize(dKey, sizeof(dKey));
+    mbedtls_platform_zeroize(decH, sizeof(decH));
 
     if (isDataCtxInitialized[volId]) {
         mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
@@ -346,7 +357,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     activeDataCtxEnc[volId] = tmpEnc;
     isDataCtxInitialized[volId] = true;
     activeFd[volId] = fd;
-
     return true;
 }
 

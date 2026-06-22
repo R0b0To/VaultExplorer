@@ -57,12 +57,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _pageController =
         PageController(initialPage: widget.initialIndex);
     _startServer();
-    // Recursive subfolder scan is now deferred — it only runs when the
-    // user explicitly switches the filter to 'All (Incl. Subfolders)'.
   }
 
   /// Returns the base directory shared by all files in the initial playlist.
-  /// Guards against an empty mediaFiles list (fix for issue #9).
   String _getBaseDir() {
     if (widget.mediaFiles.isEmpty) return '';
     final firstFile = widget.mediaFiles.first;
@@ -79,7 +76,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   /// Runs the recursive directory scan and populates [_originalList].
-  /// Only called lazily when the user selects the 'All' filter.
   Future<void> _loadRecursiveMedia() async {
     final baseDir = _getBaseDir();
     final recursiveFiles =
@@ -148,7 +144,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     if (filteredList.isNotEmpty) {
       _currentPlaylist = filteredList;
       _currentIndex = newIndex;
-      // Guard jumpToPage — PageController may not be attached yet (fix #9).
       if (_pageController.hasClients) {
         _pageController.jumpToPage(_currentIndex);
       }
@@ -227,8 +222,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     });
   }
 
-  /// Switches the folder filter; triggers the one-shot recursive scan
-  /// lazily when 'All' is first selected (fix for issue #8).
   Future<void> _filterByFolder(String folder) async {
     if (folder == 'All' && !_allFilesScanned) {
       if (mounted) {
@@ -337,48 +330,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
-  Future<void> _exportCurrentFile() async {
-    final fileName = _currentPlaylist[_currentIndex];
-    final publicDownloads =
-        Directory('/storage/emulated/0/Download');
-    if (!await publicDownloads.exists()) {
-      await publicDownloads.create(recursive: true);
-    }
-    final destPath =
-        '${publicDownloads.path}/${fileName.split('/').last}';
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content: Text(
-              'Exporting ${fileName.split('/').last}…')),
-    );
-
-    try {
-      final success = await vaultExplorerApi.decryptFile(
-        widget.container,
-        fileName,
-        destPath,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(success
-                ? 'Saved to Downloads/${fileName.split('/').last}'
-                : 'Export failed'),
-            backgroundColor:
-                success ? const Color(0xFF1A3A2A) : null,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!_serverReady || _currentPlaylist.isEmpty) {
@@ -401,8 +352,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Media swiper — ValueKey ensures Flutter disposes the old
-          // _MediaPage state when switching to a different file (fix #9).
           PageView.builder(
             controller: _pageController,
             physics: _pagePhysics,
@@ -478,68 +427,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                       ],
                     ),
                   ),
-                  // Folder filter
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.folder_open,
-                        color: Colors.white),
-                    tooltip: 'Set Directory Filter',
-                    onSelected: _filterByFolder,
-                    itemBuilder: (context) => [
-                      PopupMenuItem<String>(
-                        value: 'Current Folder Only',
-                        child: Row(children: [
-                          Icon(Icons.folder_shared,
-                              color: _selectedFolder ==
-                                      'Current Folder Only'
-                                  ? const Color(0xFF4FC3F7)
-                                  : Colors.grey,
-                              size: 18),
-                          const SizedBox(width: 8),
-                          const Text('Current Folder Only'),
-                        ]),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'All',
-                        child: Row(children: [
-                          Icon(Icons.all_inclusive,
-                              color:
-                                  _selectedFolder == 'All'
-                                      ? const Color(
-                                          0xFF4FC3F7)
-                                      : Colors.grey,
-                              size: 18),
-                          const SizedBox(width: 8),
-                          const Text(
-                              'All (Incl. Subfolders)'),
-                        ]),
-                      ),
-                    ],
-                  ),
-                  // Shuffle
-                  IconButton(
-                    icon: Icon(Icons.shuffle,
-                        color: _isShuffled
-                            ? const Color(0xFF4FC3F7)
-                            : Colors.white),
-                    tooltip: 'Shuffle Playlist',
-                    onPressed: _toggleShuffle,
-                  ),
-                  IconButton(
-                    icon: Icon(
-                        _isLandscape
-                            ? Icons.screen_lock_portrait
-                            : Icons.screen_rotation,
-                        color: Colors.white),
-                    tooltip: 'Toggle Rotation',
-                    onPressed: _toggleOrientation,
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                        Icons.download_outlined,
-                        color: Colors.white),
-                    tooltip: 'Export to Downloads',
-                    onPressed: _exportCurrentFile,
-                  ),
                   IconButton(
                     icon: const Icon(Icons.delete_outline,
                         color: Colors.redAccent),
@@ -553,6 +440,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     onSelected: (value) {
                       if (value == 'open_with') {
                         _openWithApp();
+                      } else if (value == 'toggle_orientation') {
+                        _toggleOrientation();
+                      } else if (value == 'toggle_shuffle') {
+                        _toggleShuffle();
+                      } else if (value == 'folder_current') {
+                        _filterByFolder('Current Folder Only');
+                      } else if (value == 'folder_all') {
+                        _filterByFolder('All');
                       } else if (value.startsWith('skip_')) {
                         final seconds = int.parse(
                             value.split('_')[1]);
@@ -571,6 +466,72 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                           Icon(Icons.open_in_new, size: 18),
                           SizedBox(width: 8),
                           Text('Open with App'),
+                        ]),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'toggle_orientation',
+                        child: Row(children: [
+                          Icon(
+                            _isLandscape
+                                ? Icons.screen_lock_portrait
+                                : Icons.screen_rotation,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(_isLandscape
+                              ? 'Portrait Mode'
+                              : 'Landscape Mode'),
+                        ]),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'toggle_shuffle',
+                        child: Row(children: [
+                          Icon(
+                            Icons.shuffle,
+                            color: _isShuffled
+                                ? const Color(0xFF4FC3F7)
+                                : Colors.grey,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(_isShuffled
+                              ? 'Disable Shuffle'
+                              : 'Shuffle Playlist'),
+                        ]),
+                      ),
+                      const PopupMenuDivider(),
+                      PopupMenuItem<String>(
+                        enabled: false,
+                        child: Text('Folder Filter',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context)
+                                    .disabledColor)),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'folder_current',
+                        child: Row(children: [
+                          Icon(Icons.folder_shared,
+                              color: _selectedFolder ==
+                                      'Current Folder Only'
+                                  ? const Color(0xFF4FC3F7)
+                                  : Colors.grey,
+                              size: 18),
+                          const SizedBox(width: 8),
+                          const Text('Current Folder Only'),
+                        ]),
+                      ),
+                      PopupMenuItem<String>(
+                        value: 'folder_all',
+                        child: Row(children: [
+                          Icon(Icons.all_inclusive,
+                              color: _selectedFolder == 'All'
+                                  ? const Color(0xFF4FC3F7)
+                                  : Colors.grey,
+                              size: 18),
+                          const SizedBox(width: 8),
+                          const Text('All (Incl. Subfolders)'),
                         ]),
                       ),
                       const PopupMenuDivider(),
@@ -771,6 +732,11 @@ class _RealVideoPlayerWidgetState
   bool _showRightIndicator = false;
   bool _isSpeedHeld = false;
 
+  // Audio, Loop, and Playback Speed state variables
+  bool _isMuted = false;
+  bool _isLooping = false;
+  double _playbackSpeed = 1.0;
+
   final TransformationController _videoTransformationController =
       TransformationController();
   double _videoScale = 1.0;
@@ -822,6 +788,9 @@ class _RealVideoPlayerWidgetState
           _initialized = true;
           _duration = _controller.value.duration;
         });
+        await _controller.setVolume(_isMuted ? 0.0 : 1.0);
+        await _controller.setLooping(_isLooping);
+        await _controller.setPlaybackSpeed(_playbackSpeed);
         _controller.play();
         _startHideTimer();
       }
@@ -837,14 +806,9 @@ class _RealVideoPlayerWidgetState
   void dispose() {
     _hideTimer?.cancel();
     _videoTransformationController.dispose();
-    // Always attempt to dispose the controller regardless of whether
-    // initialization completed — avoids native resource leak when
-    // initialize() throws (fix for issue #5).
     try {
       _controller.dispose();
-    } catch (_) {
-      // Controller may not have been fully initialized; safe to ignore.
-    }
+    } catch (_) {}
     super.dispose();
   }
 
@@ -875,8 +839,32 @@ class _RealVideoPlayerWidgetState
   void _onSpeedHoldEnd(LongPressEndDetails _) {
     if (!_initialized) return;
     setState(() => _isSpeedHeld = false);
-    _controller.setPlaybackSpeed(1.0);
+    _controller.setPlaybackSpeed(_playbackSpeed); // Restores user choice
     _showControlsAndResetTimer();
+  }
+
+  void _toggleMute() {
+    _showControlsAndResetTimer();
+    setState(() {
+      _isMuted = !_isMuted;
+      _controller.setVolume(_isMuted ? 0.0 : 1.0);
+    });
+  }
+
+  void _toggleLoop() {
+    _showControlsAndResetTimer();
+    setState(() {
+      _isLooping = !_isLooping;
+      _controller.setLooping(_isLooping);
+    });
+  }
+
+  void _setPlaybackSpeed(double speed) {
+    _showControlsAndResetTimer();
+    setState(() {
+      _playbackSpeed = speed;
+      _controller.setPlaybackSpeed(speed);
+    });
   }
 
   void _handleVideoDoubleTap() {
@@ -1011,7 +999,6 @@ class _RealVideoPlayerWidgetState
                   alignment: Alignment.center,
                   children: [
                     VideoPlayer(_controller),
-                    // Gesture zones
                     Row(
                       children: [
                         Expanded(
@@ -1174,105 +1161,164 @@ class _RealVideoPlayerWidgetState
               ),
             ),
 
-          // Seek bar
+          // Stacked Bottom Controls (Seek bar -> Start time & Duration -> Options)
           AnimatedPositioned(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
             left: 0,
             right: 0,
-            bottom: widget.showUI ? 0 : -100,
+            bottom: widget.showUI ? 0 : -140,
             child: Container(
               padding: EdgeInsets.only(
-                top: 8,
-                bottom:
-                    MediaQuery.of(context).padding.bottom + 8,
+                top: 12,
+                bottom: MediaQuery.of(context).padding.bottom + 12,
                 left: 16,
                 right: 16,
               ),
-              color: Colors.black.withOpacity(0.6),
-              child: Row(
+              color: Colors.black.withOpacity(0.65),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  IconButton(
-                    icon: Icon(
-                        _controller.value.isPlaying
-                            ? Icons.pause
-                            : Icons.play_arrow,
-                        color: Colors.white,
-                        size: 20),
-                    onPressed: () {
-                      _showControlsAndResetTimer();
-                      setState(() {
-                        _controller.value.isPlaying
-                            ? _controller.pause()
-                            : _controller.play();
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 4),
-                  Text(_formatDuration(_position),
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 11)),
-                  Expanded(
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        activeTrackColor:
-                            const Color(0xFF4FC3F7),
-                        inactiveTrackColor:
-                            const Color(0xFF2A3040),
-                        thumbColor: const Color(0xFF4FC3F7),
-                        trackHeight: 4,
-                        thumbShape:
-                            const RoundSliderThumbShape(
-                                enabledThumbRadius: 6),
-                        overlayShape:
-                            const RoundSliderOverlayShape(
-                                overlayRadius: 14),
-                      ),
-                      child: Slider(
-                        value: _sliderValue.clamp(0.0, 1.0),
-                        onChanged: (value) {
-                          _showControlsAndResetTimer();
-                          setState(() {
-                            _isDragging = true;
-                            _sliderValue = value;
-                          });
-                          final now = DateTime.now();
-                          if (now
-                                  .difference(_lastSeekTime)
-                                  .inMilliseconds >
-                              100) {
-                            _lastSeekTime = now;
-                            final targetMs =
-                                (value *
-                                        _duration
-                                            .inMilliseconds)
-                                    .toInt();
-                            _controller.seekTo(Duration(
-                                milliseconds: targetMs));
-                          }
-                        },
-                        onChangeEnd: (value) {
+                  // Row 1: Full-width Slider (Seek Bar)
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      activeTrackColor: const Color(0xFF4FC3F7),
+                      inactiveTrackColor: const Color(0xFF2A3040),
+                      thumbColor: const Color(0xFF4FC3F7),
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 6),
+                      overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 14),
+                      trackShape: const RectangularSliderTrackShape(),
+                    ),
+                    child: Slider(
+                      value: _sliderValue.clamp(0.0, 1.0),
+                      onChanged: (value) {
+                        _showControlsAndResetTimer();
+                        setState(() {
+                          _isDragging = true;
+                          _sliderValue = value;
+                        });
+                        final now = DateTime.now();
+                        if (now
+                                .difference(_lastSeekTime)
+                                .inMilliseconds >
+                            100) {
+                          _lastSeekTime = now;
                           final targetMs =
-                              (value *
-                                      _duration
-                                          .inMilliseconds)
-                                  .toInt();
-                          _controller
-                              .seekTo(Duration(
-                                  milliseconds: targetMs))
-                              .then((_) {
-                            setState(
-                                () => _isDragging = false);
-                            _startHideTimer();
-                          });
-                        },
-                      ),
+                              (value * _duration.inMilliseconds).toInt();
+                          _controller.seekTo(
+                              Duration(milliseconds: targetMs));
+                        }
+                      },
+                      onChangeEnd: (value) {
+                        final targetMs =
+                            (value * _duration.inMilliseconds).toInt();
+                        _controller
+                            .seekTo(Duration(milliseconds: targetMs))
+                            .then((_) {
+                          setState(() => _isDragging = false);
+                          _startHideTimer();
+                        });
+                      },
                     ),
                   ),
-                  Text(_formatDuration(_duration),
-                      style: const TextStyle(
-                          color: Color(0xFF7A8899),
-                          fontSize: 11)),
+                  const SizedBox(height: 6),
+
+                  // Row 2: Timestamps (Start Time - Duration)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _formatDuration(_position),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 11),
+                      ),
+                      Text(
+                        _formatDuration(_duration),
+                        style: const TextStyle(
+                            color: Color(0xFF7A8899), fontSize: 11),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Row 3: Options (Mute, Loop, Speed selector)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          _isMuted ? Icons.volume_off : Icons.volume_up,
+                          color: _isMuted ? Colors.redAccent : Colors.white,
+                          size: 20,
+                        ),
+                        onPressed: _toggleMute,
+                      ),
+                      const SizedBox(width: 24),
+                      IconButton(
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        icon: Icon(
+                          Icons.loop,
+                          color: _isLooping
+                              ? const Color(0xFF4FC3F7)
+                              : Colors.white,
+                          size: 20,
+                        ),
+                        onPressed: _toggleLoop,
+                      ),
+                      const SizedBox(width: 24),
+                      Theme(
+                        data: Theme.of(context).copyWith(
+                          cardColor: Colors.grey[900],
+                        ),
+                        child: PopupMenuButton<double>(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          initialValue: _playbackSpeed,
+                          onSelected: _setPlaybackSpeed,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.white24),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '${_playbackSpeed}x',
+                              style: const TextStyle(
+                                color: Color(0xFF4FC3F7),
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          itemBuilder: (context) =>
+                              [0.5, 1.0, 1.25, 1.5, 2.0].map((speed) {
+                            return PopupMenuItem<double>(
+                              value: speed,
+                              height: 36,
+                              child: Text(
+                                '${speed}x',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: _playbackSpeed == speed
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

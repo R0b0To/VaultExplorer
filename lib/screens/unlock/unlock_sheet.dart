@@ -10,11 +10,15 @@ class UnlockSheet extends StatefulWidget {
   final String? initialUri;
   final String? initialName;
 
+  /// Pre-fills the password field (from saved container config).
+  final String? prefillPassword;
+
   const UnlockSheet({
     Key? key,
     required this.onMounted,
     this.initialUri,
     this.initialName,
+    this.prefillPassword,
   }) : super(key: key);
 
   @override
@@ -22,7 +26,7 @@ class UnlockSheet extends StatefulWidget {
 }
 
 class _UnlockSheetState extends State<UnlockSheet> {
-  final _passwordCtrl = TextEditingController();
+  late TextEditingController _passwordCtrl;
   final _pimCtrl = TextEditingController();
   String? _selectedUri;
   String? _selectedName;
@@ -31,13 +35,22 @@ class _UnlockSheetState extends State<UnlockSheet> {
   bool _remember = false;
   String? _error;
 
+  /// True when the password was pre-filled from saved config — we show a
+  /// small indicator so the user knows they don't have to type it.
+  bool get _passwordPrefilled =>
+      widget.prefillPassword?.isNotEmpty == true &&
+      _passwordCtrl.text == widget.prefillPassword;
+
   @override
   void initState() {
     super.initState();
+    _passwordCtrl =
+        TextEditingController(text: widget.prefillPassword ?? '');
+
     if (widget.initialUri != null) {
       _selectedUri = widget.initialUri;
       _selectedName = widget.initialName;
-      _remember = true; // Container is already saved on dashboard
+      _remember = true;
     }
   }
 
@@ -50,7 +63,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
   Future<void> _pickFile() async {
     if (widget.initialUri != null) return;
-
     try {
       final result = await vaultExplorerApi.pickContainer();
       if (result != null) {
@@ -75,13 +87,9 @@ class _UnlockSheetState extends State<UnlockSheet> {
       return;
     }
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() { _loading = true; _error = null; });
 
     try {
-      // clampPim guards against absurdly large PBKDF2 iteration counts.
       final pim = clampPim(
           _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final name = _selectedName ?? 'Container';
@@ -145,7 +153,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
       margin: EdgeInsets.only(bottom: mq.viewInsets.bottom),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(16)),
         border: Border.all(color: cs.outline.withOpacity(0.5)),
       ),
       child: SafeArea(
@@ -207,7 +216,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          _selectedName ?? 'Select VeraCrypt container…',
+                          _selectedName ??
+                              'Select VeraCrypt container…',
                           style: TextStyle(
                               color: _selectedUri != null
                                   ? cs.onSurface
@@ -240,22 +250,40 @@ class _UnlockSheetState extends State<UnlockSheet> {
               ),
               const SizedBox(height: 12),
 
+              // Password field
               TextField(
                 controller: _passwordCtrl,
                 obscureText: _obscure,
-                autofocus: widget.initialUri != null,
+                autofocus: widget.initialUri != null &&
+                    widget.prefillPassword?.isEmpty != false,
+                onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   labelText: 'Password',
                   prefixIcon:
                       const Icon(Icons.key_outlined, size: 18),
-                  suffixIcon: IconButton(
-                    onPressed: () =>
-                        setState(() => _obscure = !_obscure),
-                    icon: Icon(
-                        _obscure
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        size: 18),
+                  // Show a "saved" badge when using stored password
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_passwordPrefilled)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Tooltip(
+                            message: 'Using saved password',
+                            child: Icon(Icons.bookmark,
+                                size: 16, color: cs.primary),
+                          ),
+                        ),
+                      IconButton(
+                        onPressed: () =>
+                            setState(() => _obscure = !_obscure),
+                        icon: Icon(
+                            _obscure
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            size: 18),
+                      ),
+                    ],
                   ),
                 ),
               ),

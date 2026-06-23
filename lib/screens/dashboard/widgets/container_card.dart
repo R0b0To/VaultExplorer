@@ -10,16 +10,20 @@ class ContainerCard extends StatelessWidget {
   final ValueChanged<int> onLocked;
   final VoidCallback onReturn;
 
+  /// Called when the card is long-pressed → opens configuration sheet.
+  final VoidCallback? onLongPress;
+
   const ContainerCard({
     super.key,
     required this.container,
     required this.onLocked,
     required this.onReturn,
+    this.onLongPress,
   });
 
   Color _storageColor(double usedFraction, ColorScheme cs) {
     if (usedFraction > 0.90) return cs.error;
-    if (usedFraction > 0.70) return cs.secondary; // amber
+    if (usedFraction > 0.70) return cs.secondary;
     return cs.primary;
   }
 
@@ -54,6 +58,7 @@ class ContainerCard extends StatelessWidget {
             );
             onReturn();
           },
+          onLongPress: onLongPress,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -79,9 +84,7 @@ class ContainerCard extends StatelessWidget {
                         children: [
                           Text(
                             container.displayName,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium,
+                            style: Theme.of(context).textTheme.titleMedium,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
@@ -90,12 +93,21 @@ class ContainerCard extends StatelessWidget {
                                 ? '${formatBytes(container.freeSpace)} free'
                                     ' of ${formatBytes(container.totalSpace)}'
                                 : 'Vol ${container.volId} • mounted',
-                            style:
-                                Theme.of(context).textTheme.bodySmall,
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
                       ),
                     ),
+                    // Config hint
+                    if (onLongPress != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Tooltip(
+                          message: 'Long-press to configure',
+                          child: Icon(Icons.more_vert,
+                              size: 16, color: cs.outline),
+                        ),
+                      ),
                     _LockButton(
                         container: container, onLocked: onLocked),
                   ],
@@ -105,17 +117,14 @@ class ContainerCard extends StatelessWidget {
                 if (hasSpaceData) ...[
                   const SizedBox(height: 10),
                   Semantics(
-                    label:
-                        '${(usedFraction * 100).round()}% used',
+                    label: '${(usedFraction * 100).round()}% used',
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(3),
                       child: LinearProgressIndicator(
                         value: usedFraction,
                         minHeight: 4,
-                        backgroundColor:
-                            cs.surfaceContainerHighest,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(barColor),
+                        backgroundColor: cs.surfaceContainerHighest,
+                        valueColor: AlwaysStoppedAnimation<Color>(barColor),
                       ),
                     ),
                   ),
@@ -130,7 +139,8 @@ class ContainerCard extends StatelessWidget {
                   children: [
                     _StatChip(
                       icon: Icons.insert_drive_file_outlined,
-                      label: '$fileCount file${fileCount != 1 ? 's' : ''}',
+                      label:
+                          '$fileCount file${fileCount != 1 ? 's' : ''}',
                     ),
                     const SizedBox(width: 10),
                     _StatChip(
@@ -236,12 +246,16 @@ class SavedContainerCard extends StatelessWidget {
   final VoidCallback onUnlock;
   final VoidCallback onForget;
 
+  /// Called when the card is long-pressed → opens configuration sheet.
+  final VoidCallback? onLongPress;
+
   const SavedContainerCard({
     super.key,
     required this.name,
     required this.uri,
     required this.onUnlock,
     required this.onForget,
+    this.onLongPress,
   });
 
   @override
@@ -255,6 +269,7 @@ class SavedContainerCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(10),
           onTap: onUnlock,
+          onLongPress: onLongPress,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -293,7 +308,8 @@ class SavedContainerCard extends StatelessWidget {
                 IconButton(
                   onPressed: onUnlock,
                   tooltip: 'Unlock container',
-                  icon: Icon(Icons.lock_open_outlined, color: cs.primary),
+                  icon:
+                      Icon(Icons.lock_open_outlined, color: cs.primary),
                 ),
                 IconButton(
                   onPressed: onForget,

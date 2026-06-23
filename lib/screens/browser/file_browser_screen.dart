@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../models/mounted_container.dart';
+import '../../services/cross_container_clipboard.dart';
 import '../../services/local_streaming_server.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../utils/format_utils.dart';
@@ -16,12 +17,6 @@ import 'widgets/clipboard_app_bar.dart';
 import 'widgets/file_grid_view.dart';
 import 'widgets/file_list_view.dart';
 import 'widgets/selection_app_bar.dart';
-
-// ── Conflict resolution ────────────────────────────────────────────────────────
-
-enum _ConflictResolution { skip, overwrite, keepBoth }
-
-typedef _ConflictResult = ({_ConflictResolution resolution, bool applyToAll});
 
 // ── Layout mode ───────────────────────────────────────────────────────────────
 
@@ -48,34 +43,34 @@ class FileBrowserScreen extends StatefulWidget {
 class _FileBrowserScreenState extends State<FileBrowserScreen>
     with SelectionMixin<FileBrowserScreen>, SortMixin<FileBrowserScreen> {
 
-  // ── Core state ───────────────────────────────────────────────────────────────
+  // ── Core state ────────────────────────────────────────────────────────────
   final List<PathSegment> _pathStack = [const PathSegment('Root', '')];
   List<String> _currentItems = [];
   bool _isLoading = false;
   int _freeSpace = 0;
 
-  // ── Clipboard state ──────────────────────────────────────────────────────────
-  bool _isClipboardMode = false;
-  bool _isCutOperation = false;
-  List<Map<String, dynamic>> _clipboardSourceItems = [];
+  // ── Single unified clipboard ──────────────────────────────────────────────
+  // CrossContainerClipboard.instance is the one source of truth for
+  // copy/cut state. It lives outside this widget so navigation never loses it.
+  CrossContainerClipboard get _clip => CrossContainerClipboard.instance;
 
-  // ── Search state ─────────────────────────────────────────────────────────────
+  // ── Search state ──────────────────────────────────────────────────────────
   bool _isSearchActive = false;
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
-  // ── Layout state ─────────────────────────────────────────────────────────────
+  // ── Layout state ──────────────────────────────────────────────────────────
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
 
-  // ── Streaming server (gallery thumbnails) ────────────────────────────────────
+  // ── Streaming server (gallery thumbnails) ─────────────────────────────────
   LocalStreamingServer? _streamingServer;
   int? _streamingServerPort;
 
-  // ── Convenience getters ───────────────────────────────────────────────────────
+  // ── Convenience getters ───────────────────────────────────────────────────
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
 
-  // ── Lifecycle ─────────────────────────────────────────────────────────────────
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -91,7 +86,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     super.dispose();
   }
 
-  // ── Streaming server ──────────────────────────────────────────────────────────
+  // ── Streaming server ──────────────────────────────────────────────────────
 
   Future<void> _startStreamingServer() async {
     try {
@@ -106,7 +101,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  // ── Directory loading ─────────────────────────────────────────────────────────
+  // ── Directory loading ─────────────────────────────────────────────────────
+
   Future<void> _loadDirectoryContents(String path) async {
     setState(() => _isLoading = true);
     try {
@@ -131,7 +127,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  // ── Search helpers ────────────────────────────────────────────────────────────
+  // ── Search helpers ────────────────────────────────────────────────────────
 
   void _clearSearch() {
     _isSearchActive = false;
@@ -139,7 +135,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _searchController.clear();
   }
 
-  // ── Navigation ────────────────────────────────────────────────────────────────
+  // ── Navigation ────────────────────────────────────────────────────────────
+
   void _enterDirectory(String rawDirEntry) {
     final name = rawDirEntry.replaceFirst('[DIR] ', '');
     final newPath =
@@ -169,7 +166,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _loadDirectoryContents(_currentDirPath);
   }
 
-  // ── Item tap / long-press ─────────────────────────────────────────────────────
+  // ── Item tap / long-press ─────────────────────────────────────────────────
+
   void _handleDirTap(String rawItem) {
     if (isSelectionMode) {
       toggleSelectItem(rawItem);
@@ -223,7 +221,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  // ── Media helpers ─────────────────────────────────────────────────────────────
+  // ── Media helpers ─────────────────────────────────────────────────────────
+
   bool _isSupportedMedia(String fileName) {
     final ext = fileName.split('.').last.toLowerCase();
     return const {
@@ -251,7 +250,14 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  // ── Clipboard ─────────────────────────────────────────────────────────────────
+  // ── Unified clipboard ─────────────────────────────────────────────────────
+  //
+  // Copy and Cut both write to CrossContainerClipboard.instance.
+  // Paste reads from it and automatically chooses the right strategy:
+  //   • same container + cut  → fast rename (no decryption needed)
+  //   • same container + copy → decrypt → re-encrypt at new path
+  //   • different container   → decrypt from source → encrypt into dest
+
   void _initClipboard({required bool cut}) {
     final sources = selectedItems.map((item) {
       final isDir = item.startsWith('[DIR] ');
@@ -262,28 +268,114 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       return <String, dynamic>{'path': path, 'isDir': isDir};
     }).toList();
 
-    setState(() {
-      _isClipboardMode = true;
-      _isCutOperation = cut;
-      _clipboardSourceItems = sources;
-      isSelectionMode = false;
-      selectedItems.clear();
-    });
+    _clip.set(
+      container: widget.container,
+      cut: cut,
+      clipItems: sources,
+    );
+
+    exitSelectionMode();
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(cut
-          ? 'Cut ${sources.length} item(s) — navigate and tap Paste'
-          : 'Copied ${sources.length} item(s) — navigate and tap Paste'),
+      content: Text(
+        cut
+            ? '${sources.length} item(s) ready to move — navigate to destination and paste'
+            : '${sources.length} item(s) ready to copy — navigate to destination and paste',
+      ),
       duration: const Duration(seconds: 4),
     ));
   }
 
-  void _cancelClipboard() => setState(() {
-        _isClipboardMode = false;
-        _clipboardSourceItems.clear();
-      });
+  Future<void> _paste() async {
+    if (!_clip.hasItems) return;
 
-  Future<void> _copyEntryRecursive(
+    final srcContainer = _clip.sourceContainer!;
+    final items = List<Map<String, dynamic>>.from(_clip.items);
+    final isCut = _clip.isCutOperation;
+    final sameContainer = _clip.isFromContainer(widget.container);
+
+    setState(() => _isLoading = true);
+    final tmpDir = await getTemporaryDirectory();
+    int failCount = 0;
+    int skipCount = 0;
+
+    try {
+      for (final item in items) {
+        final srcPath = item['path'] as String;
+        final isDir = item['isDir'] as bool;
+        final fileName = srcPath.split('/').last;
+        final destPath = _currentDirPath.isEmpty
+            ? fileName
+            : '$_currentDirPath/$fileName';
+
+        // Guard: skip if source == dest, or if dest is inside source (infinite recursion).
+        if (sameContainer) {
+          if (srcPath == destPath) { skipCount++; continue; }
+          if (isDir && destPath.startsWith('$srcPath/')) { skipCount++; continue; }
+        }
+
+        if (sameContainer && isCut) {
+          // Fast path: rename within same container (no crypto needed).
+          final ok = await vaultExplorerApi.renameFile(
+              widget.container, srcPath, destPath);
+          if (!ok) failCount++;
+        } else if (sameContainer && !isCut) {
+          final ok = await _copyEntryWithinContainer(
+              srcPath, destPath, isDir, tmpDir);
+          if (!ok) failCount++;
+        } else {
+          // Cross-container: decrypt from source, encrypt into this container.
+          final ok = await _copyEntryAcrossContainers(
+            srcContainer: srcContainer,
+            destContainer: widget.container,
+            srcPath: srcPath,
+            destPath: destPath,
+            isDir: isDir,
+            tmpDir: tmpDir,
+          );
+          if (!ok) failCount++;
+
+          // Cross-container cut: recursively delete from source after copying.
+          if (ok && isCut) {
+            await _deleteEntryRecursive(srcContainer, srcPath, isDir);
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Paste failed: ${e.runtimeType}'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ));
+      }
+    } finally {
+      _clip.clear();
+      _loadDirectoryContents(_currentDirPath);
+      setState(() => _isLoading = false);
+      if (mounted) {
+        final successCount = items.length - failCount - skipCount;
+        final msg = failCount > 0
+            ? '$successCount pasted — $failCount failed'
+            : skipCount > 0
+                ? 'Pasted $successCount item(s) ($skipCount already at destination)'
+                : 'Pasted $successCount item(s)';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(msg),
+          backgroundColor:
+              failCount == 0 ? null : Theme.of(context).colorScheme.error,
+        ));
+      }
+    }
+  }
+
+  // ── Same-container copy (decrypt → re-encrypt at new path) ────────────────
+  //
+  // IMPORTANT: children are snapshotted BEFORE the destination directory is
+  // created. Without this, listDirectory on the source would also return the
+  // newly-created destination as a child (when dest is inside src), causing
+  // infinite recursion that fills the disk.
+
+  Future<bool> _copyEntryWithinContainer(
     String srcPath,
     String destPath,
     bool isDir,
@@ -293,264 +385,88 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       final tempFile =
           File(TempFileUtils.uniquePath(tmpDir, prefix: 'cb_copy'));
       try {
-        final ok = await vaultExplorerApi.decryptFile(
+        final decOk = await vaultExplorerApi.decryptFile(
             widget.container, srcPath, tempFile.path);
-        if (ok) {
-          await vaultExplorerApi.writeBackFile(
-              widget.container, destPath, tempFile.path);
-        }
+        if (!decOk) return false;
+        return await vaultExplorerApi.writeBackFile(
+            widget.container, destPath, tempFile.path);
       } finally {
         if (await tempFile.exists()) await tempFile.delete();
       }
-      return;
     }
 
-    await vaultExplorerApi.createDirectory(widget.container, destPath);
+    // Snapshot children FIRST, then create the destination directory.
     final children =
         await vaultExplorerApi.listDirectory(widget.container, srcPath) ?? [];
+    await vaultExplorerApi.createDirectory(widget.container, destPath);
+
+    bool allOk = true;
     for (final entry in children) {
       if (entry.startsWith('System:')) continue;
       final childIsDir = entry.startsWith('[DIR] ');
       final childName = childIsDir
           ? entry.replaceFirst('[DIR] ', '')
           : entry.split('|').first;
-      await _copyEntryRecursive(
+      final ok = await _copyEntryWithinContainer(
         '$srcPath/$childName',
         '$destPath/$childName',
         childIsDir,
         tmpDir,
       );
+      if (!ok) allOk = false;
     }
+    return allOk;
   }
 
-  Future<void> _pasteClipboard() async {
-    setState(() => _isLoading = true);
-    final tmpDir = await getTemporaryDirectory();
+  // ── Cross-container copy (decrypt from src → encrypt into dest) ───────────
 
-    // Pre-fetch destination listing for conflict detection.
-    final existingRaw =
-        await vaultExplorerApi.listDirectory(widget.container, _currentDirPath) ?? [];
-    final existingNames = <String>{};
-    final existingDirs  = <String>{};
-    for (final item in existingRaw) {
-      if (item.startsWith('[DIR] ')) {
-        final n = item.replaceFirst('[DIR] ', '').toLowerCase();
-        existingNames.add(n);
-        existingDirs.add(n);
-      } else {
-        existingNames.add(item.split('|').first.toLowerCase());
-      }
-    }
-
-    _ConflictResolution? globalResolution;
-
-    try {
-      for (final src in _clipboardSourceItems) {
-        if (!mounted) break;
-
-        final srcPath  = src['path'] as String;
-        final isDir    = src['isDir'] as bool;
-        final fileName = srcPath.split('/').last;
-        final destPath = _currentDirPath.isEmpty
-            ? fileName
-            : '$_currentDirPath/$fileName';
-
-        if (srcPath == destPath) continue;
-
-        // ── Conflict handling ───────────────────────────────────────────
-        String finalDestPath = destPath;
-        if (existingNames.contains(fileName.toLowerCase())) {
-          _ConflictResolution? resolution = globalResolution;
-
-          if (resolution == null) {
-            final result = await _showConflictResolutionDialog(
-              fileName,
-              hasMore: _clipboardSourceItems.length > 1,
-            );
-            if (!mounted) break;
-            if (result == null) break; // dialog dismissed unexpectedly
-            if (result.applyToAll) globalResolution = result.resolution;
-            resolution = result.resolution;
-          }
-
-          switch (resolution) {
-            case _ConflictResolution.skip:
-              continue;
-
-            case _ConflictResolution.overwrite:
-              // rename (f_rename) fails if dest exists; delete it first.
-              if (_isCutOperation) {
-                final destIsDir = existingDirs.contains(fileName.toLowerCase());
-                await _deleteItemRecursive(destPath, destIsDir);
-              }
-              // copy path: writeBackFile uses FA_CREATE_ALWAYS, overwrites natively.
-
-            case _ConflictResolution.keepBoth:
-              final uniqueName = _makeUniqueName(fileName, existingNames);
-              existingNames.add(uniqueName.toLowerCase());
-              finalDestPath = _currentDirPath.isEmpty
-                  ? uniqueName
-                  : '$_currentDirPath/$uniqueName';
-          }
-        }
-
-        // ── Execute ─────────────────────────────────────────────────────
-        if (_isCutOperation) {
-          await vaultExplorerApi.renameFile(
-              widget.container, srcPath, finalDestPath);
-        } else {
-          await _copyEntryRecursive(srcPath, finalDestPath, isDir, tmpDir);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Operation failed: ${e.runtimeType}'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ));
-      }
-    } finally {
-      setState(() {
-        _isClipboardMode = false;
-        _clipboardSourceItems.clear();
-        _isLoading = false;
-      });
-      _loadDirectoryContents(_currentDirPath);
-    }
-  }
-
-  // ── Conflict resolution helpers ───────────────────────────────────────────────
-
-  /// Recursively deletes a file or directory (including all children).
-  Future<bool> _deleteItemRecursive(String fatPath, bool isDir) async {
+  Future<bool> _copyEntryAcrossContainers({
+    required MountedContainer srcContainer,
+    required MountedContainer destContainer,
+    required String srcPath,
+    required String destPath,
+    required bool isDir,
+    required Directory tmpDir,
+  }) async {
     if (!isDir) {
-      return vaultExplorerApi.deleteFile(widget.container, fatPath);
+      final tempFile =
+          File(TempFileUtils.uniquePath(tmpDir, prefix: 'xclip'));
+      try {
+        final decOk = await vaultExplorerApi.decryptFile(
+            srcContainer, srcPath, tempFile.path);
+        if (!decOk) return false;
+        return await vaultExplorerApi.writeBackFile(
+            destContainer, destPath, tempFile.path);
+      } finally {
+        if (await tempFile.exists()) await tempFile.delete();
+      }
     }
+
+    await vaultExplorerApi.createDirectory(destContainer, destPath);
     final children =
-        await vaultExplorerApi.listDirectory(widget.container, fatPath) ?? [];
+        await vaultExplorerApi.listDirectory(srcContainer, srcPath) ?? [];
+    bool allOk = true;
     for (final entry in children) {
       if (entry.startsWith('System:')) continue;
       final childIsDir = entry.startsWith('[DIR] ');
-      final childName  = childIsDir
+      final childName = childIsDir
           ? entry.replaceFirst('[DIR] ', '')
           : entry.split('|').first;
-      await _deleteItemRecursive('$fatPath/$childName', childIsDir);
+      final ok = await _copyEntryAcrossContainers(
+        srcContainer: srcContainer,
+        destContainer: destContainer,
+        srcPath: '$srcPath/$childName',
+        destPath: '$destPath/$childName',
+        isDir: childIsDir,
+        tmpDir: tmpDir,
+      );
+      if (!ok) allOk = false;
     }
-    return vaultExplorerApi.deleteFile(widget.container, fatPath);
+    return allOk;
   }
 
-  /// Returns a filename that does not collide with any name in [existingNames].
-  static String _makeUniqueName(String fileName, Set<String> existingNames) {
-    if (!existingNames.contains(fileName.toLowerCase())) return fileName;
-    final dotIdx = fileName.lastIndexOf('.');
-    final name   = dotIdx != -1 ? fileName.substring(0, dotIdx) : fileName;
-    final ext    = dotIdx != -1 ? fileName.substring(dotIdx) : '';
-    for (int i = 1; i < 9999; i++) {
-      final candidate = '$name ($i)$ext';
-      if (!existingNames.contains(candidate.toLowerCase())) return candidate;
-    }
-    return '$fileName-${DateTime.now().millisecondsSinceEpoch}';
-  }
+  // ── Import / Export ───────────────────────────────────────────────────────
 
-  /// Shows a dialog asking the user how to resolve a name conflict.
-  /// Returns null only if the context is gone (never in practice).
-  Future<_ConflictResult?> _showConflictResolutionDialog(
-    String fileName, {
-    required bool hasMore,
-  }) {
-    bool applyToAll = false;
-    final cs = Theme.of(context).colorScheme;
-
-    return showDialog<_ConflictResult>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('Already Exists', style: TextStyle(fontSize: 16)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              RichText(
-                text: TextSpan(
-                  style: Theme.of(ctx).textTheme.bodyMedium,
-                  children: [
-                    TextSpan(
-                      text: '"$fileName"',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, color: cs.primary),
-                    ),
-                    const TextSpan(
-                        text: ' already exists in this location.'),
-                  ],
-                ),
-              ),
-              if (hasMore) ...[
-                const SizedBox(height: 14),
-                GestureDetector(
-                  onTap: () => setLocal(() => applyToAll = !applyToAll),
-                  child: Row(
-                    children: [
-                      Checkbox(
-                        value: applyToAll,
-                        onChanged: (v) =>
-                            setLocal(() => applyToAll = v ?? false),
-                        materialTapTargetSize:
-                            MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      const SizedBox(width: 6),
-                      const Expanded(
-                        child: Text('Apply to all conflicts',
-                            style: TextStyle(fontSize: 13)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(
-                ctx,
-                (
-                  resolution: _ConflictResolution.skip,
-                  applyToAll: applyToAll
-                ),
-              ),
-              child: const Text('Skip'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(
-                ctx,
-                (
-                  resolution: _ConflictResolution.overwrite,
-                  applyToAll: applyToAll
-                ),
-              ),
-              child: Text('Overwrite',
-                  style: TextStyle(color: cs.error)),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(
-                ctx,
-                (
-                  resolution: _ConflictResolution.keepBoth,
-                  applyToAll: applyToAll
-                ),
-              ),
-              style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 10)),
-              child: const Text('Keep Both'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Import / Export ───────────────────────────────────────────────────────────
   Future<void> _exportSelectedToStorage() async {
     final items = selectedItems.map((item) {
       final isDir = item.startsWith('[DIR] ');
@@ -638,7 +554,32 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  // ── Batch delete ──────────────────────────────────────────────────────────────
+  // ── Recursive delete ──────────────────────────────────────────────────────
+  //
+  // FatFs f_unlink only removes files and *empty* directories.
+  // Directories must be emptied depth-first before they can be unlinked.
+
+  Future<bool> _deleteEntryRecursive(
+      MountedContainer container, String path, bool isDir) async {
+    if (!isDir) {
+      return vaultExplorerApi.deleteFile(container, path);
+    }
+    final children =
+        await vaultExplorerApi.listDirectory(container, path) ?? [];
+    for (final entry in children) {
+      if (entry.startsWith('System:')) continue;
+      final childIsDir = entry.startsWith('[DIR] ');
+      final childName = childIsDir
+          ? entry.replaceFirst('[DIR] ', '')
+          : entry.split('|').first;
+      await _deleteEntryRecursive(container, '$path/$childName', childIsDir);
+    }
+    // Directory is now empty — unlink it.
+    return vaultExplorerApi.deleteFile(container, path);
+  }
+
+  // ── Batch delete ──────────────────────────────────────────────────────────
+
   void _batchDelete() {
     HapticFeedback.heavyImpact();
     BrowserDialogs.showBatchDelete(
@@ -656,7 +597,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             final full = _currentDirPath.isEmpty
                 ? name
                 : '$_currentDirPath/$name';
-            if (!await _deleteItemRecursive(full, isDir)) {
+            if (!await _deleteEntryRecursive(widget.container, full, isDir)) {
               failCount++;
             }
           }
@@ -679,10 +620,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────────
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    // Sort full list first
     final dirs = _currentItems.where((f) => f.startsWith('[DIR]')).toList()
       ..sort(compareItems);
     final files = _currentItems
@@ -690,7 +631,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         .toList()
       ..sort(compareItems);
 
-    // Apply in-folder search filter
     final query = _searchQuery.trim().toLowerCase();
     final filteredDirs = query.isEmpty
         ? dirs
@@ -706,51 +646,32 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             .where((f) => f.split('|').first.toLowerCase().contains(query))
             .toList();
 
-    // Intercept Android back button / gesture to navigate up the folder tree
-    // instead of immediately popping back to the dashboard.
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop) return;
-        if (isSelectionMode) {
-          exitSelectionMode();
-        } else if (_isClipboardMode) {
-          _cancelClipboard();
-        } else if (_isSearchActive) {
-          setState(() => _clearSearch());
-        } else if (!_atRoot) {
-          _navigateUp();
-        } else {
-          Navigator.of(context).pop();
-        }
-      },
-      child: Scaffold(
-        appBar: _buildAppBar(context, filteredDirs, filteredFiles),
-        body: Column(
-          children: [
-  
-              BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-            _StatsBar(
-              dirCount: filteredDirs.length,
-              fileCount: filteredFiles.length,
-              freeSpaceBytes: _freeSpace,
-              isFiltered: query.isNotEmpty,
-            ),
-            const Divider(),
-            Expanded(child: _buildBody(filteredDirs, filteredFiles)),
-          ],
-        ),
+    return Scaffold(
+      appBar: _buildAppBar(context, filteredDirs, filteredFiles),
+      body: Column(
+        children: [
+          BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+          _StatsBar(
+            dirCount: filteredDirs.length,
+            fileCount: filteredFiles.length,
+            freeSpaceBytes: _freeSpace,
+            isFiltered: query.isNotEmpty,
+          ),
+          const Divider(),
+          Expanded(child: _buildBody(filteredDirs, filteredFiles)),
+        ],
       ),
     );
   }
 
-  // ── App bar ───────────────────────────────────────────────────────────────────
+  // ── App bar ───────────────────────────────────────────────────────────────
+
   PreferredSizeWidget _buildAppBar(
       BuildContext context, List<String> dirs, List<String> files) {
     final cs = Theme.of(context).colorScheme;
     final allSelectable = [...dirs, ...files];
 
-    // ── Selection mode ──────────────────────────────────────────────────────
+    // ── Selection mode ──────────────────────────────────────────────────
     if (isSelectionMode) {
       final single = selectedItems.length == 1;
       final singleFile =
@@ -792,17 +713,25 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       );
     }
 
-    // ── Clipboard mode ──────────────────────────────────────────────────────
-    if (_isClipboardMode) {
+    // ── Clipboard mode ──────────────────────────────────────────────────
+    // Shown whenever the global clipboard has items — whether they came from
+    // this container or another one browsed earlier.
+    if (_clip.hasItems) {
+      final fromHere = _clip.isFromContainer(widget.container);
       return ClipboardAppBar(
-        isCutOperation: _isCutOperation,
-        itemCount: _clipboardSourceItems.length,
-        onCancel: _cancelClipboard,
-        onPaste: _pasteClipboard,
+        isCutOperation: _clip.isCutOperation,
+        itemCount: _clip.items.length,
+        sourceLabel: fromHere ? null : _clip.sourceContainer?.displayName,
+        onCancel: () => setState(() => _clip.clear()),
+        onPaste: _paste,
+        // Back arrow: go up within the container, or pop to dashboard at root.
+        onBack: _atRoot
+            ? () => Navigator.of(context).pop()
+            : _navigateUp,
       );
     }
 
-    // ── Search mode ─────────────────────────────────────────────────────────
+    // ── Search mode ─────────────────────────────────────────────────────
     if (_isSearchActive) {
       return AppBar(
         backgroundColor: cs.surface,
@@ -841,30 +770,34 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       );
     }
 
-    // ── Normal app bar ──────────────────────────────────────────────────────
+    // ── Normal app bar ──────────────────────────────────────────────────
     return AppBar(
-      leading: _atRoot
-          ? null
-          : IconButton(
-              icon: const Icon(Icons.arrow_back),
-              tooltip: 'Go up',
-              onPressed: _navigateUp,
-            ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        tooltip: _atRoot ? 'Back to dashboard' : 'Go up',
+        onPressed: _atRoot
+            ? () => Navigator.of(context).pop()
+            : _navigateUp,
+      ),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(widget.container.displayName,
               style: const TextStyle(fontSize: 14)),
+          if (!_atRoot)
+            Text(
+              _currentDirPath,
+              style: TextStyle(fontSize: 10, color: cs.outline),
+              overflow: TextOverflow.ellipsis,
+            ),
         ],
       ),
       actions: [
-        // Search
         IconButton(
           icon: const Icon(Icons.search),
           tooltip: 'Search in this folder',
           onPressed: () => setState(() => _isSearchActive = true),
         ),
-        // Layout toggle: list ↔ gallery
         IconButton(
           icon: Icon(
             _layoutMode == BrowserLayoutMode.list
@@ -880,7 +813,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                 : BrowserLayoutMode.list;
           }),
         ),
-        // Sort
         PopupMenuButton<SortBy>(
           icon: const Icon(Icons.sort),
           tooltip: 'Sort by',
@@ -891,7 +823,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             buildSortMenuItem(SortBy.extension, 'Type'),
           ],
         ),
-        // New / import
         PopupMenuButton<String>(
           icon: const Icon(Icons.add),
           tooltip: 'New item',
@@ -963,7 +894,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 
-  // ── Body ──────────────────────────────────────────────────────────────────────
+  // ── Body ──────────────────────────────────────────────────────────────────
+
   Widget _buildBody(List<String> dirs, List<String> files) {
     if (_isLoading) {
       return const Center(
@@ -1025,7 +957,7 @@ class _StatsBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       color: cs.surface,
       child: Row(
         children: [
@@ -1133,10 +1065,8 @@ class _SearchEmptyState extends StatelessWidget {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.search_off_outlined, size: 48, color: cs.outline),
           const SizedBox(height: 16),
-          Text(
-            'No results',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text('No results',
+              style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
           Text(
             'Nothing in this folder matches "$query".',

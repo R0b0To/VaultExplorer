@@ -1,16 +1,9 @@
 import 'package:flutter/material.dart';
 
 /// App bar shown while the user has one or more items selected.
-/// Implements [PreferredSizeWidget] so it can be assigned directly to
-/// [Scaffold.appBar] without any wrapper.
 class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int selectedCount;
-
-  /// True when exactly one item is selected (enables Rename).
   final bool singleSelected;
-
-  /// True when the single selected item is a file, not a directory
-  /// (enables Open with App).
   final bool singleFileSelected;
 
   final VoidCallback onClose;
@@ -62,7 +55,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: cs.primaryContainer,
                   borderRadius: BorderRadius.circular(20),
@@ -77,30 +71,21 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                'selected',
-                style: TextStyle(fontSize: 13, color: cs.onSurface),
-              ),
+              Text('selected',
+                  style: TextStyle(fontSize: 13, color: cs.onSurface)),
               Icon(Icons.arrow_drop_down, color: cs.onSurface, size: 20),
             ],
           ),
         ),
         onSelected: (value) {
-          if (value == 'select_all') {
-            onSelectAll();
-          } else if (value == 'clear') {
-            onClose();
-          }
+          if (value == 'select_all') onSelectAll();
+          if (value == 'clear') onClose();
         },
         itemBuilder: (context) => [
           const PopupMenuItem<String>(
-            value: 'select_all',
-            child: Text('Select All'),
-          ),
+              value: 'select_all', child: Text('Select All')),
           const PopupMenuItem<String>(
-            value: 'clear',
-            child: Text('Clear Selection'),
-          ),
+              value: 'clear', child: Text('Clear Selection')),
         ],
       ),
       actions: [
@@ -116,7 +101,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         IconButton(
           icon: const Icon(Icons.cut_outlined),
-          tooltip: 'Cut',
+          tooltip: 'Move',
           onPressed: onCut,
         ),
         if (singleSelected)
@@ -129,33 +114,28 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
           icon: const Icon(Icons.more_vert),
           tooltip: 'More options',
           onSelected: (value) {
-            if (value == 'export') {
-              onExport();
-            } else if (value == 'open_with_app') {
-              onOpenWithApp();
-            }
+            if (value == 'export') onExport();
+            if (value == 'open_with_app') onOpenWithApp();
           },
           itemBuilder: (context) => [
             PopupMenuItem<String>(
               value: 'export',
-              child: Row(
-                children: [
-                  Icon(Icons.drive_folder_upload_outlined, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 12),
-                  const Text('Export'),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.drive_folder_upload_outlined,
+                    color: cs.onSurfaceVariant, size: 18),
+                const SizedBox(width: 12),
+                const Text('Export to device'),
+              ]),
             ),
             if (singleFileSelected)
               PopupMenuItem<String>(
                 value: 'open_with_app',
-                child: Row(
-                  children: [
-                    Icon(Icons.open_in_new, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 12),
-                    const Text('Open with App'),
-                  ],
-                ),
+                child: Row(children: [
+                  Icon(Icons.open_in_new,
+                      color: cs.onSurfaceVariant, size: 18),
+                  const SizedBox(width: 12),
+                  const Text('Open with App'),
+                ]),
               ),
           ],
         ),

@@ -64,7 +64,7 @@ class FileGridView extends StatelessWidget {
         crossAxisCount: 3,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
-        childAspectRatio: 0.76,
+        childAspectRatio: 0.74, // Adjusted slightly to accommodate text sizes beautifully
       ),
       itemCount: total,
       itemBuilder: (context, index) {
@@ -79,14 +79,19 @@ class FileGridView extends StatelessWidget {
   Widget _buildDirCell(BuildContext context, String rawItem) {
     final name = rawItem.replaceFirst('[DIR] ', '');
     final isSelected = selectedItems.contains(rawItem);
+    final cs = Theme.of(context).colorScheme;
 
     return _GridCell(
       isSelected: isSelected,
       isSelectionMode: isSelectionMode,
       onTap: () => onDirTap(rawItem),
       onLongPress: () => onItemLongPress(rawItem),
-      preview: const Center(
-        child: Icon(Icons.folder_rounded, size: 52, color: Color(0xFFFFA726)),
+      preview: Center(
+        child: Icon(
+          Icons.folder_rounded, 
+          size: 56, 
+          color: isSelected ? cs.primary : cs.secondary, // Dynamic folder colors aligned with DirectoryTile
+        ),
       ),
       label: name,
     );
@@ -112,7 +117,6 @@ class FileGridView extends StatelessWidget {
         filePath: fullPath,
       );
     } else if (isVid) {
-      // Replaced contentUrl construction with direct parameter passing:
       previewWidget = _VideoNetworkThumb(
         container: container,
         filePath: fullPath,
@@ -169,6 +173,7 @@ class _GridCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return GestureDetector(
       onTap: onTap,
@@ -177,16 +182,16 @@ class _GridCell extends StatelessWidget {
         duration: const Duration(milliseconds: 120),
         decoration: BoxDecoration(
           color: isSelected
-              ? cs.primaryContainer.withOpacity(0.4)
-              : cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8),
+              ? cs.primaryContainer.withOpacity(0.3)
+              : cs.surfaceContainerLow, // Matches standard Card background colors
+          borderRadius: BorderRadius.circular(12), // Standard Material 3 Card radius [1]
           border: Border.all(
-            color: isSelected ? cs.primary : cs.outline.withOpacity(0.35),
-            width: isSelected ? 1.5 : 0.5,
+            color: isSelected ? cs.primary : cs.outlineVariant,
+            width: isSelected ? 1.5 : 1.0,
           ),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(7.5),
+          borderRadius: BorderRadius.circular(11.0), // Snug nested clipping boundary
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -201,28 +206,27 @@ class _GridCell extends StatelessWidget {
                     if (isSelected)
                       DecoratedBox(
                         decoration: BoxDecoration(
-                          color: cs.primary.withOpacity(0.16),
+                          color: cs.primary.withOpacity(0.12),
                         ),
                         child: Align(
                           alignment: Alignment.topRight,
                           child: Padding(
-                            padding: const EdgeInsets.all(5),
+                            padding: const EdgeInsets.all(6),
                             child: _CheckBadge(
                                 color: cs.primary, onColor: cs.onPrimary),
                           ),
                         ),
                       ),
-
                   ],
                 ),
               ),
 
               // ── Label area ─────────────────────────────────────────────────
               Container(
-                padding: const EdgeInsets.fromLTRB(6, 4, 6, 5),
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
                 color: isSelected
-                    ? cs.primaryContainer.withOpacity(0.4)
-                    : cs.surface,
+                    ? cs.primaryContainer.withOpacity(0.3)
+                    : cs.surfaceContainer, // Better dark-mode separation
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -231,18 +235,18 @@ class _GridCell extends StatelessWidget {
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
+                      style: textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                         color: cs.onSurface,
-                        letterSpacing: 0.1,
                       ),
                     ),
                     if (sublabel != null) ...[
-                      const SizedBox(height: 1),
+                      const SizedBox(height: 2),
                       Text(
                         sublabel!,
-                        style: TextStyle(fontSize: 9, color: cs.outline),
+                        style: textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ],
@@ -263,9 +267,9 @@ class _CheckBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(2),
+        padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        child: Icon(Icons.check, size: 11, color: onColor),
+        child: Icon(Icons.check_rounded, size: 12, color: onColor),
       );
 }
 
@@ -287,7 +291,6 @@ class _EncryptedImageGridThumb extends StatefulWidget {
 }
 
 class _EncryptedImageGridThumbState extends State<_EncryptedImageGridThumb> {
-  // Static memory cache so thumbnail allocations persist while scrolling
   static final Map<String, Uint8List> _imageThumbCache = {};
 
   Uint8List? _bytes;
@@ -364,7 +367,7 @@ class _EncryptedImageGridThumbState extends State<_EncryptedImageGridThumb> {
 
     if (_isLoading) {
       return Container(
-        color: cs.surfaceContainerHighest,
+        color: cs.surfaceContainerLow,
         child: Center(
           child: SizedBox(
             width: 18,
@@ -380,9 +383,9 @@ class _EncryptedImageGridThumbState extends State<_EncryptedImageGridThumb> {
 
     if (_hasError || _bytes == null) {
       return Container(
-        color: cs.surfaceContainerHighest,
+        color: cs.surfaceContainerLow,
         child: Center(
-          child: Icon(Icons.broken_image_outlined, size: 28, color: cs.outline),
+          child: Icon(Icons.broken_image_rounded, size: 28, color: cs.outline),
         ),
       );
     }
@@ -390,7 +393,6 @@ class _EncryptedImageGridThumbState extends State<_EncryptedImageGridThumb> {
     return Image.memory(
       _bytes!,
       fit: BoxFit.cover,
-      // Downscale decoded image structure in GPU memory to prevent memory overhead
       cacheHeight: 180, 
     );
   }
@@ -414,7 +416,6 @@ class _VideoNetworkThumb extends StatefulWidget {
 }
 
 class _VideoNetworkThumbState extends State<_VideoNetworkThumb> {
-  // Static memory cache so standard thumbnails persist during scroll recycle actions
   static final Map<String, Uint8List> _videoThumbCache = {};
 
   Uint8List? _bytes;
@@ -486,7 +487,7 @@ class _VideoNetworkThumbState extends State<_VideoNetworkThumb> {
 
     if (_isLoading) {
       return Container(
-        color: cs.surfaceContainerHighest,
+        color: cs.surfaceContainerLow,
         child: Center(
           child: SizedBox(
             width: 18,
@@ -502,9 +503,9 @@ class _VideoNetworkThumbState extends State<_VideoNetworkThumb> {
 
     if (_hasError || _bytes == null) {
       return Container(
-        color: cs.surfaceContainerHighest,
+        color: cs.surfaceContainerLow,
         child: Center(
-          child: Icon(Icons.play_circle_outline, size: 32, color: cs.outline),
+          child: Icon(Icons.play_circle_outline_rounded, size: 32, color: cs.outline),
         ),
       );
     }
@@ -515,7 +516,7 @@ class _VideoNetworkThumbState extends State<_VideoNetworkThumb> {
         Image.memory(
           _bytes!,
           fit: BoxFit.cover,
-          cacheHeight: 180, // Memory footprint optimization
+          cacheHeight: 180,
         ),
         Container(
           color: Colors.black.withOpacity(0.12),
@@ -524,7 +525,7 @@ class _VideoNetworkThumbState extends State<_VideoNetworkThumb> {
             child: Padding(
               padding: EdgeInsets.all(6.0),
               child: Icon(
-                Icons.play_circle_outline,
+                Icons.play_circle_outline_rounded,
                 size: 16,
                 color: Colors.white70,
               ),

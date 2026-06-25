@@ -148,7 +148,6 @@ class _VaultDashboardState extends State<VaultDashboard>
       await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
-        backgroundColor: Colors.transparent,
         builder: (_) => UnlockSheet(
           onMounted: _onContainerMounted,
           initialUri: uri,
@@ -169,7 +168,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => const CreateContainerSheet(),
     ).whenComplete(() => setState(() => _actionInFlight = false));
   }
@@ -182,7 +180,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
       builder: (_) => ContainerConfigSheet(
         uri: uri,
         currentLabel: currentLabel,
@@ -207,18 +204,23 @@ class _VaultDashboardState extends State<VaultDashboard>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Remove container?', style: TextStyle(fontSize: 16)),
+        title: const Text('Remove container?'),
         content: Text('Remove "$name" from the dashboard? '
             'The container file is not deleted.'),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text('Remove',
-                  style: TextStyle(
-                      color: Theme.of(context).colorScheme.error))),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Remove',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -234,6 +236,7 @@ class _VaultDashboardState extends State<VaultDashboard>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final clipboard = CrossContainerClipboard.instance;
 
     final displayItems = <dynamic>[];
@@ -244,19 +247,29 @@ class _VaultDashboardState extends State<VaultDashboard>
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(children: [
-          Icon(Icons.lock_outline, size: 16, color: cs.primary),
-          const SizedBox(width: 8),
-          const Text('vaultexplorer'),
-        ]),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_outline, size: 20, color: cs.primary),
+            const SizedBox(width: 8),
+            Text(
+              'vaultexplorer',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.1,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'App Settings',
             onPressed: () async {
-              await Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const AppSettingsScreen()));
-              // Reload settings after returning — user may have changed root/doc provider defaults.
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
+              );
               _loadAppSettings();
             },
           ),
@@ -272,19 +285,23 @@ class _VaultDashboardState extends State<VaultDashboard>
               itemBuilder: (context) => [
                 PopupMenuItem(
                   value: 'mount',
-                  child: Row(children: [
-                    Icon(Icons.lock_open, size: 18, color: cs.primary),
-                    const SizedBox(width: 12),
-                    const Text('Mount container'),
-                  ]),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lock_open, size: 18, color: cs.primary),
+                      const SizedBox(width: 12),
+                      const Text('Mount container'),
+                    ],
+                  ),
                 ),
                 PopupMenuItem(
                   value: 'create',
-                  child: Row(children: [
-                    Icon(Icons.add_box_outlined, size: 18, color: cs.primary),
-                    const SizedBox(width: 12),
-                    const Text('Create container'),
-                  ]),
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_box_outlined, size: 18, color: cs.primary),
+                      const SizedBox(width: 12),
+                      const Text('Create container'),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -353,36 +370,53 @@ class _ClipboardStatusStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       color: cs.primaryContainer,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(children: [
-        Icon(clipboard.isCutOperation ? Icons.cut : Icons.copy,
-            size: 15, color: cs.primary),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(clipboard.summary,
-                  style: TextStyle(fontSize: 12, color: cs.primary,
-                      fontWeight: FontWeight.w500)),
-              Text('Open a container and tap "Paste Here"',
-                  style: TextStyle(fontSize: 10, color: cs.primary.withOpacity(0.7))),
-            ],
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Icon(
+            clipboard.isCutOperation ? Icons.cut : Icons.copy,
+            size: 18,
+            color: cs.onPrimaryContainer,
           ),
-        ),
-        TextButton(
-          onPressed: onClear,
-          style: TextButton.styleFrom(
-              foregroundColor: cs.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  clipboard.summary,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Open a container and tap "Paste Here"',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onPrimaryContainer.withOpacity(0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onClear,
+            style: TextButton.styleFrom(
+              foregroundColor: cs.onPrimaryContainer,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-          child: const Text('Cancel', style: TextStyle(fontSize: 12)),
-        ),
-      ]),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
     );
   }
 }

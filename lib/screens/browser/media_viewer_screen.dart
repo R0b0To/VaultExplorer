@@ -45,7 +45,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _allFilesScanned = false;
   bool _isScanningSubfolders = false;
   Timer? _slideshowTimer;
-  // Image display scale fit setting (default: BoxFit.contain / Best Fit)
   BoxFit _imageFit = BoxFit.contain;
 
   // ── Prefetch Caching system ──────────────────────────────────────────────
@@ -67,7 +66,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
     
-    // Auto-detect if we launched with a pre-scanned list containing subfolder items
     final baseDir = _getBaseDir();
     final hasSubfolderItems = widget.mediaFiles.any((file) {
       final dir = file.contains('/') 
@@ -98,9 +96,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _isSupportedMedia(String fileName) {
     final ext = fileName.split('.').last.toLowerCase();
     return [
-      'jpg', 'jpeg', 'png', 'gif', 'webp', // Images
-      'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv', // Videos
-      'mp3', 'm4a', 'wav', 'flac', 'ogg', 'aac' // Audio
+      'jpg', 'jpeg', 'png', 'gif', 'webp',
+      'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv',
+      'mp3', 'm4a', 'wav', 'flac', 'ogg', 'aac'
     ].contains(ext);
   }
 
@@ -205,11 +203,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
-  void _cancelSlideshowTimer() {
-    _slideshowTimer?.cancel();
-    _slideshowTimer = null;
-  }
-
   void _toggleAutoAdvance(bool value) {
     setState(() => _autoAdvance = value);
     if (_autoAdvance) {
@@ -217,6 +210,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     } else {
       _cancelSlideshowTimer();
     }
+  }
+
+  void _cancelSlideshowTimer() {
+    _slideshowTimer?.cancel();
+    _slideshowTimer = null;
   }
 
   void _addToCache(String fileName, Uint8List bytes) {
@@ -345,29 +343,28 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Failed to open file in external app: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ));
       }
     }
   }
 
   Future<void> _deleteCurrentFile() async {
+    final cs = Theme.of(context).colorScheme;
+    
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        title: const Text('Delete file?',
-            style: TextStyle(color: Colors.white)),
-        content: const Text('This action is permanent and cannot be undone.',
-            style: TextStyle(color: Colors.white70)),
+        title: const Text('Delete file?'),
+        content: const Text('This action is permanent and cannot be undone.'),
         actions: [ 
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: cs.error),
             child: const Text('Delete'),
           ),
         ],
@@ -404,9 +401,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('File deleted successfully')));
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Failed to delete file'),
-            backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Text('Failed to delete file'),
+            backgroundColor: cs.error));
       }
     }
   }
@@ -416,107 +413,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _navigateToNext();
   }
 
-  // ── Settings Submenus Handlers ───────────────────────────────────────────
-  Future<void> _showSpeedSubmenu(BuildContext context) async {
-    final RenderBox? overlay = Navigator.of(context).overlay?.context.findRenderObject() as RenderBox?;
-    if (overlay == null) return;
-    
-    final RelativeRect position = RelativeRect.fromLTRB(
-      overlay.size.width - 220, 
-      80, 
-      overlay.size.width - 16, 
-      0
-    );
-
-    final result = await showMenu<double>(
-      context: context,
-      position: position,
-      elevation: 8,
-      color: Colors.grey[900],
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      items: [
-        const PopupMenuItem(
-          enabled: false,
-          height: 28,
-          child: Text(
-            'Playback Speed',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
-          ),
-        ),
-        ...[0.5, 1.0, 1.25, 1.5, 2.0].map((speed) => PopupMenuItem<double>(
-          value: speed,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('${speed}x', style: const TextStyle(color: Colors.white)),
-              if (_playbackSpeed == speed)
-                const Icon(Icons.check, color: Color(0xFFEF5350), size: 16),
-            ],
-          ),
-        )),
-      ],
-    );
-
-    if (result != null && mounted) {
-      setState(() => _playbackSpeed = result);
-    }
-  }
-
-  Future<void> _showSkipSubmenu(BuildContext context) async {
-    final RenderBox? overlay = Navigator.of(context).overlay?.context.findRenderObject() as RenderBox?;
-    if (overlay == null) return;
-
-    final RelativeRect position = RelativeRect.fromLTRB(
-      overlay.size.width - 220, 
-      80, 
-      overlay.size.width - 16, 
-      0
-    );
-
-    final result = await showMenu<int>(
-      context: context,
-      position: position,
-      elevation: 8,
-      color: Colors.grey[900],
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      items: [
-        const PopupMenuItem(
-          enabled: false,
-          height: 28,
-          child: Text(
-            'Double-Tap Seek Interval',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
-          ),
-        ),
-        ...[5, 10, 15, 30].map((s) => PopupMenuItem<int>(
-          value: s,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('${s} seconds', style: const TextStyle(color: Colors.white)),
-              if (_doubleTapSkipSeconds == s)
-                const Icon(Icons.check, color: Color(0xFFEF5350), size: 16),
-            ],
-          ),
-        )),
-      ],
-    );
-
-    if (result != null && mounted) {
-      setState(() => _doubleTapSkipSeconds = result);
-    }
-  }
-
   @override
   Widget build(BuildContext context) { 
+    final cs = Theme.of(context).colorScheme;
+    
     if (_currentPlaylist.isEmpty) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.black,
         body: Center(
           child: CircularProgressIndicator(
-              strokeWidth: 2,
-              valueColor:
-                  AlwaysStoppedAnimation<Color>(Color(0xFF4FC3F7))),
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(cs.primary)),
         ),
       );
     }
@@ -532,7 +439,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         children: [
           PageView.builder(
             controller: _pageController,
-            physics: const NeverScrollableScrollPhysics(), // Swipe changes disabled
+            physics: const NeverScrollableScrollPhysics(), 
             itemCount: total,
             onPageChanged: (index) {
               setState(() {
@@ -580,7 +487,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             },
           ),
 
-          // ── Fixed Navigation Arrow Chevrons (Stable across all media transitions) ──────────────────
+          // ── Fixed Navigation Arrow Chevrons ──────────────────────────────────
           if (_showUI) ...[
             if (_currentIndex > 0)
               Positioned(
@@ -639,7 +546,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               color: Colors.black.withOpacity(0.7),
               child: Row(children: [
                 IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
                   onPressed: () => Navigator.pop(context),
                 ),
                 const SizedBox(width: 8),
@@ -666,311 +573,193 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   ), 
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline,
-                      color: Colors.redAccent),
+                  icon: Icon(Icons.delete_outline_rounded,
+                      color: cs.error),
                   tooltip: 'Delete File',
                   onPressed: _deleteCurrentFile,
                 ),
-                // Combined Contextual PopupMenuButton (Morphs settings options seamlessly)
-                PopupMenuButton<String>( 
-                  icon: Icon(
-                    isCurrentAnImage ? Icons.more_vert : Icons.settings, 
-                    color: Colors.white,
-                  ),
-                  tooltip: isCurrentAnImage ? 'More Actions' : 'Playback Settings',
-                  onSelected: (value) {
-                    if (value == 'open_with') {
-                      _openWithApp();
-                    } else if (value == 'toggle_orientation') {
-                      _toggleOrientation();
-                    } else if (value == 'toggle_shuffle') {
-                      _toggleShuffle();
-                    } else if (value == 'folder_current') {
-                      _filterByFolder('Current Folder Only');
-                    } else if (value == 'folder_all') {
-                      _filterByFolder('All');
-                    } else if (value == 'toggle_slideshow_advance') {
-                      _toggleAutoAdvance(!_autoAdvance);
-                    } else if (value == 'toggle_autoplay') {
-                      setState(() => _autoPlay = !_autoPlay);
-                    } else if (value == 'toggle_loop') {
-                      setState(() => _isLooping = !_isLooping);
-                    } else if (value == 'toggle_mute') {
-                      setState(() => _isMuted = !_isMuted);
-                    } else if (value == 'toggle_subtitles') {
-                      setState(() => _subtitlesEnabled = !_subtitlesEnabled);
-                    } else if (value == 'speed_submenu') {
-                      _showSpeedSubmenu(context);
-                    } else if (value == 'skip_submenu') {
-                      _showSkipSubmenu(context);
-                    } else if (value == 'fit_best') {
-                      setState(() => _imageFit = BoxFit.contain);
-                    } else if (value == 'fit_width') {
-                      setState(() => _imageFit = BoxFit.fitWidth);
-                    } else if (value == 'fit_height') {
-                      setState(() => _imageFit = BoxFit.fitHeight);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem<String>(
-                      enabled: false,
-                      height: 28,
-                      child: Text(
-                        'General actions',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey),
+                
+                // Native Cascading Menu Anchor replacing the bulky popup menu items and seek submenus [2]
+                MenuAnchor(
+                  builder: (ctx, controller, child) {
+                    return IconButton(
+                      onPressed: () {
+                        if (controller.isOpen) {
+                          controller.close();
+                        } else {
+                          controller.open();
+                        }
+                      },
+                      icon: Icon(
+                        isCurrentAnImage ? Icons.more_vert_rounded : Icons.settings_rounded,
+                        color: Colors.white,
                       ),
+                      tooltip: isCurrentAnImage ? 'More Actions' : 'Playback Settings',
+                    );
+                  },
+                  menuChildren: [
+                    MenuItemButton(
+                      onPressed: _openWithApp,
+                      leadingIcon: const Icon(Icons.open_in_new_rounded, size: 18),
+                      child: const Text('Open with App'),
                     ),
-                    const PopupMenuItem<String>(
-                      value: 'open_with',
-                      child: Row(children: [
-                        Icon(Icons.open_in_new, size: 18),
-                        SizedBox(width: 8),
-                        Text('Open with App'),
-                      ]),
+                    MenuItemButton(
+                      onPressed: _toggleOrientation,
+                      leadingIcon: Icon(
+                        _isLandscape ? Icons.screen_lock_portrait_rounded : Icons.screen_rotation_rounded,
+                        size: 18,
+                      ),
+                      child: Text(_isLandscape ? 'Portrait Mode' : 'Landscape Mode'),
                     ),
-                    PopupMenuItem<String>(
-                      value: 'toggle_orientation',
-                      child: Row(children: [
-                        Icon(
-                          _isLandscape
-                              ? Icons.screen_lock_portrait
-                              : Icons.screen_rotation,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(_isLandscape ? 'Portrait Mode' : 'Landscape Mode'),
-                      ]),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'toggle_shuffle',
-                      child: Row(children: [
-                        Icon(Icons.shuffle,
-                            color:
-                                _isShuffled ? const Color(0xFFEF5350) : Colors.grey,
-                            size: 18),
-                        const SizedBox(width: 8),
-                        Text(_isShuffled
-                            ? 'Disable Shuffle'
-                            : 'Shuffle Playlist'),
-                      ]),
+                    MenuItemButton(
+                      onPressed: _toggleShuffle,
+                      leadingIcon: Icon(
+                        Icons.shuffle_rounded,
+                        size: 18,
+                        color: _isShuffled ? cs.primary : cs.onSurfaceVariant,
+                      ),
+                      child: Text(_isShuffled ? 'Disable Shuffle' : 'Shuffle Playlist'),
                     ),
                     const PopupMenuDivider(),
-                    PopupMenuItem<String>(
-                      enabled: false,
-                      height: 28,
-                      child: Text('Folder Filter',
-                          style: TextStyle( 
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).disabledColor)),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'folder_current',
-                      child: Row(children: [
-                        Icon(Icons.folder_shared,
-                            color: _selectedFolder == 'Current Folder Only'
-                                ? const Color(0xFFEF5350)
-                                : Colors.grey,
-                            size: 18),
-                        const SizedBox(width: 8),
-                        const Text('Current Folder Only'),
-                      ]),
-                    ),
-                    PopupMenuItem<String>(
-                      value: 'folder_all',
-                      child: Row(children: [
-                        Icon(Icons.all_inclusive,
-                            color: _selectedFolder == 'All'
-                                ? const Color(0xFFEF5350)
-                                : Colors.grey,
-                            size: 18),
-                        const SizedBox(width: 8),
-                        const Text('All (Incl. Subfolders)'),
-                      ]),
-                    ),
-                    // Contextual Image Adjustments and Slideshow Modes
-                    if (isCurrentAnImage) ...[
-                      const PopupMenuDivider(),
-                      PopupMenuItem<String>(
-                        enabled: false,
-                        height: 28,
-                        child: Text('Image Display Fit',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).disabledColor)),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'fit_best',
-                        child: Row(children: [
-                          Icon(Icons.zoom_out_map,
-                              color: _imageFit == BoxFit.contain ? const Color(0xFFEF5350) : Colors.grey,
-                              size: 18),
-                          const SizedBox(width: 8),
-                          const Text('Best Fit (Contain)'),
-                        ]),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'fit_width',
-                        child: Row(children: [
-                          Icon(Icons.swap_horiz,
-                              color: _imageFit == BoxFit.fitWidth ? const Color(0xFFEF5350) : Colors.grey,
-                              size: 18),
-                          const SizedBox(width: 8),
-                          const Text('Fit to Width'),
-                        ]),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'fit_height',
-                        child: Row(children: [
-                          Icon(Icons.swap_vert,
-                              color: _imageFit == BoxFit.fitHeight ? const Color(0xFFEF5350) : Colors.grey,
-                              size: 18),
-                          const SizedBox(width: 8),
-                          const Text('Fit to Height'),
-                        ]),
-                      ),
-                      const PopupMenuDivider(),
-                      PopupMenuItem<String>(
-                        enabled: false,
-                        height: 28,
-                        child: Text('Slideshow',
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).disabledColor)),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'toggle_slideshow_advance',
-                        child: Row(children: [
-                          Icon(
-                            Icons.skip_next,
-                            color: _autoAdvance
-                                ? const Color(0xFFEF5350)
-                                : Colors.grey,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(_autoAdvance ? 'Auto-advance: On' : 'Auto-advance: Off'),
-                        ]),
-                      ),
-                    ],
-                    // Playback settings strictly for Audio/Video elements
-                    if (!isCurrentAnImage) ...[
-                      const PopupMenuDivider(),
-                      const PopupMenuItem<String>(
-                        enabled: false,
-                        height: 28,
-                        child: Text(
-                          'Playback Behavior',
-                          style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey),
+                    
+                    // Folder Filter Submenu
+                    SubmenuButton(
+                      menuChildren: [
+                        MenuItemButton(
+                          onPressed: () => _filterByFolder('Current Folder Only'),
+                          leadingIcon: _selectedFolder == 'Current Folder Only'
+                              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                              : const SizedBox(width: 16),
+                          child: const Text('Current Folder Only'),
                         ),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'toggle_loop',
-                        child: Row(children: [
-                          Icon(
-                            _isLooping ? Icons.loop : Icons.loop_outlined,
-                            color: _isLooping ? const Color(0xFFEF5350) : Colors.grey,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(_isLooping ? 'Looping: On' : 'Looping: Off'),
-                        ]),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'toggle_mute',
-                        child: Row(children: [
-                          Icon(
-                            _isMuted ? Icons.volume_off : Icons.volume_up,
-                            color: _isMuted ? Colors.redAccent : Colors.grey,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(_isMuted ? 'Muted: On' : 'Muted: Off'),
-                        ]),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'toggle_autoplay',
-                        child: Row(children: [
-                          Icon(
-                            _autoPlay
-                                ? Icons.play_circle_filled
-                                : Icons.play_circle_outline,
-                            color: _autoPlay
-                                ? const Color(0xFFEF5350)
-                                : Colors.grey,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(_autoPlay ? 'Auto-play: On' : 'Auto-play: Off'),
-                        ]),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'toggle_slideshow_advance',
-                        child: Row(children: [
-                          Icon(
-                            Icons.skip_next,
-                            color: _autoAdvance
-                                ? const Color(0xFFEF5350)
-                                : Colors.grey,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(_autoAdvance ? 'Auto-advance: On' : 'Auto-advance: Off'),
-                        ]),
-                      ),
-                      if (_subtitlesAvailable) ...[
-                        PopupMenuItem<String>(
-                          value: 'toggle_subtitles',
-                          child: Row(children: [
-                            Icon(
-                              _subtitlesEnabled ? Icons.subtitles : Icons.subtitles_off,
-                              color: _subtitlesEnabled
-                                  ? const Color(0xFFEF5350)
-                                  : Colors.grey,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(_subtitlesEnabled ? 'Subtitles: On' : 'Subtitles: Off'),
-                          ]),
+                        MenuItemButton(
+                          onPressed: () => _filterByFolder('All'),
+                          leadingIcon: _selectedFolder == 'All'
+                              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                              : const SizedBox(width: 16),
+                          child: const Text('All (Incl. Subfolders)'),
                         ),
                       ],
+                      child: const Text('Folder Filter'),
+                    ),
+                    
+                    // Image fit settings
+                    if (isCurrentAnImage) ...[
                       const PopupMenuDivider(),
-                      // SUBMENUS: Refactored flat lists into cascading popupmenus
-                      PopupMenuItem<String>(
-                        value: 'speed_submenu',
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(children: [
-                              const Icon(Icons.speed, color: Colors.grey, size: 18),
-                              const SizedBox(width: 8),
-                              Text('Playback Speed (${_playbackSpeed}x)'),
-                            ]),
-                            const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
-                          ],
-                        ),
+                      SubmenuButton(
+                        menuChildren: [
+                          MenuItemButton(
+                            onPressed: () => setState(() => _imageFit = BoxFit.contain),
+                            leadingIcon: _imageFit == BoxFit.contain
+                                ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                                : const SizedBox(width: 16),
+                            child: const Text('Best Fit (Contain)'),
+                          ),
+                          MenuItemButton(
+                            onPressed: () => setState(() => _imageFit = BoxFit.fitWidth),
+                            leadingIcon: _imageFit == BoxFit.fitWidth
+                                ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                                : const SizedBox(width: 16),
+                            child: const Text('Fit to Width'),
+                          ),
+                          MenuItemButton(
+                            onPressed: () => setState(() => _imageFit = BoxFit.fitHeight),
+                            leadingIcon: _imageFit == BoxFit.fitHeight
+                                ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                                : const SizedBox(width: 16),
+                            child: const Text('Fit to Height'),
+                          ),
+                        ],
+                        child: const Text('Image Display Fit'),
                       ),
-                      PopupMenuItem<String>(
-                        value: 'skip_submenu',
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(children: [
-                              const Icon(Icons.timer_outlined, color: Colors.grey, size: 18),
-                              const SizedBox(width: 8),
-                              Text('Double-Tap Seek (${_doubleTapSkipSeconds}s)'),
-                            ]),
-                            const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
-                          ],
+                      const PopupMenuDivider(),
+                      MenuItemButton(
+                        onPressed: () => _toggleAutoAdvance(!_autoAdvance),
+                        leadingIcon: Icon(
+                          Icons.skip_next_rounded,
+                          size: 18,
+                          color: _autoAdvance ? cs.primary : cs.onSurfaceVariant,
                         ),
+                        child: Text(_autoAdvance ? 'Auto-advance: On' : 'Auto-advance: Off'),
+                      ),
+                    ],
+
+                    // Playback actions for video and audio files
+                    if (!isCurrentAnImage) ...[
+                      const PopupMenuDivider(),
+                      SubmenuButton(
+                        menuChildren: [
+                          MenuItemButton(
+                            onPressed: () => setState(() => _isLooping = !_isLooping),
+                            leadingIcon: Icon(
+                              _isLooping ? Icons.loop_rounded : Icons.loop_rounded,
+                              size: 18,
+                              color: _isLooping ? cs.primary : cs.onSurfaceVariant,
+                            ),
+                            child: Text(_isLooping ? 'Looping: On' : 'Looping: Off'),
+                          ),
+                          MenuItemButton(
+                            onPressed: () => setState(() => _isMuted = !_isMuted),
+                            leadingIcon: Icon(
+                              _isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                              size: 18,
+                              color: _isMuted ? cs.error : cs.onSurfaceVariant,
+                            ),
+                            child: Text(_isMuted ? 'Muted: On' : 'Muted: Off'),
+                          ),
+                          MenuItemButton(
+                            onPressed: () => setState(() => _autoPlay = !_autoPlay),
+                            leadingIcon: Icon(
+                              _autoPlay ? Icons.play_circle_filled_rounded : Icons.play_circle_outline_rounded,
+                              size: 18,
+                              color: _autoPlay ? cs.primary : cs.onSurfaceVariant,
+                    ),
+                    child: Text(_autoPlay ? 'Auto-play: On' : 'Auto-play: Off'),
+                  ),
+                  MenuItemButton(
+                    onPressed: () => _toggleAutoAdvance(!_autoAdvance),
+                    leadingIcon: Icon(
+                      Icons.skip_next_rounded,
+                      size: 18,
+                      color: _autoAdvance ? cs.primary : cs.onSurfaceVariant,
+                    ),
+                    child: Text(_autoAdvance ? 'Auto-advance: On' : 'Auto-advance: Off'),
+                  ),
+                  if (_subtitlesAvailable)
+                    MenuItemButton(
+                      onPressed: () => setState(() => _subtitlesEnabled = !_subtitlesEnabled),
+                      leadingIcon: Icon(
+                        _subtitlesEnabled ? Icons.subtitles_rounded : Icons.subtitles_off_rounded,
+                        size: 18,
+                        color: _subtitlesEnabled ? cs.primary : cs.onSurfaceVariant,
+                      ),
+                      child: Text(_subtitlesEnabled ? 'Subtitles: On' : 'Subtitles: Off'),
+                    ),
+                        ],
+                        child: const Text('Playback Behavior'),
+                      ),
+                      const PopupMenuDivider(),
+                      // Speed Cascading Menu
+                      SubmenuButton(
+                        menuChildren: [0.5, 1.0, 1.25, 1.5, 2.0].map((speed) => MenuItemButton(
+                          onPressed: () => setState(() => _playbackSpeed = speed),
+                          leadingIcon: _playbackSpeed == speed
+                              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                              : const SizedBox(width: 16),
+                          child: Text('${speed}x'),
+                        )).toList(),
+                        child: Text('Playback Speed (${_playbackSpeed}x)'),
+                      ),
+                      // Seek Cascading Menu
+                      SubmenuButton(
+                        menuChildren: [5, 10, 15, 30].map((s) => MenuItemButton(
+                          onPressed: () => setState(() => _doubleTapSkipSeconds = s),
+                          leadingIcon: _doubleTapSkipSeconds == s
+                              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                              : const SizedBox(width: 16),
+                          child: Text('$s seconds'),
+                        )).toList(),
+                        child: Text('Double-Tap Seek (${_doubleTapSkipSeconds}s)'),
                       ),
                     ],
                   ],
@@ -984,7 +773,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 }
 
-// ── _MediaPage — routes images vs videos/audios ──────────────────────────────
+// ── _MediaPage ──────────────────────────────────────────────────────────────
 
 class _MediaPage extends StatefulWidget {
   final MountedContainer container;
@@ -1214,19 +1003,21 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     if (_error != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+          child: Text(_error!, style: TextStyle(color: cs.error, fontSize: 13)),
         ), 
       );
     }
     if (_bytes == null) {
-      return const Center( 
+      return Center( 
         child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4FC3F7))),
+            strokeWidth: 2.5,
+            valueColor: AlwaysStoppedAnimation<Color>(cs.primary)),
       );
     }
     return Image.memory(
@@ -1234,8 +1025,8 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       fit: widget.fit,
       width: double.infinity,
       height: double.infinity,
-      errorBuilder: (context, error, stackTrace) => const Center(
-        child: Text('Invalid image format.', style: TextStyle(color: Colors.red)),
+      errorBuilder: (context, error, stackTrace) => Center(
+        child: Text('Invalid image format.', style: TextStyle(color: cs.error)),
       ),
     ); 
   } 
@@ -1286,6 +1077,8 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return SizedBox(
       height: 50,
       child: AnimatedBuilder(
@@ -1310,7 +1103,7 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
                 width: 5,
                 height: 40 * factor * _heights[index],
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4FC3F7),
+                  color: cs.primary, // Adapts natively to system themes
                   borderRadius: BorderRadius.circular(3),
                 ),
               );
@@ -1322,7 +1115,7 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
   } 
 }
 
-// ── MediaPlayerWidget (Unified Video & Audio Player) ────────────────────────
+// ── MediaPlayerWidget ────────────────────────────────────────────────────────
 
 class MediaPlayerWidget extends StatefulWidget {
   final MountedContainer container;
@@ -1614,6 +1407,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   }
 
   Widget _buildAudioCenterVisual() {
+    final cs = Theme.of(context).colorScheme;
     final fileTitle = widget.fileName.split('/').last;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -1626,15 +1420,15 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             color: const Color(0xFF161B22),
             shape: BoxShape.circle,
             border: Border.all(
-              color: const Color(0xFF4FC3F7).withOpacity(0.25),
+              color: cs.primary.withOpacity(0.25),
               width: 2,
             ),
           ),
-          child: const Center(
+          child: Center(
             child: Icon(
               Icons.music_note_rounded,
               size: 56,
-              color: Color(0xFF4FC3F7),
+              color: cs.primary,
             ),
           ),
         ),
@@ -1661,17 +1455,19 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     if (_playerError != null) {
       return Center(
         child: Padding( 
           padding: const EdgeInsets.all(24.0),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.error_outline,
-                color: Color(0xFFEF5350), size: 36),
+            Icon(Icons.error_outline_rounded,
+                color: cs.error, size: 36),
             const SizedBox(height: 12),
             Text(_playerError!,
-                style: const TextStyle(
-                    color: Color(0xFFEF5350), fontSize: 13),
+                style: TextStyle(
+                    color: cs.error, fontSize: 13),
                 textAlign: TextAlign.center),
           ]),
         ),
@@ -1679,11 +1475,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     }
 
     if (!_initialized) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor:
-                AlwaysStoppedAnimation<Color>(Color(0xFF4FC3F7))),
+            strokeWidth: 2.5,
+            valueColor: AlwaysStoppedAnimation<Color>(cs.primary)),
       ); 
     }
 
@@ -1805,7 +1600,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                       color: Colors.black.withOpacity(0.55),
                       borderRadius: BorderRadius.circular(30)),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.fast_rewind,
+                    const Icon(Icons.fast_rewind_rounded,
                         color: Colors.white, size: 28),
                     const SizedBox(height: 4),
                     Text('-${widget.skipSeconds}s',
@@ -1829,7 +1624,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                       color: Colors.black.withOpacity(0.55),
                       borderRadius: BorderRadius.circular(30)),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Icon(Icons.fast_forward,
+                    const Icon(Icons.fast_forward_rounded,
                         color: Colors.white, size: 28),
                     const SizedBox(height: 4),
                     Text('+${widget.skipSeconds}s',
@@ -1853,16 +1648,16 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                     color: Colors.black.withOpacity(0.65),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: const Color(0xFF4FC3F7).withOpacity(0.6),
+                        color: cs.primary.withOpacity(0.6),
                         width: 1),
                   ),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.fast_forward_rounded,
-                        color: Color(0xFF4FC3F7), size: 16),
-                    SizedBox(width: 6),
+                        color: cs.primary, size: 16),
+                    const SizedBox(width: 6),
                     Text('2× speed',
                         style: TextStyle(
-                            color: Color(0xFF4FC3F7),
+                            color: cs.primary,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.3)),
@@ -1890,8 +1685,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                       color: Colors.black45, shape: BoxShape.circle),
                   child: Icon(
                     _controller.value.isPlaying
-                        ? Icons.pause
-                        : Icons.play_arrow,
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
                     color: Colors.white,
                     size: 44,
                   ),
@@ -1904,6 +1699,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   }
 
   Widget bottomControls(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final positionStr = _formatDuration(_position);
     final durationStr = _formatDuration(_duration);
 
@@ -1939,9 +1735,9 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             const SizedBox(height: 4),
             SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                activeTrackColor: const Color(0xFFEF5350),
+                activeTrackColor: cs.primary, // Dynamically coordinated with system accent
                 inactiveTrackColor: Colors.white24,
-                thumbColor: const Color(0xFFEF5350),
+                thumbColor: cs.primary,
                 trackHeight: 3,
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),

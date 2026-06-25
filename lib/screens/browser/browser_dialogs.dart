@@ -17,7 +17,7 @@ abstract class BrowserDialogs {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('New Folder', style: TextStyle(fontSize: 16)),
+        title: const Text('New Folder'), // Inherits standard typography scale from dialogTheme
         content: TextField(
           controller: ctrl,
           decoration: const InputDecoration(hintText: 'Folder name'),
@@ -56,7 +56,7 @@ abstract class BrowserDialogs {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('New Text File', style: TextStyle(fontSize: 16)),
+        title: const Text('New Text File'),
         content: TextField(
           controller: ctrl,
           decoration: const InputDecoration(hintText: 'filename.txt'),
@@ -96,7 +96,7 @@ abstract class BrowserDialogs {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Rename', style: TextStyle(fontSize: 16)),
+        title: const Text('Rename'),
         content: TextField(controller: ctrl, autofocus: true),
         actions: [
           TextButton(
@@ -133,14 +133,12 @@ abstract class BrowserDialogs {
     required List<String> toDelete,
     required void Function(List<String> items) onConfirmed,
   }) {
+    final cs = Theme.of(context).colorScheme;
     final hasDir = toDelete.any((item) => item.startsWith('[DIR] '));
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(
-          'Delete ${toDelete.length} item(s)?',
-          style: const TextStyle(fontSize: 16),
-        ),
+        title: Text('Delete ${toDelete.length} item(s)?'),
         content: Text(
           hasDir
               ? 'These items will be permanently deleted, including all contents of any selected folders.'
@@ -156,7 +154,10 @@ abstract class BrowserDialogs {
               Navigator.pop(context);
               onConfirmed(toDelete);
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(
+              'Delete', 
+              style: TextStyle(color: cs.error), // Uses the dynamic dark-palette error color
+            ),
           ),
         ],
       ),

@@ -120,6 +120,9 @@ class _UnlockSheetState extends State<UnlockSheet> {
         ));
 
         HapticFeedback.lightImpact();
+
+        TextInput.finishAutofillContext(shouldSave: true);
+
         if (mounted) Navigator.pop(context);
       } else {
         setState(() => _error ='Incorrect password or invalid container');
@@ -134,167 +137,173 @@ class _UnlockSheetState extends State<UnlockSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final mq = MediaQuery.of(context);
 
-    return Container(
-      margin: EdgeInsets.only(bottom: mq.viewInsets.bottom),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border.all(color: cs.outline.withOpacity(0.5)),
-      ),
+    // Let the framework-drawn BottomSheet handle the background, corners, and drag handle.
+    // We only apply keyboard offset padding here.
+    return Padding(
+      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36, height: 4,
-                  decoration: BoxDecoration(color: cs.outline, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(children: [
-                Text(
-                  widget.initialUri != null ? 'Unlock Container' : 'Mount Container',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 17),
-                ),
-              ]),
-              const SizedBox(height: 12),
-
-              // File picker
-              GestureDetector(
-                onTap: _pickFile,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceVariant,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: _selectedUri != null ? cs.primary.withOpacity(0.5) : cs.outline,
-                    ),
-                  ),
-                  child: Row(children: [
-                    Icon(
-                      _selectedUri != null ? Icons.description_outlined : Icons.folder_open,
-                      size: 18,
-                      color: _selectedUri != null ? cs.primary : cs.outline,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _selectedName ?? 'Select VeraCrypt container…',
-                        style: TextStyle(
-                          color: _selectedUri != null ? cs.onSurface : cs.outline,
-                          fontSize: 13,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (_selectedUri != null && widget.initialUri == null) ...[
-                      GestureDetector(
-                        onTap: () => setState(() { _selectedUri = null; _selectedName = null; }),
-                        child: const Icon(Icons.clear, size: 16, color: Colors.grey),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(Icons.check_circle, size: 16, color: cs.primary),
-                    ] else if (_selectedUri != null && widget.initialUri != null) ...[
-                      Icon(Icons.lock_outline, size: 16, color: cs.primary),
-                    ],
-                  ]),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Password
-              TextField(
-                controller: _passwordCtrl,
-                obscureText: _obscure,
-                autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.key_outlined, size: 18),
-                  suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
-                    if (_passwordPrefilled)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Tooltip(
-                          message: 'Using saved password',
-                          child: Icon(Icons.bookmark, size: 16, color: cs.primary),
-                        ),
-                      ),
-                    IconButton(
-                      onPressed: () => setState(() => _obscure = !_obscure),
-                      icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
-                    ),
-                  ]),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              TextField(
-                controller: _pimCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'PIM  (leave blank for default)',
-                  prefixIcon: Icon(Icons.tune, size: 18),
-                ),
-              ),
-
-              if (widget.initialUri == null) ...[
-                const SizedBox(height: 10),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: AutofillGroup(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 Row(children: [
-                  Checkbox(
-                    value: _remember,
-                    onChanged: (val) => setState(() => _remember = val ?? false),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => setState(() => _remember = !_remember),
-                    child: const Text('Remember container on dashboard',
-                        style: TextStyle(fontSize: 13)),
+                  Text(
+                    widget.initialUri != null ? 'Unlock Container' : 'Mount Container',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ]),
-              ],
+                const SizedBox(height: 16),
 
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: cs.error.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: cs.error.withOpacity(0.4)),
+                // File picker container
+                GestureDetector(
+                  onTap: _pickFile,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _selectedUri != null ? cs.primary : cs.outlineVariant,
+                        width: _selectedUri != null ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(children: [
+                      Icon(
+                        _selectedUri != null ? Icons.description_outlined : Icons.folder_open_rounded,
+                        size: 20,
+                        color: _selectedUri != null ? cs.primary : cs.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _selectedName ?? 'Select VeraCrypt container…',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: _selectedUri != null ? cs.onSurface : cs.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_selectedUri != null && widget.initialUri == null) ...[
+                        GestureDetector(
+                          onTap: () => setState(() { _selectedUri = null; _selectedName = null; }),
+                          child: Icon(Icons.clear_rounded, size: 18, color: cs.onSurfaceVariant),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.check_circle_rounded, size: 18, color: cs.primary),
+                      ] else if (_selectedUri != null && widget.initialUri != null) ...[
+                        Icon(Icons.lock_outline_rounded, size: 18, color: cs.primary),
+                      ],
+                    ]),
                   ),
-                  child: Row(children: [
-                    Icon(Icons.error_outline, size: 16, color: cs.error),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(_error!, style: TextStyle(color: cs.error, fontSize: 12))),
+                ),
+                const SizedBox(height: 16),
+
+                TextField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscure,
+                  autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
+                  onChanged: (_) => setState(() {}),
+                  keyboardType: TextInputType.visiblePassword,
+                  autofillHints: const [AutofillHints.password],
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: const Icon(Icons.key_outlined, size: 18),
+                    suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (_passwordPrefilled)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Tooltip(
+                            message: 'Using saved password',
+                            child: Icon(Icons.bookmark_rounded, size: 18, color: cs.primary),
+                          ),
+                        ),
+                      IconButton(
+                        onPressed: () => setState(() => _obscure = !_obscure),
+                        icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
+                      ),
+                    ]),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                TextField(
+                  controller: _pimCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'PIM  (leave blank for default)',
+                    prefixIcon: Icon(Icons.tune_rounded, size: 18),
+                  ),
+                ),
+
+                if (widget.initialUri == null) ...[
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Checkbox(
+                      value: _remember,
+                      onChanged: (val) => setState(() => _remember = val ?? false),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () => setState(() => _remember = !_remember),
+                      child: Text(
+                        'Remember container on dashboard',
+                        style: textTheme.bodyMedium,
+                      ),
+                    ),
                   ]),
+                ],
+
+                if (_error != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: cs.errorContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(children: [
+                      Icon(Icons.error_outline_rounded, size: 20, color: cs.onErrorContainer),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _error!, 
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ],
+
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _loading ? null : _unlock,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                  child: _loading
+                      ? SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                          ),
+                        )
+                      : const Text('Unlock'),
                 ),
               ],
-
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: _loading ? null : _unlock,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                ),
-                child: _loading
-                    ? const SizedBox(width: 18, height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(Colors.white)))
-                    : const Text('Unlock',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              ),
-            ],
+            ),
           ),
         ),
       ),

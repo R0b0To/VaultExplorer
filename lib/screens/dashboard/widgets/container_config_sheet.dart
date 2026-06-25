@@ -76,7 +76,6 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
       autoCloseMins: _autoCloseMins,
       documentProvider: _documentProvider,
     );
-    // Obfuscate password before persisting.
     if (_rememberPassword && _passwordCtrl.text.isNotEmpty) {
       await config.setPassword(_passwordCtrl.text);
     }
@@ -88,36 +87,31 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final mq = MediaQuery.of(context);
 
-    return Container(
-      margin: EdgeInsets.only(bottom: mq.viewInsets.bottom),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border.all(color: cs.outline.withOpacity(0.5)),
-      ),
+    // We use Padding instead of a decorated Container.
+    // The framework's native BottomSheet automatically renders the unified background color.
+    return Padding(
+      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: Container(
-                    width: 36, height: 4,
-                    decoration: BoxDecoration(color: cs.outline, borderRadius: BorderRadius.circular(2)),
-                  ),
-                ),
-                const SizedBox(height: 20),
                 Row(children: [
-                  Icon(Icons.settings_outlined, size: 18, color: cs.primary),
+                  Icon(Icons.settings_rounded, size: 20, color: cs.primary),
                   const SizedBox(width: 10),
-                  Text('Container Settings',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 16)),
+                  Text(
+                    'Container Settings',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ]),
                 const SizedBox(height: 20),
 
@@ -126,7 +120,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                   controller: _labelCtrl,
                   decoration: const InputDecoration(
                     labelText: 'Display Name',
-                    prefixIcon: Icon(Icons.label_outline, size: 18),
+                    prefixIcon: Icon(Icons.label_outline_rounded, size: 18),
                     hintText: 'My Vault',
                   ),
                 ),
@@ -134,9 +128,9 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
 
                 // ── Password ───────────────────────────────────────────────
                 _SectionHeader('PASSWORD', cs),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 _ToggleRow(
-                  icon: Icons.key_outlined,
+                  icon: Icons.key_rounded,
                   title: 'Remember password',
                   subtitle: 'Obfuscated and stored in app data',
                   value: _rememberPassword,
@@ -147,7 +141,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                   }),
                 ),
                 if (_rememberPassword) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   if (_loadingPassword)
                     const Center(child: SizedBox(width: 20, height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2)))
@@ -157,25 +151,27 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                       obscureText: !_showPassword,
                       decoration: InputDecoration(
                         labelText: 'Container password',
-                        prefixIcon: const Icon(Icons.lock_outline, size: 18),
+                        prefixIcon: const Icon(Icons.lock_rounded, size: 18),
                         suffixIcon: IconButton(
                           icon: Icon(_showPassword
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined, size: 18),
+                              ? Icons.visibility_off_rounded
+                              : Icons.visibility_rounded, size: 18),
                           onPressed: () => setState(() => _showPassword = !_showPassword),
                         ),
                         hintText: 'Enter container password',
                       ),
                     ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Row(children: [
-                    Icon(Icons.security_outlined, size: 12, color: cs.outline),
-                    const SizedBox(width: 6),
+                    Icon(Icons.security_rounded, size: 14, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Stored obfuscated. Not cryptographically secure — '
                         'do not use if device root access is a concern.',
-                        style: TextStyle(fontSize: 11, color: cs.outline),
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ]),
@@ -184,12 +180,12 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
 
                 // ── Auto-lock ──────────────────────────────────────────────
                 _SectionHeader('AUTO-LOCK', cs),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 DropdownButtonFormField<int>(
                   value: _autoCloseMins,
                   decoration: const InputDecoration(
                     labelText: 'Lock container after',
-                    prefixIcon: Icon(Icons.timer_outlined, size: 18),
+                    prefixIcon: Icon(Icons.timer_rounded, size: 18),
                   ),
                   items: _autoCloseOptions.map((mins) {
                     final label = mins == 0 ? 'Never'
@@ -202,9 +198,9 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
 
                 // ── Document Provider ──────────────────────────────────────
                 _SectionHeader('ANDROID INTEGRATION', cs),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 _ToggleRow(
-                  icon: Icons.folder_shared_outlined,
+                  icon: Icons.folder_shared_rounded,
                   title: 'Expose as Document Provider',
                   subtitle: 'Makes this container visible in Android\'s '
                       'system file picker when unlocked',
@@ -216,34 +212,38 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
 
                 // ── Remove from dashboard ─────────────────────────────────
                 if (widget.onForget != null) ...[
-                  const SizedBox(height: 4),
                   TextButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
                       widget.onForget!();
                     },
-                    icon: Icon(Icons.delete_outline,
-                        size: 16, color: Theme.of(context).colorScheme.error),
-                    label: Text('Remove from dashboard',
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
-                            fontSize: 13)),
+                    icon: Icon(Icons.delete_outline_rounded,
+                        size: 18, color: cs.error),
+                    label: Text(
+                      'Remove from dashboard',
+                      style: textTheme.labelLarge?.copyWith(
+                        color: cs.error,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                 ],
 
                 // ── Save ───────────────────────────────────────────────────
                 FilledButton(
                   onPressed: _saving ? null : _save,
                   style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(double.infinity, 48),
                   ),
                   child: _saving
-                      ? const SizedBox(width: 18, height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(Colors.white)))
-                      : const Text('Save', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      ? SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                          ),
+                        )
+                      : const Text('Save'),
                 ),
               ],
             ),
@@ -258,10 +258,22 @@ class _SectionHeader extends StatelessWidget {
   final String label;
   final ColorScheme cs;
   const _SectionHeader(this.label, this.cs);
+
   @override
-  Widget build(BuildContext context) => Text(label.toUpperCase(),
-      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-          letterSpacing: 1.2, color: cs.outline));
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: Text(
+        label.toUpperCase(),
+        style: textTheme.labelSmall?.copyWith(
+          color: cs.primary,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
 }
 
 class _ToggleRow extends StatelessWidget {
@@ -271,17 +283,45 @@ class _ToggleRow extends StatelessWidget {
   final bool value;
   final ColorScheme cs;
   final ValueChanged<bool> onChanged;
-  const _ToggleRow({required this.icon, required this.title,
-      required this.subtitle, required this.value, required this.cs,
-      required this.onChanged});
+
+  const _ToggleRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.cs,
+    required this.onChanged,
+  });
+
   @override
-  Widget build(BuildContext context) => Row(children: [
-    Icon(icon, size: 18, color: cs.onSurfaceVariant),
-    const SizedBox(width: 12),
-    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-      Text(subtitle, style: TextStyle(fontSize: 11, color: cs.outline)),
-    ])),
-    Switch(value: value, onChanged: onChanged, activeColor: cs.primary),
-  ]);
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: cs.onSurfaceVariant),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title, 
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle, 
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Switch(value: value, onChanged: onChanged),
+      ],
+    );
+  }
 }

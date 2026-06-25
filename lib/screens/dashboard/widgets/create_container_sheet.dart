@@ -57,7 +57,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
           _sizeUnit == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024;
       final sizeBytes = (sizeVal * multiplier).round();
 
-      // clampPim guards against absurdly large PBKDF2 iteration counts.
       final pim = clampPim(
           _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
 
@@ -91,41 +90,27 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final mq = MediaQuery.of(context);
 
-    return Container(
-      margin: EdgeInsets.only(bottom: mq.viewInsets.bottom),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border.all(color: cs.outline.withOpacity(0.5)),
-      ),
+    // Layout relies on framework's built-in canvas wrapper to prevent overlapping handles.
+    return Padding(
+      padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.outline,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
+                Text(
+                  'Create VeraCrypt Container',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 20),
-                Text('Create VeraCrypt Container',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontSize: 17)),
                 const SizedBox(height: 16),
 
                 // File name
@@ -133,7 +118,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                   controller: _nameCtrl,
                   decoration: const InputDecoration(
                     labelText: 'File Name',
-                    prefixIcon: Icon(Icons.drive_file_rename_outline,
+                    prefixIcon: Icon(Icons.drive_file_rename_outline_rounded,
                         size: 18),
                   ),
                 ),
@@ -152,7 +137,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                         decoration: const InputDecoration(
                           labelText: 'Container Size',
                           prefixIcon:
-                              Icon(Icons.sd_storage_outlined, size: 18),
+                              Icon(Icons.sd_card_outlined, size: 18),
                         ),
                       ),
                     ),
@@ -169,8 +154,9 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                               value: 'GB', child: Text('GB')),
                         ],
                         onChanged: (val) {
-                          if (val != null)
+                          if (val != null) {
                             setState(() => _sizeUnit = val);
+                          }
                         },
                       ),
                     ),
@@ -185,7 +171,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                   decoration: InputDecoration(
                     labelText: 'Password',
                     prefixIcon:
-                        const Icon(Icons.key_outlined, size: 18),
+                        const Icon(Icons.key_rounded, size: 18),
                     suffixIcon: IconButton(
                       onPressed: () =>
                           setState(() => _obscure = !_obscure),
@@ -205,7 +191,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     labelText: 'PIM  (leave blank for default)',
-                    prefixIcon: Icon(Icons.tune, size: 18),
+                    prefixIcon: Icon(Icons.tune_rounded, size: 18),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -215,7 +201,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                   value: _fileSystem,
                   decoration: const InputDecoration(
                     labelText: 'Format File System',
-                    prefixIcon: Icon(Icons.dns_outlined, size: 18),
+                    prefixIcon: Icon(Icons.dns_rounded, size: 18),
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -229,52 +215,47 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                 ),
 
                 if (_error != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: cs.error.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                          color: cs.error.withOpacity(0.4)),
+                      color: cs.errorContainer,
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline,
-                            size: 16, color: cs.error),
-                        const SizedBox(width: 8),
+                        Icon(Icons.error_outline_rounded,
+                            size: 20, color: cs.onErrorContainer),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: Text(_error!,
-                              style: TextStyle(
-                                  color: cs.error, fontSize: 12)),
+                          child: Text(
+                            _error!,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: cs.onErrorContainer,
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ],
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 FilledButton(
                   onPressed: _loading ? null : _create,
                   style: FilledButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6)),
+                    minimumSize: const Size(double.infinity, 48),
                   ),
                   child: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation(
-                                  Colors.white)),
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                          ),
                         )
-                      : const Text('Create Container',
-                          style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600)),
+                      : const Text('Create Container'),
                 ),
               ],
             ),

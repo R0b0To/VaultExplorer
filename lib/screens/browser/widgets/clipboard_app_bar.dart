@@ -37,17 +37,21 @@ class ClipboardAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     final verb = isCutOperation ? 'Moving' : 'Copying';
-    final fromSuffix =
-        sourceLabel != null ? ' from "$sourceLabel"' : '';
+    final fromSuffix = sourceLabel != null ? ' from "$sourceLabel"' : '';
     final titleText = '$verb $itemCount item(s)$fromSuffix';
 
     return AppBar(
-      backgroundColor: cs.surface,
+      // M3 Contextual App Bars use surfaceContainer to clearly signal 
+      // an active, temporary contextual layout state.
+      backgroundColor: cs.surfaceContainer,
       foregroundColor: cs.onSurface,
       elevation: 0,
-      shape: Border(bottom: BorderSide(color: cs.primary.withOpacity(0.4))),
+      shape: Border(
+        bottom: BorderSide(color: cs.outlineVariant),
+      ),
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         tooltip: 'Navigate back',
@@ -56,16 +60,17 @@ class ClipboardAppBar extends StatelessWidget implements PreferredSizeWidget {
       title: Row(
         children: [
           Icon(
-            isCutOperation ? Icons.cut : Icons.copy,
-            size: 15,
+            isCutOperation ? Icons.cut_rounded : Icons.copy_rounded,
+            size: 18,
             color: cs.primary,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               titleText,
-              style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600),
+              style: textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -73,15 +78,18 @@ class ClipboardAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         TextButton.icon(
-          style: TextButton.styleFrom(foregroundColor: cs.primary),
           onPressed: onPaste,
-          icon: const Icon(Icons.paste, size: 16),
-          label: const Text('Paste Here',
-              style:
-                  TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+          icon: const Icon(Icons.paste_rounded, size: 18),
+          label: const Text('Paste Here'),
+          style: TextButton.styleFrom(
+            foregroundColor: cs.primary,
+            textStyle: textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
         IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close_rounded),
           tooltip: 'Cancel',
           onPressed: onCancel,
         ),

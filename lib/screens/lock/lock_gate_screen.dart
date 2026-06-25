@@ -97,9 +97,16 @@ class _LockGateScreenState extends State<LockGateScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+      );
     }
+
     final s = _settings!;
     return Scaffold(
       body: SafeArea(
@@ -109,21 +116,32 @@ class _LockGateScreenState extends State<LockGateScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Soft M3 container for key visuals
                 Container(
                   width: 72, height: 72,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: cs.primaryContainer,
-                    border: Border.all(color: cs.primary.withOpacity(0.3)),
+                    border: Border.all(color: cs.outlineVariant),
                   ),
-                  child: Icon(Icons.lock_outline, size: 32, color: cs.primary),
+                  child: Icon(Icons.lock_outline_rounded, size: 32, color: cs.primary),
                 ),
                 const SizedBox(height: 28),
-                Text('VaultExplorer',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 22, letterSpacing: 0.5)),
-                const SizedBox(height: 6),
-                Text('Enter your master password to continue',
-                    style: TextStyle(fontSize: 13, color: cs.outline)),
+                Text(
+                  'VaultExplorer',
+                  style: textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Enter your master password to continue',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
                 const SizedBox(height: 36),
                 TextField(
                   controller: _pwCtrl,
@@ -132,7 +150,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
                   onSubmitted: (_) => _checkPassword(),
                   decoration: InputDecoration(
                     labelText: 'Master Password',
-                    prefixIcon: const Icon(Icons.key_outlined, size: 18),
+                    prefixIcon: const Icon(Icons.key_rounded, size: 18),
                     suffixIcon: IconButton(
                       icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
                       onPressed: () => setState(() => _obscure = !_obscure),
@@ -140,30 +158,38 @@ class _LockGateScreenState extends State<LockGateScreen> {
                   ),
                 ),
                 if (_error != null) ...[
-                  const SizedBox(height: 10),
-                  Text(_error!, style: TextStyle(color: cs.error, fontSize: 12)),
+                  const SizedBox(height: 12),
+                  Text(
+                    _error!, 
+                    style: textTheme.bodySmall?.copyWith(
+                      color: cs.error,
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 20),
                 FilledButton(
                   onPressed: _checking ? null : _checkPassword,
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    minimumSize: const Size(double.infinity, 48), // Touch target compliance
                   ),
                   child: _checking
-                      ? const SizedBox(width: 18, height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
-                      : const Text('Unlock', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      ? SizedBox(
+                          width: 20, height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5, 
+                            valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                          ),
+                        )
+                      : const Text('Unlock'),
                 ),
                 if (s.masterPasswordIsFingerprint) ...[
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
                     onPressed: _tryBiometric,
-                    icon: const Icon(Icons.fingerprint, size: 20),
+                    icon: const Icon(Icons.fingerprint_rounded, size: 20),
                     label: const Text('Use Biometric'),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ],

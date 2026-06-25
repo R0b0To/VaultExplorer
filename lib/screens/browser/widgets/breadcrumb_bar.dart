@@ -15,36 +15,65 @@ class BreadcrumbBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      height: 38,
-      color: cs.surface,
+      height: 40, // Expanded slightly to provide a better touch target area
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(
+          bottom: BorderSide(
+            color: cs.outlineVariant,
+            width: 1,
+          ),
+        ),
+      ),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         itemCount: stack.length,
         itemBuilder: (_, i) {
           final isLast = i == stack.length - 1;
+          
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              GestureDetector(
-                onTap: () => onTap(i),
-                child: Text(
-                  stack[i].label,
-                  style: TextStyle(
-                    color: isLast ? cs.onSurface : cs.primary,
-                    fontSize: 12,
-                    fontWeight:
-                        isLast ? FontWeight.w600 : FontWeight.normal,
+              if (isLast)
+                // The current directory is non-interactive to save redundant taps
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(
+                    stack[i].label,
+                    style: textTheme.labelLarge?.copyWith(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
+              else
+                // Clickable historical directories
+                InkWell(
+                  onTap: () => onTap(i),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Text(
+                      stack[i].label,
+                      style: textTheme.labelLarge?.copyWith(
+                        color: cs.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 ),
-              ),
               if (!isLast)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child:
-                      Icon(Icons.chevron_right, size: 14, color: cs.outline),
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                  child: Icon(
+                    Icons.chevron_right_rounded, // Softer rounded chevron
+                    size: 16,
+                    color: cs.onSurfaceVariant.withOpacity(0.5),
+                  ),
                 ),
             ],
           );

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -73,6 +74,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   // ── Layout state ──────────────────────────────────────────────────────────
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
+
+  // ── Filter state ──────────────────────────────────────────────────────────
+  String? _currentFilter; // 'image', 'video', 'audio', 'document' or null (all)
+
+  static const _imageExts = {'jpg', 'jpeg', 'png', 'gif', 'webp'};
+  static const _videoExts = {'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv'};
+  static const _audioExts = {'mp3', 'm4a', 'wav', 'flac', 'ogg', 'aac'};
 
   // ── Convenience getters ───────────────────────────────────────────────────
   bool get _atRoot => _pathStack.length == 1;
@@ -154,6 +162,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     setState(() {
       _pathStack.add(PathSegment(name, newPath));
       _clearSearch();
+      _currentFilter = null; // Reset filters on navigation
     });
     _loadDirectoryContents(newPath);
   }
@@ -163,6 +172,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     setState(() {
       _pathStack.removeLast();
       _clearSearch();
+      _currentFilter = null;
     });
     _loadDirectoryContents(_currentDirPath);
   }
@@ -172,6 +182,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     setState(() {
       _pathStack.removeRange(index + 1, _pathStack.length);
       _clearSearch();
+      _currentFilter = null;
     });
     _loadDirectoryContents(_currentDirPath);
   }
@@ -185,8 +196,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       _enterDirectory(rawItem);
     }
   }
-
- // ── FileBrowserScreen Navigation Excerpt ───────────────────────────────────
 
   void _handleFileTap(String rawItem) {
     if (isSelectionMode) {
@@ -213,7 +222,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             container: widget.container,
             mediaFiles: resolvedPaths,
             initialIndex: mediaEntries.indexOf(cleanName),
-            startingFolder: _currentDirPath, // <-- Passed starting folder
+            startingFolder: _currentDirPath,
           ),
         ),
       );
@@ -241,7 +250,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             container: widget.container,
             mediaFiles: resolvedPaths,
             initialIndex: 0,
-            startingFolder: _currentDirPath, // <-- Passed starting folder
+            startingFolder: _currentDirPath,
           ),
         ),
       );
@@ -264,7 +273,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               container: widget.container,
               mediaFiles: recursiveMedia,
               initialIndex: 0,
-              startingFolder: _currentDirPath, // <-- Passed starting folder
+              startingFolder: _currentDirPath,
             ),
           ),
         );
@@ -296,11 +305,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   bool _isSupportedMedia(String fileName) {
     final ext = fileName.split('.').last.toLowerCase();
-    return const {
-      'jpg', 'jpeg', 'png', 'gif', 'webp',
-      'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv',
-      'mp3', 'm4a', 'wav', 'flac', 'ogg', 'aac'
-    }.contains(ext);
+    return _imageExts.contains(ext) || _videoExts.contains(ext) || _audioExts.contains(ext);
   }
 
   Future<List<String>> _scanMediaRecursively(String dirPath) async {
@@ -329,8 +334,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
     return foundFiles;
   }
-
-
 
   Future<void> _openFileWithApp(String cleanName, String fullPath) async {
     try {
@@ -614,7 +617,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       barrierDismissible: false,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('Already Exists', style: TextStyle(fontSize: 16)),
+          title: const Text('Already Exists'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -646,10 +649,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                         materialTapTargetSize:
                             MaterialTapTargetSize.shrinkWrap,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       const Expanded(
-                        child: Text('Apply to all conflicts',
-                            style: TextStyle(fontSize: 13)),
+                        child: Text('Apply to all conflicts'),
                       ),
                     ],
                   ),
@@ -671,9 +673,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             FilledButton(
               onPressed: () => Navigator.pop(ctx,
                   (resolution: _ConflictResolution.keepBoth, applyToAll: applyToAll)),
-              style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
               child: const Text('Keep Both'),
             ),
           ],
@@ -900,6 +899,49 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
+  // ── Filter conditions (NEW FEATURE) ──────────────────────────────────────────
+
+  bool _matchesFilter(String fileName) {
+    if (_currentFilter == null) return true;
+    final ext = fileName.split('.').last.toLowerCase();
+    switch (_currentFilter) {
+      case 'image':
+        return _imageExts.contains(ext);
+      case 'video':
+        return _videoExts.contains(ext);
+      case 'audio':
+        return _audioExts.contains(ext);
+      case 'document':
+        return const {
+          'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'csv', 'zip', 'tar', 'gz', 'json', 'xml'
+        }.contains(ext);
+      default:
+        return true;
+    }
+  }
+
+  // ── Submenu Sort Option Builder ──────────────────────────────────────────────
+
+  Widget _buildSortMenuButton(SortBy value, String label, ColorScheme cs, TextTheme textTheme) {
+    final isActive = sortBy == value;
+    return MenuItemButton(
+      onPressed: () => setSort(value),
+      leadingIcon: Icon(
+        isActive
+            ? (sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded)
+            : Icons.sort_rounded,
+        size: 16,
+        color: isActive ? cs.primary : cs.onSurfaceVariant,
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
+        ),
+      ),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -912,17 +954,21 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       ..sort(compareItems);
 
     final query = _searchQuery.trim().toLowerCase();
-    final filteredDirs = query.isEmpty
+
+    // Hide folders when viewing specialized file filters to create a cleaner view (All Files is unaffected)
+    final filteredDirs = query.isEmpty && _currentFilter == null
         ? dirs
-        : dirs
-            .where((d) =>
-                d.replaceFirst('[DIR] ', '').toLowerCase().contains(query))
-            .toList();
-    final filteredFiles = query.isEmpty
-        ? files
-        : files
-            .where((f) => f.split('|').first.toLowerCase().contains(query))
-            .toList();
+        : (query.isEmpty
+            ? <String>[]
+            : dirs
+                .where((d) => d.replaceFirst('[DIR] ', '').toLowerCase().contains(query))
+                .toList());
+
+    final filteredFiles = files.where((f) {
+      final cleanName = f.split('|').first;
+      if (query.isNotEmpty && !cleanName.toLowerCase().contains(query)) return false;
+      return _matchesFilter(cleanName);
+    }).toList();
 
     return PopScope(
       canPop: false,
@@ -950,9 +996,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               dirCount: filteredDirs.length,
               fileCount: filteredFiles.length,
               freeSpaceBytes: _freeSpace,
-              isFiltered: query.isNotEmpty,
+              isFiltered: query.isNotEmpty || _currentFilter != null,
             ),
-            
+            _FilterChipsBar(
+              currentFilter: _currentFilter,
+              onFilterChanged: (filter) => setState(() => _currentFilter = filter),
+            ),
             const Divider(),
             Expanded(child: _buildBody(filteredDirs, filteredFiles)),
             if (_statusMessage != null)
@@ -972,6 +1021,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   PreferredSizeWidget _buildAppBar(
       BuildContext context, List<String> dirs, List<String> files) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final allSelectable = [...dirs, ...files];
 
     if (isSelectionMode) {
@@ -1040,7 +1090,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           controller: _searchController,
           autofocus: true,
           onChanged: (val) => setState(() => _searchQuery = val),
-          style: TextStyle(fontSize: 14, color: cs.onSurface),
+          style: textTheme.bodyMedium?.copyWith(color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'Search in this folder…',
             hintStyle: TextStyle(color: cs.outline, fontSize: 14),
@@ -1075,8 +1125,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(widget.container.displayName,
-              style: const TextStyle(fontSize: 14)),
+          Text(widget.container.displayName),
         ],
       ),
       actions: [
@@ -1149,92 +1198,72 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             ),
           ],
         ),
-        // Consolidated Options Overflow Menu
-        PopupMenuButton<dynamic>(
-          icon: const Icon(Icons.more_vert),
-          tooltip: 'Folder options',
-          onSelected: (value) {
-            if (value is SortBy) {
-              setSort(value);
-            } else if (value is String) {
-              switch (value) {
-                case 'media_viewer':
+        // Unified cascading menu anchor replacing basic popup menu buttons
+        MenuAnchor(
+          builder: (ctx, controller, child) {
+            return IconButton(
+              onPressed: () {
+                if (controller.isOpen) {
+                  controller.close();
+                } else {
+                  controller.open();
+                }
+              },
+              icon: const Icon(Icons.more_vert_rounded),
+              tooltip: 'Folder options',
+            );
+          },
+          menuChildren: [
+            MenuItemButton(
+              onPressed: () {
+                final hasLocalMedia = _currentItems
+                    .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
+                    .map((f) => f.split('|').first)
+                    .where(_isSupportedMedia)
+                    .isNotEmpty;
+                final hasSubfolders = _currentItems.any((f) => f.startsWith('[DIR] '));
+                final canPlay = hasLocalMedia || hasSubfolders;
+                if (canPlay) {
                   _startMediaViewerFromCurrentLocation();
-                  break;
-                case 'toggle_layout':
-                  setState(() {
-                    _layoutMode = _layoutMode == BrowserLayoutMode.list
-                        ? BrowserLayoutMode.grid
-                        : BrowserLayoutMode.list;
-                  });
-                  break;
-              }
-            }
-          },
-          itemBuilder: (ctx) {
-            final localCs = Theme.of(ctx).colorScheme;
-            
-            final hasLocalMedia = _currentItems
-                .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
-                .map((f) => f.split('|').first)
-                .where(_isSupportedMedia)
-                .isNotEmpty;
-                
-            final hasSubfolders = _currentItems.any((f) => f.startsWith('[DIR] '));
-            final canPlay = hasLocalMedia || hasSubfolders;
-
-            return [
-              PopupMenuItem<dynamic>(
-                value: 'media_viewer',
-                enabled: canPlay,
-                child: Row(children: [
-                  Icon(
-                    Icons.play_circle_outline_rounded,
-                    color: canPlay ? localCs.primary : localCs.error,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Play Media Here',
-                    style: TextStyle(
-                      color: canPlay ? null : localCs.error,
-                    ),
-                  ),
-                ]),
+                }
+              },
+              leadingIcon: Icon(
+                Icons.play_circle_outline_rounded,
+                color: cs.primary,
               ),
-              const PopupMenuDivider(),
-              PopupMenuItem<dynamic>(
-                value: 'toggle_layout',
-                child: Row(children: [
-                  Icon(
-                    _layoutMode == BrowserLayoutMode.list
-                        ? Icons.grid_view_rounded
-                        : Icons.view_list_rounded,
-                    color: localCs.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(_layoutMode == BrowserLayoutMode.list
-                      ? 'Switch to Gallery'
-                      : 'Switch to List'),
-                ]),
+              child: const Text('Play Media Here'),
+            ),
+            const PopupMenuDivider(),
+            MenuItemButton(
+              onPressed: () {
+                setState(() {
+                  _layoutMode = _layoutMode == BrowserLayoutMode.list
+                      ? BrowserLayoutMode.grid
+                      : BrowserLayoutMode.list;
+                });
+              },
+              leadingIcon: Icon(
+                _layoutMode == BrowserLayoutMode.list
+                    ? Icons.grid_view_rounded
+                    : Icons.view_list_rounded,
               ),
-              const PopupMenuDivider(),
-              PopupMenuItem<dynamic>(
-                enabled: false,
-                height: 28,
-                child: Text(
-                  'Sort By',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: localCs.outline,
-                  ),
-                ),
+              child: Text(
+                _layoutMode == BrowserLayoutMode.list
+                    ? 'Switch to Gallery'
+                    : 'Switch to List',
               ),
-              buildSortMenuItem(SortBy.name, 'Name'),
-              buildSortMenuItem(SortBy.size, 'Size'),
-              buildSortMenuItem(SortBy.extension, 'Type'),
-            ];
-          },
+            ),
+            const PopupMenuDivider(),
+            // Cascading sorting options using Mixin properties directly
+            SubmenuButton(
+              menuChildren: [
+                _buildSortMenuButton(SortBy.name, 'Name', cs, textTheme),
+                _buildSortMenuButton(SortBy.size, 'Size', cs, textTheme),
+                _buildSortMenuButton(SortBy.extension, 'Type', cs, textTheme),
+              ],
+              child: const Text('Sort By'),
+            ),
+          ],
         ),
       ],
     );
@@ -1244,7 +1273,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Widget _buildBody(List<String> dirs, List<String> files) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
     }
     if (_currentItems.isEmpty) {
       return _EmptyPlaceholder(onBack: _navigateUp, atRoot: _atRoot);
@@ -1277,6 +1306,62 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 }
 
+// ── Horizontal Filter Chips Bar ──────────────────────────────────────────────
+
+class _FilterChipsBar extends StatelessWidget {
+  final String? currentFilter;
+  final ValueChanged<String?> onFilterChanged;
+
+  const _FilterChipsBar({
+    required this.currentFilter,
+    required this.onFilterChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      height: 48,
+      color: cs.surface,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        children: [
+          _buildChip(context, null, 'All Files', Icons.all_inclusive_rounded),
+          const SizedBox(width: 8),
+          _buildChip(context, 'image', 'Images', Icons.image_outlined),
+          const SizedBox(width: 8),
+          _buildChip(context, 'video', 'Videos', Icons.videocam_outlined),
+          const SizedBox(width: 8),
+          _buildChip(context, 'audio', 'Audio', Icons.audiotrack_rounded),
+          const SizedBox(width: 8),
+          _buildChip(context, 'document', 'Documents', Icons.description_outlined),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChip(BuildContext context, String? filter, String label, IconData icon) {
+    final cs = Theme.of(context).colorScheme;
+    final isSelected = currentFilter == filter;
+
+    return FilterChip(
+      showCheckmark: false,
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+      ),
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        onFilterChanged(selected ? filter : null);
+      },
+    );
+  }
+}
+
 // ── Inline status bar ─────────────────────────────────────────────────────────
 
 class _StatusBar extends StatelessWidget {
@@ -1293,38 +1378,37 @@ class _StatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = isError
-        ? cs.error.withOpacity(0.12)
-        : cs.primaryContainer.withOpacity(0.6);
-    final fg = isError ? cs.error : cs.primary;
+    final textTheme = Theme.of(context).textTheme;
+
+    final bg = isError ? cs.errorContainer : cs.primaryContainer;
+    final fg = isError ? cs.onErrorContainer : cs.onPrimaryContainer;
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
       child: Container(
         key: ValueKey(message),
         color: bg,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
             Icon(
-              isError ? Icons.error_outline : Icons.info_outline,
-              size: 14,
+              isError ? Icons.error_outline_rounded : Icons.info_outline_rounded,
+              size: 16,
               color: fg,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(
-                  fontSize: 12,
+                style: textTheme.bodySmall?.copyWith(
                   color: fg,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
             GestureDetector(
               onTap: onDismiss,
-              child: Icon(Icons.close, size: 14, color: fg),
+              child: Icon(Icons.close_rounded, size: 16, color: fg),
             ),
           ],
         ),
@@ -1351,63 +1435,58 @@ class _StatsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: cs.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         children: [
-          _Chip(
-            icon: Icons.folder_outlined,
-            label: '$dirCount folder${dirCount != 1 ? 's' : ''}',
-          ),
-          const SizedBox(width: 14),
-          _Chip(
-            icon: Icons.insert_drive_file_outlined,
-            label: '$fileCount file${fileCount != 1 ? 's' : ''}',
-          ),
+          _buildStatItem(context, Icons.folder_rounded, '$dirCount folders'),
+          const SizedBox(width: 12),
+          _buildStatItem(context, Icons.description_rounded, '$fileCount files'),
+          const Spacer(),
           if (isFiltered) ...[
-            const SizedBox(width: 8),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
                 'filtered',
-                style: TextStyle(
-                    fontSize: 9,
-                    color: cs.primary,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.4),
+                style: textTheme.labelSmall?.copyWith(
+                  color: cs.onPrimaryContainer,
+                  fontSize: 8,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
+            const SizedBox(width: 12),
           ],
-          const Spacer(),
-          _Chip(
-            icon: Icons.storage_outlined,
-            label: '${formatBytes(freeSpaceBytes)} free',
-          ),
+          _buildStatItem(context, Icons.storage_rounded, '${formatBytes(freeSpaceBytes)} free'),
         ],
       ),
     );
   }
-}
 
-class _Chip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _Chip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildStatItem(BuildContext context, IconData icon, String text) {
     final cs = Theme.of(context).colorScheme;
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 13, color: cs.outline),
-      const SizedBox(width: 4),
-      Text(label, style: Theme.of(context).textTheme.bodySmall),
-    ]);
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: cs.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Text(
+          text, 
+          style: textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -1421,27 +1500,40 @@ class _EmptyPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.folder_open_outlined, size: 48, color: cs.outline),
-          const SizedBox(height: 16),
-          Text('Empty Folder',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          Text('Tap + to create files or import from device.',
-              style: TextStyle(color: cs.outline, fontSize: 12),
-              textAlign: TextAlign.center),
-          if (!atRoot) ...[
-            const SizedBox(height: 20),
-            TextButton.icon(
-              onPressed: onBack,
-              icon: const Icon(Icons.arrow_upward, size: 16),
-              label: const Text('Go back'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min, 
+          children: [
+            Icon(Icons.folder_open_rounded, size: 48, color: cs.outline),
+            const SizedBox(height: 16),
+            Text(
+              'Empty Folder',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap + to create files or import from device.',
+              style: textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (!atRoot) ...[
+              const SizedBox(height: 20),
+              TextButton.icon(
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_upward_rounded, size: 16),
+                label: const Text('Go back'),
+              ),
+            ],
           ],
-        ]),
+        ),
       ),
     );
   }
@@ -1454,17 +1546,26 @@ class _SearchEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.search_off_outlined, size: 48, color: cs.outline),
+          Icon(Icons.search_off_rounded, size: 48, color: cs.outline),
           const SizedBox(height: 16),
-          Text('No results', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
+          Text(
+            'No results', 
+            style: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
           Text(
             'Nothing in this folder matches "$query".',
-            style: TextStyle(color: cs.outline, fontSize: 12),
+            style: textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
             textAlign: TextAlign.center,
           ),
         ]),

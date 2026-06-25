@@ -15,6 +15,7 @@ class FileListView extends StatelessWidget {
   final ValueChanged<String> onItemLongPress;
 
   /// Called when the trailing "⋯" icon on a file tile is tapped.
+  /// (Retained for call-site compatibility; no longer rendered on FileTile)
   final ValueChanged<String>? onFileLongMenu;
 
   const FileListView({
@@ -32,7 +33,10 @@ class FileListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = dirs.length + files.length;
+    
     return ListView.builder(
+      // Standard Material 3 padding for scrolling list viewports [1]
+      padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: total,
       itemBuilder: (_, index) {
         final isDir = index < dirs.length;
@@ -64,9 +68,6 @@ class FileListView extends StatelessWidget {
           selected: isSelected,
           onTap: () => onFileTap(rawItem),
           onLongPress: () => onItemLongPress(rawItem),
-          onMoreTap: isSelectionMode
-              ? null
-              : () => onFileLongMenu?.call(rawItem),
         );
       },
     );

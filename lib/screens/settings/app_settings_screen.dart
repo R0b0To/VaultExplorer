@@ -99,6 +99,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -108,15 +109,20 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             TextButton(
               onPressed: _saving ? null : _save,
               child: _saving
-                  ? SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary))
-                  : Text('Save', style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700)),
+                  ? SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.primary),
+                    )
+                  : Text(
+                      'Save', 
+                      style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold),
+                    ),
             ),
           const SizedBox(width: 8),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+          ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -127,7 +133,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 _Card(cs: cs, children: [
 
                   _ToggleRow(
-                    icon: Icons.lock_person_outlined,
+                    icon: Icons.lock_person_rounded,
                     title: 'Master Password',
                     subtitle: _settings.useMasterPassword && _settings.masterPasswordHash != null
                         ? 'Active — tap toggle to remove'
@@ -146,20 +152,20 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       decoration: InputDecoration(
                         labelText: _settings.masterPasswordHash != null
                             ? 'New password' : 'Master password',
-                        prefixIcon: const Icon(Icons.password, size: 18),
+                        prefixIcon: const Icon(Icons.password_rounded, size: 18),
                         suffixIcon: IconButton(
                           icon: Icon(_obscurePw ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
                           onPressed: () => setState(() => _obscurePw = !_obscurePw),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _pwConfirmCtrl,
                       obscureText: _obscureConfirm,
                       decoration: InputDecoration(
                         labelText: 'Confirm password',
-                        prefixIcon: const Icon(Icons.password, size: 18),
+                        prefixIcon: const Icon(Icons.password_rounded, size: 18),
                         suffixIcon: IconButton(
                           icon: Icon(_obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
                           onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
@@ -167,21 +173,26 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       ),
                     ),
                     if (_pwError != null) ...[
-                      const SizedBox(height: 8),
-                      Text(_pwError!, style: TextStyle(color: cs.error, fontSize: 12)),
+                      const SizedBox(height: 10),
+                      Text(
+                        _pwError!, 
+                        style: textTheme.bodySmall?.copyWith(color: cs.error),
+                      ),
                     ],
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     Row(children: [
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () => setState(() {
                             _showPwFields = false;
                             _pwCtrl.clear(); _pwConfirmCtrl.clear(); _pwError = null;
-                            // If no hash yet, toggle off entirely
                             if (_settings.masterPasswordHash == null) {
                               _settings.useMasterPassword = false;
                             }
                           }),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 40),
+                          ),
                           child: const Text('Cancel'),
                         ),
                       ),
@@ -189,13 +200,16 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       Expanded(
                         child: FilledButton(
                           onPressed: _confirmPassword,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 40),
+                          ),
                           child: Text(_settings.masterPasswordHash != null ? 'Update' : 'Set Password'),
                         ),
                       ),
                     ]),
                   ],
 
-                  // Change / biometric options (only when PW is set and not in edit mode)
+                  // Change / biometric options
                   if (_settings.useMasterPassword &&
                       _settings.masterPasswordHash != null &&
                       !_showPwFields) ...[
@@ -203,7 +217,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
                     if (_biometricAvailable)
                       _ToggleRow(
-                        icon: Icons.fingerprint,
+                        icon: Icons.fingerprint_rounded,
                         title: 'Biometric Unlock',
                         subtitle: 'Use fingerprint or face instead of typing',
                         value: _settings.masterPasswordIsFingerprint,
@@ -212,15 +226,17 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       ),
                     if (!_biometricAvailable)
                       Padding(
-                        padding: const EdgeInsets.only(left: 30, top: 4),
-                        child: Text('Biometric not available on this device',
-                            style: TextStyle(fontSize: 11, color: cs.outline)),
+                        padding: const EdgeInsets.only(left: 32, top: 4),
+                        child: Text(
+                          'Biometric not available on this device',
+                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
                       ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     TextButton.icon(
                       onPressed: () => setState(() { _showPwFields = true; _pwError = null; }),
-                      icon: const Icon(Icons.edit, size: 16),
+                      icon: const Icon(Icons.edit_rounded, size: 16),
                       label: const Text('Change password'),
                     ),
                   ],
@@ -233,7 +249,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 const SizedBox(height: 8),
                 _Card(cs: cs, children: [
                   _ToggleRow(
-                    icon: Icons.folder_shared_outlined,
+                    icon: Icons.folder_shared_rounded,
                     title: 'Document Provider (default)',
                     subtitle: 'New containers will be exposed in Android\'s '
                         'file picker by default. Each container can override this.',
@@ -271,24 +287,46 @@ class _SectionLabel extends StatelessWidget {
   final String label;
   final ColorScheme cs;
   const _SectionLabel(this.label, this.cs);
+
   @override
-  Widget build(BuildContext context) => Text(label,
-      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-          letterSpacing: 1.4, color: cs.outline));
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 4),
+      child: Text(
+        label,
+        style: textTheme.labelSmall?.copyWith(
+          color: cs.primary,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.4,
+        ),
+      ),
+    );
+  }
 }
 
 class _Card extends StatelessWidget {
   final List<Widget> children;
   final ColorScheme cs;
   const _Card({required this.children, required this.cs});
+
   @override
-  Widget build(BuildContext context) => Container(
-      decoration: BoxDecoration(
-        color: cs.surface, borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cs.outline),
+  Widget build(BuildContext context) {
+    return Card(
+      color: cs.surfaceContainerLow,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children));
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch, 
+          children: children,
+        ),
+      ),
+    );
+  }
 }
 
 class _ToggleRow extends StatelessWidget {
@@ -298,23 +336,55 @@ class _ToggleRow extends StatelessWidget {
   final bool value;
   final ColorScheme cs;
   final ValueChanged<bool> onChanged;
-  const _ToggleRow({required this.icon, required this.title,
-      required this.subtitle, required this.value, required this.cs,
-      required this.onChanged});
+
+  const _ToggleRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.cs,
+    required this.onChanged,
+  });
+
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(padding: const EdgeInsets.only(top: 2),
-            child: Icon(icon, size: 18, color: cs.onSurfaceVariant)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 2),
-          Text(subtitle, style: TextStyle(fontSize: 11, color: cs.outline, height: 1.4)),
-        ])),
-        Switch(value: value, onChanged: onChanged, activeColor: cs.primary),
-      ]));
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start, 
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon, size: 20, color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, 
+              children: [
+                Text(
+                  title, 
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle, 
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant, 
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
 }
 
 class _InfoRow extends StatelessWidget {
@@ -322,12 +392,29 @@ class _InfoRow extends StatelessWidget {
   final String value;
   final ColorScheme cs;
   const _InfoRow(this.label, this.value, this.cs);
+
   @override
-  Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(children: [
-        Text(label, style: TextStyle(fontSize: 12, color: cs.outline)),
-        const Spacer(),
-        Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-      ]));
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Text(
+            label, 
+            style: textTheme.bodyMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            value, 
+            style: textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

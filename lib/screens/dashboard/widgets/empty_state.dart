@@ -7,39 +7,52 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: cs.outline, width: 1),
-              color: cs.surface,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Soft rounded M3 container for the key empty state illustration
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: cs.surfaceContainer,
+                border: Border.all(color: cs.outlineVariant),
+              ),
+              child: Icon(Icons.lock_outline_rounded, size: 30, color: cs.primary),
             ),
-            child: Icon(Icons.lock_outline, size: 32, color: cs.primary),
-          ),
-          const SizedBox(height: 20),
-          Text('No containers',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 6),
-          Text(
-            'Mount a VeraCrypt container to get started',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 28),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.folder_open, size: 16),
-            label: const Text('Mount Container'),
-            style: FilledButton.styleFrom(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            const SizedBox(height: 24),
+            Text(
+              'No containers',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              'Mount a VeraCrypt container to get started',
+              style: textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 28),
+            FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.folder_open_rounded, size: 18),
+              label: const Text('Mount Container'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 48), // Overrides global full-width setting to keep the layout compact
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

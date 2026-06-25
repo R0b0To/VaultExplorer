@@ -22,33 +22,39 @@ class DirectoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
-    return Material(
-      color: selected
-          ? cs.primaryContainer.withOpacity(0.35)
-          : Colors.transparent,
-      child: ListTile(
-        dense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        leading: const Icon(
-          Icons.folder_outlined,
-          size: 20,
-          color: Color(0xFFFFA726),
-        ),
-        title: Text(name, style: Theme.of(context).textTheme.bodyMedium),
-        trailing: selectionMode
-            ? Icon(
-                selected
-                    ? Icons.check_circle
-                    : Icons.radio_button_unchecked,
-                size: 18,
-                color: selected ? cs.primary : cs.outline,
-              )
-            : Icon(Icons.chevron_right, size: 16, color: cs.outline),
-        onTap: onTap,
-        onLongPress: onLongPress,
+    return ListTile(
+      dense: true,
+      selected: selected,
+      selectedTileColor: cs.primaryContainer.withOpacity(0.3),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Icon(
+        Icons.folder_rounded,
+        size: 22,
+        color: selected ? cs.primary : cs.secondary,
       ),
+      title: Text(
+        name, 
+        style: textTheme.bodyMedium?.copyWith(
+          fontWeight: selected ? FontWeight.w500 : FontWeight.normal,
+        ),
+      ),
+      trailing: selectionMode
+          ? Icon(
+              selected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: 20,
+              color: selected ? cs.primary : cs.outline,
+            )
+          : Icon(
+              Icons.chevron_right_rounded, 
+              size: 20, 
+              color: cs.onSurfaceVariant.withOpacity(0.7),
+            ),
+      onTap: onTap,
+      onLongPress: onLongPress,
     );
   }
 }

@@ -225,7 +225,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
     _prefetchedImages[fileName] = bytes;
     if (_prefetchedImages.length > 5) {
-      _prefetchedImages.remove(_prefetchedImages.keys.first); // Evict oldest
+      _prefetchedImages.remove(_prefetchedImages.keys.first);
     }
   }
 
@@ -567,13 +567,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 onAutoAdvanceChanged: _toggleAutoAdvance,
                 onSkipSecondsChanged: (val) => setState(() => _doubleTapSkipSeconds = val),
                 onMediaEnd: _onMediaEnd,
+                onNext: _navigateToNext, 
+                onPrev: _navigateToPrev,
                 isMuted: _isMuted,
                 isLooping: _isLooping,
                 playbackSpeed: _playbackSpeed,
                 subtitlesEnabled: _subtitlesEnabled,
                 imageFit: _imageFit,
                 onSubtitlesAvailableChanged: (val) => setState(() => _subtitlesAvailable = val),
-                onZoomChanged: (allowSwipe) {}, onNext: () {  }, onPrev: () {  }, 
+                onZoomChanged: (allowSwipe) {}, 
               ); 
             },
           ),
@@ -1132,6 +1134,8 @@ class _MediaPageState extends State<_MediaPage> {
               onAutoAdvanceChanged: widget.onAutoAdvanceChanged,
               onSkipSecondsChanged: widget.onSkipSecondsChanged,
               onMediaEnd: widget.onMediaEnd,
+              onNext: widget.onNext, 
+              onPrev: widget.onPrev, 
               isMuted: widget.isMuted,
               isLooping: widget.isLooping,
               playbackSpeed: widget.playbackSpeed,
@@ -1335,6 +1339,8 @@ class MediaPlayerWidget extends StatefulWidget {
   final ValueChanged<bool> onAutoAdvanceChanged;
   final ValueChanged<int> onSkipSecondsChanged;
   final VoidCallback onMediaEnd;
+  final VoidCallback onNext;
+  final VoidCallback onPrev;
   final bool isMuted;
   final bool isLooping;
   final double playbackSpeed;
@@ -1357,6 +1363,8 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.onAutoAdvanceChanged,
     required this.onSkipSecondsChanged,
     required this.onMediaEnd,
+    required this.onNext,
+    required this.onPrev,
     required this.isMuted,
     required this.isLooping,
     required this.playbackSpeed,

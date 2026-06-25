@@ -245,17 +245,19 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
                 const SizedBox(height: 24),
 
-                // ── Media ──────────────────────────────────────────────────
-                _SectionLabel('MEDIA', cs),
+                // ── Advanced ───────────────────────────────────────────────
+                _SectionLabel('ADVANCED', cs),
                 const SizedBox(height: 8),
                 _Card(cs: cs, children: [
                   _ToggleRow(
-                    icon: Icons.play_circle_outline,
-                    title: 'Auto-play videos',
-                    subtitle: 'Start playing automatically when opening a video',
-                    value: _settings.videoAutoPlay,
+                    icon: Icons.shield_outlined,
+                    title: 'Root mount (FUSE)',
+                    subtitle: 'Mount containers as native filesystem via root '
+                        'access. Best performance — requires a rooted device '
+                        'with veracrypt CLI installed.',
+                    value: _settings.useRootMount,
                     cs: cs,
-                    onChanged: (v) => setState(() => _settings.videoAutoPlay = v),
+                    onChanged: (v) => setState(() => _settings.useRootMount = v),
                   ),
                 ]),
 

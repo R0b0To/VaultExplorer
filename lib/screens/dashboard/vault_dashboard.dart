@@ -28,8 +28,8 @@ class _VaultDashboardState extends State<VaultDashboard>
   Map<String, ContainerConfig> _configs = {};
   AppSettings _appSettings = AppSettings();
   bool _actionInFlight = false;
+  bool _rootAvailable = false;
 
-  /// Per-container auto-close timers.
   final Map<int, Timer> _autoCloseTimers = {};
 
   @override
@@ -39,14 +39,13 @@ class _VaultDashboardState extends State<VaultDashboard>
     _loadSaved();
     _loadConfigs();
     _loadAppSettings();
+    _checkRoot();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    for (final t in _autoCloseTimers.values) {
-      t.cancel();
-    }
+    for (final t in _autoCloseTimers.values) t.cancel();
     super.dispose();
   }
 
@@ -74,25 +73,24 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (mounted) setState(() => _appSettings = s);
   }
 
+  Future<void> _checkRoot() async {
+    try {
+      final ok = await vaultExplorerApi.checkRootAvailable();
+      if (mounted) setState(() => _rootAvailable = ok);
+    } catch (_) {}
+  }
+
   // ── Auto-close ──────────────────────────────────────────────────────────
 
   void _scheduleAutoClose(MountedContainer container) {
     final cfg = _configs[container.uri];
     final mins = cfg?.autoCloseMins ?? 0;
     if (mins <= 0) return;
-
     _autoCloseTimers[container.volId]?.cancel();
-    _autoCloseTimers[container.volId] =
-        Timer(Duration(minutes: mins), () async {
+    _autoCloseTimers[container.volId] = Timer(Duration(minutes: mins), () async {
       if (!mounted) return;
       await vaultExplorerApi.lockContainer(container.uri);
       _onContainerLocked(container.volId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              '"${container.displayName}" auto-locked after $mins min'),
-        ));
-      }
     });
   }
 
@@ -106,8 +104,6 @@ class _VaultDashboardState extends State<VaultDashboard>
   void _onContainerMounted(MountedContainer container) {
     setState(() => _mounted.add(container));
     _scheduleAutoClose(container);
-    // Create a default config for newly seen containers so the doc provider
-    // preference from AppSettings is applied immediately.
     if (!_configs.containsKey(container.uri)) {
       final defaultCfg = ContainerConfig(
         uri: container.uri,
@@ -132,20 +128,18 @@ class _VaultDashboardState extends State<VaultDashboard>
       final space = await vaultExplorerApi.getSpaceInfo(container);
       if (space != null && space.length > 1 && mounted) {
         setState(() {
-          _mounted[idx] =
-              container.copyWith(totalSpace: space[0], freeSpace: space[1]);
+          _mounted[idx] = container.copyWith(totalSpace: space[0], freeSpace: space[1]);
         });
       }
     } catch (_) {}
   }
 
-  // ── Sheet helpers ───────────────────────────────────────────────────────
+  // ── Unlock ──────────────────────────────────────────────────────────────
 
   Future<void> _showUnlockSheet({String? uri, String? name}) async {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
 
-    // Pre-fill password using the deobfuscated value from config.
     String? rememberedPassword;
     if (uri != null) {
       final cfg = _configs[uri];
@@ -153,6 +147,10 @@ class _VaultDashboardState extends State<VaultDashboard>
         rememberedPassword = await cfg.getPassword();
       }
     }
+
+    final cfg = uri != null ? _configs[uri] : null;
+    final docProvider = cfg?.documentProvider ?? _appSettings.defaultDocumentProvider;
+    final useRoot = _appSettings.useRootMount && _rootAvailable;
 
     try {
       await showModalBottomSheet(
@@ -164,6 +162,8 @@ class _VaultDashboardState extends State<VaultDashboard>
           initialUri: uri,
           initialName: name,
           prefillPassword: rememberedPassword,
+          documentProvider: docProvider,
+          useRoot: useRoot,
         ),
       );
       _loadSaved();
@@ -183,12 +183,9 @@ class _VaultDashboardState extends State<VaultDashboard>
     ).whenComplete(() => setState(() => _actionInFlight = false));
   }
 
-  // ── Container long-press config ─────────────────────────────────────────
+  // ── Long-press config sheet ─────────────────────────────────────────────
 
-  void _showContainerConfig({
-    required String uri,
-    required String currentLabel,
-  }) {
+  void _showContainerConfig({required String uri, required String currentLabel}) {
     HapticFeedback.mediumImpact();
     final existing = _configs[uri];
     showModalBottomSheet(
@@ -201,15 +198,44 @@ class _VaultDashboardState extends State<VaultDashboard>
         existingConfig: existing,
         onSaved: (cfg) {
           setState(() => _configs[uri] = cfg);
-          // Update display name in saved list
           SavedContainerService.saveContainer(uri, cfg.label);
           _loadSaved();
-          // Re-arm auto-close timer if container is currently mounted
           final idx = _mounted.indexWhere((m) => m.uri == uri);
           if (idx != -1) _scheduleAutoClose(_mounted[idx]);
         },
+        onForget: _mounted.any((m) => m.uri == uri)
+            ? null // can't remove a currently-mounted container
+            : () => _forgetContainer(uri, currentLabel),
       ),
     );
+  }
+
+  // ── Forget container (with confirm) ────────────────────────────────────
+
+  Future<void> _forgetContainer(String uri, String name) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Remove container?', style: TextStyle(fontSize: 16)),
+        content: Text('Remove "$name" from the dashboard? '
+            'The container file is not deleted.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text('Remove',
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.error))),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await SavedContainerService.removeContainer(uri);
+    await AppSettingsService.removeContainerConfig(uri);
+    setState(() => _configs.remove(uri));
+    _loadSaved();
   }
 
   // ── Build ───────────────────────────────────────────────────────────────
@@ -222,32 +248,42 @@ class _VaultDashboardState extends State<VaultDashboard>
     final displayItems = <dynamic>[];
     displayItems.addAll(_mounted);
     for (final s in _saved) {
-      if (!_mounted.any((m) => m.uri == s['uri'])) {
-        displayItems.add(s);
-      }
+      if (!_mounted.any((m) => m.uri == s['uri'])) displayItems.add(s);
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Icon(Icons.lock_outline, size: 16, color: cs.primary),
+        title: Row(children: [
+          Icon(Icons.lock_outline, size: 16, color: cs.primary),
+          const SizedBox(width: 8),
+          const Text('vaultexplorer'),
+          if (_appSettings.useRootMount && _rootAvailable) ...[
             const SizedBox(width: 8),
-            const Text('vaultexplorer'),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.shield_outlined, size: 10, color: cs.primary),
+                const SizedBox(width: 3),
+                Text('root', style: TextStyle(fontSize: 9, color: cs.primary, fontWeight: FontWeight.w700)),
+              ]),
+            ),
           ],
-        ),
+        ]),
         actions: [
-          // Settings
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'App Settings',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => const AppSettingsScreen()),
-            ),
+            onPressed: () async {
+              await Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const AppSettingsScreen()));
+              // Reload settings after returning — user may have changed root/doc provider defaults.
+              _loadAppSettings();
+            },
           ),
-          // Add container
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: PopupMenuButton<String>(
@@ -269,8 +305,7 @@ class _VaultDashboardState extends State<VaultDashboard>
                 PopupMenuItem(
                   value: 'create',
                   child: Row(children: [
-                    Icon(Icons.add_box_outlined,
-                        size: 18, color: cs.primary),
+                    Icon(Icons.add_box_outlined, size: 18, color: cs.primary),
                     const SizedBox(width: 12),
                     const Text('Create container'),
                   ]),
@@ -282,33 +317,26 @@ class _VaultDashboardState extends State<VaultDashboard>
       ),
       body: Column(
         children: [
-          // ── Clipboard status strip ────────────────────────────────────
-          // Tells the user items are pending. Paste happens inside the browser.
           if (clipboard.hasItems)
             _ClipboardStatusStrip(
               clipboard: clipboard,
               onClear: () => setState(() => clipboard.clear()),
             ),
-
-          // ── Main list ─────────────────────────────────────────────────
           Expanded(
             child: displayItems.isEmpty
                 ? EmptyState(onAdd: () => _showUnlockSheet())
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: displayItems.length,
-                    separatorBuilder: (_, __) =>
-                        const SizedBox(height: 10),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (_, i) {
                       final item = displayItems[i];
 
                       if (item is MountedContainer) {
-                        final cfg = _configs[item.uri];
                         return ContainerCard(
                           container: item,
                           onLocked: _onContainerLocked,
-                          onReturn: () =>
-                              _refreshContainerSpace(item.volId),
+                          onReturn: () => _refreshContainerSpace(item.volId),
                           onLongPress: () => _showContainerConfig(
                             uri: item.uri,
                             currentLabel: item.displayName,
@@ -318,24 +346,16 @@ class _VaultDashboardState extends State<VaultDashboard>
                         final uri = item['uri'] as String;
                         final name = item['name'] as String;
                         final cfg = _configs[uri];
+                        final label = cfg?.label.isNotEmpty == true ? cfg!.label : name;
                         return SavedContainerCard(
-                          name: cfg?.label.isNotEmpty == true
-                              ? cfg!.label
-                              : name,
+                          name: label,
                           uri: uri,
-                          onUnlock: () =>
-                              _showUnlockSheet(uri: uri, name: name),
-                          onForget: () async {
-                            await SavedContainerService.removeContainer(uri);
-                            await AppSettingsService.removeContainerConfig(uri);
-                            setState(() => _configs.remove(uri));
-                            _loadSaved();
-                          },
+                          onUnlock: () => _showUnlockSheet(uri: uri, name: name),
                           onLongPress: () => _showContainerConfig(
                             uri: uri,
-                            currentLabel:
-                                cfg?.label.isNotEmpty == true ? cfg!.label : name,
+                            currentLabel: label,
                           ),
+                          onForget: () => _forgetContainer(uri, label),
                         );
                       }
                     },
@@ -347,19 +367,12 @@ class _VaultDashboardState extends State<VaultDashboard>
   }
 }
 
-// ── Clipboard status strip ─────────────────────────────────────────────────────
-//
-// Shown on the dashboard while items are pending paste. The user opens the
-// target container — the ClipboardAppBar inside the browser will offer "Paste".
+// ── Clipboard status strip ────────────────────────────────────────────────────
 
 class _ClipboardStatusStrip extends StatelessWidget {
   final CrossContainerClipboard clipboard;
   final VoidCallback onClear;
-
-  const _ClipboardStatusStrip({
-    required this.clipboard,
-    required this.onClear,
-  });
+  const _ClipboardStatusStrip({required this.clipboard, required this.onClear});
 
   @override
   Widget build(BuildContext context) {
@@ -367,44 +380,33 @@ class _ClipboardStatusStrip extends StatelessWidget {
     return Container(
       color: cs.primaryContainer,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          Icon(
-            clipboard.isCutOperation ? Icons.cut : Icons.copy,
-            size: 15,
-            color: cs.primary,
+      child: Row(children: [
+        Icon(clipboard.isCutOperation ? Icons.cut : Icons.copy,
+            size: 15, color: cs.primary),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(clipboard.summary,
+                  style: TextStyle(fontSize: 12, color: cs.primary,
+                      fontWeight: FontWeight.w500)),
+              Text('Open a container and tap "Paste Here"',
+                  style: TextStyle(fontSize: 10, color: cs.primary.withOpacity(0.7))),
+            ],
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  clipboard.summary,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: cs.primary,
-                      fontWeight: FontWeight.w500),
-                ),
-                Text(
-                  'Open a container and tap "Paste Here"',
-                  style: TextStyle(fontSize: 10, color: cs.primary.withOpacity(0.7)),
-                ),
-              ],
-            ),
-          ),
-          TextButton(
-            onPressed: onClear,
-            style: TextButton.styleFrom(
-                foregroundColor: cs.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-            child: const Text('Cancel', style: TextStyle(fontSize: 12)),
-          ),
-        ],
-      ),
+        ),
+        TextButton(
+          onPressed: onClear,
+          style: TextButton.styleFrom(
+              foregroundColor: cs.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+          child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+        ),
+      ]),
     );
   }
 }

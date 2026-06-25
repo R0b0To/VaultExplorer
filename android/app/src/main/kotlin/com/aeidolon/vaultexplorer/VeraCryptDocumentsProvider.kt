@@ -58,7 +58,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         }
 
         val cursor = MatrixCursor(projection ?: defaultRootProjection)
-        for ((volId, session) in VeraCryptSession.activeSessions) {
+        for ((volId, session) in VeraCryptSession.activeSessions.filter { it.value.documentProvider }) {
             val rootTitle = session.displayName ?: getFileNameFromUri(session.uri)
             val (totalBytes, freeBytes) = getRealSpace(session)
             val rootSummary = if (totalBytes > 0)

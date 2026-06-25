@@ -6,6 +6,8 @@ class ContainerConfigSheet extends StatefulWidget {
   final String currentLabel;
   final ContainerConfig? existingConfig;
   final void Function(ContainerConfig config) onSaved;
+  /// Called when the user taps "Remove from dashboard" inside this sheet.
+  final VoidCallback? onForget;
 
   const ContainerConfigSheet({
     Key? key,
@@ -13,6 +15,7 @@ class ContainerConfigSheet extends StatefulWidget {
     required this.currentLabel,
     this.existingConfig,
     required this.onSaved,
+    this.onForget,
   }) : super(key: key);
 
   @override
@@ -210,6 +213,24 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                   onChanged: (v) => setState(() => _documentProvider = v),
                 ),
                 const SizedBox(height: 24),
+
+                // ── Remove from dashboard ─────────────────────────────────
+                if (widget.onForget != null) ...[
+                  const SizedBox(height: 4),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      widget.onForget!();
+                    },
+                    icon: Icon(Icons.delete_outline,
+                        size: 16, color: Theme.of(context).colorScheme.error),
+                    label: Text('Remove from dashboard',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 13)),
+                  ),
+                  const SizedBox(height: 8),
+                ],
 
                 // ── Save ───────────────────────────────────────────────────
                 FilledButton(

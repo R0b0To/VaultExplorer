@@ -7,7 +7,8 @@ import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import androidx.annotation.NonNull
 import androidx.documentfile.provider.DocumentFile
-import io.flutter.embedding.android.FlutterActivity
+// ── biometric fix: must be FlutterFragmentActivity ───────────────────────────
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -15,16 +16,20 @@ import android.content.ClipboardManager
 import android.content.ClipData
 import android.content.Context
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import java.io.RandomAccessFile
+import java.nio.channels.FileChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "com.aeidolon.vaultexplorer/engine"
-    private val PICK_CONTAINER_REQUEST = 1001
-    private val IMPORT_FILE_REQUEST = 1002
-    private val EXPORT_FILE_REQUEST = 1003
+    private val PICK_CONTAINER_REQUEST   = 1001
+    private val IMPORT_FILE_REQUEST      = 1002
+    private val EXPORT_FILE_REQUEST      = 1003
     private val CREATE_CONTAINER_REQUEST = 1004
-    private val EXPORT_FILES_TREE_REQUEST = 1006
+    private val EXPORT_FILES_TREE_REQUEST  = 1006
     private val IMPORT_FOLDER_TREE_REQUEST = 1007
-    
+
     private var pendingFlutterResult: MethodChannel.Result? = null
 
     private var pendingImportContainerUri: String? = null
@@ -49,11 +54,13 @@ class MainActivity : FlutterActivity() {
     private var pendingExportMultiItems: List<Map<String, Any?>>? = null
     private var pendingExportMultiVolId: Int = 0
 
+    // ── Root mount state ──────────────────────────────────────────────────────
+    // Maps volId → path of the FUSE/loop mount point when root mode is active.
+    private val rootMountPoints = mutableMapOf<Int, String>()
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            sanitizeClipboard()
-        }
+        if (hasFocus) sanitizeClipboard()
     }
 
     private fun sanitizeClipboard() {
@@ -64,23 +71,53 @@ class MainActivity : FlutterActivity() {
                 if (description != null) {
                     var isCorrupt = false
                     for (i in 0 until description.mimeTypeCount) {
-                        if (description.getMimeType(i) == null) {
-                            isCorrupt = true
-                            break
-                        }
+                        if (description.getMimeType(i) == null) { isCorrupt = true; break }
                     }
                     if (isCorrupt) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P)
                             clipboard.clearPrimaryClip()
-                        } else {
+                        else {
                             @Suppress("DEPRECATION")
                             clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
                         }
                     }
                 }
             }
-        } catch (e: Exception) {
-            // Fallback to prevent crashes from clipboard security or permission checks
+        } catch (_: Exception) {}
+    }
+
+    // ── Root helpers ──────────────────────────────────────────────────────────
+
+    private fun hasRoot(): Boolean {
+        return try {
+            val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+            val out = p.inputStream.bufferedReader().readText()
+            p.waitFor()
+            out.contains("uid=0")
+        } catch (_: Exception) { false }
+    }
+
+    private fun runRoot(cmd: String): Pair<Boolean, String> {
+        return try {
+            val p = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
+            val out = p.inputStream.bufferedReader().readText()
+            val err = p.errorStream.bufferedReader().readText()
+            val code = p.waitFor()
+            Pair(code == 0, out + err)
+        } catch (e: Exception) { Pair(false, e.message ?: "") }
+    }
+
+    // ── Document-provider notification helper ─────────────────────────────────
+    // Only notifies the system roots when the container is configured to be
+    // exposed as a document provider.
+
+    private fun notifyRootsIfEnabled(uriString: String) {
+        val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: return
+        val session = VeraCryptSession.activeSessions[volId] ?: return
+        if (session.documentProvider) {
+            contentResolver.notifyChange(
+                DocumentsContract.buildRootsUri("com.aeidolon.vaultexplorer.documents"), null
+            )
         }
     }
 
@@ -90,6 +127,146 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+
+                    // ── Root capability check ─────────────────────────────
+                    "checkRootAvailable" -> {
+                        Thread { runOnUiThread { result.success(hasRoot()) } }.start()
+                    }
+
+                    // ── Root mount ────────────────────────────────────────
+                    // Mounts the VeraCrypt container as a FUSE filesystem via
+                    // veracrypt CLI (if installed) or via cryptsetup + loop.
+                    // Falls back to normal JNI mode if root commands fail.
+                    "mountRootContainer" -> {
+                        val uriString = call.argument<String>("filePath")
+                        val password  = call.argument<String>("password")
+                        val pim       = call.argument<Number>("pim")?.toInt() ?: 0
+                        val displayName = call.argument<String>("displayName") ?: "Container"
+                        val docProvider = call.argument<Boolean>("documentProvider") ?: false
+
+                        if (uriString == null || password == null) {
+                            result.error("INVALID_ARGS", "filePath and password required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        Thread {
+                            try {
+                                val uri = Uri.parse(uriString)
+                                // Resolve to a real filesystem path via /proc/self/fd
+                                val pfd = contentResolver.openFileDescriptor(uri, "rw")
+                                    ?: throw Exception("Could not open file descriptor")
+                                val fd = pfd.detachFd()
+                                val realPath = try {
+                                    java.io.File("/proc/self/fd/$fd").canonicalPath
+                                } catch (_: Exception) { null }
+
+                                if (realPath == null) {
+                                    // Can't get real path — fall back to JNI mode
+                                    android.os.ParcelFileDescriptor.adoptFd(fd).close()
+                                    runOnUiThread {
+                                        result.error("NO_REAL_PATH",
+                                            "Could not resolve real path for root mount", null)
+                                    }
+                                    return@Thread
+                                }
+                                android.os.ParcelFileDescriptor.adoptFd(fd).close()
+
+                                val mountPoint = "${cacheDir.absolutePath}/veramount_${System.currentTimeMillis()}"
+                                java.io.File(mountPoint).mkdirs()
+
+                                val pimArg = if (pim > 0) "--pim=$pim" else ""
+                                val mountCmd = "veracrypt --text --non-interactive " +
+                                    "--password='${password.replace("'", "'\\''")}' " +
+                                    "$pimArg '$realPath' '$mountPoint'"
+
+                                val (ok, output) = runRoot(mountCmd)
+                                if (!ok) {
+                                    java.io.File(mountPoint).delete()
+                                    runOnUiThread {
+                                        result.error("MOUNT_FAILED",
+                                            "Root mount failed: $output", null)
+                                    }
+                                    return@Thread
+                                }
+
+                                // Also run normal JNI unlock so the in-app browser works
+                                val pfd2 = contentResolver.openFileDescriptor(uri, "r")
+                                    ?: throw Exception("Could not re-open fd")
+                                val fd2 = pfd2.detachFd()
+
+                                val targetVolId = VeraCryptSession.getVolumeIdByUri(uriString)
+                                    ?: VeraCryptSession.getFreeVolumeId()
+                                if (targetVolId == null) {
+                                    runRoot("veracrypt --text --dismount '$mountPoint'")
+                                    runOnUiThread {
+                                        result.error("MAX_CONTAINERS", "Max containers mounted", null)
+                                    }
+                                    return@Thread
+                                }
+
+                                val files = synchronized(VeraCryptSession.locks[targetVolId]) {
+                                    VeraCryptEngine.unlockAndListNative(fd2, password, pim, targetVolId)
+                                }
+
+                                runOnUiThread {
+                                    if (files != null) {
+                                        VeraCryptSession.activeSessions[targetVolId] = ContainerSession(
+                                            uri = uriString,
+                                            volId = targetVolId,
+                                            cachedFilesList = files.toList(),
+                                            displayName = displayName,
+                                            documentProvider = docProvider,
+                                        )
+                                        rootMountPoints[targetVolId] = mountPoint
+                                        if (docProvider) {
+                                            contentResolver.notifyChange(
+                                                DocumentsContract.buildRootsUri(
+                                                    "com.aeidolon.vaultexplorer.documents"), null)
+                                        }
+                                        result.success(mapOf(
+                                            "volId" to targetVolId,
+                                            "files" to files.toList(),
+                                            "mountPoint" to mountPoint,
+                                        ))
+                                    } else {
+                                        runRoot("veracrypt --text --dismount '$mountPoint'")
+                                        java.io.File(mountPoint).delete()
+                                        result.error("AUTH_FAIL", "Incorrect password", null)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                runOnUiThread { result.error("ROOT_ERROR", e.message, null) }
+                            }
+                        }.start()
+                    }
+
+                    // ── Root unmount ──────────────────────────────────────
+                    "unmountRootContainer" -> {
+                        val uriString = call.argument<String>("filePath")
+                        if (uriString == null) { result.success(false); return@setMethodCallHandler }
+                        val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+                        if (volId != null) {
+                            val mp = rootMountPoints.remove(volId)
+                            Thread {
+                                if (mp != null) {
+                                    runRoot("veracrypt --text --dismount '$mp'")
+                                    java.io.File(mp).delete()
+                                }
+                                synchronized(VeraCryptSession.locks[volId]) {
+                                    VeraCryptEngine.lockNative(volId)
+                                }
+                                VeraCryptSession.removeSession(volId)
+                                runOnUiThread {
+                                    contentResolver.notifyChange(
+                                        DocumentsContract.buildRootsUri(
+                                            "com.aeidolon.vaultexplorer.documents"), null)
+                                    result.success(true)
+                                }
+                            }.start()
+                        } else {
+                            result.success(false)
+                        }
+                    }
 
                     "pickContainer" -> {
                         pendingResultCheck(result)
@@ -107,7 +284,6 @@ class MainActivity : FlutterActivity() {
                         pendingCreatePassword   = call.argument<String>("password")
                         pendingCreatePim        = call.argument<Number>("pim")?.toInt() ?: 0
                         pendingCreateFileSystem = call.argument<String>("fileSystem")
-
                         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                             addCategory(Intent.CATEGORY_OPENABLE)
                             type = "application/octet-stream"
@@ -121,17 +297,17 @@ class MainActivity : FlutterActivity() {
                         val password    = call.argument<String>("password")
                         val pim         = call.argument<Number>("pim")?.toInt() ?: 0
                         val displayName = call.argument<String>("displayName")
+                        val docProvider = call.argument<Boolean>("documentProvider") ?: false
 
                         if (uriString == null || password == null) {
-                            result.error("INVALID_ARGS", "filePath and password are required", null)
+                            result.error("INVALID_ARGS", "filePath and password required", null)
                             return@setMethodCallHandler
                         }
 
                         val targetVolId = VeraCryptSession.getVolumeIdByUri(uriString)
                             ?: VeraCryptSession.getFreeVolumeId()
                         if (targetVolId == null) {
-                            result.error("MAX_CONTAINERS",
-                                "Maximum 4 containers already mounted", null)
+                            result.error("MAX_CONTAINERS", "Maximum 4 containers already mounted", null)
                             return@setMethodCallHandler
                         }
 
@@ -149,14 +325,20 @@ class MainActivity : FlutterActivity() {
                                 runOnUiThread {
                                     if (files != null) {
                                         VeraCryptSession.activeSessions[targetVolId] = ContainerSession(
-                                            uri             = uriString,
-                                            volId           = targetVolId,
+                                            uri = uriString,
+                                            volId = targetVolId,
                                             cachedFilesList = files.toList(),
-                                            displayName     = displayName
+                                            displayName = displayName,
+                                            documentProvider = docProvider,
                                         )
-                                        val rootsUri = DocumentsContract.buildRootsUri(
-                                            "com.aeidolon.vaultexplorer.documents")
-                                        contentResolver.notifyChange(rootsUri, null)
+                                        // Only notify system file picker if this
+                                        // container is configured as a doc provider.
+                                        if (docProvider) {
+                                            contentResolver.notifyChange(
+                                                DocumentsContract.buildRootsUri(
+                                                    "com.aeidolon.vaultexplorer.documents"), null
+                                            )
+                                        }
                                         result.success(mapOf(
                                             "volId" to targetVolId,
                                             "files" to files.toList()
@@ -180,14 +362,23 @@ class MainActivity : FlutterActivity() {
                         }
                         val volId = VeraCryptSession.getVolumeIdByUri(uriString)
                         if (volId != null) {
-                            synchronized(VeraCryptSession.locks[volId]) {
-                                VeraCryptEngine.lockNative(volId)
-                            }
-                            VeraCryptSession.removeSession(volId)
-                            val rootsUri = DocumentsContract.buildRootsUri(
-                                "com.aeidolon.vaultexplorer.documents")
-                            contentResolver.notifyChange(rootsUri, null)
-                            result.success(true)
+                            val mp = rootMountPoints.remove(volId)
+                            Thread {
+                                if (mp != null) {
+                                    runRoot("veracrypt --text --dismount '$mp'")
+                                    java.io.File(mp).delete()
+                                }
+                                synchronized(VeraCryptSession.locks[volId]) {
+                                    VeraCryptEngine.lockNative(volId)
+                                }
+                                VeraCryptSession.removeSession(volId)
+                                runOnUiThread {
+                                    contentResolver.notifyChange(
+                                        DocumentsContract.buildRootsUri(
+                                            "com.aeidolon.vaultexplorer.documents"), null)
+                                    result.success(true)
+                                }
+                            }.start()
                         } else {
                             result.success(false)
                         }
@@ -198,12 +389,22 @@ class MainActivity : FlutterActivity() {
                         val fileName  = call.argument<String>("fileName")
                         val destPath  = call.argument<String>("destPath")
                         if (uriString == null || fileName == null || destPath == null) {
-                            result.error("INVALID_ARGS", "All arguments are required", null)
+                            result.error("INVALID_ARGS", "All arguments required", null)
                             return@setMethodCallHandler
                         }
                         Thread {
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                                // Root mode: copy directly from mount point
+                                val mp = rootMountPoints[volId]
+                                if (mp != null) {
+                                    val src = java.io.File("$mp/$fileName")
+                                    val dst = java.io.File(destPath)
+                                    val ok = try { src.copyTo(dst, overwrite = true); true }
+                                             catch (_: Exception) { false }
+                                    runOnUiThread { result.success(ok) }
+                                    return@Thread
+                                }
                                 val pfd = contentResolver.openFileDescriptor(Uri.parse(uriString), "r")
                                     ?: throw Exception("Could not open fd")
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
@@ -227,11 +428,16 @@ class MainActivity : FlutterActivity() {
                         Thread {
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                                val mp = rootMountPoints[volId]
+                                if (mp != null) {
+                                    val size = java.io.File("$mp/$fileName").length()
+                                    runOnUiThread { result.success(size) }
+                                    return@Thread
+                                }
                                 val pfd = contentResolver.openFileDescriptor(Uri.parse(uriString), "r")
                                     ?: throw Exception("Could not open fd")
                                 val size = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.getFileSizeNative(
-                                        pfd.detachFd(), "", 0, fileName, volId)
+                                    VeraCryptEngine.getFileSizeNative(pfd.detachFd(), "", 0, fileName, volId)
                                 }
                                 runOnUiThread { result.success(size) }
                             } catch (e: Exception) {
@@ -252,6 +458,17 @@ class MainActivity : FlutterActivity() {
                         Thread {
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                                val mp = rootMountPoints[volId]
+                                if (mp != null) {
+                                    val f = RandomAccessFile("$mp/$fileName", "r")
+                                    val buf = ByteArray(length)
+                                    f.seek(offset)
+                                    val read = f.read(buf, 0, length)
+                                    f.close()
+                                    val bytes = if (read > 0) buf.copyOf(read) else null
+                                    runOnUiThread { result.success(bytes) }
+                                    return@Thread
+                                }
                                 val pfd = contentResolver.openFileDescriptor(Uri.parse(uriString), "r")
                                     ?: throw Exception("Could not open fd")
                                 val bytes = synchronized(VeraCryptSession.locks[volId]) {
@@ -275,6 +492,15 @@ class MainActivity : FlutterActivity() {
                         Thread {
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                                val mp = rootMountPoints[volId]
+                                if (mp != null) {
+                                    val dir = java.io.File(if (dirPath.isEmpty()) mp else "$mp/$dirPath")
+                                    val entries = dir.listFiles()?.map { f ->
+                                        if (f.isDirectory) "[DIR] ${f.name}" else "${f.name}|${f.length()}"
+                                    } ?: emptyList()
+                                    runOnUiThread { result.success(entries) }
+                                    return@Thread
+                                }
                                 val pfd = contentResolver.openFileDescriptor(Uri.parse(uriString), "r")
                                     ?: throw Exception("Could not open fd")
                                 val files = synchronized(VeraCryptSession.locks[volId]) {
@@ -292,12 +518,18 @@ class MainActivity : FlutterActivity() {
                         val uriString = call.argument<String>("filePath")
                         val dirPath   = call.argument<String>("dirPath")
                         if (uriString == null || dirPath == null) {
-                            result.error("INVALID_ARGS", "All arguments are required", null)
+                            result.error("INVALID_ARGS", "All arguments required", null)
                             return@setMethodCallHandler
                         }
                         Thread {
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                                val mp = rootMountPoints[volId]
+                                if (mp != null) {
+                                    val ok = java.io.File("$mp/$dirPath").mkdirs()
+                                    runOnUiThread { result.success(ok) }
+                                    return@Thread
+                                }
                                 val pfd = contentResolver.openFileDescriptor(Uri.parse(uriString), "rw")
                                     ?: throw Exception("Could not open fd")
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
@@ -316,12 +548,18 @@ class MainActivity : FlutterActivity() {
                         val oldPath   = call.argument<String>("oldPath")
                         val newPath   = call.argument<String>("newPath")
                         if (uriString == null || oldPath == null || newPath == null) {
-                            result.error("INVALID_ARGS", "All arguments are required", null)
+                            result.error("INVALID_ARGS", "All arguments required", null)
                             return@setMethodCallHandler
                         }
                         Thread {
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                                val mp = rootMountPoints[volId]
+                                if (mp != null) {
+                                    val ok = java.io.File("$mp/$oldPath").renameTo(java.io.File("$mp/$newPath"))
+                                    runOnUiThread { result.success(ok) }
+                                    return@Thread
+                                }
                                 val pfd = contentResolver.openFileDescriptor(Uri.parse(uriString), "rw")
                                     ?: throw Exception("Could not open fd")
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
@@ -340,12 +578,21 @@ class MainActivity : FlutterActivity() {
                         val fileName   = call.argument<String>("fileName")
                         val sourcePath = call.argument<String>("sourcePath")
                         if (uriString == null || fileName == null || sourcePath == null) {
-                            result.error("INVALID_ARGS", "All arguments are required", null)
+                            result.error("INVALID_ARGS", "All arguments required", null)
                             return@setMethodCallHandler
                         }
                         Thread {
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                                val mp = rootMountPoints[volId]
+                                if (mp != null) {
+                                    val dst = java.io.File("$mp/$fileName")
+                                    dst.parentFile?.mkdirs()
+                                    val ok = try { java.io.File(sourcePath).copyTo(dst, overwrite = true); true }
+                                             catch (_: Exception) { false }
+                                    runOnUiThread { result.success(ok) }
+                                    return@Thread
+                                }
                                 val pfd = contentResolver.openFileDescriptor(Uri.parse(uriString), "rw")
                                     ?: throw Exception("Could not open fd")
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
@@ -368,11 +615,18 @@ class MainActivity : FlutterActivity() {
                         Thread {
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                                val mp = rootMountPoints[volId]
+                                if (mp != null) {
+                                    val stat = android.os.StatFs(mp)
+                                    val total = stat.totalBytes
+                                    val free  = stat.availableBytes
+                                    runOnUiThread { result.success(listOf(total, free)) }
+                                    return@Thread
+                                }
                                 val pfd = contentResolver.openFileDescriptor(Uri.parse(uriString), "r")
                                     ?: throw Exception("Could not open fd")
                                 val space = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.getSpaceInfoNative(
-                                        pfd.detachFd(), "", 0, volId)
+                                    VeraCryptEngine.getSpaceInfoNative(pfd.detachFd(), "", 0, volId)
                                 }
                                 runOnUiThread { result.success(space?.toList()) }
                             } catch (e: Exception) {
@@ -385,12 +639,20 @@ class MainActivity : FlutterActivity() {
                         val uriString = call.argument<String>("filePath")
                         val fileName  = call.argument<String>("fileName")
                         if (uriString == null || fileName == null) {
-                            result.error("INVALID_ARGS", "All arguments are required", null)
+                            result.error("INVALID_ARGS", "All arguments required", null)
                             return@setMethodCallHandler
                         }
                         Thread {
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                                val mp = rootMountPoints[volId]
+                                if (mp != null) {
+                                    val ok = java.io.File("$mp/$fileName").let {
+                                        if (it.isDirectory) it.deleteRecursively() else it.delete()
+                                    }
+                                    runOnUiThread { result.success(ok) }
+                                    return@Thread
+                                }
                                 val pfd = contentResolver.openFileDescriptor(Uri.parse(uriString), "rw")
                                     ?: throw Exception("Could not open fd")
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
@@ -412,10 +674,15 @@ class MainActivity : FlutterActivity() {
                             return@setMethodCallHandler
                         }
                         try {
-                            val volId     = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
-                            val docUri    = DocumentsContract.buildDocumentUri(
+                            val volId  = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                            val mp     = rootMountPoints[volId]
+                            if (mp != null) {
+                                // For root mode, serve the file directly via FileProvider
+                                // (or fall through to JNI doc provider below)
+                            }
+                            val docUri = DocumentsContract.buildDocumentUri(
                                 "com.aeidolon.vaultexplorer.documents", "$volId:file:$fileName")
-                            val intent    = Intent(Intent.ACTION_VIEW).apply {
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
                                 setDataAndType(docUri, getMimeType(fileName))
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or
                                          Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
@@ -427,12 +694,11 @@ class MainActivity : FlutterActivity() {
                         }
                     }
 
-                    "importFile" -> {    
+                    "importFile" -> {
                         pendingResultCheck(result)
                         pendingImportContainerUri = call.argument<String>("filePath")
                         pendingImportTargetName   = call.argument<String>("targetPath")
-                        pendingImportVolId        =
-                            VeraCryptSession.getVolumeIdByUri(pendingImportContainerUri!!) ?: 0
+                        pendingImportVolId = VeraCryptSession.getVolumeIdByUri(pendingImportContainerUri!!) ?: 0
                         startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                             addCategory(Intent.CATEGORY_OPENABLE)
                             type = "*/*"
@@ -446,8 +712,7 @@ class MainActivity : FlutterActivity() {
                         @Suppress("UNCHECKED_CAST")
                         pendingExportMultiItems = (call.argument<List<*>>("items"))
                             ?.map { it as Map<String, Any?> } ?: emptyList()
-                        pendingExportMultiVolId    =
-                            VeraCryptSession.getVolumeIdByUri(pendingExportMultiContainerUri!!) ?: 0
+                        pendingExportMultiVolId = VeraCryptSession.getVolumeIdByUri(pendingExportMultiContainerUri!!) ?: 0
                         startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), EXPORT_FILES_TREE_REQUEST)
                     }
 
@@ -455,8 +720,7 @@ class MainActivity : FlutterActivity() {
                         pendingResultCheck(result)
                         pendingImportFolderContainerUri = call.argument<String>("filePath")
                         pendingImportFolderTargetDir    = call.argument<String>("targetPath") ?: ""
-                        pendingImportFolderVolId        =
-                            VeraCryptSession.getVolumeIdByUri(pendingImportFolderContainerUri!!) ?: 0
+                        pendingImportFolderVolId = VeraCryptSession.getVolumeIdByUri(pendingImportFolderContainerUri!!) ?: 0
                         startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), IMPORT_FOLDER_TREE_REQUEST)
                     }
 
@@ -464,8 +728,7 @@ class MainActivity : FlutterActivity() {
                         pendingResultCheck(result)
                         pendingExportContainerUri = call.argument<String>("filePath")
                         pendingExportSourcePath   = call.argument<String>("sourcePath")
-                        pendingExportVolId        =
-                            VeraCryptSession.getVolumeIdByUri(pendingExportContainerUri!!) ?: 0
+                        pendingExportVolId = VeraCryptSession.getVolumeIdByUri(pendingExportContainerUri!!) ?: 0
                         val fileName = pendingExportSourcePath!!.split("/").last()
                         startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                             addCategory(Intent.CATEGORY_OPENABLE)
@@ -486,19 +749,14 @@ class MainActivity : FlutterActivity() {
 
     private fun resolveDisplayName(uri: Uri): String {
         return try {
-            contentResolver.query(
-                uri,
-                arrayOf(OpenableColumns.DISPLAY_NAME),
-                null, null, null
-            )?.use { cursor ->
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME),
+                null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     if (idx != -1) cursor.getString(idx) else null
                 } else null
             } ?: uri.lastPathSegment ?: "Container"
-        } catch (e: Exception) {
-            uri.lastPathSegment ?: "Container"
-        }
+        } catch (e: Exception) { uri.lastPathSegment ?: "Container" }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -510,14 +768,8 @@ class MainActivity : FlutterActivity() {
                 val uri = data.data!!
                 contentResolver.takePersistableUriPermission(uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                val displayName = resolveDisplayName(uri)
-                res.success(mapOf(
-                    "uri"         to uri.toString(),
-                    "displayName" to displayName,
-                ))
-            } else {
-                res.success(null)
-            }
+                res.success(mapOf("uri" to uri.toString(), "displayName" to resolveDisplayName(uri)))
+            } else res.success(null)
             return
         }
 
@@ -525,31 +777,19 @@ class MainActivity : FlutterActivity() {
             val res = pendingFlutterResult ?: return; pendingFlutterResult = null
             if (resultCode == Activity.RESULT_OK && data?.data != null) {
                 val destUri = data.data!!
-                val size    = pendingCreateSize
-                val pass    = pendingCreatePassword
-                val pim     = pendingCreatePim
-                val fs      = pendingCreateFileSystem ?: "fat"
-
+                val size = pendingCreateSize; val pass = pendingCreatePassword
+                val pim = pendingCreatePim; val fs = pendingCreateFileSystem ?: "fat"
                 if (pass != null && size > 0) {
                     Thread {
                         try {
                             val pfd = contentResolver.openFileDescriptor(destUri, "rw")
-                                ?: throw Exception("Could not open file descriptor in write mode")
-                            val fd = pfd.detachFd()
-                            val success = VeraCryptEngine.createContainerNative(
-                                fd, pass, pim, size, fs
-                            )
+                                ?: throw Exception("Could not open file descriptor")
+                            val success = VeraCryptEngine.createContainerNative(pfd.detachFd(), pass, pim, size, fs)
                             runOnUiThread { res.success(success) }
-                        } catch (e: Exception) {
-                            runOnUiThread { res.error("CREATE_ERROR", e.message, null) }
-                        }
+                        } catch (e: Exception) { runOnUiThread { res.error("CREATE_ERROR", e.message, null) } }
                     }.start()
-                } else {
-                    res.success(false)
-                }
-            } else {
-                res.success(false)
-            }
+                } else res.success(false)
+            } else res.success(false)
             return
         }
 
@@ -557,14 +797,11 @@ class MainActivity : FlutterActivity() {
             val res = pendingFlutterResult ?: return; pendingFlutterResult = null
             if (resultCode == Activity.RESULT_OK && data != null) {
                 val uris = mutableListOf<Uri>()
-                data.clipData?.let { clip ->
-                    for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri)
-                } ?: data.data?.let { uris.add(it) }
-
+                data.clipData?.let { clip -> for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri) }
+                    ?: data.data?.let { uris.add(it) }
                 val containerUri = pendingImportContainerUri
                 val targetDir    = pendingImportTargetName ?: ""
                 val volId        = pendingImportVolId
-
                 if (containerUri != null && uris.isNotEmpty()) {
                     Thread {
                         var successCount = 0
@@ -572,8 +809,7 @@ class MainActivity : FlutterActivity() {
                             val srcDoc = DocumentFile.fromSingleUri(this, pickedUri) ?: continue
                             val name = srcDoc.name ?: "imported_file"
                             val targetFatPath = if (targetDir.isEmpty()) name else "$targetDir/$name"
-                            successCount += importEntryRecursive(
-                                srcDoc, containerUri, targetFatPath, volId)
+                            successCount += importEntryRecursive(srcDoc, containerUri, targetFatPath, volId)
                         }
                         runOnUiThread { res.success(successCount) }
                     }.start()
@@ -588,11 +824,9 @@ class MainActivity : FlutterActivity() {
                 val treeUri = data.data!!
                 contentResolver.takePersistableUriPermission(treeUri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-
                 val containerUri = pendingExportMultiContainerUri
                 val items        = pendingExportMultiItems ?: emptyList()
                 val volId        = pendingExportMultiVolId
-
                 if (containerUri != null) {
                     Thread {
                         var successCount = 0
@@ -601,8 +835,7 @@ class MainActivity : FlutterActivity() {
                             for (item in items) {
                                 val path  = item["path"] as? String ?: continue
                                 val isDir = item["isDir"] as? Boolean ?: false
-                                successCount += exportEntryRecursive(
-                                    destTree, path, isDir, containerUri, volId)
+                                successCount += exportEntryRecursive(destTree, path, isDir, containerUri, volId)
                             }
                         }
                         runOnUiThread { res.success(successCount) }
@@ -618,12 +851,10 @@ class MainActivity : FlutterActivity() {
                 val treeUri = data.data!!
                 contentResolver.takePersistableUriPermission(treeUri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-
                 val containerUri = pendingImportFolderContainerUri
-                val targetDir     = pendingImportFolderTargetDir ?: ""
-                val volId         = pendingImportFolderVolId
-                val srcRoot       = DocumentFile.fromTreeUri(this, treeUri)
-
+                val targetDir    = pendingImportFolderTargetDir ?: ""
+                val volId        = pendingImportFolderVolId
+                val srcRoot      = DocumentFile.fromTreeUri(this, treeUri)
                 if (containerUri != null && srcRoot != null) {
                     val folderName = srcRoot.name ?: "imported_folder"
                     val targetFatPath = if (targetDir.isEmpty()) folderName else "$targetDir/$folderName"
@@ -647,13 +878,11 @@ class MainActivity : FlutterActivity() {
                     Thread {
                         try {
                             val tempFile = File(cacheDir, "export_temp")
-                            val pfd = contentResolver.openFileDescriptor(
-                                Uri.parse(containerUri), "r")
+                            val pfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "r")
                                 ?: throw Exception("Could not open fd")
                             val success = synchronized(VeraCryptSession.locks[volId]) {
                                 VeraCryptEngine.unlockAndExtractNative(
-                                    pfd.detachFd(), "", 0,
-                                    sourcePath, tempFile.absolutePath, volId)
+                                    pfd.detachFd(), "", 0, sourcePath, tempFile.absolutePath, volId)
                             }
                             if (success && tempFile.exists()) {
                                 contentResolver.openOutputStream(destUri)?.use { out ->
@@ -676,21 +905,16 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun exportEntryRecursive(
-        destParent: DocumentFile,
-        fatPath: String,
-        isDir: Boolean,
-        containerUri: String,
-        volId: Int
+        destParent: DocumentFile, fatPath: String, isDir: Boolean,
+        containerUri: String, volId: Int
     ): Int {
         val name = fatPath.substringAfterLast("/")
-
         if (!isDir) {
             return try {
                 val tempFile = File(cacheDir, "export_${System.nanoTime()}")
                 val pfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "r") ?: return 0
                 val ok = synchronized(VeraCryptSession.locks[volId]) {
-                    VeraCryptEngine.unlockAndExtractNative(
-                        pfd.detachFd(), "", 0, fatPath, tempFile.absolutePath, volId)
+                    VeraCryptEngine.unlockAndExtractNative(pfd.detachFd(), "", 0, fatPath, tempFile.absolutePath, volId)
                 }
                 var written = 0
                 if (ok && tempFile.exists()) {
@@ -703,35 +927,26 @@ class MainActivity : FlutterActivity() {
                         written = 1
                     }
                 }
-                tempFile.delete()
-                written
-            } catch (e: Exception) {
-                0
-            }
+                tempFile.delete(); written
+            } catch (_: Exception) { 0 }
         }
-
         val destDir = destParent.createDirectory(name) ?: return 0
         val listPfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "r") ?: return 0
         val children = synchronized(VeraCryptSession.locks[volId]) {
             VeraCryptEngine.listDirectoryNative(listPfd.detachFd(), "", 0, fatPath, volId)
         } ?: return 0
-
         var count = 0
         for (entry in children) {
             if (entry.startsWith("System:")) continue
             val childIsDir = entry.startsWith("[DIR] ")
             val childName  = if (childIsDir) entry.substringAfter("[DIR] ") else entry.substringBefore("|")
-            count += exportEntryRecursive(
-                destDir, "$fatPath/$childName", childIsDir, containerUri, volId)
+            count += exportEntryRecursive(destDir, "$fatPath/$childName", childIsDir, containerUri, volId)
         }
         return count
     }
 
     private fun importEntryRecursive(
-        srcDoc: DocumentFile,
-        containerUri: String,
-        targetFatPath: String,
-        volId: Int
+        srcDoc: DocumentFile, containerUri: String, targetFatPath: String, volId: Int
     ): Int {
         if (srcDoc.isDirectory) {
             val mkPfd = contentResolver.openFileDescriptor(Uri.parse(containerUri), "rw") ?: return 0
@@ -741,12 +956,10 @@ class MainActivity : FlutterActivity() {
             var count = 0
             for (child in srcDoc.listFiles()) {
                 val childName = child.name ?: continue
-                count += importEntryRecursive(
-                    child, containerUri, "$targetFatPath/$childName", volId)
+                count += importEntryRecursive(child, containerUri, "$targetFatPath/$childName", volId)
             }
             return count
         }
-
         return try {
             val tempFile = File(cacheDir, "import_${System.nanoTime()}")
             contentResolver.openInputStream(srcDoc.uri)?.use { inp ->
@@ -759,21 +972,19 @@ class MainActivity : FlutterActivity() {
             }
             tempFile.delete()
             if (ok) 1 else 0
-        } catch (e: Exception) {
-            0
-        }
+        } catch (_: Exception) { 0 }
     }
 
     private fun getMimeType(fileName: String): String = when {
-        fileName.endsWith(".png",  true)                                      -> "image/png"
-        fileName.endsWith(".jpg",  true)||fileName.endsWith(".jpeg", true)    -> "image/jpeg"
-        fileName.endsWith(".webp", true)                                      -> "image/webp"
-        fileName.endsWith(".gif",  true)                                      -> "image/gif"
-        fileName.endsWith(".mp4",  true)||fileName.endsWith(".m4v",  true)    -> "video/mp4"
-        fileName.endsWith(".webm", true)                                      -> "video/webm"
-        fileName.endsWith(".mkv",  true)                                      -> "video/x-matroska"
-        fileName.endsWith(".txt",  true)                                      -> "text/plain"
-        fileName.endsWith(".pdf",  true)                                      -> "application/pdf"
-        else                                                                  -> "application/octet-stream"
+        fileName.endsWith(".png",  true)                                   -> "image/png"
+        fileName.endsWith(".jpg",  true)||fileName.endsWith(".jpeg", true) -> "image/jpeg"
+        fileName.endsWith(".webp", true)                                   -> "image/webp"
+        fileName.endsWith(".gif",  true)                                   -> "image/gif"
+        fileName.endsWith(".mp4",  true)||fileName.endsWith(".m4v",  true) -> "video/mp4"
+        fileName.endsWith(".webm", true)                                   -> "video/webm"
+        fileName.endsWith(".mkv",  true)                                   -> "video/x-matroska"
+        fileName.endsWith(".txt",  true)                                   -> "text/plain"
+        fileName.endsWith(".pdf",  true)                                   -> "application/pdf"
+        else                                                               -> "application/octet-stream"
     }
 }

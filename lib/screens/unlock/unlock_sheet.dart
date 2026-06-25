@@ -9,9 +9,9 @@ class UnlockSheet extends StatefulWidget {
   final ValueChanged<MountedContainer> onMounted;
   final String? initialUri;
   final String? initialName;
-
-  /// Pre-fills the password field (from saved container config).
   final String? prefillPassword;
+  final bool documentProvider;
+  final bool useRoot;
 
   const UnlockSheet({
     Key? key,
@@ -19,6 +19,8 @@ class UnlockSheet extends StatefulWidget {
     this.initialUri,
     this.initialName,
     this.prefillPassword,
+    this.documentProvider = false,
+    this.useRoot = false,
   }) : super(key: key);
 
   @override
@@ -35,8 +37,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
   bool _remember = false;
   String? _error;
 
-  /// True when the password was pre-filled from saved config — we show a
-  /// small indicator so the user knows they don't have to type it.
   bool get _passwordPrefilled =>
       widget.prefillPassword?.isNotEmpty == true &&
       _passwordCtrl.text == widget.prefillPassword;
@@ -44,9 +44,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
   @override
   void initState() {
     super.initState();
-    _passwordCtrl =
-        TextEditingController(text: widget.prefillPassword ?? '');
-
+    _passwordCtrl = TextEditingController(text: widget.prefillPassword ?? '');
     if (widget.initialUri != null) {
       _selectedUri = widget.initialUri;
       _selectedName = widget.initialName;
@@ -78,20 +76,12 @@ class _UnlockSheetState extends State<UnlockSheet> {
   }
 
   Future<void> _unlock() async {
-    if (_selectedUri == null) {
-      setState(() => _error = 'Select a container first');
-      return;
-    }
-    if (_passwordCtrl.text.isEmpty) {
-      setState(() => _error = 'Password is required');
-      return;
-    }
-
+    if (_selectedUri == null) { setState(() => _error = 'Select a container first'); return; }
+    if (_passwordCtrl.text.isEmpty) { setState(() => _error = 'Password is required'); return; }
     setState(() { _loading = true; _error = null; });
 
     try {
-      final pim = clampPim(
-          _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
+      final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final name = _selectedName ?? 'Container';
 
       final result = await vaultExplorerApi.unlockContainer(
@@ -99,6 +89,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
         _passwordCtrl.text,
         pim,
         displayName: name,
+        documentProvider: widget.documentProvider,
+        useRoot: widget.useRoot,
       );
 
       if (result != null) {
@@ -117,10 +109,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
         );
 
         final space = await vaultExplorerApi.getSpaceInfo(tempContainer);
-        final total =
-            (space != null && space.isNotEmpty) ? space[0] : 0;
-        final free =
-            (space != null && space.length > 1) ? space[1] : 0;
+        final total = (space != null && space.isNotEmpty) ? space[0] : 0;
+        final free  = (space != null && space.length > 1) ? space[1] : 0;
 
         widget.onMounted(MountedContainer(
           uri: _selectedUri!,
@@ -135,7 +125,9 @@ class _UnlockSheetState extends State<UnlockSheet> {
         HapticFeedback.lightImpact();
         if (mounted) Navigator.pop(context);
       } else {
-        setState(() => _error = 'Incorrect password or invalid container');
+        setState(() => _error = widget.useRoot
+            ? 'Root mount failed — check password and root access'
+            : 'Incorrect password or invalid container');
       }
     } on PlatformException catch (e) {
       setState(() => _error = e.message ?? 'Unknown error');
@@ -153,8 +145,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
       margin: EdgeInsets.only(bottom: mq.viewInsets.bottom),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius:
-            const BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         border: Border.all(color: cs.outline.withOpacity(0.5)),
       ),
       child: SafeArea(
@@ -167,124 +158,101 @@ class _UnlockSheetState extends State<UnlockSheet> {
             children: [
               Center(
                 child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.outline,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(color: cs.outline, borderRadius: BorderRadius.circular(2)),
                 ),
               ),
               const SizedBox(height: 20),
-              Text(
-                widget.initialUri != null
-                    ? 'Unlock Container'
-                    : 'Mount Container',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontSize: 17),
-              ),
+              Row(children: [
+                Text(
+                  widget.initialUri != null ? 'Unlock Container' : 'Mount Container',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 17),
+                ),
+                if (widget.useRoot) ...[
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.shield_outlined, size: 12, color: cs.primary),
+                      const SizedBox(width: 4),
+                      Text('Root', style: TextStyle(fontSize: 11, color: cs.primary, fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                ],
+              ]),
               const SizedBox(height: 12),
 
-              // File picker row
+              // File picker
               GestureDetector(
                 onTap: _pickFile,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   decoration: BoxDecoration(
                     color: cs.surfaceVariant,
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: _selectedUri != null
-                          ? cs.primary.withOpacity(0.5)
-                          : cs.outline,
+                      color: _selectedUri != null ? cs.primary.withOpacity(0.5) : cs.outline,
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _selectedUri != null
-                            ? Icons.description_outlined
-                            : Icons.folder_open,
-                        size: 18,
-                        color: _selectedUri != null
-                            ? cs.primary
-                            : cs.outline,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _selectedName ??
-                              'Select VeraCrypt container…',
-                          style: TextStyle(
-                              color: _selectedUri != null
-                                  ? cs.onSurface
-                                  : cs.outline,
-                              fontSize: 13),
-                          overflow: TextOverflow.ellipsis,
+                  child: Row(children: [
+                    Icon(
+                      _selectedUri != null ? Icons.description_outlined : Icons.folder_open,
+                      size: 18,
+                      color: _selectedUri != null ? cs.primary : cs.outline,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _selectedName ?? 'Select VeraCrypt container…',
+                        style: TextStyle(
+                          color: _selectedUri != null ? cs.onSurface : cs.outline,
+                          fontSize: 13,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (_selectedUri != null &&
-                          widget.initialUri == null) ...[
-                        GestureDetector(
-                          onTap: () => setState(() {
-                            _selectedUri = null;
-                            _selectedName = null;
-                          }),
-                          child: const Icon(Icons.clear,
-                              size: 16, color: Colors.grey),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(Icons.check_circle,
-                            size: 16, color: cs.primary),
-                      ] else if (_selectedUri != null &&
-                          widget.initialUri != null) ...[
-                        Icon(Icons.lock_outline,
-                            size: 16, color: cs.primary),
-                      ],
+                    ),
+                    if (_selectedUri != null && widget.initialUri == null) ...[
+                      GestureDetector(
+                        onTap: () => setState(() { _selectedUri = null; _selectedName = null; }),
+                        child: const Icon(Icons.clear, size: 16, color: Colors.grey),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.check_circle, size: 16, color: cs.primary),
+                    ] else if (_selectedUri != null && widget.initialUri != null) ...[
+                      Icon(Icons.lock_outline, size: 16, color: cs.primary),
                     ],
-                  ),
+                  ]),
                 ),
               ),
               const SizedBox(height: 12),
 
-              // Password field
+              // Password
               TextField(
                 controller: _passwordCtrl,
                 obscureText: _obscure,
-                autofocus: widget.initialUri != null &&
-                    widget.prefillPassword?.isEmpty != false,
+                autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
                 onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   labelText: 'Password',
-                  prefixIcon:
-                      const Icon(Icons.key_outlined, size: 18),
-                  // Show a "saved" badge when using stored password
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_passwordPrefilled)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: Tooltip(
-                            message: 'Using saved password',
-                            child: Icon(Icons.bookmark,
-                                size: 16, color: cs.primary),
-                          ),
+                  prefixIcon: const Icon(Icons.key_outlined, size: 18),
+                  suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+                    if (_passwordPrefilled)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Tooltip(
+                          message: 'Using saved password',
+                          child: Icon(Icons.bookmark, size: 16, color: cs.primary),
                         ),
-                      IconButton(
-                        onPressed: () =>
-                            setState(() => _obscure = !_obscure),
-                        icon: Icon(
-                            _obscure
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            size: 18),
                       ),
-                    ],
-                  ),
+                    IconButton(
+                      onPressed: () => setState(() => _obscure = !_obscure),
+                      icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 18),
+                    ),
+                  ]),
                 ),
               ),
               const SizedBox(height: 10),
@@ -300,25 +268,19 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
               if (widget.initialUri == null) ...[
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _remember,
-                      onChanged: (val) =>
-                          setState(() => _remember = val ?? false),
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () =>
-                          setState(() => _remember = !_remember),
-                      child: const Text(
-                          'Remember container on dashboard',
-                          style: TextStyle(fontSize: 13)),
-                    ),
-                  ],
-                ),
+                Row(children: [
+                  Checkbox(
+                    value: _remember,
+                    onChanged: (val) => setState(() => _remember = val ?? false),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => setState(() => _remember = !_remember),
+                    child: const Text('Remember container on dashboard',
+                        style: TextStyle(fontSize: 13)),
+                  ),
+                ]),
               ],
 
               if (_error != null) ...[
@@ -328,21 +290,13 @@ class _UnlockSheetState extends State<UnlockSheet> {
                   decoration: BoxDecoration(
                     color: cs.error.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(6),
-                    border:
-                        Border.all(color: cs.error.withOpacity(0.4)),
+                    border: Border.all(color: cs.error.withOpacity(0.4)),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 16, color: cs.error),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(_error!,
-                            style: TextStyle(
-                                color: cs.error, fontSize: 12)),
-                      ),
-                    ],
-                  ),
+                  child: Row(children: [
+                    Icon(Icons.error_outline, size: 16, color: cs.error),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(_error!, style: TextStyle(color: cs.error, fontSize: 12))),
+                  ]),
                 ),
               ],
 
@@ -350,24 +304,15 @@ class _UnlockSheetState extends State<UnlockSheet> {
               FilledButton(
                 onPressed: _loading ? null : _unlock,
                 style: FilledButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                 ),
                 child: _loading
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(
-                                Colors.white)),
-                      )
+                    ? const SizedBox(width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white)))
                     : const Text('Unlock',
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600)),
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               ),
             ],
           ),

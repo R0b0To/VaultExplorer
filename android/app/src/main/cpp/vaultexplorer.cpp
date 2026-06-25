@@ -20,7 +20,7 @@
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
-#define MAX_VOLUMES 4
+#define MAX_VOLUMES 8
 
 // ----------------------------------------------------------------====
 // GLOBAL STATE
@@ -39,7 +39,7 @@ static mbedtls_aes_xts_context activeDataCtxEnc[MAX_VOLUMES];
 
 // Drive paths for up to 4 volumes — FatFs uses single-digit drive numbers.
 static const char* drivePaths[MAX_VOLUMES] = {
-    "0:", "1:", "2:", "3:"
+    "0:", "1:", "2:", "3:", "4:", "5:", "6:", "7:"
 };
 static FATFS globalFs[MAX_VOLUMES];
 

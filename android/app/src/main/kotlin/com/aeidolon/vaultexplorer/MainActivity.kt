@@ -145,7 +145,7 @@ class MainActivity : FlutterFragmentActivity() {
                         val targetVolId = VeraCryptSession.getVolumeIdByUri(uriString)
                             ?: VeraCryptSession.getFreeVolumeId()
                         if (targetVolId == null) {
-                            result.error("MAX_CONTAINERS", "Maximum 4 containers already mounted", null)
+                            result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
                             return@setMethodCallHandler
                         }
 

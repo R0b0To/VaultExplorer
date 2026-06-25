@@ -9,7 +9,7 @@ data class ContainerSession(
 )
 
 object VeraCryptSession {
-    const val MAX_VOLUMES = 4
+    const val MAX_VOLUMES = 8
 
     val locks: Array<Any> = Array(MAX_VOLUMES) { Any() }
     val activeSessions = mutableMapOf<Int, ContainerSession>()

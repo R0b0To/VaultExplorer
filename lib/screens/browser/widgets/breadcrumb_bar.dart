@@ -72,7 +72,7 @@ class BreadcrumbBar extends StatelessWidget {
                   child: Icon(
                     Icons.chevron_right_rounded, // Softer rounded chevron
                     size: 16,
-                    color: cs.onSurfaceVariant.withOpacity(0.5),
+                    color: cs.onSurfaceVariant.withValues(alpha:0.5),
                   ),
                 ),
             ],

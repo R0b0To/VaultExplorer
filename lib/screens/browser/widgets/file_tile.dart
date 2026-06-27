@@ -33,7 +33,7 @@ class FileTile extends StatelessWidget {
         dense: true,
         selected: selected,
         // Match selection background style with DirectoryTile
-        selectedTileColor: cs.primaryContainer.withOpacity(0.3),
+        selectedTileColor: cs.primaryContainer.withValues(alpha:0.3),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Icon(
           iconForFile(name),

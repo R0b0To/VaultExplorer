@@ -132,8 +132,8 @@ ThemeData buildTheme() {
       style: FilledButton.styleFrom(
         backgroundColor: primary,
         foregroundColor: onPrimary,
-        disabledBackgroundColor: onSurface.withOpacity(0.12),
-        disabledForegroundColor: onSurface.withOpacity(0.38),
+        disabledBackgroundColor: onSurface.withValues(alpha:0.12),
+        disabledForegroundColor: onSurface.withValues(alpha:0.38),
         textStyle: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w500,

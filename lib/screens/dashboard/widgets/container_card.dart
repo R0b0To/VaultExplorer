@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import '../../../models/mounted_container.dart';
 import '../../../services/vaultexplorer_api.dart';
 import '../../../utils/format_utils.dart';
-import '../../browser/file_browser_screen.dart';
 
 // ── Mounted container card ────────────────────────────────────────────────────
 
@@ -13,11 +12,17 @@ class ContainerCard extends StatelessWidget {
   final VoidCallback onReturn;
   final VoidCallback? onLongPress;
 
+  /// FIX: Navigation is now owned by VaultDashboard so it can wire the
+  ///      auto-close activity callback. Previously this widget pushed the
+  ///      route directly, bypassing the timer reset.
+  final VoidCallback onBrowse;
+
   const ContainerCard({
     super.key,
     required this.container,
     required this.onLocked,
     required this.onReturn,
+    required this.onBrowse,
     this.onLongPress,
   });
 
@@ -39,15 +44,9 @@ class ContainerCard extends StatelessWidget {
 
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(12), // Standardized to match Card radius
-        onTap: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => FileBrowserScreen(container: container)),
-          );
-          onReturn();
-        },
+        borderRadius: BorderRadius.circular(12),
+        // FIX: Use the injected onBrowse callback instead of pushing directly
+        onTap: onBrowse,
         onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -63,9 +62,9 @@ class ContainerCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    Icons.folder_zip_outlined, 
-                    size: 20, 
-                    color: cs.onPrimaryContainer, // Clean high-contrast foreground color
+                    Icons.folder_zip_outlined,
+                    size: 20,
+                    color: cs.onPrimaryContainer,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -94,7 +93,7 @@ class ContainerCard extends StatelessWidget {
               if (hasSpace) ...[
                 const SizedBox(height: 12),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(100), // Rounded pill style track
+                  borderRadius: BorderRadius.circular(100),
                   child: LinearProgressIndicator(
                     value: usedFraction,
                     minHeight: 4,
@@ -121,7 +120,7 @@ class ContainerCard extends StatelessWidget {
                     'Hold to configure',
                     style: textTheme.bodySmall?.copyWith(
                       fontSize: 10,
-                      color: cs.onSurfaceVariant.withOpacity(0.7),
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                     ),
                   ),
               ]),
@@ -172,10 +171,10 @@ class _LockButtonState extends State<_LockButton> {
       tooltip: 'Lock container',
       icon: _loading
           ? SizedBox(
-              width: 18, 
+              width: 18,
               height: 18,
               child: CircularProgressIndicator(
-                strokeWidth: 2, 
+                strokeWidth: 2,
                 color: cs.error,
               ),
             )
@@ -209,7 +208,7 @@ class SavedContainerCard extends StatelessWidget {
 
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(12), // Standardized to match Card radius
+        borderRadius: BorderRadius.circular(12),
         onTap: onUnlock,
         onLongPress: onLongPress,
         child: Padding(
@@ -223,9 +222,9 @@ class SavedContainerCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
-                Icons.folder_zip_outlined, 
-                size: 20, 
-                color: cs.onSurfaceVariant, // Better legibility against dark container
+                Icons.folder_zip_outlined,
+                size: 20,
+                color: cs.onSurfaceVariant,
               ),
             ),
             const SizedBox(width: 12),

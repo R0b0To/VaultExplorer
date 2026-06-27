@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import '../../models/mounted_container.dart';
 import '../../services/app_settings_service.dart';
-import '../../services/container_repository.dart';
 import '../../services/cross_container_clipboard.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../settings/app_settings_screen.dart';
@@ -13,6 +11,7 @@ import 'widgets/container_card.dart';
 import 'widgets/container_config_sheet.dart';
 import 'widgets/create_container_sheet.dart';
 import 'widgets/empty_state.dart';
+import '../browser/file_browser_screen.dart';
 
 class VaultDashboard extends StatefulWidget {
   const VaultDashboard({Key? key}) : super(key: key);
@@ -69,14 +68,23 @@ class _VaultDashboardState extends State<VaultDashboard>
   void _scheduleAutoClose(MountedContainer container) {
     final record = _records[container.uri];
     final mins   = record?.autoCloseMins ?? 0;
-    if (mins <= 0) return;
+    if (mins <= 0) {
+      // No auto-close configured — cancel any existing timer
+      _cancelAutoClose(container.volId);
+      return;
+    }
 
+    // FIX: always cancel the existing timer before creating a new one,
+    //      so calling this on user activity resets the countdown correctly.
     _autoCloseTimers[container.volId]?.cancel();
     _autoCloseTimers[container.volId] = Timer(Duration(minutes: mins), () async {
       if (!mounted) return;
 
       if (!vaultExplorerApi.acquireLockGuard(container.volId)) {
-        _scheduleAutoClose(container);
+        // A batch operation is in progress — reschedule for 30 s later.
+        _autoCloseTimers[container.volId] = Timer(const Duration(seconds: 30), () {
+          _scheduleAutoClose(container);
+        });
         return;
       }
 
@@ -87,6 +95,19 @@ class _VaultDashboardState extends State<VaultDashboard>
         vaultExplorerApi.releaseLockGuard(container.volId);
       }
     });
+  }
+
+  /// FIX: Public so FileBrowserScreen can call it via the onUserActivity callback.
+  void _onUserActivityForContainer(int volId) {
+    final container = _mounted.firstWhere(
+      (c) => c.volId == volId,
+      orElse: () => throw StateError('Container $volId not mounted'),
+    );
+    // Only reschedule if auto-close is configured.
+    final record = _records[container.uri];
+    if ((record?.autoCloseMins ?? 0) > 0) {
+      _scheduleAutoClose(container);
+    }
   }
 
   void _cancelAutoClose(int volId) {
@@ -114,12 +135,9 @@ class _VaultDashboardState extends State<VaultDashboard>
   void _onContainerLocked(int volId) {
     _cancelAutoClose(volId);
 
-    final lockedContainer = _mounted.where((c) => c.volId == volId).firstOrNull;
-
+    // FIX: Clear clipboard using volId — no longer need the container object.
     final clip = CrossContainerClipboard.instance;
-    if (lockedContainer != null &&
-        clip.hasItems &&
-        clip.sourceVolId == volId) {
+    if (clip.hasItems && clip.sourceVolId == volId) {
       clip.clear();
     }
 
@@ -196,10 +214,13 @@ class _VaultDashboardState extends State<VaultDashboard>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      // FIX: Pass the already-loaded appSettings to avoid redundant file I/O
+      //      inside ContainerConfigSheet._loadSavedPasswordAndSettings.
       builder: (_) => ContainerConfigSheet(
         uri: uri,
         currentLabel: currentLabel,
         existingRecord: existing,
+        appSettings: _appSettings,
         onSaved: (record) async {
           setState(() => _records[uri] = record);
           final idx = _mounted.indexWhere((m) => m.uri == uri);
@@ -236,6 +257,36 @@ class _VaultDashboardState extends State<VaultDashboard>
 
     await ContainerRepository.instance.remove(uri);
     setState(() => _records.remove(uri));
+  }
+
+  // ── Navigate to browser ───────────────────────────────────────────────────
+
+  /// FIX: Centralised navigation to FileBrowserScreen so the onUserActivity
+  ///      callback is always wired correctly.
+Future<void> _openBrowser(MountedContainer container) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FileBrowserScreen(
+          container: container,
+          // Look up and return the matching MountedContainer from the active list
+          resolveContainer: (int volId) {
+            for (final c in _mounted) {
+              if (c.volId == volId) return c;
+            }
+            return null;
+          },
+          onUserActivity: () {
+            // Reset the auto-close timer whenever the user is active
+            if (_mounted.any((c) => c.volId == container.volId)) {
+              _onUserActivityForContainer(container.volId);
+            }
+          },
+        ),
+      ),
+    );
+    // Refresh space info when returning from the browser
+    _refreshContainerSpace(container.volId);
   }
 
   @override
@@ -319,10 +370,12 @@ class _VaultDashboardState extends State<VaultDashboard>
                   itemBuilder: (_, i) {
                     final item = displayItems[i];
                     if (item is MountedContainer) {
+                      // FIX: Use _openBrowser to ensure activity callback is wired
                       return ContainerCard(
                         container: item,
                         onLocked: _onContainerLocked,
                         onReturn: () => _refreshContainerSpace(item.volId),
+                        onBrowse: () => _openBrowser(item),
                         onLongPress: () => _showContainerConfig(
                           uri: item.uri,
                           currentLabel: item.displayName,
@@ -382,7 +435,7 @@ class _ClipboardStatusStrip extends StatelessWidget {
               const SizedBox(height: 2),
               Text('Open a container and tap "Paste Here"',
                   style: textTheme.bodySmall?.copyWith(
-                      color: cs.onPrimaryContainer.withOpacity(0.8))),
+                      color: cs.onPrimaryContainer.withValues(alpha: 0.8))),
             ],
           ),
         ),

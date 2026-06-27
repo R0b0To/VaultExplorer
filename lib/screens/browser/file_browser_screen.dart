@@ -45,13 +45,8 @@ class PathSegment {
 
 class FileBrowserScreen extends StatefulWidget {
   final MountedContainer container;
-
-  /// Optional override. If null, resolved internally from the container record
-  /// with fallback to [AppSettings.defaultThumbnailCacheMode].
+  final MountedContainer? Function(int volId)? resolveContainer;
   final ThumbnailCacheMode? thumbnailCacheMode;
-
-  /// FIX: Optional callback to notify parent (VaultDashboard) that the user
-  ///      is active so the auto-close timer can be reset.
   final VoidCallback? onUserActivity;
 
   const FileBrowserScreen({
@@ -59,6 +54,7 @@ class FileBrowserScreen extends StatefulWidget {
     required this.container,
     this.thumbnailCacheMode,
     this.onUserActivity,
+    this.resolveContainer,
   });
 
   @override
@@ -444,7 +440,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (!_clip.hasItems) return;
     _signalActivity();
 
-    // FIX: Resolve source container from mounted containers via volId only
     final srcVolId = _clip.sourceVolId;
     if (srcVolId == null) {
       _setStatus('Clipboard source is invalid', error: true);
@@ -457,24 +452,29 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final sameContainer = _clip.isFromVolume(widget.container.volId);
     final items         = List<Map<String, dynamic>>.from(_clip.items);
 
-    // For cross-container ops, we still need a MountedContainer handle for API calls.
-    // The caller (VaultDashboard) must ensure it stays mounted while the paste runs.
-    // We verify by checking space info.
+    // Resolve the source container
     MountedContainer? srcContainer;
     if (!sameContainer) {
-      // We can only verify the source is still mounted — the container object
-      // itself is not stored in the clipboard (by design). The VaultDashboard
-      // must pass it. For now: fail gracefully if vol is unmounted.
-      _setStatus(
-        'Cross-container paste requires both containers to remain mounted.',
-        error: true,
-        autoClear: const Duration(seconds: 6),
-      );
-      // NOTE: A proper fix requires VaultDashboard to pass a container lookup
-      // callback. Clearing clipboard to prevent a stale paste.
-      _clip.clear();
-      setState(() {});
-      return;
+      if (widget.resolveContainer == null) {
+        _setStatus(
+          'Cross-container paste configuration is missing.',
+          error: true,
+        );
+        return;
+      }
+      srcContainer = widget.resolveContainer!(srcVolId);
+      if (srcContainer == null) {
+        _setStatus(
+          'Cross-container paste requires both containers to remain mounted.',
+          error: true,
+          autoClear: const Duration(seconds: 6),
+        );
+        _clip.clear();
+        setState(() {});
+        return;
+      }
+    } else {
+      srcContainer = widget.container;
     }
 
     final toProcess  = <Map<String, dynamic>>[];
@@ -486,8 +486,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       final destPath = _currentDirPath.isEmpty
           ? fileName
           : '$_currentDirPath/$fileName';
-      if (srcPath == destPath) { skipCount++; continue; }
-      if (isDir && destPath.startsWith('$srcPath/')) { skipCount++; continue; }
+      
+      // Only skip same-path transfers if we are operating within the same volume
+      if (sameContainer && srcPath == destPath) { skipCount++; continue; }
+      if (sameContainer && isDir && destPath.startsWith('$srcPath/')) { skipCount++; continue; }
+      
       toProcess.add({...item, '_destPath': destPath});
     }
 
@@ -506,7 +509,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (!isCut) {
       int requiredBytes = 0;
       for (final item in toProcess) {
-        requiredBytes += await _measureItemBytes(widget.container, item);
+        // Measure bytes using the resolved source container
+        requiredBytes += await _measureItemBytes(srcContainer, item);
       }
       final spaceInfo = await vaultExplorerApi.getSpaceInfo(widget.container);
       final freeBytes = (spaceInfo != null && spaceInfo.length > 1)
@@ -589,11 +593,14 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
 
         try {
-          final ok = await _copyEntryWithinContainer(
-              srcPath, destPath, isDir, createdDestPaths);
+          // Perform the copy operation across containers
+          final ok = await _copyEntry(
+              srcContainer, widget.container, srcPath, destPath, isDir, createdDestPaths);
           if (!ok) failCount++;
+          
+          // Delete from source container if this is a cut/move operation
           if (ok && isCut) {
-            await _deleteEntryRecursive(widget.container, srcPath, isDir);
+            await _deleteEntryRecursive(srcContainer, srcPath, isDir);
           }
         } on _DiskFullException {
           diskFull = true;
@@ -743,7 +750,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   // ── Same-container copy ───────────────────────────────────────────────────
 
-  Future<bool> _copyEntryWithinContainer(
+  Future<bool> _copyEntry(
+    MountedContainer srcContainer,
+    MountedContainer destContainer,
     String srcPath,
     String destPath,
     bool isDir,
@@ -751,13 +760,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   ) async {
     if (!isDir) {
       try {
-        final size = await vaultExplorerApi.getFileSize(widget.container, srcPath);
+        final size = await vaultExplorerApi.getFileSize(srcContainer, srcPath);
         if (size < 0) return false;
 
-        await vaultExplorerApi.deleteFile(widget.container, destPath);
+        await vaultExplorerApi.deleteFile(destContainer, destPath);
 
         if (size == 0) {
-          final ok = await vaultExplorerApi.createEmptyFile(widget.container, destPath);
+          final ok = await vaultExplorerApi.createEmptyFile(destContainer, destPath);
           if (ok) createdDestPaths.add(destPath);
           return ok;
         }
@@ -768,11 +777,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         while (offset < size) {
           final chunkLen = min(size - offset, chunkSize);
           final chunk = await vaultExplorerApi.readFileChunk(
-              widget.container, srcPath, offset, chunkLen);
+              srcContainer, srcPath, offset, chunkLen);
           if (chunk == null || chunk.isEmpty) return false;
 
           final ok = await vaultExplorerApi.writeFileChunk(
-              widget.container, destPath, offset, chunk);
+              destContainer, destPath, offset, chunk);
           if (!ok) throw const _DiskFullException();
 
           offset += chunk.length;
@@ -786,8 +795,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
 
     final children =
-        await vaultExplorerApi.listDirectory(widget.container, srcPath) ?? [];
-    await vaultExplorerApi.createDirectory(widget.container, destPath);
+        await vaultExplorerApi.listDirectory(srcContainer, srcPath) ?? [];
+    await vaultExplorerApi.createDirectory(destContainer, destPath);
     createdDestPaths.add(destPath);
     bool allOk = true;
     for (final entry in children) {
@@ -796,7 +805,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       final childName  = childIsDir
           ? entry.replaceFirst('[DIR] ', '')
           : entry.split('|').first;
-      final ok = await _copyEntryWithinContainer(
+      final ok = await _copyEntry(
+        srcContainer,
+        destContainer,
         '$srcPath/$childName',
         '$destPath/$childName',
         childIsDir,

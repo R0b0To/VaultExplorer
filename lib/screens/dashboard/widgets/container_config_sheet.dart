@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../models/thumbnail_cache_mode.dart';
-import '../../../services/app_settings_service.dart'; // Added
+import '../../../services/app_settings_service.dart';
 import '../../../services/container_repository.dart';
 
 class ContainerConfigSheet extends StatefulWidget {
@@ -10,6 +10,11 @@ class ContainerConfigSheet extends StatefulWidget {
   final void Function(ContainerRecord record) onSaved;
   final VoidCallback? onForget;
 
+  /// FIX: Accept the already-loaded [AppSettings] from [VaultDashboard]
+  ///      instead of loading it again inside this sheet on every open.
+  ///      Falls back to a fresh load only when null (e.g. standalone usage).
+  final AppSettings? appSettings;
+
   const ContainerConfigSheet({
     Key? key,
     required this.uri,
@@ -17,6 +22,7 @@ class ContainerConfigSheet extends StatefulWidget {
     this.existingRecord,
     required this.onSaved,
     this.onForget,
+    this.appSettings,
   }) : super(key: key);
 
   @override
@@ -30,7 +36,8 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
   late bool _showPassword;
   late int  _autoCloseMins;
   late bool _documentProvider;
-  late ThumbnailCacheMode? _thumbnailCacheMode;
+  ThumbnailCacheMode? _thumbnailCacheMode;
+
   bool _saving          = false;
   bool _loadingPassword = true;
 
@@ -39,30 +46,30 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
   @override
   void initState() {
     super.initState();
-    final rec       = widget.existingRecord;
-    _labelCtrl      = TextEditingController(
+    final rec         = widget.existingRecord;
+    _labelCtrl        = TextEditingController(
         text: rec?.label.isNotEmpty == true ? rec!.label : widget.currentLabel);
-    _passwordCtrl   = TextEditingController();
+    _passwordCtrl     = TextEditingController();
     _rememberPassword = rec?.rememberPassword ?? false;
-    _showPassword   = false;
-    _autoCloseMins  = rec?.autoCloseMins ?? 0;
+    _showPassword     = false;
+    _autoCloseMins    = rec?.autoCloseMins ?? 0;
     _documentProvider = rec?.documentProvider ?? false;
     _thumbnailCacheMode = rec?.thumbnailCacheMode;
-    _loadSavedPasswordAndSettings(); // Updated method name
+    _initAsync();
   }
 
-  Future<void> _loadSavedPasswordAndSettings() async {
-    // 1. Load default app settings to resolve the fallback cache mode
+  /// FIX: Uses the pre-loaded [AppSettings] when available; only falls back
+  ///      to an async load when the sheet is opened without one (rare).
+  Future<void> _initAsync() async {
+    // 1. Resolve thumbnail cache mode from app settings
     try {
-      final settings = await AppSettingsService.loadSettings();
+      final settings = widget.appSettings ?? await AppSettingsService.loadSettings();
       if (mounted) {
         setState(() {
-          // If the record has no caching preference (null), resolve to global default
           _thumbnailCacheMode ??= settings.defaultThumbnailCacheMode;
         });
       }
     } catch (_) {
-      // Safe fallback
       if (mounted) {
         setState(() {
           _thumbnailCacheMode ??= ThumbnailCacheMode.appCache;
@@ -70,13 +77,12 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
       }
     }
 
-    // 2. Load passwords if applicable
+    // 2. Load saved password from Keystore if applicable
     if (widget.existingRecord?.rememberPassword == true) {
-      final plain =
-          await ContainerRepository.instance.getPassword(widget.uri);
+      final plain = await ContainerRepository.instance.getPassword(widget.uri);
       if (mounted) _passwordCtrl.text = plain ?? '';
     }
-    
+
     if (mounted) setState(() => _loadingPassword = false);
   }
 
@@ -94,8 +100,6 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
         ? widget.currentLabel
         : _labelCtrl.text.trim();
 
-    // Build the record. pendingPassword is set only when the user has
-    // explicitly entered/changed a password with rememberPassword enabled.
     final record = ContainerRecord(
       uri: widget.uri,
       label: label,
@@ -108,7 +112,6 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
           : null,
     );
 
-    // ContainerRepository.save handles Keystore write/delete atomically.
     await ContainerRepository.instance.save(record);
 
     widget.onSaved(record);
@@ -141,19 +144,18 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                 ]),
                 const SizedBox(height: 20),
 
-                // ── Label ───────────────────────────────────────────────────
+                // ── Label ────────────────────────────────────────────────────
                 TextField(
                   controller: _labelCtrl,
                   decoration: const InputDecoration(
                     labelText: 'Display Name',
-                    prefixIcon:
-                        Icon(Icons.label_outline_rounded, size: 18),
+                    prefixIcon: Icon(Icons.label_outline_rounded, size: 18),
                     hintText: 'My Vault',
                   ),
                 ),
                 const SizedBox(height: 16),
 
-                // ── Password ────────────────────────────────────────────────
+                // ── Password ─────────────────────────────────────────────────
                 _SectionHeader('PASSWORD', cs),
                 const SizedBox(height: 10),
                 _ToggleRow(
@@ -179,7 +181,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                     TextField(
                       controller: _passwordCtrl,
                       obscureText: !_showPassword,
-                      // SEC-07 fix: no autofill hints for container passwords.
+                      // SEC-07: no autofill hints for container passwords.
                       autofillHints: null,
                       decoration: InputDecoration(
                         labelText: 'Container password',
@@ -214,7 +216,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                 ],
                 const SizedBox(height: 16),
 
-                // ── Auto-lock ───────────────────────────────────────────────
+                // ── Auto-lock ─────────────────────────────────────────────────
                 _SectionHeader('AUTO-LOCK', cs),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<int>(
@@ -237,7 +239,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                 ),
                 const SizedBox(height: 16),
 
-                // ── Document Provider ───────────────────────────────────────
+                // ── Document Provider ─────────────────────────────────────────
                 _SectionHeader('ANDROID INTEGRATION', cs),
                 const SizedBox(height: 10),
                 _ToggleRow(
@@ -248,15 +250,13 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                       'picker when unlocked',
                   value: _documentProvider,
                   cs: cs,
-                  onChanged: (v) =>
-                      setState(() => _documentProvider = v),
+                  onChanged: (v) => setState(() => _documentProvider = v),
                 ),
                 const SizedBox(height: 16),
 
-                /// ── Thumbnail Caching ───────────────────────────────────────
+                // ── Thumbnail Caching ─────────────────────────────────────────
                 _SectionHeader('THUMBNAIL CACHING', cs),
                 const SizedBox(height: 10),
-                // Guard rendering with a loader until AppSettings completes loading
                 if (_loadingPassword)
                   const Center(
                       child: SizedBox(
@@ -270,24 +270,20 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                       labelText: 'Thumbnail Cache Mode',
                       prefixIcon: Icon(Icons.cached_rounded, size: 18),
                     ),
-                    items: [
-                      ...ThumbnailCacheMode.values.map((mode) {
-                        return DropdownMenuItem<ThumbnailCacheMode?>(
-                          value: mode,
-                          child: Text(mode.label),
-                        );
-                      }),
-                    ],
-                    onChanged: (v) {
-                      setState(() => _thumbnailCacheMode = v);
-                    },
+                    items: ThumbnailCacheMode.values
+                        .map((mode) => DropdownMenuItem<ThumbnailCacheMode?>(
+                              value: mode,
+                              child: Text(mode.label),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setState(() => _thumbnailCacheMode = v),
                   ),
                 const SizedBox(height: 8),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: Text(
-                    _thumbnailCacheMode?.description ?? 
-                    'Uses the default setting configured globally in App Settings.',
+                    _thumbnailCacheMode?.description ??
+                        'Uses the default setting configured globally in App Settings.',
                     style: textTheme.bodySmall
                         ?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
                   ),
@@ -303,8 +299,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                     icon: Icon(Icons.delete_outline_rounded,
                         size: 18, color: cs.error),
                     label: Text('Remove from dashboard',
-                        style:
-                            textTheme.labelLarge?.copyWith(color: cs.error)),
+                        style: textTheme.labelLarge?.copyWith(color: cs.error)),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -315,7 +310,8 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                       minimumSize: const Size(double.infinity, 48)),
                   child: _saving
                       ? SizedBox(
-                          width: 20, height: 20,
+                          width: 20,
+                          height: 20,
                           child: CircularProgressIndicator(
                               strokeWidth: 2.5,
                               valueColor:

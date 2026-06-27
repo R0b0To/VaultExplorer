@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <memory>
 #include <algorithm>
-#include <mutex>       // FIX: Add per-volume mutex
+#include <mutex>
 
 #include "mbedtls/md.h"
 #include "mbedtls/pkcs5.h"
@@ -24,7 +24,7 @@
 #define MAX_VOLUMES FF_VOLUMES
 
 // ----------------------------------------------------------------====
-// NAMED CONSTANTS  (FIX: replace magic numbers throughout)
+// NAMED CONSTANTS
 // ----------------------------------------------------------------====
 
 static constexpr size_t VC_SALT_SIZE            = 64;
@@ -35,14 +35,14 @@ static constexpr size_t IO_BUFFER_SIZE          = 262144;   // 256 KB
 static constexpr int    VC_KEY_OFFSET_PRIMARY   = 252;
 static constexpr int    VC_KEY_OFFSET_SECONDARY = 192;
 static constexpr int    VC_KEY_MATERIAL_LEN     = 64;
-static constexpr size_t MAX_DIR_ENTRIES         = 50000;    // FIX: bound directory listing
+static constexpr size_t MAX_DIR_ENTRIES         = 50000;
 static constexpr uint64_t SCAN_SECTORS          = 2048;
 static constexpr uint64_t SCAN_BATCH            = 64;
 static constexpr int    MKFS_WORK_BUF_SIZE      = 4096;
 static constexpr size_t MAX_CHUNK_SIZE          = 64 * 1024 * 1024; // 64 MB safety cap
 
 // ----------------------------------------------------------------====
-// RAII WRAPPERS  (FIX: prevent mbedTLS context leaks)
+// RAII WRAPPERS
 // ----------------------------------------------------------------====
 
 struct XtsContextPair {
@@ -58,7 +58,6 @@ struct XtsContextPair {
         mbedtls_aes_xts_free(&dec);
         mbedtls_aes_xts_free(&enc);
     }
-    // Non-copyable
     XtsContextPair(const XtsContextPair&) = delete;
     XtsContextPair& operator=(const XtsContextPair&) = delete;
 };
@@ -73,10 +72,7 @@ struct MdContextGuard {
 // GLOBAL STATE
 // ----------------------------------------------------------------====
 
-// FIX: Per-volume C++ mutex — Kotlin locks protect the JNI boundary,
-//      but these guard the C-level global arrays themselves.
 static std::mutex    volumeMutex[MAX_VOLUMES];
-// FIX: Separate mutex for slot allocation in createContainerNative
 static std::mutex    slotAllocMutex;
 
 static int           activeFd[MAX_VOLUMES];
@@ -182,8 +178,6 @@ extern "C" DSTATUS disk_status(BYTE pdrv)     { return 0; }
 extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     if (pdrv >= MAX_VOLUMES || activeFd[pdrv] < 0 || !isDataCtxInitialized[pdrv])
         return RES_NOTRDY;
-
-    // FIX: tighter bounds check
     if (count == 0 || count > 8192) return RES_PARERR;
 
     const uint64_t basePhysical = activeDataOffset[pdrv] / 512;
@@ -192,9 +186,17 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     const uint64_t firstPhysical = basePhysical + sector;
     const size_t   totalBytes    = static_cast<size_t>(count) * 512;
 
-    std::unique_ptr<unsigned char[]> encBuf(new unsigned char[totalBytes]);
+    // Fast stack allocation for standard read chunks (keeps UI scrolling responsive)
+    alignas(16) unsigned char stackBuf[65536];
+    unsigned char* encBuf = stackBuf;
+    std::unique_ptr<unsigned char[]> heapBuf;
 
-    ssize_t got = pread(fd, encBuf.get(), totalBytes,
+    if (totalBytes > sizeof(stackBuf)) {
+        heapBuf.reset(new unsigned char[totalBytes]);
+        encBuf = heapBuf.get();
+    }
+
+    ssize_t got = pread(fd, encBuf, totalBytes,
                         static_cast<off_t>(firstPhysical * 512));
     if (got < static_cast<ssize_t>(totalBytes)) return RES_ERROR;
 
@@ -202,8 +204,8 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         const uint64_t physSector = firstPhysical + i;
         const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
         decryptSector(&activeDataCtxDec[pdrv], tweak,
-                      encBuf.get() + (i * 512),
-                      buff         + (i * 512));
+                      encBuf + (i * 512),
+                      buff   + (i * 512));
     }
     return RES_OK;
 }
@@ -219,17 +221,24 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     const uint64_t firstPhysical = basePhysical + sector;
     const size_t   totalBytes    = static_cast<size_t>(count) * 512;
 
-    std::unique_ptr<unsigned char[]> encBuf(new unsigned char[totalBytes]);
+    alignas(16) unsigned char stackBuf[65536];
+    unsigned char* encBuf = stackBuf;
+    std::unique_ptr<unsigned char[]> heapBuf;
+
+    if (totalBytes > sizeof(stackBuf)) {
+        heapBuf.reset(new unsigned char[totalBytes]);
+        encBuf = heapBuf.get();
+    }
 
     for (UINT i = 0; i < count; i++) {
         const uint64_t physSector = firstPhysical + i;
         const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
         encryptSector(&activeDataCtxEnc[pdrv], tweak,
-                      buff        + (i * 512),
-                      encBuf.get() + (i * 512));
+                      buff   + (i * 512),
+                      encBuf + (i * 512));
     }
 
-    ssize_t written = pwrite(fd, encBuf.get(), totalBytes,
+    ssize_t written = pwrite(fd, encBuf, totalBytes,
                              static_cast<off_t>(firstPhysical * 512));
     return (written == static_cast<ssize_t>(totalBytes)) ? RES_OK : RES_ERROR;
 }
@@ -265,28 +274,32 @@ extern "C" DWORD get_fattime() { return 0; }
 // CRYPTO SESSION BUILDER
 // ----------------------------------------------------------------====
 
-// FIX: prepareSession now takes the fd as a transient parameter.
-//      activeFd[volId] is set for the duration of FatFs I/O and
-//      MUST be reset before this function returns.
-//      The caller is responsible for closing fd after use.
 bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive) {
     if (volId < 0 || volId >= MAX_VOLUMES) {
-        // FIX: always close fd on early exit
-        close(fd);
+        if (fd >= 0) close(fd);
         return false;
     }
 
-    // FIX: Hold volume mutex for the entire session setup
     std::lock_guard<std::mutex> lock(volumeMutex[volId]);
 
-    if (!forceDerive && isDataCtxInitialized[volId]) {
-        struct stat st;
-        if (fstat(fd, &st) == 0)
-            activeFileSize[volId] = static_cast<uint64_t>(st.st_size);
-        // FIX: store fd for FatFs disk hooks; caller closes after the JNI call completes
-        activeFd[volId] = fd;
+    // Persistent connection hit
+    if (!forceDerive && isDataCtxInitialized[volId] && activeFd[volId] >= 0) {
+        if (fd >= 0) close(fd);
         return true;
     }
+
+    if (!forceDerive && isDataCtxInitialized[volId]) {
+        if (fd >= 0) {
+            struct stat st;
+            if (fstat(fd, &st) == 0)
+                activeFileSize[volId] = static_cast<uint64_t>(st.st_size);
+            activeFd[volId] = fd;
+            return true;
+        }
+        return false;
+    }
+
+    if (fd < 0) return false;
 
     LOGI("Running PBKDF2 Key Derivation for Volume %d...", volId);
 
@@ -318,7 +331,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
 
     unsigned char decH[VC_HEADER_BODY_SIZE];
     {
-        // FIX: RAII for header decryption XTS context
         XtsContextPair hdrXts;
         mbedtls_aes_xts_setkey_dec(&hdrXts.dec, hKey, 512);
         const unsigned char zTw[16] = {0};
@@ -339,9 +351,7 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     unsigned char dKey[VC_KEY_MATERIAL_LEN];
     bool fsFound = false;
 
-    // FIX: Use RAII pair — freed automatically on all exit paths
     XtsContextPair candidate;
-
     std::unique_ptr<unsigned char[]> encBatch(new unsigned char[SCAN_BATCH * 512]);
     unsigned char decS[512];
     unsigned char tweak[16];
@@ -399,15 +409,12 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     mbedtls_aes_xts_setkey_enc(&candidate.enc, dKey, 512);
     mbedtls_platform_zeroize(dKey, sizeof(dKey));
 
-    // Commit: free old contexts and move in the new ones
     if (isDataCtxInitialized[volId]) {
         mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
         mbedtls_aes_xts_free(&activeDataCtxEnc[volId]);
     }
-    // Transfer ownership by copying context bytes (mbedTLS contexts are plain structs)
     activeDataCtxDec[volId] = candidate.dec;
     activeDataCtxEnc[volId] = candidate.enc;
-    // Prevent RAII destructor from double-freeing what we just transferred
     mbedtls_aes_xts_init(&candidate.dec);
     mbedtls_aes_xts_init(&candidate.enc);
 
@@ -417,7 +424,7 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
 }
 
 // ----------------------------------------------------------------====
-// SHARED: directory listing
+// SHARED: Directory listing
 // ----------------------------------------------------------------====
 
 static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pathSuffix) {
@@ -432,7 +439,6 @@ static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pa
     FILINFO fno;
     if (f_opendir(&dir, fullPath.c_str()) == FR_OK) {
         while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
-            // FIX: bound the result set to prevent DoS from malformed containers
             if (results.size() >= MAX_DIR_ENTRIES) {
                 results.push_back("System:TRUNCATED");
                 LOGI("buildDirectoryListing: truncated at %zu entries", MAX_DIR_ENTRIES);
@@ -489,13 +495,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
-    // FIX: fd is closed by prepareSession on failure; on success activeFd[volId] == fd.
-    // Reset activeFd so it isn't used after close.
-    {
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-    }
-    close(fd);
+    // Keep raw fd persistently open in activeFd[volId] cache
     return result;
 }
 
@@ -526,9 +526,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndExtractNative(
                 f_close(&f);
             }
         }
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-        close(fd);
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -567,9 +564,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFileNative(
                 f_close(&f);
             }
         }
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-        close(fd);
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -593,9 +587,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFileNative(
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
             success = (f_unlink(fatPath.c_str()) == FR_OK);
         }
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-        close(fd);
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -609,7 +600,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
 
     std::lock_guard<std::mutex> lock(volumeMutex[volId]);
 
-    // FIX: close any lingering fd before zeroing state
     if (activeFd[volId] >= 0) {
         close(activeFd[volId]);
     }
@@ -646,9 +636,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSizeNative(
                 f_close(&f);
             }
         }
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-        close(fd);
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -662,10 +649,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunkNative(
         jint fd, jstring password, jint pim,
         jstring targetFileName, jlong offset, jint length, jint volId) {
 
-    // FIX: Enforce a maximum chunk size to prevent memory exhaustion
     if (length <= 0 || static_cast<size_t>(length) > MAX_CHUNK_SIZE) {
         LOGI("readFileChunkNative: invalid length %d", length);
-        close(fd);
+        if (fd >= 0) close(fd);
         return nullptr;
     }
 
@@ -689,9 +675,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunkNative(
                 f_close(&f);
             }
         }
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-        close(fd);
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -712,9 +695,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectoryNative(
         if (ensureMounted(volId)) {
             result = buildDirectoryListing(env, volId, nativePath);
         }
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-        close(fd);
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -736,9 +716,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectoryNative(
             std::string fullPath = std::string(drivePaths[volId]) + "/" + nativePath;
             success = (f_mkdir(fullPath.c_str()) == FR_OK);
         }
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-        close(fd);
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -763,9 +740,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFileNative(
             std::string fullNew = std::string(drivePaths[volId]) + "/" + nativeNew;
             success = (f_rename(fullOld.c_str(), fullNew.c_str()) == FR_OK);
         }
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-        close(fd);
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -791,9 +765,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfoNative(
                 freeBytes  = static_cast<jlong>(fre_clust)        * fs->csize * 512;
             }
         }
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-        close(fd);
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -814,7 +785,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 
     bool success = false;
 
-    // Sensitive key material — stack-allocated and zeroed on all exit paths
     unsigned char salt[VC_SALT_SIZE]               = {0};
     unsigned char combinedMasterKey[VC_KEY_MATERIAL_LEN] = {0};
 
@@ -824,7 +794,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             break;
         }
 
-        // FIX: Slot allocation is now mutex-protected
         int volId = -1;
         {
             std::lock_guard<std::mutex> allocLock(slotAllocMutex);
@@ -909,7 +878,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 
         unsigned char encBody[VC_HEADER_BODY_SIZE];
         {
-            // FIX: RAII for header encryption context
             XtsContextPair hdrXts;
             mbedtls_aes_xts_setkey_enc(&hdrXts.enc, headerKey, 512);
             const unsigned char zeroTweak[16] = {0};
@@ -933,7 +901,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         }
 
         {
-            // FIX: RAII for data encryption context
             XtsContextPair dataXts;
             mbedtls_aes_xts_setkey_enc(&dataXts.enc, combinedMasterKey, 512);
 
@@ -970,7 +937,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 
         fsync(fd);
 
-        // Format the new container
+        // Format drive
         {
             std::lock_guard<std::mutex> vlock(volumeMutex[volId]);
 
@@ -1004,7 +971,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             LOGI("createContainer: f_mkfs result=%d fmt=%d exfat=%d",
                  (int)fr, (int)mp.fmt, (int)useExFat);
 
-            // Tear down the temporary mount before releasing the lock
             f_mount(nullptr, drivePaths[volId], 0);
             fsMounted[volId]          = false;
             activeFd[volId]           = -1;
@@ -1027,13 +993,12 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 
     } while (false);
 
-    // FIX: always zero key material on all paths
     mbedtls_platform_zeroize(combinedMasterKey, sizeof(combinedMasterKey));
     mbedtls_platform_zeroize(salt, sizeof(salt));
 
     env->ReleaseStringUTFChars(password, nativePass);
     env->ReleaseStringUTFChars(fileSystem, nativeFS);
-    close(fd);
+    close(fd); // Closing temporary container write-fd is expected here
 
     return success ? JNI_TRUE : JNI_FALSE;
 }
@@ -1046,10 +1011,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunkNative(
 
     jsize len = env->GetArrayLength(data);
 
-    // FIX: Validate chunk size before proceeding
     if (len <= 0 || static_cast<size_t>(len) > MAX_CHUNK_SIZE) {
         LOGI("writeFileChunkNative: invalid length %d", (int)len);
-        close(fd);
+        if (fd >= 0) close(fd);
         return JNI_FALSE;
     }
 
@@ -1063,7 +1027,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunkNative(
         if (ensureMounted(volId)) {
             FIL f;
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            // FIX: Use FA_CREATE_ALWAYS when writing from offset 0 to prevent stale tail bytes
             BYTE openMode = (offset == 0)
                 ? (FA_WRITE | FA_CREATE_ALWAYS)
                 : (FA_WRITE | FA_OPEN_ALWAYS);
@@ -1078,9 +1041,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunkNative(
                 f_close(&f);
             }
         }
-        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-        activeFd[volId] = -1;
-        close(fd);
     }
 
     env->ReleaseByteArrayElements(data, body, JNI_ABORT);

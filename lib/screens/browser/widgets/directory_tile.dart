@@ -27,7 +27,7 @@ class DirectoryTile extends StatelessWidget {
     return ListTile(
       dense: true,
       selected: selected,
-      selectedTileColor: cs.primaryContainer.withOpacity(0.3),
+      selectedTileColor: cs.primaryContainer.withValues(alpha:0.3),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Icon(
         Icons.folder_rounded,
@@ -51,7 +51,7 @@ class DirectoryTile extends StatelessWidget {
           : Icon(
               Icons.chevron_right_rounded, 
               size: 20, 
-              color: cs.onSurfaceVariant.withOpacity(0.7),
+              color: cs.onSurfaceVariant.withValues(alpha:0.7),
             ),
       onTap: onTap,
       onLongPress: onLongPress,

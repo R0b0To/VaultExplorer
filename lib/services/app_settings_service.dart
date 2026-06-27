@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
+import '../models/thumbnail_cache_mode.dart';
 import 'vaultexplorer_api.dart';
 import 'container_repository.dart';
 
@@ -28,6 +29,10 @@ class AppSettings {
   bool defaultDocumentProvider;
   bool videoAutoPlay;
 
+  /// App-wide default thumbnail cache mode, applied to every container whose
+  /// [ContainerRecord.thumbnailCacheMode] is null.
+  ThumbnailCacheMode defaultThumbnailCacheMode;
+
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
 
@@ -36,6 +41,7 @@ class AppSettings {
     this.masterPasswordIsFingerprint = false,
     this.defaultDocumentProvider = false,
     this.videoAutoPlay = true,
+    this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
     String? masterPasswordHash,
     String? masterPasswordSalt,
   })  : _masterPasswordHash = masterPasswordHash,
@@ -68,18 +74,21 @@ class AppSettings {
         'masterPasswordIsFingerprint': masterPasswordIsFingerprint,
         'defaultDocumentProvider': defaultDocumentProvider,
         'videoAutoPlay': videoAutoPlay,
+        'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
-        useMasterPassword: j['useMasterPassword'] as bool? ?? false,
-        masterPasswordIsFingerprint:
-            j['masterPasswordIsFingerprint'] as bool? ?? false,
-        defaultDocumentProvider: j['defaultDocumentProvider'] as bool? ??
-            j['mountAsDocumentProvider'] as bool? ?? false,
-        videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
-        // Hash material is NOT loaded here — AppSettingsService.loadSettings
-        // reads it separately from Keystore.
-      );
+      useMasterPassword: j['useMasterPassword'] as bool? ?? false,
+      masterPasswordIsFingerprint:
+          j['masterPasswordIsFingerprint'] as bool? ?? false,
+      defaultDocumentProvider: j['defaultDocumentProvider'] as bool? ??
+          j['mountAsDocumentProvider'] as bool? ?? false,
+      videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
+      
+      // Resolve nullable parsed mode and default to appCache if null
+      defaultThumbnailCacheMode: ThumbnailCacheMode.fromJson(
+          j['defaultThumbnailCacheMode'] as String?) ?? ThumbnailCacheMode.appCache,
+    );
 
   // ── Password verification ─────────────────────────────────────────────────
 
@@ -191,6 +200,4 @@ class AppSettingsService {
     await _secure.delete(key: _kMasterSalt);
     await saveSettings(settings);
   }
-
-
 }

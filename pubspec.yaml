@@ -16,8 +16,9 @@ dependencies:
   fvp: ^0.37.2 # FFmpeg-backed drop-in engine replacement for video_player
   get_thumbnail_video: ^0.7.3
   local_auth: ^2.3.0
-  pointycastle: ^4.0.0
+  pointycastle: ^3.6.2
   flutter_secure_storage: 10.3.1
+  encrypt: ^5.0.3
 
 dev_dependencies:
   flutter_test:

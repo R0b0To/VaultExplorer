@@ -46,6 +46,7 @@ private object ChannelMethods {
     const val OPEN_WITH_APP       = "openWithApp"
     const val GET_VIDEO_THUMBNAIL = "getVideoThumbnail"
     const val HASH_PASSWORD       = "hashPassword"
+    const val WRITE_FILE_CHUNK    = "writeFileChunk"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -569,6 +570,33 @@ class MainActivity : FlutterFragmentActivity() {
                             type = getMimeType(fileName)
                             putExtra(Intent.EXTRA_TITLE, fileName)
                         }, EXPORT_FILE_REQUEST)
+                    }
+
+                    ChannelMethods.WRITE_FILE_CHUNK -> {
+                        val uriString = call.argument<String>("filePath")
+                        val fileName  = call.argument<String>("fileName")
+                        val offset    = call.argument<Number>("offset")?.toLong() ?: 0L
+                        val data      = call.argument<ByteArray>("data")
+                        
+                        if (uriString == null || fileName == null || data == null) {
+                            result.error("INVALID_ARGS", "filePath, fileName and data required", null)
+                            return@setMethodCallHandler
+                        }
+                        
+                        Thread {
+                            try {
+                                val volId   = VeraCryptSession.getVolumeIdByUri(uriString) ?: 0
+                                val pfd     = contentResolver.openFileDescriptor(Uri.parse(uriString), "rw")
+                                    ?: throw Exception("Could not open fd")
+                                    
+                                val success = synchronized(VeraCryptSession.locks[volId]) {
+                                    VeraCryptEngine.writeFileChunkNative(pfd.detachFd(), "", 0, fileName, offset, data, volId)
+                                }
+                                runOnUiThread { result.success(success) }
+                            } catch (e: Exception) { 
+                                runOnUiThread { result.error("C++_ERROR", e.message, null) } 
+                            }
+                        }.start()
                     }
 
                     else -> result.notImplemented()

@@ -1,13 +1,15 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../models/mounted_container.dart';
+import '../../models/thumbnail_cache_mode.dart';
+import '../../services/app_settings_service.dart'; // Added
+import '../../services/container_repository.dart'; // Added
 import '../../services/cross_container_clipboard.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../utils/format_utils.dart';
-import '../../utils/temp_file_utils.dart';
 import 'browser_dialogs.dart';
 import 'media_viewer_screen.dart';
 import 'mixins/selection_mixin.dart';
@@ -45,7 +47,16 @@ class PathSegment {
 
 class FileBrowserScreen extends StatefulWidget {
   final MountedContainer container;
-  const FileBrowserScreen({super.key, required this.container});
+
+  /// Optional override. If null, resolved internally from the container record
+  /// with fallback to [AppSettings.defaultThumbnailCacheMode].
+  final ThumbnailCacheMode? thumbnailCacheMode;
+
+  const FileBrowserScreen({
+    super.key,
+    required this.container,
+    this.thumbnailCacheMode, // Changed to nullable optional
+  });
 
   @override
   State<FileBrowserScreen> createState() => _FileBrowserScreenState();
@@ -71,6 +82,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
   String? _currentFilter;
 
+  // State-resolved cache mode
+  ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
+
   static const _imageExts    = {'jpg', 'jpeg', 'png', 'gif', 'webp'};
   static const _videoExts    = {'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv'};
   static const _audioExts    = {'mp3', 'm4a', 'wav', 'flac', 'ogg', 'aac'};
@@ -82,13 +96,40 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   void initState() {
     super.initState();
     _freeSpace = widget.container.freeSpace;
-    _loadDirectoryContents('');
+    _initSettingsAndContents(); // Changed from _loadDirectoryContents('')
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  // ── Init settings and contents ────────────────────────────────────────────
+
+  Future<void> _initSettingsAndContents() async {
+    setState(() => _isLoading = true);
+    try {
+      if (widget.thumbnailCacheMode != null) {
+        _resolvedThumbnailCacheMode = widget.thumbnailCacheMode!;
+      } else {
+        // Resolve cache settings internally from persistent stores
+        final appSettings = await AppSettingsService.loadSettings();
+        final records = await ContainerRepository.instance.loadAll();
+        final record = records[widget.container.uri];
+        
+        if (mounted) {
+          setState(() {
+            _resolvedThumbnailCacheMode =
+                record?.thumbnailCacheMode ?? appSettings.defaultThumbnailCacheMode;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to resolve thumbnail cache mode: $e');
+    }
+    // Load directory contents once the settings are resolved
+    await _loadDirectoryContents(_currentDirPath);
   }
 
   // ── Inline status ─────────────────────────────────────────────────────────
@@ -276,7 +317,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _videoExts.contains(ext) ||
         _audioExts.contains(ext);
   }
-
 
   Future<List<String>> _scanMediaRecursively(String dirPath) async {
     final foundFiles  = <String>[];
@@ -511,29 +551,25 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
 
         try {
-          if (sameContainer && isCut) {
-            final ok = await vaultExplorerApi.renameFile(
-                widget.container, srcPath, destPath);
-            if (!ok) failCount++;
-          } else if (sameContainer && !isCut) {
-            final ok = await _copyEntryWithinContainer(
-                srcPath, destPath, isDir, tmpDir, createdDestPaths);
-            if (!ok) failCount++;
-          } else {
-            final ok = await _copyEntryAcrossContainers(
-              srcContainer: srcContainer,
-              destContainer: widget.container,
-              srcPath: srcPath,
-              destPath: destPath,
-              isDir: isDir,
-              tmpDir: tmpDir,
-              createdDestPaths: createdDestPaths,
-            );
-            if (!ok) failCount++;
-            if (ok && isCut) {
-              await _deleteEntryRecursive(srcContainer, srcPath, isDir);
-            }
-          }
+          // Inside your _paste() method, update the internal loop calls:
+if (sameContainer && !isCut) {
+  final ok = await _copyEntryWithinContainer(
+      srcPath, destPath, isDir, createdDestPaths); // Removed tmpDir
+  if (!ok) failCount++;
+} else if (!sameContainer) {
+  final ok = await _copyEntryAcrossContainers(
+    srcContainer: srcContainer,
+    destContainer: widget.container,
+    srcPath: srcPath,
+    destPath: destPath,
+    isDir: isDir,
+    createdDestPaths: createdDestPaths, // Removed tmpDir
+  );
+  if (!ok) failCount++;
+  if (ok && isCut) {
+    await _deleteEntryRecursive(srcContainer, srcPath, isDir);
+  }
+}
         } on _DiskFullException {
           diskFull = true;
           break;
@@ -584,7 +620,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   // ── Conflict helpers ──────────────────────────────────────────────────────
 
-  /// Returns a name not present in [existingNames] (case-insensitive).
   static String makeUniqueName(String fileName, Set<String> existingNames) {
     if (!existingNames.contains(fileName.toLowerCase())) return fileName;
     final dotIdx = fileName.lastIndexOf('.');
@@ -697,25 +732,44 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     String srcPath,
     String destPath,
     bool isDir,
-    Directory tmpDir,
-    List<String> createdDestPaths,
+    List<String> createdDestPaths, // Removed unused tmpDir parameter
   ) async {
     if (!isDir) {
-      final tempFile =
-          File(TempFileUtils.uniquePath(tmpDir, prefix: 'cb_copy'));
       try {
-        final decOk = await vaultExplorerApi.decryptFile(
-            widget.container, srcPath, tempFile.path);
-        if (!decOk) return false;
-        final ok = await vaultExplorerApi.writeBackFile(
-            widget.container, destPath, tempFile.path);
-        if (!ok) throw const _DiskFullException();
+        final size = await vaultExplorerApi.getFileSize(widget.container, srcPath);
+        if (size < 0) return false;
+
+        // Clear any pre-existing file at the destination
+        await vaultExplorerApi.deleteFile(widget.container, destPath);
+
+        if (size == 0) {
+          final ok = await vaultExplorerApi.createEmptyFile(widget.container, destPath);
+          if (ok) createdDestPaths.add(destPath);
+          return ok;
+        }
+
+        int offset = 0;
+        const int chunkSize = 256 * 1024; // Stream in efficient 256 KB blocks in memory
+
+        while (offset < size) {
+          final chunkLen = min(size - offset, chunkSize);
+          final chunk = await vaultExplorerApi.readFileChunk(
+              widget.container, srcPath, offset, chunkLen);
+          if (chunk == null || chunk.isEmpty) return false;
+
+          final ok = await vaultExplorerApi.writeFileChunk(
+              widget.container, destPath, offset, chunk);
+          if (!ok) throw const _DiskFullException();
+          
+          offset += chunk.length;
+        }
         createdDestPaths.add(destPath);
         return true;
-      } finally {
-        if (await tempFile.exists()) await tempFile.delete();
+      } catch (_) {
+        return false;
       }
     }
+    
     final children =
         await vaultExplorerApi.listDirectory(widget.container, srcPath) ?? [];
     await vaultExplorerApi.createDirectory(widget.container, destPath);
@@ -731,7 +785,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         '$srcPath/$childName',
         '$destPath/$childName',
         childIsDir,
-        tmpDir,
         createdDestPaths,
       );
       if (!ok) allOk = false;
@@ -747,25 +800,43 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     required String srcPath,
     required String destPath,
     required bool isDir,
-    required Directory tmpDir,
-    required List<String> createdDestPaths,
+    required List<String> createdDestPaths, // Removed unused tmpDir parameter
   }) async {
     if (!isDir) {
-      final tempFile =
-          File(TempFileUtils.uniquePath(tmpDir, prefix: 'xclip'));
       try {
-        final decOk = await vaultExplorerApi.decryptFile(
-            srcContainer, srcPath, tempFile.path);
-        if (!decOk) return false;
-        final ok = await vaultExplorerApi.writeBackFile(
-            destContainer, destPath, tempFile.path);
-        if (!ok) throw const _DiskFullException();
+        final size = await vaultExplorerApi.getFileSize(srcContainer, srcPath);
+        if (size < 0) return false;
+
+        await vaultExplorerApi.deleteFile(destContainer, destPath);
+
+        if (size == 0) {
+          final ok = await vaultExplorerApi.createEmptyFile(destContainer, destPath);
+          if (ok) createdDestPaths.add(destPath);
+          return ok;
+        }
+
+        int offset = 0;
+        const int chunkSize = 256 * 1024; // Stream in 256 KB blocks
+
+        while (offset < size) {
+          final chunkLen = min(size - offset, chunkSize);
+          final chunk = await vaultExplorerApi.readFileChunk(
+              srcContainer, srcPath, offset, chunkLen);
+          if (chunk == null || chunk.isEmpty) return false;
+
+          final ok = await vaultExplorerApi.writeFileChunk(
+              destContainer, destPath, offset, chunk);
+          if (!ok) throw const _DiskFullException();
+
+          offset += chunk.length;
+        }
         createdDestPaths.add(destPath);
         return true;
-      } finally {
-        if (await tempFile.exists()) await tempFile.delete();
+      } catch (_) {
+        return false;
       }
     }
+    
     final children =
         await vaultExplorerApi.listDirectory(srcContainer, srcPath) ?? [];
     await vaultExplorerApi.createDirectory(destContainer, destPath);
@@ -783,7 +854,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         srcPath: '$srcPath/$childName',
         destPath: '$destPath/$childName',
         isDir: childIsDir,
-        tmpDir: tmpDir,
         createdDestPaths: createdDestPaths,
       );
       if (!ok) allOk = false;
@@ -1239,6 +1309,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         isSelectionMode: isSelectionMode,
         selectedItems: selectedItems,
         currentDirPath: _currentDirPath,
+        thumbnailCacheMode: _resolvedThumbnailCacheMode, // <-- Update to state-resolved mode
         onDirTap: _handleDirTap,
         onFileTap: _handleFileTap,
         onItemLongPress: _handleItemLongPress,

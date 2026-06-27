@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../models/thumbnail_cache_mode.dart';
+import '../../../services/app_settings_service.dart'; // Added
 import '../../../services/container_repository.dart';
 
 class ContainerConfigSheet extends StatefulWidget {
@@ -28,6 +30,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
   late bool _showPassword;
   late int  _autoCloseMins;
   late bool _documentProvider;
+  late ThumbnailCacheMode? _thumbnailCacheMode;
   bool _saving          = false;
   bool _loadingPassword = true;
 
@@ -44,15 +47,36 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
     _showPassword   = false;
     _autoCloseMins  = rec?.autoCloseMins ?? 0;
     _documentProvider = rec?.documentProvider ?? false;
-    _loadSavedPassword();
+    _thumbnailCacheMode = rec?.thumbnailCacheMode;
+    _loadSavedPasswordAndSettings(); // Updated method name
   }
 
-  Future<void> _loadSavedPassword() async {
+  Future<void> _loadSavedPasswordAndSettings() async {
+    // 1. Load default app settings to resolve the fallback cache mode
+    try {
+      final settings = await AppSettingsService.loadSettings();
+      if (mounted) {
+        setState(() {
+          // If the record has no caching preference (null), resolve to global default
+          _thumbnailCacheMode ??= settings.defaultThumbnailCacheMode;
+        });
+      }
+    } catch (_) {
+      // Safe fallback
+      if (mounted) {
+        setState(() {
+          _thumbnailCacheMode ??= ThumbnailCacheMode.appCache;
+        });
+      }
+    }
+
+    // 2. Load passwords if applicable
     if (widget.existingRecord?.rememberPassword == true) {
       final plain =
           await ContainerRepository.instance.getPassword(widget.uri);
       if (mounted) _passwordCtrl.text = plain ?? '';
     }
+    
     if (mounted) setState(() => _loadingPassword = false);
   }
 
@@ -78,6 +102,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
       rememberPassword: _rememberPassword,
       autoCloseMins: _autoCloseMins,
       documentProvider: _documentProvider,
+      thumbnailCacheMode: _thumbnailCacheMode,
       pendingPassword: _rememberPassword && _passwordCtrl.text.isNotEmpty
           ? _passwordCtrl.text
           : null,
@@ -225,6 +250,47 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                   cs: cs,
                   onChanged: (v) =>
                       setState(() => _documentProvider = v),
+                ),
+                const SizedBox(height: 16),
+
+                /// ── Thumbnail Caching ───────────────────────────────────────
+                _SectionHeader('THUMBNAIL CACHING', cs),
+                const SizedBox(height: 10),
+                // Guard rendering with a loader until AppSettings completes loading
+                if (_loadingPassword)
+                  const Center(
+                      child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2)))
+                else
+                  DropdownButtonFormField<ThumbnailCacheMode?>(
+                    value: _thumbnailCacheMode,
+                    decoration: const InputDecoration(
+                      labelText: 'Thumbnail Cache Mode',
+                      prefixIcon: Icon(Icons.cached_rounded, size: 18),
+                    ),
+                    items: [
+                      ...ThumbnailCacheMode.values.map((mode) {
+                        return DropdownMenuItem<ThumbnailCacheMode?>(
+                          value: mode,
+                          child: Text(mode.label),
+                        );
+                      }),
+                    ],
+                    onChanged: (v) {
+                      setState(() => _thumbnailCacheMode = v);
+                    },
+                  ),
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    _thumbnailCacheMode?.description ?? 
+                    'Uses the default setting configured globally in App Settings.',
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
+                  ),
                 ),
                 const SizedBox(height: 24),
 

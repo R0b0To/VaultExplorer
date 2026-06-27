@@ -216,6 +216,20 @@ class VaultExplorerApi {
     return result ?? false;
   }
 
+  Future<bool> writeFileChunk(
+      MountedContainer container, String fileName, int offset, Uint8List data) async {
+    final result = await _channel.invokeMethod<bool>(
+      'writeFileChunk',
+      {
+        'filePath': container.uri,
+        'fileName': fileName,
+        'offset':   offset,
+        'data':     data,
+      },
+    );
+    return result ?? false;
+  }
+
   Future<bool> deleteFile(MountedContainer container, String fileName) async {
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.deleteFile,

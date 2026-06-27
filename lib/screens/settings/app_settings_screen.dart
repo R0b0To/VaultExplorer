@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
+import '../../models/thumbnail_cache_mode.dart';
 import '../../services/app_settings_service.dart';
 
 class AppSettingsScreen extends StatefulWidget {
@@ -312,6 +313,34 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     cs: cs,
                     onChanged: (v) =>
                         setState(() => _settings.defaultDocumentProvider = v),
+                  ),
+                  const Divider(height: 24),
+                  DropdownButtonFormField<ThumbnailCacheMode>(
+                    value: _settings.defaultThumbnailCacheMode,
+                    decoration: const InputDecoration(
+                      labelText: 'Thumbnail Caching (default)',
+                      prefixIcon: Icon(Icons.cached_rounded, size: 18),
+                    ),
+                    items: ThumbnailCacheMode.values.map((mode) {
+                      return DropdownMenuItem(
+                        value: mode,
+                        child: Text(mode.label),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() => _settings.defaultThumbnailCacheMode = v);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      _settings.defaultThumbnailCacheMode.description,
+                      style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant, height: 1.4),
+                    ),
                   ),
                 ]),
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
+import '../models/thumbnail_cache_mode.dart';
 
 /// Unified repository for per-container state.
 ///
@@ -11,7 +12,6 @@ import 'package:path_provider/path_provider.dart';
 /// Lifecycle: [add] → [update] → [remove] atomically handles all three
 /// backing stores: the JSON index, the config JSON, and Android Keystore.
 ///
-
 class ContainerRepository {
   ContainerRepository._();
   static final ContainerRepository instance = ContainerRepository._();
@@ -113,12 +113,19 @@ class ContainerRepository {
 ///
 /// [pendingPassword] is transient — it is written to Keystore during [save]
 /// and is never serialised to the JSON file.
+///
+/// [thumbnailCacheMode] is null when the container should inherit the
+/// app-level default (see [AppSettings.defaultThumbnailCacheMode]).
 class ContainerRecord {
   final String uri;
   final String label;
   final bool rememberPassword;
   final int autoCloseMins;
   final bool documentProvider;
+
+  /// Per-container thumbnail cache override.
+  /// `null` means "use [AppSettings.defaultThumbnailCacheMode]".
+  final ThumbnailCacheMode? thumbnailCacheMode;
 
   /// Only populated when the caller wants to update the stored password.
   /// Not persisted to JSON.
@@ -130,6 +137,7 @@ class ContainerRecord {
     this.rememberPassword = false,
     this.autoCloseMins = 0,
     this.documentProvider = false,
+    this.thumbnailCacheMode,  // null = inherit app default
     this.pendingPassword,
   });
 
@@ -138,6 +146,8 @@ class ContainerRecord {
     bool? rememberPassword,
     int? autoCloseMins,
     bool? documentProvider,
+    // Use an explicit sentinel so callers can set thumbnailCacheMode to null.
+    Object? thumbnailCacheMode = _keep,
     String? pendingPassword,
   }) {
     return ContainerRecord(
@@ -146,6 +156,9 @@ class ContainerRecord {
       rememberPassword: rememberPassword ?? this.rememberPassword,
       autoCloseMins: autoCloseMins ?? this.autoCloseMins,
       documentProvider: documentProvider ?? this.documentProvider,
+      thumbnailCacheMode: thumbnailCacheMode == _keep
+          ? this.thumbnailCacheMode
+          : thumbnailCacheMode as ThumbnailCacheMode?,
       pendingPassword: pendingPassword,
     );
   }
@@ -156,6 +169,8 @@ class ContainerRecord {
         'rememberPassword': rememberPassword,
         'autoCloseMins': autoCloseMins,
         'documentProvider': documentProvider,
+        if (thumbnailCacheMode != null)
+          'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
         // pendingPassword is intentionally NOT serialised.
       };
 
@@ -166,5 +181,13 @@ class ContainerRecord {
         autoCloseMins: j['autoCloseMins'] as int? ?? 0,
         documentProvider: j['documentProvider'] as bool? ??
             j['mountAsDocumentProvider'] as bool? ?? false,
+        thumbnailCacheMode:
+            j.containsKey('thumbnailCacheMode')
+                ? ThumbnailCacheMode.fromJson(
+                    j['thumbnailCacheMode'] as String?)
+                : null, // null = inherit app default
       );
 }
+
+// Sentinel object for copyWith's nullable field pattern.
+const _keep = Object();

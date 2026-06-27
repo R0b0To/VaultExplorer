@@ -3,14 +3,16 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../../../models/mounted_container.dart';
+import '../../../models/thumbnail_cache_mode.dart';
+import '../../../services/thumbnail_cache_service.dart';
 import '../../../services/vaultexplorer_api.dart';
 import '../../../utils/file_type_utils.dart';
 import '../../../utils/format_utils.dart';
 import '../../../utils/lru_cache.dart';
+import 'dart:ui' as ui; // Added for hardware-accelerated resizing
 
 /// Maximum bytes read from an image file for thumbnail generation.
-/// PERF-02 fix: prevents loading a 20 MB RAW photo into RAM just to show a
-/// 180 px grid cell. Flutter's image decoder will handle downscaling.
+/// Prevents loading a large RAW/TIFF into RAM just to show a 180 px grid cell.
 const int _kThumbReadLimit = 512 * 1024; // 512 KB
 
 /// A dynamic gallery grid for the file browser supporting pinch-to-zoom.
@@ -21,6 +23,10 @@ class FileGridView extends StatefulWidget {
   final bool isSelectionMode;
   final Set<String> selectedItems;
   final String currentDirPath;
+
+  /// Effective thumbnail cache mode for this container.
+  /// Resolved by the caller from the container record + app default.
+  final ThumbnailCacheMode thumbnailCacheMode;
 
   final ValueChanged<String> onDirTap;
   final ValueChanged<String> onFileTap;
@@ -35,6 +41,7 @@ class FileGridView extends StatefulWidget {
     required this.isSelectionMode,
     required this.selectedItems,
     required this.currentDirPath,
+    required this.thumbnailCacheMode,
     required this.onDirTap,
     required this.onFileTap,
     required this.onItemLongPress,
@@ -100,6 +107,7 @@ class _FileGridViewState extends State<FileGridView> {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('FileGridView active cacheMode: ${widget.thumbnailCacheMode}');
     final total = widget.dirs.length + widget.files.length;
 
     return GestureDetector(
@@ -161,10 +169,16 @@ class _FileGridViewState extends State<FileGridView> {
     Widget previewWidget;
     if (isImg) {
       previewWidget = _EncryptedImageGridThumb(
-          container: widget.container, filePath: fullPath);
+        container: widget.container,
+        filePath: fullPath,
+        cacheMode: widget.thumbnailCacheMode,
+      );
     } else if (isVid) {
       previewWidget = _VideoThumb(
-          container: widget.container, filePath: fullPath);
+        container: widget.container,
+        filePath: fullPath,
+        cacheMode: widget.thumbnailCacheMode,
+      );
     } else {
       previewWidget = Center(
         child: Icon(
@@ -308,12 +322,14 @@ class _CheckBadge extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Generic async thumbnail loader
+// ─────────────────────────────────────────────────────────────────────────────
 
 typedef _FetchFn = Future<Uint8List> Function(
     MountedContainer container, String filePath);
 
-/// A stateful thumbnail loader that handles debouncing, concurrency limiting,
-/// LRU caching, and widget recycling cancellation generically.
+/// Handles debouncing, concurrency limiting, in-memory LRU caching,
+/// and widget-recycling cancellation generically.
 class _AsyncThumb extends StatefulWidget {
   final MountedContainer container;
   final String filePath;
@@ -463,31 +479,74 @@ class _AsyncThumbState extends State<_AsyncThumb> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Encrypted image thumbnail
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Encrypted image thumbnail ─────────────────────────────────────────────
 
 class _EncryptedImageGridThumb extends StatelessWidget {
+  // Shared across all instances — the in-memory LRU sits above the disk cache.
   static final _cache   = LruCache<String, Future<Uint8List>>(60);
   static final _limiter = ConcurrencyLimiter(3);
 
   final MountedContainer container;
   final String filePath;
+  final ThumbnailCacheMode cacheMode;
 
   const _EncryptedImageGridThumb({
     required this.container,
     required this.filePath,
+    required this.cacheMode,
   });
 
+  /// Downscales raw image bytes to a tiny thumbnail (e.g., 180px width)
+  /// using Flutter's built-in engine codecs (Skia / Impeller).
+  static Future<Uint8List> _resizeImage(Uint8List data, {required int targetWidth}) async {
+    final codec = await ui.instantiateImageCodec(
+      data,
+      targetWidth: targetWidth,
+    );
+    final frameInfo = await codec.getNextFrame();
+    final byteData = await frameInfo.image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) return data;
+    return byteData.buffer.asUint8List();
+  }
+
+  /// Fetch pipeline:
+  ///   1. Persistent disk cache hit (ThumbnailCacheService) -> returns small ~10KB bytes
+  ///   2. Container read via API (reads the original image)
+  ///   3. Downscale original image bytes to 180px width in memory
+  ///   4. Write downscaled result to disk cache (fire-and-forget)
   static Future<Uint8List> _fetch(
-      MountedContainer container, String path) async {
+    MountedContainer container,
+    String path,
+    ThumbnailCacheMode mode,
+  ) async {
+    // 1. Persistent cache hit? (Returns resized 10KB thumbnail if present)
+    final cached = await ThumbnailCacheService.get(
+        container: container, filePath: path, mode: mode);
+    if (cached != null && cached.isNotEmpty) return cached;
+
+    // 2. Read from container. (Reads full image on the absolute first cache miss)
     final size = await vaultExplorerApi.getFileSize(container, path);
     if (size <= 0) throw Exception('File is empty');
 
-    // PERF-02 fix: only read up to _kThumbReadLimit bytes.
-    // For JPEG/PNG the header and first few tiles are enough for a thumbnail.
-    final readLen = min(size, _kThumbReadLimit);
     final data = await vaultExplorerApi.readFileChunk(
         container, path, 0, size);
     if (data == null || data.isEmpty) throw Exception('No bytes read');
-    return data;
+
+    // 3. Generate downscaled thumbnail bytes
+    Uint8List thumbData;
+    try {
+      thumbData = await _resizeImage(data, targetWidth: 180);
+    } catch (_) {
+      thumbData = data; // Fallback to raw if decoding fails
+    }
+
+    // 4. Write the resized thumbnail to disk cache (non-blocking)
+    ThumbnailCacheService.put(
+        container: container, filePath: path, data: thumbData, mode: mode);
+
+    return thumbData;
   }
 
   @override
@@ -497,7 +556,7 @@ class _EncryptedImageGridThumb extends StatelessWidget {
         filePath: filePath,
         cache: _cache,
         limiter: _limiter,
-        fetchFn: _fetch,
+        fetchFn: (c, p) => _fetch(c, p, cacheMode),
         debounce: const Duration(milliseconds: 100),
       );
 }
@@ -512,13 +571,36 @@ class _VideoThumb extends StatelessWidget {
 
   final MountedContainer container;
   final String filePath;
+  final ThumbnailCacheMode cacheMode;
 
-  const _VideoThumb({required this.container, required this.filePath});
+  const _VideoThumb({
+    required this.container,
+    required this.filePath,
+    required this.cacheMode,
+  });
 
+  /// Fetch pipeline:
+  ///   1. Persistent disk cache
+  ///   2. Native getVideoThumbnail (JPEG bytes from the C++ layer)
+  ///   3. Write JPEG to disk cache (fire-and-forget)
   static Future<Uint8List> _fetch(
-      MountedContainer container, String path) async {
+    MountedContainer container,
+    String path,
+    ThumbnailCacheMode mode,
+  ) async {
+    // 1. Persistent cache hit?
+    final cached = await ThumbnailCacheService.get(
+        container: container, filePath: path, mode: mode);
+    if (cached != null && cached.isNotEmpty) return cached;
+
+    // 2. Ask the native layer for a JPEG thumbnail.
     final data = await vaultExplorerApi.getVideoThumbnail(container, path);
     if (data == null || data.isEmpty) return Uint8List(0);
+
+    // 3. Persist (non-blocking; empty results are not cached).
+    ThumbnailCacheService.put(
+        container: container, filePath: path, data: data, mode: mode);
+
     return data;
   }
 
@@ -535,7 +617,7 @@ class _VideoThumb extends StatelessWidget {
           filePath: filePath,
           cache: _cache,
           limiter: _limiter,
-          fetchFn: _fetch,
+          fetchFn: (c, p) => _fetch(c, p, cacheMode),
           debounce: const Duration(milliseconds: 150),
         ),
         // Play icon overlay — always visible regardless of thumb load state.
@@ -554,6 +636,8 @@ class _VideoThumb extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ConcurrencyLimiter
+// ─────────────────────────────────────────────────────────────────────────────
+
 class ConcurrencyLimiter {
   final int maxConcurrency;
   int _running = 0;
@@ -566,19 +650,14 @@ class ConcurrencyLimiter {
   Future<void> acquire(Completer<void> completer) async {
     if (_running < maxConcurrency) {
       _running++;
-      // Complete immediately — caller proceeds without entering the wait list.
       completer.complete();
       return;
     }
     _waiting.add(completer);
-    // Wait for release() to resolve our completer. May throw if cancelled.
     await completer.future;
-    // completer.future resolving means release() incremented _running for us
-    // before completing it (see _drainNext).
   }
 
   /// Cancels a waiting completer. Safe to call even if not in the list.
-  /// Does NOT touch [_running] because the slot was never acquired.
   void cancel(Completer<void> completer) {
     if (_waiting.remove(completer)) {
       if (!completer.isCompleted) {
@@ -589,7 +668,6 @@ class ConcurrencyLimiter {
 
   /// Releases a previously acquired slot and wakes the next waiter if any.
   void release() {
-    // Decrement first, then attempt to hand off to a waiter.
     _running = (_running - 1).clamp(0, maxConcurrency);
     _drainNext();
   }
@@ -597,12 +675,7 @@ class ConcurrencyLimiter {
   void _drainNext() {
     while (_waiting.isNotEmpty && _running < maxConcurrency) {
       final next = _waiting.removeLast();
-      if (next.isCompleted) {
-        // Already cancelled — skip without consuming a slot.
-        continue;
-      }
-      // Reserve the slot before completing so the waiter sees _running already
-      // incremented when it resumes from acquire().
+      if (next.isCompleted) continue;
       _running++;
       next.complete();
       return;

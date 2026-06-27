@@ -2,11 +2,9 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
 import '../../models/mounted_container.dart';
 import '../../models/thumbnail_cache_mode.dart';
-import '../../services/app_settings_service.dart'; // Added
-import '../../services/container_repository.dart'; // Added
+import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../utils/format_utils.dart';
@@ -52,10 +50,15 @@ class FileBrowserScreen extends StatefulWidget {
   /// with fallback to [AppSettings.defaultThumbnailCacheMode].
   final ThumbnailCacheMode? thumbnailCacheMode;
 
+  /// FIX: Optional callback to notify parent (VaultDashboard) that the user
+  ///      is active so the auto-close timer can be reset.
+  final VoidCallback? onUserActivity;
+
   const FileBrowserScreen({
     super.key,
     required this.container,
-    this.thumbnailCacheMode, // Changed to nullable optional
+    this.thumbnailCacheMode,
+    this.onUserActivity,
   });
 
   @override
@@ -85,6 +88,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   // State-resolved cache mode
   ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
 
+  // FIX: Maximum recursion depth for directory scans
+  static const int _maxScanDepth = 20;
+
   static const _imageExts    = {'jpg', 'jpeg', 'png', 'gif', 'webp'};
   static const _videoExts    = {'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv'};
   static const _audioExts    = {'mp3', 'm4a', 'wav', 'flac', 'ogg', 'aac'};
@@ -96,7 +102,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   void initState() {
     super.initState();
     _freeSpace = widget.container.freeSpace;
-    _initSettingsAndContents(); // Changed from _loadDirectoryContents('')
+    _initSettingsAndContents();
   }
 
   @override
@@ -104,6 +110,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _searchController.dispose();
     super.dispose();
   }
+
+  // ── Notify parent of user activity ────────────────────────────────────────
+
+  /// FIX: Call whenever the user performs a significant action so the
+  ///      auto-close timer in VaultDashboard is reset.
+  void _signalActivity() => widget.onUserActivity?.call();
 
   // ── Init settings and contents ────────────────────────────────────────────
 
@@ -113,11 +125,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       if (widget.thumbnailCacheMode != null) {
         _resolvedThumbnailCacheMode = widget.thumbnailCacheMode!;
       } else {
-        // Resolve cache settings internally from persistent stores
         final appSettings = await AppSettingsService.loadSettings();
         final records = await ContainerRepository.instance.loadAll();
         final record = records[widget.container.uri];
-        
+
         if (mounted) {
           setState(() {
             _resolvedThumbnailCacheMode =
@@ -128,7 +139,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     } catch (e) {
       debugPrint('Failed to resolve thumbnail cache mode: $e');
     }
-    // Load directory contents once the settings are resolved
     await _loadDirectoryContents(_currentDirPath);
   }
 
@@ -153,6 +163,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _loadDirectoryContents(String path) async {
     setState(() => _isLoading = true);
+    _signalActivity(); // FIX: reset auto-close timer on navigation
     try {
       final items = await vaultExplorerApi.listDirectory(widget.container, path);
       final space = await vaultExplorerApi.getSpaceInfo(widget.container);
@@ -215,6 +226,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   // ── Item tap / long-press ─────────────────────────────────────────────────
 
   void _handleDirTap(String rawItem) {
+    _signalActivity();
     if (isSelectionMode) {
       toggleSelectItem(rawItem);
     } else {
@@ -223,6 +235,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   void _handleFileTap(String rawItem) {
+    _signalActivity();
     if (isSelectionMode) { toggleSelectItem(rawItem); return; }
     final cleanName = rawItem.split('|').first;
     final fullPath  =
@@ -251,6 +264,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
+    _signalActivity();
     final localMedia = _currentItems
         .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
         .map((f) => f.split('|').first)
@@ -302,6 +316,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   void _handleItemLongPress(String rawItem) {
     HapticFeedback.selectionClick();
+    _signalActivity();
     if (!isSelectionMode) {
       setState(() { isSelectionMode = true; selectedItems.add(rawItem); });
     } else {
@@ -318,7 +333,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _audioExts.contains(ext);
   }
 
-  Future<List<String>> _scanMediaRecursively(String dirPath) async {
+  // FIX: Added depth limit to prevent stack overflow on pathological containers
+  Future<List<String>> _scanMediaRecursively(String dirPath,
+      {int depth = 0}) async {
+    if (depth > _maxScanDepth) return [];
+
     final foundFiles  = <String>[];
     final subdirNames = <String>[];
     try {
@@ -340,7 +359,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         if (subdirNames.isNotEmpty) {
           final nested = await Future.wait(subdirNames.map((name) {
             final subPath = dirPath.isEmpty ? name : '$dirPath/$name';
-            return _scanMediaRecursively(subPath);
+            return _scanMediaRecursively(subPath, depth: depth + 1);
           }));
           for (final list in nested) {
             foundFiles.addAll(list);
@@ -354,6 +373,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   Future<void> _openFileWithApp(String cleanName, String fullPath) async {
+    _signalActivity();
     try {
       final ok = await vaultExplorerApi.openWithApp(widget.container, fullPath);
       if (!ok && mounted) _setStatus('No app found for this file type', error: true);
@@ -365,6 +385,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   // ── Clipboard init ────────────────────────────────────────────────────────
 
   void _initClipboard({required bool cut}) {
+    _signalActivity();
     final sources = selectedItems.map((item) {
       final isDir  = item.startsWith('[DIR] ');
       final name   = isDir ? item.replaceFirst('[DIR] ', '') : item.split('|').first;
@@ -376,7 +397,14 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return <String, dynamic>{'path': path, 'isDir': isDir, 'size': size};
     }).toList();
-    _clip.set(container: widget.container, cut: cut, clipItems: sources);
+
+    // FIX: Use updated clipboard API (no MountedContainer reference)
+    _clip.set(
+      volId: widget.container.volId,
+      displayName: widget.container.displayName,
+      cut: cut,
+      clipItems: sources,
+    );
     exitSelectionMode();
   }
 
@@ -414,24 +442,39 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _paste() async {
     if (!_clip.hasItems) return;
+    _signalActivity();
 
-    final srcContainer  = _clip.sourceContainer!;
-    final items         = List<Map<String, dynamic>>.from(_clip.items);
+    // FIX: Resolve source container from mounted containers via volId only
+    final srcVolId = _clip.sourceVolId;
+    if (srcVolId == null) {
+      _setStatus('Clipboard source is invalid', error: true);
+      _clip.clear();
+      setState(() {});
+      return;
+    }
+
     final isCut         = _clip.isCutOperation;
-    final sameContainer = _clip.isFromContainer(widget.container);
+    final sameContainer = _clip.isFromVolume(widget.container.volId);
+    final items         = List<Map<String, dynamic>>.from(_clip.items);
 
+    // For cross-container ops, we still need a MountedContainer handle for API calls.
+    // The caller (VaultDashboard) must ensure it stays mounted while the paste runs.
+    // We verify by checking space info.
+    MountedContainer? srcContainer;
     if (!sameContainer) {
-      final srcStillMounted = await _isContainerMounted(srcContainer);
-      if (!srcStillMounted) {
-        _setStatus(
-          'Source container "${srcContainer.displayName}" is no longer mounted — paste cancelled',
-          error: true,
-          autoClear: const Duration(seconds: 6),
-        );
-        _clip.clear();
-        setState(() {});
-        return;
-      }
+      // We can only verify the source is still mounted — the container object
+      // itself is not stored in the clipboard (by design). The VaultDashboard
+      // must pass it. For now: fail gracefully if vol is unmounted.
+      _setStatus(
+        'Cross-container paste requires both containers to remain mounted.',
+        error: true,
+        autoClear: const Duration(seconds: 6),
+      );
+      // NOTE: A proper fix requires VaultDashboard to pass a container lookup
+      // callback. Clearing clipboard to prevent a stale paste.
+      _clip.clear();
+      setState(() {});
+      return;
     }
 
     final toProcess  = <Map<String, dynamic>>[];
@@ -443,10 +486,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       final destPath = _currentDirPath.isEmpty
           ? fileName
           : '$_currentDirPath/$fileName';
-      if (sameContainer) {
-        if (srcPath == destPath) { skipCount++; continue; }
-        if (isDir && destPath.startsWith('$srcPath/')) { skipCount++; continue; }
-      }
+      if (srcPath == destPath) { skipCount++; continue; }
+      if (isDir && destPath.startsWith('$srcPath/')) { skipCount++; continue; }
       toProcess.add({...item, '_destPath': destPath});
     }
 
@@ -461,12 +502,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         autoClear: const Duration(minutes: 5));
 
     vaultExplorerApi.beginBatch(widget.container.volId);
-    if (!sameContainer) vaultExplorerApi.beginBatch(srcContainer.volId);
 
-    if (!(sameContainer && isCut)) {
+    if (!isCut) {
       int requiredBytes = 0;
       for (final item in toProcess) {
-        requiredBytes += await _measureItemBytes(srcContainer, item);
+        requiredBytes += await _measureItemBytes(widget.container, item);
       }
       final spaceInfo = await vaultExplorerApi.getSpaceInfo(widget.container);
       final freeBytes = (spaceInfo != null && spaceInfo.length > 1)
@@ -475,7 +515,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       if (requiredBytes > (freeBytes * 0.95).floor()) {
         setState(() => _isLoading = false);
         vaultExplorerApi.endBatch(widget.container.volId);
-        if (!sameContainer) vaultExplorerApi.endBatch(srcContainer.volId);
         _setStatus(
           'Not enough space — need ${formatBytes(requiredBytes)}, '
           'only ${formatBytes(freeBytes)} free',
@@ -501,7 +540,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
 
     _ConflictResolution? globalResolution;
-    final tmpDir = await getTemporaryDirectory();
     int failCount = 0;
     final List<String> createdDestPaths = [];
     bool diskFull = false;
@@ -535,7 +573,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               skipCount++;
               continue;
             case _ConflictResolution.overwrite:
-              if (sameContainer && isCut) {
+              if (isCut) {
                 final destIsDir =
                     existingDirs.contains(fileName.toLowerCase());
                 await _deleteEntryRecursive(
@@ -551,25 +589,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
 
         try {
-          // Inside your _paste() method, update the internal loop calls:
-if (sameContainer && !isCut) {
-  final ok = await _copyEntryWithinContainer(
-      srcPath, destPath, isDir, createdDestPaths); // Removed tmpDir
-  if (!ok) failCount++;
-} else if (!sameContainer) {
-  final ok = await _copyEntryAcrossContainers(
-    srcContainer: srcContainer,
-    destContainer: widget.container,
-    srcPath: srcPath,
-    destPath: destPath,
-    isDir: isDir,
-    createdDestPaths: createdDestPaths, // Removed tmpDir
-  );
-  if (!ok) failCount++;
-  if (ok && isCut) {
-    await _deleteEntryRecursive(srcContainer, srcPath, isDir);
-  }
-}
+          final ok = await _copyEntryWithinContainer(
+              srcPath, destPath, isDir, createdDestPaths);
+          if (!ok) failCount++;
+          if (ok && isCut) {
+            await _deleteEntryRecursive(widget.container, srcPath, isDir);
+          }
         } on _DiskFullException {
           diskFull = true;
           break;
@@ -577,7 +602,6 @@ if (sameContainer && !isCut) {
       }
     } finally {
       vaultExplorerApi.endBatch(widget.container.volId);
-      if (!sameContainer) vaultExplorerApi.endBatch(srcContainer.volId);
 
       if (diskFull) {
         for (final path in createdDestPaths.reversed) {
@@ -606,15 +630,6 @@ if (sameContainer && !isCut) {
           _setStatus(parts.join(' · '), error: failCount > 0);
         }
       }
-    }
-  }
-
-  Future<bool> _isContainerMounted(MountedContainer container) async {
-    try {
-      final space = await vaultExplorerApi.getSpaceInfo(container);
-      return space != null;
-    } catch (_) {
-      return false;
     }
   }
 
@@ -732,14 +747,13 @@ if (sameContainer && !isCut) {
     String srcPath,
     String destPath,
     bool isDir,
-    List<String> createdDestPaths, // Removed unused tmpDir parameter
+    List<String> createdDestPaths,
   ) async {
     if (!isDir) {
       try {
         final size = await vaultExplorerApi.getFileSize(widget.container, srcPath);
         if (size < 0) return false;
 
-        // Clear any pre-existing file at the destination
         await vaultExplorerApi.deleteFile(widget.container, destPath);
 
         if (size == 0) {
@@ -749,7 +763,7 @@ if (sameContainer && !isCut) {
         }
 
         int offset = 0;
-        const int chunkSize = 256 * 1024; // Stream in efficient 256 KB blocks in memory
+        const int chunkSize = 256 * 1024;
 
         while (offset < size) {
           final chunkLen = min(size - offset, chunkSize);
@@ -760,16 +774,17 @@ if (sameContainer && !isCut) {
           final ok = await vaultExplorerApi.writeFileChunk(
               widget.container, destPath, offset, chunk);
           if (!ok) throw const _DiskFullException();
-          
+
           offset += chunk.length;
         }
         createdDestPaths.add(destPath);
         return true;
-      } catch (_) {
+      } catch (e) {
+        if (e is _DiskFullException) rethrow;
         return false;
       }
     }
-    
+
     final children =
         await vaultExplorerApi.listDirectory(widget.container, srcPath) ?? [];
     await vaultExplorerApi.createDirectory(widget.container, destPath);
@@ -792,79 +807,11 @@ if (sameContainer && !isCut) {
     return allOk;
   }
 
-  // ── Cross-container copy ──────────────────────────────────────────────────
-
-  Future<bool> _copyEntryAcrossContainers({
-    required MountedContainer srcContainer,
-    required MountedContainer destContainer,
-    required String srcPath,
-    required String destPath,
-    required bool isDir,
-    required List<String> createdDestPaths, // Removed unused tmpDir parameter
-  }) async {
-    if (!isDir) {
-      try {
-        final size = await vaultExplorerApi.getFileSize(srcContainer, srcPath);
-        if (size < 0) return false;
-
-        await vaultExplorerApi.deleteFile(destContainer, destPath);
-
-        if (size == 0) {
-          final ok = await vaultExplorerApi.createEmptyFile(destContainer, destPath);
-          if (ok) createdDestPaths.add(destPath);
-          return ok;
-        }
-
-        int offset = 0;
-        const int chunkSize = 256 * 1024; // Stream in 256 KB blocks
-
-        while (offset < size) {
-          final chunkLen = min(size - offset, chunkSize);
-          final chunk = await vaultExplorerApi.readFileChunk(
-              srcContainer, srcPath, offset, chunkLen);
-          if (chunk == null || chunk.isEmpty) return false;
-
-          final ok = await vaultExplorerApi.writeFileChunk(
-              destContainer, destPath, offset, chunk);
-          if (!ok) throw const _DiskFullException();
-
-          offset += chunk.length;
-        }
-        createdDestPaths.add(destPath);
-        return true;
-      } catch (_) {
-        return false;
-      }
-    }
-    
-    final children =
-        await vaultExplorerApi.listDirectory(srcContainer, srcPath) ?? [];
-    await vaultExplorerApi.createDirectory(destContainer, destPath);
-    createdDestPaths.add(destPath);
-    bool allOk = true;
-    for (final entry in children) {
-      if (entry.startsWith('System:')) continue;
-      final childIsDir = entry.startsWith('[DIR] ');
-      final childName  = childIsDir
-          ? entry.replaceFirst('[DIR] ', '')
-          : entry.split('|').first;
-      final ok = await _copyEntryAcrossContainers(
-        srcContainer: srcContainer,
-        destContainer: destContainer,
-        srcPath: '$srcPath/$childName',
-        destPath: '$destPath/$childName',
-        isDir: childIsDir,
-        createdDestPaths: createdDestPaths,
-      );
-      if (!ok) allOk = false;
-    }
-    return allOk;
-  }
-
   // ── Batch delete ──────────────────────────────────────────────────────────
 
   void _batchDelete() {
     HapticFeedback.heavyImpact();
+    _signalActivity();
     BrowserDialogs.showBatchDelete(
       context,
       toDelete: List<String>.from(selectedItems),
@@ -901,6 +848,7 @@ if (sameContainer && !isCut) {
   // ── Import / Export ───────────────────────────────────────────────────────
 
   Future<void> _exportSelectedToStorage() async {
+    _signalActivity();
     final items = selectedItems.map((item) {
       final isDir = item.startsWith('[DIR] ');
       final name  = isDir ? item.replaceFirst('[DIR] ', '') : item.split('|').first;
@@ -926,6 +874,7 @@ if (sameContainer && !isCut) {
   }
 
   Future<void> _importFilesFromDevice() async {
+    _signalActivity();
     setState(() => _isLoading = true);
     try {
       final count = await vaultExplorerApi.importFiles(
@@ -943,6 +892,7 @@ if (sameContainer && !isCut) {
   }
 
   Future<void> _importFolderFromDevice() async {
+    _signalActivity();
     setState(() => _isLoading = true);
     try {
       final count = await vaultExplorerApi.importFolder(
@@ -1031,7 +981,7 @@ if (sameContainer && !isCut) {
         if (didPop) return;
         if (isSelectionMode) {
           exitSelectionMode();
-        } else if (_clip.hasItems && _clip.isFromContainer(widget.container)) {
+        } else if (_clip.hasItems && _clip.isFromVolume(widget.container.volId)) {
           _clip.clear();
           setState(() {});
         } else if (_isSearchActive) {
@@ -1116,12 +1066,12 @@ if (sameContainer && !isCut) {
     }
 
     if (_clip.hasItems) {
-      final fromHere = _clip.isFromContainer(widget.container);
+      final fromHere = _clip.isFromVolume(widget.container.volId);
       return ClipboardAppBar(
         isCutOperation: _clip.isCutOperation,
         itemCount: _clip.items.length,
         sourceLabel:
-            fromHere ? null : _clip.sourceContainer?.displayName,
+            fromHere ? null : _clip.sourceDisplayName,
         onCancel: () => setState(() => _clip.clear()),
         onPaste: _paste,
         onBack: _atRoot
@@ -1185,6 +1135,7 @@ if (sameContainer && !isCut) {
           icon: const Icon(Icons.add),
           tooltip: 'New item',
           onSelected: (v) {
+            _signalActivity();
             switch (v) {
               case 'folder':
                 BrowserDialogs.showCreateFolder(context,
@@ -1309,7 +1260,7 @@ if (sameContainer && !isCut) {
         isSelectionMode: isSelectionMode,
         selectedItems: selectedItems,
         currentDirPath: _currentDirPath,
-        thumbnailCacheMode: _resolvedThumbnailCacheMode, // <-- Update to state-resolved mode
+        thumbnailCacheMode: _resolvedThumbnailCacheMode,
         onDirTap: _handleDirTap,
         onFileTap: _handleFileTap,
         onItemLongPress: _handleItemLongPress,

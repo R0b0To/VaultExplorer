@@ -1,14 +1,23 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui'; // Required for ImageFilter glassmorphism
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import '../../models/mounted_container.dart';
 import '../../services/vaultexplorer_api.dart';
 
-bool _autoPlay    = true;
-bool _autoAdvance = false;
+// Global file-level variables (persists during the app session)
+bool   _autoPlay              = true;
+bool   _autoAdvance           = false;
+bool   _isMuted               = false;
+bool   _isLooping             = false;
+double _playbackSpeed         = 1.0;
+bool   _subtitlesEnabled      = true;
+int    _doubleTapSkipSeconds  = 5;
+String _selectedFolder        = 'Current Folder Only';
+BoxFit _imageFit              = BoxFit.contain;
 
 class MediaViewerScreen extends StatefulWidget {
   final MountedContainer container;
@@ -38,21 +47,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   late List<String> _currentPlaylist;
   bool _isShuffled = false;
 
-  String _selectedFolder        = 'Current Folder Only';
-  int    _doubleTapSkipSeconds  = 5;
-
   bool _allFilesScanned    = false;
   bool _isScanningSubfolders = false;
   Timer? _slideshowTimer;
-  BoxFit _imageFit = BoxFit.contain;
 
   final Map<String, Uint8List> _prefetchedImages = {};
   final Set<String> _prefetchingActive = {};
 
-  bool   _isMuted           = false;
-  bool   _isLooping         = false;
-  double _playbackSpeed     = 1.0;
-  bool   _subtitlesEnabled  = true;
   bool   _subtitlesAvailable = false;
 
   @override
@@ -100,7 +101,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final baseDir        = _getBaseDir();
     final recursiveFiles = await _scanDirectoryRecursively(baseDir);
     if (recursiveFiles.isEmpty) return;
-    if (mounted) setState(() => _originalList = List.from(recursiveFiles));
+    if (mounted) {
+      setState(() => _originalList = List.from(recursiveFiles));
+    }
   }
 
   Future<List<String>> _scanDirectoryRecursively(String baseDir) async {
@@ -156,7 +159,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _currentPlaylist = filteredList;
       _currentIndex    = newIndex;
       if (_pageController.hasClients) {
-        _pageController.jumpToPage(_currentIndex);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(_currentIndex);
+          }
+        });
       }
       _prefetchSurroundingItems();
     }
@@ -165,8 +172,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   void _navigateToNext() {
     _cancelSlideshowTimer();
     if (_currentIndex < _currentPlaylist.length - 1) {
+      HapticFeedback.lightImpact();
       _pageController.animateToPage(_currentIndex + 1,
-          duration: const Duration(milliseconds: 350),
+          duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut);
     }
   }
@@ -174,8 +182,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   void _navigateToPrev() {
     _cancelSlideshowTimer();
     if (_currentIndex > 0) {
+      HapticFeedback.lightImpact();
       _pageController.animateToPage(_currentIndex - 1,
-          duration: const Duration(milliseconds: 350),
+          duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut);
     }
   }
@@ -192,6 +201,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   void _toggleAutoAdvance(bool value) {
+    HapticFeedback.mediumImpact();
     setState(() => _autoAdvance = value);
     if (_autoAdvance) {
       _startSlideshowTimerIfNeeded();
@@ -265,6 +275,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   void _toggleOrientation() {
+    HapticFeedback.mediumImpact();
     setState(() => _isLandscape = !_isLandscape);
     if (_isLandscape) {
       SystemChrome.setPreferredOrientations([
@@ -277,6 +288,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   void _toggleShuffle() {
+    HapticFeedback.mediumImpact();
     setState(() {
       final currentFile = _currentPlaylist[_currentIndex];
       if (!_isShuffled) {
@@ -297,18 +309,41 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   Future<void> _filterByFolder(String folder) async {
-    if (folder == 'All' && !_allFilesScanned) {
-      if (mounted) setState(() => _isScanningSubfolders = true);
-      await _loadRecursiveMedia();
-      _allFilesScanned = true;
-      if (mounted) setState(() => _isScanningSubfolders = false);
-    }
     if (!mounted) return;
+    HapticFeedback.mediumImpact();
+
     setState(() {
-      _selectedFolder  = folder;
-      final currentFile = _currentPlaylist[_currentIndex];
+      _selectedFolder = folder;
+      final currentFile = _currentPlaylist.isNotEmpty ? _currentPlaylist[_currentIndex] : '';
       _applyFolderFiltering(folder, currentFile);
     });
+
+    if (folder == 'All' && !_allFilesScanned) {
+      setState(() => _isScanningSubfolders = true);
+      try {
+        final baseDir = _getBaseDir();
+        final recursiveFiles = await _scanDirectoryRecursively(baseDir);
+        
+        if (mounted) {
+          setState(() {
+            if (recursiveFiles.isNotEmpty) {
+              _originalList = List.from(recursiveFiles);
+            }
+            _allFilesScanned = true;
+            if (_selectedFolder == 'All') {
+              final currentFile = _currentPlaylist.isNotEmpty ? _currentPlaylist[_currentIndex] : '';
+              _applyFolderFiltering('All', currentFile);
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading subfolders: $e');
+      } finally {
+        if (mounted) {
+          setState(() => _isScanningSubfolders = false);
+        }
+      }
+    }
   }
 
   Future<void> _openWithApp() async {
@@ -454,296 +489,178 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               onSubtitlesAvailableChanged: (val) =>
                   setState(() => _subtitlesAvailable = val),
               onZoomChanged: (allowSwipe) {},
+              onImageFitChanged: (fit) => setState(() => _imageFit = fit),
+              onToggleMute: () => setState(() => _isMuted = !_isMuted),
+              onToggleLooping: () => setState(() => _isLooping = !_isLooping),
+              onPlaybackSpeedChanged: (speed) => setState(() => _playbackSpeed = speed),
+              onToggleSubtitles: () => setState(() => _subtitlesEnabled = !_subtitlesEnabled),
+              subtitlesAvailable: _subtitlesAvailable,
             );
           },
         ),
 
-        // ── Navigation chevrons ────────────────────────────────────────────
-        if (_showUI) ...[
-          if (_currentIndex > 0)
-            Positioned(
-              left: 16, top: 0, bottom: 0,
-              child: Center(
-                child: Container(
-                  decoration: const BoxDecoration(
-                      color: Colors.black38, shape: BoxShape.circle),
-                  child: IconButton(
-                    icon: const Icon(Icons.chevron_left_rounded,
-                        color: Colors.white, size: 36),
-                    tooltip: 'Previous',
-                    onPressed: _navigateToPrev,
-                  ),
-                ),
-              ),
-            ),
-          if (_currentIndex < total - 1)
-            Positioned(
-              right: 16, top: 0, bottom: 0,
-              child: Center(
-                child: Container(
-                  decoration: const BoxDecoration(
-                      color: Colors.black38, shape: BoxShape.circle),
-                  child: IconButton(
-                    icon: const Icon(Icons.chevron_right_rounded,
-                        color: Colors.white, size: 36),
-                    tooltip: 'Next',
-                    onPressed: _navigateToNext,
-                  ),
-                ),
-              ),
-            ),
-        ],
-
-        // ── Top action bar ─────────────────────────────────────────────────
+        // ── Top action bar (Modern Android 16/17 Floating Capsule) ────────
         AnimatedPositioned(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
-          top: _showUI ? 0 : -100,
-          left: 0, right: 0,
-          child: Container(
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 8,
-              bottom: 12, left: 8, right: 8,
-            ),
-            color: Colors.black.withOpacity(0.7),
-            child: Row(children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_rounded,
-                    color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(currentName.split('/').last,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${_currentIndex + 1} of $total'
-                      '${_isScanningSubfolders ? '  ·  scanning…' : ''}',
-                      style: const TextStyle(
-                          color: Color(0xFF7A8899), fontSize: 11),
+          top: _showUI ? MediaQuery.of(context).padding.top + 8 : -110,
+          left: 16, right: 16,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: Row(children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded,
+                        color: Colors.white),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.pop(context);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(currentName.split('/').last,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 1),
+                        Text(
+                          '${_currentIndex + 1} of $total'
+                          '${_isScanningSubfolders ? '  ·  scanning…' : ''}',
+                          style: TextStyle(
+                              color: Colors.white.withOpacity(0.6), fontSize: 10),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: Icon(Icons.delete_outline_rounded, color: cs.error),
-                tooltip: 'Delete File',
-                onPressed: _deleteCurrentFile,
-              ),
-              MenuAnchor(
-                builder: (ctx, controller, child) => IconButton(
-                  onPressed: () => controller.isOpen
-                      ? controller.close()
-                      : controller.open(),
-                  icon: Icon(
-                    isCurrentAnImage
-                        ? Icons.more_vert_rounded
-                        : Icons.settings_rounded,
-                    color: Colors.white,
                   ),
-                  tooltip: isCurrentAnImage
-                      ? 'More Actions'
-                      : 'Playback Settings',
-                ),
-                menuChildren: [
-                  MenuItemButton(
-                    onPressed: _openWithApp,
-                    leadingIcon:
-                        const Icon(Icons.open_in_new_rounded, size: 18),
-                    child: const Text('Open with App'),
+                  IconButton(
+                    icon: Icon(Icons.delete_outline_rounded, color: cs.error),
+                    tooltip: 'Delete File',
+                    onPressed: _deleteCurrentFile,
                   ),
-                  MenuItemButton(
-                    onPressed: _toggleOrientation,
-                    leadingIcon: Icon(
-                        _isLandscape
-                            ? Icons.screen_lock_portrait_rounded
-                            : Icons.screen_rotation_rounded,
-                        size: 18),
-                    child: Text(_isLandscape
-                        ? 'Portrait Mode'
-                        : 'Landscape Mode'),
-                  ),
-                  MenuItemButton(
-                    onPressed: _toggleShuffle,
-                    leadingIcon: Icon(Icons.shuffle_rounded,
-                        size: 18,
-                        color: _isShuffled ? cs.primary : cs.onSurfaceVariant),
-                    child: Text(_isShuffled
-                        ? 'Disable Shuffle'
-                        : 'Shuffle Playlist'),
-                  ),
-                  const PopupMenuDivider(),
-                  SubmenuButton(
+                  MenuAnchor(
+                    builder: (ctx, controller, child) => IconButton(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        controller.isOpen ? controller.close() : controller.open();
+                      },
+                      icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+                      tooltip: 'More Actions',
+                    ),
                     menuChildren: [
                       MenuItemButton(
-                        onPressed: () =>
-                            _filterByFolder('Current Folder Only'),
-                        leadingIcon: _selectedFolder == 'Current Folder Only'
-                            ? Icon(Icons.check_rounded,
-                                size: 16, color: cs.primary)
-                            : const SizedBox(width: 16),
-                        child: const Text('Current Folder Only'),
+                        onPressed: _openWithApp,
+                        leadingIcon:
+                            const Icon(Icons.open_in_new_rounded, size: 18),
+                        child: const Text('Open with App'),
                       ),
                       MenuItemButton(
-                        onPressed: () => _filterByFolder('All'),
-                        leadingIcon: _selectedFolder == 'All'
-                            ? Icon(Icons.check_rounded,
-                                size: 16, color: cs.primary)
-                            : const SizedBox(width: 16),
-                        child: const Text('All (Incl. Subfolders)'),
+                        onPressed: _toggleOrientation,
+                        leadingIcon: Icon(
+                            _isLandscape
+                                ? Icons.screen_lock_portrait_rounded
+                                : Icons.screen_rotation_rounded,
+                            size: 18),
+                        child: Text(_isLandscape
+                            ? 'Portrait Mode'
+                            : 'Landscape Mode'),
+                      ),
+                      MenuItemButton(
+                        onPressed: _toggleShuffle,
+                        leadingIcon: Icon(Icons.shuffle_rounded,
+                            size: 18,
+                            color: _isShuffled ? cs.primary : cs.onSurfaceVariant),
+                        child: Text(_isShuffled
+                            ? 'Disable Shuffle'
+                            : 'Shuffle Playlist'),
+                      ),
+                      const PopupMenuDivider(),
+                      SubmenuButton(
+                        menuChildren: [
+                          MenuItemButton(
+                            onPressed: () =>
+                                _filterByFolder('Current Folder Only'),
+                            leadingIcon: _selectedFolder == 'Current Folder Only'
+                                ? Icon(Icons.check_rounded,
+                                    size: 16, color: cs.primary)
+                                : const SizedBox(width: 16),
+                            child: const Text('Current Folder Only'),
+                          ),
+                          MenuItemButton(
+                            onPressed: () => _filterByFolder('All'),
+                            leadingIcon: _selectedFolder == 'All'
+                                ? Icon(Icons.check_rounded,
+                                    size: 16, color: cs.primary)
+                                : const SizedBox(width: 16),
+                            child: const Text('All (Incl. Subfolders)'),
+                          ),
+                        ],
+                        child: const Text('Folder Filter'),
                       ),
                     ],
-                    child: const Text('Folder Filter'),
                   ),
-                  if (isCurrentAnImage) ...[
-                    const PopupMenuDivider(),
-                    SubmenuButton(
-                      menuChildren: [
-                        _fitItem(context, BoxFit.contain, 'Best Fit (Contain)'),
-                        _fitItem(context, BoxFit.fitWidth, 'Fit to Width'),
-                        _fitItem(context, BoxFit.fitHeight, 'Fit to Height'),
-                      ],
-                      child: const Text('Image Display Fit'),
-                    ),
-                    const PopupMenuDivider(),
-                    MenuItemButton(
-                      onPressed: () => _toggleAutoAdvance(!_autoAdvance),
-                      leadingIcon: Icon(Icons.skip_next_rounded,
-                          size: 18,
-                          color: _autoAdvance
-                              ? cs.primary
-                              : cs.onSurfaceVariant),
-                      child: Text(_autoAdvance
-                          ? 'Auto-advance: On'
-                          : 'Auto-advance: Off'),
-                    ),
-                  ],
-                  if (!isCurrentAnImage) ...[
-                    const PopupMenuDivider(),
-                    SubmenuButton(
-                      menuChildren: [
-                        MenuItemButton(
-                          onPressed: () =>
-                              setState(() => _isLooping = !_isLooping),
-                          leadingIcon: Icon(Icons.loop_rounded,
-                              size: 18,
-                              color: _isLooping ? cs.primary : cs.onSurfaceVariant),
-                          child: Text(_isLooping
-                              ? 'Looping: On'
-                              : 'Looping: Off'),
-                        ),
-                        MenuItemButton(
-                          onPressed: () =>
-                              setState(() => _isMuted = !_isMuted),
-                          leadingIcon: Icon(
-                              _isMuted
-                                  ? Icons.volume_off_rounded
-                                  : Icons.volume_up_rounded,
-                              size: 18,
-                              color: _isMuted ? cs.error : cs.onSurfaceVariant),
-                          child: Text(_isMuted ? 'Muted: On' : 'Muted: Off'),
-                        ),
-                        MenuItemButton(
-                          onPressed: () =>
-                              setState(() => _autoPlay = !_autoPlay),
-                          leadingIcon: Icon(
-                              _autoPlay
-                                  ? Icons.play_circle_filled_rounded
-                                  : Icons.play_circle_outline_rounded,
-                              size: 18,
-                              color: _autoPlay ? cs.primary : cs.onSurfaceVariant),
-                          child: Text(
-                              _autoPlay ? 'Auto-play: On' : 'Auto-play: Off'),
-                        ),
-                        MenuItemButton(
-                          onPressed: () =>
-                              _toggleAutoAdvance(!_autoAdvance),
-                          leadingIcon: Icon(Icons.skip_next_rounded,
-                              size: 18,
-                              color: _autoAdvance
-                                  ? cs.primary
-                                  : cs.onSurfaceVariant),
-                          child: Text(_autoAdvance
-                              ? 'Auto-advance: On'
-                              : 'Auto-advance: Off'),
-                        ),
-                        if (_subtitlesAvailable)
-                          MenuItemButton(
-                            onPressed: () => setState(
-                                () => _subtitlesEnabled = !_subtitlesEnabled),
-                            leadingIcon: Icon(
-                                _subtitlesEnabled
-                                    ? Icons.subtitles_rounded
-                                    : Icons.subtitles_off_rounded,
-                                size: 18,
-                                color: _subtitlesEnabled
-                                    ? cs.primary
-                                    : cs.onSurfaceVariant),
-                            child: Text(_subtitlesEnabled
-                                ? 'Subtitles: On'
-                                : 'Subtitles: Off'),
-                          ),
-                      ],
-                      child: const Text('Playback Behavior'),
-                    ),
-                    const PopupMenuDivider(),
-                    SubmenuButton(
-                      menuChildren: [0.5, 1.0, 1.25, 1.5, 2.0].map((speed) =>
-                        MenuItemButton(
-                          onPressed: () =>
-                              setState(() => _playbackSpeed = speed),
-                          leadingIcon: _playbackSpeed == speed
-                              ? Icon(Icons.check_rounded,
-                                  size: 16, color: cs.primary)
-                              : const SizedBox(width: 16),
-                          child: Text('${speed}x'),
-                        )).toList(),
-                      child:
-                          Text('Playback Speed (${_playbackSpeed}x)'),
-                    ),
-                    SubmenuButton(
-                      menuChildren: [5, 10, 15, 30].map((s) =>
-                        MenuItemButton(
-                          onPressed: () =>
-                              setState(() => _doubleTapSkipSeconds = s),
-                          leadingIcon: _doubleTapSkipSeconds == s
-                              ? Icon(Icons.check_rounded,
-                                  size: 16, color: cs.primary)
-                              : const SizedBox(width: 16),
-                          child: Text('$s seconds'),
-                        )).toList(),
-                      child: Text(
-                          'Double-Tap Seek (${_doubleTapSkipSeconds}s)'),
-                    ),
-                  ],
-                ],
+                ]),
               ),
-            ]),
+            ),
           ),
         ),
       ]),
     );
   }
+}
 
-  MenuItemButton _fitItem(
-      BuildContext context, BoxFit fit, String label) {
-    final cs = Theme.of(context).colorScheme;
-    return MenuItemButton(
-      onPressed: () => setState(() => _imageFit = fit),
-      leadingIcon: _imageFit == fit
-          ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-          : const SizedBox(width: 16),
-      child: Text(label),
-    );
-  }
+// ── Shared UI Helper: Premium Android 16/17 Glassmorphic Control Dock ──────
+
+Widget _buildGlassDock(BuildContext context, {required List<Widget> children}) {
+  return Container(
+    margin: EdgeInsets.only(
+      left: 16,
+      right: 16,
+      bottom: MediaQuery.of(context).padding.bottom + 16,
+    ),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(28),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.4),
+          blurRadius: 24,
+          offset: const Offset(0, 12),
+        )
+      ],
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.55),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: children,
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 // ── _MediaPage ────────────────────────────────────────────────────────────────
@@ -772,6 +689,14 @@ class _MediaPage extends StatefulWidget {
   final bool subtitlesEnabled;
   final BoxFit imageFit;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
+  
+  // Dynamic Option Callbacks:
+  final ValueChanged<BoxFit> onImageFitChanged;
+  final VoidCallback onToggleMute;
+  final VoidCallback onToggleLooping;
+  final ValueChanged<double> onPlaybackSpeedChanged;
+  final VoidCallback onToggleSubtitles;
+  final bool subtitlesAvailable;
 
   const _MediaPage({
     Key? key,
@@ -798,6 +723,12 @@ class _MediaPage extends StatefulWidget {
     required this.subtitlesEnabled,
     required this.imageFit,
     required this.onSubtitlesAvailableChanged,
+    required this.onImageFitChanged,
+    required this.onToggleMute,
+    required this.onToggleLooping,
+    required this.onPlaybackSpeedChanged,
+    required this.onToggleSubtitles,
+    required this.subtitlesAvailable,
   }) : super(key: key);
 
   @override
@@ -809,6 +740,7 @@ class _MediaPageState extends State<_MediaPage> {
       TransformationController();
   double _scale = 1.0;
   TapDownDetails? _doubleTapDetails;
+  int _rotationQuarterTurns = 0;
 
   @override
   void dispose() {
@@ -840,6 +772,119 @@ class _MediaPageState extends State<_MediaPage> {
     });
   }
 
+  Widget _buildFitOptionButton(BuildContext context, BoxFit fit, IconData icon, String tooltip) {
+    final cs = Theme.of(context).colorScheme;
+    final isSelected = widget.imageFit == fit;
+    return IconButton(
+      icon: Icon(
+        icon,
+        color: isSelected ? cs.primary : Colors.white70,
+        size: 20,
+      ),
+      tooltip: tooltip,
+      onPressed: () {
+        HapticFeedback.lightImpact();
+        widget.onImageFitChanged(fit);
+      },
+    );
+  }
+
+  Widget _buildImageBottomControls(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: _buildGlassDock(
+        context,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                widget.autoAdvance ? Icons.slideshow_rounded : Icons.image_rounded,
+                color: widget.autoAdvance ? cs.primary : Colors.white70,
+                size: 14,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                widget.autoAdvance ? 'Auto-Advance Active (4s)' : 'Static Mode',
+                style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Left: Image formatting shortcuts & Rotate (Expanded to dynamically prevent clipping)
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildFitOptionButton(context, BoxFit.contain, Icons.aspect_ratio_rounded, 'Contain'),
+                        _buildFitOptionButton(context, BoxFit.fitWidth, Icons.swap_horiz_rounded, 'Fit Width'),
+                        _buildFitOptionButton(context, BoxFit.fitHeight, Icons.swap_vert_rounded, 'Fit Height'),
+                        IconButton(
+                          icon: const Icon(Icons.rotate_right_rounded, color: Colors.white70, size: 20),
+                          tooltip: 'Rotate 90°',
+                          onPressed: () {
+                            HapticFeedback.mediumImpact();
+                            setState(() {
+                              _rotationQuarterTurns = (_rotationQuarterTurns + 1) % 4;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Center: Navigation
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.skip_previous_rounded, color: Colors.white, size: 28),
+                    onPressed: widget.onPrev,
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => widget.onAutoAdvanceChanged(!widget.autoAdvance),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: widget.autoAdvance ? cs.primary : Colors.white12,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        widget.autoAdvance ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        color: widget.autoAdvance ? cs.onPrimary : Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 28),
+                    onPressed: widget.onNext,
+                  ),
+                ],
+              ),
+              // Right: Balance Spacer matching left alignment
+              const Expanded(
+                child: SizedBox.shrink(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ext   = widget.fileName.split('.').last.toLowerCase();
@@ -849,36 +894,47 @@ class _MediaPageState extends State<_MediaPage> {
     return Container(
       color: Colors.black,
       child: isImg
-          ? GestureDetector(
-              onTap: () => widget.onToggleUI(!widget.showUI),
-              onDoubleTapDown: (d) => _doubleTapDetails = d,
-              onDoubleTap: _handleDoubleTap,
-              child: InteractiveViewer(
-                transformationController: _transformationController,
-                maxScale: 4.0,
-                onInteractionUpdate: (details) {
-                  final s =
-                      _transformationController.value.getMaxScaleOnAxis();
-                  if (s != _scale) {
-                    setState(() => _scale = s);
-                    widget.onZoomChanged(s <= 1.01);
-                  }
-                },
-                onInteractionEnd: (details) {
-                  final s =
-                      _transformationController.value.getMaxScaleOnAxis();
-                  if (s <= 1.01) widget.onZoomChanged(true);
-                },
-                child: SizedBox.expand(
-                  child: EncryptedImageWidget(
-                    container: widget.container,
-                    fileName: widget.fileName,
-                    prefetchedBytes: widget.prefetchedBytes,
-                    onImageLoaded: widget.onImageLoaded,
-                    fit: widget.imageFit,
+          ? Stack(
+              children: [
+                GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: () => widget.onToggleUI(!widget.showUI),
+                  onDoubleTapDown: (d) => _doubleTapDetails = d,
+                  onDoubleTap: _handleDoubleTap,
+                  child: SizedBox.expand(
+                    child: InteractiveViewer(
+                      transformationController: _transformationController,
+                      maxScale: 4.0,
+                      onInteractionUpdate: (details) {
+                        final s =
+                            _transformationController.value.getMaxScaleOnAxis();
+                        if (s != _scale) {
+                          setState(() => _scale = s);
+                          widget.onZoomChanged(s <= 1.01);
+                        }
+                      },
+                      onInteractionEnd: (details) {
+                        final s =
+                            _transformationController.value.getMaxScaleOnAxis();
+                        if (s <= 1.01) widget.onZoomChanged(true);
+                      },
+                      child: Center(
+                        child: RotatedBox(
+                          quarterTurns: _rotationQuarterTurns,
+                          child: EncryptedImageWidget(
+                            container: widget.container,
+                            fileName: widget.fileName,
+                            prefetchedBytes: widget.prefetchedBytes,
+                            onImageLoaded: widget.onImageLoaded,
+                            fit: widget.imageFit,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                if (widget.showUI) _buildImageBottomControls(context),
+              ],
             )
           : MediaPlayerWidget(
               container: widget.container,
@@ -902,6 +958,11 @@ class _MediaPageState extends State<_MediaPage> {
               subtitlesEnabled: widget.subtitlesEnabled,
               onSubtitlesAvailableChanged: widget.onSubtitlesAvailableChanged,
               onZoomChanged: widget.onZoomChanged,
+              onToggleMute: widget.onToggleMute,
+              onToggleLooping: widget.onToggleLooping,
+              onPlaybackSpeedChanged: widget.onPlaybackSpeedChanged,
+              onToggleSubtitles: widget.onToggleSubtitles,
+              subtitlesAvailable: widget.subtitlesAvailable,
             ),
     );
   }
@@ -1068,6 +1129,52 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
   }
 }
 
+// ── Speed Selector Contextual Submenu Widget ──────────────────────────────────
+
+class _SpeedControlMenu extends StatelessWidget {
+  final double currentSpeed;
+  final ValueChanged<double> onSpeedChanged;
+
+  const _SpeedControlMenu({
+    Key? key,
+    required this.currentSpeed,
+    required this.onSpeedChanged,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return MenuAnchor(
+      builder: (ctx, controller, child) => IconButton(
+        icon: Text(
+          '${currentSpeed}x',
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        tooltip: 'Playback Speed',
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          controller.isOpen ? controller.close() : controller.open();
+        },
+      ),
+      menuChildren: [0.5, 1.0, 1.25, 1.5, 2.0].map((speed) =>
+        MenuItemButton(
+          onPressed: () {
+            HapticFeedback.lightImpact();
+            onSpeedChanged(speed);
+          },
+          leadingIcon: currentSpeed == speed
+              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+              : const SizedBox(width: 16),
+          child: Text('${speed}x'),
+        )).toList(),
+    );
+  }
+}
+
 // ── MediaPlayerWidget ─────────────────────────────────────────────────────────
 
 class MediaPlayerWidget extends StatefulWidget {
@@ -1092,6 +1199,13 @@ class MediaPlayerWidget extends StatefulWidget {
   final double playbackSpeed;
   final bool subtitlesEnabled;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
+  
+  // Custom Option Callbacks:
+  final VoidCallback onToggleMute;
+  final VoidCallback onToggleLooping;
+  final ValueChanged<double> onPlaybackSpeedChanged;
+  final VoidCallback onToggleSubtitles;
+  final bool subtitlesAvailable;
 
   const MediaPlayerWidget({
     Key? key,
@@ -1116,6 +1230,11 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.playbackSpeed,
     required this.subtitlesEnabled,
     required this.onSubtitlesAvailableChanged,
+    required this.onToggleMute,
+    required this.onToggleLooping,
+    required this.onPlaybackSpeedChanged,
+    required this.onToggleSubtitles,
+    required this.subtitlesAvailable,
   }) : super(key: key);
 
   @override
@@ -1190,7 +1309,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
           _duration    = _controller.value.duration;
         });
         await _controller.setVolume(widget.isMuted ? 0.0 : 1.0);
-        await _controller.setLooping(widget.isLooping);
+        await _controller.setLooping(false); // Managed manually
         await _controller.setPlaybackSpeed(widget.playbackSpeed);
         if (widget.autoPlay) { _controller.play(); _startHideTimer(); }
       }
@@ -1219,13 +1338,35 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         }
       });
     }
-    if (_initialized && !widget.isLooping && _duration > Duration.zero &&
+
+    if (_initialized && widget.isLooping && _duration > Duration.zero &&
+        _position >= _duration && !_endFired) {
+      _endFired = true;
+      _manualLoop();
+    }
+    else if (_initialized && !widget.isLooping && _duration > Duration.zero &&
         _position >= _duration && !_endFired) {
       _endFired = true;
       Future.delayed(const Duration(milliseconds: 400),
           () => widget.onMediaEnd());
     }
+    
     if (_position < _duration * 0.95) _endFired = false;
+  }
+
+  Future<void> _manualLoop() async {
+    try {
+      await _controller.pause();
+      await _controller.seekTo(Duration.zero);
+      await _controller.play();
+      if (mounted) {
+        setState(() {
+          _endFired = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Manual loop error: $e');
+    }
   }
 
   @override
@@ -1235,7 +1376,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       _controller.setVolume(widget.isMuted ? 0.0 : 1.0);
     }
     if (oldWidget.isLooping != widget.isLooping) {
-      _controller.setLooping(widget.isLooping);
+     _controller.setLooping(false);
     }
     if (oldWidget.playbackSpeed != widget.playbackSpeed) {
       _controller.setPlaybackSpeed(widget.playbackSpeed);
@@ -1267,7 +1408,9 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   void _onSpeedHoldStart(LongPressStartDetails _) {
     if (!_initialized) return;
+    HapticFeedback.heavyImpact();
     _controller.setPlaybackSpeed(2.0);
+    setState(() => _isSpeedHeld = true);
     widget.onToggleUI(false);
     _hideTimer?.cancel();
   }
@@ -1275,6 +1418,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   void _onSpeedHoldEnd(LongPressEndDetails _) {
     if (!_initialized) return;
     _controller.setPlaybackSpeed(widget.playbackSpeed);
+    setState(() => _isSpeedHeld = false);
     _showControlsAndResetTimer();
   }
 
@@ -1304,6 +1448,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   }
 
   void _skip({required bool backwards}) {
+    HapticFeedback.lightImpact();
     _showControlsAndResetTimer();
     final currentPos = _controller.value.position;
     final targetPos  = backwards
@@ -1396,7 +1541,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
           if (!widget.isAudio && _controller.value.isInitialized &&
               widget.subtitlesEnabled)
             Positioned(
-              bottom: widget.showUI ? 110 : 25,
+              bottom: widget.showUI ? 130 : 25,
               left: 20, right: 20,
               child: ClosedCaption(
                 text: _controller.value.caption.text,
@@ -1496,7 +1641,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                 ]),
               ))),
           if (_isSpeedHeld)
-            Positioned(top: 20,
+            Positioned(top: 100,
               child: IgnorePointer(child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                 decoration: BoxDecoration(
@@ -1512,26 +1657,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                 ]),
               ))),
           _bottomControls(context),
-          if (widget.showUI)
-            Center(child: GestureDetector(
-              onTap: () {
-                _showControlsAndResetTimer();
-                setState(() { _controller.value.isPlaying
-                    ? _controller.pause()
-                    : _controller.play(); });
-              },
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                    color: Colors.black45, shape: BoxShape.circle),
-                child: Icon(
-                  _controller.value.isPlaying
-                      ? Icons.pause_rounded
-                      : Icons.play_arrow_rounded,
-                  color: Colors.white, size: 44,
-                ),
-              ),
-            )),
         ],
       ),
     );
@@ -1546,52 +1671,163 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
       left: 0, right: 0,
-      bottom: widget.showUI ? 0 : -140,
-      child: Container(
-        padding: EdgeInsets.only(
-          top: 8,
-          bottom: MediaQuery.of(context).padding.bottom + 12,
-          left: 16, right: 16,
-        ),
-        color: Colors.black.withOpacity(0.65),
-        child: Column(mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      bottom: widget.showUI ? 0 : -200,
+      child: _buildGlassDock(
+        context,
+        children: [
+          Row(
             children: [
-          Align(alignment: Alignment.centerLeft,
-            child: Text('$positionStr / $durationStr',
-                style: const TextStyle(color: Colors.white, fontSize: 12,
-                    fontWeight: FontWeight.w500))),
-          const SizedBox(height: 4),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: cs.primary,
-              inactiveTrackColor: Colors.white24,
-              thumbColor: cs.primary,
-              trackHeight: 3,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-              trackShape: const RectangularSliderTrackShape(),
-            ),
-            child: Slider(
-              value: _sliderValue.clamp(0.0, 1.0),
-              onChanged: (value) {
-                _showControlsAndResetTimer();
-                setState(() { _isDragging = true; _sliderValue = value; });
-                final now = DateTime.now();
-                if (now.difference(_lastSeekTime).inMilliseconds > 100) {
-                  _lastSeekTime = now;
-                  final targetMs = (value * _duration.inMilliseconds).toInt();
-                  _controller.seekTo(Duration(milliseconds: targetMs));
-                }
-              },
-              onChangeEnd: (value) {
-                final targetMs = (value * _duration.inMilliseconds).toInt();
-                _controller.seekTo(Duration(milliseconds: targetMs))
-                    .then((_) { setState(() => _isDragging = false); _startHideTimer(); });
-              },
-            ),
+              Text(positionStr,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11,
+                      fontWeight: FontWeight.bold)),
+              Expanded(
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: cs.primary,
+                    inactiveTrackColor: Colors.white24,
+                    thumbColor: cs.primary,
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                    trackShape: const RectangularSliderTrackShape(),
+                  ),
+                  child: Slider(
+                    value: _sliderValue.clamp(0.0, 1.0),
+                    onChanged: (value) {
+                      _showControlsAndResetTimer();
+                      setState(() { _isDragging = true; _sliderValue = value; });
+                      final now = DateTime.now();
+                      if (now.difference(_lastSeekTime).inMilliseconds > 100) {
+                        _lastSeekTime = now;
+                        final targetMs = (value * _duration.inMilliseconds).toInt();
+                        _controller.seekTo(Duration(milliseconds: targetMs));
+                      }
+                    },
+                    onChangeEnd: (value) {
+                      final targetMs = (value * _duration.inMilliseconds).toInt();
+                      _controller.seekTo(Duration(milliseconds: targetMs))
+                          .then((_) { setState(() => _isDragging = false); _startHideTimer(); });
+                    },
+                  ),
+                ),
+              ),
+              Text(durationStr,
+                  style: const TextStyle(color: Colors.white70, fontSize: 11,
+                      fontWeight: FontWeight.bold)),
+            ],
           ),
-        ]),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              // Left: Loop, Mute (Flexible alignment ensures symmetry & zero layout overflow)
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            widget.isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
+                            color: widget.isMuted ? cs.error : Colors.white70,
+                            size: 20,
+                          ),
+                          tooltip: 'Mute',
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            widget.onToggleMute();
+                          },
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            widget.isLooping ? Icons.loop_rounded : Icons.repeat_one_rounded,
+                            color: widget.isLooping ? cs.primary : Colors.white70,
+                            size: 20,
+                          ),
+                          tooltip: 'Loop Mode',
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            widget.onToggleLooping();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Center: Navigation
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.skip_previous_rounded, color: Colors.white, size: 28),
+                    onPressed: widget.onPrev,
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      _showControlsAndResetTimer();
+                      setState(() { _controller.value.isPlaying
+                          ? _controller.pause()
+                          : _controller.play(); });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                          color: cs.primary, shape: BoxShape.circle),
+                      child: Icon(
+                        _controller.value.isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: cs.onPrimary, size: 28,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 28),
+                    onPressed: widget.onNext,
+                  ),
+                ],
+              ),
+              // Right: Speed, Captions
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (widget.subtitlesAvailable)
+                          IconButton(
+                            icon: Icon(
+                              widget.subtitlesEnabled ? Icons.subtitles_rounded : Icons.subtitles_off_rounded,
+                              color: widget.subtitlesEnabled ? cs.primary : Colors.white70,
+                              size: 20,
+                            ),
+                            tooltip: 'Subtitles',
+                            onPressed: () {
+                              HapticFeedback.lightImpact();
+                              widget.onToggleSubtitles();
+                            },
+                          ),
+                        _SpeedControlMenu(
+                          currentSpeed: widget.playbackSpeed,
+                          onSpeedChanged: widget.onPlaybackSpeedChanged,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -119,7 +119,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     final clip = CrossContainerClipboard.instance;
     if (lockedContainer != null &&
         clip.hasItems &&
-        clip.sourceContainer?.volId == volId) {
+        clip.sourceVolId == volId) {
       clip.clear();
     }
 

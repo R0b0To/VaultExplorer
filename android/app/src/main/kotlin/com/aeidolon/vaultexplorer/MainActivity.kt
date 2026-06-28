@@ -89,7 +89,23 @@ class MainActivity : FlutterFragmentActivity() {
     private var pendingExportMultiContainerUri: String?           = null
     private var pendingExportMultiItems: List<Map<String, Any?>>? = null
     private var pendingExportMultiVolId: Int                       = 0
-
+    /**
+ * Scales [src] so its longer edge is exactly [maxEdge] pixels,
+ * preserving the original aspect ratio.
+ *
+ * Returns [src] unchanged if it already fits within [maxEdge] × [maxEdge].
+ * The caller is responsible for recycling the returned bitmap if it differs
+ * from [src].
+ */
+private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
+    val w = src.width
+    val h = src.height
+    if (w <= maxEdge && h <= maxEdge) return src          // Already small enough.
+    val scale = maxEdge.toFloat() / maxOf(w, h)
+    val dstW  = (w * scale).toInt().coerceAtLeast(1)
+    val dstH  = (h * scale).toInt().coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(src, dstW, dstH, true)
+}
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) sanitizeClipboard()
@@ -342,20 +358,18 @@ class MainActivity : FlutterFragmentActivity() {
                                 inputStream.close()
 
                                 if (rawBitmap != null) {
-                                    val scaledBitmap = Bitmap.createScaledBitmap(rawBitmap, targetSize, targetSize, true)
-                                    if (scaledBitmap != rawBitmap) {
-                                        rawBitmap.recycle()
-                                    }
+    val scaledBitmap = scaledToFit(rawBitmap, targetSize)
+    if (scaledBitmap != rawBitmap) rawBitmap.recycle()
 
-                                    val stream = ByteArrayOutputStream()
-                                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 75, stream)
-                                    val bytes = stream.toByteArray()
-                                    scaledBitmap.recycle()
+    val stream = ByteArrayOutputStream()
+    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 75, stream)
+    val bytes = stream.toByteArray()
+    scaledBitmap.recycle()
 
-                                    runOnUiThread { result.success(bytes) }
-                                } else {
-                                    runOnUiThread { result.error("DECODE_FAILED", "Failed to decode image bytes", null) }
-                                }
+    runOnUiThread { result.success(bytes) }
+} else {
+    runOnUiThread { result.error("DECODE_FAILED", "Failed to decode image bytes", null) }
+}
                             } catch (e: Exception) {
                                 runOnUiThread { result.error("THUMBNAIL_ERROR", e.message, null) }
                             }

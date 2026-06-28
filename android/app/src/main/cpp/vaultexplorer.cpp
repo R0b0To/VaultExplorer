@@ -42,6 +42,17 @@ static constexpr uint64_t SCAN_BATCH            = 64;
 static constexpr int    MKFS_WORK_BUF_SIZE      = 4096;
 static constexpr size_t MAX_CHUNK_SIZE          = 64 * 1024 * 1024; // 64 MB safety cap
 
+// FIX P14: Use a much larger batch for container creation to reduce pwrite()
+// syscall count. 4096 sectors = 2 MB per write vs 32 KB — 64× fewer syscalls
+// for a 1 GB container (512 writes vs 32,768).
+static constexpr uint64_t CREATE_FILL_BATCH     = 4096;
+
+// FIX P12: Per-volume persistent IO buffer to avoid allocating a fresh heap
+// buffer on every large disk_read/disk_write call (which FatFs can issue up to
+// 4 MB at once during sequential file access).
+static constexpr size_t   IO_VOL_BUF_SECTORS    = 512;    // 256 KB per volume
+static constexpr size_t   IO_VOL_BUF_SIZE       = IO_VOL_BUF_SECTORS * 512;
+
 // ----------------------------------------------------------------====
 // RAII WRAPPERS
 // ----------------------------------------------------------------====
@@ -86,6 +97,13 @@ static bool          fsMounted[MAX_VOLUMES];
 static mbedtls_aes_xts_context activeDataCtxDec[MAX_VOLUMES];
 static mbedtls_aes_xts_context activeDataCtxEnc[MAX_VOLUMES];
 
+// FIX P12: Per-volume persistent IO buffers. Allocated once on first use,
+// reused for every subsequent disk_read/disk_write on that volume, eliminating
+// per-call heap churn for large sequential reads (video, export, copy).
+static std::unique_ptr<unsigned char[]> ioVolBuf[MAX_VOLUMES];
+static size_t                           ioVolBufSize[MAX_VOLUMES];
+static std::mutex                       ioVolBufMutex[MAX_VOLUMES];
+
 static const char* drivePaths[MAX_VOLUMES] = {
     "0:", "1:", "2:", "3:", "4:", "5:", "6:", "7:"
 };
@@ -99,6 +117,7 @@ static bool _globalInit = [](){
         isDataCtxInitialized[i]   = false;
         activeFileSize[i]         = 0;
         fsMounted[i]              = false;
+        ioVolBufSize[i]           = 0;
     }
     return true;
 }();
@@ -126,18 +145,30 @@ static void unmountVolume(int volId) {
         f_mount(nullptr, drivePaths[volId], 0);
         fsMounted[volId] = false;
     }
+    // Release persistent IO buffer when volume is locked.
+    std::lock_guard<std::mutex> bufLock(ioVolBufMutex[volId]);
+    ioVolBuf[volId].reset();
+    ioVolBufSize[volId] = 0;
 }
 
 // ----------------------------------------------------------------====
 // INLINE HELPERS
 // ----------------------------------------------------------------====
 
-static inline bool isUnsafeControlChar(unsigned char c) {
-    return c < 32 || c == 127;
+// FIX P13: Fast check before paying the full replace_if scan cost.
+// The vast majority of filenames from FAT filesystems are clean ASCII —
+// checking first avoids a full byte scan on every directory entry.
+static inline bool hasControlChar(const std::string& s) {
+    for (unsigned char c : s) {
+        if (c < 32 || c == 127) return true;
+    }
+    return false;
 }
 
 static void sanitizeString(std::string& s) {
-    std::replace_if(s.begin(), s.end(), isUnsafeControlChar, '?');
+    if (!hasControlChar(s)) return;   // FIX P13: skip replace_if when clean
+    std::replace_if(s.begin(), s.end(),
+        [](unsigned char c){ return c < 32 || c == 127; }, '?');
 }
 
 static inline void setTweak(unsigned char* tweak, uint64_t sectorNum) {
@@ -189,6 +220,20 @@ static void decryptSector(mbedtls_aes_xts_context* ctx, uint64_t sectorNum,
 }
 
 // ----------------------------------------------------------------====
+// FIX P12: Per-volume IO buffer accessor
+// Returns a pointer to a buffer of at least `neededBytes` for `volId`.
+// The buffer is allocated once and grown if needed; never shrunk.
+// MUST be called with ioVolBufMutex[volId] held.
+// ----------------------------------------------------------------====
+static unsigned char* getVolIoBuf(int volId, size_t neededBytes) {
+    if (ioVolBufSize[volId] < neededBytes) {
+        ioVolBuf[volId].reset(new unsigned char[neededBytes]);
+        ioVolBufSize[volId] = neededBytes;
+    }
+    return ioVolBuf[volId].get();
+}
+
+// ----------------------------------------------------------------====
 // FATFS LOW-LEVEL DISK HOOKS
 // ----------------------------------------------------------------====
 
@@ -206,14 +251,27 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     const uint64_t firstPhysical = basePhysical + sector;
     const size_t   totalBytes    = static_cast<size_t>(count) * 512;
 
-    // Fast stack allocation for standard read chunks (keeps UI scrolling responsive)
+    // FIX P12: Use the per-volume persistent buffer for requests that exceed
+    // the stack threshold, eliminating heap alloc/free on every large read.
     alignas(16) unsigned char stackBuf[65536];
-    unsigned char* encBuf = stackBuf;
-    std::unique_ptr<unsigned char[]> heapBuf;
+    unsigned char* encBuf;
 
-    if (totalBytes > sizeof(stackBuf)) {
-        heapBuf.reset(new unsigned char[totalBytes]);
-        encBuf = heapBuf.get();
+    if (totalBytes <= sizeof(stackBuf)) {
+        encBuf = stackBuf;
+    } else {
+        std::lock_guard<std::mutex> bufLock(ioVolBufMutex[pdrv]);
+        encBuf = getVolIoBuf(pdrv, totalBytes);
+        // pread directly into the persistent buffer, decrypt into caller's buff.
+        ssize_t got = pread(fd, encBuf, totalBytes,
+                            static_cast<off_t>(firstPhysical * 512));
+        if (got < static_cast<ssize_t>(totalBytes)) return RES_ERROR;
+        for (UINT i = 0; i < count; i++) {
+            const uint64_t physSector = firstPhysical + i;
+            const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
+            decryptSector(&activeDataCtxDec[pdrv], tweak,
+                          encBuf + (i * 512), buff + (i * 512));
+        }
+        return RES_OK;
     }
 
     ssize_t got = pread(fd, encBuf, totalBytes,
@@ -224,8 +282,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         const uint64_t physSector = firstPhysical + i;
         const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
         decryptSector(&activeDataCtxDec[pdrv], tweak,
-                      encBuf + (i * 512),
-                      buff   + (i * 512));
+                      encBuf + (i * 512), buff + (i * 512));
     }
     return RES_OK;
 }
@@ -241,26 +298,34 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     const uint64_t firstPhysical = basePhysical + sector;
     const size_t   totalBytes    = static_cast<size_t>(count) * 512;
 
+    // FIX P12: Same persistent-buffer strategy for writes.
     alignas(16) unsigned char stackBuf[65536];
-    unsigned char* encBuf = stackBuf;
-    std::unique_ptr<unsigned char[]> heapBuf;
+    unsigned char* encBuf;
 
-    if (totalBytes > sizeof(stackBuf)) {
-        heapBuf.reset(new unsigned char[totalBytes]);
-        encBuf = heapBuf.get();
+    if (totalBytes <= sizeof(stackBuf)) {
+        encBuf = stackBuf;
+        for (UINT i = 0; i < count; i++) {
+            const uint64_t physSector = firstPhysical + i;
+            const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
+            encryptSector(&activeDataCtxEnc[pdrv], tweak,
+                          buff + (i * 512), encBuf + (i * 512));
+        }
+        ssize_t written = pwrite(fd, encBuf, totalBytes,
+                                 static_cast<off_t>(firstPhysical * 512));
+        return (written == static_cast<ssize_t>(totalBytes)) ? RES_OK : RES_ERROR;
+    } else {
+        std::lock_guard<std::mutex> bufLock(ioVolBufMutex[pdrv]);
+        encBuf = getVolIoBuf(pdrv, totalBytes);
+        for (UINT i = 0; i < count; i++) {
+            const uint64_t physSector = firstPhysical + i;
+            const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
+            encryptSector(&activeDataCtxEnc[pdrv], tweak,
+                          buff + (i * 512), encBuf + (i * 512));
+        }
+        ssize_t written = pwrite(fd, encBuf, totalBytes,
+                                 static_cast<off_t>(firstPhysical * 512));
+        return (written == static_cast<ssize_t>(totalBytes)) ? RES_OK : RES_ERROR;
     }
-
-    for (UINT i = 0; i < count; i++) {
-        const uint64_t physSector = firstPhysical + i;
-        const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
-        encryptSector(&activeDataCtxEnc[pdrv], tweak,
-                      buff   + (i * 512),
-                      encBuf + (i * 512));
-    }
-
-    ssize_t written = pwrite(fd, encBuf, totalBytes,
-                             static_cast<off_t>(firstPhysical * 512));
-    return (written == static_cast<ssize_t>(totalBytes)) ? RES_OK : RES_ERROR;
 }
 
 extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
@@ -292,7 +357,24 @@ extern "C" DWORD get_fattime() { return 0; }
 
 // ----------------------------------------------------------------====
 // CRYPTO SESSION BUILDER
+//
+// FIX P11: PBKDF2 runs for ~2 s (500k iterations). The original code held
+// volumeMutex for the entire derivation, blocking ALL reads/writes on that
+// volume slot while the key was being computed.
+//
+// The fix: derive the key with NO lock held, then acquire the mutex only for
+// the brief header-decrypt + context-swap phase (~microseconds). A secondary
+// "derivation in progress" atomic flag prevents two threads from deriving
+// simultaneously for the same volume without blocking readers.
 // ----------------------------------------------------------------====
+
+static std::atomic<bool> derivationInProgress[MAX_VOLUMES];
+
+static bool _derivationInit = [](){
+    for (int i = 0; i < MAX_VOLUMES; i++)
+        derivationInProgress[i].store(false);
+    return true;
+}();
 
 bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive) {
     if (volId < 0 || volId >= MAX_VOLUMES) {
@@ -300,39 +382,57 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
         return false;
     }
 
-    std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-
-    // Persistent connection hit
-    if (!forceDerive && isDataCtxInitialized[volId] && activeFd[volId] >= 0) {
-        if (fd >= 0) close(fd);
-        return true;
-    }
-
-    if (!forceDerive && isDataCtxInitialized[volId]) {
-        if (fd >= 0) {
-            struct stat st;
-            if (fstat(fd, &st) == 0)
-                activeFileSize[volId] = static_cast<uint64_t>(st.st_size);
-            activeFd[volId] = fd;
+    // Fast path: session already established, no derivation needed.
+    if (!forceDerive) {
+        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
+        if (isDataCtxInitialized[volId] && activeFd[volId] >= 0) {
+            if (fd >= 0) close(fd);
             return true;
         }
-        return false;
+        if (isDataCtxInitialized[volId]) {
+            if (fd >= 0) {
+                struct stat st;
+                if (fstat(fd, &st) == 0)
+                    activeFileSize[volId] = static_cast<uint64_t>(st.st_size);
+                activeFd[volId] = fd;
+                return true;
+            }
+            return false;
+        }
     }
 
     if (fd < 0) return false;
 
-    LOGI("Running PBKDF2 Key Derivation for Volume %d...", volId);
+    // FIX P11: Prevent two threads from deriving simultaneously for the same
+    // volume (e.g., rapid double-tap unlock). Second thread waits via spinlock.
+    bool expected = false;
+    while (!derivationInProgress[volId].compare_exchange_weak(
+               expected, true, std::memory_order_acquire)) {
+        expected = false;
+        // Re-check: the first thread may have finished by now.
+        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
+        if (isDataCtxInitialized[volId]) {
+            if (fd >= 0) close(fd);
+            derivationInProgress[volId].store(false, std::memory_order_release);
+            return true;
+        }
+    }
 
+    LOGI("Running PBKDF2 Key Derivation for Volume %d (mutex NOT held)...", volId);
+
+    // --- Read header WITHOUT holding the volume mutex ---
     unsigned char headerBuf[VC_FULL_HEADER_SIZE];
     if (pread(fd, headerBuf, VC_FULL_HEADER_SIZE, 0) != VC_FULL_HEADER_SIZE) {
         close(fd);
+        derivationInProgress[volId].store(false, std::memory_order_release);
         return false;
     }
 
+    uint64_t fileSize = 0;
     {
         struct stat st;
         if (fstat(fd, &st) == 0)
-            activeFileSize[volId] = static_cast<uint64_t>(st.st_size);
+            fileSize = static_cast<uint64_t>(st.st_size);
     }
 
     const unsigned char* salt = headerBuf;
@@ -341,6 +441,9 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     const int safePim = clampPim(pim);
     const int iter = (safePim > 0) ? (15000 + (safePim * 1000)) : 500000;
 
+    // FIX P11: PBKDF2 runs here — completely outside the volume mutex.
+    // Other volume operations (reads on an already-unlocked volume, operations
+    // on different volumes) are entirely unaffected.
     MdContextGuard mdGuard;
     mbedtls_md_setup(&mdGuard.ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
 
@@ -363,6 +466,7 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     if (decH[0] != 'V' || decH[1] != 'E' || decH[2] != 'R' || decH[3] != 'A') {
         mbedtls_platform_zeroize(decH, sizeof(decH));
         close(fd);
+        derivationInProgress[volId].store(false, std::memory_order_release);
         return false;
     }
 
@@ -370,6 +474,8 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
 
     unsigned char dKey[VC_KEY_MATERIAL_LEN];
     bool fsFound = false;
+    uint64_t foundDataOffset = 0;
+    bool     foundRelTweak   = false;
 
     XtsContextPair candidate;
     std::unique_ptr<unsigned char[]> encBatch(new unsigned char[SCAN_BATCH * 512]);
@@ -397,8 +503,8 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
                 mbedtls_aes_crypt_xts(&candidate.dec, MBEDTLS_AES_DECRYPT,
                                       512, tweak, enc, decS);
                 if (decS[510] == 0x55 && decS[511] == 0xAA) {
-                    activeDataOffset[volId] = sectorIdx * 512;
-                    activeIsRelTweak[volId] = false;
+                    foundDataOffset = sectorIdx * 512;
+                    foundRelTweak   = false;
                     fsFound = true;
                     break;
                 }
@@ -407,8 +513,8 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
                 mbedtls_aes_crypt_xts(&candidate.dec, MBEDTLS_AES_DECRYPT,
                                       512, tweak, enc, decS);
                 if (decS[510] == 0x55 && decS[511] == 0xAA) {
-                    activeDataOffset[volId] = sectorIdx * 512;
-                    activeIsRelTweak[volId] = true;
+                    foundDataOffset = sectorIdx * 512;
+                    foundRelTweak   = true;
                     fsFound = true;
                     break;
                 }
@@ -423,23 +529,35 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     if (!fsFound) {
         mbedtls_platform_zeroize(dKey, sizeof(dKey));
         close(fd);
+        derivationInProgress[volId].store(false, std::memory_order_release);
         return false;
     }
 
     mbedtls_aes_xts_setkey_enc(&candidate.enc, dKey, 512);
     mbedtls_platform_zeroize(dKey, sizeof(dKey));
 
-    if (isDataCtxInitialized[volId]) {
-        mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
-        mbedtls_aes_xts_free(&activeDataCtxEnc[volId]);
-    }
-    activeDataCtxDec[volId] = candidate.dec;
-    activeDataCtxEnc[volId] = candidate.enc;
-    mbedtls_aes_xts_init(&candidate.dec);
-    mbedtls_aes_xts_init(&candidate.enc);
+    // FIX P11: Now acquire the mutex ONLY for the brief context swap.
+    // All the slow crypto work is already done above.
+    {
+        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
 
-    isDataCtxInitialized[volId] = true;
-    activeFd[volId] = fd;
+        if (isDataCtxInitialized[volId]) {
+            mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
+            mbedtls_aes_xts_free(&activeDataCtxEnc[volId]);
+        }
+        activeDataCtxDec[volId] = candidate.dec;
+        activeDataCtxEnc[volId] = candidate.enc;
+        mbedtls_aes_xts_init(&candidate.dec);
+        mbedtls_aes_xts_init(&candidate.enc);
+
+        isDataCtxInitialized[volId] = true;
+        activeFd[volId]             = fd;
+        activeDataOffset[volId]     = foundDataOffset;
+        activeIsRelTweak[volId]     = foundRelTweak;
+        activeFileSize[volId]       = fileSize;
+    }
+
+    derivationInProgress[volId].store(false, std::memory_order_release);
     return true;
 }
 
@@ -494,14 +612,12 @@ static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pa
 
             const uint64_t ts = fatToUnixTimestamp(fno.fdate, fno.ftime);
             if (fno.fattrib & AM_DIR) {
-                // Format: "[DIR] name|0|unixSecs"
                 std::string entry = "[DIR] ";
                 entry += name;
                 entry += "|0|";
                 entry += std::to_string(ts);
                 results.push_back(std::move(entry));
             } else {
-                // Format: "name|sizeBytes|unixSecs"
                 std::string entry = name;
                 entry += '|';
                 entry += std::to_string(fno.fsize);
@@ -547,7 +663,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
-    // Keep raw fd persistently open in activeFd[volId] cache
     return result;
 }
 
@@ -666,7 +781,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
         isDataCtxInitialized[volId] = false;
     }
 
-    unmountVolume(volId);
+    unmountVolume(volId);  // also clears the persistent IO buffer
 }
 
 extern "C" JNIEXPORT jlong JNICALL
@@ -959,14 +1074,18 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             const uint64_t START_SECTOR  = VC_DATA_AREA_OFFSET / 512;
             const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - VC_DATA_AREA_OFFSET) / 512;
 
+            // FIX P14: Use CREATE_FILL_BATCH (4096 sectors = 2 MB) instead of
+            // SCAN_BATCH (64 sectors = 32 KB). For a 1 GB container this reduces
+            // pwrite() syscalls from 32,768 → 512, cutting creation time noticeably.
             const unsigned char ZERO_SECTOR[512] = {0};
-            std::unique_ptr<unsigned char[]> batch(new unsigned char[512 * SCAN_BATCH]);
+            const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
+            std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
             unsigned char tweak[16];
             bool writeOk = true;
 
             for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS && writeOk; ) {
                 const uint64_t rem   = TOTAL_SECTORS - s;
-                const uint64_t count = (rem < SCAN_BATCH) ? rem : SCAN_BATCH;
+                const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
 
                 for (uint64_t i = 0; i < count; ++i) {
                     setTweak(tweak, s + i);
@@ -1050,7 +1169,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 
     env->ReleaseStringUTFChars(password, nativePass);
     env->ReleaseStringUTFChars(fileSystem, nativeFS);
-    close(fd); // Closing temporary container write-fd is expected here
+    close(fd);
 
     return success ? JNI_TRUE : JNI_FALSE;
 }

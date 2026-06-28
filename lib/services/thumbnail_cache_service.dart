@@ -13,20 +13,7 @@ import 'vaultexplorer_api.dart';
 import 'app_cache_encryption.dart';
 
 /// Three-tier thumbnail cache.
-///
-/// Tier 1 — static in-memory [LruCache] ([_memoryCache])
-///   Synchronous O(1).  Survives widget dispose/recreate within a session.
-///   120 entries × ~20 KB ≈ 2.4 MB maximum footprint.
-///   Checked first, before any async work is scheduled.
-///
-/// Tier 2 — encrypted disk file (appCache) or container file (inContainer)
-///   Async; AES-GCM runs *inline* (no Isolate spawn).
-///   App-cache directory path cached statically after first resolution.
-///   File read via try/catch — no redundant exists() syscall on every miss.
-///
-/// Tier 3 — full container read (handled by callers on a complete miss)
-///   Returns raw or native-thumbnail bytes; callers write the result back
-///   into Tier 1 and schedule a Tier 2 write so the next access is faster.
+
 class ThumbnailCacheService {
   ThumbnailCacheService._();
 
@@ -39,22 +26,26 @@ class ThumbnailCacheService {
   // Static so the cache survives widget disposal and scroll recycling.
   static final _memoryCache = LruCache<String, Uint8List>(120);
 
-  // ── AES key — read from Keystore exactly once per app session ─────────────
+  // ── AES key — read from Keystore exactly once per session ─────────────────
   static enc.Key? _cachedKey;
 
-  /// Returns the persistent AES-256 key.  Safe to call from any async context.
-  static Future<enc.Key> getOrFetchKey() async =>
+  static Future<enc.Key> _getOrFetchKey() async =>
       _cachedKey ??= await AppCacheEncryption.getEncryptionKey();
 
   // ── App-cache directory — resolved once, never re-queried ─────────────────
-  //
-  // BUG FIXED: the old code called getApplicationCacheDirectory() on *every*
+  // BUG FIXED: the old code called getApplicationCacheDirectory() on every
   // single cache read, paying a platform-channel round-trip every time.
-  // The path never changes at runtime; cache it statically.
   static String? _appCacheRoot;
 
   static Future<String> _thumbDir(int volId) async {
-    _appCacheRoot ??= (await getApplicationCacheDirectory()).path;
+    // FIX: Wrap in try/catch so a temporarily-unavailable cache dir doesn't
+    // throw an unhandled exception. Fall back to a temp directory if needed.
+    try {
+      _appCacheRoot ??= (await getApplicationCacheDirectory()).path;
+    } catch (e) {
+      debugPrint('ThumbnailCacheService._thumbDir: cache directory unavailable: $e');
+      _appCacheRoot ??= (await getTemporaryDirectory()).path;
+    }
     return '$_appCacheRoot/thumbs/$volId';
   }
 
@@ -65,16 +56,9 @@ class ThumbnailCacheService {
   }
 
   // ── AES-GCM — inline, no Isolate ──────────────────────────────────────────
-  //
-  // BUG FIXED: the old code used Isolate.run() for every encrypt/decrypt.
-  // Spawning a fresh Isolate costs ~5–10 ms.
-  // AES-GCM on a 20 KB thumbnail costs ~0.3 ms.
-  // The isolate overhead was 20–30× the actual work, making every disk cache
-  // hit *slower* than reading directly from the container.
-  //
-  // Running AES-GCM inline is safe here: the concurrency limiter upstream
-  // ensures at most 2 image loads run simultaneously, so the worst-case
-  // synchronous CPU cost per frame is ~0.6 ms — well inside a 16 ms budget.
+  // Running AES-GCM inline is safe: the concurrency limiter upstream ensures
+  // at most 2 image loads run simultaneously, so worst-case synchronous CPU
+  // cost per frame is ~0.6 ms — well inside a 16 ms budget.
   static Uint8List? _decrypt(Uint8List raw, enc.Key key) {
     if (raw.length <= _gcmNonceSize + _gcmTagSize) return null;
     try {
@@ -105,23 +89,17 @@ class ThumbnailCacheService {
       '${container.volId}:$filePath';
 
   /// Synchronous O(1) lookup into the in-memory tier.
-  ///
-  /// Call this from widget [initState] / [build] so that already-loaded
-  /// thumbnails are displayed immediately without entering the async pipeline.
   static Uint8List? getFromMemory(MountedContainer container, String filePath) =>
       _memoryCache[_memKey(container, filePath)];
 
-  /// Writes directly to the in-memory tier.  Safe to call from any async context.
+  /// Writes directly to the in-memory tier. Safe to call from any async context.
   static void putInMemory(
       MountedContainer container, String filePath, Uint8List data) =>
       _memoryCache[_memKey(container, filePath)] = data;
 
   // ── Public: read ──────────────────────────────────────────────────────────
 
-  /// Returns cached thumbnail bytes, or null on a miss.
-  ///
-  /// Read order: Tier 1 (memory, synchronous) → Tier 2 (disk / container).
-  /// On a Tier-2 hit the result is promoted to Tier 1 automatically.
+  /// Returns cached thumbnail bytes, or null on any miss or error.
   static Future<Uint8List?> get({
     required MountedContainer container,
     required String filePath,
@@ -134,46 +112,81 @@ class ThumbnailCacheService {
     if (mem != null) return mem;
 
     // ── Tier 2: disk / in-container ───────────────────────────────────────
+    // FIX: Top-level try/catch ensures NO exception can escape from get(),
+    // not even from _thumbDir() → getApplicationCacheDirectory() on first call.
     try {
       if (mode == ThumbnailCacheMode.appCache) {
-        final dir  = await _thumbDir(container.volId);
-        final file = File('$dir/${_encodeKey(filePath)}');
-
-        // BUG FIXED: old code called file.exists() before file.readAsBytes().
-        // That's two syscalls for every miss.  Using try/catch on readAsBytes()
-        // handles the ENOENT case in a single syscall.
-        final Uint8List raw;
-        try {
-          raw = await file.readAsBytes();
-        } on PathNotFoundException {
-          return null; // Clean miss — no bytes written yet.
-        } catch (_) {
-          return null;
-        }
-
-        if (raw.length <= _gcmNonceSize + _gcmTagSize) return null;
-
-        final key       = await getOrFetchKey();
-        final decrypted = _decrypt(raw, key); // Inline — fast for thumbnail data.
-        if (decrypted == null || decrypted.isEmpty) return null;
-
-        // Promote to Tier 1 so the next access is instant.
-        putInMemory(container, filePath, decrypted);
-        return decrypted;
+        return await _getFromAppCache(container, filePath);
       } else {
-        // inContainer: stored unencrypted inside the FAT filesystem.
-        final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
-        final size = await vaultExplorerApi.getFileSize(container, cachePath);
-        if (size <= 0) return null;
-        final bytes =
-            await vaultExplorerApi.readFileChunk(container, cachePath, 0, size);
-        if (bytes != null && bytes.isNotEmpty) {
-          putInMemory(container, filePath, bytes);
-        }
-        return bytes;
+        return await _getFromContainer(container, filePath);
       }
+    } catch (e, stack) {
+      debugPrint('ThumbnailCacheService.get: unexpected error for $filePath\n$e\n$stack');
+      return null;
+    }
+  }
+
+  static Future<Uint8List?> _getFromAppCache(
+      MountedContainer container, String filePath) async {
+    final dir  = await _thumbDir(container.volId);
+    final file = File('$dir/${_encodeKey(filePath)}');
+    final Uint8List raw;
+    try {
+      raw = await file.readAsBytes();
+    } on PathNotFoundException {
+      // Expected: cache entry doesn't exist yet. Not an error.
+      return null;
+    } on FileSystemException catch (e) {
+      if (e.osError?.errorCode == 2 /* ENOENT */) return null;
+      debugPrint('ThumbnailCacheService._getFromAppCache: FileSystemException '
+          'reading $filePath: $e');
+      return null;
     } catch (e) {
-      debugPrint('ThumbnailCacheService.get: $e');
+      debugPrint('ThumbnailCacheService._getFromAppCache: unexpected error '
+          'reading $filePath: $e');
+      return null;
+    }
+
+    // Validate minimum size before attempting decryption.
+    if (raw.length <= _gcmNonceSize + _gcmTagSize) {
+      debugPrint('ThumbnailCacheService._getFromAppCache: cache file too small '
+          '(${raw.length} bytes) for $filePath — deleting.');
+      file.delete().catchError((_) {}); // Fire-and-forget cleanup
+      return null;
+    }
+
+    final key       = await _getOrFetchKey();
+    final decrypted = _decrypt(raw, key);
+
+    if (decrypted == null || decrypted.isEmpty) {
+      // AES-GCM authentication failure — corrupted or tampered cache file.
+      // Delete it so the next access regenerates from the container.
+      debugPrint('ThumbnailCacheService._getFromAppCache: AES-GCM auth failure '
+          'for $filePath — deleting corrupt cache entry.');
+      file.delete().catchError((_) {});
+      return null;
+    }
+
+    // Promote to Tier 1 so the next access is instant.
+    putInMemory(container, filePath, decrypted);
+    return decrypted;
+  }
+
+  /// Reads from the in-container .thumbcache directory.
+  static Future<Uint8List?> _getFromContainer(
+      MountedContainer container, String filePath) async {
+    try {
+      final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
+      final size = await vaultExplorerApi.getFileSize(container, cachePath);
+      if (size <= 0) return null;
+      final bytes =
+          await vaultExplorerApi.readFileChunk(container, cachePath, 0, size);
+      if (bytes != null && bytes.isNotEmpty) {
+        putInMemory(container, filePath, bytes);
+      }
+      return bytes;
+    } catch (e) {
+      debugPrint('ThumbnailCacheService._getFromContainer: $e');
       return null;
     }
   }
@@ -194,36 +207,70 @@ class ThumbnailCacheService {
 
     try {
       if (mode == ThumbnailCacheMode.appCache) {
-        final dirPath = await _thumbDir(container.volId);
-        final dir     = Directory(dirPath);
-        if (!await dir.exists()) await dir.create(recursive: true);
-
-        final file      = File('$dirPath/${_encodeKey(filePath)}');
-        final key       = await getOrFetchKey();
-        final encrypted = _encrypt(data, key); // Inline — fast for small data.
-
-        // Atomic write: write to a temp file then rename to prevent partial reads.
-        final tmp = File('${file.path}.tmp');
-        await tmp.writeAsBytes(encrypted, flush: true);
-        await tmp.rename(file.path);
+        await _putToAppCache(container, filePath, data);
       } else {
-        // inContainer
-        final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
-        final tmpPath   = '$cachePath.tmp';
-        await vaultExplorerApi.createDirectory(container, inContainerDir);
+        await _putToContainer(container, filePath, data);
+      }
+    } catch (e, stack) {
+      // Last-resort safety net — should not fire in normal operation.
+      debugPrint('ThumbnailCacheService.put: unexpected error for $filePath\n$e\n$stack');
+    }
+  }
+
+  static Future<void> _putToAppCache(
+      MountedContainer container, String filePath, Uint8List data) async {
+    final dirPath = await _thumbDir(container.volId);
+    final dir = Directory(dirPath);
+    try {
+      await dir.create(recursive: true);
+    } on PathNotFoundException catch (e) {
+      debugPrint('ThumbnailCacheService._putToAppCache: cannot create '
+          'cache dir $dirPath: $e');
+      return; // Non-fatal — thumbnail will be regenerated next access
+    } on FileSystemException catch (e) {
+      debugPrint('ThumbnailCacheService._putToAppCache: filesystem error '
+          'creating $dirPath: $e');
+      return;
+    }
+
+    final file      = File('$dirPath/${_encodeKey(filePath)}');
+    final key       = await _getOrFetchKey();
+    final encrypted = _encrypt(data, key);
+
+    // Atomic write: write to a .tmp file then rename to prevent partial reads
+    final tmp = File('${file.path}.tmp');
+    try {
+      await tmp.writeAsBytes(encrypted, flush: true);
+      await tmp.rename(file.path);
+    } on PathNotFoundException {
+      debugPrint('ThumbnailCacheService._putToAppCache: directory vanished '
+          'during write for $filePath — skipping disk cache.');
+      tmp.delete().catchError((_) {});
+    } on FileSystemException catch (e) {
+      debugPrint('ThumbnailCacheService._putToAppCache: write failed '
+          'for $filePath: $e');
+      tmp.delete().catchError((_) {});
+    }
+  }
+
+  static Future<void> _putToContainer(
+      MountedContainer container, String filePath, Uint8List data) async {
+    try {
+      final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
+      final tmpPath   = '$cachePath.tmp';
+      await vaultExplorerApi.createDirectory(container, inContainerDir);
+      await vaultExplorerApi.deleteFile(container, tmpPath);
+      final ok = await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, data);
+      if (ok) {
+        await vaultExplorerApi.deleteFile(container, cachePath);
+        await vaultExplorerApi.renameFile(container, tmpPath, cachePath);
+      } else {
         await vaultExplorerApi.deleteFile(container, tmpPath);
-        final ok =
-            await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, data);
-        if (ok) {
-          await vaultExplorerApi.deleteFile(container, cachePath);
-          await vaultExplorerApi.renameFile(container, tmpPath, cachePath);
-        } else {
-          await vaultExplorerApi.deleteFile(container, tmpPath);
-          debugPrint('ThumbnailCacheService.put: inContainer write failed for $filePath');
-        }
+        debugPrint('ThumbnailCacheService._putToContainer: '
+            'write failed for $filePath');
       }
     } catch (e) {
-      debugPrint('ThumbnailCacheService.put: $e');
+      debugPrint('ThumbnailCacheService._putToContainer: $e');
     }
   }
 
@@ -263,8 +310,8 @@ class ThumbnailCacheService {
       final dir = Directory(await _thumbDir(container.volId));
       if (await dir.exists()) await dir.delete(recursive: true);
     } catch (_) {}
-    // LruCache has no prefix-delete API, so flush the whole memory cache
-    // conservatively.  It will refill quickly on the next scroll.
+    // LruCache has no prefix-delete, so flush the whole memory cache.
+    // It refills quickly on the next scroll.
     _memoryCache.clear();
   }
 

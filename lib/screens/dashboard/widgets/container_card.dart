@@ -11,10 +11,6 @@ class ContainerCard extends StatelessWidget {
   final ValueChanged<int> onLocked;
   final VoidCallback onReturn;
   final VoidCallback? onLongPress;
-
-  /// FIX: Navigation is now owned by VaultDashboard so it can wire the
-  ///      auto-close activity callback. Previously this widget pushed the
-  ///      route directly, bypassing the timer reset.
   final VoidCallback onBrowse;
 
   const ContainerCard({
@@ -45,7 +41,6 @@ class ContainerCard extends StatelessWidget {
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        // FIX: Use the injected onBrowse callback instead of pushing directly
         onTap: onBrowse,
         onLongPress: onLongPress,
         child: Padding(
@@ -148,6 +143,17 @@ class _LockButtonState extends State<_LockButton> {
 
   Future<void> _lock() async {
     HapticFeedback.mediumImpact();
+    if (!vaultExplorerApi.acquireLockGuard(widget.container.volId)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('An operation is in progress. Please wait before locking.'),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       await vaultExplorerApi.lockContainer(widget.container.uri);
@@ -159,6 +165,7 @@ class _LockButtonState extends State<_LockButton> {
         );
       }
     } finally {
+      vaultExplorerApi.releaseLockGuard(widget.container.volId);
       if (mounted) setState(() => _loading = false);
     }
   }

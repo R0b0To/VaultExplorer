@@ -444,12 +444,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     return _measureTreeBytes(container, item['path'] as String);
   }
 
-  // ── Paste ─────────────────────────────────────────────────────────────────
-
-  Future<void> _paste() async {
+    Future<void> _paste() async {
     if (!_clip.hasItems) return;
     _signalActivity();
-
+ 
     final srcVolId = _clip.sourceVolId;
     if (srcVolId == null) {
       _setStatus('Clipboard source is invalid', error: true);
@@ -457,11 +455,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       setState(() {});
       return;
     }
-
+ 
     final isCut         = _clip.isCutOperation;
     final sameContainer = _clip.isFromVolume(widget.container.volId);
     final items         = List<Map<String, dynamic>>.from(_clip.items);
-
+ 
     // Resolve the source container
     MountedContainer? srcContainer;
     if (!sameContainer) {
@@ -486,7 +484,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     } else {
       srcContainer = widget.container;
     }
-
+ 
     final toProcess  = <Map<String, dynamic>>[];
     int skipCount    = 0;
     for (final item in items) {
@@ -496,81 +494,96 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       final destPath = _currentDirPath.isEmpty
           ? fileName
           : '$_currentDirPath/$fileName';
-      
-      // Only skip same-path transfers if we are operating within the same volume
+ 
       if (sameContainer && srcPath == destPath) { skipCount++; continue; }
       if (sameContainer && isDir && destPath.startsWith('$srcPath/')) { skipCount++; continue; }
-      
+ 
       toProcess.add({...item, '_destPath': destPath});
     }
-
+ 
     if (toProcess.isEmpty) {
       _setStatus('Nothing to paste — already at destination');
       _clip.clear();
       return;
     }
-
+ 
     setState(() => _isLoading = true);
     _setStatus('Checking available space…',
         autoClear: const Duration(minutes: 5));
-
+ 
     vaultExplorerApi.beginBatch(widget.container.volId);
-
-    if (!isCut) {
-      int requiredBytes = 0;
-      for (final item in toProcess) {
-        // Measure bytes using the resolved source container
-        requiredBytes += await _measureItemBytes(srcContainer, item);
-      }
-      final spaceInfo = await vaultExplorerApi.getSpaceInfo(widget.container);
-      final freeBytes = (spaceInfo != null && spaceInfo.length > 1)
-          ? spaceInfo[1]
-          : 0;
-      if (requiredBytes > (freeBytes * 0.95).floor()) {
-        setState(() => _isLoading = false);
-        vaultExplorerApi.endBatch(widget.container.volId);
-        _setStatus(
-          'Not enough space — need ${formatBytes(requiredBytes)}, '
-          'only ${formatBytes(freeBytes)} free',
-          error: true,
-          autoClear: const Duration(seconds: 6),
-        );
-        return;
-      }
+ 
+    // FIX: Always check space, regardless of cut/copy.
+    // A cross-container move copies bytes to the destination before deleting
+    // from the source, so it consumes destination space just like a copy.
+    // A same-container move is handled natively by f_rename and doesn't
+    // consume extra space, but we still check to be safe.
+    int requiredBytes = 0;
+    for (final item in toProcess) {
+      requiredBytes += await _measureItemBytes(srcContainer, item);
     }
-
+    if (!mounted) {
+      vaultExplorerApi.endBatch(widget.container.volId);
+      return;
+    }
+ 
+    final spaceInfo = await vaultExplorerApi.getSpaceInfo(widget.container);
+    if (!mounted) {
+      vaultExplorerApi.endBatch(widget.container.volId);
+      return;
+    }
+    final freeBytes = (spaceInfo != null && spaceInfo.length > 1)
+        ? spaceInfo[1]
+        : 0;
+ 
+    if (requiredBytes > (freeBytes * 0.95).floor()) {
+      setState(() => _isLoading = false);
+      vaultExplorerApi.endBatch(widget.container.volId);
+      _setStatus(
+        'Not enough space — need ${formatBytes(requiredBytes)}, '
+        'only ${formatBytes(freeBytes)} free',
+        error: true,
+        autoClear: const Duration(seconds: 6),
+      );
+      return;
+    }
+ 
     final existingRaw = await vaultExplorerApi.listDirectory(
             widget.container, _currentDirPath) ?? [];
+    if (!mounted) {
+      vaultExplorerApi.endBatch(widget.container.volId);
+      return;
+    }
+ 
     final existingNames = <String>{};
     final existingDirs  = <String>{};
     for (final item in existingRaw) {
-      final entry = RawEntry.parse(item);
-      final name = entry.name;
-      if (entry.isDir) {
-        existingNames.add(name.toLowerCase());
-        existingDirs.add(name.toLowerCase());
+      if (item.startsWith('[DIR] ')) {
+        final n = item.replaceFirst('[DIR] ', '').toLowerCase();
+        existingNames.add(n);
+        existingDirs.add(n);
       } else {
-        existingNames.add(name.toLowerCase());
+        existingNames.add(item.split('|').first.toLowerCase());
       }
     }
-
+ 
     _ConflictResolution? globalResolution;
     int failCount = 0;
     final List<String> createdDestPaths = [];
     bool diskFull = false;
-
+ 
     _setStatus(isCut ? 'Moving…' : 'Copying…',
         autoClear: const Duration(minutes: 10));
-
+ 
     try {
       for (final item in toProcess) {
         if (!mounted) break;
-
+ 
         final srcPath  = item['path'] as String;
         final isDir    = item['isDir'] as bool;
         final fileName = srcPath.split('/').last;
         String destPath = item['_destPath'] as String;
-
+ 
         if (existingNames.contains(fileName.toLowerCase())) {
           _ConflictResolution? resolution = globalResolution;
           if (resolution == null) {
@@ -602,14 +615,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   : '$_currentDirPath/$uniqueName';
           }
         }
-
+ 
         try {
-          // Perform the copy operation across containers
           final ok = await _copyEntry(
               srcContainer, widget.container, srcPath, destPath, isDir, createdDestPaths);
-          if (!ok) failCount++;
-          
-          // Delete from source container if this is a cut/move operation
+          if (!ok) {
+            failCount++;
+            continue;
+          }
+ 
           if (ok && isCut) {
             await _deleteEntryRecursive(srcContainer, srcPath, isDir);
           }
@@ -620,8 +634,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
     } finally {
       vaultExplorerApi.endBatch(widget.container.volId);
-
+ 
       if (diskFull) {
+        // Roll back partially-created destination files
         for (final path in createdDestPaths.reversed) {
           try {
             await _deleteEntryRecursive(widget.container, path, false);
@@ -650,6 +665,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
     }
   }
+
 
   // ── Conflict helpers ──────────────────────────────────────────────────────
 
@@ -760,6 +776,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   // ── Same-container copy ───────────────────────────────────────────────────
 
+    // FIX: _copyEntry now verifies the destination file truly does not exist
+  // before writing, to guard against silent truncation when deleteFile
+  // returns false but leaves the file on disk.
   Future<bool> _copyEntry(
     MountedContainer srcContainer,
     MountedContainer destContainer,
@@ -772,28 +791,35 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       try {
         final size = await vaultExplorerApi.getFileSize(srcContainer, srcPath);
         if (size < 0) return false;
-
+ 
+        // Attempt deletion and verify the file is truly gone before writing.
         await vaultExplorerApi.deleteFile(destContainer, destPath);
-
+        final stillExists = await vaultExplorerApi.getFileSize(destContainer, destPath);
+        if (stillExists > 0) {
+          // Delete failed — aborting to prevent silent truncation of existing data.
+          debugPrint('_copyEntry: could not delete existing file at $destPath, skipping.');
+          return false;
+        }
+ 
         if (size == 0) {
           final ok = await vaultExplorerApi.createEmptyFile(destContainer, destPath);
           if (ok) createdDestPaths.add(destPath);
           return ok;
         }
-
+ 
         int offset = 0;
         const int chunkSize = 256 * 1024;
-
+ 
         while (offset < size) {
           final chunkLen = min(size - offset, chunkSize);
           final chunk = await vaultExplorerApi.readFileChunk(
               srcContainer, srcPath, offset, chunkLen);
           if (chunk == null || chunk.isEmpty) return false;
-
+ 
           final ok = await vaultExplorerApi.writeFileChunk(
               destContainer, destPath, offset, chunk);
           if (!ok) throw const _DiskFullException();
-
+ 
           offset += chunk.length;
         }
         createdDestPaths.add(destPath);
@@ -803,7 +829,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         return false;
       }
     }
-
+ 
+    // Directory copy — recursive
     final children =
         await vaultExplorerApi.listDirectory(srcContainer, srcPath) ?? [];
     await vaultExplorerApi.createDirectory(destContainer, destPath);
@@ -811,9 +838,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     bool allOk = true;
     for (final entry in children) {
       if (entry.startsWith('System:')) continue;
-      final entryParsed = RawEntry.parse(entry);
-      final childIsDir  = entryParsed.isDir;
-      final childName   = entryParsed.name;
+      final childIsDir = entry.startsWith('[DIR] ');
+      final childName  = childIsDir
+          ? entry.replaceFirst('[DIR] ', '')
+          : entry.split('|').first;
       final ok = await _copyEntry(
         srcContainer,
         destContainer,
@@ -826,6 +854,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
     return allOk;
   }
+
 
   // ── Batch delete ──────────────────────────────────────────────────────────
 

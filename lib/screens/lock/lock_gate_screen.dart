@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../services/app_settings_service.dart';
 import '../dashboard/vault_dashboard.dart';
@@ -14,15 +15,20 @@ class LockGateScreen extends StatefulWidget {
 }
 
 class _LockGateScreenState extends State<LockGateScreen> {
+  static const _secure = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
+  static const _kFailedAttempts = 'lock_gate_failed_attempts_v1';
+  static const _kLockedUntilMs  = 'lock_gate_locked_until_ms_v1';
+
   AppSettings? _settings;
   bool _loading = true;
 
   final _pwCtrl = TextEditingController();
-  bool _obscure = true;
+  bool _obscure  = true;
   String? _error;
   bool _checking = false;
 
-  // FIX: Brute-force protection — track failed attempts and lock out
   int _failedAttempts = 0;
   DateTime? _lockedUntil;
 
@@ -41,6 +47,8 @@ class _LockGateScreenState extends State<LockGateScreen> {
   }
 
   Future<void> _init() async {
+    await _loadPersistedLockoutState();
+
     final s = await AppSettingsService.loadSettings();
     if (!mounted) return;
 
@@ -56,6 +64,30 @@ class _LockGateScreenState extends State<LockGateScreen> {
 
     if (s.masterPasswordIsFingerprint) {
       _tryBiometric();
+    }
+  }
+
+  /// Restores [_failedAttempts] and [_lockedUntil] from secure storage.
+  Future<void> _loadPersistedLockoutState() async {
+    try {
+      final storedAttempts = await _secure.read(key: _kFailedAttempts);
+      final storedUntilMs  = await _secure.read(key: _kLockedUntilMs);
+
+      _failedAttempts = int.tryParse(storedAttempts ?? '') ?? 0;
+
+      if (storedUntilMs != null) {
+        final ms = int.tryParse(storedUntilMs);
+        if (ms != null) {
+          _lockedUntil = DateTime.fromMillisecondsSinceEpoch(ms);
+          // Clear expired lockout from storage immediately
+          if (_lockedUntil!.isBefore(DateTime.now())) {
+            _lockedUntil = null;
+            await _secure.delete(key: _kLockedUntilMs);
+          }
+        }
+      }
+    } catch (_) {
+      // If secure storage read fails, start fresh rather than crashing
     }
   }
 
@@ -80,36 +112,65 @@ class _LockGateScreenState extends State<LockGateScreen> {
     }
   }
 
-  /// FIX: Returns null if locked out, otherwise remaining lockout duration.
+  /// Returns remaining lockout duration, or null if not locked out.
   Duration? _currentLockout() {
     if (_lockedUntil == null) return null;
     final remaining = _lockedUntil!.difference(DateTime.now());
     if (remaining.isNegative) {
       _lockedUntil = null;
+      // Clean up expired entry from storage (fire-and-forget)
+      _secure.delete(key: _kLockedUntilMs).catchError((_) {});
       return null;
     }
     return remaining;
   }
 
-  /// FIX: Exponential backoff lockout:
+  /// Records a failed attempt and applies exponential backoff lockout.
+  ///
+  /// Thresholds:
   ///   5 failures  → 30 s
   ///   6 failures  → 60 s
   ///   7 failures  → 120 s
   ///   8+ failures → 300 s (5 min)
-  void _recordFailure() {
+  ///
+  /// FIX: State is persisted to secure storage so killing the app
+  /// between attempts does not reset the counter.
+  Future<void> _recordFailure() async {
     _failedAttempts++;
+
     if (_failedAttempts >= 5) {
-      final excess    = _failedAttempts - 4;
-      final seconds   = (30 * excess).clamp(30, 300);
-      _lockedUntil    = DateTime.now().add(Duration(seconds: seconds));
+      final excess  = _failedAttempts - 4;
+      final seconds = (30 * excess).clamp(30, 300);
+      _lockedUntil  = DateTime.now().add(Duration(seconds: seconds));
     }
+
+    // Persist atomically (best-effort — don't crash the UI on storage failure)
+    try {
+      await _secure.write(
+          key: _kFailedAttempts, value: _failedAttempts.toString());
+      if (_lockedUntil != null) {
+        await _secure.write(
+            key: _kLockedUntilMs,
+            value: _lockedUntil!.millisecondsSinceEpoch.toString());
+      }
+    } catch (_) {}
+  }
+
+  /// Clears the persisted lockout state on successful authentication.
+  Future<void> _clearLockoutState() async {
+    _failedAttempts = 0;
+    _lockedUntil    = null;
+    try {
+      await _secure.delete(key: _kFailedAttempts);
+      await _secure.delete(key: _kLockedUntilMs);
+    } catch (_) {}
   }
 
   Future<void> _checkPassword() async {
     final s = _settings;
     if (s == null) return;
 
-    // FIX: Enforce lockout before doing any work
+    // Enforce lockout before doing any work
     final lockout = _currentLockout();
     if (lockout != null) {
       setState(() {
@@ -134,9 +195,8 @@ class _LockGateScreenState extends State<LockGateScreen> {
     if (!mounted) return;
 
     if (ok) {
-      // Reset counters on success
-      _failedAttempts = 0;
-      _lockedUntil    = null;
+      // FIX: Clear persisted counter on success
+      await _clearLockoutState();
 
       if (s.needsHashUpgrade) {
         _upgradeMasterPasswordHashInBackground(s, pw);
@@ -144,7 +204,9 @@ class _LockGateScreenState extends State<LockGateScreen> {
       _goToDashboard();
     } else {
       HapticFeedback.heavyImpact();
-      _recordFailure(); // FIX: record and potentially lock
+      // FIX: await the async persist
+      await _recordFailure();
+      if (!mounted) return;
 
       final newLockout = _currentLockout();
       setState(() {
@@ -220,11 +282,8 @@ class _LockGateScreenState extends State<LockGateScreen> {
                 TextField(
                   controller: _pwCtrl,
                   obscureText: _obscure,
-                  // FIX: Disable input when locked out
                   enabled: !isLockedOut && !_checking,
                   autofocus: !s.masterPasswordIsFingerprint,
-                  // SEC-07: master password must not be offered to
-                  // third-party autofill services.
                   autofillHints: null,
                   onSubmitted: (_) => _checkPassword(),
                   decoration: InputDecoration(
@@ -249,7 +308,6 @@ class _LockGateScreenState extends State<LockGateScreen> {
                 ],
                 const SizedBox(height: 20),
                 FilledButton(
-                  // FIX: disable button when locked out or checking
                   onPressed: (_checking || isLockedOut) ? null : _checkPassword,
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),

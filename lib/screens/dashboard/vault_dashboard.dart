@@ -39,7 +39,10 @@ class _VaultDashboardState extends State<VaultDashboard>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    for (final t in _autoCloseTimers.values) t.cancel();
+    for (final t in _autoCloseTimers.values) {
+      t.cancel();
+    }
+    _autoCloseTimers.clear();
     super.dispose();
   }
 
@@ -69,41 +72,39 @@ class _VaultDashboardState extends State<VaultDashboard>
     final record = _records[container.uri];
     final mins   = record?.autoCloseMins ?? 0;
     if (mins <= 0) {
-      // No auto-close configured — cancel any existing timer
       _cancelAutoClose(container.volId);
       return;
     }
 
-    // FIX: always cancel the existing timer before creating a new one,
-    //      so calling this on user activity resets the countdown correctly.
     _autoCloseTimers[container.volId]?.cancel();
     _autoCloseTimers[container.volId] = Timer(Duration(minutes: mins), () async {
       if (!mounted) return;
 
       if (!vaultExplorerApi.acquireLockGuard(container.volId)) {
-        // A batch operation is in progress — reschedule for 30 s later.
-        _autoCloseTimers[container.volId] = Timer(const Duration(seconds: 30), () {
-          _scheduleAutoClose(container);
-        });
+        if (mounted) {
+          _autoCloseTimers[container.volId] = Timer(const Duration(seconds: 30), () {
+            if (mounted) _scheduleAutoClose(container);
+          });
+        }
         return;
       }
 
       try {
         await vaultExplorerApi.lockContainer(container.uri);
+        if (!mounted) return;
         _onContainerLocked(container.volId);
+      } catch (e) {
+        debugPrint('Auto-close lock failed for volId=${container.volId}: $e');
       } finally {
         vaultExplorerApi.releaseLockGuard(container.volId);
       }
     });
   }
 
-  /// FIX: Public so FileBrowserScreen can call it via the onUserActivity callback.
   void _onUserActivityForContainer(int volId) {
-    final container = _mounted.firstWhere(
-      (c) => c.volId == volId,
-      orElse: () => throw StateError('Container $volId not mounted'),
-    );
-    // Only reschedule if auto-close is configured.
+    final idx = _mounted.indexWhere((c) => c.volId == volId);
+    if (idx == -1) return; // Container already unmounted — no-op
+    final container = _mounted[idx];
     final record = _records[container.uri];
     if ((record?.autoCloseMins ?? 0) > 0) {
       _scheduleAutoClose(container);
@@ -135,13 +136,14 @@ class _VaultDashboardState extends State<VaultDashboard>
   void _onContainerLocked(int volId) {
     _cancelAutoClose(volId);
 
-    // FIX: Clear clipboard using volId — no longer need the container object.
     final clip = CrossContainerClipboard.instance;
     if (clip.hasItems && clip.sourceVolId == volId) {
       clip.clear();
     }
 
-    setState(() => _mounted.removeWhere((c) => c.volId == volId));
+    if (mounted) {
+      setState(() => _mounted.removeWhere((c) => c.volId == volId));
+    }
   }
 
   Future<void> _refreshContainerSpace(int volId) async {
@@ -152,8 +154,11 @@ class _VaultDashboardState extends State<VaultDashboard>
       final space = await vaultExplorerApi.getSpaceInfo(container);
       if (space != null && space.length > 1 && mounted) {
         setState(() {
-          _mounted[idx] =
-              container.copyWith(totalSpace: space[0], freeSpace: space[1]);
+          final currentIdx = _mounted.indexWhere((c) => c.volId == volId);
+          if (currentIdx != -1) {
+            _mounted[currentIdx] =
+                container.copyWith(totalSpace: space[0], freeSpace: space[1]);
+          }
         });
       }
     } catch (_) {}
@@ -214,15 +219,13 @@ class _VaultDashboardState extends State<VaultDashboard>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      // FIX: Pass the already-loaded appSettings to avoid redundant file I/O
-      //      inside ContainerConfigSheet._loadSavedPasswordAndSettings.
       builder: (_) => ContainerConfigSheet(
         uri: uri,
         currentLabel: currentLabel,
         existingRecord: existing,
         appSettings: _appSettings,
         onSaved: (record) async {
-          setState(() => _records[uri] = record);
+          if (mounted) setState(() => _records[uri] = record);
           final idx = _mounted.indexWhere((m) => m.uri == uri);
           if (idx != -1) _scheduleAutoClose(_mounted[idx]);
         },
@@ -256,20 +259,17 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (confirmed != true) return;
 
     await ContainerRepository.instance.remove(uri);
-    setState(() => _records.remove(uri));
+    if (mounted) setState(() => _records.remove(uri));
   }
 
   // ── Navigate to browser ───────────────────────────────────────────────────
 
-  /// FIX: Centralised navigation to FileBrowserScreen so the onUserActivity
-  ///      callback is always wired correctly.
-Future<void> _openBrowser(MountedContainer container) async {
+  Future<void> _openBrowser(MountedContainer container) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => FileBrowserScreen(
           container: container,
-          // Look up and return the matching MountedContainer from the active list
           resolveContainer: (int volId) {
             for (final c in _mounted) {
               if (c.volId == volId) return c;
@@ -277,7 +277,6 @@ Future<void> _openBrowser(MountedContainer container) async {
             return null;
           },
           onUserActivity: () {
-            // Reset the auto-close timer whenever the user is active
             if (_mounted.any((c) => c.volId == container.volId)) {
               _onUserActivityForContainer(container.volId);
             }
@@ -285,8 +284,7 @@ Future<void> _openBrowser(MountedContainer container) async {
         ),
       ),
     );
-    // Refresh space info when returning from the browser
-    _refreshContainerSpace(container.volId);
+    if (mounted) _refreshContainerSpace(container.volId);
   }
 
   @override
@@ -295,7 +293,6 @@ Future<void> _openBrowser(MountedContainer container) async {
     final textTheme = Theme.of(context).textTheme;
     final clipboard = CrossContainerClipboard.instance;
 
-    // Build display list: mounted containers first, then saved-but-locked.
     final displayItems = <dynamic>[];
     displayItems.addAll(_mounted);
     for (final entry in _records.entries) {
@@ -370,7 +367,6 @@ Future<void> _openBrowser(MountedContainer container) async {
                   itemBuilder: (_, i) {
                     final item = displayItems[i];
                     if (item is MountedContainer) {
-                      // FIX: Use _openBrowser to ensure activity callback is wired
                       return ContainerCard(
                         container: item,
                         onLocked: _onContainerLocked,

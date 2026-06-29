@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../models/thumbnail_cache_mode.dart';
 import '../../services/app_settings_service.dart';
+import '../../services/password_hasher.dart';
 
 class AppSettingsScreen extends StatefulWidget {
   const AppSettingsScreen({Key? key}) : super(key: key);
@@ -81,7 +82,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     });
   }
 
-  /// Derives PBKDF2-SHA512 and persists hash to Android Keystore.
+  /// Derives PBKDF2-SHA512 via [PasswordHasher] and persists hash to Android Keystore.
   Future<void> _confirmPassword() async {
     final pw      = _pwCtrl.text;
     final confirm = _pwConfirmCtrl.text;
@@ -101,7 +102,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     setState(() { _saving = true; _pwError = null; });
 
     try {
-      final (hash, salt) = await AppSettings.derivePasswordHash(pw);
+      final (:hash, :salt) = await PasswordHasher.deriveHash(pw);
       if (!mounted) return;
 
       await AppSettingsService.saveMasterPassword(_settings, hash, salt);

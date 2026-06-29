@@ -1,7 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
@@ -84,60 +82,11 @@ class AppSettings {
       defaultDocumentProvider: j['defaultDocumentProvider'] as bool? ??
           j['mountAsDocumentProvider'] as bool? ?? false,
       videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
-      
+
       // Resolve nullable parsed mode and default to appCache if null
       defaultThumbnailCacheMode: ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?) ?? ThumbnailCacheMode.appCache,
     );
-
-  // ── Password verification ─────────────────────────────────────────────────
-
-  static Future<(String hash, String salt)> derivePasswordHash(
-      String plaintext) async {
-    final saltBytes = Uint8List(16);
-    final rng = Random.secure();
-    for (int i = 0; i < 16; i++) {
-      saltBytes[i] = rng.nextInt(256);
-    }
-
-    final hashBytes = await vaultExplorerApi.hashPassword(
-      password: plaintext,
-      salt: saltBytes,
-      iterations: 200000,
-    );
-    if (hashBytes == null || hashBytes.isEmpty) {
-      throw StateError('PBKDF2 derivation failed');
-    }
-    return (base64Encode(hashBytes), base64Encode(saltBytes));
-  }
-
-  /// Verifies [candidate] against the stored hash using PBKDF2-SHA512.
-  Future<bool> checkPassword(String candidate) async {
-    if (_masterPasswordHash == null) return false;
-
-    if (_masterPasswordSalt == null || _masterPasswordSalt!.isEmpty) {
-      return false;
-    }
-
-    final saltBytes = base64Decode(_masterPasswordSalt!);
-    final hashBytes = await vaultExplorerApi.hashPassword(
-      password: candidate,
-      salt: saltBytes,
-      iterations: 200000,
-    );
-    if (hashBytes == null) return false;
-
-    final storedHash = base64Decode(_masterPasswordHash!);
-    return _secureEqual(hashBytes, storedHash);
-  }
-
-  // Constant-time byte comparison to prevent timing attacks.
-  static bool _secureEqual(Uint8List a, Uint8List b) {
-    if (a.length != b.length) return false;
-    var result = 0;
-    for (var i = 0; i < a.length; i++) result |= a[i] ^ b[i];
-    return result == 0;
-  }
 }
 
 

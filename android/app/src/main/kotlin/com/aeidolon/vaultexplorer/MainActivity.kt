@@ -67,29 +67,29 @@ class MainActivity : FlutterFragmentActivity() {
     private val EXPORT_FILES_TREE_REQUEST  = 1006
     private val IMPORT_FOLDER_TREE_REQUEST = 1007
 
-    private var pendingFlutterResult: MethodChannel.Result? = null
+   @Volatile private var pendingFlutterResult: MethodChannel.Result? = null
 
-    private var pendingImportContainerUri: String? = null
-    private var pendingImportTargetName: String?   = null
-    private var pendingImportVolId: Int?            = null
+    @Volatile private var pendingImportContainerUri: String? = null
+    @Volatile private var pendingImportTargetName: String?   = null
+    @Volatile private var pendingImportVolId: Int?           = null
 
-    private var pendingExportContainerUri: String? = null
-    private var pendingExportSourcePath: String?   = null
-    private var pendingExportVolId: Int            = 0
+    @Volatile private var pendingExportContainerUri: String? = null
+    @Volatile private var pendingExportSourcePath: String?   = null
+    @Volatile private var pendingExportVolId: Int            = 0
 
-    private var pendingCreateName: String?       = null
-    private var pendingCreateSize: Long          = 0L
-    private var pendingCreatePassword: String?   = null
-    private var pendingCreatePim: Int            = 0
-    private var pendingCreateFileSystem: String? = null
+    @Volatile private var pendingCreateName: String?       = null
+    @Volatile private var pendingCreateSize: Long          = 0L
+    @Volatile private var pendingCreatePassword: String?   = null
+    @Volatile private var pendingCreatePim: Int            = 0
+    @Volatile private var pendingCreateFileSystem: String? = null
 
-    private var pendingImportFolderContainerUri: String? = null
-    private var pendingImportFolderTargetDir: String?    = null
-    private var pendingImportFolderVolId: Int?           = null
+    @Volatile private var pendingImportFolderContainerUri: String? = null
+    @Volatile private var pendingImportFolderTargetDir: String?    = null
+    @Volatile private var pendingImportFolderVolId: Int?           = null
 
-    private var pendingExportMultiContainerUri: String?           = null
-    private var pendingExportMultiItems: List<Map<String, Any?>>? = null
-    private var pendingExportMultiVolId: Int                       = 0
+    @Volatile private var pendingExportMultiContainerUri: String?           = null
+    @Volatile private var pendingExportMultiItems: List<Map<String, Any?>>? = null
+    @Volatile private var pendingExportMultiVolId: Int                       = 0
     /**
  * Scales [src] so its longer edge is exactly [maxEdge] pixels,
  * preserving the original aspect ratio.

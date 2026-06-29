@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../services/app_settings_service.dart';
+import '../../services/password_hasher.dart';
 import '../dashboard/vault_dashboard.dart';
 
 /// Shown at app start when a master password is configured.
@@ -191,7 +192,11 @@ class _LockGateScreenState extends State<LockGateScreen> {
     await Future<void>.delayed(const Duration(milliseconds: 80));
     if (!mounted) return;
 
-    final ok = await s.checkPassword(pw);
+    final ok = await PasswordHasher.verify(
+      candidate: pw,
+      hash: s.masterPasswordHash,
+      salt: s.masterPasswordSalt,
+    );
     if (!mounted) return;
 
     if (ok) {
@@ -222,8 +227,8 @@ class _LockGateScreenState extends State<LockGateScreen> {
   }
 
   void _upgradeMasterPasswordHashInBackground(AppSettings s, String pw) {
-    AppSettings.derivePasswordHash(pw).then((hashSalt) async {
-      await AppSettingsService.saveMasterPassword(s, hashSalt.$1, hashSalt.$2);
+    PasswordHasher.deriveHash(pw).then((result) async {
+      await AppSettingsService.saveMasterPassword(s, result.hash, result.salt);
     }).catchError((_) {});
   }
 

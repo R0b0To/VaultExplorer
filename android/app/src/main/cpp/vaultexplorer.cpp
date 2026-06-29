@@ -24,13 +24,52 @@
 
 #define MAX_VOLUMES FF_VOLUMES
 
-// ----------------------------------------------------------------====
-// NAMED CONSTANTS
-// ----------------------------------------------------------------====
-
+// ── VeraCrypt on-disk format constants ───────────────────────────────────────
+//
+// All offsets refer to the primary volume header at byte 0 of the container
+// file. The backup header is a byte-for-byte copy stored at
+// (volume_size - 131072). Spec ref: VeraCrypt source, Common/Volumes.h and
+// Format/VolumeCreator.cpp.
+//
+//  VC_SALT_SIZE (64)
+//      PKCS#5 salt occupying bytes [0, 63] of the header sector. Fed directly
+//      to PBKDF2-SHA512 together with the user password.
+//
+//  VC_HEADER_BODY_SIZE (448)
+//      The encrypted portion of the header, bytes [64, 511]. Decrypted with
+//      AES-XTS using a key derived from PBKDF2 output at offset 0 of the key
+//      material (the "header key"). After decryption the first four bytes
+//      must equal ASCII "VERA" to confirm the correct password was used.
+//
+//  VC_FULL_HEADER_SIZE (512)
+//      One full 512-byte sector: salt (64) + encrypted body (448).
+//
+//  VC_DATA_AREA_OFFSET (131072 = 256 × 512)
+//      The data area begins 256 sectors into the file. The first 256 sectors
+//      hold the primary header (sector 0) plus reserved/hidden-volume space.
+//      The backup header occupies the last 256 sectors of the file.
+//
+//  VC_KEY_OFFSET_PRIMARY (252)
+//      Byte offset inside the *decrypted* header body where the primary
+//      master key material starts (64 bytes). Used for AES-XTS data
+//      encryption/decryption of the actual volume contents.
+//
+//  VC_KEY_OFFSET_SECONDARY (192)
+//      Byte offset of the secondary (XTS tweak) key inside the decrypted
+//      header body (also 64 bytes). AES-XTS requires two equal-length keys;
+//      primary and secondary together form the 512-bit key passed to
+//      mbedtls_aes_xts_setkey_*.
+//
+//  VC_KEY_MATERIAL_LEN (64)
+//      Length of each individual key in bytes (512 bits). Both primary and
+//      secondary keys are this size; the PBKDF2 output buffer must therefore
+//      be at least 2 × 64 = 128 bytes when deriving both at once, but the
+//      current implementation derives only 64 bytes and picks the two keys
+//      from fixed offsets inside the decrypted header body.
+//
 static constexpr size_t VC_SALT_SIZE            = 64;
 static constexpr size_t VC_HEADER_BODY_SIZE     = 448;
-static constexpr size_t VC_FULL_HEADER_SIZE     = 512;      // salt(64) + body(448)
+static constexpr size_t VC_FULL_HEADER_SIZE     = 512;
 static constexpr uint64_t VC_DATA_AREA_OFFSET   = 131072ULL;
 static constexpr size_t IO_BUFFER_SIZE          = 262144;   // 256 KB
 static constexpr int    VC_KEY_OFFSET_PRIMARY   = 252;

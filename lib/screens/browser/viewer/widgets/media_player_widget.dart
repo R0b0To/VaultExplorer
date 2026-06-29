@@ -124,7 +124,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         await _controller.setLooping(false);
         if (widget.autoPlay) {
           _controller.play();
-          widget.onToggleUI(true);
+          //widget.onToggleUI(false);
         }
       }
     } catch (e) {
@@ -183,14 +183,12 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     HapticFeedback.heavyImpact();
     _controller.setPlaybackSpeed(2.0);
     setState(() => _isSpeedHeld = true);
-    widget.onToggleUI(false);
   }
 
   void _onSpeedHoldEnd(LongPressEndDetails _) {
     if (!_initialized) return;
     _controller.setPlaybackSpeed(1.0);
     setState(() => _isSpeedHeld = false);
-    widget.onToggleUI(true);
   }
 
   void _handleVideoDoubleTap() {

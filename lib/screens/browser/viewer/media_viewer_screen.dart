@@ -68,6 +68,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   @override
   void initState() {
     super.initState();
+    // Enable sensor-based auto-rotation by default when entering the viewer
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+
     _playlistController = PlaylistController(
       container: widget.container,
       initialMediaFiles: widget.mediaFiles,
@@ -425,7 +428,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const SizedBox(height: 12),
-                          // Integrated non-floating drag handle indicator
                           Container(
                             width: 36,
                             height: 4,

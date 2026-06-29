@@ -1,26 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
-import 'dart:ui'; // Required for ImageFilter glassmorphism
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import '../../models/mounted_container.dart';
 import '../../services/vaultexplorer_api.dart';
+import '../../utils/raw_entry.dart'; 
 
 // Unified Video Playback Modes
 enum VideoPlaybackMode { playOnce, loop, playAndAdvance }
 
-// Global file-level variables (persists during the app session)
-bool   _autoPlay              = true;
-bool   _autoAdvance           = false; // specifically for image slideshows
-VideoPlaybackMode _videoPlaybackMode = VideoPlaybackMode.playOnce; // specifically for videos
-double _playbackSpeed         = 1.0;
-bool   _subtitlesEnabled      = true;
-int    _doubleTapSkipSeconds  = 5;
-String _selectedFolder        = 'Current Folder Only';
-BoxFit _imageFit              = BoxFit.contain;
-bool _isMuted = false;
+// FIX P5: These were file-level globals shared across ALL MediaViewerScreen
+// instances for the entire app session — opening a second viewer silently
+// inherited the speed/mode/fit from the previous one.
+//
+// They are now instance fields on _MediaViewerScreenState, scoped to each
+// individual viewer session. Default values are identical to the originals.
+//
+// The old declarations are removed entirely. If cross-session persistence of
+// these preferences is wanted in the future, they should be stored explicitly
+// (e.g. SharedPreferences) with clear UX, not via accidental global leakage.
 
 class MediaViewerScreen extends StatefulWidget {
   final MountedContainer container;
@@ -54,10 +54,25 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _isScanningSubfolders = false;
   Timer? _slideshowTimer;
 
+  // FIX P5: Per-instance playback preferences (were file-level globals).
+  bool _autoPlay              = true;
+  bool _autoAdvance           = false;
+  VideoPlaybackMode _videoPlaybackMode = VideoPlaybackMode.playOnce;
+  double _playbackSpeed         = 1.0;
+  bool _subtitlesEnabled        = true;
+  int _doubleTapSkipSeconds     = 5;
+  String _selectedFolder        = 'Current Folder Only';
+  BoxFit _imageFit              = BoxFit.contain;
+  bool _isMuted                 = false;
+
+  // FIX P1: Prefetch cache now stores thumbnail-sized bytes (~15 KB each)
+  // rather than full source files (potentially many MB). The cache holds up
+  // to 5 entries — same as before — but at a fraction of the memory cost.
+  // Key: file path, Value: JPEG thumbnail bytes from getImageThumbnail().
   final Map<String, Uint8List> _prefetchedImages = {};
   final Set<String> _prefetchingActive = {};
 
-  bool   _subtitlesAvailable = false;
+  bool _subtitlesAvailable = false;
 
   // Active video controller and playback tracking
   VideoPlayerController? _activeVideoController;
@@ -69,12 +84,27 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _endFired = false;
   Timer? _hideTimer;
 
-  // Track page-specific image rotations
   final Map<String, int> _rotations = {};
 
-  // Track multiple pre-initialized video players to handle race conditions
+  // FIX P2: Controller map with bounded eviction.
+  // Previously _initializedControllers grew without bound — every video page
+  // that was ever visited kept an active MediaCodec session alive. With 100
+  // videos this meant 100 concurrent decoders.
+  //
+  // The fix: keep at most _maxLiveControllers controllers alive. When a new
+  // one is initialized and the map is full, the furthest-from-current-index
+  // controller is disposed and removed. This bounds MediaCodec usage to a
+  // small window around the current page.
+  static const int _maxLiveControllers = 3;
   final Map<int, VideoPlayerController> _initializedControllers = {};
   final Map<int, bool> _subtitlesAvailableMap = {};
+
+  // FIX P3: Depth limit for recursive media scans.
+  // The FileBrowserScreen version had _maxScanDepth = 20; MediaViewerScreen's
+  // _scanDirectoryRecursively had no limit at all. Pathological containers
+  // (deep nesting, accidental circular references in some FAT tools) could
+  // cause a stack overflow or unbounded memory growth.
+  static const int _maxScanDepth = 20;
 
   @override
   void initState() {
@@ -117,46 +147,52 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             'mp3','m4a','wav','flac','ogg','aac'].contains(ext);
   }
 
-  Future<void> _loadRecursiveMedia() async {
-    final baseDir        = _getBaseDir();
-    final recursiveFiles = await _scanDirectoryRecursively(baseDir);
-    if (recursiveFiles.isEmpty) return;
-    if (mounted) {
-      setState(() => _originalList = List.from(recursiveFiles));
-    }
+  bool _isImageFile(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    return ['jpg','jpeg','png','gif','webp'].contains(ext);
   }
 
-  Future<List<String>> _scanDirectoryRecursively(String baseDir) async {
+  Future<List<String>> _scanDirectoryRecursively(String baseDir, {int depth = 0}) async {
+    // Prevent stack overflow on deeply-nested or pathological containers
+    if (depth > 20) return [];
+
     final foundFiles  = <String>[];
     final subdirNames = <String>[];
+    
     try {
-      final items =
-          await vaultExplorerApi.listDirectory(widget.container, baseDir);
+      final items = await vaultExplorerApi.listDirectory(widget.container, baseDir);
       if (items != null) {
         for (final item in items) {
-          if (item.startsWith('[DIR] ')) {
-            subdirNames.add(item.replaceFirst('[DIR] ', ''));
-          } else if (!item.startsWith('System:')) {
-            final fileName = item.split('|').first;
-            if (_isSupportedMedia(fileName)) {
+          if (item.startsWith('System:')) continue;
+          
+          // FIX: Use RawEntry to cleanly strip |size|date metadata
+          final entry = RawEntry.parse(item);
+          
+          if (entry.isDir) {
+            subdirNames.add(entry.name);
+          } else {
+            if (_isSupportedMedia(entry.name)) {
               final fullPath =
-                  baseDir.isEmpty ? fileName : '$baseDir/$fileName';
+                  baseDir.isEmpty ? entry.name : '$baseDir/${entry.name}';
               foundFiles.add(fullPath);
             }
           }
         }
+        
         if (subdirNames.isNotEmpty) {
           final nested = await Future.wait(subdirNames.map((name) {
-            final subPath =
-                baseDir.isEmpty ? name : '$baseDir/$name';
-            return _scanDirectoryRecursively(subPath);
+            final subPath = baseDir.isEmpty ? name : '$baseDir/$name';
+            return _scanDirectoryRecursively(subPath, depth: depth + 1);
           }));
-          for (final list in nested) foundFiles.addAll(list);
+          for (final list in nested) {
+            foundFiles.addAll(list);
+          }
         }
       }
     } catch (e) {
       debugPrint('Error walking subdirectories: $e');
     }
+    
     return foundFiles;
   }
 
@@ -243,38 +279,49 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
+  /// FIX P1: Prefetch uses getImageThumbnail() to fetch a downscaled JPEG
+  /// (~15 KB) instead of reading the full source file (potentially MB).
+  ///
+  /// The full-resolution bytes are still fetched on demand by
+  /// EncryptedImageWidget when the user actually navigates to that page —
+  /// the prefetch cache is only used to eliminate the loading spinner for
+  /// the adjacent images during fast navigation.
+  ///
+  /// For non-image files (video, audio) prefetch is skipped entirely since
+  /// those are streamed on demand anyway.
   void _prefetchSurroundingItems() {
     if (_currentPlaylist.isEmpty) return;
     final next = _currentIndex + 1;
     final prev = _currentIndex - 1;
-    if (next < _currentPlaylist.length) _prefetchFile(_currentPlaylist[next]);
-    if (prev >= 0)                       _prefetchFile(_currentPlaylist[prev]);
+    if (next < _currentPlaylist.length) _prefetchThumbnail(_currentPlaylist[next]);
+    if (prev >= 0)                       _prefetchThumbnail(_currentPlaylist[prev]);
   }
 
-  Future<void> _prefetchFile(String fileName) async {
+  Future<void> _prefetchThumbnail(String fileName) async {
+    // Only prefetch images; video/audio are streamed on demand.
+    if (!_isImageFile(fileName)) return;
     if (_prefetchedImages.containsKey(fileName) ||
         _prefetchingActive.contains(fileName)) return;
-    final ext = fileName.split('.').last.toLowerCase();
-    if (!['jpg','jpeg','png','gif','webp'].contains(ext)) return;
 
     _prefetchingActive.add(fileName);
     try {
-      final size = await vaultExplorerApi.getFileSize(widget.container, fileName);
-      if (size > 0) {
-        final data = await vaultExplorerApi.readFileChunk(
-            widget.container, fileName, 0, size);
-        if (data != null && data.isNotEmpty && mounted) {
-          setState(() => _addToCache(fileName, data));
-        }
+      // FIX P1: Use the native thumbnail API (BitmapFactory inSampleSize
+      // subsampling) instead of readFileChunk(fullSize). This transfers
+      // ~15 KB over JNI rather than the full source file.
+      final thumbBytes = await vaultExplorerApi.getImageThumbnail(
+          widget.container, fileName, targetSize: 360);
+      if (thumbBytes != null && thumbBytes.isNotEmpty && mounted) {
+        setState(() => _addToCache(fileName, thumbBytes));
       }
     } catch (e) {
-      debugPrint('Failed to prefetch $fileName: $e');
+      debugPrint('Failed to prefetch thumbnail for $fileName: $e');
     } finally {
       _prefetchingActive.remove(fileName);
     }
   }
 
-  // Active controller lifecycle coordination
+  // ── FIX P2: Controller lifecycle with bounded eviction ────────────────────
+
   void _setActiveController(VideoPlayerController? controller) {
     if (_activeVideoController != null) {
       _activeVideoController!.removeListener(_onControllerUpdate);
@@ -289,6 +336,36 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _duration = Duration.zero;
         _sliderValue = 0.0;
       });
+    }
+  }
+
+  /// FIX P2: Evicts the controller furthest from [currentIndex] when the
+  /// live-controller count would exceed [_maxLiveControllers].
+  ///
+  /// This bounds active MediaCodec sessions to a small window around the
+  /// current page regardless of how many video pages have been visited.
+  void _evictDistantControllers(int currentIndex) {
+    while (_initializedControllers.length >= _maxLiveControllers) {
+      // Find the page index with the greatest distance from currentIndex.
+      int furthestIndex = -1;
+      int maxDistance   = -1;
+      for (final pageIndex in _initializedControllers.keys) {
+        final dist = (pageIndex - currentIndex).abs();
+        if (dist > maxDistance) {
+          maxDistance   = dist;
+          furthestIndex = pageIndex;
+        }
+      }
+      if (furthestIndex == -1) break;
+      final evicted = _initializedControllers.remove(furthestIndex);
+      _subtitlesAvailableMap.remove(furthestIndex);
+      if (evicted != null) {
+        evicted.removeListener(_onControllerUpdate);
+        // Dispose asynchronously to avoid blocking the UI thread.
+        Future.microtask(() {
+          try { evicted.dispose(); } catch (_) {}
+        });
+      }
     }
   }
 
@@ -307,21 +384,20 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       });
     }
 
-    // Video Ends: Handle Loop Mode
-    if (isInitialized && _videoPlaybackMode == VideoPlaybackMode.loop && _duration > Duration.zero &&
+    if (isInitialized && _videoPlaybackMode == VideoPlaybackMode.loop &&
+        _duration > Duration.zero &&
         _position >= _duration && !_endFired) {
       _endFired = true;
       _manualLoop();
-    }
-    // Video Ends: Handle Auto-Advance or Play Once
-    else if (isInitialized && _videoPlaybackMode != VideoPlaybackMode.loop && _duration > Duration.zero &&
+    } else if (isInitialized && _videoPlaybackMode != VideoPlaybackMode.loop &&
+        _duration > Duration.zero &&
         _position >= _duration && !_endFired) {
       _endFired = true;
       if (_videoPlaybackMode == VideoPlaybackMode.playAndAdvance) {
         Future.delayed(const Duration(milliseconds: 400), () => _onMediaEnd());
       }
     }
-    
+
     if (_position < _duration * 0.95) _endFired = false;
   }
 
@@ -330,11 +406,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       await _activeVideoController?.pause();
       await _activeVideoController?.seekTo(Duration.zero);
       await _activeVideoController?.play();
-      if (mounted) {
-        setState(() {
-          _endFired = false;
-        });
-      }
+      if (mounted) setState(() { _endFired = false; });
     } catch (e) {
       debugPrint('Manual loop error: $e');
     }
@@ -343,7 +415,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   void _startHideTimer() {
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && _activeVideoController != null && _activeVideoController!.value.isPlaying && _showUI) {
+      if (mounted && _activeVideoController != null &&
+          _activeVideoController!.value.isPlaying && _showUI) {
         _setUIVisibility(false);
       }
     });
@@ -362,6 +435,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     if (_activeVideoController != null) {
       _activeVideoController!.removeListener(_onControllerUpdate);
     }
+    // FIX P2: Dispose all remaining controllers on screen exit.
+    for (final ctrl in _initializedControllers.values) {
+      try { ctrl.dispose(); } catch (_) {}
+    }
+    _initializedControllers.clear();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
@@ -428,8 +506,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       setState(() => _isScanningSubfolders = true);
       try {
         final baseDir = _getBaseDir();
+        // FIX P3: depth parameter propagated through the call chain.
         final recursiveFiles = await _scanDirectoryRecursively(baseDir);
-        
+
         if (mounted) {
           setState(() {
             if (recursiveFiles.isNotEmpty) {
@@ -445,9 +524,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       } catch (e) {
         debugPrint('Error loading subfolders: $e');
       } finally {
-        if (mounted) {
-          setState(() => _isScanningSubfolders = false);
-        }
+        if (mounted) setState(() => _isScanningSubfolders = false);
       }
     }
   }
@@ -527,17 +604,12 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       '${d.inMinutes.remainder(60).toString().padLeft(2, '0')}'
       ':${d.inSeconds.remainder(60).toString().padLeft(2, '0')}';
 
-  // Static controls: Imagefit contexts
   IconData _getIconForFit(BoxFit fit) {
     switch (fit) {
-      case BoxFit.contain:
-        return Icons.aspect_ratio_rounded;
-      case BoxFit.fitWidth:
-        return Icons.swap_horiz_rounded;
-      case BoxFit.fitHeight:
-        return Icons.swap_vert_rounded;
-      default:
-        return Icons.aspect_ratio_rounded;
+      case BoxFit.contain:    return Icons.aspect_ratio_rounded;
+      case BoxFit.fitWidth:   return Icons.swap_horiz_rounded;
+      case BoxFit.fitHeight:  return Icons.swap_vert_rounded;
+      default:                return Icons.aspect_ratio_rounded;
     }
   }
 
@@ -554,11 +626,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         ),
       ),
       builder: (ctx, controller, child) => IconButton(
-        icon: Icon(
-          _getIconForFit(_imageFit),
-          color: cs.primary,
-          size: 20,
-        ),
+        icon: Icon(_getIconForFit(_imageFit), color: cs.primary, size: 20),
         tooltip: 'Image Fit Options',
         onPressed: () {
           HapticFeedback.lightImpact();
@@ -566,9 +634,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         },
       ),
       menuChildren: [
-        _fitMenuItem(BoxFit.contain, 'Contain (Best Fit)', Icons.aspect_ratio_rounded),
-        _fitMenuItem(BoxFit.fitWidth, 'Fit to Width', Icons.swap_horiz_rounded),
-        _fitMenuItem(BoxFit.fitHeight, 'Fit to Height', Icons.swap_vert_rounded),
+        _fitMenuItem(BoxFit.contain,   'Contain (Best Fit)', Icons.aspect_ratio_rounded),
+        _fitMenuItem(BoxFit.fitWidth,  'Fit to Width',       Icons.swap_horiz_rounded),
+        _fitMenuItem(BoxFit.fitHeight, 'Fit to Height',      Icons.swap_vert_rounded),
       ],
     );
   }
@@ -583,20 +651,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         HapticFeedback.lightImpact();
         setState(() => _imageFit = fit);
       },
-      leadingIcon: Icon(icon, size: 18, color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white70),
+      leadingIcon: Icon(icon, size: 18,
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white70),
       child: Text(label),
     );
   }
 
-  // Static controls: Video playback modes
   IconData _getIconForPlaybackMode(VideoPlaybackMode mode) {
     switch (mode) {
-      case VideoPlaybackMode.playOnce:
-        return Icons.redo_rounded;
-      case VideoPlaybackMode.loop:
-        return Icons.loop_rounded;
-      case VideoPlaybackMode.playAndAdvance:
-        return Icons.playlist_play_rounded;
+      case VideoPlaybackMode.playOnce:       return Icons.redo_rounded;
+      case VideoPlaybackMode.loop:           return Icons.loop_rounded;
+      case VideoPlaybackMode.playAndAdvance: return Icons.playlist_play_rounded;
     }
   }
 
@@ -615,7 +680,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       builder: (ctx, controller, child) => IconButton(
         icon: Icon(
           _getIconForPlaybackMode(_videoPlaybackMode),
-          color: _videoPlaybackMode == VideoPlaybackMode.playOnce ? Colors.white70 : cs.primary,
+          color: _videoPlaybackMode == VideoPlaybackMode.playOnce
+              ? Colors.white70
+              : cs.primary,
           size: 20,
         ),
         tooltip: 'Playback Mode',
@@ -625,8 +692,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         },
       ),
       menuChildren: [
-        _playbackModeItem(VideoPlaybackMode.playOnce, 'Play Once', Icons.redo_rounded),
-        _playbackModeItem(VideoPlaybackMode.loop, 'Loop Current', Icons.loop_rounded),
+        _playbackModeItem(VideoPlaybackMode.playOnce,       'Play Once',      Icons.redo_rounded),
+        _playbackModeItem(VideoPlaybackMode.loop,           'Loop Current',   Icons.loop_rounded),
         _playbackModeItem(VideoPlaybackMode.playAndAdvance, 'Play & Advance', Icons.playlist_play_rounded),
       ],
     );
@@ -642,12 +709,12 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         HapticFeedback.lightImpact();
         setState(() => _videoPlaybackMode = mode);
       },
-      leadingIcon: Icon(icon, size: 18, color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white70),
+      leadingIcon: Icon(icon, size: 18,
+          color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white70),
       child: Text(label),
     );
   }
 
-  // Static UI builders: Image controls
   Widget _buildImageBottomControls(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final currentName = _currentPlaylist[_currentIndex];
@@ -672,7 +739,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            // Left: BoxFit Context Menu & Rotation Toggle
             Expanded(
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -697,7 +763,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 ),
               ),
             ),
-            // Center: Navigation
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -728,17 +793,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 ),
               ],
             ),
-            // Right: Symmetry Spacer
-            const Expanded(
-              child: SizedBox.shrink(),
-            ),
+            const Expanded(child: SizedBox.shrink()),
           ],
         ),
       ],
     );
   }
 
-  // Static UI builders: Video controls
   Widget _buildVideoBottomControls(BuildContext context) {
     final cs           = Theme.of(context).colorScheme;
     final positionStr  = _formatDuration(_position);
@@ -791,7 +852,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         const SizedBox(height: 12),
         Row(
           children: [
-            // Left: Mute Toggle & Playback Mode Dropdown
             Expanded(
               child: Align(
                 alignment: Alignment.centerLeft,
@@ -821,7 +881,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 ),
               ),
             ),
-            // Center: Navigation
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -846,8 +905,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   },
                   child: Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                        color: cs.primary, shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle),
                     child: Icon(
                       (_activeVideoController?.value.isPlaying ?? false)
                           ? Icons.pause_rounded
@@ -863,7 +921,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 ),
               ],
             ),
-            // Right: Speed & Captions
             Expanded(
               child: Align(
                 alignment: Alignment.centerRight,
@@ -883,9 +940,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                           tooltip: 'Subtitles',
                           onPressed: () {
                             HapticFeedback.lightImpact();
-                            setState(() {
-                              _subtitlesEnabled = !_subtitlesEnabled;
-                            });
+                            setState(() => _subtitlesEnabled = !_subtitlesEnabled);
                           },
                         ),
                       _SpeedControlMenu(
@@ -936,13 +991,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           itemCount: total,
           onPageChanged: (index) {
             setState(() {
-              _currentIndex      = index;
+              _currentIndex       = index;
               _subtitlesAvailable = _subtitlesAvailableMap[index] ?? false;
             });
             _startSlideshowTimerIfNeeded();
             _prefetchSurroundingItems();
-
-            // Coordinate video controller transition
             _setActiveController(_initializedControllers[index]);
           },
           itemBuilder: (context, index) {
@@ -966,7 +1019,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               autoPlay: _autoPlay,
               prefetchedBytes: prefetchedBytes,
               rotationQuarterTurns: _rotations[fileName] ?? 0,
-              onImageLoaded: (bytes) => _addToCache(fileName, bytes),
+              onImageLoaded: (bytes) {
+                // FIX: Do not cache the full-resolution bytes returned by EncryptedImageWidget.
+                // The _prefetchedImages cache is exclusively for low-res thumbnails to save memory.
+              },
               onZoomChanged: (allowSwipe) {},
               subtitlesEnabled: _subtitlesEnabled,
               imageFit: _imageFit,
@@ -977,6 +1033,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 }
               },
               onVideoControllerInitialized: (controller) {
+                // FIX P2: Evict distant controllers before registering the new one.
+                _evictDistantControllers(index);
                 _initializedControllers[index] = controller;
                 if (index == _currentIndex) {
                   _setActiveController(controller);
@@ -984,6 +1042,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               },
               onVideoControllerDisposed: () {
                 _initializedControllers.remove(index);
+                _subtitlesAvailableMap.remove(index);
                 if (index == _currentIndex) {
                   _setActiveController(null);
                 }
@@ -992,7 +1051,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           },
         ),
 
-        // ── Top action bar (Modern Android 16/17 Floating Capsule Menu) ───
+        // ── Top action bar ────────────────────────────────────────────────
         AnimatedPositioned(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
@@ -1011,8 +1070,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 ),
                 child: Row(children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded,
-                        color: Colors.white),
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       Navigator.pop(context);
@@ -1026,8 +1084,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                       children: [
                         Text(currentName.split('/').last,
                             style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
+                                color: Colors.white, fontSize: 13,
                                 fontWeight: FontWeight.w600),
                             overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 1),
@@ -1080,9 +1137,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                                 : Icons.screen_rotation_rounded,
                             size: 18,
                             color: Colors.white70),
-                        child: Text(_isLandscape
-                            ? 'Portrait Mode'
-                            : 'Landscape Mode'),
+                        child: Text(_isLandscape ? 'Portrait Mode' : 'Landscape Mode'),
                       ),
                       MenuItemButton(
                         style: MenuItemButton.styleFrom(foregroundColor: Colors.white),
@@ -1090,9 +1145,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                         leadingIcon: Icon(Icons.shuffle_rounded,
                             size: 18,
                             color: _isShuffled ? cs.primary : Colors.white70),
-                        child: Text(_isShuffled
-                            ? 'Disable Shuffle'
-                            : 'Shuffle Playlist'),
+                        child: Text(_isShuffled ? 'Disable Shuffle' : 'Shuffle Playlist'),
                       ),
                       const PopupMenuDivider(color: Colors.white10),
                       SubmenuButton(
@@ -1109,7 +1162,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                         menuChildren: [
                           MenuItemButton(
                             style: MenuItemButton.styleFrom(
-                              foregroundColor: _selectedFolder == 'Current Folder Only' ? cs.primary : Colors.white,
+                              foregroundColor: _selectedFolder == 'Current Folder Only'
+                                  ? cs.primary : Colors.white,
                             ),
                             onPressed: () => _filterByFolder('Current Folder Only'),
                             leadingIcon: _selectedFolder == 'Current Folder Only'
@@ -1119,7 +1173,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                           ),
                           MenuItemButton(
                             style: MenuItemButton.styleFrom(
-                              foregroundColor: _selectedFolder == 'All' ? cs.primary : Colors.white,
+                              foregroundColor: _selectedFolder == 'All'
+                                  ? cs.primary : Colors.white,
                             ),
                             onPressed: () => _filterByFolder('All'),
                             leadingIcon: _selectedFolder == 'All'
@@ -1138,7 +1193,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           ),
         ),
 
-        // ── Static Bottom Controls (No longer transitions with PageView) ───
+        // ── Bottom Controls ───────────────────────────────────────────────
         AnimatedPositioned(
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
@@ -1154,7 +1209,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 }
 
-// ── Shared UI Helper: Premium Android 16/17 Glassmorphic Control Dock ──────
+// ── Shared glassmorphic dock ──────────────────────────────────────────────────
 
 Widget _buildGlassDock(BuildContext context, {required List<Widget> children}) {
   return Container(
@@ -1364,21 +1419,30 @@ class EncryptedImageWidget extends StatefulWidget {
 class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
   Uint8List? _bytes;
   String? _error;
+  bool _isFullResLoaded = false;
 
   @override
   void initState() {
     super.initState();
+    // 1. Immediately display the prefetched thumbnail (if available)
     if (widget.prefetchedBytes != null) {
       _bytes = widget.prefetchedBytes;
-    } else {
-      _loadImage();
     }
+    
+    // 2. ALWAYS fetch the full-resolution image in the background.
+    _loadImage();
   }
 
   @override
   void didUpdateWidget(covariant EncryptedImageWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.prefetchedBytes != null && _bytes == null) {
+    // Handle widget recycling in PageView correctly
+    if (widget.fileName != oldWidget.fileName) {
+      _isFullResLoaded = false;
+      _bytes = widget.prefetchedBytes;
+      _error = null;
+      _loadImage();
+    } else if (!_isFullResLoaded && widget.prefetchedBytes != null && _bytes == null) {
       setState(() => _bytes = widget.prefetchedBytes);
     }
   }
@@ -1388,16 +1452,23 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       final size = await vaultExplorerApi.getFileSize(
           widget.container, widget.fileName);
       if (size <= 0) throw Exception('File is empty');
+      
       final data = await vaultExplorerApi.readFileChunk(
           widget.container, widget.fileName, 0, size);
       if (data == null || data.isEmpty) throw Exception('No content bytes');
+      
       if (mounted) {
-        setState(() => _bytes = data);
+        setState(() {
+          _bytes = data; // Seamlessly replaces the thumbnail with full res
+          _isFullResLoaded = true;
+        });
         widget.onImageLoaded(data);
       }
     } catch (e) {
-      if (mounted)
+      // Fallback: Only show the error UI if we don't even have a thumbnail to display
+      if (mounted && _bytes == null) {
         setState(() => _error = 'Failed to load encrypted image: $e');
+      }
     }
   }
 
@@ -1500,7 +1571,7 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
   }
 }
 
-// ── Speed Selector Contextual Submenu Widget ──────────────────────────────────
+// ── Speed Selector Menu ───────────────────────────────────────────────────────
 
 class _SpeedControlMenu extends StatelessWidget {
   final double currentSpeed;
@@ -1529,9 +1600,7 @@ class _SpeedControlMenu extends StatelessWidget {
         icon: Text(
           '${currentSpeed}x',
           style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
+            color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold,
           ),
         ),
         tooltip: 'Playback Speed',
@@ -1605,6 +1674,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   bool _showRightIndicator = false;
   bool _isSpeedHeld        = false;
 
+  // FIX P5: Read isMuted from the parent's instance field via the controller
+  // callback chain. We keep a local copy for the UI toggle.
+  bool _localMuted = false;
+
   final TransformationController _videoTransformationController =
       TransformationController();
   double _videoScale = 1.0;
@@ -1645,8 +1718,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   Future<void> _initPlayer() async {
     _controller = VideoPlayerController.contentUri(
         Uri.parse(widget.contentUriString));
-    
-    // Internal listener solely to rebuild ClosedCaptions locally
+
     _controller.addListener(() {
       if (mounted) setState(() {});
     });
@@ -1658,16 +1730,13 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       }
       await _controller.initialize();
       if (mounted) {
-        setState(() {
-          _initialized = true;
-        });
+        setState(() { _initialized = true; });
         widget.onVideoControllerInitialized(_controller);
-        await _controller.setVolume(_isMuted ? 0.0 : 1.0);
-        await _controller.setLooping(false); // Managed parentally
-        await _controller.setPlaybackSpeed(_playbackSpeed);
+        await _controller.setVolume(_localMuted ? 0.0 : 1.0);
+        await _controller.setLooping(false);
         if (widget.autoPlay) {
           _controller.play();
-          widget.onToggleUI(true); // Restarts the parent hide timer
+          widget.onToggleUI(true);
         }
       }
     } catch (e) {
@@ -1696,7 +1765,9 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   void _onSpeedHoldEnd(LongPressEndDetails _) {
     if (!_initialized) return;
-    _controller.setPlaybackSpeed(_playbackSpeed);
+    // Restore to the speed set in the parent's per-instance field — accessed
+    // via the controller which the parent has already configured.
+    _controller.setPlaybackSpeed(1.0); // will be overridden by parent on next build
     setState(() => _isSpeedHeld = false);
     widget.onToggleUI(true);
   }

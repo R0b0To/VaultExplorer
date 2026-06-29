@@ -393,7 +393,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
     }
 
     /**
-     * Fully in-memory file bridge.
+     * Fully in-memory, ZERO-COPY file bridge optimized for fvp / FFmpeg.
      */
     inner class VeraCryptProxyCallback(
         private val volId: Int,
@@ -406,20 +406,14 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         private var hasChanges = false
         private var fileSizeCached: Long = -1L
 
-        private val sessionPfd: ParcelFileDescriptor? = runCatching {
-            context?.contentResolver?.openFileDescriptor(
-                Uri.parse(session.uri), if (isWrite) "rw" else "r")
-        }.getOrNull()
+        // REMOVED sessionPfd! C++ already holds the file descriptor open from the unlock phase.
 
         init {
-            if (sessionPfd == null) {
-                handlerThread.quitSafely()
-                throw FileNotFoundException("Could not open session PFD for $fatPath")
-            }
             try {
                 synchronized(VeraCryptSession.locks[volId]) {
+                    // Pass -1 for FD; C++ will use its cached activeFd
                     fileSizeCached = VeraCryptEngine.getFileSizeNative(
-                        sessionPfd.dup().detachFd(), "", 0, fatPath, volId)
+                        -1, "", 0, fatPath, volId)
                 }
                 if (fileSizeCached < 0) fileSizeCached = 0L
             } catch (e: Exception) {
@@ -431,25 +425,30 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         override fun onGetSize(): Long = fileSizeCached
 
         override fun onRead(offset: Long, size: Int, data: ByteArray): Int {
-            val pfd   = sessionPfd ?: throw ErrnoException("onRead", OsConstants.EBADF)
-            val chunk = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.readFileChunkNative(
-                    pfd.dup().detachFd(), "", 0, fatPath, offset, size, volId)
-            } ?: throw ErrnoException("onRead", OsConstants.EIO)
-            if (chunk.isEmpty()) return 0
-            val readSize = minOf(chunk.size, size)
-            System.arraycopy(chunk, 0, data, 0, readSize)
-            return readSize
+            if (offset >= fileSizeCached) return 0
+            val readSize = minOf(size.toLong(), fileSizeCached - offset).toInt()
+            if (readSize <= 0) return 0
+
+            val actualRead = synchronized(VeraCryptSession.locks[volId]) {
+                // ZERO-COPY READ: C++ writes directly into the 'data' array.
+                VeraCryptEngine.readFileChunkDirectNative(
+                    -1, "", 0, fatPath, offset, data, readSize, volId
+                )
+            }
+            
+            if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
+            return actualRead
         }
 
         override fun onWrite(offset: Long, size: Int, data: ByteArray): Int {
             if (!isWrite) throw ErrnoException("onWrite", OsConstants.EBADF)
-            val pfd       = sessionPfd ?: throw ErrnoException("onWrite", OsConstants.EBADF)
+            
             val chunkData = if (data.size == size) data else data.copyOf(size)
-            val success   = synchronized(VeraCryptSession.locks[volId]) {
+            val success = synchronized(VeraCryptSession.locks[volId]) {
                 VeraCryptEngine.writeFileChunkNative(
-                    pfd.dup().detachFd(), "", 0, fatPath, offset, chunkData, volId)
+                    -1, "", 0, fatPath, offset, chunkData, volId)
             }
+            
             if (!success) throw ErrnoException("onWrite", OsConstants.EIO)
             val endOffset = offset + size
             if (endOffset > fileSizeCached) fileSizeCached = endOffset
@@ -466,7 +465,6 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                     DocumentsContract.buildChildDocumentsUri(
                         "com.aeidolon.vaultexplorer.documents", "$volId:dir:$parentPath"), null)
             }
-            runCatching { sessionPfd?.close() }
             handlerThread.quitSafely()
         }
     }

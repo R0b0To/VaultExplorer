@@ -316,12 +316,6 @@ class _CheckBadge extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 typedef _FetchFn   = Future<Uint8List> Function(MountedContainer, String);
-
-/// Optional synchronous callback checked before entering the async pipeline.
-///
-/// If it returns non-null bytes the widget displays the image immediately —
-/// no loading state, no setState call, no frame of spinner.  Used to query
-/// [ThumbnailCacheService.getFromMemory] at widget construction time.
 typedef _SyncLookup = Uint8List? Function();
 
 class _AsyncThumb extends StatefulWidget {
@@ -331,9 +325,6 @@ class _AsyncThumb extends StatefulWidget {
   final ConcurrencyLimiter limiter;
   final _FetchFn fetchFn;
   final Duration debounce;
-
-  /// Checked synchronously in [initState] and [didUpdateWidget].
-  /// Returning non-null skips the entire async pipeline for that render cycle.
   final _SyncLookup? syncLookup;
 
   const _AsyncThumb({
@@ -359,14 +350,15 @@ class _AsyncThumbState extends State<_AsyncThumb> {
   Completer<void>? _limiterCompleter;
   String? _loadingPath;
 
+  // FIX P9: Track whether this widget instance has been disposed so we can
+  // avoid calling setState after disposal even when the native fetch completes.
+  bool _disposed = false;
+
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
-    // FIX: Synchronous memory-cache check before any async work.
-    // If the bytes are already in Tier 1 memory, display immediately — no
-    // loading spinner, no setState, no async scheduling overhead.
     final syncBytes = widget.syncLookup?.call();
     if (syncBytes != null) {
       _bytes    = syncBytes;
@@ -381,7 +373,6 @@ class _AsyncThumbState extends State<_AsyncThumb> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.filePath != widget.filePath) {
       _cancel();
-      // FIX: Check memory cache for the new path before resetting to loading.
       final syncBytes = widget.syncLookup?.call();
       if (syncBytes != null) {
         setState(() {
@@ -402,6 +393,7 @@ class _AsyncThumbState extends State<_AsyncThumb> {
 
   @override
   void dispose() {
+    _disposed = true;
     _cancel();
     super.dispose();
   }
@@ -413,6 +405,10 @@ class _AsyncThumbState extends State<_AsyncThumb> {
       widget.limiter.cancel(_limiterCompleter!);
       _limiterCompleter = null;
     }
+    // FIX P9: Clearing _loadingPath signals in-flight async continuations to
+    // abandon their work as early as possible — the path guard check
+    // `targetPath != _loadingPath` below now fires as soon as dispose() runs,
+    // rather than only after the limiter wait completes.
     _loadingPath = null;
   }
 
@@ -421,10 +417,6 @@ class _AsyncThumbState extends State<_AsyncThumb> {
     _loadingPath     = targetPath;
     final cacheKey   = '${widget.container.volId}:$targetPath';
 
-    // ── Check the Future-LRU cache (request deduplication) ────────────────
-    // Multiple widgets requesting the same path share a single in-flight Future
-    // so the underlying fetch runs only once regardless of how many cells
-    // scroll into view simultaneously.
     var future = widget.cache[cacheKey];
 
     if (future == null) {
@@ -432,28 +424,20 @@ class _AsyncThumbState extends State<_AsyncThumb> {
         setState(() { _isLoading = true; _hasError = false; });
       }
 
-      // Debounce: items that scroll away within this window never trigger a
-      // fetch at all.
       await Future.delayed(widget.debounce);
-      if (targetPath != _loadingPath || !mounted) return;
+      if (targetPath != _loadingPath || !mounted || _disposed) return;
 
-      // FIX: Re-check memory cache after debounce.  If a sibling widget
-      // finished loading this thumbnail during the debounce window, the bytes
-      // are now in Tier 1 — skip the fetch entirely.
       final syncBytes = widget.syncLookup?.call();
       if (syncBytes != null) {
-        if (mounted) setState(() { _bytes = syncBytes; _isLoading = false; });
+        if (mounted && !_disposed) setState(() { _bytes = syncBytes; _isLoading = false; });
         return;
       }
 
-      // Re-check Future cache (another widget may have created the Future
-      // during the debounce window).
       future = widget.cache[cacheKey];
       if (future == null) {
         future = _fetchWithQueue(widget.container, targetPath).then(
           (data) => data,
           onError: (err) {
-            // Evict stale failed Future so the next attempt retries cleanly.
             if (widget.cache[cacheKey] == future) {
               widget.cache.remove(cacheKey);
             }
@@ -466,10 +450,10 @@ class _AsyncThumbState extends State<_AsyncThumb> {
 
     try {
       final data = await future;
-      if (targetPath != _loadingPath || !mounted) return;
+      if (targetPath != _loadingPath || !mounted || _disposed) return;
       setState(() { _bytes = data; _isLoading = false; });
     } catch (_) {
-      if (targetPath == _loadingPath && mounted) {
+      if (targetPath == _loadingPath && mounted && !_disposed) {
         setState(() { _isLoading = false; _hasError = true; });
       }
     }
@@ -485,7 +469,9 @@ class _AsyncThumbState extends State<_AsyncThumb> {
       await widget.limiter.acquire(completer);
       acquired = true;
 
-      if (targetPath != _loadingPath || !mounted) {
+      // FIX P9: Check disposed state after acquiring the limiter slot —
+      // the widget may have been disposed while waiting in the queue.
+      if (targetPath != _loadingPath || !mounted || _disposed) {
         throw Exception('Cancelled before processing');
       }
 
@@ -521,7 +507,7 @@ class _AsyncThumbState extends State<_AsyncThumb> {
     return Image.memory(
       _bytes!,
       fit: BoxFit.cover,
-      cacheHeight: 180, // Let Flutter cache the decoded bitmap at display size.
+      cacheHeight: 180,
       errorBuilder: (_, __, ___) => _errorPlaceholder(cs),
     );
   }
@@ -539,8 +525,6 @@ class _AsyncThumbState extends State<_AsyncThumb> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _EncryptedImageGridThumb extends StatelessWidget {
-  // Shared across all instances — deduplicates in-flight requests and keeps
-  // resolved Futures alive for the lifetime of the widget tree.
   static final _cache   = LruCache<String, Future<Uint8List>>(60);
   static final _limiter = ConcurrencyLimiter(2);
 
@@ -554,62 +538,32 @@ class _EncryptedImageGridThumb extends StatelessWidget {
     required this.cacheMode,
   });
 
-  /// Full three-tier fetch:
-  ///
-  ///  1. Tier 1 — memory (via syncLookup in _AsyncThumb, not reached here)
-  ///  2. Tier 2 — disk (delegated to ThumbnailCacheService.get)
-  ///  3. Tier 3 — native [getImageThumbnail]:
-  ///     Uses Android BitmapFactory with inSampleSize subsampling, scales to
-  ///     the target size, and JPEG-compresses.  Returns ~15 KB over JNI instead
-  ///     of the raw multi-MB source file.
-  ///
-  /// FIX: the old code called readFileChunk() on cache miss, transferring the
-  /// entire source file (potentially 5–10 MB) over the JNI bridge just to
-  /// display a 180×180 thumbnail.  getImageThumbnail() does the downscale
-  /// natively and transfers ~300–500× less data for identical visual output.
-  ///
-  /// FIX: _triggerBackgroundThumbnailGen() (the old fire-and-forget native
-  /// write) has been removed.  Thumbnails are generated inline on the cache-
-  /// miss path and written to disk immediately via ThumbnailCacheService.put().
-  /// This eliminates a competing native decode/encode/write that was previously
-  /// running *during* scroll for every cache miss.
   static Future<Uint8List> _fetch(
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
   ) async {
-    // Tier 2 — disk / in-container.
-    // (Tier 1 is already checked synchronously by syncLookup before _fetch
-    //  is ever called, but ThumbnailCacheService.get also guards it internally.)
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await ThumbnailCacheService.get(
           container: container, filePath: path, mode: mode);
       if (cached != null && cached.isNotEmpty) return cached;
-      // Note: get() calls putInMemory() on a hit, so Tier 1 is now populated.
     }
 
-    // Tier 3 — generate via native Android subsampled decode.
     Uint8List? thumbBytes =
         await vaultExplorerApi.getImageThumbnail(container, path, targetSize: 180);
 
-    // Fallback: raw file read for unsupported/corrupt images.
-    // Full-res bytes are intentionally *not* stored in the memory cache to
-    // avoid blowing the ~2.4 MB budget with a single large image.
     if (thumbBytes == null || thumbBytes.isEmpty) {
       final size = await vaultExplorerApi.getFileSize(container, path);
       if (size <= 0) throw Exception('Empty file: $path');
       final raw =
           await vaultExplorerApi.readFileChunk(container, path, 0, size);
       if (raw == null || raw.isEmpty) throw Exception('Read failed: $path');
-      // Only cache small files in memory (icons, screenshots).  Large files
-      // (>200 KB) stay in the LRU-Future cache only to cap memory usage.
       if (raw.length < 200 * 1024) {
         ThumbnailCacheService.putInMemory(container, path, raw);
       }
       return raw;
     }
 
-    // Cache the generated thumbnail: memory immediately, disk asynchronously.
     ThumbnailCacheService.putInMemory(container, path, thumbBytes);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(ThumbnailCacheService.put(
@@ -628,9 +582,6 @@ class _EncryptedImageGridThumb extends StatelessWidget {
         limiter: _limiter,
         fetchFn: (c, p) => _fetch(c, p, cacheMode),
         debounce: const Duration(milliseconds: 100),
-        // FIX: Synchronous fast-path.  If bytes are already in Tier 1 memory,
-        // the widget displays the image in initState — no loading state, no
-        // setState, no async scheduling.
         syncLookup: () =>
             ThumbnailCacheService.getFromMemory(container, filePath),
       );
@@ -659,18 +610,15 @@ class _VideoThumb extends StatelessWidget {
     String path,
     ThumbnailCacheMode mode,
   ) async {
-    // Tier 2 — disk / in-container.
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await ThumbnailCacheService.get(
           container: container, filePath: path, mode: mode);
       if (cached != null && cached.isNotEmpty) return cached;
     }
 
-    // Tier 3 — native video frame extraction.
     final data = await vaultExplorerApi.getVideoThumbnail(container, path);
     if (data == null || data.isEmpty) return Uint8List(0);
 
-    // Cache: memory immediately, disk asynchronously.
     ThumbnailCacheService.putInMemory(container, path, data);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(ThumbnailCacheService.put(
@@ -746,13 +694,23 @@ class ConcurrencyLimiter {
     _drainNext();
   }
 
+  // FIX P8: The original while loop contained a `return` inside the body,
+  // meaning it could only ever drain one waiter per release() call regardless
+  // of how many concurrent slots opened up. This was harmless for
+  // maxConcurrency=1 but misleading and wrong for higher values.
+  //
+  // The corrected version drains as many waiters as there are free slots,
+  // skipping already-completed (cancelled) completers without burning a slot.
   void _drainNext() {
     while (_waiting.isNotEmpty && _running < maxConcurrency) {
       final next = _waiting.removeLast();
-      if (next.isCompleted) continue;
+      if (next.isCompleted) {
+        // This completer was cancelled while waiting — skip it and try the next
+        // one without consuming a concurrency slot.
+        continue;
+      }
       _running++;
       next.complete();
-      return;
     }
   }
 }

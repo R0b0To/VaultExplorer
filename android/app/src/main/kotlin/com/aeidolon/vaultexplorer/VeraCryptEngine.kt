@@ -50,4 +50,7 @@ object VeraCryptEngine {
 
     @JvmStatic
     external fun hashPasswordNative(password: String, salt: ByteArray, iterations: Int): ByteArray?
+
+    @JvmStatic
+external fun readFileChunkDirectNative(fd: Int, password: String, pim: Int, targetFileName: String, offset: Long, buffer: ByteArray, length: Int, volId: Int): Int
 }

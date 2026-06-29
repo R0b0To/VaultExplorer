@@ -1288,3 +1288,44 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_hashPasswordNative(
 
     return result;
 }
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunkDirectNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring password, jint pim,
+        jstring targetFileName, jlong offset, jbyteArray outBuffer, jint length, jint volId) {
+
+    if (length <= 0) return 0;
+
+    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
+
+    jint bytesRead = -1;
+
+    // Passing fd=-1 is fine here because prepareSession knows to use activeFd[volId]
+    if (prepareSession(fd, nativePass, pim, volId, false)) {
+        if (ensureMounted(volId)) {
+            FIL f;
+            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+                f_lseek(&f, static_cast<FSIZE_t>(offset));
+                
+                // ZERO-COPY: Get a direct pointer to the Kotlin byte array!
+                jbyte* destBuf = env->GetByteArrayElements(outBuffer, nullptr);
+                if (destBuf != nullptr) {
+                    UINT br = 0;
+                    if (f_read(&f, destBuf, static_cast<UINT>(length), &br) == FR_OK) {
+                        bytesRead = static_cast<jint>(br);
+                    }
+                    // Release and commit the changes back to Kotlin memory
+                    env->ReleaseByteArrayElements(outBuffer, destBuf, 0);
+                }
+                f_close(&f);
+            }
+        }
+    }
+
+    env->ReleaseStringUTFChars(password, nativePass);
+    env->ReleaseStringUTFChars(targetFileName, targetName);
+    return bytesRead;
+}

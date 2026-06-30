@@ -21,10 +21,19 @@ import 'app_cache_encryption.dart';
 /// Tier 2 — encrypted disk file (appCache) or container file (inContainer).
 ///   AES-GCM runs inline for small thumbnails (< [_computeThresholdBytes])
 ///   and is offloaded to a background isolate via [compute()] for larger data.
-///   This prevents the UI thread from dropping frames when the gallery grid
-///   stores a full-resolution fallback image (up to ~200 KB).
 ///
 /// Tier 3 — full container read (handled by callers on a complete miss).
+///
+/// ### Cache isolation across container lock/unlock cycles
+///
+/// Memory keys include [MountedContainer.mountedAt] so that a different
+/// container mounted into the same volume slot always gets a fresh key —
+/// stale entries from the previous session are never served and are evicted
+/// naturally by LRU.
+///
+/// Disk cache directories are keyed by the container's URI (base64-encoded)
+/// rather than by volId, so two different container files that happen to share
+/// a slot at different times never collide on disk.
 class ThumbnailCacheService {
   ThumbnailCacheService._();
 
@@ -35,8 +44,6 @@ class ThumbnailCacheService {
 
   /// Data above this size is encrypted/decrypted in a background isolate via
   /// [compute()] to avoid blocking the UI thread.
-  /// Below this threshold the inline path (~0.3 ms) is cheaper than the
-  /// isolate spawn overhead (~5–10 ms).
   static const _computeThresholdBytes = 100 * 1024; // 100 KB
 
   // ── Tier 1: static in-memory LRU ──────────────────────────────────────────
@@ -48,21 +55,34 @@ class ThumbnailCacheService {
       _cachedKey ??= await AppCacheEncryption.getEncryptionKey();
 
   // ── App-cache directory — resolved once ───────────────────────────────────
+  //
+  // Keyed by the container's URI (base64-encoded and truncated to 180 chars)
+  // rather than by volId. Two different container files that happen to occupy
+  // the same volume slot at different times therefore never share a disk
+  // directory, eliminating stale thumbnail cross-contamination.
   static String? _appCacheRoot;
-  static Future<String> _thumbDir(int volId) async {
+
+  static Future<String> _thumbDir(MountedContainer container) async {
     _appCacheRoot ??= (await getApplicationCacheDirectory()).path;
-    return '$_appCacheRoot/thumbs/$volId';
+    return '$_appCacheRoot/thumbs/${_encodeKey(container.uri)}';
   }
 
-  // ── Filename encoding ──────────────────────────────────────────────────────
-  static String _encodeKey(String filePath) {
-    final encoded = base64Url.encode(utf8.encode(filePath));
+  // ── Filename / key encoding ────────────────────────────────────────────────
+  static String _encodeKey(String value) {
+    final encoded = base64Url.encode(utf8.encode(value));
     return encoded.length > 180 ? encoded.substring(0, 180) : encoded;
   }
 
+  // ── Memory-tier key ───────────────────────────────────────────────────────
+  //
+  // Includes mountedAt so that a new session for the same volId always
+  // generates a distinct key, preventing stale bytes from a previous container
+  // from being served without a disk/API round-trip.
+  static String _memKey(MountedContainer container, String filePath) =>
+      '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath';
+
   // ── AES-GCM helpers ────────────────────────────────────────────────────────
 
-  /// Decrypt [raw] inline (called when data is below [_computeThresholdBytes]).
   static Uint8List? _decryptInline(Uint8List raw, enc.Key key) {
     if (raw.length <= _gcmNonceSize + _gcmTagSize) return null;
     try {
@@ -77,7 +97,6 @@ class ThumbnailCacheService {
     }
   }
 
-  /// Encrypt [data] inline (called when data is below [_computeThresholdBytes]).
   static Uint8List _encryptInline(Uint8List data, enc.Key key) {
     final iv        = enc.IV.fromSecureRandom(_gcmNonceSize);
     final encrypted =
@@ -89,10 +108,6 @@ class ThumbnailCacheService {
   }
 
   // ── Top-level functions for compute() ─────────────────────────────────────
-  //
-  // compute() cannot capture closures or instance members — the function must
-  // be a static method or a top-level function.  We pass all required data as
-  // a single record argument.
 
   static Uint8List? _decryptIsolate(_DecryptArgs args) {
     if (args.raw.length <= _gcmNonceSize + _gcmTagSize) return null;
@@ -123,7 +138,6 @@ class ThumbnailCacheService {
 
   // ── Dispatch helpers ───────────────────────────────────────────────────────
 
-  /// Decrypt [raw] — inline for small data, background isolate for large data.
   static Future<Uint8List?> _decrypt(Uint8List raw, enc.Key key) async {
     if (raw.length < _computeThresholdBytes) {
       return _decryptInline(raw, key);
@@ -131,7 +145,6 @@ class ThumbnailCacheService {
     return compute(_decryptIsolate, _DecryptArgs(raw: raw, keyBytes: key.bytes));
   }
 
-  /// Encrypt [data] — inline for small data, background isolate for large data.
   static Future<Uint8List> _encrypt(Uint8List data, enc.Key key) async {
     if (data.length < _computeThresholdBytes) {
       return _encryptInline(data, key);
@@ -140,9 +153,6 @@ class ThumbnailCacheService {
   }
 
   // ── Memory-tier public helpers ─────────────────────────────────────────────
-
-  static String _memKey(MountedContainer container, String filePath) =>
-      '${container.volId}:$filePath';
 
   /// Synchronous O(1) lookup into the in-memory tier.
   static Uint8List? getFromMemory(MountedContainer container, String filePath) =>
@@ -169,7 +179,7 @@ class ThumbnailCacheService {
     // Tier 2: disk / in-container.
     try {
       if (mode == ThumbnailCacheMode.appCache) {
-        final dir  = await _thumbDir(container.volId);
+        final dir  = await _thumbDir(container);
         final file = File('$dir/${_encodeKey(filePath)}');
 
         final Uint8List raw;
@@ -221,7 +231,7 @@ class ThumbnailCacheService {
 
     try {
       if (mode == ThumbnailCacheMode.appCache) {
-        final dirPath = await _thumbDir(container.volId);
+        final dirPath = await _thumbDir(container);
         final dir     = Directory(dirPath);
         if (!await dir.exists()) await dir.create(recursive: true);
 
@@ -257,7 +267,7 @@ class ThumbnailCacheService {
 
   static Future<int> appCacheBytesFor(MountedContainer container) async {
     try {
-      final dir = Directory(await _thumbDir(container.volId));
+      final dir = Directory(await _thumbDir(container));
       if (!await dir.exists()) return 0;
       var total = 0;
       await for (final e in dir.list()) {
@@ -282,7 +292,7 @@ class ThumbnailCacheService {
 
   static Future<void> clearAppCacheFor(MountedContainer container) async {
     try {
-      final dir = Directory(await _thumbDir(container.volId));
+      final dir = Directory(await _thumbDir(container));
       if (await dir.exists()) await dir.delete(recursive: true);
     } catch (_) {}
     _memoryCache.clear();
@@ -297,15 +307,21 @@ class ThumbnailCacheService {
     _memoryCache.clear();
   }
 
-  static Future<void> pruneStaleAppCache(Set<int> activeVolIds) async {
+  /// Deletes on-disk thumbnail directories for containers whose URIs are not
+  /// in [activeContainerUris]. Call this on app start or after a bulk lock.
+  ///
+  /// Signature changed from `Set<int> activeVolIds` to `Set<String> activeContainerUris`
+  /// because disk directories are now keyed by encoded URI, not volId.
+  static Future<void> pruneStaleAppCache(Set<String> activeContainerUris) async {
     try {
       _appCacheRoot ??= (await getApplicationCacheDirectory()).path;
       final root = Directory('$_appCacheRoot/thumbs');
       if (!await root.exists()) return;
+      final activeKeys = activeContainerUris.map(_encodeKey).toSet();
       await for (final e in root.list()) {
         if (e is! Directory) continue;
-        final id = int.tryParse(e.path.split('/').last);
-        if (id != null && !activeVolIds.contains(id)) {
+        final dirName = e.path.split('/').last;
+        if (!activeKeys.contains(dirName)) {
           await e.delete(recursive: true);
         }
       }
@@ -314,9 +330,6 @@ class ThumbnailCacheService {
 }
 
 // ── compute() argument records ─────────────────────────────────────────────
-//
-// compute() requires serialisable arguments.  Plain classes with only
-// Uint8List fields are safe to pass across isolate boundaries.
 
 class _DecryptArgs {
   final Uint8List raw;

@@ -414,7 +414,7 @@ class _AsyncThumbState extends State<_AsyncThumb> {
   Future<void> _load() async {
     final targetPath = widget.filePath;
     _loadingPath     = targetPath;
-    final cacheKey   = '${widget.container.volId}:$targetPath';
+    final cacheKey   = '${widget.container.volId}:${widget.container.mountedAt.millisecondsSinceEpoch}:$targetPath';
 
     var future = widget.cache[cacheKey];
 

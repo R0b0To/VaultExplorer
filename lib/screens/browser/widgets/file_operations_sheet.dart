@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../models/file_operation.dart';
-import '../../../utils/format_utils.dart';
 
 /// Full bottom sheet for all in-flight and recent file operations.
 ///

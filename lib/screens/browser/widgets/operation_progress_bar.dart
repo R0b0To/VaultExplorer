@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../models/file_operation.dart';
-import '../../../utils/format_utils.dart';
 import 'file_operations_sheet.dart';
 
 /// Persistent transfer progress bar that sits at the bottom of the screen body.

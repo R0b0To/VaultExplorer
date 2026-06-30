@@ -277,17 +277,18 @@ class _LockGateScreenState extends State<LockGateScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 72,
-                    height: 72,
+                    width: 180,
+                    height: 180,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: cs.primaryContainer,
-                      border: Border.all(color: cs.outlineVariant),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: cs.outlineVariant.withValues(alpha: 0)),
                     ),
-                    child: Icon(
-                      Icons.lock_outline_rounded,
-                      size: 32,
-                      color: cs.primary,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image.asset(
+                        'assets/images/app_icon.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 28),

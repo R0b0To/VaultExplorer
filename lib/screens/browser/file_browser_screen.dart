@@ -15,15 +15,12 @@ import 'viewer/media_viewer_screen.dart';
 import 'mixins/selection_mixin.dart';
 import 'mixins/sort_mixin.dart';
 import 'widgets/breadcrumb_bar.dart';
-import 'widgets/clipboard_app_bar.dart';
+import 'widgets/clipboard_banner.dart';
+import 'widgets/conflict_resolution_sheet.dart';
 import 'widgets/file_grid_view.dart';
 import 'widgets/file_list_view.dart';
+import 'widgets/operation_progress_bar.dart';
 import 'widgets/selection_app_bar.dart';
-
-// ── Conflict resolution (still needed for the dialog — Phase 3 will move it) ─
-
-enum _ConflictResolution { skip, overwrite, keepBoth }
-typedef _ConflictResult = ({_ConflictResolution resolution, bool applyToAll});
 
 // ── Layout mode ───────────────────────────────────────────────────────────────
 
@@ -456,55 +453,60 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       srcContainer = widget.container;
     }
 
-    final items   = List<ClipboardItem>.from(_clip.items);
-    final isCut   = _clip.isCutOperation;
+    final items = List<ClipboardItem>.from(_clip.items);
+    final isCut = _clip.isCutOperation;
 
-    // ── Conflict resolution (serial dialog pass — Phase 3 replaces with sheet) ─
+    // ── Batch conflict scan ────────────────────────────────────────────────
+    //
+    // Single directory read, single pass over items. Replaces the old serial
+    // per-file AlertDialog loop — every collision is collected up front and
+    // shown to the user in one ConflictResolutionSheet instead of N modal
+    // interruptions.
 
-    final existingRaw =
-        await vaultExplorerApi.listDirectory(widget.container, _currentDirPath) ?? [];
+    final existingRaw = await vaultExplorerApi.listDirectory(
+            widget.container, _currentDirPath) ??
+        [];
     if (!mounted) return;
 
     final existingNames = <String>{};
+    final existingDirs  = <String>{};
     for (final raw in existingRaw) {
       final e = RawEntry.parse(raw);
       existingNames.add(e.name.toLowerCase());
+      if (e.isDir) existingDirs.add(e.name.toLowerCase());
     }
 
-    final conflictPlan = <String, ConflictResolution>{};
-    ConflictResolution? globalResolution;
-
+    final conflicts = <ConflictEntry>[];
     for (final item in items) {
       final fileName = item.name;
       if (!existingNames.contains(fileName.toLowerCase())) continue;
-      // Same-container move to same location — service skips these, no dialog.
-      if (!isCrossContainer && item.path ==
-          (_currentDirPath.isEmpty ? fileName : '$_currentDirPath/$fileName')) {
-        continue;
-      }
 
-      ConflictResolution? resolution = globalResolution;
-      if (resolution == null) {
-        final result = await _showConflictResolutionDialog(
-          fileName,
-          hasMore: items.where((i) =>
-              existingNames.contains(i.name.toLowerCase())).length > 1,
-        );
-        if (!mounted) return;
-        if (result == null) return; // user cancelled the whole paste
+      // Same-container move to the exact same location — FileOperationService
+      // skips these silently; don't surface them as a conflict to resolve.
+      final wouldBeSamePath = !isCrossContainer &&
+          item.path ==
+              (_currentDirPath.isEmpty ? fileName : '$_currentDirPath/$fileName');
+      if (wouldBeSamePath) continue;
 
-        final mapped = switch (result.resolution) {
-          _ConflictResolution.skip      => ConflictResolution.skip,
-          _ConflictResolution.overwrite => ConflictResolution.overwrite,
-          _ConflictResolution.keepBoth  => ConflictResolution.keepBoth,
-        };
-        if (result.applyToAll) globalResolution = mapped;
-        resolution = mapped;
-      }
-      conflictPlan[fileName.toLowerCase()] = resolution;
+      conflicts.add(ConflictEntry(
+        item: item,
+        destIsDir: existingDirs.contains(fileName.toLowerCase()),
+      ));
     }
 
-    // ── Enqueue with FileOperationService ─────────────────────────────────
+    ConflictPlan conflictPlan = const {};
+    if (conflicts.isNotEmpty) {
+      if (!mounted) return;
+      final result = await ConflictResolutionSheet.show(
+        context,
+        conflicts: conflicts,
+      );
+      if (!mounted) return;
+      if (result == null) return; // user cancelled the whole paste
+      conflictPlan = result;
+    }
+
+    // ── Enqueue with FileOperationService ───────────────────────────────────
 
     final op = _opSvc.enqueue(
       isCut: isCut,
@@ -517,10 +519,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
     _clip.clear();
 
-    // Show live status while the operation is active.
-    _setStatus(op.shortSummary, autoClear: const Duration(minutes: 10));
-
-    // Attach a one-shot listener: reload directory when the op finishes.
+    // Live progress is shown by OperationProgressBar — this listener's only
+    // job is reloading the directory listing the instant the operation
+    // finishes (the bar itself doesn't touch directory state).
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
@@ -530,102 +531,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           op.status != FileOperationStatus.running;
       if (done) {
         op.removeListener(listener);
-        _loadDirectoryContents(_currentDirPath).then((_) {
-          if (mounted) _setStatus(op.completionSummary, error: op.failCount > 0);
-        });
+        _loadDirectoryContents(_currentDirPath);
       }
     }
 
     op.addListener(listener);
-  }
-
-  // ── Conflict dialog (unchanged from original) ─────────────────────────────
-
-  Future<_ConflictResult?> _showConflictResolutionDialog(
-    String fileName, {
-    required bool hasMore,
-  }) {
-    bool applyToAll = false;
-    final cs = Theme.of(context).colorScheme;
-
-    return showDialog<_ConflictResult>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('Already Exists'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              RichText(
-                text: TextSpan(
-                  style: Theme.of(ctx).textTheme.bodyMedium,
-                  children: [
-                    TextSpan(
-                      text: '"$fileName"',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600, color: cs.primary),
-                    ),
-                    const TextSpan(
-                        text: ' already exists in this location.'),
-                  ],
-                ),
-              ),
-              if (hasMore) ...[
-                const SizedBox(height: 14),
-                GestureDetector(
-                  onTap: () =>
-                      setLocal(() => applyToAll = !applyToAll),
-                  child: Row(children: [
-                    Checkbox(
-                      value: applyToAll,
-                      onChanged: (v) =>
-                          setLocal(() => applyToAll = v ?? false),
-                      materialTapTargetSize:
-                          MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                        child: Text('Apply to all conflicts')),
-                  ]),
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(
-                  ctx,
-                  (
-                    resolution: _ConflictResolution.skip,
-                    applyToAll: applyToAll
-                  )),
-              child: const Text('Skip'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(
-                  ctx,
-                  (
-                    resolution: _ConflictResolution.overwrite,
-                    applyToAll: applyToAll
-                  )),
-              child:
-                  Text('Overwrite', style: TextStyle(color: cs.error)),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(
-                  ctx,
-                  (
-                    resolution: _ConflictResolution.keepBoth,
-                    applyToAll: applyToAll
-                  )),
-              child: const Text('Keep Both'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   // ── Batch delete ──────────────────────────────────────────────────────────
@@ -829,6 +739,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         appBar: _buildAppBar(context, filteredDirs, filteredFiles),
         body: Column(children: [
           BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+          if (_clip.hasItems)
+            ClipboardBanner(
+              isCutOperation: _clip.isCutOperation,
+              itemCount: _clip.items.length,
+              sourceLabel: _clip.isFromVolume(widget.container.volId)
+                  ? null
+                  : _clip.sourceDisplayName,
+              onCancel: () => setState(() => _clip.clear()),
+              onPaste: _paste,
+            ),
           _StatsBar(
             dirCount: filteredDirs.length,
             fileCount: filteredFiles.length,
@@ -842,6 +762,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           ),
           const Divider(),
           Expanded(child: _buildBody(filteredDirs, filteredFiles)),
+          const OperationProgressBar(),
           if (_statusMessage != null)
             _StatusBar(
               message: _statusMessage!,
@@ -902,18 +823,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           vaultExplorerApi.openWithApp(widget.container, path);
           exitSelectionMode();
         },
-      );
-    }
-
-    if (_clip.hasItems) {
-      final fromHere = _clip.isFromVolume(widget.container.volId);
-      return ClipboardAppBar(
-        isCutOperation: _clip.isCutOperation,
-        itemCount:      _clip.items.length,
-        sourceLabel:    fromHere ? null : _clip.sourceDisplayName,
-        onCancel:       () => setState(() => _clip.clear()),
-        onPaste:        _paste,
-        onBack:         _atRoot ? () => Navigator.of(context).pop() : _navigateUp,
       );
     }
 

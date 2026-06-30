@@ -235,49 +235,34 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ? entry.name
         : '$_currentDirPath/${entry.name}';
 
-    if (_isSupportedMedia(entry.name)) {
-      final mediaEntries = _currentItems
-          .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
-          .map((f) => RawEntry.parse(f).name)
-          .where(_isSupportedMedia)
-          .toList();
-      final resolvedPaths = mediaEntries
-          .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
-          .toList();
-      Navigator.push(
+    final parts = entry.name.split('.');
+    final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
+
+    final settings = await AppSettingsService.loadSettings();
+    final pref = settings.extensionPreferences[ext];
+
+    if (pref == 'editor') {
+      if (!mounted) return;
+      await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => MediaViewerScreen(
+          builder: (_) => TextEditorScreen(
             container: widget.container,
-            mediaFiles: resolvedPaths,
-            initialIndex: mediaEntries.indexOf(entry.name),
-            startingFolder: _currentDirPath,
-          ),
-        ),
-      );
-    } else {
-      final parts = entry.name.split('.');
-      final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
-
-      final settings = await AppSettingsService.loadSettings();
-      final pref = settings.extensionPreferences[ext];
-
-      if (pref == 'editor') {
-        if (!mounted) return;
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => TextEditorScreen(
-              container: widget.container,
-              filePath: fullPath,
+            filePath: fullPath,
             ),
           ),
-        );
-        _loadDirectoryContents(_currentDirPath);
-      } else if (pref != null && pref.startsWith('package:')) {
-        _openFileWithApp(entry.name, fullPath, packageName: pref.substring(8));
-      } else if (pref == 'external') {
-        _openFileWithApp(entry.name, fullPath);
+      );
+      _loadDirectoryContents(_currentDirPath);
+    } else if (pref == 'media') {
+      _openMediaViewer(entry.name, fullPath);
+    } else if (pref != null && pref.startsWith('package:')) {
+      _openFileWithApp(entry.name, fullPath, packageName: pref.substring(8));
+    } else if (pref == 'external') {
+      _openFileWithApp(entry.name, fullPath);
+    } else {
+      // pref is null
+      if (_isSupportedMedia(entry.name)) {
+        _openMediaViewer(entry.name, fullPath);
       } else {
         if (!mounted) return;
         await _showOpenWithDialog(entry.name, fullPath, ext, settings);
@@ -285,11 +270,38 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
+  void _openMediaViewer(String fileName, String fullPath) {
+    final mediaEntries = _currentItems
+        .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
+        .map((f) => RawEntry.parse(f).name)
+        .where(_isSupportedMedia)
+        .toList();
+    final resolvedPaths = mediaEntries
+        .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
+        .toList();
+
+    final index = mediaEntries.indexOf(fileName);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MediaViewerScreen(
+          container: widget.container,
+          mediaFiles: resolvedPaths.isNotEmpty ? resolvedPaths : [fullPath],
+          initialIndex: index >= 0 ? index : 0,
+          startingFolder: _currentDirPath,
+        ),
+      ),
+    );
+  }
+
   Future<void> _showOpenWithDialog(
       String fileName, String fullPath, String ext, AppSettings settings) async {
     bool remember = false;
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    final isMedia = _isSupportedMedia(fileName);
 
     final result = await showDialog<String>(
       context: context,
@@ -308,7 +320,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   ),
                   const SizedBox(height: 16),
                   InkWell(
-                    onTap: () => Navigator.of(context).pop('editor'),
+                    onTap: () => Navigator.of(context).pop(isMedia ? 'media' : 'editor'),
                     borderRadius: BorderRadius.circular(12),
                     child: Ink(
                       padding: const EdgeInsets.all(12),
@@ -319,20 +331,26 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.edit_note_rounded, color: cs.primary, size: 28),
+                          Icon(
+                            isMedia ? Icons.play_circle_outline_rounded : Icons.edit_note_rounded,
+                            color: cs.primary,
+                            size: 28,
+                          ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'In-app Text Editor',
+                                  isMedia ? 'In-app Media Viewer' : 'In-app Text Editor',
                                   style: textTheme.bodyLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 Text(
-                                  'View/edit text, markdown, code',
+                                  isMedia
+                                      ? 'Play video/audio or view image in-app'
+                                      : 'View/edit text, markdown, code',
                                   style: textTheme.bodySmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                   ),
@@ -435,6 +453,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ),
       );
       _loadDirectoryContents(_currentDirPath);
+    } else if (result == 'media') {
+      if (remember) {
+        settings.extensionPreferences[ext] = 'media';
+        await AppSettingsService.saveSettings(settings);
+      }
+      _openMediaViewer(fileName, fullPath);
     } else if (result == 'external') {
       if (remember) {
         // Register a one-shot callback to capture the specific app
@@ -1010,13 +1034,18 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         onCut:    () => _initClipboard(cut: true),
         onExport: _exportSelectedToStorage,
         onDelete: _batchDelete,
-        onOpenWithApp: () {
+        onOpenWithApp: () async {
           final entry = RawEntry.parse(selectedItems.first);
           final path  = _currentDirPath.isEmpty
               ? entry.name
               : '$_currentDirPath/${entry.name}';
-          vaultExplorerApi.openWithApp(widget.container, path);
+          final parts = entry.name.split('.');
+          final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
           exitSelectionMode();
+          final settings = await AppSettingsService.loadSettings();
+          if (mounted) {
+            await _showOpenWithDialog(entry.name, path, ext, settings);
+          }
         },
       );
     }

@@ -181,44 +181,50 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
                   if (_settings.useMasterPassword && _showPwFields) ...[
                     const SizedBox(height: 14),
-                    TextField(
-                      controller: _pwCtrl,
-                      obscureText: _obscurePw,
-                      autofillHints: null,
-                      decoration: InputDecoration(
-                        labelText: _settings.masterPasswordHash != null
-                            ? 'New password'
-                            : 'Master password',
-                        prefixIcon: const Icon(Icons.password_rounded, size: 18),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                              _obscurePw
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              size: 18),
-                          onPressed: () =>
-                              setState(() => _obscurePw = !_obscurePw),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _pwConfirmCtrl,
-                      obscureText: _obscureConfirm,
-                      autofillHints: null,
-                      decoration: InputDecoration(
-                        labelText: 'Confirm password',
-                        prefixIcon: const Icon(Icons.password_rounded, size: 18),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                              _obscureConfirm
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                              size: 18),
-                          onPressed: () =>
-                              setState(
-                                  () => _obscureConfirm = !_obscureConfirm),
-                        ),
+                    AutofillGroup(
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _pwCtrl,
+                            obscureText: _obscurePw,
+                            autofillHints: const [AutofillHints.newPassword],
+                            decoration: InputDecoration(
+                              labelText: _settings.masterPasswordHash != null
+                                  ? 'New password'
+                                  : 'Master password',
+                              prefixIcon: const Icon(Icons.password_rounded, size: 18),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                    _obscurePw
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    size: 18),
+                                onPressed: () =>
+                                    setState(() => _obscurePw = !_obscurePw),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _pwConfirmCtrl,
+                            obscureText: _obscureConfirm,
+                            autofillHints: const [AutofillHints.newPassword],
+                            decoration: InputDecoration(
+                              labelText: 'Confirm password',
+                              prefixIcon: const Icon(Icons.password_rounded, size: 18),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                    _obscureConfirm
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    size: 18),
+                                onPressed: () =>
+                                    setState(
+                                        () => _obscureConfirm = !_obscureConfirm),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     if (_pwError != null) ...[
@@ -420,9 +426,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                                 child: Text(
                                   entry.value == 'editor'
                                       ? 'In-app Text Editor'
-                                      : (entry.value.startsWith('package:')
-                                          ? 'App: ${entry.value.substring(8)}'
-                                          : 'External App'),
+                                      : (entry.value == 'media'
+                                          ? 'In-app Media Viewer'
+                                          : (entry.value.startsWith('package:')
+                                              ? 'App: ${entry.value.substring(8)}'
+                                              : 'External App')),
                                   style: textTheme.bodyMedium,
                                   overflow: TextOverflow.ellipsis,
                                 ),

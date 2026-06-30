@@ -101,10 +101,11 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+            child: AutofillGroup(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 Text(
                   'Create VeraCrypt Container',
                   style: textTheme.titleMedium?.copyWith(
@@ -168,6 +169,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                 TextField(
                   controller: _passwordCtrl,
                   obscureText: _obscure,
+                  autofillHints: const [AutofillHints.password],
                   decoration: InputDecoration(
                     labelText: 'Password',
                     prefixIcon:
@@ -259,6 +261,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                 ),
               ],
             ),
+          ),
           ),
         ),
       ),

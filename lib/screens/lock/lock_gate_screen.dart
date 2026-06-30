@@ -257,9 +257,10 @@ class _LockGateScreenState extends State<LockGateScreen> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 40),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
+            child: AutofillGroup(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Container(
                   width: 72, height: 72,
                   decoration: BoxDecoration(
@@ -289,7 +290,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
                   obscureText: _obscure,
                   enabled: !isLockedOut && !_checking,
                   autofocus: !s.masterPasswordIsFingerprint,
-                  autofillHints: null,
+                  autofillHints: const [AutofillHints.password],
                   onSubmitted: (_) => _checkPassword(),
                   decoration: InputDecoration(
                     labelText: 'Master Password',
@@ -340,6 +341,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
                 ],
               ],
             ),
+          ),
           ),
         ),
       ),

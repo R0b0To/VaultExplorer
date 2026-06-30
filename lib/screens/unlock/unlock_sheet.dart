@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:local_auth/local_auth.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../services/container_repository.dart';
 import '../../models/mounted_container.dart';
 import '../../utils/validation_utils.dart';
+import '../lock/pattern_lock_view.dart';
 
 class UnlockSheet extends StatefulWidget {
   final ValueChanged<MountedContainer> onMounted;
@@ -35,6 +37,14 @@ class _UnlockSheetState extends State<UnlockSheet> {
   bool _remember = false;
   String? _error;
 
+  // ── Unlock method state ──────────────────────────────────────────────────
+  ContainerUnlockMethod _unlockMethod = ContainerUnlockMethod.password;
+  bool _showPasswordFallback = false;
+  bool _patternError = false;
+  int _patternResetKey = 0;
+  String? _storedPatternHash;
+  bool _loadingAuth = true;
+
   bool get _passwordPrefilled =>
       widget.prefillPassword?.isNotEmpty == true &&
       _passwordCtrl.text == widget.prefillPassword;
@@ -48,6 +58,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
       _selectedName = widget.initialName;
       _remember     = true;
     }
+    _initUnlockMethod();
   }
 
   @override
@@ -56,6 +67,116 @@ class _UnlockSheetState extends State<UnlockSheet> {
     _pimCtrl.dispose();
     super.dispose();
   }
+
+  /// Loads the container record and prepares the appropriate unlock flow.
+  Future<void> _initUnlockMethod() async {
+    if (widget.initialUri == null) {
+      // Fresh mount — no saved record, just show password field.
+      if (mounted) setState(() => _loadingAuth = false);
+      return;
+    }
+
+    try {
+      final records = await ContainerRepository.instance.loadAll();
+      final record = records[widget.initialUri];
+      if (record == null) {
+        if (mounted) setState(() => _loadingAuth = false);
+        return;
+      }
+
+      _unlockMethod = record.unlockMethod;
+
+      if (_unlockMethod == ContainerUnlockMethod.pattern) {
+        _storedPatternHash =
+            await ContainerRepository.instance.getPatternHash(widget.initialUri!);
+      }
+
+      if (mounted) setState(() => _loadingAuth = false);
+
+      // Auto-trigger biometric prompt.
+      if (_unlockMethod == ContainerUnlockMethod.biometrics) {
+        _tryBiometric();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingAuth = false);
+    }
+  }
+
+  // ── Biometric ────────────────────────────────────────────────────────────
+
+  Future<void> _tryBiometric() async {
+    try {
+      final localAuth = LocalAuthentication();
+      final ok = await localAuth.authenticate(
+        localizedReason: 'Authenticate to unlock container',
+        options: const AuthenticationOptions(
+            biometricOnly: false, stickyAuth: true),
+      );
+      if (ok && mounted) {
+        // Fetch saved password and auto-unlock.
+        final pw =
+            await ContainerRepository.instance.getPassword(widget.initialUri!);
+        if (pw != null && pw.isNotEmpty) {
+          _passwordCtrl.text = pw;
+          _unlock();
+        } else {
+          setState(() {
+            _error = 'No saved password found. Please enter it manually.';
+            _showPasswordFallback = true;
+          });
+        }
+      }
+    } on PlatformException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Biometric error: ${e.message}';
+          _showPasswordFallback = true;
+        });
+      }
+    }
+  }
+
+  // ── Pattern ──────────────────────────────────────────────────────────────
+
+  Future<void> _onPatternComplete(List<int> pattern) async {
+    if (_storedPatternHash == null) {
+      setState(() {
+        _error = 'No pattern configured. Please enter password manually.';
+        _showPasswordFallback = true;
+      });
+      return;
+    }
+
+    final attempt = hashPattern(pattern);
+    if (attempt == _storedPatternHash) {
+      // Pattern matches — fetch saved password and unlock.
+      final pw =
+          await ContainerRepository.instance.getPassword(widget.initialUri!);
+      if (pw != null && pw.isNotEmpty) {
+        _passwordCtrl.text = pw;
+        _unlock();
+      } else {
+        setState(() {
+          _error = 'No saved password found. Please enter it manually.';
+          _showPasswordFallback = true;
+        });
+      }
+    } else {
+      setState(() {
+        _patternError = true;
+      });
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() {
+            _patternError = false;
+            _patternResetKey++;
+          });
+        }
+      });
+    }
+  }
+
+  // ── File picking ─────────────────────────────────────────────────────────
 
   Future<void> _pickFile() async {
     if (widget.initialUri != null) return;
@@ -147,6 +268,15 @@ class _UnlockSheetState extends State<UnlockSheet> {
     }
   }
 
+  // ── Whether to show the standard password UI ────────────────────────────
+
+  bool get _showPasswordUI {
+    if (_showPasswordFallback) return true;
+    if (widget.initialUri == null) return true; // fresh mount — always show
+    return _unlockMethod == ContainerUnlockMethod.password ||
+           _unlockMethod == ContainerUnlockMethod.rememberPassword;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs        = Theme.of(context).colorScheme;
@@ -234,67 +364,145 @@ class _UnlockSheetState extends State<UnlockSheet> {
               ),
               const SizedBox(height: 16),
 
-              TextField(
-                controller: _passwordCtrl,
-                obscureText: _obscure,
-                autofocus: widget.initialUri != null &&
-                    widget.prefillPassword?.isEmpty != false,
-                onChanged: (_) => setState(() {}),
-                keyboardType: TextInputType.visiblePassword,
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: const Icon(Icons.key_outlined, size: 18),
-                  suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
-                    if (_passwordPrefilled)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Tooltip(
-                          message: 'Using saved password',
-                          child: Icon(Icons.bookmark_rounded,
-                              size: 18, color: cs.primary),
-                        ),
-                      ),
-                    IconButton(
+              // ── Auth-specific UI ──────────────────────────────────────────
+
+              if (_loadingAuth)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                )
+
+              // ── Biometric prompt feedback ──────────────────────────────
+              else if (_unlockMethod == ContainerUnlockMethod.biometrics &&
+                       !_showPasswordFallback) ...[
+                Center(
+                  child: Column(children: [
+                    Icon(Icons.fingerprint_rounded,
+                        size: 56, color: cs.primary),
+                    const SizedBox(height: 12),
+                    Text('Waiting for biometric...',
+                        style: textTheme.bodyMedium
+                            ?.copyWith(color: cs.onSurfaceVariant)),
+                    const SizedBox(height: 16),
+                    TextButton(
+                      onPressed: _tryBiometric,
+                      child: const Text('Retry'),
+                    ),
+                    TextButton(
                       onPressed: () =>
-                          setState(() => _obscure = !_obscure),
-                      icon: Icon(
-                          _obscure
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          size: 18),
+                          setState(() => _showPasswordFallback = true),
+                      child: const Text('Use Password'),
                     ),
                   ]),
                 ),
-              ),
-              const SizedBox(height: 12),
+              ]
 
-              TextField(
-                controller: _pimCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'PIM  (leave blank for default)',
-                  prefixIcon: Icon(Icons.tune_rounded, size: 18),
+              // ── Pattern grid ───────────────────────────────────────────
+              else if (_unlockMethod == ContainerUnlockMethod.pattern &&
+                       !_showPasswordFallback) ...[
+                Center(
+                  child: Column(children: [
+                    Text(
+                      _patternError ? 'Wrong pattern — try again' : 'Draw your unlock pattern',
+                      style: textTheme.bodyMedium?.copyWith(
+                                // ── Standard password fields ───────────────────────────────
+              else if (_showPasswordUI) ...[
+                AutofillGroup(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _passwordCtrl,
+                        obscureText: _obscure,
+                        autofocus: widget.initialUri != null &&
+                            widget.prefillPassword?.isEmpty != false,
+                        onChanged: (_) => setState(() {}),
+                        keyboardType: TextInputType.visiblePassword,
+                        autofillHints: const [AutofillHints.password],
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.key_outlined, size: 18),
+                          suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+                            if (_passwordPrefilled)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 4),
+                                child: Tooltip(
+                                  message: 'Using saved password',
+                                  child: Icon(Icons.bookmark_rounded,
+                                      size: 18, color: cs.primary),
+                                ),
+                              ),
+                            IconButton(
+                              onPressed: () =>
+                                  setState(() => _obscure = !_obscure),
+                              icon: Icon(
+                                  _obscure
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  size: 18),
+                            ),
+                          ]),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _pimCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'PIM  (leave blank for default)',
+                          prefixIcon: Icon(Icons.tune_rounded, size: 18),
+                        ),
+                      ),
+                      if (widget.initialUri == null) ...[
+                        const SizedBox(height: 10),
+                        Row(children: [
+                          Checkbox(
+                            value: _remember,
+                            onChanged: (val) =>
+                                setState(() => _remember = val ?? false),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          const SizedBox(width: 10),
+                          GestureDetector(
+                            onTap: () => setState(() => _remember = !_remember),
+                            child: Text(
+                              'Remember container on dashboard',
+                              style: textTheme.bodyMedium,
+                            ),
+                          ),
+                        ]),
+                      ],
+                    ],
+                  ),
                 ),
-              ),
+              ],    ),
+                ),
 
-              if (widget.initialUri == null) ...[
-                const SizedBox(height: 10),
-                Row(children: [
-                  Checkbox(
-                    value: _remember,
-                    onChanged: (val) =>
-                        setState(() => _remember = val ?? false),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  const SizedBox(width: 10),
-                  GestureDetector(
-                    onTap: () => setState(() => _remember = !_remember),
-                    child: Text(
-                      'Remember container on dashboard',
-                      style: textTheme.bodyMedium,
+                if (widget.initialUri == null) ...[
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    Checkbox(
+                      value: _remember,
+                      onChanged: (val) =>
+                          setState(() => _remember = val ?? false),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                  ),
-                ]),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () => setState(() => _remember = !_remember),
+                      child: Text(
+                        'Remember container on dashboard',
+                        style: textTheme.bodyMedium,
+                      ),
+                    ),
+                  ]),
+                ],
               ],
 
               if (_error != null) ...[
@@ -322,24 +530,27 @@ class _UnlockSheetState extends State<UnlockSheet> {
                 ),
               ],
 
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _loading ? null : _unlock,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 48),
+              // Only show the unlock button when password UI is visible.
+              if (_showPasswordUI) ...[
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _loading ? null : _unlock,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                  child: _loading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor:
+                                AlwaysStoppedAnimation(cs.onPrimary),
+                          ),
+                        )
+                      : const Text('Unlock'),
                 ),
-                child: _loading
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor:
-                              AlwaysStoppedAnimation(cs.onPrimary),
-                        ),
-                      )
-                    : const Text('Unlock'),
-              ),
+              ],
             ],
           ),
         ),

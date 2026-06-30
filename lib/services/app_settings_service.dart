@@ -5,7 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/thumbnail_cache_mode.dart';
 import 'container_repository.dart';
 
-export 'container_repository.dart' show ContainerRepository, ContainerRecord;
+export 'container_repository.dart' show ContainerRepository, ContainerRecord, ContainerUnlockMethod;
 
 // ── Secure storage instance ───────────────────────────────────────────────────
 

@@ -173,7 +173,10 @@ class _VaultDashboardState extends State<VaultDashboard>
     String? rememberedPassword;
     if (uri != null) {
       final record = _records[uri];
-      if (record?.rememberPassword == true) {
+      // Only prefill the password for the simple "rememberPassword" method.
+      // Biometric and pattern methods handle password retrieval internally
+      // after the user authenticates.
+      if (record?.unlockMethod == ContainerUnlockMethod.rememberPassword) {
         rememberedPassword =
             await ContainerRepository.instance.getPassword(uri);
       }

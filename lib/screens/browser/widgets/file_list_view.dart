@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../utils/file_type_utils.dart';
 import '../../../utils/format_utils.dart';
 import '../../../utils/raw_entry.dart';
+import 'tile_selection_style.dart';
 
 /// Stateless renderer for a flat columned list of directory entries.
 class FileListView extends StatelessWidget {
@@ -83,14 +84,14 @@ class FileListView extends StatelessWidget {
 
               final entry = RawEntry.parse(rawItem);
               final dateStr = _formatDateColumn(entry.modifiedSecs);
-              final sizeStr = isDir ? '—' : formatBytes(entry.sizeBytes);
+              final sizeStr = isDir ? '' : formatBytes(entry.sizeBytes);
 
               return InkWell(
                 onTap: () => isDir ? onDirTap(rawItem) : onFileTap(rawItem),
                 onLongPress: () => onItemLongPress(rawItem),
                 child: Container(
                   color: isSelected
-                      ? cs.primaryContainer.withValues(alpha: 0.3)
+                      ? TileSelectionStyle.selectedBackground(cs)
                       : Colors.transparent,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
@@ -99,9 +100,12 @@ class FileListView extends StatelessWidget {
                       Icon(
                         isDir ? Icons.folder_rounded : iconForFile(entry.name),
                         size: 22,
-                        color: isSelected
-                            ? cs.primary
-                            : (isDir ? cs.secondary : colorForFile(entry.name)),
+                        color: TileSelectionStyle.leadingIconColor(
+                          cs,
+                          selected: isSelected,
+                          unselectedColor:
+                              isDir ? cs.secondary : colorForFile(entry.name),
+                        ),
                       ),
                       const SizedBox(width: 16),
 
@@ -113,7 +117,7 @@ class FileListView extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                            fontWeight: TileSelectionStyle.titleWeight(isSelected),
                           ),
                         ),
                       ),
@@ -132,7 +136,29 @@ class FileListView extends StatelessWidget {
                       const SizedBox(width: 16),
 
                       // Size Column
-                      SizedBox(
+                      
+
+                      // Action Icon or Checkbox
+                      if (isSelectionMode) ...[
+                        if(isSelected) ...[    
+                        const SizedBox(width: 60),
+                        TileSelectionIndicator(selected: isSelected),
+                        ]else ...[
+                          SizedBox(
+                        width: 80,
+                        child: Text(
+                          sizeStr,
+                          textAlign: TextAlign.right,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),],
+                        
+                      ] else if (isDir) ...[
+                        const SizedBox(width: 80),
+                      ] else ...[
+                        SizedBox(
                         width: 80,
                         child: Text(
                           sizeStr,
@@ -142,24 +168,6 @@ class FileListView extends StatelessWidget {
                           ),
                         ),
                       ),
-
-                      // Action Icon or Checkbox
-                      if (isSelectionMode) ...[
-                        const SizedBox(width: 16),
-                        Icon(
-                          isSelected
-                              ? Icons.check_circle_rounded
-                              : Icons.radio_button_unchecked_rounded,
-                          size: 20,
-                          color: isSelected ? cs.primary : cs.outline,
-                        ),
-                      ] else if (isDir) ...[
-                        const SizedBox(width: 16),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 20,
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                        ),
                       ],
                     ],
                   ),

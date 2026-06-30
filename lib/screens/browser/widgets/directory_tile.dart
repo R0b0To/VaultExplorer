@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'tile_selection_style.dart';
 
 class DirectoryTile extends StatelessWidget {
   final String name;
-  final String? subtitle; // Added subtitle property
+  final String? subtitle;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
@@ -14,7 +15,7 @@ class DirectoryTile extends StatelessWidget {
   const DirectoryTile({
     Key? key,
     required this.name,
-    this.subtitle, // Added subtitle parameter
+    this.subtitle,
     required this.onTap,
     this.onLongPress,
     this.selectionMode = false,
@@ -29,17 +30,21 @@ class DirectoryTile extends StatelessWidget {
     return ListTile(
       dense: true,
       selected: selected,
-      selectedTileColor: cs.primaryContainer.withValues(alpha:0.3),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      selectedTileColor: TileSelectionStyle.selectedBackground(cs),
+      contentPadding: TileSelectionStyle.contentPadding,
       leading: Icon(
         Icons.folder_rounded,
         size: 22,
-        color: selected ? cs.primary : cs.secondary,
+        color: TileSelectionStyle.leadingIconColor(
+          cs,
+          selected: selected,
+          unselectedColor: cs.secondary,
+        ),
       ),
       title: Text(
-        name, 
+        name,
         style: textTheme.bodyMedium?.copyWith(
-          fontWeight: selected ? FontWeight.w500 : FontWeight.normal,
+          fontWeight: TileSelectionStyle.titleWeight(selected),
         ),
       ),
       subtitle: subtitle != null
@@ -50,19 +55,6 @@ class DirectoryTile extends StatelessWidget {
               ),
             )
           : null, // Renders the modified date below the folder title
-      trailing: selectionMode
-          ? Icon(
-              selected
-                  ? Icons.check_circle_rounded
-                  : Icons.radio_button_unchecked_rounded,
-              size: 20,
-              color: selected ? cs.primary : cs.outline,
-            )
-          : Icon(
-              Icons.chevron_right_rounded, 
-              size: 20, 
-              color: cs.onSurfaceVariant.withValues(alpha:0.7),
-            ),
       onTap: onTap,
       onLongPress: onLongPress,
     );

@@ -58,26 +58,8 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
     private fun detachFd(uriString: String, mode: String): Int =
         openPfd(uriString, mode).detachFd()
 
-    // FIX: Centralised, bounds-checked volId parser.
-    //
-    // Previously every override parsed `parts[0].toIntOrNull()` without
-    // validating the range. A malicious document URI with volId=-1 or
-    // volId=100 would cause ArrayIndexOutOfBoundsException on
-    // VeraCryptSession.locks[volId]. Now all overrides call this helper.
-    private fun parseVolId(raw: String?): Int {
-        val id = raw?.toIntOrNull()
-            ?: throw FileNotFoundException("Missing volume ID in document URI")
-        if (id < 0 || id >= VeraCryptSession.MAX_VOLUMES) {
-            throw FileNotFoundException("Volume ID $id is out of range [0, ${VeraCryptSession.MAX_VOLUMES})")
-        }
-        return id
-    }
-
-    // FIX: Centralised session lookup.
-    //
-    // Avoids duplicating the null check + error message across every override.
-    // Also ensures we never operate on an inactive session (which would pass
-    // an empty password to native, silently failing or worse).
+    // Centralised session lookup. Ensures we never operate on an inactive
+    // session (which would pass an empty password to native, silently failing).
     private fun requireSession(volId: Int): ContainerSession =
         VeraCryptSession.activeSessions[volId]
             ?: throw FileNotFoundException(
@@ -104,7 +86,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             cursor.newRow().apply {
                 add(DocumentsContract.Root.COLUMN_ROOT_ID, volId.toString())
                 add(DocumentsContract.Root.COLUMN_MIME_TYPES, "*/*")
-                add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, "$volId:dir:")
+                add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, DocumentId(volId, "dir", "").toString())
                 add(DocumentsContract.Root.COLUMN_TITLE, rootTitle)
                 add(DocumentsContract.Root.COLUMN_SUMMARY, rootSummary)
                 add(DocumentsContract.Root.COLUMN_FLAGS, flags)
@@ -118,18 +100,17 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
 
     override fun isChildDocument(parentDocumentId: String?, documentId: String?): Boolean {
         if (parentDocumentId == null || documentId == null) return false
-        val parentParts = parentDocumentId.split(":")
-        val childParts  = documentId.split(":")
-        if (parentParts.size < 2 || childParts.size < 2) return false
-        if (parentParts[0] != childParts[0]) return false
-        val parentFatPath = parentParts.drop(2).joinToString(":")
-        val childFatPath  = childParts.drop(2).joinToString(":")
-        return if (parentFatPath.isEmpty()) true
-        else childFatPath.startsWith("$parentFatPath/")
+        val parent = try { DocumentId.parse(parentDocumentId, "parent") }
+                     catch (_: FileNotFoundException) { return false }
+        val child  = try { DocumentId.parse(documentId, "child") }
+                     catch (_: FileNotFoundException) { return false }
+        if (parent.volId != child.volId) return false
+        return if (parent.fatPath.isEmpty()) true
+               else child.fatPath.startsWith("${parent.fatPath}/")
     }
 
     override fun ejectRoot(rootId: String?) {
-        // FIX: Use parseVolId for bounds checking
+        // Root IDs are plain volId strings, not full DocumentId wire strings.
         val volId = rootId?.toIntOrNull()
             ?.takeIf { it in 0 until VeraCryptSession.MAX_VOLUMES }
             ?: return
@@ -142,22 +123,16 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
 
     override fun queryDocument(documentId: String?, projection: Array<out String>?): Cursor {
         val cursor = MatrixCursor(projection ?: defaultDocumentProjection)
-        val docId  = documentId ?: throw FileNotFoundException("No document ID")
-        val parts  = docId.split(":")
-        if (parts.size < 2) throw FileNotFoundException("Invalid document ID: $docId")
+        val doc     = DocumentId.parse(documentId, "document")
+        val volId   = doc.volId
+        val fatPath = doc.fatPath
 
-        // FIX: bounds-checked volId parse
-        val volId   = parseVolId(parts[0])
-        val type    = parts[1]
-        val fatPath = parts.drop(2).joinToString(":")
-        val isDir   = type == "dir"
         val displayName = if (fatPath.isEmpty()) "Root $volId" else fatPath.substringAfterLast("/")
-        val mimeType    = if (isDir) DocumentsContract.Document.MIME_TYPE_DIR
+        val mimeType    = if (doc.isDir) DocumentsContract.Document.MIME_TYPE_DIR
                           else MimeTypeHelper.getMimeType(displayName)
 
-        val size: Long = if (isDir) 0L else {
+        val size: Long = if (doc.isDir) 0L else {
             try {
-                // FIX: requireSession instead of nullable access
                 val session = requireSession(volId)
                 synchronized(VeraCryptSession.locks[volId]) {
                     VeraCryptEngine.getFileSizeNative(
@@ -167,7 +142,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         }
 
         var flags = DocumentsContract.Document.FLAG_SUPPORTS_DELETE
-        if (isDir) {
+        if (doc.isDir) {
             flags = flags or DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
         } else {
             flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_WRITE
@@ -175,7 +150,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         }
 
         cursor.newRow().apply {
-            add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, docId)
+            add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, doc.toString())
             add(DocumentsContract.Document.COLUMN_MIME_TYPE, mimeType)
             add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, displayName)
             add(DocumentsContract.Document.COLUMN_FLAGS, flags)
@@ -189,17 +164,11 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         projection: Array<out String>?,
         sortOrder: String?
     ): Cursor {
-        val cursor   = MatrixCursor(projection ?: defaultDocumentProjection)
-        val parentId = parentDocumentId ?: throw FileNotFoundException("No parent ID")
-        val parts    = parentId.split(":")
-        if (parts.size < 2) throw FileNotFoundException("Invalid parent ID: $parentId")
-
-        // FIX: bounds-checked volId parse
-        val volId         = parseVolId(parts[0])
-        val parentFatPath = parts.drop(2).joinToString(":")
-
-        // FIX: requireSession — fail fast with a clear error if session is gone
-        val session = requireSession(volId)
+        val cursor        = MatrixCursor(projection ?: defaultDocumentProjection)
+        val parent        = DocumentId.parse(parentDocumentId, "parent")
+        val volId         = parent.volId
+        val parentFatPath = parent.fatPath
+        val session       = requireSession(volId)
 
         try {
             val files = synchronized(VeraCryptSession.locks[volId]) {
@@ -209,12 +178,13 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             files?.forEach { file ->
                 if (file.startsWith("System:")) return@forEach
                 val isDir     = file.startsWith("[DIR] ")
-                val cleanName = if (isDir) file.substringAfter("[DIR] ").substringBefore("|") else file.substringBefore("|")
+                val cleanName = if (isDir) file.substringAfter("[DIR] ").substringBefore("|")
+                                else file.substringBefore("|")
                 val size      = if (isDir) 0L else file.split("|").getOrNull(1)?.toLongOrNull() ?: 0L
                 val childFatPath = if (parentFatPath.isEmpty()) cleanName else "$parentFatPath/$cleanName"
-                val childType = if (isDir) "dir" else "file"
-                val childMime = if (isDir) DocumentsContract.Document.MIME_TYPE_DIR
-                                else MimeTypeHelper.getMimeType(cleanName)
+                val childType    = if (isDir) "dir" else "file"
+                val childMime    = if (isDir) DocumentsContract.Document.MIME_TYPE_DIR
+                                   else MimeTypeHelper.getMimeType(cleanName)
 
                 var flags = DocumentsContract.Document.FLAG_SUPPORTS_DELETE
                 if (isDir) flags = flags or DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
@@ -224,7 +194,8 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                 }
 
                 cursor.newRow().apply {
-                    add(DocumentsContract.Document.COLUMN_DOCUMENT_ID, "$volId:$childType:$childFatPath")
+                    add(DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentId(volId, childType, childFatPath).toString())
                     add(DocumentsContract.Document.COLUMN_DISPLAY_NAME, cleanName)
                     add(DocumentsContract.Document.COLUMN_MIME_TYPE, childMime)
                     add(DocumentsContract.Document.COLUMN_FLAGS, flags)
@@ -235,22 +206,18 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             throw e // Re-throw session-not-found errors
         } catch (e: Exception) {
             android.util.Log.e("vaultexplorer_Provider",
-                "queryChildDocuments failed for $parentId: ${e.javaClass.simpleName}")
+                "queryChildDocuments failed for $parentDocumentId: ${e.javaClass.simpleName}")
         }
         return cursor
     }
 
     @Throws(FileNotFoundException::class)
     override fun createDocument(parentDocumentId: String?, mimeType: String?, displayName: String?): String {
-        val parentId = parentDocumentId ?: throw FileNotFoundException("No parent ID")
-        val parts    = parentId.split(":")
-        if (parts.size < 2) throw FileNotFoundException("Invalid parent ID: $parentId")
-
-        // FIX: bounds-checked volId parse + requireSession
-        val volId         = parseVolId(parts[0])
-        val parentFatPath = parts.drop(2).joinToString(":")
+        val parent        = DocumentId.parse(parentDocumentId, "parent")
+        val volId         = parent.volId
+        val parentFatPath = parent.fatPath
         val session       = requireSession(volId)
-        val fileName      = displayName ?: throw FileNotFoundException("No file name")
+        val fileName      = displayName ?: throw FileNotFoundException("No file name provided")
         val cleanPath     = if (parentFatPath.isEmpty()) fileName else "$parentFatPath/$fileName"
         val isDirectory   = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
 
@@ -277,21 +244,18 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
 
         val childType = if (isDirectory) "dir" else "file"
         context?.contentResolver?.notifyChange(
-            DocumentsContract.buildChildDocumentsUri("com.aeidolon.vaultexplorer.documents", parentId), null
+            DocumentsContract.buildChildDocumentsUri(
+                "com.aeidolon.vaultexplorer.documents", parentDocumentId), null
         )
-        return "$volId:$childType:$cleanPath"
+        return DocumentId(volId, childType, cleanPath).toString()
     }
 
     @Throws(FileNotFoundException::class)
     override fun deleteDocument(documentId: String?) {
-        val docId   = documentId ?: throw FileNotFoundException("No document ID")
-        val parts   = docId.split(":")
-        if (parts.size < 2) throw FileNotFoundException("Invalid document ID: $docId")
-
-        // FIX: bounds-checked volId parse + requireSession
-        val volId   = parseVolId(parts[0])
+        val doc     = DocumentId.parse(documentId, "document")
+        val volId   = doc.volId
         val session = requireSession(volId)
-        val fatPath = parts.drop(2).joinToString(":")
+        val fatPath = doc.fatPath
 
         val success = synchronized(VeraCryptSession.locks[volId]) {
             VeraCryptEngine.deleteFileNative(detachFd(session.uri, "rw"), "", 0, fatPath, volId)
@@ -301,7 +265,8 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val parentPath = if (fatPath.contains("/")) fatPath.substringBeforeLast("/") else ""
         context?.contentResolver?.notifyChange(
             DocumentsContract.buildChildDocumentsUri(
-                "com.aeidolon.vaultexplorer.documents", "$volId:dir:$parentPath"), null
+                "com.aeidolon.vaultexplorer.documents",
+                DocumentId(volId, "dir", parentPath).toString()), null
         )
     }
 
@@ -311,14 +276,10 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         mode: String?,
         signal: CancellationSignal?
     ): ParcelFileDescriptor {
-        val docId   = documentId ?: throw FileNotFoundException("No document ID")
-        val parts   = docId.split(":")
-        if (parts.size < 2) throw FileNotFoundException("Invalid document ID: $docId")
-
-        // FIX: bounds-checked volId parse + requireSession
-        val volId   = parseVolId(parts[0])
+        val doc     = DocumentId.parse(documentId, "document")
+        val volId   = doc.volId
         val session = requireSession(volId)
-        val fatPath = parts.drop(2).joinToString(":")
+        val fatPath = doc.fatPath
         val isWrite = mode?.contains("w") == true || mode?.contains("r+") == true
 
         val storageManager = context?.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
@@ -344,14 +305,11 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         sizeHint: Point?,
         signal: CancellationSignal?
     ): AssetFileDescriptor {
-        val docId   = documentId ?: throw FileNotFoundException("No document ID")
-        val parts   = docId.split(":")
-        if (parts.size < 3) throw FileNotFoundException("Invalid document ID for thumbnail: $docId")
-
-        // FIX: bounds-checked volId parse + requireSession
-        val volId   = parseVolId(parts[0])
+        val doc     = DocumentId.parse(documentId, "document")
+        val volId   = doc.volId
+        val fatPath = doc.fatPath
+        if (fatPath.isEmpty()) throw FileNotFoundException("Cannot generate thumbnail for volume root")
         val session = requireSession(volId)
-        val fatPath = parts.drop(2).joinToString(":")
 
         val pipe     = ParcelFileDescriptor.createPipe()
         val readEnd  = pipe[0]
@@ -370,7 +328,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                     BitmapFactory.decodeFile(tempFile.absolutePath, opts)
                     val reqW = sizeHint?.x ?: 256
                     val reqH = sizeHint?.y ?: 256
-                    opts.inSampleSize    = calculateInSampleSize(opts, reqW, reqH)
+                    opts.inSampleSize       = calculateInSampleSize(opts, reqW, reqH)
                     opts.inJustDecodeBounds = false
                     val bmp = BitmapFactory.decodeFile(tempFile.absolutePath, opts)
                     if (bmp != null) {
@@ -412,7 +370,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                 synchronized(VeraCryptSession.locks[volId]) {
                     fileSizeCached = VeraCryptEngine.getFileSizeNative(-1, "", 0, fatPath, volId)
                     if (fileSizeCached < 0) fileSizeCached = 0L
-                    
+
                     if (!isWrite) {
                         streamPtr = VeraCryptEngine.openStreamNative(-1, "", 0, fatPath, volId)
                     }
@@ -433,20 +391,20 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             val actualRead = synchronized(VeraCryptSession.locks[volId]) {
                 VeraCryptEngine.readStreamNative(streamPtr, offset, data, readSize, volId)
             }
-            
+
             if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
             return actualRead
         }
 
         override fun onWrite(offset: Long, size: Int, data: ByteArray): Int {
             if (!isWrite) throw ErrnoException("onWrite", OsConstants.EBADF)
-            
+
             val chunkData = if (data.size == size) data else data.copyOf(size)
             val success = synchronized(VeraCryptSession.locks[volId]) {
                 VeraCryptEngine.writeFileChunkNative(
                     -1, "", 0, fatPath, offset, chunkData, volId)
             }
-            
+
             if (!success) throw ErrnoException("onWrite", OsConstants.EIO)
             val endOffset = offset + size
             if (endOffset > fileSizeCached) fileSizeCached = endOffset
@@ -463,12 +421,13 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                     streamPtr = 0L
                 }
             }
-            
+
             if (isWrite && hasChanges) {
                 val parentPath = if (fatPath.contains("/")) fatPath.substringBeforeLast("/") else ""
                 context?.contentResolver?.notifyChange(
                     DocumentsContract.buildChildDocumentsUri(
-                        "com.aeidolon.vaultexplorer.documents", "$volId:dir:$parentPath"), null)
+                        "com.aeidolon.vaultexplorer.documents",
+                        DocumentId(volId, "dir", parentPath).toString()), null)
             }
             handlerThread.quitSafely()
         }

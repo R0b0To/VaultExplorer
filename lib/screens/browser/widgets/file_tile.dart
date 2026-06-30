@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../utils/file_type_utils.dart';
+import 'tile_selection_style.dart';
 
 class FileTile extends StatelessWidget {
   final String name;
@@ -32,19 +33,22 @@ class FileTile extends StatelessWidget {
       child: ListTile(
         dense: true,
         selected: selected,
-        // Match selection background style with DirectoryTile
-        selectedTileColor: cs.primaryContainer.withValues(alpha:0.3),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        selectedTileColor: TileSelectionStyle.selectedBackground(cs),
+        contentPadding: TileSelectionStyle.contentPadding,
         leading: Icon(
           iconForFile(name),
           size: 22,
-          color: selected ? cs.primary : colorForFile(name),
+          color: TileSelectionStyle.leadingIconColor(
+            cs,
+            selected: selected,
+            unselectedColor: colorForFile(name),
+          ),
           semanticLabel: null, // covered by parent Semantics
         ),
         title: Text(
           name,
           style: textTheme.bodyMedium?.copyWith(
-            fontWeight: selected ? FontWeight.w500 : FontWeight.normal,
+            fontWeight: TileSelectionStyle.titleWeight(selected),
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -57,16 +61,8 @@ class FileTile extends StatelessWidget {
                 ),
               )
             : null,
-        // Displays the standard selection indicator when selectionMode is active, otherwise null
-        trailing: selectionMode
-            ? Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked_rounded,
-                size: 20,
-                color: selected ? cs.primary : cs.outline,
-              )
-            : null,
+        // Files have no chevron when not in selection mode — they open
+        // directly rather than navigating into a sub-view.
         onTap: onTap,
         onLongPress: onLongPress,
       ),

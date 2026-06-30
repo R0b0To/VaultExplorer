@@ -6,7 +6,6 @@ import '../../../models/thumbnail_cache_mode.dart';
 import '../../../services/thumbnail_cache_service.dart';
 import '../../../services/vaultexplorer_api.dart';
 import '../../../utils/file_type_utils.dart';
-import '../../../utils/format_utils.dart';
 import '../../../utils/lru_cache.dart';
 import '../../../utils/raw_entry.dart';
 

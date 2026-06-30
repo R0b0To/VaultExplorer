@@ -10,7 +10,7 @@ export 'container_repository.dart' show ContainerRepository, ContainerRecord;
 // ── Secure storage instance ───────────────────────────────────────────────────
 
 const _secure = FlutterSecureStorage(
-  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  aOptions: AndroidOptions(),
 );
 
 // Keystore keys for master password material.

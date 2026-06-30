@@ -23,6 +23,7 @@ import android.media.MediaDataSource
 import android.media.MediaMetadataRetriever
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import androidx.activity.result.contract.ActivityResultContracts
 
 private object ChannelMethods {
     const val PICK_CONTAINER      = "pickContainer"
@@ -60,96 +61,296 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     private val CHANNEL = "com.aeidolon.vaultexplorer/engine"
-    private val PICK_CONTAINER_REQUEST     = 1001
-    private val IMPORT_FILE_REQUEST        = 1002
-    private val EXPORT_FILE_REQUEST        = 1003
-    private val CREATE_CONTAINER_REQUEST   = 1004
-    private val EXPORT_FILES_TREE_REQUEST  = 1006
-    private val IMPORT_FOLDER_TREE_REQUEST = 1007
 
-   @Volatile private var pendingFlutterResult: MethodChannel.Result? = null
+    @Volatile private var pendingFlutterResult: MethodChannel.Result? = null
 
-    @Volatile private var pendingImportContainerUri: String? = null
-    @Volatile private var pendingImportTargetName: String?   = null
-    @Volatile private var pendingImportVolId: Int?           = null
+    // ── Activity Result Launchers ──────────────────────────────────────────
 
-    @Volatile private var pendingExportContainerUri: String? = null
-    @Volatile private var pendingExportSourcePath: String?   = null
-    @Volatile private var pendingExportVolId: Int            = 0
-
-    @Volatile private var pendingCreateName: String?       = null
-    @Volatile private var pendingCreateSize: Long          = 0L
-    @Volatile private var pendingCreatePassword: String?   = null
-    @Volatile private var pendingCreatePim: Int            = 0
-    @Volatile private var pendingCreateFileSystem: String? = null
-
-    @Volatile private var pendingImportFolderContainerUri: String? = null
-    @Volatile private var pendingImportFolderTargetDir: String?    = null
-    @Volatile private var pendingImportFolderVolId: Int?           = null
-
-    @Volatile private var pendingExportMultiContainerUri: String?           = null
-    @Volatile private var pendingExportMultiItems: List<Map<String, Any?>>? = null
-    @Volatile private var pendingExportMultiVolId: Int                       = 0
-   
-
-    // MainActivity.kt — add as a private helper inside MainActivity
-
-/**
- * Resolves [uriString] to an active volId, then runs [block] on a background
- * thread inside `synchronized(VeraCryptSession.locks[volId])`, dispatching
- * the outcome back to [result] on the UI thread.
- *
- * Replaces the ~15 hand-copied Thread{}/synchronized/runOnUiThread blocks
- * that previously wrapped every native call individually. New native methods
- * only need to supply [block]; everything else — volId resolution, locking,
- * threading, and NOT_UNLOCKED vs generic error dispatch — is handled once.
- */
-private fun <T> runNativeOp(
-    uriString: String?,
-    result: MethodChannel.Result,
-    block: (volId: Int) -> T,
-) {
-    if (uriString == null) {
-        result.error("INVALID_ARGS", "filePath is required", null)
-        return
+    // 1. Pick Container Launcher
+    private val pickContainerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingFlutterResult ?: return@registerForActivityResult
+        pendingFlutterResult = null
+        val data = activityResult.data
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
+            val uri = data.data!!
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            res.success(mapOf("uri" to uri.toString(), "displayName" to resolveDisplayName(uri)))
+        } else {
+            res.success(null)
+        }
     }
-    val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-    if (volId == null) {
-        result.error("NOT_MOUNTED", "Container not mounted", null)
-        return
+
+    // 2. Create Container Launcher
+    private data class PendingCreate(
+        val name: String, val sizeBytes: Long, val password: String,
+        val pim: Int, val fileSystem: String,
+    )
+    private var pendingCreate: PendingCreate? = null
+
+    private val createContainerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingFlutterResult ?: return@registerForActivityResult
+        pendingFlutterResult = null
+        val create = pendingCreate
+        pendingCreate = null
+
+        val data = activityResult.data
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null && create != null) {
+            val destUri = data.data!!
+            Thread {
+                try {
+                    val pfd = contentResolver.openFileDescriptor(destUri, "rw")
+                        ?: throw Exception("Could not open file descriptor")
+                    val success = synchronized(createContainerLock) {
+                        VeraCryptEngine.createContainerNative(
+                            pfd.detachFd(), create.password, create.pim, create.sizeBytes, create.fileSystem
+                        )
+                    }
+                    runOnUiThread { res.success(success) }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        if (isNotUnlockedException(e)) {
+                            res.error("NOT_UNLOCKED", e.message, null)
+                        } else {
+                            res.error("C++_ERROR", e.message, null)
+                        }
+                    }
+                }
+            }.start()
+        } else {
+            res.success(false)
+        }
     }
-    Thread {
-        try {
-            val value = synchronized(VeraCryptSession.locks[volId]) { block(volId) }
-            runOnUiThread { result.success(value) }
-        } catch (e: Exception) {
-            runOnUiThread {
-                if (isNotUnlockedException(e)) {
-                    result.error("NOT_UNLOCKED", e.message, null)
-                } else {
-                    result.error("C++_ERROR", e.message, null)
+
+    // 3. Import File Launcher
+    private data class PendingImport(val containerUri: String, val targetDir: String, val volId: Int)
+    private var pendingImport: PendingImport? = null
+
+    private val importFileLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingFlutterResult ?: return@registerForActivityResult
+        pendingFlutterResult = null
+        val pending = pendingImport
+        pendingImport = null
+        val data = activityResult.data
+
+        if (activityResult.resultCode == Activity.RESULT_OK && data != null && pending != null) {
+            val uris = mutableListOf<Uri>()
+            data.clipData?.let { clip -> for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri) }
+                ?: data.data?.let { uris.add(it) }
+            if (uris.isNotEmpty()) {
+                Thread {
+                    try {
+                        var successCount = 0
+                        for (pickedUri in uris) {
+                            val srcDoc = DocumentFile.fromSingleUri(this, pickedUri) ?: continue
+                            val name = srcDoc.name ?: "imported_file"
+                            val targetFatPath = if (pending.targetDir.isEmpty()) name else "${pending.targetDir}/$name"
+                            successCount += importEntryRecursive(srcDoc, pending.containerUri, targetFatPath, pending.volId)
+                        }
+                        runOnUiThread { res.success(successCount) }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            if (isNotUnlockedException(e)) {
+                                res.error("NOT_UNLOCKED", e.message, null)
+                            } else {
+                                res.error("C++_ERROR", e.message, null)
+                            }
+                        }
+                    }
+                }.start()
+            } else {
+                res.success(0)
+            }
+        } else {
+            res.success(0)
+        }
+    }
+
+    // 4. Export Files/Folder Launcher (Tree)
+    private data class PendingExportMulti(val containerUri: String, val items: List<Map<String, Any?>>, val volId: Int)
+    private var pendingExportMulti: PendingExportMulti? = null
+
+    private val exportFilesFolderLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingFlutterResult ?: return@registerForActivityResult
+        pendingFlutterResult = null
+        val pending = pendingExportMulti
+        pendingExportMulti = null
+        val data = activityResult.data
+
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null && pending != null) {
+            val treeUri = data.data!!
+            contentResolver.takePersistableUriPermission(
+                treeUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            Thread {
+                try {
+                    var successCount = 0
+                    val destTree = DocumentFile.fromTreeUri(this, treeUri)
+                    if (destTree != null) {
+                        for (item in pending.items) {
+                            val path  = item["path"] as? String ?: continue
+                            val isDir = item["isDir"] as? Boolean ?: false
+                            successCount += exportEntryRecursive(destTree, path, isDir, pending.containerUri, pending.volId)
+                        }
+                    }
+                    runOnUiThread { res.success(successCount) }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        if (isNotUnlockedException(e)) {
+                            res.error("NOT_UNLOCKED", e.message, null)
+                        } else {
+                            res.error("C++_ERROR", e.message, null)
+                        }
+                    }
+                }
+            }.start()
+        } else {
+            res.success(0)
+        }
+    }
+
+    // 5. Import Folder Launcher (Tree)
+    private data class PendingImportFolder(val containerUri: String, val targetDir: String, val volId: Int)
+    private var pendingImportFolder: PendingImportFolder? = null
+
+    private val importFolderLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingFlutterResult ?: return@registerForActivityResult
+        pendingFlutterResult = null
+        val pending = pendingImportFolder
+        pendingImportFolder = null
+        val data = activityResult.data
+
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null && pending != null) {
+            val treeUri = data.data!!
+            contentResolver.takePersistableUriPermission(
+                treeUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            val srcRoot = DocumentFile.fromTreeUri(this, treeUri)
+            if (srcRoot != null) {
+                val folderName = srcRoot.name ?: "imported_folder"
+                val targetFatPath = if (pending.targetDir.isEmpty()) folderName else "${pending.targetDir}/$folderName"
+                Thread {
+                    try {
+                        val count = importEntryRecursive(srcRoot, pending.containerUri, targetFatPath, pending.volId)
+                        runOnUiThread { res.success(count) }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            if (isNotUnlockedException(e)) {
+                                res.error("NOT_UNLOCKED", e.message, null)
+                            } else {
+                                res.error("C++_ERROR", e.message, null)
+                            }
+                        }
+                    }
+                }.start()
+            } else {
+                res.success(0)
+            }
+        } else {
+            res.success(0)
+        }
+    }
+
+    // 6. Export File Launcher
+    private data class PendingExportFile(val containerUri: String, val sourcePath: String, val volId: Int)
+    private var pendingExportFile: PendingExportFile? = null
+
+    private val exportFileLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingFlutterResult ?: return@registerForActivityResult
+        pendingFlutterResult = null
+        val pending = pendingExportFile
+        pendingExportFile = null
+        val data = activityResult.data
+
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null && pending != null) {
+            val destUri = data.data!!
+            Thread {
+                try {
+                    val tempFile = File(cacheDir, "export_temp")
+                    val success = synchronized(VeraCryptSession.locks[pending.volId]) {
+                        VeraCryptEngine.unlockAndExtractNative(
+                            VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                            VeraCryptEngine.SESSION_PIM_UNUSED, pending.sourcePath, tempFile.absolutePath, pending.volId
+                        )
+                    }
+                    if (success && tempFile.exists()) {
+                        contentResolver.openOutputStream(destUri)?.use { out ->
+                            tempFile.inputStream().use { it.copyTo(out) }
+                        }
+                        tempFile.delete()
+                        runOnUiThread { res.success(true) }
+                    } else {
+                        tempFile.delete()
+                        runOnUiThread { res.success(false) }
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        if (isNotUnlockedException(e)) {
+                            res.error("NOT_UNLOCKED", e.message, null)
+                        } else {
+                            res.error("C++_ERROR", e.message, null)
+                        }
+                    }
+                }
+            }.start()
+        } else {
+            res.success(false)
+        }
+    }
+
+    private fun <T> runNativeOp(
+        uriString: String?,
+        result: MethodChannel.Result,
+        block: (volId: Int) -> T,
+    ) {
+        if (uriString == null) {
+            result.error("INVALID_ARGS", "filePath is required", null)
+            return
+        }
+        val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+        if (volId == null) {
+            result.error("NOT_MOUNTED", "Container not mounted", null)
+            return
+        }
+        Thread {
+            try {
+                val value = synchronized(VeraCryptSession.locks[volId]) { block(volId) }
+                runOnUiThread { result.success(value) }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    if (isNotUnlockedException(e)) {
+                        result.error("NOT_UNLOCKED", e.message, null)
+                    } else {
+                        result.error("C++_ERROR", e.message, null)
+                    }
                 }
             }
-        }
-    }.start()
-}
-
+        }.start()
+    }
 
     private fun isNotUnlockedException(e: Throwable): Boolean =
         e is IllegalStateException && e.message?.startsWith("NOT_UNLOCKED") == true 
    
-    /**
-     * Scales [src] so its longer edge is exactly [maxEdge] pixels,
-     * preserving the original aspect ratio.
-     *
-     * Returns [src] unchanged if it already fits within [maxEdge] × [maxEdge].
-     * The caller is responsible for recycling the returned bitmap if it differs
-     * from [src].
-     */
     private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
         val w = src.width
         val h = src.height
-        if (w <= maxEdge && h <= maxEdge) return src          // Already small enough.
+        if (w <= maxEdge && h <= maxEdge) return src
         val scale = maxEdge.toFloat() / maxOf(w, h)
         val dstW  = (w * scale).toInt().coerceAtLeast(1)
         val dstH  = (h * scale).toInt().coerceAtLeast(1)
@@ -186,7 +387,6 @@ private fun <T> runNativeOp(
 
     private fun encodeKey(filePath: String): String {
         val bytes = filePath.toByteArray(Charsets.UTF_8)
-        // Matches Dart's base64Url encoding layout
         val encoded = android.util.Base64.encodeToString(bytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
         val trimmed = encoded.trim()
         return if (trimmed.length > 180) trimmed.substring(0, 180) else trimmed
@@ -205,22 +405,28 @@ private fun <T> runNativeOp(
                             addCategory(Intent.CATEGORY_OPENABLE)
                             type = "*/*"
                         }
-                        startActivityForResult(intent, PICK_CONTAINER_REQUEST)
+                        pickContainerLauncher.launch(intent)
                     }
 
                     ChannelMethods.CREATE_CONTAINER -> {
                         pendingResultCheck(result)
-                        pendingCreateName       = call.argument<String>("displayName")
-                        pendingCreateSize       = call.argument<Number>("sizeBytes")?.toLong() ?: 0L
-                        pendingCreatePassword   = call.argument<String>("password")
-                        pendingCreatePim        = call.argument<Number>("pim")?.toInt() ?: 0
-                        pendingCreateFileSystem = call.argument<String>("fileSystem")
+                        val name = call.argument<String>("displayName") ?: "vault.tc"
+                        pendingCreate = PendingCreate(
+                            name        = name,
+                            sizeBytes   = call.argument<Number>("sizeBytes")?.toLong() ?: 0L,
+                            password    = call.argument<String>("password") ?: run {
+                                result.error("INVALID_ARGS", "password required", null)
+                                return@setMethodCallHandler
+                            },
+                            pim         = call.argument<Number>("pim")?.toInt() ?: 0,
+                            fileSystem  = call.argument<String>("fileSystem") ?: "fat"
+                        )
                         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                             addCategory(Intent.CATEGORY_OPENABLE)
                             type = "application/octet-stream"
-                            putExtra(Intent.EXTRA_TITLE, pendingCreateName ?: "vault.tc")
+                            putExtra(Intent.EXTRA_TITLE, name)
                         }
-                        startActivityForResult(intent, CREATE_CONTAINER_REQUEST)
+                        createContainerLauncher.launch(intent)
                     }
 
                     ChannelMethods.UNLOCK_CONTAINER -> {
@@ -454,7 +660,6 @@ private fun <T> runNativeOp(
                         }.start()
                     }
 
-                    // ── OPTIMIZATION: FIRE-AND-FORGET BACKGROUND CACHE GENERATION ──
                     ChannelMethods.GENERATE_AND_CACHE_THUMBNAIL -> {
                         val uriString = call.argument<String>("filePath")
                         val fileName  = call.argument<String>("fileName")
@@ -506,7 +711,6 @@ private fun <T> runNativeOp(
                                     val thumbData = stream.toByteArray()
                                     scaledBitmap.recycle()
 
-                                    // Hardware AES-GCM Encrypt natively (12-byte random IV)
                                     val secureRandom = java.security.SecureRandom()
                                     val nonce = ByteArray(12)
                                     secureRandom.nextBytes(nonce)
@@ -518,7 +722,6 @@ private fun <T> runNativeOp(
                                     cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKeySpec, gcmParameterSpec)
                                     val encryptedData = cipher.doFinal(thumbData)
 
-                                    // Concat: [nonce (12)] + [ciphertext + 16-byte GCM tag]
                                     val outBytes = ByteArray(nonce.size + encryptedData.size)
                                     System.arraycopy(nonce, 0, outBytes, 0, nonce.size)
                                     System.arraycopy(encryptedData, 0, outBytes, nonce.size, encryptedData.size)
@@ -537,7 +740,7 @@ private fun <T> runNativeOp(
                             } catch (_: Exception) {}
                         }.start()
 
-                        result.success(null) // Exit channel task immediately, non-blocking
+                        result.success(null)
                     }
 
                     ChannelMethods.LOCK_CONTAINER -> {
@@ -722,70 +925,77 @@ private fun <T> runNativeOp(
                         pendingResultCheck(result)
                         val containerUri = call.argument<String>("filePath")
                         if (containerUri == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null); return@setMethodCallHandler
+                            result.error("INVALID_ARGS", "filePath is required", null)
+                            return@setMethodCallHandler
                         }
-                        val resolvedVolId = VeraCryptSession.getVolumeIdByUri(containerUri)
-                        if (resolvedVolId == null) {
-                            result.error("NOT_MOUNTED", "Container is not mounted", null); return@setMethodCallHandler
-                        }
-                        pendingImportContainerUri = containerUri
-                        pendingImportTargetName   = call.argument<String>("targetPath")
-                        pendingImportVolId        = resolvedVolId
-                        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                            ?: run {
+                                result.error("NOT_MOUNTED", "Container is not mounted", null)
+                                return@setMethodCallHandler
+                            }
+                        pendingImport = PendingImport(containerUri, call.argument<String>("targetPath") ?: "", volId)
+                        importFileLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                             addCategory(Intent.CATEGORY_OPENABLE)
                             type = "*/*"
                             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                        }, IMPORT_FILE_REQUEST)
+                        })
                     }
 
                     ChannelMethods.EXPORT_FILES_FOLDER -> {
                         pendingResultCheck(result)
                         val containerUri = call.argument<String>("filePath")
                         if (containerUri == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null); return@setMethodCallHandler
+                            result.error("INVALID_ARGS", "filePath is required", null)
+                            return@setMethodCallHandler
                         }
-                        pendingExportMultiContainerUri = containerUri
-                        @Suppress("UNCHECKED_CAST")
-                        pendingExportMultiItems = (call.argument<List<*>>("items"))
-                            ?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
-                        pendingExportMultiVolId = VeraCryptSession.getVolumeIdByUri(containerUri) ?: run {
+                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri) ?: run {
                             result.error("NOT_MOUNTED", "Container not mounted", null)
                             return@setMethodCallHandler
                         }
-                        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), EXPORT_FILES_TREE_REQUEST)
+                        @Suppress("UNCHECKED_CAST")
+                        val items = (call.argument<List<*>>("items"))
+                            ?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
+                        
+                        pendingExportMulti = PendingExportMulti(containerUri, items, volId)
+                        exportFilesFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
                     }
 
                     ChannelMethods.IMPORT_FOLDER -> {
                         pendingResultCheck(result)
                         val containerUri = call.argument<String>("filePath")
                         if (containerUri == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null); return@setMethodCallHandler
+                            result.error("INVALID_ARGS", "filePath is required", null)
+                            return@setMethodCallHandler
                         }
-                        val resolvedVolId = VeraCryptSession.getVolumeIdByUri(containerUri)
-                        if (resolvedVolId == null) {
-                            result.error("NOT_MOUNTED", "Container is not mounted", null); return@setMethodCallHandler
-                        }
-                        pendingImportFolderContainerUri = containerUri
-                        pendingImportFolderTargetDir    = call.argument<String>("targetPath") ?: ""
-                        pendingImportFolderVolId        = resolvedVolId
-                        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), IMPORT_FOLDER_TREE_REQUEST)
+                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                            ?: run {
+                                result.error("NOT_MOUNTED", "Container is not mounted", null)
+                                return@setMethodCallHandler
+                            }
+                        pendingImportFolder = PendingImportFolder(containerUri, call.argument<String>("targetPath") ?: "", volId)
+                        importFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
                     }
 
                     ChannelMethods.EXPORT_FILE -> {
                         pendingResultCheck(result)
-                        pendingExportContainerUri = call.argument<String>("filePath")
-                        pendingExportSourcePath   = call.argument<String>("sourcePath")
-                        pendingExportVolId = VeraCryptSession.getVolumeIdByUri(
-                            pendingExportContainerUri!!) ?: run {
+                        val containerUri = call.argument<String>("filePath")
+                        val sourcePath = call.argument<String>("sourcePath")
+                        if (containerUri == null || sourcePath == null) {
+                            result.error("INVALID_ARGS", "filePath and sourcePath required", null)
+                            return@setMethodCallHandler
+                        }
+                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri) ?: run {
                             result.error("NOT_MOUNTED", "Container not mounted", null)
                             return@setMethodCallHandler
                         }
-                        val fileName = pendingExportSourcePath!!.split("/").last()
-                        startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        pendingExportFile = PendingExportFile(containerUri, sourcePath, volId)
+                        val fileName = sourcePath.split("/").last()
+                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                             addCategory(Intent.CATEGORY_OPENABLE)
                             type = getMimeType(fileName)
                             putExtra(Intent.EXTRA_TITLE, fileName)
-                        }, EXPORT_FILE_REQUEST)
+                        }
+                        exportFileLauncher.launch(intent)
                     }
 
                     ChannelMethods.WRITE_FILE_CHUNK -> {
@@ -826,197 +1036,6 @@ private fun <T> runNativeOp(
                 } else null
             } ?: uri.lastPathSegment ?: "Container"
         } catch (e: Exception) { uri.lastPathSegment ?: "Container" }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == PICK_CONTAINER_REQUEST) {
-            val res = pendingFlutterResult ?: return; pendingFlutterResult = null
-            if (resultCode == Activity.RESULT_OK && data?.data != null) {
-                val uri = data.data!!
-                contentResolver.takePersistableUriPermission(uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                res.success(mapOf("uri" to uri.toString(), "displayName" to resolveDisplayName(uri)))
-            } else res.success(null)
-            return
-        }
-
-        if (requestCode == CREATE_CONTAINER_REQUEST) {
-            val res = pendingFlutterResult ?: return; pendingFlutterResult = null
-            if (resultCode == Activity.RESULT_OK && data?.data != null) {
-                val destUri = data.data!!
-                val size = pendingCreateSize; val pass = pendingCreatePassword
-                val pim = pendingCreatePim; val fs = pendingCreateFileSystem ?: "fat"
-                if (pass != null && size > 0) {
-                    Thread {
-                        try {
-                          val pfd = contentResolver.openFileDescriptor(destUri, "rw")
-                              ?: throw Exception("Could not open file descriptor")
-                          val success = synchronized(createContainerLock) {
-                              VeraCryptEngine.createContainerNative(pfd.detachFd(), pass, pim, size, fs)
-                          }
-                          runOnUiThread { res.success(success) }
-                        } catch (e: Exception) {
-                            runOnUiThread {
-                                if (isNotUnlockedException(e)) {
-                                    res.error("NOT_UNLOCKED", e.message, null)
-                                } else {
-                                    res.error("C++_ERROR", e.message, null)
-                                }
-                            }
-                        }
-                    }.start()
-                } else res.success(false)
-            } else res.success(false)
-            return
-        }
-
-        if (requestCode == IMPORT_FILE_REQUEST) {
-            val res = pendingFlutterResult ?: return; pendingFlutterResult = null
-            if (resultCode == Activity.RESULT_OK && data != null) {
-                val uris = mutableListOf<Uri>()
-                data.clipData?.let { clip -> for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri) }
-                    ?: data.data?.let { uris.add(it) }
-                val containerUri = pendingImportContainerUri
-                val targetDir    = pendingImportTargetName ?: ""
-                val volId        = pendingImportVolId
-                if (containerUri != null && volId != null && uris.isNotEmpty()) {
-                    Thread {
-                        try {
-                            var successCount = 0
-                            for (pickedUri in uris) {
-                                val srcDoc = DocumentFile.fromSingleUri(this, pickedUri) ?: continue
-                                val name = srcDoc.name ?: "imported_file"
-                                val targetFatPath = if (targetDir.isEmpty()) name else "$targetDir/$name"
-                                successCount += importEntryRecursive(srcDoc, containerUri, targetFatPath, volId)
-                            }
-                            runOnUiThread { res.success(successCount) }
-                        } catch (e: Exception) {
-                            runOnUiThread {
-                                if (isNotUnlockedException(e)) {
-                                    res.error("NOT_UNLOCKED", e.message, null)
-                                } else {
-                                    res.error("C++_ERROR", e.message, null)
-                                }
-                            }
-                        }
-                    }.start()
-                } else res.success(0)
-            } else res.success(0)
-            pendingImportVolId = null
-            return
-        }
-
-        if (requestCode == EXPORT_FILES_TREE_REQUEST) {
-            val res = pendingFlutterResult ?: return; pendingFlutterResult = null
-            if (resultCode == Activity.RESULT_OK && data?.data != null) {
-                val treeUri = data.data!!
-                contentResolver.takePersistableUriPermission(treeUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                val containerUri = pendingExportMultiContainerUri
-                val items        = pendingExportMultiItems ?: emptyList()
-                val volId        = pendingExportMultiVolId
-                if (containerUri != null) {
-                    Thread {
-                        try {
-                            var successCount = 0
-                            val destTree = DocumentFile.fromTreeUri(this, treeUri)
-                            if (destTree != null) {
-                                for (item in items) {
-                                    val path  = item["path"] as? String ?: continue
-                                    val isDir = item["isDir"] as? Boolean ?: false
-                                    successCount += exportEntryRecursive(destTree, path, isDir, containerUri, volId)
-                                }
-                            }
-                            runOnUiThread { res.success(successCount) }
-                        } catch (e: Exception) {
-                            runOnUiThread {
-                                if (isNotUnlockedException(e)) {
-                                    res.error("NOT_UNLOCKED", e.message, null)
-                                } else {
-                                    res.error("C++_ERROR", e.message, null)
-                                }
-                            }
-                        }
-                    }.start()
-                } else res.success(0)
-            } else res.success(0)
-            return
-        }
-
-        if (requestCode == IMPORT_FOLDER_TREE_REQUEST) {
-            val res = pendingFlutterResult ?: return; pendingFlutterResult = null
-            if (resultCode == Activity.RESULT_OK && data?.data != null) {
-                val treeUri = data.data!!
-                contentResolver.takePersistableUriPermission(treeUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                val containerUri = pendingImportFolderContainerUri
-                val targetDir    = pendingImportFolderTargetDir ?: ""
-                val volId        = pendingImportFolderVolId
-                val srcRoot      = DocumentFile.fromTreeUri(this, treeUri)
-                if (containerUri != null && volId != null && srcRoot != null) {
-                    val folderName    = srcRoot.name ?: "imported_folder"
-                    val targetFatPath = if (targetDir.isEmpty()) folderName else "$targetDir/$folderName"
-                    Thread {
-                        try {
-                            val count = importEntryRecursive(srcRoot, containerUri, targetFatPath, volId)
-                            runOnUiThread { res.success(count) }
-                        } catch (e: Exception) {
-                            runOnUiThread {
-                                if (isNotUnlockedException(e)) {
-                                    res.error("NOT_UNLOCKED", e.message, null)
-                                } else {
-                                    res.error("C++_ERROR", e.message, null)
-                                }
-                            }
-                        }
-                    }.start()
-                } else res.success(0)
-            } else res.success(0)
-            pendingImportFolderVolId = null
-            return
-        }
-
-        if (requestCode == EXPORT_FILE_REQUEST) {
-            val res = pendingFlutterResult ?: return; pendingFlutterResult = null
-            if (resultCode == Activity.RESULT_OK && data?.data != null) {
-                val destUri      = data.data!!
-                val containerUri = pendingExportContainerUri
-                val sourcePath   = pendingExportSourcePath
-                val volId        = pendingExportVolId
-                if (containerUri != null && sourcePath != null) {
-                    Thread {
-                        try {
-                            val tempFile = File(cacheDir, "export_temp")
-                            val success = synchronized(VeraCryptSession.locks[volId]) {
-                                VeraCryptEngine.unlockAndExtractNative(
-                                    VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, sourcePath, tempFile.absolutePath, volId)
-                            }
-                            if (success && tempFile.exists()) {
-                                contentResolver.openOutputStream(destUri)?.use { out ->
-                                    tempFile.inputStream().use { it.copyTo(out) }
-                                }
-                                tempFile.delete()
-                                runOnUiThread { res.success(true) }
-                            } else {
-                                tempFile.delete()
-                                runOnUiThread { res.success(false) }
-                            }
-                        } catch (e: Exception) {
-                            runOnUiThread {
-                                if (isNotUnlockedException(e)) {
-                                    res.error("NOT_UNLOCKED", e.message, null)
-                                } else {
-                                    res.error("C++_ERROR", e.message, null)
-                                }
-                            }
-                        }
-                    }.start()
-                } else res.success(false)
-            } else res.success(false)
-            return
-        }
     }
 
     private fun exportEntryRecursive(

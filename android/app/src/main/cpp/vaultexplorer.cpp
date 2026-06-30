@@ -468,6 +468,78 @@ static bool _derivationInit = [](){
     return true;
 }();
 
+// Result of trying one candidate key against the early sectors of the
+// container, searching for a valid FAT/exFAT boot-sector signature (0x55AA)
+// under either tweak convention (absolute physical sector vs. relative to
+// the data-area start). VeraCrypt volumes can use either depending on
+// version/format, so both must be tried per candidate key.
+struct FsScanResult {
+    bool found = false;
+    uint64_t dataOffset = 0;
+    bool relTweak = false;
+};
+
+// Tries one 64-byte key candidate (primary or secondary key offset from the
+// decrypted header) against up to SCAN_SECTORS sectors, looking for the
+// 0x55AA boot-sector signature. Returns immediately on first hit.
+//
+// Factored out of prepareSession() so the dual-tweak-check inner body exists
+// in exactly one place — previously this logic was correct but implicitly
+// duplicated by virtue of being inside a `for (int kOff : keyOffsets)` loop
+// with no named boundary, making it easy to accidentally diverge the two
+// iterations during a future edit.
+static FsScanResult tryKeyCandidate(
+    int fd,
+    const unsigned char* keyMaterial, // 64 bytes, VC_KEY_MATERIAL_LEN
+    mbedtls_aes_xts_context& candidateDecCtx // already keyed via setkey_dec
+) {
+    FsScanResult result;
+
+    std::unique_ptr<unsigned char[]> encBatch(new unsigned char[SCAN_BATCH * 512]);
+    unsigned char decS[512];
+    unsigned char tweak[16];
+
+    uint64_t s = 0;
+    while (s < SCAN_SECTORS) {
+        const uint64_t batchCount = std::min(SCAN_BATCH, SCAN_SECTORS - s);
+        const ssize_t  batchBytes = static_cast<ssize_t>(batchCount * 512);
+
+        if (pread(fd, encBatch.get(), batchBytes,
+                  static_cast<off_t>(s * 512)) != batchBytes) {
+            break;
+        }
+
+        for (uint64_t i = 0; i < batchCount; i++) {
+            const uint64_t sectorIdx = s + i;
+            const unsigned char* enc = encBatch.get() + (i * 512);
+
+            // Convention A: tweak = absolute physical sector index.
+            setTweak(tweak, sectorIdx);
+            mbedtls_aes_crypt_xts(&candidateDecCtx, MBEDTLS_AES_DECRYPT,
+                                  512, tweak, enc, decS);
+            if (decS[510] == 0x55 && decS[511] == 0xAA) {
+                result.found      = true;
+                result.dataOffset = sectorIdx * 512;
+                result.relTweak   = false;
+                return result;
+            }
+
+            // Convention B: tweak = sector index relative to the data area
+            // (i.e. zero at the first scanned sector).
+            memset(tweak, 0, 16);
+            mbedtls_aes_crypt_xts(&candidateDecCtx, MBEDTLS_AES_DECRYPT,
+                                  512, tweak, enc, decS);
+            if (decS[510] == 0x55 && decS[511] == 0xAA) {
+                result.found      = true;
+                result.dataOffset = sectorIdx * 512;
+                result.relTweak   = true;
+                return result;
+            }
+        }
+        s += batchCount;
+    }
+    return result; // found == false
+}
 
 
 // ----------------------------------------------------------------====
@@ -596,57 +668,32 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     }
 
     const int keyOffsets[] = {VC_KEY_OFFSET_PRIMARY, VC_KEY_OFFSET_SECONDARY};
-
+    // NOTE on ordering: VeraCrypt's header layout places the primary
+    // data-encryption key before the secondary (XTS tweak) key in the
+    // decrypted header body. We try primary first since the overwhelming
+    // majority of volumes are formatted with the primary key in that slot;
+    // trying secondary first would just cost one extra failed scan pass for
+    // every successful primary-key volume. There is no correctness
+    // difference — both are tried regardless, only the average-case cost
+    // changes.
     unsigned char dKey[VC_KEY_MATERIAL_LEN];
     bool fsFound = false;
     uint64_t foundDataOffset = 0;
     bool     foundRelTweak   = false;
 
     XtsContextPair candidate;
-    std::unique_ptr<unsigned char[]> encBatch(new unsigned char[SCAN_BATCH * 512]);
-    unsigned char decS[512];
-    unsigned char tweak[16];
 
     for (int kOff : keyOffsets) {
         memcpy(dKey, &decH[kOff], VC_KEY_MATERIAL_LEN);
         mbedtls_aes_xts_setkey_dec(&candidate.dec, dKey, 512);
 
-        uint64_t s = 0;
-        while (s < SCAN_SECTORS && !fsFound) {
-            const uint64_t batchCount = std::min(SCAN_BATCH, SCAN_SECTORS - s);
-            const ssize_t  batchBytes = static_cast<ssize_t>(batchCount * 512);
-
-            if (pread(fd, encBatch.get(), batchBytes,
-                      static_cast<off_t>(s * 512)) != batchBytes)
-                break;
-
-            for (uint64_t i = 0; i < batchCount && !fsFound; i++) {
-                const uint64_t sectorIdx = s + i;
-                const unsigned char* enc = encBatch.get() + (i * 512);
-
-                setTweak(tweak, sectorIdx);
-                mbedtls_aes_crypt_xts(&candidate.dec, MBEDTLS_AES_DECRYPT,
-                                      512, tweak, enc, decS);
-                if (decS[510] == 0x55 && decS[511] == 0xAA) {
-                    foundDataOffset = sectorIdx * 512;
-                    foundRelTweak   = false;
-                    fsFound = true;
-                    break;
-                }
-
-                memset(tweak, 0, 16);
-                mbedtls_aes_crypt_xts(&candidate.dec, MBEDTLS_AES_DECRYPT,
-                                      512, tweak, enc, decS);
-                if (decS[510] == 0x55 && decS[511] == 0xAA) {
-                    foundDataOffset = sectorIdx * 512;
-                    foundRelTweak   = true;
-                    fsFound = true;
-                    break;
-                }
-            }
-            s += batchCount;
+        FsScanResult scan = tryKeyCandidate(fd, dKey, candidate.dec);
+        if (scan.found) {
+            fsFound         = true;
+            foundDataOffset = scan.dataOffset;
+            foundRelTweak   = scan.relTweak;
+            break;
         }
-        if (fsFound) break;
     }
 
     mbedtls_platform_zeroize(decH, sizeof(decH));

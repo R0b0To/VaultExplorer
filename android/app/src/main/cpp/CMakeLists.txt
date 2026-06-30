@@ -48,6 +48,8 @@ target_link_libraries(
 
 if(NOT ANDROID)
     add_executable(sector_batching_test test/sector_batching_test.cpp)
+    add_executable(fs_scan_test test/fs_scan_test.cpp)
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)
-endif()        
+    add_test(NAME fs_scan_test COMMAND fs_scan_test)
+endif()     

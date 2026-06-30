@@ -4,6 +4,12 @@ object VeraCryptEngine {
     init {
         System.loadLibrary("vaultexplorer")
     }
+     // Sentinel values passed to "stateless" natives (list/read/write/size/etc.)
+    // that operate on an already-unlocked session. These natives ignore fd/
+    // password/pim entirely
+    const val SESSION_FD_UNUSED = -1
+    const val SESSION_PW_UNUSED = ""
+    const val SESSION_PIM_UNUSED = 0
 
     @JvmStatic
     external fun unlockAndListNative(fd: Int, password: String, pim: Int, volId: Int): Array<String>?

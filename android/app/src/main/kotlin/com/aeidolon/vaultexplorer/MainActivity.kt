@@ -90,23 +90,72 @@ class MainActivity : FlutterFragmentActivity() {
     @Volatile private var pendingExportMultiContainerUri: String?           = null
     @Volatile private var pendingExportMultiItems: List<Map<String, Any?>>? = null
     @Volatile private var pendingExportMultiVolId: Int                       = 0
-    /**
- * Scales [src] so its longer edge is exactly [maxEdge] pixels,
- * preserving the original aspect ratio.
+   
+
+    // MainActivity.kt — add as a private helper inside MainActivity
+
+/**
+ * Resolves [uriString] to an active volId, then runs [block] on a background
+ * thread inside `synchronized(VeraCryptSession.locks[volId])`, dispatching
+ * the outcome back to [result] on the UI thread.
  *
- * Returns [src] unchanged if it already fits within [maxEdge] × [maxEdge].
- * The caller is responsible for recycling the returned bitmap if it differs
- * from [src].
+ * Replaces the ~15 hand-copied Thread{}/synchronized/runOnUiThread blocks
+ * that previously wrapped every native call individually. New native methods
+ * only need to supply [block]; everything else — volId resolution, locking,
+ * threading, and NOT_UNLOCKED vs generic error dispatch — is handled once.
  */
-private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
-    val w = src.width
-    val h = src.height
-    if (w <= maxEdge && h <= maxEdge) return src          // Already small enough.
-    val scale = maxEdge.toFloat() / maxOf(w, h)
-    val dstW  = (w * scale).toInt().coerceAtLeast(1)
-    val dstH  = (h * scale).toInt().coerceAtLeast(1)
-    return Bitmap.createScaledBitmap(src, dstW, dstH, true)
+private fun <T> runNativeOp(
+    uriString: String?,
+    result: MethodChannel.Result,
+    block: (volId: Int) -> T,
+) {
+    if (uriString == null) {
+        result.error("INVALID_ARGS", "filePath is required", null)
+        return
+    }
+    val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+    if (volId == null) {
+        result.error("NOT_MOUNTED", "Container not mounted", null)
+        return
+    }
+    Thread {
+        try {
+            val value = synchronized(VeraCryptSession.locks[volId]) { block(volId) }
+            runOnUiThread { result.success(value) }
+        } catch (e: Exception) {
+            runOnUiThread {
+                if (isNotUnlockedException(e)) {
+                    result.error("NOT_UNLOCKED", e.message, null)
+                } else {
+                    result.error("C++_ERROR", e.message, null)
+                }
+            }
+        }
+    }.start()
 }
+
+
+    private fun isNotUnlockedException(e: Throwable): Boolean =
+        e is IllegalStateException && e.message?.startsWith("NOT_UNLOCKED") == true 
+   
+    /**
+     * Scales [src] so its longer edge is exactly [maxEdge] pixels,
+     * preserving the original aspect ratio.
+     *
+     * Returns [src] unchanged if it already fits within [maxEdge] × [maxEdge].
+     * The caller is responsible for recycling the returned bitmap if it differs
+     * from [src].
+     */
+    private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
+        val w = src.width
+        val h = src.height
+        if (w <= maxEdge && h <= maxEdge) return src          // Already small enough.
+        val scale = maxEdge.toFloat() / maxOf(w, h)
+        val dstW  = (w * scale).toInt().coerceAtLeast(1)
+        val dstH  = (h * scale).toInt().coerceAtLeast(1)
+        return Bitmap.createScaledBitmap(src, dstW, dstH, true)
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) sanitizeClipboard()
@@ -228,7 +277,13 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                     }
                                 }
                             } catch (e: Exception) {
-                                runOnUiThread { result.error("C++_ERROR", e.message, null) }
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
                             }
                         }.start()
                     }
@@ -244,10 +299,20 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                         }
 
                         Thread {
-                            val hash = VeraCryptEngine.hashPasswordNative(password, saltBytes, iterations)
-                            runOnUiThread {
-                                if (hash != null) result.success(hash)
-                                else result.error("KDF_FAILED", "PBKDF2 derivation failed", null)
+                            try {
+                                val hash = VeraCryptEngine.hashPasswordNative(password, saltBytes, iterations)
+                                runOnUiThread {
+                                    if (hash != null) result.success(hash)
+                                    else result.error("KDF_FAILED", "PBKDF2 derivation failed", null)
+                                }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
                             }
                         }.start()
                     }
@@ -307,7 +372,13 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                     runOnUiThread { result.error("UNSUPPORTED_OS", "Requires Android 6.0+", null) }
                                 }
                             } catch (e: Exception) {
-                                runOnUiThread { result.error("THUMBNAIL_ERROR", e.message, null) }
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
                             } finally {
                                 runCatching { retriever?.release() }
                             }
@@ -359,20 +430,26 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                 inputStream.close()
 
                                 if (rawBitmap != null) {
-    val scaledBitmap = scaledToFit(rawBitmap, targetSize)
-    if (scaledBitmap != rawBitmap) rawBitmap.recycle()
+                                    val scaledBitmap = scaledToFit(rawBitmap, targetSize)
+                                    if (scaledBitmap != rawBitmap) rawBitmap.recycle()
 
-    val stream = ByteArrayOutputStream()
-    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 75, stream)
-    val bytes = stream.toByteArray()
-    scaledBitmap.recycle()
+                                    val stream = ByteArrayOutputStream()
+                                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 75, stream)
+                                    val bytes = stream.toByteArray()
+                                    scaledBitmap.recycle()
 
-    runOnUiThread { result.success(bytes) }
-} else {
-    runOnUiThread { result.error("DECODE_FAILED", "Failed to decode image bytes", null) }
-}
+                                    runOnUiThread { result.success(bytes) }
+                                } else {
+                                    runOnUiThread { result.error("DECODE_FAILED", "Failed to decode image bytes", null) }
+                                }
                             } catch (e: Exception) {
-                                runOnUiThread { result.error("THUMBNAIL_ERROR", e.message, null) }
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
                             }
                         }.start()
                     }
@@ -472,15 +549,25 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                         val volId = VeraCryptSession.getVolumeIdByUri(uriString)
                         if (volId != null) {
                             Thread {
-                                synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.lockNative(volId)
-                                }
-                                VeraCryptSession.removeSession(volId)
-                                runOnUiThread {
-                                    contentResolver.notifyChange(
-                                        DocumentsContract.buildRootsUri(
-                                            "com.aeidolon.vaultexplorer.documents"), null)
-                                    result.success(true)
+                                try {
+                                    synchronized(VeraCryptSession.locks[volId]) {
+                                        VeraCryptEngine.lockNative(volId)
+                                    }
+                                    VeraCryptSession.removeSession(volId)
+                                    runOnUiThread {
+                                        contentResolver.notifyChange(
+                                            DocumentsContract.buildRootsUri(
+                                                "com.aeidolon.vaultexplorer.documents"), null)
+                                        result.success(true)
+                                    }
+                                } catch (e: Exception) {
+                                    runOnUiThread {
+                                        if (isNotUnlockedException(e)) {
+                                            result.error("NOT_UNLOCKED", e.message, null)
+                                        } else {
+                                            result.error("C++_ERROR", e.message, null)
+                                        }
+                                    }
                                 }
                             }.start()
                         } else {
@@ -503,10 +590,18 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                         return@Thread
                                     }
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.unlockAndExtractNative(-1, "", 0, fileName, destPath, volId)
+                                    VeraCryptEngine.unlockAndExtractNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, destPath, volId)
                                 }
                                 runOnUiThread { result.success(success) }
-                            } catch (e: Exception) { runOnUiThread { result.error("C++_CRASH", e.message, null) } }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
+                            }
                         }.start()
                     }
 
@@ -524,36 +619,50 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                         return@Thread
                                     }
                                 val size = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.getFileSizeNative(-1, "", 0, fileName, volId)
+                                    VeraCryptEngine.getFileSizeNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
                                 }
                                 runOnUiThread { result.success(size) }
-                            } catch (e: Exception) { runOnUiThread { result.error("C++_CRASH", e.message, null) } }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
+                            }
                         }.start()
                     }
 
                     ChannelMethods.GET_FOLDER_SIZE -> {
-        val uriString = call.argument<String>("filePath")
-        val dirPath   = call.argument<String>("dirPath") ?: ""
-        if (uriString == null) {
-            result.error("INVALID_ARGS", "filePath is required", null)
-            return@setMethodCallHandler
-        }
-        Thread {
-            try {
-                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                    ?: run {
-                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                        return@Thread
+                        val uriString = call.argument<String>("filePath")
+                        val dirPath   = call.argument<String>("dirPath") ?: ""
+                        if (uriString == null) {
+                            result.error("INVALID_ARGS", "filePath is required", null)
+                            return@setMethodCallHandler
+                        }
+                        Thread {
+                            try {
+                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+                                    ?: run {
+                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
+                                        return@Thread
+                                    }
+                                val total = synchronized(VeraCryptSession.locks[volId]) {
+                                    VeraCryptEngine.getFolderSizeNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)
+                                }
+                                runOnUiThread { result.success(total) }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
+                            }
+                        }.start()
                     }
-                val total = synchronized(VeraCryptSession.locks[volId]) {
-                    VeraCryptEngine.getFolderSizeNative(-1, "", 0, dirPath, volId)
-                }
-                runOnUiThread { result.success(total) }
-            } catch (e: Exception) {
-                runOnUiThread { result.error("C++_ERROR", e.message, null) }
-            }
-        }.start()
-    }
 
                     ChannelMethods.READ_FILE_CHUNK -> {
                         val uriString = call.argument<String>("filePath")
@@ -577,10 +686,18 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                         return@Thread
                                     }
                                 val bytes = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.readFileChunkNative(-1, "", 0, fileName, offset, length, volId)
+                                    VeraCryptEngine.readFileChunkNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, offset, length, volId)
                                 }
                                 runOnUiThread { result.success(bytes) }
-                            } catch (e: Exception) { runOnUiThread { result.error("C++_CRASH", e.message, null) } }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
+                            }
                         }.start()
                     }
 
@@ -598,10 +715,18 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                         return@Thread
                                     }
                                 val files = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.listDirectoryNative(-1, "", 0, dirPath, volId)
+                                    VeraCryptEngine.listDirectoryNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)
                                 }
                                 runOnUiThread { result.success(files?.toList()) }
-                            } catch (e: Exception) { runOnUiThread { result.error("C++_ERROR", e.message, null) } }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
+                            }
                         }.start()
                     }
 
@@ -619,10 +744,18 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                         return@Thread
                                     }
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.createDirectoryNative(-1, "", 0, dirPath, volId)
+                                    VeraCryptEngine.createDirectoryNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)
                                 }
                                 runOnUiThread { result.success(success) }
-                            } catch (e: Exception) { runOnUiThread { result.error("C++_ERROR", e.message, null) } }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
+                            }
                         }.start()
                     }
 
@@ -641,10 +774,18 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                         return@Thread
                                     }
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.renameFileNative(-1, "", 0, oldPath, newPath, volId)
+                                    VeraCryptEngine.renameFileNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, oldPath, newPath, volId)
                                 }
                                 runOnUiThread { result.success(success) }
-                            } catch (e: Exception) { runOnUiThread { result.error("C++_ERROR", e.message, null) } }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
+                            }
                         }.start()
                     }
 
@@ -663,10 +804,18 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                         return@Thread
                                     }
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.writeBackFileNative(-1, "", 0, fileName, sourcePath, volId)
+                                    VeraCryptEngine.writeBackFileNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, sourcePath, volId)
                                 }
                                 runOnUiThread { result.success(success) }
-                            } catch (e: Exception) { runOnUiThread { result.error("C++_ERROR", e.message, null) } }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
+                            }
                         }.start()
                     }
 
@@ -683,10 +832,18 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                         return@Thread
                                     }
                                 val space = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.getSpaceInfoNative(-1, "", 0, volId)
+                                    VeraCryptEngine.getSpaceInfoNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, volId)
                                 }
                                 runOnUiThread { result.success(space?.toList()) }
-                            } catch (e: Exception) { runOnUiThread { result.error("C++_CRASH", e.message, null) } }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
+                            }
                         }.start()
                     }
 
@@ -704,10 +861,18 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                         return@Thread
                                     }
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.deleteFileNative(-1, "", 0, fileName, volId)
+                                    VeraCryptEngine.deleteFileNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
                                 }
                                 runOnUiThread { result.success(success) }
-                            } catch (e: Exception) { runOnUiThread { result.error("C++_ERROR", e.message, null) } }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
+                            }
                         }.start()
                     }
 
@@ -828,11 +993,17 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                         return@Thread
                                     }
                                 val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.writeFileChunkNative(-1, "", 0, fileName, offset, data, volId)
+                                    VeraCryptEngine.writeFileChunkNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, offset, data, volId)
                                 }
                                 runOnUiThread { result.success(success) }
                             } catch (e: Exception) {
-                                runOnUiThread { result.error("C++_ERROR", e.message, null) }
+                                runOnUiThread {
+                                    if (isNotUnlockedException(e)) {
+                                        result.error("NOT_UNLOCKED", e.message, null)
+                                    } else {
+                                        result.error("C++_ERROR", e.message, null)
+                                    }
+                                }
                             }
                         }.start()
                     }
@@ -882,13 +1053,21 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                 if (pass != null && size > 0) {
                     Thread {
                         try {
-                            val pfd = contentResolver.openFileDescriptor(destUri, "rw")
-                                ?: throw Exception("Could not open file descriptor")
-                            val success = synchronized(createContainerLock) {
-                                VeraCryptEngine.createContainerNative(pfd.detachFd(), pass, pim, size, fs)
+                          val pfd = contentResolver.openFileDescriptor(destUri, "rw")
+                              ?: throw Exception("Could not open file descriptor")
+                          val success = synchronized(createContainerLock) {
+                              VeraCryptEngine.createContainerNative(pfd.detachFd(), pass, pim, size, fs)
+                          }
+                          runOnUiThread { res.success(success) }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                if (isNotUnlockedException(e)) {
+                                    res.error("NOT_UNLOCKED", e.message, null)
+                                } else {
+                                    res.error("C++_ERROR", e.message, null)
+                                }
                             }
-                            runOnUiThread { res.success(success) }
-                        } catch (e: Exception) { runOnUiThread { res.error("CREATE_ERROR", e.message, null) } }
+                        }
                     }.start()
                 } else res.success(false)
             } else res.success(false)
@@ -906,14 +1085,24 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                 val volId        = pendingImportVolId
                 if (containerUri != null && volId != null && uris.isNotEmpty()) {
                     Thread {
-                        var successCount = 0
-                        for (pickedUri in uris) {
-                            val srcDoc = DocumentFile.fromSingleUri(this, pickedUri) ?: continue
-                            val name = srcDoc.name ?: "imported_file"
-                            val targetFatPath = if (targetDir.isEmpty()) name else "$targetDir/$name"
-                            successCount += importEntryRecursive(srcDoc, containerUri, targetFatPath, volId)
+                        try {
+                            var successCount = 0
+                            for (pickedUri in uris) {
+                                val srcDoc = DocumentFile.fromSingleUri(this, pickedUri) ?: continue
+                                val name = srcDoc.name ?: "imported_file"
+                                val targetFatPath = if (targetDir.isEmpty()) name else "$targetDir/$name"
+                                successCount += importEntryRecursive(srcDoc, containerUri, targetFatPath, volId)
+                            }
+                            runOnUiThread { res.success(successCount) }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                if (isNotUnlockedException(e)) {
+                                    res.error("NOT_UNLOCKED", e.message, null)
+                                } else {
+                                    res.error("C++_ERROR", e.message, null)
+                                }
+                            }
                         }
-                        runOnUiThread { res.success(successCount) }
                     }.start()
                 } else res.success(0)
             } else res.success(0)
@@ -932,16 +1121,26 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                 val volId        = pendingExportMultiVolId
                 if (containerUri != null) {
                     Thread {
-                        var successCount = 0
-                        val destTree = DocumentFile.fromTreeUri(this, treeUri)
-                        if (destTree != null) {
-                            for (item in items) {
-                                val path  = item["path"] as? String ?: continue
-                                val isDir = item["isDir"] as? Boolean ?: false
-                                successCount += exportEntryRecursive(destTree, path, isDir, containerUri, volId)
+                        try {
+                            var successCount = 0
+                            val destTree = DocumentFile.fromTreeUri(this, treeUri)
+                            if (destTree != null) {
+                                for (item in items) {
+                                    val path  = item["path"] as? String ?: continue
+                                    val isDir = item["isDir"] as? Boolean ?: false
+                                    successCount += exportEntryRecursive(destTree, path, isDir, containerUri, volId)
+                                }
+                            }
+                            runOnUiThread { res.success(successCount) }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                if (isNotUnlockedException(e)) {
+                                    res.error("NOT_UNLOCKED", e.message, null)
+                                } else {
+                                    res.error("C++_ERROR", e.message, null)
+                                }
                             }
                         }
-                        runOnUiThread { res.success(successCount) }
                     }.start()
                 } else res.success(0)
             } else res.success(0)
@@ -962,8 +1161,18 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                     val folderName    = srcRoot.name ?: "imported_folder"
                     val targetFatPath = if (targetDir.isEmpty()) folderName else "$targetDir/$folderName"
                     Thread {
-                        val count = importEntryRecursive(srcRoot, containerUri, targetFatPath, volId)
-                        runOnUiThread { res.success(count) }
+                        try {
+                            val count = importEntryRecursive(srcRoot, containerUri, targetFatPath, volId)
+                            runOnUiThread { res.success(count) }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                if (isNotUnlockedException(e)) {
+                                    res.error("NOT_UNLOCKED", e.message, null)
+                                } else {
+                                    res.error("C++_ERROR", e.message, null)
+                                }
+                            }
+                        }
                     }.start()
                 } else res.success(0)
             } else res.success(0)
@@ -984,7 +1193,7 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                             val tempFile = File(cacheDir, "export_temp")
                             val success = synchronized(VeraCryptSession.locks[volId]) {
                                 VeraCryptEngine.unlockAndExtractNative(
-                                    -1, "", 0, sourcePath, tempFile.absolutePath, volId)
+                                    VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, sourcePath, tempFile.absolutePath, volId)
                             }
                             if (success && tempFile.exists()) {
                                 contentResolver.openOutputStream(destUri)?.use { out ->
@@ -996,7 +1205,15 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                                 tempFile.delete()
                                 runOnUiThread { res.success(false) }
                             }
-                        } catch (e: Exception) { runOnUiThread { res.error("EXPORT_ERROR", e.message, null) } }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                if (isNotUnlockedException(e)) {
+                                    res.error("NOT_UNLOCKED", e.message, null)
+                                } else {
+                                    res.error("C++_ERROR", e.message, null)
+                                }
+                            }
+                        }
                     }.start()
                 } else res.success(false)
             } else res.success(false)
@@ -1013,7 +1230,7 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
             return try {
                 val tempFile = File(cacheDir, "export_${System.nanoTime()}")
                 val ok  = synchronized(VeraCryptSession.locks[volId]) {
-                    VeraCryptEngine.unlockAndExtractNative(-1, "", 0, fatPath, tempFile.absolutePath, volId)
+                    VeraCryptEngine.unlockAndExtractNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fatPath, tempFile.absolutePath, volId)
                 }
                 var written = 0
                 if (ok && tempFile.exists()) {
@@ -1031,7 +1248,7 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
         }
         val destDir = destParent.createDirectory(name) ?: return 0
         val children = synchronized(VeraCryptSession.locks[volId]) {
-            VeraCryptEngine.listDirectoryNative(-1, "", 0, fatPath, volId)
+            VeraCryptEngine.listDirectoryNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fatPath, volId)
         } ?: return 0
         var count = 0
         for (entry in children) {
@@ -1048,7 +1265,7 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
     ): Int {
         if (srcDoc.isDirectory) {
             synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.createDirectoryNative(-1, "", 0, targetFatPath, volId)
+                VeraCryptEngine.createDirectoryNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, targetFatPath, volId)
             }
             var count = 0
             for (child in srcDoc.listFiles()) {
@@ -1063,7 +1280,7 @@ private fun scaledToFit(src: Bitmap, maxEdge: Int): Bitmap {
                 tempFile.outputStream().use { inp.copyTo(it) }
             }
             val ok = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.writeBackFileNative(-1, "", 0, targetFatPath, tempFile.absolutePath, volId)
+                VeraCryptEngine.writeBackFileNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, targetFatPath, tempFile.absolutePath, volId)
             }
             tempFile.delete()
             if (ok) 1 else 0
@@ -1088,7 +1305,7 @@ class VeraCryptInputStream(
 
     init {
         fileSize = synchronized(VeraCryptSession.locks[volId]) {
-            VeraCryptEngine.getFileSizeNative(-1, "", 0, fileName, volId)
+            VeraCryptEngine.getFileSizeNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
         }
     }
 
@@ -1106,7 +1323,7 @@ class VeraCryptInputStream(
         if (toRead <= 0) return -1
 
         val chunk = synchronized(VeraCryptSession.locks[volId]) {
-            VeraCryptEngine.readFileChunkNative(-1, "", 0, fileName, position, toRead, volId)
+            VeraCryptEngine.readFileChunkNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, position, toRead, volId)
         } ?: return -1
 
         if (chunk.isEmpty()) return -1
@@ -1163,7 +1380,7 @@ class VeraCryptMediaDataSource(
         if (cachedSize >= 0) return cachedSize
         try {
             cachedSize = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.getFileSizeNative(-1, "", 0, fileName, volId)
+                VeraCryptEngine.getFileSizeNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
             }
         } catch (_: Exception) { cachedSize = 0L }
         return cachedSize
@@ -1177,7 +1394,7 @@ class VeraCryptMediaDataSource(
         try {
             val chunk = synchronized(VeraCryptSession.locks[volId]) {
                 VeraCryptEngine.readFileChunkNative(
-                    -1, "", 0, fileName, position, readSize, volId)
+                    VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, position, readSize, volId)
             } ?: return -1
             if (chunk.isEmpty()) return -1
             val actualRead = minOf(chunk.size, readSize)

@@ -161,6 +161,35 @@ static bool _globalInit = [](){
     return true;
 }();
 
+// Returns true only if volId already has an active, unlocked session.
+// Stateless natives (list/read/write/size/etc.) call this FIRST and bail
+// with a clear log line instead of silently falling through into
+// prepareSession's derivation path with an empty password.
+static inline bool requireActiveSession(int volId, const char* callerName) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return false;
+    std::lock_guard<std::mutex> lock(volumeMutex[volId]);
+    if (!isDataCtxInitialized[volId] || activeFd[volId] < 0) {
+        LOGI("%s: volume %d has no active session (not unlocked)", callerName, volId);
+        return false;
+    }
+    return true;
+}
+
+
+// Throws a Kotlin-catchable IllegalStateException with a machine-readable
+// reason code, then returns. Callers must `return` immediately after this —
+// JNI does not unwind the C++ stack, it just marks a pending exception that
+// fires when control returns to the JVM.
+static void throwNotUnlocked(JNIEnv* env, int volId, const char* callerName) {
+    jclass exClass = env->FindClass("java/lang/IllegalStateException");
+    char msg[160];
+    snprintf(msg, sizeof(msg), "NOT_UNLOCKED: volume %d has no active session (%s)",
+             volId, callerName);
+    env->ThrowNew(exClass, msg);
+}
+
+
+
 // ----------------------------------------------------------------====
 // MOUNT CACHE HELPERS
 // ----------------------------------------------------------------====
@@ -282,46 +311,58 @@ extern "C" DSTATUS disk_status(BYTE pdrv)     { return 0; }
 extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     if (pdrv >= MAX_VOLUMES || activeFd[pdrv] < 0 || !isDataCtxInitialized[pdrv])
         return RES_NOTRDY;
-    if (count == 0 || count > 8192) return RES_PARERR;
+    if (count == 0) return RES_PARERR;
 
     const uint64_t basePhysical = activeDataOffset[pdrv] / 512;
     const bool relTweak = activeIsRelTweak[pdrv];
     const int fd = activeFd[pdrv];
-    const uint64_t firstPhysical = basePhysical + sector;
-    const size_t   totalBytes    = static_cast<size_t>(count) * 512;
 
-    // FIX P12: Use the per-volume persistent buffer for requests that exceed
-    // the stack threshold, eliminating heap alloc/free on every large read.
+    static constexpr UINT MAX_SECTORS_PER_BATCH = 8192; // 4 MB/batch — unchanged tuning, no longer a hard limit
+    UINT remaining   = count;
+    LBA_t curSector  = sector;
+    BYTE* curBuf     = buff;
+
     alignas(16) unsigned char stackBuf[65536];
-    unsigned char* encBuf;
 
-    if (totalBytes <= sizeof(stackBuf)) {
-        encBuf = stackBuf;
-    } else {
-        std::lock_guard<std::mutex> bufLock(ioVolBufMutex[pdrv]);
-        encBuf = getVolIoBuf(pdrv, totalBytes);
-        // pread directly into the persistent buffer, decrypt into caller's buff.
+    while (remaining > 0) {
+        const UINT batchCount = std::min(remaining, MAX_SECTORS_PER_BATCH);
+        const uint64_t firstPhysical = basePhysical + curSector;
+        const size_t   totalBytes    = static_cast<size_t>(batchCount) * 512;
+
+        unsigned char* encBuf;
+        if (totalBytes <= sizeof(stackBuf)) {
+            encBuf = stackBuf;
+        } else {
+            std::lock_guard<std::mutex> bufLock(ioVolBufMutex[pdrv]);
+            encBuf = getVolIoBuf(pdrv, totalBytes);
+            ssize_t got = pread(fd, encBuf, totalBytes,
+                                static_cast<off_t>(firstPhysical * 512));
+            if (got < static_cast<ssize_t>(totalBytes)) return RES_ERROR;
+            for (UINT i = 0; i < batchCount; i++) {
+                const uint64_t physSector = firstPhysical + i;
+                const uint64_t tweak = relTweak ? (physSector - basePhysical) : physSector;
+                decryptSector(&activeDataCtxDec[pdrv], tweak,
+                              encBuf + (i * 512), curBuf + (i * 512));
+            }
+            remaining -= batchCount;
+            curSector += batchCount;
+            curBuf    += batchCount * 512;
+            continue;
+        }
+
         ssize_t got = pread(fd, encBuf, totalBytes,
                             static_cast<off_t>(firstPhysical * 512));
         if (got < static_cast<ssize_t>(totalBytes)) return RES_ERROR;
-        for (UINT i = 0; i < count; i++) {
+
+        for (UINT i = 0; i < batchCount; i++) {
             const uint64_t physSector = firstPhysical + i;
-            const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
+            const uint64_t tweak = relTweak ? (physSector - basePhysical) : physSector;
             decryptSector(&activeDataCtxDec[pdrv], tweak,
-                          encBuf + (i * 512), buff + (i * 512));
+                          encBuf + (i * 512), curBuf + (i * 512));
         }
-        return RES_OK;
-    }
-
-    ssize_t got = pread(fd, encBuf, totalBytes,
-                        static_cast<off_t>(firstPhysical * 512));
-    if (got < static_cast<ssize_t>(totalBytes)) return RES_ERROR;
-
-    for (UINT i = 0; i < count; i++) {
-        const uint64_t physSector = firstPhysical + i;
-        const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
-        decryptSector(&activeDataCtxDec[pdrv], tweak,
-                      encBuf + (i * 512), buff + (i * 512));
+        remaining -= batchCount;
+        curSector += batchCount;
+        curBuf    += batchCount * 512;
     }
     return RES_OK;
 }
@@ -329,42 +370,54 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
     if (pdrv >= MAX_VOLUMES || activeFd[pdrv] < 0 || !isDataCtxInitialized[pdrv])
         return RES_NOTRDY;
-    if (count == 0 || count > 8192) return RES_PARERR;
+    if (count == 0) return RES_PARERR;
 
     const uint64_t basePhysical = activeDataOffset[pdrv] / 512;
     const bool     relTweak     = activeIsRelTweak[pdrv];
     const int      fd           = activeFd[pdrv];
-    const uint64_t firstPhysical = basePhysical + sector;
-    const size_t   totalBytes    = static_cast<size_t>(count) * 512;
 
-    // FIX P12: Same persistent-buffer strategy for writes.
+    static constexpr UINT MAX_SECTORS_PER_BATCH = 8192;
+    UINT remaining        = count;
+    LBA_t curSector       = sector;
+    const BYTE* curBuf    = buff;
+
     alignas(16) unsigned char stackBuf[65536];
-    unsigned char* encBuf;
 
-    if (totalBytes <= sizeof(stackBuf)) {
-        encBuf = stackBuf;
-        for (UINT i = 0; i < count; i++) {
-            const uint64_t physSector = firstPhysical + i;
-            const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
-            encryptSector(&activeDataCtxEnc[pdrv], tweak,
-                          buff + (i * 512), encBuf + (i * 512));
+    while (remaining > 0) {
+        const UINT batchCount = std::min(remaining, MAX_SECTORS_PER_BATCH);
+        const uint64_t firstPhysical = basePhysical + curSector;
+        const size_t   totalBytes    = static_cast<size_t>(batchCount) * 512;
+
+        unsigned char* encBuf;
+        bool usedPersistent = false;
+        if (totalBytes <= sizeof(stackBuf)) {
+            encBuf = stackBuf;
+        } else {
+            usedPersistent = true;
         }
+
+        std::unique_lock<std::mutex> bufLock;
+        if (usedPersistent) {
+            bufLock = std::unique_lock<std::mutex>(ioVolBufMutex[pdrv]);
+            encBuf = getVolIoBuf(pdrv, totalBytes);
+        }
+
+        for (UINT i = 0; i < batchCount; i++) {
+            const uint64_t physSector = firstPhysical + i;
+            const uint64_t tweak = relTweak ? (physSector - basePhysical) : physSector;
+            encryptSector(&activeDataCtxEnc[pdrv], tweak,
+                          curBuf + (i * 512), encBuf + (i * 512));
+        }
+
         ssize_t written = pwrite(fd, encBuf, totalBytes,
                                  static_cast<off_t>(firstPhysical * 512));
-        return (written == static_cast<ssize_t>(totalBytes)) ? RES_OK : RES_ERROR;
-    } else {
-        std::lock_guard<std::mutex> bufLock(ioVolBufMutex[pdrv]);
-        encBuf = getVolIoBuf(pdrv, totalBytes);
-        for (UINT i = 0; i < count; i++) {
-            const uint64_t physSector = firstPhysical + i;
-            const uint64_t tweak      = relTweak ? (physSector - basePhysical) : physSector;
-            encryptSector(&activeDataCtxEnc[pdrv], tweak,
-                          buff + (i * 512), encBuf + (i * 512));
-        }
-        ssize_t written = pwrite(fd, encBuf, totalBytes,
-                                 static_cast<off_t>(firstPhysical * 512));
-        return (written == static_cast<ssize_t>(totalBytes)) ? RES_OK : RES_ERROR;
+        if (written != static_cast<ssize_t>(totalBytes)) return RES_ERROR;
+
+        remaining -= batchCount;
+        curSector += batchCount;
+        curBuf    += batchCount * 512;
     }
+    return RES_OK;
 }
 
 extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
@@ -415,6 +468,39 @@ static bool _derivationInit = [](){
     return true;
 }();
 
+
+
+// ----------------------------------------------------------------====
+// LOCK DOMAIN CONTRACT (read before touching prepareSession/disk_read/disk_write)
+//
+// There are TWO independent lock domains protecting volume state, and they
+// are NOT composable — neither one alone is sufficient:
+//
+//   1. Kotlin: `synchronized(VeraCryptSession.locks[volId])`
+//      Serializes JNI *call entry* per volume from the Kotlin side. Ensures
+//      two Kotlin threads never call into native for the same volId at once.
+//
+//   2. C++: `volumeMutex[volId]`
+//      Protects the C++ globals (activeFd, activeDataCtxDec/Enc,
+//      isDataCtxInitialized, activeDataOffset) directly.
+//
+// prepareSession() DELIBERATELY derives the PBKDF2 key (the slow ~2s step)
+// WITHOUT holding volumeMutex[volId] (see FIX P11) so that disk_read/disk_write
+// on an *already-unlocked* volume aren't blocked by a concurrent unlock of
+// that SAME volume. This is safe only because:
+//   - disk_read/disk_write require isDataCtxInitialized[pdrv] == true,
+//     which is set exclusively inside the volumeMutex-guarded block at the
+//     end of prepareSession — so a reader either sees the fully-swapped
+//     context or the previous one, never a half-written one.
+//   - The Kotlin-side `locks[volId]` still prevents two *unlock* calls (the
+//     only callers that pass forceDerive=true) from racing each other for
+//     the same volId, via derivationInProgress[] as a secondary guard.
+//
+// DO NOT remove the Kotlin `synchronized(VeraCryptSession.locks[volId])`
+// wrapper believing the C++ mutex already covers it — they guard different
+// invariants (call ordering vs. memory state), and the safety argument above
+// depends on both being present.
+// ----------------------------------------------------------------====
 bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive) {
     if (volId < 0 || volId >= MAX_VOLUMES) {
         if (fd >= 0) close(fd);
@@ -746,6 +832,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFileNative(
         jint fd, jstring password, jint pim,
         jstring targetFileName, jstring sourcePath, jint volId) {
 
+    if (!requireActiveSession(volId, "writeBackFileNative")) {
+        throwNotUnlocked(env, volId, "writeBackFileNative");
+        return JNI_FALSE;}
+
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     const char* source     = env->GetStringUTFChars(sourcePath, nullptr);
@@ -784,6 +874,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFileNative(
         jint fd, jstring password, jint pim,
         jstring targetFileName, jint volId) {
 
+    if (!requireActiveSession(volId, "deleteFileNative")) {
+        throwNotUnlocked(env, volId, "deleteFileNative");
+        return JNI_FALSE;}
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
 
@@ -828,7 +921,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSizeNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim,
         jstring targetFileName, jint volId) {
-
+    if (!requireActiveSession(volId, "getFileSizeNative")) {
+        throwNotUnlocked(env, volId, "getFileSizeNative");
+        return -1;}
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
 
@@ -854,6 +949,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunkNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim,
         jstring targetFileName, jlong offset, jint length, jint volId) {
+
+            if (!requireActiveSession(volId, "readFileChunkNative")) {
+                throwNotUnlocked(env, volId, "readFileChunkNative");
+                return nullptr;}
 
     if (length <= 0 || static_cast<size_t>(length) > MAX_CHUNK_SIZE) {
         LOGI("readFileChunkNative: invalid length %d", length);
@@ -893,6 +992,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectoryNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jstring dirPath, jint volId) {
 
+    if (!requireActiveSession(volId, "listDirectoryNative")) {
+        throwNotUnlocked(env, volId, "listDirectoryNative");
+        return nullptr;}
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
 
@@ -912,6 +1014,10 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectoryNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jstring dirPath, jint volId) {
+
+            if (!requireActiveSession(volId, "createDirectoryNative")) {
+                throwNotUnlocked(env, volId, "createDirectoryNative");
+                return JNI_FALSE;}
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
@@ -934,7 +1040,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFileNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim,
         jstring oldPath, jstring newPath, jint volId) {
-
+if (!requireActiveSession(volId, "renameFileNative")) {
+    throwNotUnlocked(env, volId, "renameFileNative");
+    return JNI_FALSE;}
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* nativeOld  = env->GetStringUTFChars(oldPath, nullptr);
     const char* nativeNew  = env->GetStringUTFChars(newPath, nullptr);
@@ -959,6 +1067,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfoNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jint volId) {
 
+            if (!requireActiveSession(volId, "getSpaceInfoNative")) {
+                throwNotUnlocked(env, volId, "getSpaceInfoNative");
+                return nullptr;}
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
 
     jlong totalBytes = 0, freeBytes = 0;
@@ -1219,6 +1330,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunkNative(
         jint fd, jstring password, jint pim,
         jstring targetFileName, jlong offset, jbyteArray data, jint volId) {
 
+            if (!requireActiveSession(volId, "writeFileChunkNative")) {
+                throwNotUnlocked(env, volId, "writeFileChunkNative");
+                return JNI_FALSE;}
+
     jsize len = env->GetArrayLength(data);
 
     if (len <= 0 || static_cast<size_t>(len) > MAX_CHUNK_SIZE) {
@@ -1265,6 +1380,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSizeNative(
         jint fd, jstring password, jint pim,
         jstring dirPath, jint volId) {
 
+    if (!requireActiveSession(volId, "getFolderSizeNative")) {
+        throwNotUnlocked(env, volId, "getFolderSizeNative");
+        return -1;}
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
 
@@ -1334,6 +1452,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunkDirectNative(
         jint fd, jstring password, jint pim,
         jstring targetFileName, jlong offset, jbyteArray outBuffer, jint length, jint volId) {
 
+            if (!requireActiveSession(volId, "readFileChunkDirectNative")) {
+                throwNotUnlocked(env, volId, "readFileChunkDirectNative");
+                return -1;}
+
     if (length <= 0) return 0;
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
@@ -1376,6 +1498,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_openStreamNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim,
         jstring targetFileName, jint volId) {
+
+            if (!requireActiveSession(volId, "openStreamNative")) {
+                throwNotUnlocked(env, volId, "openStreamNative");
+                return 0;}
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
@@ -1436,3 +1562,5 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStreamNative(
         delete f; // Free memory
     }
 }
+
+

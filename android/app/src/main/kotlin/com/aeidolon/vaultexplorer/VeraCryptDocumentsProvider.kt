@@ -368,11 +368,11 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         init {
             try {
                 synchronized(VeraCryptSession.locks[volId]) {
-                    fileSizeCached = VeraCryptEngine.getFileSizeNative(-1, "", 0, fatPath, volId)
+                    fileSizeCached = VeraCryptEngine.getFileSizeNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fatPath, volId)
                     if (fileSizeCached < 0) fileSizeCached = 0L
 
                     if (!isWrite) {
-                        streamPtr = VeraCryptEngine.openStreamNative(-1, "", 0, fatPath, volId)
+                        streamPtr = VeraCryptEngine.openStreamNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fatPath, volId)
                     }
                 }
             } catch (e: Exception) {
@@ -402,7 +402,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             val chunkData = if (data.size == size) data else data.copyOf(size)
             val success = synchronized(VeraCryptSession.locks[volId]) {
                 VeraCryptEngine.writeFileChunkNative(
-                    -1, "", 0, fatPath, offset, chunkData, volId)
+                    VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fatPath, offset, chunkData, volId)
             }
 
             if (!success) throw ErrnoException("onWrite", OsConstants.EIO)

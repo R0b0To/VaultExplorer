@@ -45,3 +45,9 @@ target_link_libraries(
         vaultexplorer
         ${log-lib}
         mbedcrypto)
+
+if(NOT ANDROID)
+    add_executable(sector_batching_test test/sector_batching_test.cpp)
+    enable_testing()
+    add_test(NAME sector_batching_test COMMAND sector_batching_test)
+endif()        

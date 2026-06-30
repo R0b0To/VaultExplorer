@@ -576,304 +576,122 @@ private fun <T> runNativeOp(
                     }
 
                     ChannelMethods.DECRYPT_FILE -> {
-                        val uriString = call.argument<String>("filePath")
-                        val fileName  = call.argument<String>("fileName")
-                        val destPath  = call.argument<String>("destPath")
-                        if (uriString == null || fileName == null || destPath == null) {
-                            result.error("INVALID_ARGS", "All arguments required", null); return@setMethodCallHandler
+                        val fileName = call.argument<String>("fileName")
+                        val destPath = call.argument<String>("destPath")
+                        if (fileName == null || destPath == null) {
+                            result.error("INVALID_ARGS", "fileName and destPath required", null); return@setMethodCallHandler
                         }
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.unlockAndExtractNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, destPath, volId)
-                                }
-                                runOnUiThread { result.success(success) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.unlockAndExtractNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, destPath, volId)
+                        }
                     }
 
                     ChannelMethods.GET_FILE_SIZE -> {
-                        val uriString = call.argument<String>("filePath")
-                        val fileName  = call.argument<String>("fileName")
-                        if (uriString == null || fileName == null) {
-                            result.error("INVALID_ARGS", "filePath and fileName required", null); return@setMethodCallHandler
+                        val fileName = call.argument<String>("fileName")
+                        if (fileName == null) {
+                            result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
                         }
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val size = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.getFileSizeNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
-                                }
-                                runOnUiThread { result.success(size) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.getFileSizeNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
+                        }
                     }
 
                     ChannelMethods.GET_FOLDER_SIZE -> {
-                        val uriString = call.argument<String>("filePath")
-                        val dirPath   = call.argument<String>("dirPath") ?: ""
-                        if (uriString == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null)
-                            return@setMethodCallHandler
+                        val dirPath = call.argument<String>("dirPath") ?: ""
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.getFolderSizeNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)
                         }
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val total = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.getFolderSizeNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)
-                                }
-                                runOnUiThread { result.success(total) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
                     }
 
                     ChannelMethods.READ_FILE_CHUNK -> {
-                        val uriString = call.argument<String>("filePath")
-                        val fileName  = call.argument<String>("fileName")
+                        val fileName = call.argument<String>("fileName")
                         val offset    = call.argument<Number>("offset")?.toLong() ?: 0L
                         val length    = call.argument<Number>("length")?.toInt() ?: 0
-
-                        if (uriString == null || fileName == null) {
-                            result.error("INVALID_ARGS", "filePath and fileName required", null); return@setMethodCallHandler
+                        if (fileName == null) {
+                            result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
                         }
                         if (length <= 0 || length > MAX_CHUNK_BYTES) {
                             result.error("INVALID_ARGS", "length must be between 1 and $MAX_CHUNK_BYTES bytes", null)
                             return@setMethodCallHandler
                         }
-
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val bytes = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.readFileChunkNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, offset, length, volId)
-                                }
-                                runOnUiThread { result.success(bytes) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.readFileChunkNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, offset, length, volId)
+                        }
                     }
 
                     ChannelMethods.LIST_DIRECTORY -> {
-                        val uriString = call.argument<String>("filePath")
-                        val dirPath   = call.argument<String>("dirPath") ?: ""
-                        if (uriString == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null); return@setMethodCallHandler
+                        val dirPath = call.argument<String>("dirPath") ?: ""
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.listDirectoryNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)?.toList()
                         }
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val files = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.listDirectoryNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)
-                                }
-                                runOnUiThread { result.success(files?.toList()) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
                     }
 
                     ChannelMethods.CREATE_DIRECTORY -> {
-                        val uriString = call.argument<String>("filePath")
-                        val dirPath   = call.argument<String>("dirPath")
-                        if (uriString == null || dirPath == null) {
-                            result.error("INVALID_ARGS", "All arguments required", null); return@setMethodCallHandler
+                        val dirPath = call.argument<String>("dirPath")
+                        if (dirPath == null) {
+                            result.error("INVALID_ARGS", "dirPath required", null); return@setMethodCallHandler
                         }
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.createDirectoryNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)
-                                }
-                                runOnUiThread { result.success(success) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.createDirectoryNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)
+                        }
                     }
 
                     ChannelMethods.RENAME_FILE -> {
-                        val uriString = call.argument<String>("filePath")
-                        val oldPath   = call.argument<String>("oldPath")
-                        val newPath   = call.argument<String>("newPath")
-                        if (uriString == null || oldPath == null || newPath == null) {
-                            result.error("INVALID_ARGS", "All arguments required", null); return@setMethodCallHandler
+                        val oldPath = call.argument<String>("oldPath")
+                        val newPath = call.argument<String>("newPath")
+                        if (oldPath == null || newPath == null) {
+                            result.error("INVALID_ARGS", "oldPath and newPath required", null); return@setMethodCallHandler
                         }
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.renameFileNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, oldPath, newPath, volId)
-                                }
-                                runOnUiThread { result.success(success) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.renameFileNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, oldPath, newPath, volId)
+                        }
                     }
 
                     ChannelMethods.WRITE_BACK_FILE -> {
-                        val uriString  = call.argument<String>("filePath")
                         val fileName   = call.argument<String>("fileName")
                         val sourcePath = call.argument<String>("sourcePath")
-                        if (uriString == null || fileName == null || sourcePath == null) {
-                            result.error("INVALID_ARGS", "All arguments required", null); return@setMethodCallHandler
+                        if (fileName == null || sourcePath == null) {
+                            result.error("INVALID_ARGS", "fileName and sourcePath required", null); return@setMethodCallHandler
                         }
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.writeBackFileNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, sourcePath, volId)
-                                }
-                                runOnUiThread { result.success(success) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.writeBackFileNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, sourcePath, volId)
+                        }
                     }
 
                     ChannelMethods.GET_SPACE_INFO -> {
-                        val uriString = call.argument<String>("filePath")
-                        if (uriString == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null); return@setMethodCallHandler
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.getSpaceInfoNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, volId)?.toList()
                         }
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val space = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.getSpaceInfoNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, volId)
-                                }
-                                runOnUiThread { result.success(space?.toList()) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
                     }
 
                     ChannelMethods.DELETE_FILE -> {
-                        val uriString = call.argument<String>("filePath")
-                        val fileName  = call.argument<String>("fileName")
-                        if (uriString == null || fileName == null) {
-                            result.error("INVALID_ARGS", "All arguments required", null); return@setMethodCallHandler
+                        val fileName = call.argument<String>("fileName")
+                        if (fileName == null) {
+                            result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
                         }
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.deleteFileNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
-                                }
-                                runOnUiThread { result.success(success) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.deleteFileNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
+                        }
                     }
 
                     ChannelMethods.OPEN_WITH_APP -> {
@@ -971,41 +789,21 @@ private fun <T> runNativeOp(
                     }
 
                     ChannelMethods.WRITE_FILE_CHUNK -> {
-                        val uriString = call.argument<String>("filePath")
-                        val fileName  = call.argument<String>("fileName")
-                        val offset    = call.argument<Number>("offset")?.toLong() ?: 0L
-                        val data      = call.argument<ByteArray>("data")
-
-                        if (uriString == null || fileName == null || data == null) {
-                            result.error("INVALID_ARGS", "filePath, fileName and data required", null)
-                            return@setMethodCallHandler
+                        val fileName = call.argument<String>("fileName")
+                        val offset   = call.argument<Number>("offset")?.toLong() ?: 0L
+                        val data     = call.argument<ByteArray>("data")
+                        if (fileName == null || data == null) {
+                            result.error("INVALID_ARGS", "fileName and data required", null); return@setMethodCallHandler
                         }
                         if (data.size > MAX_CHUNK_BYTES) {
                             result.error("INVALID_ARGS", "Chunk too large (max $MAX_CHUNK_BYTES bytes)", null)
                             return@setMethodCallHandler
                         }
-
-                        Thread {
-                            try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
-                                    }
-                                val success = synchronized(VeraCryptSession.locks[volId]) {
-                                    VeraCryptEngine.writeFileChunkNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, offset, data, volId)
-                                }
-                                runOnUiThread { result.success(success) }
-                            } catch (e: Exception) {
-                                runOnUiThread {
-                                    if (isNotUnlockedException(e)) {
-                                        result.error("NOT_UNLOCKED", e.message, null)
-                                    } else {
-                                        result.error("C++_ERROR", e.message, null)
-                                    }
-                                }
-                            }
-                        }.start()
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.writeFileChunkNative(
+                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
+                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, offset, data, volId)
+                        }
                     }
 
                     else -> result.notImplemented()

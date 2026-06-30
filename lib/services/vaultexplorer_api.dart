@@ -132,6 +132,19 @@ class VaultExplorerApi {
     return result ?? false;
   }
 
+  Future<bool> updateContainerSettings(
+      String filePath, String displayName, bool documentProvider) async {
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.updateContainerSettings,
+      {
+        'filePath': filePath,
+        'displayName': displayName,
+        'documentProvider': documentProvider,
+      },
+    );
+    return result ?? false;
+  }
+
   // ── File I/O ──────────────────────────────────────────────────────────────
 
   Future<bool> openWithApp(MountedContainer container, String fileName) async {

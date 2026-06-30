@@ -227,7 +227,23 @@ class _VaultDashboardState extends State<VaultDashboard>
         onSaved: (record) async {
           if (mounted) setState(() => _records[uri] = record);
           final idx = _mounted.indexWhere((m) => m.uri == uri);
-          if (idx != -1) _scheduleAutoClose(_mounted[idx]);
+          if (idx != -1) {
+            final oldContainer = _mounted[idx];
+            final newName = record.label.isNotEmpty 
+                ? record.label 
+                : record.uri.split('/').last;
+                
+            final newContainer = oldContainer.copyWith(displayName: newName);
+            if (mounted) setState(() => _mounted[idx] = newContainer);
+            
+            await vaultExplorerApi.updateContainerSettings(
+              uri,
+              newName,
+              record.documentProvider,
+            );
+            
+            _scheduleAutoClose(newContainer);
+          }
         },
         onForget: _mounted.any((m) => m.uri == uri)
             ? null

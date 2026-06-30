@@ -51,6 +51,7 @@ private object ChannelMethods {
     const val HASH_PASSWORD       = "hashPassword"
     const val WRITE_FILE_CHUNK    = "writeFileChunk"
     const val SET_SECURE_SCREEN   = "setSecureScreen"
+    const val UPDATE_CONTAINER_SETTINGS = "updateContainerSettings"
 }
 
 private const val MAX_CHUNK_BYTES = 64 * 1024 * 1024  // 64 MB
@@ -790,6 +791,33 @@ class MainActivity : FlutterFragmentActivity() {
                                     }
                                 }
                             }.start()
+                        } else {
+                            result.success(false)
+                        }
+                    }
+
+                    ChannelMethods.UPDATE_CONTAINER_SETTINGS -> {
+                        val uriString = call.argument<String>("filePath")
+                        val displayName = call.argument<String>("displayName")
+                        val docProvider = call.argument<Boolean>("documentProvider") ?: false
+
+                        if (uriString == null) {
+                            result.error("INVALID_ARGS", "filePath is required", null)
+                            return@setMethodCallHandler
+                        }
+                        val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+                        if (volId != null) {
+                            val session = VeraCryptSession.activeSessions[volId]
+                            if (session != null) {
+                                session.displayName = displayName
+                                session.documentProvider = docProvider
+                                contentResolver.notifyChange(
+                                    DocumentsContract.buildRootsUri(
+                                        "com.aeidolon.vaultexplorer.documents"), null)
+                                result.success(true)
+                            } else {
+                                result.success(false)
+                            }
                         } else {
                             result.success(false)
                         }

@@ -4,8 +4,8 @@ data class ContainerSession(
     val uri: String,
     val volId: Int,
     var cachedFilesList: List<String>,
-    val displayName: String? = null,
-    val documentProvider: Boolean = false,
+    var displayName: String? = null,
+    var documentProvider: Boolean = false,
 )
 
 object VeraCryptSession {

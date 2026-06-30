@@ -18,13 +18,14 @@ class MountedContainer {
   });
 
   MountedContainer copyWith({
+    String? displayName,
     List<String>? rootFiles,
     int? totalSpace,
     int? freeSpace,
   }) {
     return MountedContainer(
       uri: uri,
-      displayName: displayName,
+      displayName: displayName ?? this.displayName,
       volId: volId,
       rootFiles: rootFiles ?? this.rootFiles,
       mountedAt: mountedAt,

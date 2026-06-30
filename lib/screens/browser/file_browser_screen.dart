@@ -61,7 +61,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   List<String> _currentItems = [];
   bool _isLoading = false;
   int _freeSpace = 0;
-
+  bool _isListingTruncated = false;
   String? _statusMessage;
   bool _statusIsError = false;
 
@@ -161,12 +161,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       );
       final space = await vaultExplorerApi.getSpaceInfo(widget.container);
       if (mounted) {
-        setState(() {
-          _currentItems = items ?? [];
-          if (space != null && space.length > 1) _freeSpace = space[1];
-          _isLoading = false;
-        });
-      }
+    final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
+    setState(() {
+        _currentItems = items?.where(
+            (f) => !f.startsWith('System:')).toList() ?? [];
+        _isListingTruncated = isTruncated;   // new bool field
+        if (space != null && space.length > 1) _freeSpace = space[1];
+        _isLoading = false;
+    });
+}
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -1352,6 +1355,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (_searchQuery.trim().isNotEmpty && dirs.isEmpty && files.isEmpty) {
       return _SearchEmptyState(query: _searchQuery.trim());
     }
+
+    if (_isListingTruncated) {
+      _TruncatedBanner();
+    }
+
     if (_layoutMode == BrowserLayoutMode.grid) {
       return FileGridView(
         container: widget.container,
@@ -1377,7 +1385,34 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 }
+// New widget — same visual language as _StatusBar:
+class _TruncatedBanner extends StatelessWidget {
+  const _TruncatedBanner();
 
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      color: cs.tertiaryContainer,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(children: [
+        Icon(Icons.warning_amber_rounded, size: 16,
+             color: cs.onTertiaryContainer),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Showing first 50,000 items — this folder has more files.',
+            style: textTheme.bodySmall?.copyWith(
+              color: cs.onTertiaryContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}
 // ── Filter chips bar ──────────────────────────────────────────────────────────
 
 class _FilterChipsBar extends StatelessWidget {

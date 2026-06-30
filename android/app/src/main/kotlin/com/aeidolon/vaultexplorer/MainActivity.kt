@@ -299,12 +299,8 @@ class MainActivity : FlutterFragmentActivity() {
             Thread {
                 try {
                     val tempFile = File(cacheDir, "export_temp")
-                    val success = synchronized(VeraCryptSession.locks[pending.volId]) {
-                        VeraCryptEngine.unlockAndExtractNative(
-                            VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                            VeraCryptEngine.SESSION_PIM_UNUSED, pending.sourcePath, tempFile.absolutePath, pending.volId
-                        )
-                    }
+                    val success = VeraCryptBridge.extractToFile(pending.volId, pending.sourcePath, tempFile.absolutePath)
+                    
                     if (success && tempFile.exists()) {
                         contentResolver.openOutputStream(destUri)?.use { out ->
                             tempFile.inputStream().use { it.copyTo(out) }
@@ -466,9 +462,9 @@ class MainActivity : FlutterFragmentActivity() {
                         val name = call.argument<String>("displayName") ?: "vault.tc"
                         val password = call.argument<String>("password")
                         if (password == null) {
-        result.error("INVALID_ARGS", "password required", null)
-        return@setMethodCallHandler
-    }
+                            result.error("INVALID_ARGS", "password required", null)
+                            return@setMethodCallHandler
+                        }
 
                         pendingCreate = PendingCreate(
                             name        = name,
@@ -872,9 +868,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName and destPath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.unlockAndExtractNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, destPath, volId)
+                            VeraCryptEngine.extractFile(fileName, destPath, volId)
                         }
                     }
 
@@ -884,18 +878,14 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.getFileSizeNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
+                            VeraCryptEngine.getFileSize(fileName, volId)
                         }
                     }
 
                     ChannelMethods.GET_FOLDER_SIZE -> {
                         val dirPath = call.argument<String>("dirPath") ?: ""
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.getFolderSizeNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)
+                            VeraCryptEngine.getFolderSize(dirPath, volId)
                         }
                     }
 
@@ -911,18 +901,14 @@ class MainActivity : FlutterFragmentActivity() {
                             return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.readFileChunkNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, offset, length, volId)
+                            VeraCryptEngine.readFileChunk(fileName, offset, length, volId)
                         }
                     }
 
                     ChannelMethods.LIST_DIRECTORY -> {
                         val dirPath = call.argument<String>("dirPath") ?: ""
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.listDirectoryNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)?.toList()
+                            VeraCryptEngine.listDirectory(dirPath, volId)?.toList()
                         }
                     }
 
@@ -932,9 +918,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "dirPath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.createDirectoryNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, dirPath, volId)
+                            VeraCryptEngine.createDirectory(dirPath, volId)
                         }
                     }
 
@@ -945,9 +929,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "oldPath and newPath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.renameFileNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, oldPath, newPath, volId)
+                            VeraCryptEngine.renameFile(oldPath, newPath, volId)
                         }
                     }
 
@@ -958,17 +940,13 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName and sourcePath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.writeBackFileNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, sourcePath, volId)
+                            VeraCryptEngine.writeBackFile(fileName, sourcePath, volId)
                         }
                     }
 
                     ChannelMethods.GET_SPACE_INFO -> {
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.getSpaceInfoNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, volId)?.toList()
+                            VeraCryptEngine.getSpaceInfo(volId)?.toList()
                         }
                     }
 
@@ -978,9 +956,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.deleteFileNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
+                            VeraCryptEngine.deleteFile(fileName, volId)
                         }
                     }
 
@@ -1048,81 +1024,81 @@ class MainActivity : FlutterFragmentActivity() {
                     }
 
                     ChannelMethods.IMPORT_FILE -> {
-    val containerUri = call.argument<String>("filePath")
-    if (containerUri == null) {
-        result.error("INVALID_ARGS", "filePath is required", null)
-        return@setMethodCallHandler
-    }
-    val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
-    if (volId == null) {
-        result.error("NOT_MOUNTED", "Container is not mounted", null)
-        return@setMethodCallHandler
-    }
-    pendingImport = PendingImport(containerUri, call.argument<String>("targetPath") ?: "", volId)
-    pendingResultCheck(result)
-    importFileLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-        addCategory(Intent.CATEGORY_OPENABLE)
-        type = "*/*"
-        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-    })
-}
+                        val containerUri = call.argument<String>("filePath")
+                        if (containerUri == null) {
+                            result.error("INVALID_ARGS", "filePath is required", null)
+                            return@setMethodCallHandler
+                        }
+                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                        if (volId == null) {
+                            result.error("NOT_MOUNTED", "Container is not mounted", null)
+                            return@setMethodCallHandler
+                        }
+                        pendingImport = PendingImport(containerUri, call.argument<String>("targetPath") ?: "", volId)
+                        pendingResultCheck(result)
+                        importFileLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        })
+                    }
 
                     ChannelMethods.EXPORT_FILES_FOLDER -> {
-    val containerUri = call.argument<String>("filePath")
-    if (containerUri == null) {
-        result.error("INVALID_ARGS", "filePath is required", null)
-        return@setMethodCallHandler
-    }
-    val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
-    if (volId == null) {
-        result.error("NOT_MOUNTED", "Container not mounted", null)
-        return@setMethodCallHandler
-    }
-    @Suppress("UNCHECKED_CAST")
-    val items = (call.argument<List<*>>("items"))?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
-    pendingExportMulti = PendingExportMulti(containerUri, items, volId)
-    pendingResultCheck(result)   // ← moved here
-    exportFilesFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
-}
+                        val containerUri = call.argument<String>("filePath")
+                        if (containerUri == null) {
+                            result.error("INVALID_ARGS", "filePath is required", null)
+                            return@setMethodCallHandler
+                        }
+                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                        if (volId == null) {
+                            result.error("NOT_MOUNTED", "Container not mounted", null)
+                            return@setMethodCallHandler
+                        }
+                        @Suppress("UNCHECKED_CAST")
+                        val items = (call.argument<List<*>>("items"))?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
+                        pendingExportMulti = PendingExportMulti(containerUri, items, volId)
+                        pendingResultCheck(result)
+                        exportFilesFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
+                    }
 
                     ChannelMethods.IMPORT_FOLDER -> {
-    val containerUri = call.argument<String>("filePath")
-    if (containerUri == null) {
-        result.error("INVALID_ARGS", "filePath is required", null)
-        return@setMethodCallHandler
-    }
-    val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
-    if (volId == null) {
-        result.error("NOT_MOUNTED", "Container is not mounted", null)
-        return@setMethodCallHandler
-    }
-    pendingImportFolder = PendingImportFolder(containerUri, call.argument<String>("targetPath") ?: "", volId)
-    pendingResultCheck(result)   // ← moved here
-    importFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
-}
+                        val containerUri = call.argument<String>("filePath")
+                        if (containerUri == null) {
+                            result.error("INVALID_ARGS", "filePath is required", null)
+                            return@setMethodCallHandler
+                        }
+                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                        if (volId == null) {
+                            result.error("NOT_MOUNTED", "Container is not mounted", null)
+                            return@setMethodCallHandler
+                        }
+                        pendingImportFolder = PendingImportFolder(containerUri, call.argument<String>("targetPath") ?: "", volId)
+                        pendingResultCheck(result)
+                        importFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
+                    }
 
                     ChannelMethods.EXPORT_FILE -> {
-    val containerUri = call.argument<String>("filePath")
-    val sourcePath = call.argument<String>("sourcePath")
-    if (containerUri == null || sourcePath == null) {
-        result.error("INVALID_ARGS", "filePath and sourcePath required", null)
-        return@setMethodCallHandler
-    }
-    val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
-    if (volId == null) {
-        result.error("NOT_MOUNTED", "Container not mounted", null)
-        return@setMethodCallHandler
-    }
-    pendingExportFile = PendingExportFile(containerUri, sourcePath, volId)
-    pendingResultCheck(result)   // ← moved here
-    val fileName = sourcePath.split("/").last()
-    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-        addCategory(Intent.CATEGORY_OPENABLE)
-        type = getMimeType(fileName)
-        putExtra(Intent.EXTRA_TITLE, fileName)
-    }
-    exportFileLauncher.launch(intent)
-}
+                        val containerUri = call.argument<String>("filePath")
+                        val sourcePath = call.argument<String>("sourcePath")
+                        if (containerUri == null || sourcePath == null) {
+                            result.error("INVALID_ARGS", "filePath and sourcePath required", null)
+                            return@setMethodCallHandler
+                        }
+                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                        if (volId == null) {
+                            result.error("NOT_MOUNTED", "Container not mounted", null)
+                            return@setMethodCallHandler
+                        }
+                        pendingExportFile = PendingExportFile(containerUri, sourcePath, volId)
+                        pendingResultCheck(result)
+                        val fileName = sourcePath.split("/").last()
+                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = getMimeType(fileName)
+                            putExtra(Intent.EXTRA_TITLE, fileName)
+                        }
+                        exportFileLauncher.launch(intent)
+                    }
 
                     ChannelMethods.WRITE_FILE_CHUNK -> {
                         val fileName = call.argument<String>("fileName")
@@ -1136,9 +1112,7 @@ class MainActivity : FlutterFragmentActivity() {
                             return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.writeFileChunkNative(
-                                VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED,
-                                VeraCryptEngine.SESSION_PIM_UNUSED, fileName, offset, data, volId)
+                            VeraCryptEngine.writeFileChunk(fileName, offset, data, volId)
                         }
                     }
 
@@ -1172,9 +1146,7 @@ class MainActivity : FlutterFragmentActivity() {
         if (!isDir) {
             return try {
                 val tempFile = File(cacheDir, "export_${System.nanoTime()}")
-                val ok  = synchronized(VeraCryptSession.locks[volId]) {
-                    VeraCryptEngine.unlockAndExtractNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fatPath, tempFile.absolutePath, volId)
-                }
+                val ok = VeraCryptBridge.extractToFile(volId, fatPath, tempFile.absolutePath)
                 var written = 0
                 if (ok && tempFile.exists()) {
                     destParent.findFile(name)?.delete()
@@ -1190,14 +1162,13 @@ class MainActivity : FlutterFragmentActivity() {
             } catch (_: Exception) { 0 }
         }
         val destDir = destParent.createDirectory(name) ?: return 0
-        val children = synchronized(VeraCryptSession.locks[volId]) {
-            VeraCryptEngine.listDirectoryNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fatPath, volId)
-        } ?: return 0
+        val children = VeraCryptBridge.listDirectory(volId, fatPath) ?: return 0
         var count = 0
         for (entry in children) {
             if (entry.startsWith("System:")) continue
             val childIsDir = entry.startsWith("[DIR] ")
-            val childName = if (childIsDir) entry.substringAfter("[DIR] ").substringBefore("|") else entry.substringBefore("|")
+            val childName = if (childIsDir) entry.substringAfter("[DIR] ").substringBefore("|")
+                            else entry.substringBefore("|")
             count += exportEntryRecursive(destDir, "$fatPath/$childName", childIsDir, containerUri, volId)
         }
         return count
@@ -1207,9 +1178,7 @@ class MainActivity : FlutterFragmentActivity() {
         srcDoc: DocumentFile, containerUri: String, targetFatPath: String, volId: Int
     ): Int {
         if (srcDoc.isDirectory) {
-            synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.createDirectoryNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, targetFatPath, volId)
-            }
+            VeraCryptBridge.createDirectory(volId, targetFatPath)
             var count = 0
             for (child in srcDoc.listFiles()) {
                 val childName = child.name ?: continue
@@ -1222,9 +1191,7 @@ class MainActivity : FlutterFragmentActivity() {
             contentResolver.openInputStream(srcDoc.uri)?.use { inp ->
                 tempFile.outputStream().use { inp.copyTo(it) }
             }
-            val ok = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.writeBackFileNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, targetFatPath, tempFile.absolutePath, volId)
-            }
+            val ok = VeraCryptBridge.writeBackFile(volId, targetFatPath, tempFile.absolutePath)
             tempFile.delete()
             if (ok) 1 else 0
         } catch (_: Exception) { 0 }
@@ -1247,9 +1214,7 @@ class VeraCryptInputStream(
     private var markedPosition: Long = 0L
 
     init {
-        fileSize = synchronized(VeraCryptSession.locks[volId]) {
-            VeraCryptEngine.getFileSizeNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
-        }
+        fileSize = VeraCryptBridge.getFileSize(volId, fileName)
     }
 
     override fun read(): Int {
@@ -1261,14 +1226,9 @@ class VeraCryptInputStream(
 
     override fun read(b: ByteArray, off: Int, len: Int): Int {
         if (fileSize >= 0 && position >= fileSize) return -1
-        val currentSize = fileSize
-        val toRead = minOf(len.toLong(), currentSize - position).toInt()
+        val toRead = minOf(len.toLong(), fileSize - position).toInt()
         if (toRead <= 0) return -1
-
-        val chunk = synchronized(VeraCryptSession.locks[volId]) {
-            VeraCryptEngine.readFileChunkNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, position, toRead, volId)
-        } ?: return -1
-
+        val chunk = VeraCryptBridge.readFileChunk(volId, fileName, position, toRead) ?: return -1
         if (chunk.isEmpty()) return -1
         val actual = minOf(chunk.size, toRead)
         System.arraycopy(chunk, 0, b, off, actual)
@@ -1278,36 +1238,24 @@ class VeraCryptInputStream(
 
     override fun skip(n: Long): Long {
         if (n <= 0) return 0
-        val currentSize = fileSize
-        val actualSkip = minOf(n, currentSize - position)
+        val actualSkip = minOf(n, fileSize - position)
         position += actualSkip
         return actualSkip
     }
 
     override fun available(): Int {
-        val currentSize = fileSize
-        return if (currentSize >= 0) {
-            val avail = currentSize - position
-            if (avail > Int.MAX_VALUE) Int.MAX_VALUE else avail.toInt()
-        } else 0
-    }
-
-    override fun markSupported(): Boolean = true
-
-    override fun mark(readlimit: Int) {
-        synchronized(this) {
-            markedPosition = position
+        val avail = fileSize - position
+        return when {
+            fileSize < 0       -> 0
+            avail > Int.MAX_VALUE -> Int.MAX_VALUE
+            else               -> avail.toInt()
         }
     }
 
-    override fun reset() {
-        synchronized(this) {
-            position = markedPosition
-        }
-    }
+    override fun markSupported() = true
+    override fun mark(readlimit: Int) { synchronized(this) { markedPosition = position } }
+    override fun reset()              { synchronized(this) { position = markedPosition } }
 }
-
-// ── VeraCryptMediaDataSource (Optimized Native Video Stream) ─────────────────────
 
 @TargetApi(Build.VERSION_CODES.M)
 class VeraCryptMediaDataSource(
@@ -1321,11 +1269,9 @@ class VeraCryptMediaDataSource(
 
     override fun getSize(): Long {
         if (cachedSize >= 0) return cachedSize
-        try {
-            cachedSize = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.getFileSizeNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, volId)
-            }
-        } catch (_: Exception) { cachedSize = 0L }
+        cachedSize = try {
+            VeraCryptBridge.getFileSize(volId, fileName)
+        } catch (_: Exception) { 0L }
         return cachedSize
     }
 
@@ -1334,16 +1280,14 @@ class VeraCryptMediaDataSource(
         if (position >= fileLength) return -1
         val readSize = minOf(size.toLong(), fileLength - position).toInt()
         if (readSize <= 0) return -1
-        try {
-            val chunk = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.readFileChunkNative(
-                    VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fileName, position, readSize, volId)
-            } ?: return -1
+        return try {
+            val chunk = VeraCryptBridge.readFileChunk(volId, fileName, position, readSize)
+                ?: return -1
             if (chunk.isEmpty()) return -1
             val actualRead = minOf(chunk.size, readSize)
             System.arraycopy(chunk, 0, buffer, offset, actualRead)
-            return actualRead
-        } catch (_: Exception) { return -1 }
+            actualRead
+        } catch (_: Exception) { -1 }
     }
 
     override fun close() {}

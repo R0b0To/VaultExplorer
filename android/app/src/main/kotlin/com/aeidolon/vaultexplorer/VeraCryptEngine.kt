@@ -1,66 +1,71 @@
 package com.aeidolon.vaultexplorer
 
+/**
+ * JNI bridge to vaultexplorer.cpp.
+ *
+ * API is split into two clear tiers:
+ *
+ *   1. Session-establishment calls — take a real fd + password + pim because
+ *      they are creating the crypto session from scratch.
+ *
+ *   2. Stateless calls — take volId only; the C++ side asserts an active
+ *      session exists via requireActiveSession() and throws
+ *      IllegalStateException("NOT_UNLOCKED: ...") if it doesn't.
+ *
+ * The old fd/password/pim-carrying variants of the stateless calls have been
+ * removed. All call sites now go through VeraCryptBridge which holds the
+ * single synchronized(VeraCryptSession.locks[volId]) wrapper.
+ */
 object VeraCryptEngine {
     init {
         System.loadLibrary("vaultexplorer")
     }
-     // Sentinel values passed to "stateless" natives (list/read/write/size/etc.)
-    // that operate on an already-unlocked session. These natives ignore fd/
-    // password/pim entirely
-    const val SESSION_FD_UNUSED = -1
-    const val SESSION_PW_UNUSED = ""
-    const val SESSION_PIM_UNUSED = 0
 
-    @JvmStatic
-    external fun unlockAndListNative(fd: Int, password: String, pim: Int, volId: Int): Array<String>?
+    // ── Tier 1: session establishment ──────────────────────────────────────
 
+    /** Opens fd, runs PBKDF2, mounts the FAT layer, returns root listing. */
     @JvmStatic
-    external fun unlockAndExtractNative(fd: Int, password: String, pim: Int, targetFileName: String, destPath: String, volId: Int): Boolean
+    external fun unlockAndListNative(
+        fd: Int, password: String, pim: Int, volId: Int
+    ): Array<String>?
 
+    /** Writes a new VeraCrypt container to fd, formats it. */
     @JvmStatic
-    external fun writeBackFileNative(fd: Int, password: String, pim: Int, targetFileName: String, sourcePath: String, volId: Int): Boolean
+    external fun createContainerNative(
+        fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String
+    ): Boolean
 
+    /** PBKDF2-SHA512 via mbedTLS; no volId, no session required. */
     @JvmStatic
-    external fun deleteFileNative(fd: Int, password: String, pim: Int, targetFileName: String, volId: Int): Boolean
+    external fun hashPasswordNative(
+        password: String, salt: ByteArray, iterations: Int
+    ): ByteArray?
+
+    // ── Session teardown ───────────────────────────────────────────────────
 
     @JvmStatic
     external fun lockNative(volId: Int)
 
-    @JvmStatic
-    external fun getFileSizeNative(fd: Int, password: String, pim: Int, targetFileName: String, volId: Int): Long
+    // ── Tier 2: stateless file operations (volId-only) ─────────────────────
 
-    /** Returns the recursive byte total for every file under [dirPath] inside volume [volId]. */
-    @JvmStatic
-    external fun getFolderSizeNative(fd: Int, password: String, pim: Int, dirPath: String, volId: Int): Long
+    @JvmStatic external fun listDirectory(dirPath: String, volId: Int): Array<String>?
+    @JvmStatic external fun getFileSize(fileName: String, volId: Int): Long
+    @JvmStatic external fun getFolderSize(dirPath: String, volId: Int): Long
+    @JvmStatic external fun readFileChunk(fileName: String, offset: Long, length: Int, volId: Int): ByteArray?
+    @JvmStatic external fun writeFileChunk(fileName: String, offset: Long, data: ByteArray, volId: Int): Boolean
+    @JvmStatic external fun writeBackFile(targetFileName: String, sourcePath: String, volId: Int): Boolean
+    @JvmStatic external fun extractFile(targetFileName: String, destPath: String, volId: Int): Boolean
+    @JvmStatic external fun deleteFile(targetFileName: String, volId: Int): Boolean
+    @JvmStatic external fun createDirectory(dirPath: String, volId: Int): Boolean
+    @JvmStatic external fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean
+    @JvmStatic external fun getSpaceInfo(volId: Int): LongArray?
 
-    @JvmStatic
-    external fun readFileChunkNative(fd: Int, password: String, pim: Int, targetFileName: String, offset: Long, length: Int, volId: Int): ByteArray?
+    // ── Tier 2: stream lifecycle ───────────────────────────────────────────
+    // Used exclusively by VeraCryptProxyCallback. Passes a raw C++ FIL*
+    // as a Long — kept separate from the one-shot stateless methods above
+    // because the pointer lifetime is tied to the ProxyFileDescriptor callback.
 
-    @JvmStatic
-    external fun writeFileChunkNative(fd: Int, password: String, pim: Int, targetFileName: String, offset: Long, data: ByteArray, volId: Int): Boolean
-
-    @JvmStatic
-    external fun listDirectoryNative(fd: Int, password: String, pim: Int, dirPath: String, volId: Int): Array<String>?
-
-    @JvmStatic
-    external fun createDirectoryNative(fd: Int, password: String, pim: Int, dirPath: String, volId: Int): Boolean
-
-    @JvmStatic
-    external fun renameFileNative(fd: Int, password: String, pim: Int, oldPath: String, newPath: String, volId: Int): Boolean
-
-    @JvmStatic
-    external fun getSpaceInfoNative(fd: Int, password: String, pim: Int, volId: Int): LongArray?
-
-    @JvmStatic
-    external fun createContainerNative(fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String): Boolean
-
-    @JvmStatic
-    external fun hashPasswordNative(password: String, salt: ByteArray, iterations: Int): ByteArray?
-
-    @JvmStatic
-external fun readFileChunkDirectNative(fd: Int, password: String, pim: Int, targetFileName: String, offset: Long, buffer: ByteArray, length: Int, volId: Int): Int
-
-@JvmStatic external fun openStreamNative(fd: Int, password: String, pim: Int, targetFileName: String, volId: Int): Long
-@JvmStatic external fun readStreamNative(streamPtr: Long, offset: Long, buffer: ByteArray, length: Int, volId: Int): Int
-@JvmStatic external fun closeStreamNative(streamPtr: Long, volId: Int)
+    @JvmStatic external fun openStream(targetFileName: String, volId: Int): Long
+    @JvmStatic external fun readStream(streamPtr: Long, offset: Long, outBuffer: ByteArray, length: Int, volId: Int): Int
+    @JvmStatic external fun closeStream(streamPtr: Long, volId: Int)
 }

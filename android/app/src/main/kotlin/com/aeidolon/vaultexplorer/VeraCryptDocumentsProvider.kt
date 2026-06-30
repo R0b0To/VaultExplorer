@@ -1,4 +1,3 @@
-// android/app/src/main/kotlin/com/aeidolon/vaultexplorer/VeraCryptDocumentsProvider.kt
 package com.aeidolon.vaultexplorer
 
 import android.content.Context
@@ -22,6 +21,7 @@ import android.system.ErrnoException
 import android.system.OsConstants
 import java.io.File
 import java.io.FileNotFoundException
+import java.io.FileOutputStream
 
 class VeraCryptDocumentsProvider : DocumentsProvider() {
 
@@ -48,14 +48,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
 
     override fun onCreate() = true
 
-    // Centralised session lookup. Ensures we never operate on an inactive
-    // session (which would pass an empty password to native, silently failing).
-    private fun requireSession(volId: Int): ContainerSession =
-        VeraCryptSession.activeSessions[volId]
-            ?: throw FileNotFoundException(
-                "No active session for volume $volId. " +
-                "Please unlock the container first."
-            )
+    // ── Roots ──────────────────────────────────────────────────────────────
 
     override fun queryRoots(projection: Array<out String>?): Cursor {
         var flags = DocumentsContract.Root.FLAG_SUPPORTS_CREATE or
@@ -68,7 +61,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val cursor = MatrixCursor(projection ?: defaultRootProjection)
         for ((volId, session) in VeraCryptSession.activeSessions.filter { it.value.documentProvider }) {
             val rootTitle = session.displayName ?: getFileNameFromUri(session.uri)
-            val (totalBytes, freeBytes) = getRealSpace(session)
+            val (totalBytes, freeBytes) = VeraCryptBridge.getSpacePair(volId)
             val rootSummary = if (totalBytes > 0)
                 "Volume — ${android.text.format.Formatter.formatFileSize(context, freeBytes)} free"
             else "Volume"
@@ -76,11 +69,13 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             cursor.newRow().apply {
                 add(DocumentsContract.Root.COLUMN_ROOT_ID, volId.toString())
                 add(DocumentsContract.Root.COLUMN_MIME_TYPES, "*/*")
-                add(DocumentsContract.Root.COLUMN_DOCUMENT_ID, DocumentId(volId, "dir", "").toString())
+                add(DocumentsContract.Root.COLUMN_DOCUMENT_ID,
+                    DocumentId(volId, "dir", "").toString())
                 add(DocumentsContract.Root.COLUMN_TITLE, rootTitle)
                 add(DocumentsContract.Root.COLUMN_SUMMARY, rootSummary)
                 add(DocumentsContract.Root.COLUMN_FLAGS, flags)
-                add(DocumentsContract.Root.COLUMN_ICON, android.R.drawable.ic_lock_idle_charging)
+                add(DocumentsContract.Root.COLUMN_ICON,
+                    android.R.drawable.ic_lock_idle_charging)
                 add(DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, freeBytes)
                 add(DocumentsContract.Root.COLUMN_CAPACITY_BYTES, totalBytes)
             }
@@ -103,6 +98,8 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val volId = rootId?.toIntOrNull()
             ?.takeIf { it in 0 until VeraCryptSession.MAX_VOLUMES }
             ?: return
+        // lockNative takes only volId — no session required, so direct call
+        // (not via Bridge) is correct here; the Bridge requires an active session.
         VeraCryptEngine.lockNative(volId)
         VeraCryptSession.removeSession(volId)
         context?.contentResolver?.notifyChange(
@@ -110,19 +107,22 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         )
     }
 
+    // ── Document queries ───────────────────────────────────────────────────
+
     override fun queryDocument(documentId: String?, projection: Array<out String>?): Cursor {
-        val cursor = MatrixCursor(projection ?: defaultDocumentProjection)
+        val cursor  = MatrixCursor(projection ?: defaultDocumentProjection)
         val doc     = DocumentId.parse(documentId, "document")
         val volId   = doc.volId
         val fatPath = doc.fatPath
 
-        val displayName = if (fatPath.isEmpty()) "Root $volId" else fatPath.substringAfterLast("/")
-        val mimeType    = if (doc.isDir) DocumentsContract.Document.MIME_TYPE_DIR
-                          else MimeTypeHelper.getMimeType(displayName)
+        val displayName = if (fatPath.isEmpty()) "Root $volId"
+                          else fatPath.substringAfterLast("/")
+        val mimeType = if (doc.isDir) DocumentsContract.Document.MIME_TYPE_DIR
+                       else MimeTypeHelper.getMimeType(displayName)
 
         val size: Long = if (doc.isDir) 0L else {
             try {
-                requireSession(volId)
+                VeraCryptBridge.requireSession(volId)  // fast existence check
                 VeraCryptBridge.getFileSize(volId, fatPath)
             } catch (_: Exception) { 0L }
         }
@@ -132,7 +132,8 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             flags = flags or DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
         } else {
             flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_WRITE
-            if (mimeType.startsWith("image/")) flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL
+            if (mimeType.startsWith("image/"))
+                flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL
         }
 
         cursor.newRow().apply {
@@ -154,7 +155,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val parent        = DocumentId.parse(parentDocumentId, "parent")
         val volId         = parent.volId
         val parentFatPath = parent.fatPath
-        requireSession(volId)
+        VeraCryptBridge.requireSession(volId)   // throws FileNotFoundException if not unlocked
 
         try {
             val files = VeraCryptBridge.listDirectory(volId, parentFatPath)
@@ -163,17 +164,21 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                 val isDir     = file.startsWith("[DIR] ")
                 val cleanName = if (isDir) file.substringAfter("[DIR] ").substringBefore("|")
                                 else file.substringBefore("|")
-                val size      = if (isDir) 0L else file.split("|").getOrNull(1)?.toLongOrNull() ?: 0L
-                val childFatPath = if (parentFatPath.isEmpty()) cleanName else "$parentFatPath/$cleanName"
+                val size      = if (isDir) 0L
+                                else file.split("|").getOrNull(1)?.toLongOrNull() ?: 0L
+                val childFatPath = if (parentFatPath.isEmpty()) cleanName
+                                   else "$parentFatPath/$cleanName"
                 val childType    = if (isDir) "dir" else "file"
                 val childMime    = if (isDir) DocumentsContract.Document.MIME_TYPE_DIR
                                    else MimeTypeHelper.getMimeType(cleanName)
 
                 var flags = DocumentsContract.Document.FLAG_SUPPORTS_DELETE
-                if (isDir) flags = flags or DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
-                else {
+                if (isDir) {
+                    flags = flags or DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
+                } else {
                     flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_WRITE
-                    if (childMime.startsWith("image/")) flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL
+                    if (childMime.startsWith("image/"))
+                        flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL
                 }
 
                 cursor.newRow().apply {
@@ -186,7 +191,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                 }
             }
         } catch (e: FileNotFoundException) {
-            throw e // Re-throw session-not-found errors
+            throw e
         } catch (e: Exception) {
             android.util.Log.e("vaultexplorer_Provider",
                 "queryChildDocuments failed for $parentDocumentId: ${e.javaClass.simpleName}")
@@ -194,20 +199,29 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         return cursor
     }
 
+    // ── Mutations ──────────────────────────────────────────────────────────
+
     @Throws(FileNotFoundException::class)
-    override fun createDocument(parentDocumentId: String?, mimeType: String?, displayName: String?): String {
+    override fun createDocument(
+        parentDocumentId: String?,
+        mimeType: String?,
+        displayName: String?
+    ): String {
         val parent        = DocumentId.parse(parentDocumentId, "parent")
         val volId         = parent.volId
         val parentFatPath = parent.fatPath
-        requireSession(volId)
-        val fileName      = displayName ?: throw FileNotFoundException("No file name provided")
-        val cleanPath     = if (parentFatPath.isEmpty()) fileName else "$parentFatPath/$fileName"
-        val isDirectory   = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
+        VeraCryptBridge.requireSession(volId)
+        val fileName  = displayName ?: throw FileNotFoundException("No file name provided")
+        val cleanPath = if (parentFatPath.isEmpty()) fileName else "$parentFatPath/$fileName"
+        val isDirectory = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
 
         val success = if (isDirectory) {
             VeraCryptBridge.createDirectory(volId, cleanPath)
         } else {
-            val tempFile = File(context?.cacheDir, "vc_new_${volId}_${cleanPath.hashCode()}_$fileName")
+            val tempFile = File(
+                context?.cacheDir,
+                "vc_new_${volId}_${cleanPath.hashCode()}_$fileName"
+            )
             try {
                 tempFile.delete()
                 tempFile.createNewFile()
@@ -231,8 +245,8 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
     override fun deleteDocument(documentId: String?) {
         val doc     = DocumentId.parse(documentId, "document")
         val volId   = doc.volId
-        requireSession(volId)
         val fatPath = doc.fatPath
+        VeraCryptBridge.requireSession(volId)
 
         val success = VeraCryptBridge.deleteFile(volId, fatPath)
         if (!success) throw FileNotFoundException("Delete failed for $fatPath")
@@ -245,6 +259,8 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         )
     }
 
+    // ── File open (proxy) ──────────────────────────────────────────────────
+
     @Throws(FileNotFoundException::class)
     override fun openDocument(
         documentId: String?,
@@ -253,14 +269,16 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
     ): ParcelFileDescriptor {
         val doc     = DocumentId.parse(documentId, "document")
         val volId   = doc.volId
-        val session = requireSession(volId)
+        val session = VeraCryptBridge.requireSession(volId)
         val fatPath = doc.fatPath
         val isWrite = mode?.contains("w") == true || mode?.contains("r+") == true
 
         val storageManager = context?.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
             ?: throw FileNotFoundException("Could not obtain StorageManager")
 
-        val handlerThread = HandlerThread("vc_proxy_${volId}_${System.nanoTime()}").apply { start() }
+        val handlerThread = HandlerThread(
+            "vc_proxy_${volId}_${System.nanoTime()}"
+        ).apply { start() }
         val handler = Handler(handlerThread.looper)
 
         val callback = VeraCryptProxyCallback(volId, session, fatPath, isWrite, handlerThread)
@@ -270,9 +288,13 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             storageManager.openProxyFileDescriptor(parcelMode, callback, handler)
         } catch (e: Exception) {
             handlerThread.quitSafely()
-            throw FileNotFoundException("Failed to open proxy file descriptor: ${e.message}")
+            throw FileNotFoundException(
+                "Failed to open proxy file descriptor: ${e.message}"
+            )
         }
     }
+
+    // ── Thumbnail ──────────────────────────────────────────────────────────
 
     @Throws(FileNotFoundException::class)
     override fun openDocumentThumbnail(
@@ -283,8 +305,10 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         val doc     = DocumentId.parse(documentId, "document")
         val volId   = doc.volId
         val fatPath = doc.fatPath
-        if (fatPath.isEmpty()) throw FileNotFoundException("Cannot generate thumbnail for volume root")
-        requireSession(volId)
+        if (fatPath.isEmpty()) throw FileNotFoundException(
+            "Cannot generate thumbnail for volume root"
+        )
+        VeraCryptBridge.requireSession(volId)
 
         val pipe     = ParcelFileDescriptor.createPipe()
         val readEnd  = pipe[0]
@@ -322,9 +346,13 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         return AssetFileDescriptor(readEnd, 0, AssetFileDescriptor.UNKNOWN_LENGTH)
     }
 
-    /**
-     * Fully in-memory, ZERO-COPY file bridge optimized for fvp / FFmpeg.
-     */
+    // ── Proxy callback (zero-copy stream bridge) ───────────────────────────
+    //
+    // Intentionally does NOT use VeraCryptBridge for the stream lifecycle:
+    // openStreamNative / readStreamNative / closeStreamNative pass a raw C++
+    // FIL* pointer as a Long across calls, which is specific to this callback's
+    // own lifecycle and has no place in a general-purpose bridge.
+
     inner class VeraCryptProxyCallback(
         private val volId: Int,
         private val session: ContainerSession,
@@ -335,16 +363,15 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
 
         private var hasChanges = false
         private var fileSizeCached: Long = -1L
-        private var streamPtr: Long = 0L // Holds the C++ FIL* pointer
+        private var streamPtr: Long = 0L
 
         init {
             try {
-                synchronized(VeraCryptSession.locks[volId]) {
-                    fileSizeCached = VeraCryptEngine.getFileSizeNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fatPath, volId)
+                VeraCryptBridge.withLock(volId) {
+                    fileSizeCached = VeraCryptEngine.getFileSize(fatPath, volId)
                     if (fileSizeCached < 0) fileSizeCached = 0L
-
                     if (!isWrite) {
-                        streamPtr = VeraCryptEngine.openStreamNative(VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fatPath, volId)
+                        streamPtr = VeraCryptEngine.openStream(fatPath, volId)
                     }
                 }
             } catch (e: Exception) {
@@ -359,24 +386,19 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             if (offset >= fileSizeCached || streamPtr == 0L) return 0
             val readSize = minOf(size.toLong(), fileSizeCached - offset).toInt()
             if (readSize <= 0) return 0
-
-            val actualRead = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.readStreamNative(streamPtr, offset, data, readSize, volId)
+            val actualRead = VeraCryptBridge.withLock(volId) {
+                VeraCryptEngine.readStream(streamPtr, offset, data, readSize, volId)
             }
-
             if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
             return actualRead
         }
 
         override fun onWrite(offset: Long, size: Int, data: ByteArray): Int {
             if (!isWrite) throw ErrnoException("onWrite", OsConstants.EBADF)
-
             val chunkData = if (data.size == size) data else data.copyOf(size)
-            val success = synchronized(VeraCryptSession.locks[volId]) {
-                VeraCryptEngine.writeFileChunkNative(
-                    VeraCryptEngine.SESSION_FD_UNUSED, VeraCryptEngine.SESSION_PW_UNUSED, VeraCryptEngine.SESSION_PIM_UNUSED, fatPath, offset, chunkData, volId)
+            val success = VeraCryptBridge.withLock(volId) {
+                VeraCryptEngine.writeFileChunk(fatPath, offset, chunkData, volId)
             }
-
             if (!success) throw ErrnoException("onWrite", OsConstants.EIO)
             val endOffset = offset + size
             if (endOffset > fileSizeCached) fileSizeCached = endOffset
@@ -387,15 +409,15 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         override fun onFsync() {}
 
         override fun onRelease() {
-            synchronized(VeraCryptSession.locks[volId]) {
+            VeraCryptBridge.withLock(volId) {
                 if (streamPtr != 0L) {
-                    VeraCryptEngine.closeStreamNative(streamPtr, volId)
+                    VeraCryptEngine.closeStream(streamPtr, volId)
                     streamPtr = 0L
                 }
             }
-
             if (isWrite && hasChanges) {
-                val parentPath = if (fatPath.contains("/")) fatPath.substringBeforeLast("/") else ""
+                val parentPath = if (fatPath.contains("/"))
+                    fatPath.substringBeforeLast("/") else ""
                 context?.contentResolver?.notifyChange(
                     DocumentsContract.buildChildDocumentsUri(
                         "com.aeidolon.vaultexplorer.documents",
@@ -405,36 +427,37 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Private helpers ────────────────────────────────────────────────────
 
-    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+    private fun calculateInSampleSize(
+        options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int
+    ): Int {
         val height = options.outHeight
         val width  = options.outWidth
         var inSampleSize = 1
         if (height > reqHeight || width > reqWidth) {
             val halfHeight = height / 2
             val halfWidth  = width / 2
-            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+            while (halfHeight / inSampleSize >= reqHeight &&
+                   halfWidth / inSampleSize >= reqWidth) {
                 inSampleSize *= 2
             }
         }
         return inSampleSize
     }
 
-    private fun getRealSpace(session: ContainerSession): Pair<Long, Long> = try {
-        val space = VeraCryptBridge.getSpaceInfo(session.volId)
-        if (space != null && space.size > 1) Pair(space[0], space[1]) else Pair(0L, 0L)
-    } catch (_: Exception) { Pair(0L, 0L) }
-
     private fun getFileNameFromUri(uriString: String): String {
         val uri = Uri.parse(uriString)
         if (uri.scheme == "content") {
             try {
                 context?.contentResolver?.query(
-                    uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null
+                    uri,
+                    arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                    null, null, null
                 )?.use { cursor ->
                     if (cursor.moveToFirst()) {
-                        val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        val idx = cursor.getColumnIndex(
+                            android.provider.OpenableColumns.DISPLAY_NAME)
                         if (idx != -1) return cursor.getString(idx)
                     }
                 }

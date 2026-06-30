@@ -112,9 +112,9 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     _controller = VideoPlayerController.contentUri(
       Uri.parse(widget.contentUriString),
     );
+    
 
     _controller.addListener(_onControllerTick);
-
     try {
       final captionFile = await _loadCaptions(widget.fileName);
       if (captionFile != null && mounted) {
@@ -232,7 +232,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   void _skip({required bool backwards}) {
     HapticFeedback.lightImpact();
-    widget.onToggleUI(true);
     final currentPos = _controller.value.position;
     final duration = _controller.value.duration;
     final targetPos = backwards

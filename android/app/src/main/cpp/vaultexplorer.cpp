@@ -838,108 +838,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     return result;
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndExtractNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim,
-        jstring targetFileName, jstring destPath, jint volId) {
-
-    const char* nativePass  = env->GetStringUTFChars(password, nullptr);
-    const char* targetName  = env->GetStringUTFChars(targetFileName, nullptr);
-    const char* destination = env->GetStringUTFChars(destPath, nullptr);
-
-    bool success = false;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            FIL f;
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-                std::ofstream outFile(destination, std::ios::binary);
-                if (outFile.is_open()) {
-                    std::unique_ptr<unsigned char[]> buf(new unsigned char[IO_BUFFER_SIZE]);
-                    UINT br;
-                    while (f_read(&f, buf.get(), IO_BUFFER_SIZE, &br) == FR_OK && br > 0)
-                        outFile.write(reinterpret_cast<char*>(buf.get()), br);
-                    success = true;
-                }
-                f_close(&f);
-            }
-        }
-    }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(targetFileName, targetName);
-    env->ReleaseStringUTFChars(destPath, destination);
-    return success ? JNI_TRUE : JNI_FALSE;
-}
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFileNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim,
-        jstring targetFileName, jstring sourcePath, jint volId) {
-
-    if (!requireActiveSession(volId, "writeBackFileNative")) {
-        throwNotUnlocked(env, volId, "writeBackFileNative");
-        return JNI_FALSE;}
-
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
-    const char* source     = env->GetStringUTFChars(sourcePath, nullptr);
-
-    bool success = false;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            FIL f;
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
-                std::ifstream inFile(source, std::ios::binary);
-                if (inFile.is_open()) {
-                    std::unique_ptr<char[]> buf(new char[IO_BUFFER_SIZE]);
-                    UINT bw;
-                    while (inFile) {
-                        inFile.read(buf.get(), IO_BUFFER_SIZE);
-                        std::streamsize n = inFile.gcount();
-                        if (n > 0) f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
-                    }
-                    success = true;
-                }
-                f_close(&f);
-            }
-        }
-    }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(targetFileName, targetName);
-    env->ReleaseStringUTFChars(sourcePath, source);
-    return success ? JNI_TRUE : JNI_FALSE;
-}
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFileNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim,
-        jstring targetFileName, jint volId) {
-
-    if (!requireActiveSession(volId, "deleteFileNative")) {
-        throwNotUnlocked(env, volId, "deleteFileNative");
-        return JNI_FALSE;}
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
-
-    bool success = false;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            success = (f_unlink(fatPath.c_str()) == FR_OK);
-        }
-    }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(targetFileName, targetName);
-    return success ? JNI_TRUE : JNI_FALSE;
-}
-
 extern "C" JNIEXPORT void JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jint volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return;
@@ -961,182 +859,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
     }
 
     unmountVolume(volId);  // also clears the persistent IO buffer
-}
-
-extern "C" JNIEXPORT jlong JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSizeNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim,
-        jstring targetFileName, jint volId) {
-    if (!requireActiveSession(volId, "getFileSizeNative")) {
-        throwNotUnlocked(env, volId, "getFileSizeNative");
-        return -1;}
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
-
-    jlong size = 0;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            FIL f;
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-                size = static_cast<jlong>(f_size(&f));
-                f_close(&f);
-            }
-        }
-    }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(targetFileName, targetName);
-    return size;
-}
-
-extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunkNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim,
-        jstring targetFileName, jlong offset, jint length, jint volId) {
-
-            if (!requireActiveSession(volId, "readFileChunkNative")) {
-                throwNotUnlocked(env, volId, "readFileChunkNative");
-                return nullptr;}
-
-    if (length <= 0 || static_cast<size_t>(length) > MAX_CHUNK_SIZE) {
-        LOGI("readFileChunkNative: invalid length %d", length);
-        if (fd >= 0) close(fd);
-        return nullptr;
-    }
-
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
-
-    jbyteArray retArray = nullptr;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            FIL f;
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-                f_lseek(&f, static_cast<FSIZE_t>(offset));
-                std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
-                UINT br = 0;
-                if (f_read(&f, buffer.get(), static_cast<UINT>(length), &br) == FR_OK && br > 0) {
-                    retArray = env->NewByteArray(static_cast<jsize>(br));
-                    env->SetByteArrayRegion(retArray, 0, static_cast<jsize>(br),
-                                            reinterpret_cast<jbyte*>(buffer.get()));
-                }
-                f_close(&f);
-            }
-        }
-    }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(targetFileName, targetName);
-    return retArray;
-}
-
-extern "C" JNIEXPORT jobjectArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectoryNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim, jstring dirPath, jint volId) {
-
-    if (!requireActiveSession(volId, "listDirectoryNative")) {
-        throwNotUnlocked(env, volId, "listDirectoryNative");
-        return nullptr;}
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
-
-    jobjectArray result = nullptr;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            result = buildDirectoryListing(env, volId, nativePath);
-        }
-    }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(dirPath, nativePath);
-    return result;
-}
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectoryNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim, jstring dirPath, jint volId) {
-
-            if (!requireActiveSession(volId, "createDirectoryNative")) {
-                throwNotUnlocked(env, volId, "createDirectoryNative");
-                return JNI_FALSE;}
-
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
-
-    bool success = false;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            std::string fullPath = std::string(drivePaths[volId]) + "/" + nativePath;
-            success = (f_mkdir(fullPath.c_str()) == FR_OK);
-        }
-    }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(dirPath, nativePath);
-    return success ? JNI_TRUE : JNI_FALSE;
-}
-
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFileNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim,
-        jstring oldPath, jstring newPath, jint volId) {
-if (!requireActiveSession(volId, "renameFileNative")) {
-    throwNotUnlocked(env, volId, "renameFileNative");
-    return JNI_FALSE;}
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* nativeOld  = env->GetStringUTFChars(oldPath, nullptr);
-    const char* nativeNew  = env->GetStringUTFChars(newPath, nullptr);
-
-    bool success = false;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            std::string fullOld = std::string(drivePaths[volId]) + "/" + nativeOld;
-            std::string fullNew = std::string(drivePaths[volId]) + "/" + nativeNew;
-            success = (f_rename(fullOld.c_str(), fullNew.c_str()) == FR_OK);
-        }
-    }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(oldPath, nativeOld);
-    env->ReleaseStringUTFChars(newPath, nativeNew);
-    return success ? JNI_TRUE : JNI_FALSE;
-}
-
-extern "C" JNIEXPORT jlongArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfoNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim, jint volId) {
-
-            if (!requireActiveSession(volId, "getSpaceInfoNative")) {
-                throwNotUnlocked(env, volId, "getSpaceInfoNative");
-                return nullptr;}
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-
-    jlong totalBytes = 0, freeBytes = 0;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            FATFS* fs;
-            DWORD fre_clust;
-            if (f_getfree(drivePaths[volId], &fre_clust, &fs) == FR_OK) {
-                totalBytes = static_cast<jlong>(fs->n_fatent - 2) * fs->csize * 512;
-                freeBytes  = static_cast<jlong>(fre_clust)        * fs->csize * 512;
-            }
-        }
-    }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-
-    jlongArray ret = env->NewLongArray(2);
-    const jlong tmp[2] = {totalBytes, freeBytes};
-    env->SetLongArrayRegion(ret, 0, 2, tmp);
-    return ret;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -1371,80 +1093,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunkNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim,
-        jstring targetFileName, jlong offset, jbyteArray data, jint volId) {
-
-            if (!requireActiveSession(volId, "writeFileChunkNative")) {
-                throwNotUnlocked(env, volId, "writeFileChunkNative");
-                return JNI_FALSE;}
-
-    jsize len = env->GetArrayLength(data);
-
-    if (len <= 0 || static_cast<size_t>(len) > MAX_CHUNK_SIZE) {
-        LOGI("writeFileChunkNative: invalid length %d", (int)len);
-        if (fd >= 0) close(fd);
-        return JNI_FALSE;
-    }
-
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
-
-    jbyte* body = env->GetByteArrayElements(data, nullptr);
-
-    bool success = false;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            FIL f;
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            BYTE openMode = (offset == 0)
-                ? (FA_WRITE | FA_CREATE_ALWAYS)
-                : (FA_WRITE | FA_OPEN_ALWAYS);
-            if (f_open(&f, fatPath.c_str(), openMode) == FR_OK) {
-                if (f_lseek(&f, static_cast<FSIZE_t>(offset)) == FR_OK) {
-                    UINT bw = 0;
-                    if (f_write(&f, body, static_cast<UINT>(len), &bw) == FR_OK &&
-                        bw == static_cast<UINT>(len)) {
-                        success = true;
-                    }
-                }
-                f_close(&f);
-            }
-        }
-    }
-
-    env->ReleaseByteArrayElements(data, body, JNI_ABORT);
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(targetFileName, targetName);
-    return success ? JNI_TRUE : JNI_FALSE;
-}
-
-extern "C" JNIEXPORT jlong JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSizeNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim,
-        jstring dirPath, jint volId) {
-
-    if (!requireActiveSession(volId, "getFolderSizeNative")) {
-        throwNotUnlocked(env, volId, "getFolderSizeNative");
-        return -1;}
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
-
-    jlong total = 0;
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            total = static_cast<jlong>(recursiveFolderSize(volId, nativePath));
-        }
-    }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(dirPath, nativePath);
-    return total;
-}
-
 // ----------------------------------------------------------------====
 // PBKDF2-SHA512
 // ----------------------------------------------------------------====
@@ -1493,121 +1141,309 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_hashPasswordNative(
     return result;
 }
 
-extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunkDirectNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim,
-        jstring targetFileName, jlong offset, jbyteArray outBuffer, jint length, jint volId) {
+// ----------------------------------------------------------------====
+// JNI API — Tier 2: stateless (volId-only)
+//
+// No fd, password, or pim. requireActiveSession() is the first thing
+// every function calls; it throws IllegalStateException("NOT_UNLOCKED:…")
+// so Kotlin catches it as a typed signal rather than a silent null/0/false.
+// ----------------------------------------------------------------====
 
-            if (!requireActiveSession(volId, "readFileChunkDirectNative")) {
-                throwNotUnlocked(env, volId, "readFileChunkDirectNative");
-                return -1;}
-
-    if (length <= 0) return 0;
-
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
-
-    jint bytesRead = -1;
-
-    // Passing fd=-1 is fine here because prepareSession knows to use activeFd[volId]
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            FIL f;
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-                f_lseek(&f, static_cast<FSIZE_t>(offset));
-                
-                // ZERO-COPY: Get a direct pointer to the Kotlin byte array!
-                jbyte* destBuf = env->GetByteArrayElements(outBuffer, nullptr);
-                if (destBuf != nullptr) {
-                    UINT br = 0;
-                    if (f_read(&f, destBuf, static_cast<UINT>(length), &br) == FR_OK) {
-                        bytesRead = static_cast<jint>(br);
-                    }
-                    // Release and commit the changes back to Kotlin memory
-                    env->ReleaseByteArrayElements(outBuffer, destBuf, 0);
-                }
-                f_close(&f);
-            }
-        }
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectory(
+        JNIEnv* env, jobject, jstring dirPath, jint volId) {
+    if (!requireActiveSession(volId, "listDirectory")) {
+        throwNotUnlocked(env, volId, "listDirectory"); return nullptr;
     }
-
-    env->ReleaseStringUTFChars(password, nativePass);
-    env->ReleaseStringUTFChars(targetFileName, targetName);
-    return bytesRead;
+    const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
+    jobjectArray result = nullptr;
+    if (ensureMounted(volId))
+        result = buildDirectoryListing(env, volId, nativePath);
+    env->ReleaseStringUTFChars(dirPath, nativePath);
+    return result;
 }
 
-
-// 1. OPEN STREAM
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_openStreamNative(
-        JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim,
-        jstring targetFileName, jint volId) {
-
-            if (!requireActiveSession(volId, "openStreamNative")) {
-                throwNotUnlocked(env, volId, "openStreamNative");
-                return 0;}
-
-    const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
-    jlong streamPtr = 0;
-
-    if (prepareSession(fd, nativePass, pim, volId, false)) {
-        if (ensureMounted(volId)) {
-            FIL* f = new FIL(); // Allocate on heap
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            
-            if (f_open(f, fatPath.c_str(), FA_READ) == FR_OK) {
-                streamPtr = reinterpret_cast<jlong>(f); // Pass pointer to Kotlin
-            } else {
-                delete f;
-            }
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSize(
+        JNIEnv* env, jobject, jstring fileName, jint volId) {
+    if (!requireActiveSession(volId, "getFileSize")) {
+        throwNotUnlocked(env, volId, "getFileSize"); return 0L;
+    }
+    const char* targetName = env->GetStringUTFChars(fileName, nullptr);
+    jlong size = 0;
+    if (ensureMounted(volId)) {
+        FIL f;
+        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+        if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+            size = static_cast<jlong>(f_size(&f));
+            f_close(&f);
         }
     }
+    env->ReleaseStringUTFChars(fileName, targetName);
+    return size;
+}
 
-    env->ReleaseStringUTFChars(password, nativePass);
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSize(
+        JNIEnv* env, jobject, jstring dirPath, jint volId) {
+    if (!requireActiveSession(volId, "getFolderSize")) {
+        throwNotUnlocked(env, volId, "getFolderSize"); return 0L;
+    }
+    const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
+    jlong total = 0;
+    if (ensureMounted(volId))
+        total = static_cast<jlong>(recursiveFolderSize(volId, nativePath));
+    env->ReleaseStringUTFChars(dirPath, nativePath);
+    return total;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunk(
+        JNIEnv* env, jobject,
+        jstring fileName, jlong offset, jint length, jint volId) {
+    if (length <= 0 || static_cast<size_t>(length) > MAX_CHUNK_SIZE) return nullptr;
+    if (!requireActiveSession(volId, "readFileChunk")) {
+        throwNotUnlocked(env, volId, "readFileChunk"); return nullptr;
+    }
+    const char* targetName = env->GetStringUTFChars(fileName, nullptr);
+    jbyteArray retArray = nullptr;
+    if (ensureMounted(volId)) {
+        FIL f;
+        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+        if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+            f_lseek(&f, static_cast<FSIZE_t>(offset));
+            std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
+            UINT br = 0;
+            if (f_read(&f, buffer.get(), static_cast<UINT>(length), &br) == FR_OK && br > 0) {
+                retArray = env->NewByteArray(static_cast<jsize>(br));
+                env->SetByteArrayRegion(retArray, 0, static_cast<jsize>(br),
+                                        reinterpret_cast<jbyte*>(buffer.get()));
+            }
+            f_close(&f);
+        }
+    }
+    env->ReleaseStringUTFChars(fileName, targetName);
+    return retArray;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
+        JNIEnv* env, jobject,
+        jstring fileName, jlong offset, jbyteArray data, jint volId) {
+    jsize len = env->GetArrayLength(data);
+    if (len <= 0 || static_cast<size_t>(len) > MAX_CHUNK_SIZE) return JNI_FALSE;
+    if (!requireActiveSession(volId, "writeFileChunk")) {
+        throwNotUnlocked(env, volId, "writeFileChunk"); return JNI_FALSE;
+    }
+    const char* targetName = env->GetStringUTFChars(fileName, nullptr);
+    jbyte* body = env->GetByteArrayElements(data, nullptr);
+    bool success = false;
+    if (ensureMounted(volId)) {
+        FIL f;
+        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+        BYTE openMode = (offset == 0)
+            ? (FA_WRITE | FA_CREATE_ALWAYS)
+            : (FA_WRITE | FA_OPEN_ALWAYS);
+        if (f_open(&f, fatPath.c_str(), openMode) == FR_OK) {
+            if (f_lseek(&f, static_cast<FSIZE_t>(offset)) == FR_OK) {
+                UINT bw = 0;
+                if (f_write(&f, body, static_cast<UINT>(len), &bw) == FR_OK &&
+                    bw == static_cast<UINT>(len))
+                    success = true;
+            }
+            f_close(&f);
+        }
+    }
+    env->ReleaseByteArrayElements(data, body, JNI_ABORT);
+    env->ReleaseStringUTFChars(fileName, targetName);
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
+        JNIEnv* env, jobject,
+        jstring targetFileName, jstring sourcePath, jint volId) {
+    if (!requireActiveSession(volId, "writeBackFile")) {
+        throwNotUnlocked(env, volId, "writeBackFile"); return JNI_FALSE;
+    }
+    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
+    const char* source     = env->GetStringUTFChars(sourcePath, nullptr);
+    bool success = false;
+    if (ensureMounted(volId)) {
+        FIL f;
+        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+        if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+            std::ifstream inFile(source, std::ios::binary);
+            if (inFile.is_open()) {
+                std::unique_ptr<char[]> buf(new char[IO_BUFFER_SIZE]);
+                UINT bw;
+                while (inFile) {
+                    inFile.read(buf.get(), IO_BUFFER_SIZE);
+                    std::streamsize n = inFile.gcount();
+                    if (n > 0) f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
+                }
+                success = true;
+            }
+            f_close(&f);
+        }
+    }
+    env->ReleaseStringUTFChars(targetFileName, targetName);
+    env->ReleaseStringUTFChars(sourcePath, source);
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_extractFile(
+        JNIEnv* env, jobject,
+        jstring targetFileName, jstring destPath, jint volId) {
+    if (!requireActiveSession(volId, "extractFile")) {
+        throwNotUnlocked(env, volId, "extractFile"); return JNI_FALSE;
+    }
+    const char* targetName  = env->GetStringUTFChars(targetFileName, nullptr);
+    const char* destination = env->GetStringUTFChars(destPath, nullptr);
+    bool success = false;
+    if (ensureMounted(volId)) {
+        FIL f;
+        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+        if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+            std::ofstream outFile(destination, std::ios::binary);
+            if (outFile.is_open()) {
+                std::unique_ptr<unsigned char[]> buf(new unsigned char[IO_BUFFER_SIZE]);
+                UINT br;
+                while (f_read(&f, buf.get(), IO_BUFFER_SIZE, &br) == FR_OK && br > 0)
+                    outFile.write(reinterpret_cast<char*>(buf.get()), br);
+                success = true;
+            }
+            f_close(&f);
+        }
+    }
+    env->ReleaseStringUTFChars(targetFileName, targetName);
+    env->ReleaseStringUTFChars(destPath, destination);
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
+        JNIEnv* env, jobject, jstring targetFileName, jint volId) {
+    if (!requireActiveSession(volId, "deleteFile")) {
+        throwNotUnlocked(env, volId, "deleteFile"); return JNI_FALSE;
+    }
+    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
+    bool success = false;
+    if (ensureMounted(volId)) {
+        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+        success = (f_unlink(fatPath.c_str()) == FR_OK);
+    }
+    env->ReleaseStringUTFChars(targetFileName, targetName);
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
+        JNIEnv* env, jobject, jstring dirPath, jint volId) {
+    if (!requireActiveSession(volId, "createDirectory")) {
+        throwNotUnlocked(env, volId, "createDirectory"); return JNI_FALSE;
+    }
+    const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
+    bool success = false;
+    if (ensureMounted(volId)) {
+        std::string fullPath = std::string(drivePaths[volId]) + "/" + nativePath;
+        success = (f_mkdir(fullPath.c_str()) == FR_OK);
+    }
+    env->ReleaseStringUTFChars(dirPath, nativePath);
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
+        JNIEnv* env, jobject,
+        jstring oldPath, jstring newPath, jint volId) {
+    if (!requireActiveSession(volId, "renameFile")) {
+        throwNotUnlocked(env, volId, "renameFile"); return JNI_FALSE;
+    }
+    const char* nativeOld = env->GetStringUTFChars(oldPath, nullptr);
+    const char* nativeNew = env->GetStringUTFChars(newPath, nullptr);
+    bool success = false;
+    if (ensureMounted(volId)) {
+        std::string fullOld = std::string(drivePaths[volId]) + "/" + nativeOld;
+        std::string fullNew = std::string(drivePaths[volId]) + "/" + nativeNew;
+        success = (f_rename(fullOld.c_str(), fullNew.c_str()) == FR_OK);
+    }
+    env->ReleaseStringUTFChars(oldPath, nativeOld);
+    env->ReleaseStringUTFChars(newPath, nativeNew);
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
+        JNIEnv* env, jobject, jint volId) {
+    if (!requireActiveSession(volId, "getSpaceInfo")) {
+        throwNotUnlocked(env, volId, "getSpaceInfo");
+        jlongArray empty = env->NewLongArray(2);
+        const jlong zeros[2] = {0, 0};
+        env->SetLongArrayRegion(empty, 0, 2, zeros);
+        return empty;
+    }
+    jlong totalBytes = 0, freeBytes = 0;
+    if (ensureMounted(volId)) {
+        FATFS* fs;
+        DWORD fre_clust;
+        if (f_getfree(drivePaths[volId], &fre_clust, &fs) == FR_OK) {
+            totalBytes = static_cast<jlong>(fs->n_fatent - 2) * fs->csize * 512;
+            freeBytes  = static_cast<jlong>(fre_clust)        * fs->csize * 512;
+        }
+    }
+    jlongArray ret = env->NewLongArray(2);
+    const jlong tmp[2] = {totalBytes, freeBytes};
+    env->SetLongArrayRegion(ret, 0, 2, tmp);
+    return ret;
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_openStream(
+        JNIEnv* env, jobject, jstring targetFileName, jint volId) {
+    if (!requireActiveSession(volId, "openStream")) {
+        throwNotUnlocked(env, volId, "openStream"); return 0L;
+    }
+    const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
+    jlong streamPtr = 0;
+    if (ensureMounted(volId)) {
+        FIL* f = new FIL();
+        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+        if (f_open(f, fatPath.c_str(), FA_READ) == FR_OK) {
+            streamPtr = reinterpret_cast<jlong>(f);
+        } else {
+            delete f;
+        }
+    }
     env->ReleaseStringUTFChars(targetFileName, targetName);
     return streamPtr;
 }
 
-// 2. READ STREAM (Zero-Copy)
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStreamNative(
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStream(
         JNIEnv* env, jobject,
         jlong streamPtr, jlong offset, jbyteArray outBuffer, jint length, jint volId) {
-    
     if (streamPtr == 0 || length <= 0) return -1;
-    
     FIL* f = reinterpret_cast<FIL*>(streamPtr);
     jint bytesRead = -1;
-
-    // Fast seek using already-loaded cluster chains
     f_lseek(f, static_cast<FSIZE_t>(offset));
-
     jbyte* destBuf = env->GetByteArrayElements(outBuffer, nullptr);
     if (destBuf != nullptr) {
         UINT br = 0;
-        if (f_read(f, destBuf, static_cast<UINT>(length), &br) == FR_OK) {
+        if (f_read(f, destBuf, static_cast<UINT>(length), &br) == FR_OK)
             bytesRead = static_cast<jint>(br);
-        }
-        env->ReleaseByteArrayElements(outBuffer, destBuf, 0); // 0 = commit changes back
+        env->ReleaseByteArrayElements(outBuffer, destBuf, 0);
     }
-    
     return bytesRead;
 }
 
-// 3. CLOSE STREAM
 extern "C" JNIEXPORT void JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStreamNative(
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
         JNIEnv* env, jobject, jlong streamPtr, jint volId) {
-    
     if (streamPtr != 0) {
         FIL* f = reinterpret_cast<FIL*>(streamPtr);
         f_close(f);
-        delete f; // Free memory
+        delete f;
     }
 }
-
-

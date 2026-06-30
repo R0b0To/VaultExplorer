@@ -43,7 +43,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
       ValueNotifier<VideoPlaybackProgress>(const VideoPlaybackProgress());
 
-  bool _showUI = true;
+  bool _showUI = false;
   bool _isLandscape = false;
   int _activeMenuCount = 0;
 
@@ -163,8 +163,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   Future<void> _prefetchThumbnail(String fileName) async {
     if (!MediaViewerConstants.isImage(fileName)) return;
     if (_prefetchedImages.containsKey(fileName) ||
-        _prefetchingActive.contains(fileName))
+        _prefetchingActive.contains(fileName)) {
       return;
+    }
 
     _prefetchingActive.add(fileName);
     try {

@@ -14,6 +14,10 @@ import java.io.File
 import android.content.ClipboardManager
 import android.content.ClipData
 import android.content.Context
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import android.content.ComponentName
+import android.app.PendingIntent
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.annotation.TargetApi
@@ -65,6 +69,16 @@ class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "com.aeidolon.vaultexplorer/engine"
 
     @Volatile private var pendingFlutterResult: MethodChannel.Result? = null
+    private var methodChannel: MethodChannel? = null
+    private val ACTION_CHOOSER = "com.aeidolon.vaultexplorer.ACTION_CHOOSER"
+    private var chooserReceiver: BroadcastReceiver? = null
+
+    override fun onDestroy() {
+        chooserReceiver?.let {
+            unregisterReceiver(it)
+        }
+        super.onDestroy()
+    }
 
     // ── Activity Result Launchers ──────────────────────────────────────────
 
@@ -397,9 +411,37 @@ class MainActivity : FlutterFragmentActivity() {
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        methodChannel = channel
+
+        val filter = IntentFilter(ACTION_CHOOSER)
+        chooserReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == ACTION_CHOOSER) {
+                    val selectedComponent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(Intent.EXTRA_CHOSEN_COMPONENT, ComponentName::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra<ComponentName>(Intent.EXTRA_CHOSEN_COMPONENT)
+                    }
+                    selectedComponent?.let {
+                        val pkg = it.packageName
+                        val ext = intent.getStringExtra("extension") ?: ""
+                        runOnUiThread {
+                            methodChannel?.invokeMethod("onAppSelected", mapOf("extension" to ext, "package" to pkg))
+                        }
+                    }
+                }
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(chooserReceiver, filter, RECEIVER_EXPORTED)
+        } else {
+            registerReceiver(chooserReceiver, filter)
+        }
+
+        channel.setMethodCallHandler { call, result ->
+            when (call.method) {
 
                     ChannelMethods.SET_SECURE_SCREEN -> {
                         val enabled = call.argument<Boolean>("enabled") ?: false
@@ -945,6 +987,7 @@ class MainActivity : FlutterFragmentActivity() {
                     ChannelMethods.OPEN_WITH_APP -> {
                         val uriString = call.argument<String>("filePath")
                         val fileName  = call.argument<String>("fileName")
+                        val packageName = call.argument<String>("packageName")
                         if (uriString == null || fileName == null) {
                             result.error("INVALID_ARGS", "filePath and fileName required", null); return@setMethodCallHandler
                         }
@@ -960,8 +1003,46 @@ class MainActivity : FlutterFragmentActivity() {
                                 setDataAndType(docUri, getMimeType(fileName))
                                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or
                                          Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                                if (!packageName.isNullOrEmpty()) {
+                                    setPackage(packageName)
+                                }
                             }
-                            startActivity(Intent.createChooser(intent, "Open file with…"))
+                            
+                            if (!packageName.isNullOrEmpty()) {
+                                try {
+                                    startActivity(intent)
+                                } catch (e: Exception) {
+                                    // Fallback to chooser if specific package launch fails (e.g. app uninstalled)
+                                    intent.setPackage(null)
+                                    val receiverIntent = Intent(ACTION_CHOOSER).apply {
+                                        val ext = fileName.substringAfterLast('.', "")
+                                        putExtra("extension", ext)
+                                        `package` = this@MainActivity.packageName
+                                    }
+                                    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                                    } else {
+                                        PendingIntent.FLAG_UPDATE_CURRENT
+                                    }
+                                    val pendingIntent = PendingIntent.getBroadcast(this, 0, receiverIntent, flags)
+                                    val chooser = Intent.createChooser(intent, "Open file with…", pendingIntent.intentSender)
+                                    startActivity(chooser)
+                                }
+                            } else {
+                                val receiverIntent = Intent(ACTION_CHOOSER).apply {
+                                    val ext = fileName.substringAfterLast('.', "")
+                                    putExtra("extension", ext)
+                                    `package` = this@MainActivity.packageName
+                                }
+                                val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                                } else {
+                                    PendingIntent.FLAG_UPDATE_CURRENT
+                                }
+                                val pendingIntent = PendingIntent.getBroadcast(this, 0, receiverIntent, flags)
+                                val chooser = Intent.createChooser(intent, "Open file with…", pendingIntent.intentSender)
+                                startActivity(chooser)
+                            }
                             result.success(true)
                         } catch (e: Exception) { result.error("OPEN_WITH_ERROR", e.message, null) }
                     }

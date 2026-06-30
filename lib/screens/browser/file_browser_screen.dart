@@ -12,6 +12,7 @@ import '../../utils/format_utils.dart';
 import '../../utils/raw_entry.dart';
 import 'browser_dialogs.dart';
 import 'viewer/media_viewer_screen.dart';
+import 'viewer/text_editor_screen.dart';
 import 'mixins/selection_mixin.dart';
 import 'mixins/sort_mixin.dart';
 import 'widgets/breadcrumb_bar.dart';
@@ -226,7 +227,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     else _enterDirectory(rawItem);
   }
 
-  void _handleFileTap(String rawItem) {
+  Future<void> _handleFileTap(String rawItem) async {
     _signalActivity();
     if (isSelectionMode) { toggleSelectItem(rawItem); return; }
     final entry    = RawEntry.parse(rawItem);
@@ -255,9 +256,201 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ),
       );
     } else {
-      _openFileWithApp(entry.name, fullPath);
+      final parts = entry.name.split('.');
+      final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
+
+      final settings = await AppSettingsService.loadSettings();
+      final pref = settings.extensionPreferences[ext];
+
+      if (pref == 'editor') {
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TextEditorScreen(
+              container: widget.container,
+              filePath: fullPath,
+            ),
+          ),
+        );
+        _loadDirectoryContents(_currentDirPath);
+      } else if (pref != null && pref.startsWith('package:')) {
+        _openFileWithApp(entry.name, fullPath, packageName: pref.substring(8));
+      } else if (pref == 'external') {
+        _openFileWithApp(entry.name, fullPath);
+      } else {
+        if (!mounted) return;
+        await _showOpenWithDialog(entry.name, fullPath, ext, settings);
+      }
     }
   }
+
+  Future<void> _showOpenWithDialog(
+      String fileName, String fullPath, String ext, AppSettings settings) async {
+    bool remember = false;
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Open File'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Choose how to open "$fileName":',
+                    style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 16),
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop('editor'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Ink(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerLow,
+                        border: Border.all(color: cs.outlineVariant),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_note_rounded, color: cs.primary, size: 28),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'In-app Text Editor',
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'View/edit text, markdown, code',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop('external'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Ink(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerLow,
+                        border: Border.all(color: cs.outlineVariant),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.open_in_new_rounded, color: cs.secondary, size: 28),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'External App',
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'Send file to third-party app',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: remember,
+                        onChanged: (val) {
+                          setDialogState(() {
+                            remember = val ?? false;
+                          });
+                        },
+                      ),
+                      Expanded(
+                        child: Text(
+                          ext.isNotEmpty
+                              ? 'Always remember choice for .$ext files'
+                              : 'Always remember choice for files without extension',
+                          style: textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == 'editor') {
+      if (remember) {
+        settings.extensionPreferences[ext] = 'editor';
+        await AppSettingsService.saveSettings(settings);
+      }
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TextEditorScreen(
+            container: widget.container,
+            filePath: fullPath,
+          ),
+        ),
+      );
+      _loadDirectoryContents(_currentDirPath);
+    } else if (result == 'external') {
+      if (remember) {
+        // Register a one-shot callback to capture the specific app
+        // chosen from the Android system chooser.
+        VaultExplorerApi.onAppSelectedCallback = (selectedExt, pkg) {
+          if (selectedExt.toLowerCase() == ext.toLowerCase()) {
+            settings.extensionPreferences[ext] = 'package:$pkg';
+            AppSettingsService.saveSettings(settings);
+            VaultExplorerApi.onAppSelectedCallback = null;
+          }
+        };
+      }
+      _openFileWithApp(fileName, fullPath);
+    }
+  }
+
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
@@ -369,11 +562,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     return foundFiles;
   }
 
-  Future<void> _openFileWithApp(String cleanName, String fullPath) async {
+  Future<void> _openFileWithApp(String cleanName, String fullPath, {String? packageName}) async {
     _signalActivity();
     try {
       final ok =
-          await vaultExplorerApi.openWithApp(widget.container, fullPath);
+          await vaultExplorerApi.openWithApp(widget.container, fullPath, packageName: packageName);
       if (!ok && mounted) {
         _setStatus('No app found for this file type', error: true);
       }

@@ -30,6 +30,8 @@ class AppSettings {
   /// [ContainerRecord.thumbnailCacheMode] is null.
   ThumbnailCacheMode defaultThumbnailCacheMode;
 
+  Map<String, String> extensionPreferences;
+
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
 
@@ -40,9 +42,11 @@ class AppSettings {
     this.videoAutoPlay = true,
     this.blockScreenshots = false,
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
+    Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
     String? masterPasswordSalt,
-  })  : _masterPasswordHash = masterPasswordHash,
+  })  : extensionPreferences = extensionPreferences ?? {},
+        _masterPasswordHash = masterPasswordHash,
         _masterPasswordSalt = masterPasswordSalt;
 
   // Read-only accessors — callers must not store these; use Keystore directly.
@@ -74,6 +78,7 @@ class AppSettings {
         'videoAutoPlay': videoAutoPlay,
         'blockScreenshots': blockScreenshots,
         'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
+        'extensionPreferences': extensionPreferences,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -88,6 +93,9 @@ class AppSettings {
       // Resolve nullable parsed mode and default to appCache if null
       defaultThumbnailCacheMode: ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?) ?? ThumbnailCacheMode.appCache,
+      extensionPreferences: (j['extensionPreferences'] as Map<String, dynamic>?)
+              ?.map((k, v) => MapEntry(k, v as String)) ??
+          {},
     );
 }
 

@@ -13,6 +13,7 @@ String appVersion = '0.0.0';
 void main() async {
   // Ensure bindings are initialised before calling path_provider.
   WidgetsFlutterBinding.ensureInitialized();
+  VaultExplorerApi.initMethodCallHandler();
 
   try {
     final settings = await AppSettingsService.loadSettings();
@@ -63,6 +64,7 @@ Future<void> _cleanupOrphanedTempFiles() async {
       // VaultExplorerApi.createEmptyFile.
       if (name.startsWith('cb_copy_') ||
           name.startsWith('cb_empty_') ||
+          name.startsWith('cb_edit_') ||
           name.startsWith('xclip_') ||
           name.startsWith('tmp_')) {
         try {

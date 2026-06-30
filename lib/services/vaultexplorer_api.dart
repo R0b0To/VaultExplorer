@@ -11,6 +11,20 @@ class VaultExplorerApi {
 
   static const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
 
+  static void Function(String ext, String pkg)? onAppSelectedCallback;
+
+  static void initMethodCallHandler() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onAppSelected') {
+        final ext = call.arguments['extension'] as String?;
+        final pkg = call.arguments['package'] as String?;
+        if (ext != null && pkg != null) {
+          onAppSelectedCallback?.call(ext, pkg);
+        }
+      }
+    });
+  }
+
 
   static final Set<int> _activeBatches = {};
   static final Set<int> _lockPending   = {};
@@ -147,10 +161,14 @@ class VaultExplorerApi {
 
   // ── File I/O ──────────────────────────────────────────────────────────────
 
-  Future<bool> openWithApp(MountedContainer container, String fileName) async {
+  Future<bool> openWithApp(MountedContainer container, String fileName, {String? packageName}) async {
     final result = await _channel.invokeMethod<bool>(
       ChannelMethods.openWithApp,
-      {'filePath': container.uri, 'fileName': fileName},
+      {
+        'filePath': container.uri,
+        'fileName': fileName,
+        if (packageName != null) 'packageName': packageName,
+      },
     );
     return result ?? false;
   }

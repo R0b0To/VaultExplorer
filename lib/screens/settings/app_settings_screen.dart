@@ -361,10 +361,93 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     child: Text(
                       _settings.defaultThumbnailCacheMode.description,
                       style: textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant, height: 1.4),
-                    ),
+                          color: cs.onSurfaceVariant, height: 1.4),)
                   ),
                 ]),
+
+                const SizedBox(height: 24),
+
+                _SectionLabel('FILE ASSOCIATIONS', cs),
+                const SizedBox(height: 8),
+                _Card(
+                  cs: cs,
+                  children: [
+                    if (_settings.extensionPreferences.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Text(
+                          'No remembered file associations yet. You will be prompted when opening non-media files.',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            height: 1.4,
+                          ),
+                        ),
+                      )
+                    else ...[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Default actions when tapping files in the browser:',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      const Divider(),
+                      ..._settings.extensionPreferences.entries.map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: cs.primaryContainer.withValues(alpha: 0.3),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '.${entry.key.toUpperCase()}',
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  entry.value == 'editor'
+                                      ? 'In-app Text Editor'
+                                      : (entry.value.startsWith('package:')
+                                          ? 'App: ${entry.value.substring(8)}'
+                                          : 'External App'),
+                                  style: textTheme.bodyMedium,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: cs.error,
+                                  size: 20,
+                                ),
+                                tooltip: 'Remove association',
+                                onPressed: () {
+                                  setState(() {
+                                    _settings.extensionPreferences.remove(entry.key);
+                                  });
+                                  _save(); // Auto-save after removing
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ],
+                ),
 
                 const SizedBox(height: 24),
 

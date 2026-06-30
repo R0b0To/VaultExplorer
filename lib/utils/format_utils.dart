@@ -10,5 +10,5 @@ String formatBytes(int bytes) {
     size /= 1024;
     idx++;
   }
-  return '${size.toStringAsFixed(size < 10 ? 1 : 0)} ${suffixes[idx]}';
+  return '${size.toStringAsFixed((size < 10 && idx > 0) ? 1 : 0)} ${suffixes[idx]}';
 }

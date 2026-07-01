@@ -51,7 +51,7 @@
 
 #define FF_FS_TINY      0      /* Normal buffer system */
 #define FF_FS_EXFAT     1      /* 1: Enable exFAT support! */
-#define FF_FS_NORTC     1      /* 1: System has no real-time clock hardware */
+#define FF_FS_NORTC     0      /* 0: System clock */
 #define FF_NORTC_YEAR   2026
 #define FF_NORTC_MON    6
 #define FF_NORTC_MDAY   17

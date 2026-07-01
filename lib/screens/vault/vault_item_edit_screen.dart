@@ -64,15 +64,10 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
   bool get _isNew => widget.existing == null;
 
   bool _validate() {
+    // Only the title is required now
     if (_titleCtrl.text.trim().isEmpty) {
       _showSnack('Title is required');
       return false;
-    }
-    for (final f in _fields) {
-      if (f.required && (_ctrls[f.key]?.text.trim().isEmpty ?? true)) {
-        _showSnack('${f.label} is required');
-        return false;
-      }
     }
     return true;
   }
@@ -262,7 +257,7 @@ class _FieldInput extends StatelessWidget {
           ? TextCapitalization.sentences
           : TextCapitalization.none,
       decoration: InputDecoration(
-        labelText: field.label + (field.required ? ' *' : ''),
+        labelText: field.label, // Removed the `+ (field.required ? ' *' : '')`
         prefixIcon: Icon(_prefixIcon(field.type), size: 18, color: cs.onSurfaceVariant),
         suffixIcon: isSecret
             ? Row(

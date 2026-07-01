@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/vaultexplorer_api.dart';
-
 import '../../models/mounted_container.dart';
 import '../../models/vault_item.dart';
 import '../../services/vault_items_service.dart';
+import '../../utils/file_type_utils.dart'; // ← added
 import 'vault_item_edit_screen.dart';
 
 class VaultItemDetailScreen extends StatefulWidget {
@@ -65,17 +65,17 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
           type: _item.type,
           existing: _item,
           filePath: _currentFilePath,
-          currentDirPath: '', // Not needed for existing
+          currentDirPath: '',
         ),
       ),
     );
     if (resultPath != null && mounted) {
       final updated = await VaultItemsService.instance.loadItem(widget.container, resultPath);
       if (updated != null) {
-        setState(() { 
-          _item = updated; 
-          _currentFilePath = resultPath; 
-          _modified = true; 
+        setState(() {
+          _item = updated;
+          _currentFilePath = resultPath;
+          _modified = true;
         });
       }
     }
@@ -143,7 +143,6 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(0, 8, 0, 32),
           children: [
-            // ── Header card ──────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _HeaderCard(item: _item),
@@ -151,7 +150,6 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
 
             const SizedBox(height: 20),
 
-            // ── Fields ───────────────────────────────────────────────────────
             if (fields.isEmpty)
               Center(
                 child: Padding(
@@ -200,7 +198,6 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
               ),
             ],
 
-            // ── Metadata ─────────────────────────────────────────────────────
             const SizedBox(height: 20),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -249,7 +246,10 @@ class _HeaderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final (icon, color) = _typeStyle(item.type, cs);
+    // Delegates to the shared helpers; type.name matches the extension key
+    // (VaultItemType.password.name == 'password', etc.).
+    final icon  = vaultIconForExt(item.type.name)  ?? Icons.lock_rounded;
+    final color = vaultColorForExt(item.type.name) ?? cs.primary;
 
     return Card(
       child: Padding(
@@ -300,16 +300,6 @@ class _HeaderCard extends StatelessWidget {
       ),
     );
   }
-
-  static (IconData, Color) _typeStyle(VaultItemType type, ColorScheme cs) =>
-      switch (type) {
-        VaultItemType.password        => (Icons.key_rounded, const Color(0xFFA8C7FA)),
-        VaultItemType.paymentCard     => (Icons.credit_card_rounded, const Color(0xFF80CBC4)),
-        VaultItemType.identity        => (Icons.badge_rounded, const Color(0xFFCE93D8)),
-        VaultItemType.secureNote      => (Icons.sticky_note_2_rounded, const Color(0xFFFFCC80)),
-        VaultItemType.bankAccount     => (Icons.account_balance_rounded, const Color(0xFF80DEEA)),
-        VaultItemType.softwareLicense => (Icons.computer_rounded, const Color(0xFFA5D6A7)),
-      };
 }
 
 // ── Field row ─────────────────────────────────────────────────────────────────

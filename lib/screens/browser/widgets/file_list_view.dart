@@ -4,28 +4,6 @@ import '../../../utils/format_utils.dart';
 import '../../../utils/raw_entry.dart';
 import 'tile_selection_style.dart';
 
-// ── Vault Icon Helpers ────────────────────────────────────────────────────────
-IconData? _getVaultIcon(String ext) => switch (ext) {
-  'password'        => Icons.key_rounded,
-  'paymentCard'     => Icons.credit_card_rounded,
-  'identity'        => Icons.badge_rounded,
-  'secureNote'      => Icons.sticky_note_2_rounded,
-  'bankAccount'     => Icons.account_balance_rounded,
-  'softwareLicense' => Icons.computer_rounded,
-  _                 => null,
-};
-
-Color? _getVaultColor(String ext) => switch (ext) {
-  'password'        => const Color(0xFFA8C7FA),
-  'paymentCard'     => const Color(0xFF80CBC4),
-  'identity'        => const Color(0xFFCE93D8),
-  'secureNote'      => const Color(0xFFFFCC80),
-  'bankAccount'     => const Color(0xFF80DEEA),
-  'softwareLicense' => const Color(0xFFA5D6A7),
-  _                 => null,
-};
-// ──────────────────────────────────────────────────────────────────────────────
-
 /// Stateless renderer for a flat columned list of directory entries.
 class FileListView extends StatelessWidget {
   final List<String> dirs;
@@ -60,7 +38,6 @@ class FileListView extends StatelessWidget {
   String _formatDateColumn(int secs) {
     if (secs <= 0) return '—';
     final dt = DateTime.fromMillisecondsSinceEpoch(secs * 1000);
-    
     final now = DateTime.now();
 
     final isToday =
@@ -97,17 +74,18 @@ class FileListView extends StatelessWidget {
               final isSelected = selectedItems.contains(rawItem);
 
               final entry = RawEntry.parse(rawItem);
-              
+
               String displayName = entry.name;
               IconData? vaultIcon;
               Color? vaultColor;
 
               if (!isDir) {
                 final ext = displayName.split('.').last;
-                vaultIcon = _getVaultIcon(ext);
-                vaultColor = _getVaultColor(ext);
-                
-                // If it is a vault item, visually strip the extension
+                // Use the shared vault-type helpers from file_type_utils.dart.
+                vaultIcon = vaultIconForExt(ext);
+                vaultColor = vaultColorForExt(ext);
+
+                // Strip the vault extension from the display name.
                 if (vaultIcon != null) {
                   final parts = displayName.split('.');
                   if (parts.length > 1) {
@@ -119,16 +97,16 @@ class FileListView extends StatelessWidget {
 
               final dateStr = _formatDateColumn(entry.modifiedSecs);
               // Hide sizes for vault items and directories
-              final sizeStr = isDir || vaultIcon != null 
-                  ? '' 
+              final sizeStr = isDir || vaultIcon != null
+                  ? ''
                   : formatBytes(entry.sizeBytes);
 
-              final displayIcon = isDir 
-                  ? Icons.folder_rounded 
+              final displayIcon = isDir
+                  ? Icons.folder_rounded
                   : (vaultIcon ?? iconForFile(entry.name));
-                  
-              final iconColor = isDir 
-                  ? cs.secondary 
+
+              final iconColor = isDir
+                  ? cs.secondary
                   : (vaultColor ?? colorForFile(entry.name));
 
               return InkWell(

@@ -27,6 +27,7 @@ import 'widgets/operation_progress_bar.dart';
 import 'widgets/selection_app_bar.dart';
 import '../vault/vault_item_detail_screen.dart';
 import '../vault/vault_item_edit_screen.dart';
+import '../../utils/file_type_utils.dart';
 
 // ── Layout mode ───────────────────────────────────────────────────────────────
 
@@ -1427,19 +1428,10 @@ class _VaultTypeIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final (icon, color) = _style(type);
+    final icon  = vaultIconForExt(type.name)  ?? Icons.lock_rounded;
+    final color = vaultColorForExt(type.name) ?? Theme.of(context).colorScheme.primary;
     return Icon(icon, size: 18, color: color.withValues(alpha: 0.85));
   }
-
-  static (IconData, Color) _style(VaultItemType type) => switch (type) {
-    VaultItemType.password        => (Icons.key_rounded,              Color(0xFFA8C7FA)),
-    VaultItemType.paymentCard     => (Icons.credit_card_rounded,      Color(0xFF80CBC4)),
-    VaultItemType.identity        => (Icons.badge_rounded,            Color(0xFFCE93D8)),
-    VaultItemType.secureNote      => (Icons.sticky_note_2_rounded,    Color(0xFFFFCC80)),
-    VaultItemType.bankAccount     => (Icons.account_balance_rounded,  Color(0xFF80DEEA)),
-    VaultItemType.softwareLicense => (Icons.computer_rounded,         Color(0xFFA5D6A7)),
-  };
 }
 
 // ── Truncated banner ──────────────────────────────────────────────────────────

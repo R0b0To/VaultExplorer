@@ -70,3 +70,35 @@ Color colorForFile(String name) {
       return const Color(0xFF546E7A);
   }
 }
+
+// ── Vault-item icon / colour helpers ─────────────────────────────────────────
+//
+// The file extension for a vault item doubles as the [VaultItemType] enum name
+// (e.g. "Passwords.password" → VaultItemType.password).  Having a single
+// source of truth here means a new item type only needs its icon/colour
+// registered in one place, and the grid view, list view, file browser, and
+// detail screen all stay in sync automatically.
+
+/// Returns the [IconData] for a vault-item file extension, or `null` when the
+/// extension does not correspond to any known vault item type.
+IconData? vaultIconForExt(String ext) => switch (ext) {
+  'password'        => Icons.key_rounded,
+  'paymentCard'     => Icons.credit_card_rounded,
+  'identity'        => Icons.badge_rounded,
+  'secureNote'      => Icons.sticky_note_2_rounded,
+  'bankAccount'     => Icons.account_balance_rounded,
+  'softwareLicense' => Icons.computer_rounded,
+  _                 => null,
+};
+
+/// Returns the accent [Color] for a vault-item file extension, or `null` when
+/// the extension does not correspond to any known vault item type.
+Color? vaultColorForExt(String ext) => switch (ext) {
+  'password'        => const Color(0xFFA8C7FA),
+  'paymentCard'     => const Color(0xFF80CBC4),
+  'identity'        => const Color(0xFFCE93D8),
+  'secureNote'      => const Color(0xFFFFCC80),
+  'bankAccount'     => const Color(0xFF80DEEA),
+  'softwareLicense' => const Color(0xFFA5D6A7),
+  _                 => null,
+};

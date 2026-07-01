@@ -10,28 +10,6 @@ import '../../../utils/lru_cache.dart';
 import '../../../utils/raw_entry.dart';
 import '../viewer/media_viewer_constants.dart';
 
-// ── Vault Icon Helpers ────────────────────────────────────────────────────────
-IconData? _getVaultIcon(String ext) => switch (ext) {
-  'password'        => Icons.key_rounded,
-  'paymentCard'     => Icons.credit_card_rounded,
-  'identity'        => Icons.badge_rounded,
-  'secureNote'      => Icons.sticky_note_2_rounded,
-  'bankAccount'     => Icons.account_balance_rounded,
-  'softwareLicense' => Icons.computer_rounded,
-  _                 => null,
-};
-
-Color? _getVaultColor(String ext) => switch (ext) {
-  'password'        => const Color(0xFFA8C7FA),
-  'paymentCard'     => const Color(0xFF80CBC4),
-  'identity'        => const Color(0xFFCE93D8),
-  'secureNote'      => const Color(0xFFFFCC80),
-  'bankAccount'     => const Color(0xFF80DEEA),
-  'softwareLicense' => const Color(0xFFA5D6A7),
-  _                 => null,
-};
-// ──────────────────────────────────────────────────────────────────────────────
-
 /// A dynamic gallery grid for the file browser supporting pinch-to-zoom.
 class FileGridView extends StatefulWidget {
   final MountedContainer container;
@@ -166,10 +144,12 @@ class _FileGridViewState extends State<FileGridView> {
 
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
-    final vaultIcon = _getVaultIcon(ext);
-    final vaultColor = _getVaultColor(ext);
 
-    // If it is a vault item, visually strip the extension
+    // Use the shared vault-type helpers from file_type_utils.dart.
+    final vaultIcon = vaultIconForExt(ext);
+    final vaultColor = vaultColorForExt(ext);
+
+    // Strip the vault extension from the display name.
     if (vaultIcon != null) {
       final nameParts = cleanName.split('.');
       if (nameParts.length > 1) {
@@ -183,7 +163,6 @@ class _FileGridViewState extends State<FileGridView> {
 
     Widget previewWidget;
     if (vaultIcon != null) {
-      // It's a vault item
       previewWidget = Center(
         child: Icon(
           vaultIcon,
@@ -392,11 +371,7 @@ class _AsyncThumbState extends State<_AsyncThumb> {
   Completer<void>? _limiterCompleter;
   String? _loadingPath;
 
-  // FIX P9: Track whether this widget instance has been disposed so we can
-  // avoid calling setState after disposal even when the native fetch completes.
   bool _disposed = false;
-
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -440,15 +415,11 @@ class _AsyncThumbState extends State<_AsyncThumb> {
     super.dispose();
   }
 
-  // ── Private helpers ────────────────────────────────────────────────────────
-
   void _cancel() {
     if (_limiterCompleter != null) {
       widget.limiter.cancel(_limiterCompleter!);
       _limiterCompleter = null;
     }
-    // FIX P9: Clearing _loadingPath signals in-flight async continuations to
-    // abandon their work as early as possible.
     _loadingPath = null;
   }
 
@@ -526,7 +497,6 @@ class _AsyncThumbState extends State<_AsyncThumb> {
       await widget.limiter.acquire(completer);
       acquired = true;
 
-      // FIX P9: Check disposed state after acquiring the limiter slot.
       if (targetPath != _loadingPath || !mounted || _disposed) {
         throw Exception('Cancelled before processing');
       }
@@ -537,8 +507,6 @@ class _AsyncThumbState extends State<_AsyncThumb> {
       if (acquired) widget.limiter.release();
     }
   }
-
-  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -778,8 +746,6 @@ class ConcurrencyLimiter {
     _drainNext();
   }
 
-  // FIX P8: Drain as many waiters as there are free slots, skipping
-  // already-completed (cancelled) completers without burning a slot.
   void _drainNext() {
     while (_waiting.isNotEmpty && _running < maxConcurrency) {
       final next = _waiting.removeLast();

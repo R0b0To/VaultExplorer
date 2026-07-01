@@ -8,6 +8,29 @@ import '../../../services/vaultexplorer_api.dart';
 import '../../../utils/file_type_utils.dart';
 import '../../../utils/lru_cache.dart';
 import '../../../utils/raw_entry.dart';
+import '../viewer/media_viewer_constants.dart';
+
+// ── Vault Icon Helpers ────────────────────────────────────────────────────────
+IconData? _getVaultIcon(String ext) => switch (ext) {
+  'password'        => Icons.key_rounded,
+  'paymentCard'     => Icons.credit_card_rounded,
+  'identity'        => Icons.badge_rounded,
+  'secureNote'      => Icons.sticky_note_2_rounded,
+  'bankAccount'     => Icons.account_balance_rounded,
+  'softwareLicense' => Icons.computer_rounded,
+  _                 => null,
+};
+
+Color? _getVaultColor(String ext) => switch (ext) {
+  'password'        => const Color(0xFFA8C7FA),
+  'paymentCard'     => const Color(0xFF80CBC4),
+  'identity'        => const Color(0xFFCE93D8),
+  'secureNote'      => const Color(0xFFFFCC80),
+  'bankAccount'     => const Color(0xFF80DEEA),
+  'softwareLicense' => const Color(0xFFA5D6A7),
+  _                 => null,
+};
+// ──────────────────────────────────────────────────────────────────────────────
 
 /// A dynamic gallery grid for the file browser supporting pinch-to-zoom.
 class FileGridView extends StatefulWidget {
@@ -43,23 +66,8 @@ class FileGridView extends StatefulWidget {
 }
 
 class _FileGridViewState extends State<FileGridView> {
-  static const _imageExts = {'jpg', 'jpeg', 'png', 'webp', 'gif'};
-  static const _videoExts = {'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv'};
-
   int _crossAxisCount = 3;
   double _baselineScale = 1.0;
-
-  bool _isImage(String name) {
-    final dot = name.lastIndexOf('.');
-    if (dot == -1) return false;
-    return _imageExts.contains(name.substring(dot + 1).toLowerCase());
-  }
-
-  bool _isVideo(String name) {
-    final dot = name.lastIndexOf('.');
-    if (dot == -1) return false;
-    return _videoExts.contains(name.substring(dot + 1).toLowerCase());
-  }
 
   double _getAspectRatio(int columns) {
     switch (columns) {
@@ -151,17 +159,39 @@ class _FileGridViewState extends State<FileGridView> {
   Widget _buildFileCell(BuildContext context, String rawItem) {
     final parts = rawItem.split('|');
     final cleanName = parts.first;
-    final fileSize = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
     final fullPath = widget.currentDirPath.isEmpty
         ? cleanName
         : '${widget.currentDirPath}/$cleanName';
     final isSelected = widget.selectedItems.contains(rawItem);
 
-    final isImg = _isImage(cleanName);
-    final isVid = _isVideo(cleanName);
+    String displayName = cleanName;
+    final ext = cleanName.split('.').last;
+    final vaultIcon = _getVaultIcon(ext);
+    final vaultColor = _getVaultColor(ext);
+
+    // If it is a vault item, visually strip the extension
+    if (vaultIcon != null) {
+      final nameParts = cleanName.split('.');
+      if (nameParts.length > 1) {
+        nameParts.removeLast();
+        displayName = nameParts.join('.');
+      }
+    }
+
+    final isImg = MediaViewerConstants.isImage(cleanName);
+    final isVid = MediaViewerConstants.isVideo(cleanName);
 
     Widget previewWidget;
-    if (isImg) {
+    if (vaultIcon != null) {
+      // It's a vault item
+      previewWidget = Center(
+        child: Icon(
+          vaultIcon,
+          size: _crossAxisCount == 1 ? 52 : 40,
+          color: vaultColor,
+        ),
+      );
+    } else if (isImg) {
       previewWidget = _EncryptedImageGridThumb(
         container: widget.container,
         filePath: fullPath,
@@ -192,7 +222,7 @@ class _FileGridViewState extends State<FileGridView> {
           ? null
           : () => widget.onFileLongMenu?.call(rawItem),
       preview: previewWidget,
-      label: cleanName,
+      label: displayName,
     );
   }
 }
@@ -322,6 +352,7 @@ class _CheckBadge extends StatelessWidget {
   );
 }
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Generic async thumbnail loader
 // ─────────────────────────────────────────────────────────────────────────────
@@ -417,9 +448,7 @@ class _AsyncThumbState extends State<_AsyncThumb> {
       _limiterCompleter = null;
     }
     // FIX P9: Clearing _loadingPath signals in-flight async continuations to
-    // abandon their work as early as possible — the path guard check
-    // `targetPath != _loadingPath` below now fires as soon as dispose() runs,
-    // rather than only after the limiter wait completes.
+    // abandon their work as early as possible.
     _loadingPath = null;
   }
 
@@ -497,8 +526,7 @@ class _AsyncThumbState extends State<_AsyncThumb> {
       await widget.limiter.acquire(completer);
       acquired = true;
 
-      // FIX P9: Check disposed state after acquiring the limiter slot —
-      // the widget may have been disposed while waiting in the queue.
+      // FIX P9: Check disposed state after acquiring the limiter slot.
       if (targetPath != _loadingPath || !mounted || _disposed) {
         throw Exception('Cancelled before processing');
       }
@@ -750,19 +778,12 @@ class ConcurrencyLimiter {
     _drainNext();
   }
 
-  // FIX P8: The original while loop contained a `return` inside the body,
-  // meaning it could only ever drain one waiter per release() call regardless
-  // of how many concurrent slots opened up. This was harmless for
-  // maxConcurrency=1 but misleading and wrong for higher values.
-  //
-  // The corrected version drains as many waiters as there are free slots,
-  // skipping already-completed (cancelled) completers without burning a slot.
+  // FIX P8: Drain as many waiters as there are free slots, skipping
+  // already-completed (cancelled) completers without burning a slot.
   void _drainNext() {
     while (_waiting.isNotEmpty && _running < maxConcurrency) {
       final next = _waiting.removeLast();
       if (next.isCompleted) {
-        // This completer was cancelled while waiting — skip it and try the next
-        // one without consuming a concurrency slot.
         continue;
       }
       _running++;

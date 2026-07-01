@@ -445,7 +445,23 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
     return RES_PARERR;
 }
 
-extern "C" DWORD get_fattime() { return 0; }
+extern "C" DWORD get_fattime() {
+    time_t now = time(nullptr);
+    struct tm t{};
+    localtime_r(&now, &t);
+
+    WORD fdate = static_cast<WORD>(
+        (((t.tm_year + 1900 - 1980) & 0x7F) << 9) |
+        (((t.tm_mon + 1)            & 0x0F) << 5) |
+        ( t.tm_mday                 & 0x1F));
+
+    WORD ftime = static_cast<WORD>(
+        ((t.tm_hour & 0x1F) << 11) |
+        ((t.tm_min  & 0x3F) << 5)  |
+        ((t.tm_sec / 2) & 0x1F));
+
+    return (static_cast<DWORD>(fdate) << 16) | ftime;
+}
 
 // ----------------------------------------------------------------====
 // CRYPTO SESSION BUILDER

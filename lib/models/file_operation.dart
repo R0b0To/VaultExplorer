@@ -3,6 +3,7 @@ library file_operation;
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:vaultexplorer/utils/format_utils.dart';
 import '/models/clipboard_item.dart';
 import '/models/mounted_container.dart';
 import '../utils/raw_entry.dart';

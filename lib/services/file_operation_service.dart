@@ -208,8 +208,8 @@ class FileOperationService extends ChangeNotifier {
 
       if (requiredBytes > (freeBytes * 0.95).floor()) {
         op._setError(
-          'Not enough space — need ${_fmtBytes(requiredBytes)}, '
-          'only ${_fmtBytes(freeBytes)} free',
+          'Not enough space — need ${formatBytes(requiredBytes)}, '
+          'only ${formatBytes(freeBytes)} free',
         );
         op._setStatus(FileOperationStatus.failed);
         notifyListeners();
@@ -495,19 +495,5 @@ class FileOperationService extends ChangeNotifier {
       await _deleteEntryRecursive(container, '$path/${e.name}', e.isDir);
     }
     return vaultExplorerApi.deleteFile(container, path);
-  }
-
-  // ── Private formatting helper ─────────────────────────────────────────────
-
-  static String _fmtBytes(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    double size = bytes.toDouble();
-    int idx = 0;
-    while (size >= 1024 && idx < suffixes.length - 1) {
-      size /= 1024;
-      idx++;
-    }
-    return '${size.toStringAsFixed(size < 10 ? 1 : 0)} ${suffixes[idx]}';
   }
 }

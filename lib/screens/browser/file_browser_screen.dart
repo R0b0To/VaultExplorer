@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/clipboard_item.dart';
-import '../../models/file_operation.dart'; // also exports FileOperationService, ConflictPlan, enums
+import '../../models/file_operation.dart';
 import '../../models/mounted_container.dart';
 import '../../models/thumbnail_cache_mode.dart';
+import '../../models/vault_item.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
+import '../../services/vault_items_service.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../utils/format_utils.dart';
 import '../../utils/raw_entry.dart';
@@ -23,6 +25,8 @@ import 'widgets/file_grid_view.dart';
 import 'widgets/file_list_view.dart';
 import 'widgets/operation_progress_bar.dart';
 import 'widgets/selection_app_bar.dart';
+import '../vault/vault_item_detail_screen.dart';
+import '../vault/vault_item_edit_screen.dart';
 
 // ── Layout mode ───────────────────────────────────────────────────────────────
 
@@ -127,7 +131,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     } catch (e) {
-      debugPrint('Failed to resolve thumbnail cache mode: $e');
+      debugPrint('Failed to resolve settings: $e');
     }
     await _loadDirectoryContents(_currentDirPath);
   }
@@ -164,16 +168,17 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         path,
       );
       final space = await vaultExplorerApi.getSpaceInfo(widget.container);
+      
       if (mounted) {
-    final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
-    setState(() {
-        _currentItems = items?.where(
-            (f) => !f.startsWith('System:')).toList() ?? [];
-        _isListingTruncated = isTruncated;   // new bool field
-        if (space != null && space.length > 1) _freeSpace = space[1];
-        _isLoading = false;
-    });
-}
+        final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
+        
+        setState(() {
+            _currentItems = items?.where((f) => !f.startsWith('System:')).toList() ?? [];
+            _isListingTruncated = isTruncated;
+            if (space != null && space.length > 1) _freeSpace = space[1];
+            _isLoading = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -251,6 +256,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       toggleSelectItem(rawItem);
       return;
     }
+
     final entry = RawEntry.parse(rawItem);
     final fullPath = _currentDirPath.isEmpty
         ? entry.name
@@ -259,6 +265,35 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final parts = entry.name.split('.');
     final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
 
+    // Check if it's a VaultItem (secure item)
+    if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
+      final item = await VaultItemsService.instance.loadItem(widget.container, fullPath);
+
+      if (item != null) {
+        // Force the title to perfectly match the file's base name in case it was renamed externally
+        final baseName = entry.name.substring(0, entry.name.lastIndexOf('.'));
+        item.title = baseName;
+
+        if (mounted) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => VaultItemDetailScreen(
+                container: widget.container, 
+                item: item,
+                filePath: fullPath,
+              ),
+            ),
+          );
+          _loadDirectoryContents(_currentDirPath);
+        }
+      } else {
+        _setStatus('Failed to read secure item', error: true);
+      }
+      return;
+    }
+
+    // Normal files
     final settings = await AppSettingsService.loadSettings();
     final pref = settings.extensionPreferences[ext];
 
@@ -279,7 +314,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     } else if (pref == 'external') {
       _openFileWithApp(entry.name, fullPath);
     } else {
-      // pref is null
       if (_isSupportedMedia(entry.name)) {
         _openMediaViewer(entry.name, fullPath);
       } else {
@@ -589,8 +623,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   // ── Media helpers ─────────────────────────────────────────────────────────
 
-  /// Delegates to [MediaViewerConstants] — the single source of truth for
-  /// supported media extensions across the entire viewer stack.
   bool _isSupportedMedia(String fileName) =>
       MediaViewerConstants.isSupported(fileName);
 
@@ -623,9 +655,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               return _scanMediaRecursively(subPath, depth: depth + 1);
             }),
           );
-          for (final list in nested) {
-            foundFiles.addAll(list);
-          }
+          for (final list in nested) foundFiles.addAll(list);
         }
       }
     } catch (e) {
@@ -654,7 +684,25 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  // ── Clipboard init ────────────────────────────────────────────────────────
+  // ── Vault items ───────────────────────────────────────────────────────────
+
+  Future<void> _addVaultItem(VaultItemType type) async {
+    _signalActivity();
+    await Navigator.push<String?>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VaultItemEditScreen(
+          container: widget.container,
+          type: type,
+          currentDirPath: _currentDirPath,
+        ),
+      ),
+    );
+    // Refresh directory as VaultItems natively exist in the filesystem now
+    _loadDirectoryContents(_currentDirPath);
+  }
+
+  // ── Clipboard ─────────────────────────────────────────────────────────────
 
   void _initClipboard({required bool cut}) {
     _signalActivity();
@@ -679,8 +727,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
     exitSelectionMode();
   }
-
-  // ── Paste ─────────────────────────────────────────────────────────────────
 
   Future<void> _paste() async {
     if (!_clip.hasItems) return;
@@ -795,8 +841,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     op.addListener(listener);
   }
 
-  // ── Batch delete ──────────────────────────────────────────────────────────
-
   void _batchDelete() {
     HapticFeedback.heavyImpact();
     _signalActivity();
@@ -834,10 +878,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 
-  // ── Import / Export ───────────────────────────────────────────────────────
-
   Future<void> _exportSelectedToStorage() async {
     _signalActivity();
+    
     final items = selectedItems.map((raw) {
       final e = RawEntry.parse(raw);
       final path = _currentDirPath.isEmpty
@@ -845,6 +888,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           : '$_currentDirPath/${e.name}';
       return <String, dynamic>{'path': path, 'isDir': e.isDir};
     }).toList();
+    
     if (items.isEmpty) return;
 
     setState(() => _isLoading = true);
@@ -1076,7 +1120,17 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         onClose: exitSelectionMode,
         onSelectAll: () => setState(() => selectedItems.addAll(allItems)),
         onRename: () {
-          final entry = RawEntry.parse(selectedItems.first);
+          final raw = selectedItems.first;
+          final entry = RawEntry.parse(raw);
+          final parts = entry.name.split('.');
+          final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
+          
+          if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
+             _setStatus('Edit secure items to rename them');
+             exitSelectionMode();
+             return;
+          }
+          
           BrowserDialogs.showRename(
             context,
             container: widget.container,
@@ -1091,13 +1145,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         onExport: _exportSelectedToStorage,
         onDelete: _batchDelete,
         onOpenWithApp: () async {
-          final entry = RawEntry.parse(selectedItems.first);
+          final raw = selectedItems.first;
+          final entry = RawEntry.parse(raw);
           final path = _currentDirPath.isEmpty
               ? entry.name
               : '$_currentDirPath/${entry.name}';
           final parts = entry.name.split('.');
           final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
           exitSelectionMode();
+          
+          if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
+             _setStatus('Vault items cannot be opened in external apps', error: true);
+             return;
+          }
+          
           final settings = await AppSettingsService.loadSettings();
           if (mounted) {
             await _showOpenWithDialog(entry.name, path, ext, settings);
@@ -1157,6 +1218,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           tooltip: 'Search in this folder',
           onPressed: () => setState(() => _isSearchActive = true),
         ),
+        // ── + menu ────────────────────────────────────────────────────────
         PopupMenuButton<String>(
           icon: const Icon(Icons.add),
           tooltip: 'New item',
@@ -1181,57 +1243,72 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                 _importFilesFromDevice();
               case 'import_folder':
                 _importFolderFromDevice();
+              // vault item types — value is 'vault:password', 'vault:paymentCard', etc.
+              default:
+                if (v.startsWith('vault:')) {
+                  final type = VaultItemType.fromJson(v.substring(6));
+                  _addVaultItem(type);
+                }
             }
           },
           itemBuilder: (_) => [
+            // ── Files section ──────────────────────────────────────────────
             PopupMenuItem(
               value: 'folder',
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.create_new_folder_outlined,
-                    color: cs.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('New Folder'),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.create_new_folder_outlined, color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('New Folder'),
+              ]),
             ),
             PopupMenuItem(
               value: 'file',
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.insert_drive_file_outlined,
-                    color: cs.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 12),
-                  const Text('New File'),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.insert_drive_file_outlined, color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('New File'),
+              ]),
             ),
             const PopupMenuDivider(),
             PopupMenuItem(
               value: 'import',
-              child: Row(
-                children: [
-                  Icon(Icons.upload_file_outlined, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 12),
-                  const Text('Import Files'),
-                ],
-              ),
+              child: Row(children: [
+                Icon(Icons.upload_file_outlined, color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('Import Files'),
+              ]),
             ),
             PopupMenuItem(
               value: 'import_folder',
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.drive_folder_upload_outlined,
-                    color: cs.onSurfaceVariant,
-                  ),
+              child: Row(children: [
+                Icon(Icons.drive_folder_upload_outlined, color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('Import Folder'),
+              ]),
+            ),
+            // ── Vault section ──────────────────────────────────────────────
+            const PopupMenuDivider(),
+            // Non-interactive label row
+            PopupMenuItem(
+              enabled: false,
+              height: 28,
+              child: Text(
+                'SECURE ITEM',
+                style: textTheme.labelSmall?.copyWith(
+                  color: cs.primary,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            ...VaultItemType.values.map(
+              (type) => PopupMenuItem(
+                value: 'vault:${type.toJson()}',
+                child: Row(children: [
+                  _VaultTypeIcon(type: type),
                   const SizedBox(width: 12),
-                  const Text('Import Folder'),
-                ],
+                  Text(type.label),
+                ]),
               ),
             ),
           ],
@@ -1341,7 +1418,32 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 }
-// New widget — same visual language as _StatusBar:
+
+// ── Small icon used inside the + menu ────────────────────────────────────────
+
+class _VaultTypeIcon extends StatelessWidget {
+  final VaultItemType type;
+  const _VaultTypeIcon({required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final (icon, color) = _style(type);
+    return Icon(icon, size: 18, color: color.withValues(alpha: 0.85));
+  }
+
+  static (IconData, Color) _style(VaultItemType type) => switch (type) {
+    VaultItemType.password        => (Icons.key_rounded,              Color(0xFFA8C7FA)),
+    VaultItemType.paymentCard     => (Icons.credit_card_rounded,      Color(0xFF80CBC4)),
+    VaultItemType.identity        => (Icons.badge_rounded,            Color(0xFFCE93D8)),
+    VaultItemType.secureNote      => (Icons.sticky_note_2_rounded,    Color(0xFFFFCC80)),
+    VaultItemType.bankAccount     => (Icons.account_balance_rounded,  Color(0xFF80DEEA)),
+    VaultItemType.softwareLicense => (Icons.computer_rounded,         Color(0xFFA5D6A7)),
+  };
+}
+
+// ── Truncated banner ──────────────────────────────────────────────────────────
+
 class _TruncatedBanner extends StatelessWidget {
   const _TruncatedBanner();
 
@@ -1353,8 +1455,7 @@ class _TruncatedBanner extends StatelessWidget {
       color: cs.tertiaryContainer,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(children: [
-        Icon(Icons.warning_amber_rounded, size: 16,
-             color: cs.onTertiaryContainer),
+        Icon(Icons.warning_amber_rounded, size: 16, color: cs.onTertiaryContainer),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
@@ -1369,6 +1470,7 @@ class _TruncatedBanner extends StatelessWidget {
     );
   }
 }
+
 // ── Filter chips bar ──────────────────────────────────────────────────────────
 
 class _FilterChipsBar extends StatelessWidget {
@@ -1403,21 +1505,13 @@ class _FilterChipsBar extends StatelessWidget {
     );
   }
 
-  Widget _chip(
-    BuildContext context,
-    String? filter,
-    String label,
-    IconData icon,
-  ) {
+  Widget _chip(BuildContext context, String? filter, String label, IconData icon) {
     final cs = Theme.of(context).colorScheme;
     final isSelected = currentFilter == filter;
     return FilterChip(
       showCheckmark: false,
-      avatar: Icon(
-        icon,
-        size: 16,
-        color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-      ),
+      avatar: Icon(icon, size: 16,
+          color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant),
       label: Text(label),
       selected: isSelected,
       onSelected: (selected) => onFilterChanged(selected ? filter : null),
@@ -1452,9 +1546,7 @@ class _StatusBar extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              isError
-                  ? Icons.error_outline_rounded
-                  : Icons.info_outline_rounded,
+              isError ? Icons.error_outline_rounded : Icons.info_outline_rounded,
               size: 16,
               color: fg,
             ),
@@ -1524,11 +1616,7 @@ class _StatsBar extends StatelessWidget {
             ),
             const SizedBox(width: 12),
           ],
-          _stat(
-            context,
-            Icons.storage_rounded,
-            '${formatBytes(freeSpaceBytes)} free',
-          ),
+          _stat(context, Icons.storage_rounded, '${formatBytes(freeSpaceBytes)} free'),
         ],
       ),
     );
@@ -1542,10 +1630,7 @@ class _StatsBar extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: cs.onSurfaceVariant),
         const SizedBox(width: 6),
-        Text(
-          text,
-          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
+        Text(text, style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       ],
     );
   }
@@ -1570,18 +1655,12 @@ class _EmptyPlaceholder extends StatelessWidget {
           children: [
             Icon(Icons.folder_open_rounded, size: 48, color: cs.outline),
             const SizedBox(height: 16),
-            Text(
-              'Empty Folder',
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text('Empty Folder',
+                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text(
-              'Tap + to create files or import from device.',
-              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
+            Text('Tap + to create files or import from device.',
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                textAlign: TextAlign.center),
             if (!atRoot) ...[
               const SizedBox(height: 20),
               TextButton.icon(
@@ -1613,18 +1692,12 @@ class _SearchEmptyState extends StatelessWidget {
           children: [
             Icon(Icons.search_off_rounded, size: 48, color: cs.outline),
             const SizedBox(height: 16),
-            Text(
-              'No results',
-              style: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text('No results',
+                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text(
-              'Nothing in this folder matches "$query".',
-              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
+            Text('Nothing in this folder matches "$query".',
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                textAlign: TextAlign.center),
           ],
         ),
       ),

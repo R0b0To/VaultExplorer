@@ -11,6 +11,8 @@
 #include <memory>
 #include <algorithm>
 #include <mutex>
+#include <atomic>  // std::atomic<bool> derivationInProgress[] below relies on this directly,
+                   // not on a transitive include from <mutex>/<memory>.
 #include <ctime>   // mktime, struct tm, time_t
 
 #include "mbedtls/md.h"
@@ -142,6 +144,16 @@ static mbedtls_aes_xts_context activeDataCtxEnc[MAX_VOLUMES];
 static std::unique_ptr<unsigned char[]> ioVolBuf[MAX_VOLUMES];
 static size_t                           ioVolBufSize[MAX_VOLUMES];
 static std::mutex                       ioVolBufMutex[MAX_VOLUMES];
+
+// FIX: openStream() hands Kotlin a raw FIL* that outlives the JNI call. If
+// lockNative() runs while that stream is still open, the underlying fd is
+// closed and the crypto context is freed/zeroized out from under it — a
+// subsequent readStream() would decrypt through a dead context (UB / stale
+// data) or read from a closed fd. Track live streams per volume, guarded by
+// volumeMutex[volId], so lockNative() can close and invalidate them, and
+// readStream()/closeStream() can reject pointers that are no longer valid
+// for that volume's current session.
+static std::vector<FIL*> openStreams[MAX_VOLUMES];
 
 static const char* drivePaths[MAX_VOLUMES] = {
     "0:", "1:", "2:", "3:", "4:", "5:", "6:", "7:"
@@ -324,30 +336,27 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 
     alignas(16) unsigned char stackBuf[65536];
 
+    // FIX: previously this loop duplicated the pread+decrypt body once for
+    // the "fits on the stack" case and again (with an early `continue`) for
+    // the "needs the persistent volume buffer" case. Two copies of the same
+    // logic is exactly the trap the tryKeyCandidate() comment above warns
+    // about elsewhere in this file — easy to silently diverge on a future
+    // edit. disk_write() already uses the single-path form below; mirror it
+    // here so both hooks share one code path.
     while (remaining > 0) {
         const UINT batchCount = std::min(remaining, MAX_SECTORS_PER_BATCH);
         const uint64_t firstPhysical = basePhysical + curSector;
         const size_t   totalBytes    = static_cast<size_t>(batchCount) * 512;
 
         unsigned char* encBuf;
-        if (totalBytes <= sizeof(stackBuf)) {
-            encBuf = stackBuf;
-        } else {
-            std::lock_guard<std::mutex> bufLock(ioVolBufMutex[pdrv]);
+        bool usedPersistent = (totalBytes > sizeof(stackBuf));
+
+        std::unique_lock<std::mutex> bufLock;
+        if (usedPersistent) {
+            bufLock = std::unique_lock<std::mutex>(ioVolBufMutex[pdrv]);
             encBuf = getVolIoBuf(pdrv, totalBytes);
-            ssize_t got = pread(fd, encBuf, totalBytes,
-                                static_cast<off_t>(firstPhysical * 512));
-            if (got < static_cast<ssize_t>(totalBytes)) return RES_ERROR;
-            for (UINT i = 0; i < batchCount; i++) {
-                const uint64_t physSector = firstPhysical + i;
-                const uint64_t tweak = relTweak ? (physSector - basePhysical) : physSector;
-                decryptSector(&activeDataCtxDec[pdrv], tweak,
-                              encBuf + (i * 512), curBuf + (i * 512));
-            }
-            remaining -= batchCount;
-            curSector += batchCount;
-            curBuf    += batchCount * 512;
-            continue;
+        } else {
+            encBuf = stackBuf;
         }
 
         ssize_t got = pread(fd, encBuf, totalBytes,
@@ -360,6 +369,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             decryptSector(&activeDataCtxDec[pdrv], tweak,
                           encBuf + (i * 512), curBuf + (i * 512));
         }
+
         remaining -= batchCount;
         curSector += batchCount;
         curBuf    += batchCount * 512;
@@ -844,10 +854,13 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     }
 
     jobjectArray result = nullptr;
-    if (ensureMounted(volId)) {
-        result = buildDirectoryListing(env, volId, nullptr);
-    } else {
-        LOGI("FATFS Mount failed on volume %d", volId);
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            result = buildDirectoryListing(env, volId, nullptr);
+        } else {
+            LOGI("FATFS Mount failed on volume %d", volId);
+        }
     }
 
     env->ReleaseStringUTFChars(password, nativePass);
@@ -859,6 +872,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
     if (volId < 0 || volId >= MAX_VOLUMES) return;
 
     std::lock_guard<std::mutex> lock(volumeMutex[volId]);
+
+    // FIX: invalidate any FIL* streams handed out via openStream() before we
+    // tear down the fd/crypto context they read through. Without this, a
+    // stream left open across a lock() call becomes a dangling handle into
+    // freed/zeroized crypto state.
+    for (FIL* f : openStreams[volId]) {
+        f_close(f);
+        delete f;
+    }
+    openStreams[volId].clear();
 
     if (activeFd[volId] >= 0) {
         close(activeFd[volId]);
@@ -1023,7 +1046,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
                 const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
 
                 for (uint64_t i = 0; i < count; ++i) {
-                    setTweak(tweak, s + i);
+                    setTweak(tweak, (s + i));
                     mbedtls_aes_crypt_xts(&dataXts.enc, MBEDTLS_AES_ENCRYPT,
                                           512, tweak, ZERO_SECTOR,
                                           batch.get() + i * 512);
@@ -1065,7 +1088,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 
             MKFS_PARM mp;
             memset(&mp, 0, sizeof(mp));
-            mp.fmt    = useExFat ? FM_EXFAT : FM_FAT;
+            mp.fmt = (useExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
             mp.n_fat  = 1;
             mp.n_root = 512;
             mp.au_size = 0;
@@ -1173,8 +1196,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectory(
     }
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     jobjectArray result = nullptr;
-    if (ensureMounted(volId))
-        result = buildDirectoryListing(env, volId, nativePath);
+    {
+        // FIX: FF_FS_REENTRANT is 0, so concurrent FatFs calls on the same
+        // globalFs[volId] (e.g. this listDirectory racing a writeFileChunk
+        // or deleteFile on another thread) can corrupt FAT/directory state.
+        // volumeMutex[volId] is the only lock the codebase uses to protect
+        // this instance, so serialize FatFs access through it.
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId))
+            result = buildDirectoryListing(env, volId, nativePath);
+    }
     env->ReleaseStringUTFChars(dirPath, nativePath);
     return result;
 }
@@ -1187,12 +1218,15 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSize(
     }
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jlong size = 0;
-    if (ensureMounted(volId)) {
-        FIL f;
-        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-        if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-            size = static_cast<jlong>(f_size(&f));
-            f_close(&f);
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            FIL f;
+            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+                size = static_cast<jlong>(f_size(&f));
+                f_close(&f);
+            }
         }
     }
     env->ReleaseStringUTFChars(fileName, targetName);
@@ -1207,8 +1241,11 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSize(
     }
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     jlong total = 0;
-    if (ensureMounted(volId))
-        total = static_cast<jlong>(recursiveFolderSize(volId, nativePath));
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId))
+            total = static_cast<jlong>(recursiveFolderSize(volId, nativePath));
+    }
     env->ReleaseStringUTFChars(dirPath, nativePath);
     return total;
 }
@@ -1223,19 +1260,22 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunk(
     }
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jbyteArray retArray = nullptr;
-    if (ensureMounted(volId)) {
-        FIL f;
-        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-        if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-            f_lseek(&f, static_cast<FSIZE_t>(offset));
-            std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
-            UINT br = 0;
-            if (f_read(&f, buffer.get(), static_cast<UINT>(length), &br) == FR_OK && br > 0) {
-                retArray = env->NewByteArray(static_cast<jsize>(br));
-                env->SetByteArrayRegion(retArray, 0, static_cast<jsize>(br),
-                                        reinterpret_cast<jbyte*>(buffer.get()));
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            FIL f;
+            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+                f_lseek(&f, static_cast<FSIZE_t>(offset));
+                std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
+                UINT br = 0;
+                if (f_read(&f, buffer.get(), static_cast<UINT>(length), &br) == FR_OK && br > 0) {
+                    retArray = env->NewByteArray(static_cast<jsize>(br));
+                    env->SetByteArrayRegion(retArray, 0, static_cast<jsize>(br),
+                                            reinterpret_cast<jbyte*>(buffer.get()));
+                }
+                f_close(&f);
             }
-            f_close(&f);
         }
     }
     env->ReleaseStringUTFChars(fileName, targetName);
@@ -1254,20 +1294,23 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jbyte* body = env->GetByteArrayElements(data, nullptr);
     bool success = false;
-    if (ensureMounted(volId)) {
-        FIL f;
-        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-        BYTE openMode = (offset == 0)
-            ? (FA_WRITE | FA_CREATE_ALWAYS)
-            : (FA_WRITE | FA_OPEN_ALWAYS);
-        if (f_open(&f, fatPath.c_str(), openMode) == FR_OK) {
-            if (f_lseek(&f, static_cast<FSIZE_t>(offset)) == FR_OK) {
-                UINT bw = 0;
-                if (f_write(&f, body, static_cast<UINT>(len), &bw) == FR_OK &&
-                    bw == static_cast<UINT>(len))
-                    success = true;
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            FIL f;
+            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+            BYTE openMode = (offset == 0)
+                ? (FA_WRITE | FA_CREATE_ALWAYS)
+                : (FA_WRITE | FA_OPEN_ALWAYS);
+            if (f_open(&f, fatPath.c_str(), openMode) == FR_OK) {
+                if (f_lseek(&f, static_cast<FSIZE_t>(offset)) == FR_OK) {
+                    UINT bw = 0;
+                    if (f_write(&f, body, static_cast<UINT>(len), &bw) == FR_OK &&
+                        bw == static_cast<UINT>(len))
+                        success = true;
+                }
+                f_close(&f);
             }
-            f_close(&f);
         }
     }
     env->ReleaseByteArrayElements(data, body, JNI_ABORT);
@@ -1285,22 +1328,25 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     const char* source     = env->GetStringUTFChars(sourcePath, nullptr);
     bool success = false;
-    if (ensureMounted(volId)) {
-        FIL f;
-        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-        if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
-            std::ifstream inFile(source, std::ios::binary);
-            if (inFile.is_open()) {
-                std::unique_ptr<char[]> buf(new char[IO_BUFFER_SIZE]);
-                UINT bw;
-                while (inFile) {
-                    inFile.read(buf.get(), IO_BUFFER_SIZE);
-                    std::streamsize n = inFile.gcount();
-                    if (n > 0) f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            FIL f;
+            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+            if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+                std::ifstream inFile(source, std::ios::binary);
+                if (inFile.is_open()) {
+                    std::unique_ptr<char[]> buf(new char[IO_BUFFER_SIZE]);
+                    UINT bw;
+                    while (inFile) {
+                        inFile.read(buf.get(), IO_BUFFER_SIZE);
+                        std::streamsize n = inFile.gcount();
+                        if (n > 0) f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
+                    }
+                    success = true;
                 }
-                success = true;
+                f_close(&f);
             }
-            f_close(&f);
         }
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);
@@ -1318,19 +1364,22 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_extractFile(
     const char* targetName  = env->GetStringUTFChars(targetFileName, nullptr);
     const char* destination = env->GetStringUTFChars(destPath, nullptr);
     bool success = false;
-    if (ensureMounted(volId)) {
-        FIL f;
-        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-        if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-            std::ofstream outFile(destination, std::ios::binary);
-            if (outFile.is_open()) {
-                std::unique_ptr<unsigned char[]> buf(new unsigned char[IO_BUFFER_SIZE]);
-                UINT br;
-                while (f_read(&f, buf.get(), IO_BUFFER_SIZE, &br) == FR_OK && br > 0)
-                    outFile.write(reinterpret_cast<char*>(buf.get()), br);
-                success = true;
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            FIL f;
+            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+                std::ofstream outFile(destination, std::ios::binary);
+                if (outFile.is_open()) {
+                    std::unique_ptr<unsigned char[]> buf(new unsigned char[IO_BUFFER_SIZE]);
+                    UINT br;
+                    while (f_read(&f, buf.get(), IO_BUFFER_SIZE, &br) == FR_OK && br > 0)
+                        outFile.write(reinterpret_cast<char*>(buf.get()), br);
+                    success = true;
+                }
+                f_close(&f);
             }
-            f_close(&f);
         }
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);
@@ -1346,9 +1395,12 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
     }
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     bool success = false;
-    if (ensureMounted(volId)) {
-        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-        success = (f_unlink(fatPath.c_str()) == FR_OK);
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+            success = (f_unlink(fatPath.c_str()) == FR_OK);
+        }
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);
     return success ? JNI_TRUE : JNI_FALSE;
@@ -1362,9 +1414,12 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
     }
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     bool success = false;
-    if (ensureMounted(volId)) {
-        std::string fullPath = std::string(drivePaths[volId]) + "/" + nativePath;
-        success = (f_mkdir(fullPath.c_str()) == FR_OK);
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            std::string fullPath = std::string(drivePaths[volId]) + "/" + nativePath;
+            success = (f_mkdir(fullPath.c_str()) == FR_OK);
+        }
     }
     env->ReleaseStringUTFChars(dirPath, nativePath);
     return success ? JNI_TRUE : JNI_FALSE;
@@ -1380,10 +1435,13 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
     const char* nativeOld = env->GetStringUTFChars(oldPath, nullptr);
     const char* nativeNew = env->GetStringUTFChars(newPath, nullptr);
     bool success = false;
-    if (ensureMounted(volId)) {
-        std::string fullOld = std::string(drivePaths[volId]) + "/" + nativeOld;
-        std::string fullNew = std::string(drivePaths[volId]) + "/" + nativeNew;
-        success = (f_rename(fullOld.c_str(), fullNew.c_str()) == FR_OK);
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            std::string fullOld = std::string(drivePaths[volId]) + "/" + nativeOld;
+            std::string fullNew = std::string(drivePaths[volId]) + "/" + nativeNew;
+            success = (f_rename(fullOld.c_str(), fullNew.c_str()) == FR_OK);
+        }
     }
     env->ReleaseStringUTFChars(oldPath, nativeOld);
     env->ReleaseStringUTFChars(newPath, nativeNew);
@@ -1401,12 +1459,15 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
         return empty;
     }
     jlong totalBytes = 0, freeBytes = 0;
-    if (ensureMounted(volId)) {
-        FATFS* fs;
-        DWORD fre_clust;
-        if (f_getfree(drivePaths[volId], &fre_clust, &fs) == FR_OK) {
-            totalBytes = static_cast<jlong>(fs->n_fatent - 2) * fs->csize * 512;
-            freeBytes  = static_cast<jlong>(fre_clust)        * fs->csize * 512;
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            FATFS* fs;
+            DWORD fre_clust;
+            if (f_getfree(drivePaths[volId], &fre_clust, &fs) == FR_OK) {
+                totalBytes = static_cast<jlong>(fs->n_fatent - 2) * fs->csize * 512;
+                freeBytes  = static_cast<jlong>(fre_clust)        * fs->csize * 512;
+            }
         }
     }
     jlongArray ret = env->NewLongArray(2);
@@ -1423,13 +1484,17 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_openStream(
     }
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     jlong streamPtr = 0;
-    if (ensureMounted(volId)) {
-        FIL* f = new FIL();
-        std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-        if (f_open(f, fatPath.c_str(), FA_READ) == FR_OK) {
-            streamPtr = reinterpret_cast<jlong>(f);
-        } else {
-            delete f;
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            FIL* f = new FIL();
+            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+            if (f_open(f, fatPath.c_str(), FA_READ) == FR_OK) {
+                streamPtr = reinterpret_cast<jlong>(f);
+                openStreams[volId].push_back(f);
+            } else {
+                delete f;
+            }
         }
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);
@@ -1441,8 +1506,24 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStream(
         JNIEnv* env, jobject,
         jlong streamPtr, jlong offset, jbyteArray outBuffer, jint length, jint volId) {
     if (streamPtr == 0 || length <= 0) return -1;
+    if (volId < 0 || volId >= MAX_VOLUMES) return -1;
     FIL* f = reinterpret_cast<FIL*>(streamPtr);
     jint bytesRead = -1;
+
+    // FIX: previously volId was unused here, so a stream pointer left over
+    // from a volume that has since been locked (fd closed, crypto context
+    // freed) would still be read through — UB / stale-context decryption.
+    // Take volumeMutex and confirm the pointer is still a stream we handed
+    // out for THIS volume before touching it. lockNative() removes entries
+    // from openStreams[volId] when it invalidates them, so this check fails
+    // safely once a lock has happened.
+    std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+    auto& streams = openStreams[volId];
+    if (std::find(streams.begin(), streams.end(), f) == streams.end()) {
+        LOGI("readStream: stale/unknown stream pointer for volume %d", volId);
+        return -1;
+    }
+
     f_lseek(f, static_cast<FSIZE_t>(offset));
     jbyte* destBuf = env->GetByteArrayElements(outBuffer, nullptr);
     if (destBuf != nullptr) {
@@ -1457,9 +1538,20 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStream(
 extern "C" JNIEXPORT void JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
         JNIEnv* env, jobject, jlong streamPtr, jint volId) {
-    if (streamPtr != 0) {
-        FIL* f = reinterpret_cast<FIL*>(streamPtr);
-        f_close(f);
-        delete f;
+    if (streamPtr == 0) return;
+    if (volId < 0 || volId >= MAX_VOLUMES) return;
+    FIL* f = reinterpret_cast<FIL*>(streamPtr);
+
+    // FIX: guard against double-close / closing a pointer lockNative() has
+    // already torn down (which would double-free / close an invalid fd).
+    std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+    auto& streams = openStreams[volId];
+    auto it = std::find(streams.begin(), streams.end(), f);
+    if (it == streams.end()) {
+        LOGI("closeStream: stale/unknown stream pointer for volume %d, ignoring", volId);
+        return;
     }
+    streams.erase(it);
+    f_close(f);
+    delete f;
 }

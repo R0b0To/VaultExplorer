@@ -1,6 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+// ── Design tokens ────────────────────────────────────────────────────────────
+//
+// Single source of truth for radius/icon-size values that were previously
+// hardcoded as magic numbers scattered across ~15 files. New UI should always
+// reference these instead of literal numbers.
+
+abstract final class AppRadius {
+  static const sm = 8.0; // chips, small controls
+  static const md = 12.0; // cards, tiles, standard containers, dialogs' children
+  static const lg = 20.0; // icon badges, prominent hero containers
+  static const sheet = 28.0; // bottom sheets, dialogs (MD3 large)
+}
+
+abstract final class AppIconSize {
+  static const inline = 14.0; // stat rows, meta text icons
+  static const small = 18.0; // input prefix icons, dense list icons
+  static const standard = 20.0; // toggle rows, section leading icons
+  static const action = 24.0; // AppBar / default IconButton
+  static const feature = 40.0; // empty-state / error-state illustrations
+  static const hero = 56.0; // large empty states
+}
+
+abstract final class AppSpacing {
+  static const pagePadding = EdgeInsets.fromLTRB(16, 12, 16, 32);
+  static const sheetPadding = EdgeInsets.fromLTRB(24, 8, 24, 24);
+}
+
 ThemeData buildTheme() {
   // Official Material Design 3 Baseline Dark Tokens (Google Blue Seed)
   const surface = Color(0xFF111318);
@@ -56,13 +83,13 @@ ThemeData buildTheme() {
         fontWeight: FontWeight.w400,
         color: onSurface,
       ),
-      iconTheme: IconThemeData(color: onSurface, size: 24),
+      iconTheme: IconThemeData(color: onSurface, size: AppIconSize.action),
       actionsIconTheme: IconThemeData(color: onSurfaceVariant),
       systemOverlayStyle: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
         systemNavigationBarColor:
-            Colors.transparent, // Android 15/16 Edge-to-Edge
+            Colors.transparent, // Android 15/16/17 Edge-to-Edge
         systemNavigationBarIconBrightness: Brightness.light,
       ),
     ),
@@ -72,7 +99,7 @@ ThemeData buildTheme() {
       elevation: 0,
       shadowColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12), // Strict MD3 Card spec
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       margin: EdgeInsets.zero,
     ),
@@ -131,6 +158,12 @@ ThemeData buildTheme() {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
     ),
 
+    // FIX: minimumSize height was 40, which made primary buttons on
+    // AppSettingsScreen (Save / Set Password / Update) render 8dp shorter
+    // than every other FilledButton in the app (unlock, create container,
+    // lock gate, container config all explicitly overrode to 48). Raising
+    // the theme default to 48 means those per-call overrides are now
+    // redundant (harmless) and any *new* button automatically matches.
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: primary,
@@ -143,7 +176,7 @@ ThemeData buildTheme() {
           letterSpacing: 0.1,
         ),
         shape: const StadiumBorder(), // Material You Pill shape
-        minimumSize: const Size(double.infinity, 40),
+        minimumSize: const Size(double.infinity, 48),
       ),
     ),
 
@@ -163,8 +196,22 @@ ThemeData buildTheme() {
       color: surfaceContainer,
       elevation: 3,
       shadowColor: Colors.black,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.sm / 2),
+      ),
       textStyle: const TextStyle(color: onSurface, fontSize: 14),
+    ),
+
+    menuTheme: MenuThemeData(
+      style: MenuStyle(
+        backgroundColor: WidgetStateProperty.all(surfaceContainer),
+        elevation: WidgetStateProperty.all(3),
+        shape: WidgetStateProperty.all(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm * 2),
+          ),
+        ),
+      ),
     ),
 
     bottomSheetTheme: const BottomSheetThemeData(
@@ -172,7 +219,7 @@ ThemeData buildTheme() {
       modalBackgroundColor: surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
-          top: Radius.circular(28),
+          top: Radius.circular(AppRadius.sheet),
         ), // Big MD3 radius
       ),
       showDragHandle: true, // Native Android drag pill
@@ -192,7 +239,9 @@ ThemeData buildTheme() {
       backgroundColor: surfaceContainerHigh,
       elevation: 6,
       shadowColor: Colors.black45,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.sheet),
+      ),
       titleTextStyle: const TextStyle(
         color: onSurface,
         fontSize: 24,
@@ -207,6 +256,24 @@ ThemeData buildTheme() {
     ),
 
     textTheme: const TextTheme(
+      // FIX: previously undefined — LockGateScreen's app title fell back to
+      // stock Material headlineSmall (24/w400/0 letterSpacing) instead of
+      // this app's design language.
+      headlineSmall: TextStyle(
+        color: onSurface,
+        fontSize: 24,
+        fontWeight: FontWeight.bold,
+        letterSpacing: -0.2,
+      ),
+      // FIX: previously undefined — VaultDashboard's AppBar title fell back
+      // to stock Material titleLarge instead of matching the rest of the
+      // type scale.
+      titleLarge: TextStyle(
+        color: onSurface,
+        fontSize: 22,
+        fontWeight: FontWeight.w400,
+        letterSpacing: 0,
+      ),
       bodyLarge: TextStyle(
         color: onSurface,
         fontSize: 16,
@@ -234,6 +301,12 @@ ThemeData buildTheme() {
       labelMedium: TextStyle(
         color: onSurfaceVariant,
         fontSize: 12,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.5,
+      ),
+      labelSmall: TextStyle(
+        color: onSurfaceVariant,
+        fontSize: 11,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.5,
       ),

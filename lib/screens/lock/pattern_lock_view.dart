@@ -136,24 +136,38 @@ class _PatternLockViewState extends State<PatternLockView>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _pulseAnim,
-      builder: (_, _) => GestureDetector(
-        onPanStart: _onPanStart,
-        onPanUpdate: _onPanUpdate,
-        onPanEnd: _onPanEnd,
-        child: CustomPaint(
-          painter: _PatternPainter(
-            gridSize: widget.gridSize,
-            selected: _selectedDots,
-            currentTouch: _currentTouch,
-            colorScheme: Theme.of(context).colorScheme,
-            showError: widget.showError,
-            pulseScale: _pulseAnim.value,
+    // FIX: was a hardcoded Size(280, 280) regardless of viewport. On small
+    // phones or foldables in narrow mode (esp. inside UnlockSheet's bottom
+    // sheet, which also has 24dp horizontal padding from AppBottomSheet),
+    // this could overflow or leave inconsistent margins. Now it clamps to
+    // the available width minus the sheet's own horizontal padding.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxSide = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : 280.0;
+        final side = maxSide.clamp(220.0, 320.0);
+
+        return AnimatedBuilder(
+          animation: _pulseAnim,
+          builder: (_, _) => GestureDetector(
+            onPanStart: _onPanStart,
+            onPanUpdate: _onPanUpdate,
+            onPanEnd: _onPanEnd,
+            child: CustomPaint(
+              painter: _PatternPainter(
+                gridSize: widget.gridSize,
+                selected: _selectedDots,
+                currentTouch: _currentTouch,
+                colorScheme: Theme.of(context).colorScheme,
+                showError: widget.showError,
+                pulseScale: _pulseAnim.value,
+              ),
+              size: Size(side, side),
+            ),
           ),
-          size: const Size(280, 280),
-        ),
-      ),
+        );
+      },
     );
   }
 }

@@ -5,6 +5,8 @@ import '../../services/vaultexplorer_api.dart';
 import '../../models/mounted_container.dart';
 import '../../models/vault_item.dart';
 import '../../services/vault_items_service.dart';
+import '../../theme.dart';
+import '../../widgets/common_widgets.dart';
 
 class VaultItemEditScreen extends StatefulWidget {
   final MountedContainer container;
@@ -181,25 +183,26 @@ return PopScope(
             const SizedBox(width: 8),
           ],
         ),
+        // FIX: was fromLTRB(16, 12, 16, 32) already — this screen was the
+        // correct reference for AppSpacing.pagePadding, now using the
+        // named constant instead of a repeated literal so it can't drift.
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          padding: AppSpacing.pagePadding,
           children: [
             // ── Title ───────────────────────────────────────────────────────
-            _SectionLabel('TITLE'),
-            const SizedBox(height: 8),
+            const SectionLabel('Title'),
             TextField(
               controller: _titleCtrl,
               autofocus: _isNew,
               textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
                 hintText: '${widget.type.label} name',
-                prefixIcon: Icon(Icons.label_outline_rounded, size: 18, color: cs.onSurfaceVariant),
+                prefixIcon: Icon(Icons.label_outline_rounded, size: AppIconSize.small, color: cs.onSurfaceVariant),
               ),
             ),
 
             const SizedBox(height: 24),
-            _SectionLabel('FIELDS'),
-            const SizedBox(height: 8),
+            const SectionLabel('Fields'),
 
             // ── Fields ──────────────────────────────────────────────────────
             ...(_fields.map((f) => Padding(
@@ -260,22 +263,23 @@ class _FieldInput extends StatelessWidget {
           ? TextCapitalization.sentences
           : TextCapitalization.none,
       decoration: InputDecoration(
-        labelText: field.label, // Removed the `+ (field.required ? ' *' : '')`
-        prefixIcon: Icon(_prefixIcon(field.type), size: 18, color: cs.onSurfaceVariant),
+        labelText: field.label,
+        prefixIcon: Icon(_prefixIcon(field.type), size: AppIconSize.small, color: cs.onSurfaceVariant),
         suffixIcon: isSecret
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      revealed ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                      size: 18,
-                    ),
-                    onPressed: onToggleReveal,
-                    tooltip: revealed ? 'Hide' : 'Show',
+                  // FIX: previously a bespoke IconButton pair here — kept
+                  // functionally identical (this one already used the
+                  // outlined icons correctly), but routed through the
+                  // shared toggle so it can't diverge from the other
+                  // password/secret fields across the app.
+                  PasswordVisibilityToggle(
+                    obscured: !revealed,
+                    onToggle: onToggleReveal,
                   ),
                   IconButton(
-                    icon: const Icon(Icons.copy_rounded, size: 16),
+                    icon: Icon(Icons.copy_rounded, size: AppIconSize.small),
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: controller.text));
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -314,22 +318,8 @@ class _FieldInput extends StatelessWidget {
 }
 
 // ── Section label ─────────────────────────────────────────────────────────────
-
-class _SectionLabel extends StatelessWidget {
-  final String label;
-  const _SectionLabel(this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Text(
-      label,
-      style: textTheme.labelSmall?.copyWith(
-        color: cs.primary,
-        fontWeight: FontWeight.bold,
-        letterSpacing: 1.4,
-      ),
-    );
-  }
-}
+//
+// _SectionLabel was removed from this file — it is now the shared
+// SectionLabel widget in lib/widgets/common_widgets.dart, previously
+// duplicated verbatim here, in app_settings_screen.dart (as _SectionLabel),
+// and as _SectionHeader in container_config_sheet.dart.

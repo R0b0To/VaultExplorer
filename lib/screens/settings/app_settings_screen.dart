@@ -6,6 +6,8 @@ import '../../models/thumbnail_cache_mode.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/password_hasher.dart';
 import '../../services/vaultexplorer_api.dart';
+import '../../theme.dart';
+import '../../widgets/common_widgets.dart';
 
 class AppSettingsScreen extends StatefulWidget {
   const AppSettingsScreen({Key? key}) : super(key: key);
@@ -171,14 +173,18 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
           : ListView(
-              padding: const EdgeInsets.all(16),
+              // FIX: standardized to the same page-padding pattern used by
+              // vault_item_edit_screen.dart (bottom 32 clears Android
+              // gesture-nav on 16/17 edge-to-edge; top 12 gives breathing
+              // room under the AppBar). Previously this screen used a flat
+              // EdgeInsets.all(16).
+              padding: AppSpacing.pagePadding,
               children: [
-                _SectionLabel('SECURITY', cs),
-                const SizedBox(height: 8),
+                const SectionLabel('Security'),
                 _Card(
                   cs: cs,
                   children: [
-                    _ToggleRow(
+                    SettingsToggleRow(
                       icon: Icons.lock_person_rounded,
                       title: 'Master Password',
                       subtitle:
@@ -187,7 +193,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                           ? 'Active — tap toggle to remove'
                           : 'Require a password to open the app',
                       value: _settings.useMasterPassword,
-                      cs: cs,
                       onChanged: _toggleMasterPassword,
                     ),
 
@@ -204,18 +209,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                                 labelText: _settings.masterPasswordHash != null
                                     ? 'New password'
                                     : 'Master password',
-                                prefixIcon: const Icon(
+                                prefixIcon: Icon(
                                   Icons.password_rounded,
-                                  size: 18,
+                                  size: AppIconSize.small,
                                 ),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscurePw
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                    size: 18,
-                                  ),
-                                  onPressed: () =>
+                                suffixIcon: PasswordVisibilityToggle(
+                                  obscured: _obscurePw,
+                                  onToggle: () =>
                                       setState(() => _obscurePw = !_obscurePw),
                                 ),
                               ),
@@ -227,18 +227,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                               autofillHints: const [AutofillHints.newPassword],
                               decoration: InputDecoration(
                                 labelText: 'Confirm password',
-                                prefixIcon: const Icon(
+                                prefixIcon: Icon(
                                   Icons.password_rounded,
-                                  size: 18,
+                                  size: AppIconSize.small,
                                 ),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _obscureConfirm
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                    size: 18,
-                                  ),
-                                  onPressed: () => setState(
+                                suffixIcon: PasswordVisibilityToggle(
+                                  obscured: _obscureConfirm,
+                                  onToggle: () => setState(
                                     () => _obscureConfirm = !_obscureConfirm,
                                   ),
                                 ),
@@ -272,7 +267,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                                       }
                                     }),
                               style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(0, 40),
+                                minimumSize: const Size(0, 48),
                               ),
                               child: const Text('Cancel'),
                             ),
@@ -282,7 +277,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                             child: FilledButton(
                               onPressed: _saving ? null : _confirmPassword,
                               style: FilledButton.styleFrom(
-                                minimumSize: const Size(0, 40),
+                                minimumSize: const Size(0, 48),
                               ),
                               child: _saving
                                   ? const SizedBox(
@@ -309,12 +304,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       const Divider(height: 24),
 
                       if (_biometricAvailable)
-                        _ToggleRow(
+                        SettingsToggleRow(
                           icon: Icons.fingerprint_rounded,
                           title: 'Biometric Unlock',
                           subtitle: 'Use fingerprint or face instead of typing',
                           value: _settings.masterPasswordIsFingerprint,
-                          cs: cs,
                           onChanged: (v) => setState(
                             () => _settings.masterPasswordIsFingerprint = v,
                           ),
@@ -336,7 +330,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                           _showPwFields = true;
                           _pwError = null;
                         }),
-                        icon: const Icon(Icons.edit_rounded, size: 16),
+                        icon: Icon(Icons.edit_rounded, size: AppIconSize.small),
                         label: const Text('Change password'),
                       ),
                     ],
@@ -345,18 +339,16 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
                 const SizedBox(height: 24),
 
-                _SectionLabel('PRIVACY', cs),
-                const SizedBox(height: 8),
+                const SectionLabel('Privacy'),
                 _Card(
                   cs: cs,
                   children: [
-                    _ToggleRow(
+                    SettingsToggleRow(
                       icon: Icons.security_rounded,
                       title: 'Block Screenshots',
                       subtitle:
                           'Prevent screenshots and hide content in recent apps preview.',
                       value: _settings.blockScreenshots,
-                      cs: cs,
                       onChanged: (v) async {
                         setState(() => _settings.blockScreenshots = v);
                         await vaultExplorerApi.setSecureScreen(v);
@@ -367,28 +359,26 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
                 const SizedBox(height: 24),
 
-                _SectionLabel('INTEGRATION', cs),
-                const SizedBox(height: 8),
+                const SectionLabel('Integration'),
                 _Card(
                   cs: cs,
                   children: [
-                    _ToggleRow(
+                    SettingsToggleRow(
                       icon: Icons.folder_shared_rounded,
                       title: 'Document Provider (default)',
                       subtitle:
                           'New containers will be exposed in Android\'s file '
                           'picker by default.',
                       value: _settings.defaultDocumentProvider,
-                      cs: cs,
                       onChanged: (v) =>
                           setState(() => _settings.defaultDocumentProvider = v),
                     ),
                     const Divider(height: 24),
                     DropdownButtonFormField<ThumbnailCacheMode>(
-                      value: _settings.defaultThumbnailCacheMode,
-                      decoration: const InputDecoration(
+                      initialValue: _settings.defaultThumbnailCacheMode,
+                      decoration: InputDecoration(
                         labelText: 'Thumbnail Caching (default)',
-                        prefixIcon: Icon(Icons.cached_rounded, size: 18),
+                        prefixIcon: Icon(Icons.cached_rounded, size: AppIconSize.small),
                       ),
                       items: ThumbnailCacheMode.values.map((mode) {
                         return DropdownMenuItem(
@@ -420,8 +410,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
                 const SizedBox(height: 24),
 
-                _SectionLabel('FILE ASSOCIATIONS', cs),
-                const SizedBox(height: 8),
+                const SectionLabel('File Associations'),
                 _Card(
                   cs: cs,
                   children: [
@@ -462,7 +451,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                                   color: cs.primaryContainer.withValues(
                                     alpha: 0.3,
                                   ),
-                                  borderRadius: BorderRadius.circular(4),
+                                  borderRadius: BorderRadius.circular(AppRadius.sm / 2),
                                 ),
                                 child: Text(
                                   '.${entry.key.toUpperCase()}',
@@ -492,7 +481,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                                 icon: Icon(
                                   Icons.delete_outline_rounded,
                                   color: cs.error,
-                                  size: 20,
+                                  size: AppIconSize.standard,
                                 ),
                                 tooltip: 'Remove association',
                                 onPressed: () {
@@ -514,8 +503,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
                 const SizedBox(height: 24),
 
-                _SectionLabel('ABOUT', cs),
-                const SizedBox(height: 8),
+                const SectionLabel('About'),
                 _Card(
                   cs: cs,
                   children: [
@@ -548,28 +536,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
-
-class _SectionLabel extends StatelessWidget {
-  final String label;
-  final ColorScheme cs;
-  const _SectionLabel(this.label, this.cs);
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 4),
-      child: Text(
-        label,
-        style: textTheme.labelSmall?.copyWith(
-          color: cs.primary,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.4,
-        ),
-      ),
-    );
-  }
-}
+//
+// _SectionLabel and _ToggleRow were removed from this file — they are now
+// the shared SectionLabel / SettingsToggleRow widgets in
+// lib/widgets/common_widgets.dart, previously duplicated verbatim here and
+// in container_config_sheet.dart.
 
 class _Card extends StatelessWidget {
   final List<Widget> children;
@@ -580,7 +551,7 @@ class _Card extends StatelessWidget {
   Widget build(BuildContext context) => Card(
     color: cs.surfaceContainerLow,
     elevation: 0,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
@@ -589,64 +560,6 @@ class _Card extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _ToggleRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ColorScheme cs;
-  final ValueChanged<bool> onChanged;
-
-  const _ToggleRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.cs,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(icon, size: 20, color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(value: value, onChanged: onChanged),
-        ],
-      ),
-    );
-  }
 }
 
 class _InfoRow extends StatelessWidget {

@@ -4,7 +4,9 @@ import '../../services/vaultexplorer_api.dart';
 import '../../models/mounted_container.dart';
 import '../../models/vault_item.dart';
 import '../../services/vault_items_service.dart';
-import '../../utils/file_type_utils.dart'; // ← added
+import '../../utils/file_type_utils.dart';
+import '../../theme.dart';
+import '../../widgets/common_widgets.dart';
 import 'vault_item_edit_screen.dart';
 
 class VaultItemDetailScreen extends StatefulWidget {
@@ -131,7 +133,7 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
                 PopupMenuItem(
                   value: 'delete',
                   child: Row(children: [
-                    Icon(Icons.delete_outline_rounded, color: cs.error, size: 18),
+                    Icon(Icons.delete_outline_rounded, color: cs.error, size: AppIconSize.standard),
                     const SizedBox(width: 12),
                     Text('Delete', style: TextStyle(color: cs.error)),
                   ]),
@@ -140,13 +142,18 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
             ),
           ],
         ),
+        // FIX: previously the ListView had padding: fromLTRB(0, 8, 0, 32)
+        // and every single child (_HeaderCard, the two SectionLabels, both
+        // Cards) re-declared its own Padding(horizontal: 16) wrapper. That's
+        // the "unnecessary nested widgets / repeated styling" pattern flagged
+        // in the audit — six separate horizontal-padding wrappers doing the
+        // same job the ListView should do once. Now the ListView carries the
+        // horizontal inset via AppSpacing.pagePadding and every child was
+        // un-wrapped accordingly.
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(0, 8, 0, 32),
+          padding: AppSpacing.pagePadding,
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _HeaderCard(item: _item),
-            ),
+            _HeaderCard(item: _item),
 
             const SizedBox(height: 20),
 
@@ -162,20 +169,8 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
                 ),
               )
             else ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'DETAILS',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.4,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
+              const SectionLabel('Details'),
               Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   children: fields.asMap().entries.map((entry) {
                     final i = entry.key;
@@ -199,20 +194,8 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
             ],
 
             const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Text(
-                'INFO',
-                style: textTheme.labelSmall?.copyWith(
-                  color: cs.primary,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.4,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
+            const SectionLabel('Info'),
             Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
                   _MetaRow(label: 'Type', value: _item.type.label),
@@ -261,7 +244,7 @@ class _HeaderCard extends StatelessWidget {
               height: 52,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
               ),
               child: Icon(icon, size: 26, color: color),
             ),
@@ -289,7 +272,7 @@ class _HeaderCard extends StatelessWidget {
                     ),
                     if (item.favourite) ...[
                       const SizedBox(width: 8),
-                      const Icon(Icons.star_rounded, size: 14, color: Color(0xFFFFC107)),
+                      const Icon(Icons.star_rounded, size: AppIconSize.inline, color: Color(0xFFFFC107)),
                     ],
                   ]),
                 ],
@@ -355,19 +338,18 @@ class _FieldRow extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // FIX: previously a bespoke IconButton pair — now routed
+                // through the shared PasswordVisibilityToggle so the
+                // reveal/hide glyph pair can never diverge from the other
+                // secret-reveal controls in the app (vault_item_edit_screen,
+                // password fields, etc).
                 if (isSecret)
-                  IconButton(
-                    icon: Icon(
-                      revealed ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                      size: 18,
-                      color: cs.onSurfaceVariant,
-                    ),
-                    onPressed: onReveal,
-                    visualDensity: VisualDensity.compact,
-                    tooltip: revealed ? 'Hide' : 'Reveal',
+                  PasswordVisibilityToggle(
+                    obscured: !revealed,
+                    onToggle: onReveal,
                   ),
                 IconButton(
-                  icon: Icon(Icons.copy_rounded, size: 16, color: cs.onSurfaceVariant),
+                  icon: Icon(Icons.copy_rounded, size: AppIconSize.small, color: cs.onSurfaceVariant),
                   onPressed: onCopy,
                   visualDensity: VisualDensity.compact,
                   tooltip: 'Copy ${field.label}',

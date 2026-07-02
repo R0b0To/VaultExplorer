@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 
+      Class 8 corresponds to USB Mass Storage devices (like USB flash drives and external hard drives).
+      Since your app is "Vault Explorer", this is likely what you want to detect.
+    -->
+    <usb-device class="8" />
+</resources>

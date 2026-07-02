@@ -59,6 +59,7 @@ object VeraCryptEngine {
     @JvmStatic external fun createDirectory(dirPath: String, volId: Int): Boolean
     @JvmStatic external fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean
     @JvmStatic external fun getSpaceInfo(volId: Int): LongArray?
+    @JvmStatic external fun unlockUsbAndListNative(password: String, pim: Int, volId: Int, deviceSizeBytes: Long): Array<String>?
 
     // ── Tier 2: stream lifecycle ───────────────────────────────────────────
     // Used exclusively by VeraCryptProxyCallback. Passes a raw C++ FIL*

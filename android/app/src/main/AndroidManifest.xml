@@ -3,6 +3,7 @@
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
     <application
         android:label="Vault Explorer"
@@ -27,6 +28,16 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- ADDED: USB intent filter and meta-data -->
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data 
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter" />
+            <!-- END OF ADDITION -->
+
         </activity>
         <provider
             android:name="com.aeidolon.vaultexplorer.VeraCryptDocumentsProvider"

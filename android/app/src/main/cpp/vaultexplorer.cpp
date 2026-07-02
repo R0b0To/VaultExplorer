@@ -94,6 +94,8 @@ static constexpr uint64_t CREATE_FILL_BATCH     = 4096;
 static constexpr size_t   IO_VOL_BUF_SECTORS    = 512;    // 256 KB per volume
 static constexpr size_t   IO_VOL_BUF_SIZE       = IO_VOL_BUF_SECTORS * 512;
 
+static uint64_t activePartitionStartSector[MAX_VOLUMES];
+
 // ----------------------------------------------------------------====
 // RAII WRAPPERS
 // ----------------------------------------------------------------====
@@ -155,6 +157,148 @@ static std::mutex                       ioVolBufMutex[MAX_VOLUMES];
 // for that volume's current session.
 static std::vector<FIL*> openStreams[MAX_VOLUMES];
 
+// ── USB backing-store support ────────────────────────────────────────────
+//
+// A volume's physical bytes come from one of two places:
+//   - a container file's fd (existing path, pread/pwrite)
+//   - a USB mass-storage device, reached only through a Kotlin upcall
+//     (UsbBlockBridge.readSectors/writeSectors), since raw block-device
+//     access on unrooted Android only exists via the USB Host API.
+//
+// isUsbSource[volId] selects which path physRead/physWrite below use.
+// activeFd[volId] stays -1 for USB volumes; only isUsbSource matters.
+
+static bool isUsbSource[MAX_VOLUMES];
+
+static JavaVM*   g_vm             = nullptr;
+static jclass    g_usbBridgeClass = nullptr;
+static jmethodID g_usbReadMethod  = nullptr;  // static byte[]  readSectors(int, long, int)
+static jmethodID g_usbWriteMethod = nullptr;  // static boolean writeSectors(int, long, int, byte[])
+
+static bool isValidBootSector(const unsigned char* decS) {
+    // End of sector signature must be 0x55AA
+    if (decS[510] != 0x55 || decS[511] != 0xAA) {
+        return false;
+    }
+
+    // Check for exFAT jump instruction (EB 76 90) and OEM name "EXFAT   "
+    if (decS[0] == 0xEB && decS[1] == 0x76 && decS[2] == 0x90) {
+        if (memcmp(&decS[3], "EXFAT   ", 8) == 0) {
+            return true;
+        }
+    }
+
+    // Check for FAT12/FAT16/FAT32 jump instruction (EB xx 90 or E9 xx xx)
+    if (decS[0] == 0xEB || decS[0] == 0xE9) {
+        // FAT/FAT32 volumes have a valid sector size of 512 bytes at offset 11
+        // Safely read the little-endian 16-bit value byte-by-byte to prevent unaligned crashes on ARM
+        uint16_t bytesPerSector = static_cast<uint16_t>(decS[11]) | (static_cast<uint16_t>(decS[12]) << 8);
+        if (bytesPerSector == 512) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
+    g_vm = vm;
+    JNIEnv* env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
+
+    jclass localClass = env->FindClass("com/aeidolon/vaultexplorer/UsbBlockBridge");
+    if (!localClass) {
+        LOGI("JNI_OnLoad: UsbBlockBridge class not found");
+        return JNI_ERR;
+    }
+    g_usbBridgeClass = reinterpret_cast<jclass>(env->NewGlobalRef(localClass));
+    env->DeleteLocalRef(localClass);
+
+    g_usbReadMethod  = env->GetStaticMethodID(g_usbBridgeClass, "readSectors",  "(IJI)[B");
+    g_usbWriteMethod = env->GetStaticMethodID(g_usbBridgeClass, "writeSectors", "(IJI[B)Z");
+    if (!g_usbReadMethod || !g_usbWriteMethod) {
+        LOGI("JNI_OnLoad: UsbBlockBridge methods not found");
+        return JNI_ERR;
+    }
+    return JNI_VERSION_1_6;
+}
+
+// disk_read/disk_write can run on any thread FatFs happens to be driven
+// from, not necessarily one already attached to the JVM. Attach on demand,
+// detach only if we were the ones who attached.
+struct ScopedJniEnv {
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    ScopedJniEnv() {
+        if (!g_vm) return;
+        if (g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) return;
+        if (g_vm->AttachCurrentThread(&env, nullptr) == JNI_OK) attached = true;
+        else env = nullptr;
+    }
+    ~ScopedJniEnv() { if (attached) g_vm->DetachCurrentThread(); }
+};
+
+static bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount, unsigned char* outBuf) {
+    ScopedJniEnv scope;
+    if (!scope.env) return false;
+    JNIEnv* env = scope.env;
+
+    jbyteArray result = static_cast<jbyteArray>(env->CallStaticObjectMethod(
+        g_usbBridgeClass, g_usbReadMethod,
+        static_cast<jint>(volId), static_cast<jlong>(startSector), static_cast<jint>(sectorCount)));
+
+    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+    if (!result) return false;
+
+    const jsize len = env->GetArrayLength(result);
+    const size_t expected = static_cast<size_t>(sectorCount) * 512;
+    if (static_cast<size_t>(len) != expected) { env->DeleteLocalRef(result); return false; }
+
+    env->GetByteArrayRegion(result, 0, len, reinterpret_cast<jbyte*>(outBuf));
+    env->DeleteLocalRef(result);
+    return true;
+}
+
+static bool usbWriteSectors(int volId, uint64_t startSector, uint32_t sectorCount, const unsigned char* inBuf) {
+    ScopedJniEnv scope;
+    if (!scope.env) return false;
+    JNIEnv* env = scope.env;
+
+    const jsize len = static_cast<jsize>(static_cast<size_t>(sectorCount) * 512);
+    jbyteArray data = env->NewByteArray(len);
+    if (!data) return false;
+    env->SetByteArrayRegion(data, 0, len, reinterpret_cast<const jbyte*>(inBuf));
+
+    const jboolean ok = env->CallStaticBooleanMethod(
+        g_usbBridgeClass, g_usbWriteMethod,
+        static_cast<jint>(volId), static_cast<jlong>(startSector), static_cast<jint>(sectorCount), data);
+
+    env->DeleteLocalRef(data);
+    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+    return ok == JNI_TRUE;
+}
+
+// Unified physical-IO dispatch used by disk_read/disk_write. [physByteOffset]
+// and [totalBytes] must both be multiples of 512 (true for every call site
+// in this file — sectors in, sectors out).
+static bool physRead(int pdrv, uint64_t physByteOffset, unsigned char* buf, size_t totalBytes) {
+    if (isUsbSource[pdrv]) {
+        return usbReadSectors(pdrv, physByteOffset / 512,
+                               static_cast<uint32_t>(totalBytes / 512), buf);
+    }
+    const ssize_t got = pread(activeFd[pdrv], buf, totalBytes, static_cast<off_t>(physByteOffset));
+    return got == static_cast<ssize_t>(totalBytes);
+}
+
+static bool physWrite(int pdrv, uint64_t physByteOffset, const unsigned char* buf, size_t totalBytes) {
+    if (isUsbSource[pdrv]) {
+        return usbWriteSectors(pdrv, physByteOffset / 512,
+                                static_cast<uint32_t>(totalBytes / 512), buf);
+    }
+    const ssize_t written = pwrite(activeFd[pdrv], buf, totalBytes, static_cast<off_t>(physByteOffset));
+    return written == static_cast<ssize_t>(totalBytes);
+}
+
 static const char* drivePaths[MAX_VOLUMES] = {
     "0:", "1:", "2:", "3:", "4:", "5:", "6:", "7:"
 };
@@ -169,6 +313,8 @@ static bool _globalInit = [](){
         activeFileSize[i]         = 0;
         fsMounted[i]              = false;
         ioVolBufSize[i]           = 0;
+        isUsbSource[i] = false; 
+        activePartitionStartSector[i] = 0;
     }
     return true;
 }();
@@ -180,7 +326,9 @@ static bool _globalInit = [](){
 static inline bool requireActiveSession(int volId, const char* callerName) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
     std::lock_guard<std::mutex> lock(volumeMutex[volId]);
-    if (!isDataCtxInitialized[volId] || activeFd[volId] < 0) {
+    
+    // Allow activeFd to be < 0 only if this is an active USB session
+    if (!isDataCtxInitialized[volId] || (activeFd[volId] < 0 && !isUsbSource[volId])) {
         LOGI("%s: volume %d has no active session (not unlocked)", callerName, volId);
         return false;
     }
@@ -262,6 +410,29 @@ static inline int clampPim(int pim) {
     return pim;
 }
 
+struct PartitionCandidate {
+    uint64_t startSector;
+    uint64_t sectorCount;
+};
+
+static uint32_t readUint32LE(const unsigned char* p) {
+    return static_cast<uint32_t>(p[0]) |
+           (static_cast<uint32_t>(p[1]) << 8) |
+           (static_cast<uint32_t>(p[2]) << 16) |
+           (static_cast<uint32_t>(p[3]) << 24);
+}
+
+static uint64_t readUint64LE(const unsigned char* p) {
+    return static_cast<uint64_t>(p[0]) |
+           (static_cast<uint64_t>(p[1]) << 8) |
+           (static_cast<uint64_t>(p[2]) << 16) |
+           (static_cast<uint64_t>(p[3]) << 24) |
+           (static_cast<uint64_t>(p[4]) << 32) |
+           (static_cast<uint64_t>(p[5]) << 40) |
+           (static_cast<uint64_t>(p[6]) << 48) |
+           (static_cast<uint64_t>(p[7]) << 56);
+}
+
 // ── FAT date/time → Unix timestamp ─────────────────────────────────────────
 
 static uint64_t fatToUnixTimestamp(WORD fdate, WORD ftime) {
@@ -321,13 +492,15 @@ extern "C" DSTATUS disk_initialize(BYTE pdrv) { return 0; }
 extern "C" DSTATUS disk_status(BYTE pdrv)     { return 0; }
 
 extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
-    if (pdrv >= MAX_VOLUMES || activeFd[pdrv] < 0 || !isDataCtxInitialized[pdrv])
-        return RES_NOTRDY;
+    if (pdrv >= MAX_VOLUMES || !isDataCtxInitialized[pdrv])
+    return RES_NOTRDY;
+if (!isUsbSource[pdrv] && activeFd[pdrv] < 0)
+    return RES_NOTRDY;
     if (count == 0) return RES_PARERR;
 
     const uint64_t basePhysical = activeDataOffset[pdrv] / 512;
     const bool relTweak = activeIsRelTweak[pdrv];
-    const int fd = activeFd[pdrv];
+
 
     static constexpr UINT MAX_SECTORS_PER_BATCH = 8192; // 4 MB/batch — unchanged tuning, no longer a hard limit
     UINT remaining   = count;
@@ -359,13 +532,12 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             encBuf = stackBuf;
         }
 
-        ssize_t got = pread(fd, encBuf, totalBytes,
-                            static_cast<off_t>(firstPhysical * 512));
-        if (got < static_cast<ssize_t>(totalBytes)) return RES_ERROR;
+        if (!physRead(pdrv, firstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
         for (UINT i = 0; i < batchCount; i++) {
             const uint64_t physSector = firstPhysical + i;
-            const uint64_t tweak = relTweak ? (physSector - basePhysical) : physSector;
+            const uint64_t sectorInPartition = physSector - activePartitionStartSector[pdrv];
+            const uint64_t tweak = relTweak ? (physSector - basePhysical) : sectorInPartition;
             decryptSector(&activeDataCtxDec[pdrv], tweak,
                           encBuf + (i * 512), curBuf + (i * 512));
         }
@@ -378,13 +550,14 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 }
 
 extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count) {
-    if (pdrv >= MAX_VOLUMES || activeFd[pdrv] < 0 || !isDataCtxInitialized[pdrv])
-        return RES_NOTRDY;
+    if (pdrv >= MAX_VOLUMES || !isDataCtxInitialized[pdrv])
+    return RES_NOTRDY;
+if (!isUsbSource[pdrv] && activeFd[pdrv] < 0)
+    return RES_NOTRDY;
     if (count == 0) return RES_PARERR;
 
     const uint64_t basePhysical = activeDataOffset[pdrv] / 512;
     const bool     relTweak     = activeIsRelTweak[pdrv];
-    const int      fd           = activeFd[pdrv];
 
     static constexpr UINT MAX_SECTORS_PER_BATCH = 8192;
     UINT remaining        = count;
@@ -414,14 +587,13 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
 
         for (UINT i = 0; i < batchCount; i++) {
             const uint64_t physSector = firstPhysical + i;
-            const uint64_t tweak = relTweak ? (physSector - basePhysical) : physSector;
+            const uint64_t sectorInPartition = physSector - activePartitionStartSector[pdrv];
+            const uint64_t tweak = relTweak ? (physSector - basePhysical) : sectorInPartition;
             encryptSector(&activeDataCtxEnc[pdrv], tweak,
                           curBuf + (i * 512), encBuf + (i * 512));
         }
 
-        ssize_t written = pwrite(fd, encBuf, totalBytes,
-                                 static_cast<off_t>(firstPhysical * 512));
-        if (written != static_cast<ssize_t>(totalBytes)) return RES_ERROR;
+        if (!physWrite(pdrv, firstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
         remaining -= batchCount;
         curSector += batchCount;
@@ -543,7 +715,7 @@ static FsScanResult tryKeyCandidate(
             setTweak(tweak, sectorIdx);
             mbedtls_aes_crypt_xts(&candidateDecCtx, MBEDTLS_AES_DECRYPT,
                                   512, tweak, enc, decS);
-            if (decS[510] == 0x55 && decS[511] == 0xAA) {
+            if (isValidBootSector(decS)) {
                 result.found      = true;
                 result.dataOffset = sectorIdx * 512;
                 result.relTweak   = false;
@@ -555,7 +727,7 @@ static FsScanResult tryKeyCandidate(
             memset(tweak, 0, 16);
             mbedtls_aes_crypt_xts(&candidateDecCtx, MBEDTLS_AES_DECRYPT,
                                   512, tweak, enc, decS);
-            if (decS[510] == 0x55 && decS[511] == 0xAA) {
+            if (isValidBootSector(decS)) {
                 result.found      = true;
                 result.dataOffset = sectorIdx * 512;
                 result.relTweak   = true;
@@ -759,6 +931,207 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     return true;
 }
 
+
+// USB-backed equivalent of tryKeyCandidate(): scans via the USB upcall
+// instead of pread on a container fd. Kept as a separate function rather
+// than parameterizing the fd-based version above, since the two read paths
+// (pread vs JNI upcall) are different enough that folding them into one
+// function would make the already-delicate unlock flow harder to reason
+// about, not easier.
+static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector, mbedtls_aes_xts_context& candidateDecCtx) {
+    FsScanResult result;
+    std::unique_ptr<unsigned char[]> encBatch(new unsigned char[SCAN_BATCH * 512]);
+    unsigned char decS[512];
+    unsigned char tweak[16];
+
+    uint64_t s = 0;
+    while (s < SCAN_SECTORS) {
+        const uint64_t batchCount = std::min(SCAN_BATCH, SCAN_SECTORS - s);
+        if (!usbReadSectors(volId, partitionStartSector + s, static_cast<uint32_t>(batchCount), encBatch.get())) break;
+
+        for (uint64_t i = 0; i < batchCount; i++) {
+            const uint64_t sectorIdx = s + i;
+            const unsigned char* enc = encBatch.get() + (i * 512);
+
+            // Absolute physical sector tweak (relative to partition start)
+            setTweak(tweak, sectorIdx);
+            mbedtls_aes_crypt_xts(&candidateDecCtx, MBEDTLS_AES_DECRYPT, 512, tweak, enc, decS);
+            if (isValidBootSector(decS)) {
+                result.found = true; 
+                result.dataOffset = (partitionStartSector + sectorIdx) * 512;
+                result.relTweak = false;
+                return result;
+            }
+
+            // Zero relative tweak
+            memset(tweak, 0, 16);
+            mbedtls_aes_crypt_xts(&candidateDecCtx, MBEDTLS_AES_DECRYPT, 512, tweak, enc, decS);
+            if (isValidBootSector(decS)) {
+                result.found = true; 
+                result.dataOffset = (partitionStartSector + sectorIdx) * 512;
+                result.relTweak = true;
+                return result;
+            }
+        }
+        s += batchCount;
+    }
+    return result; // found == false
+}
+
+// USB-backed equivalent of prepareSession(). There is no fd — Kotlin must
+// already have opened the USB device, granted permission, run READ CAPACITY,
+// and called UsbBlockBridge.register(volId, device) BEFORE this is invoked,
+// since PBKDF2 + the header/boot-sector reads below both go through the
+// upcall immediately.
+static bool prepareUsbSession(const char* password, int pim, int volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return false;
+
+    // Collect partition candidates. Start with raw disk (LBA 0)
+    std::vector<PartitionCandidate> partitions;
+    partitions.push_back({0, 0});
+
+    // Read the first 34 sectors to scan MBR and primary GPT entries (17 KB)
+    std::unique_ptr<unsigned char[]> diskBuf(new unsigned char[34 * 512]);
+    if (usbReadSectors(volId, 0, 34, diskBuf.get())) {
+        const unsigned char* sector0 = diskBuf.get();
+        const unsigned char* sector1 = diskBuf.get() + 512;
+        const unsigned char* gptEntries = diskBuf.get() + 1024;
+
+        if (sector0[510] == 0x55 && sector0[511] == 0xAA) {
+            bool isGpt = false;
+            
+            // 1. Scan MBR entries
+            for (int i = 0; i < 4; i++) {
+                const unsigned char* entry = &sector0[446 + i * 16];
+                uint8_t type = entry[4];
+                if (type == 0xEE) {
+                    isGpt = true;
+                    break;
+                }
+                uint32_t startLba = readUint32LE(&entry[8]);
+                uint32_t numSectors = readUint32LE(&entry[12]);
+                if (startLba > 0 && numSectors > 0) {
+                    partitions.push_back({startLba, numSectors});
+                }
+            }
+
+            // 2. Scan GPT partition table (if protective MBR is detected)
+            if (isGpt && memcmp(sector1, "EFI PART", 8) == 0) {
+                uint32_t numEntries = readUint32LE(&sector1[80]);
+                uint32_t entrySize = readUint32LE(&sector1[84]);
+                
+                if (entrySize >= 128 && numEntries <= 128) {
+                    for (uint32_t i = 0; i < numEntries; i++) {
+                        const unsigned char* entry = gptEntries + (i * entrySize);
+                        
+                        bool unused = true;
+                        for (int g = 0; g < 16; g++) {
+                            if (entry[g] != 0) { unused = false; break; }
+                        }
+                        if (unused) continue;
+
+                        uint64_t startLba = readUint64LE(&entry[32]);
+                        uint64_t endLba = readUint64LE(&entry[40]);
+                        if (startLba > 0 && endLba >= startLba) {
+                            partitions.push_back({startLba, endLba - startLba + 1});
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    bool fsFound = false;
+    uint64_t foundDataOffset = 0;
+    bool foundRelTweak = false;
+    XtsContextPair candidate;
+    uint64_t matchedPartitionStart = 0;
+
+    // Loop through candidates; the first one that successfully validates with the password wins
+    for (const auto& part : partitions) {
+        unsigned char headerBuf[VC_FULL_HEADER_SIZE];
+        if (!usbReadSectors(volId, part.startSector, 1, headerBuf)) {
+            continue;
+        }
+
+        const unsigned char* salt = headerBuf;
+        const unsigned char* encH = headerBuf + VC_SALT_SIZE;
+
+        const int safePim = clampPim(pim);
+        const int iter = (safePim > 0) ? (15000 + (safePim * 1000)) : 500000;
+
+        MdContextGuard mdGuard;
+        mbedtls_md_setup(&mdGuard.ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
+
+        unsigned char hKey[VC_KEY_MATERIAL_LEN];
+        mbedtls_pkcs5_pbkdf2_hmac(&mdGuard.ctx,
+            reinterpret_cast<const unsigned char*>(password), strlen(password),
+            salt, VC_SALT_SIZE, iter, VC_KEY_MATERIAL_LEN, hKey);
+
+        unsigned char decH[VC_HEADER_BODY_SIZE];
+        {
+            XtsContextPair hdrXts;
+            mbedtls_aes_xts_setkey_dec(&hdrXts.dec, hKey, 512);
+            const unsigned char zTw[16] = {0};
+            mbedtls_aes_crypt_xts(&hdrXts.dec, MBEDTLS_AES_DECRYPT, VC_HEADER_BODY_SIZE, zTw, encH, decH);
+        }
+        mbedtls_platform_zeroize(hKey, sizeof(hKey));
+
+        if (decH[0] != 'V' || decH[1] != 'E' || decH[2] != 'R' || decH[3] != 'A') {
+            mbedtls_platform_zeroize(decH, sizeof(decH));
+            continue; // Header decryption failed for this candidate; try next partition
+        }
+
+        const int keyOffsets[] = {VC_KEY_OFFSET_PRIMARY, VC_KEY_OFFSET_SECONDARY};
+        unsigned char dKey[VC_KEY_MATERIAL_LEN];
+
+        for (int kOff : keyOffsets) {
+            memcpy(dKey, &decH[kOff], VC_KEY_MATERIAL_LEN);
+            mbedtls_aes_xts_setkey_dec(&candidate.dec, dKey, 512);
+
+            FsScanResult scan = tryKeyCandidateUsb(volId, part.startSector, candidate.dec);
+            if (scan.found) {
+                fsFound = true;
+                foundDataOffset = scan.dataOffset;
+                foundRelTweak = scan.relTweak;
+                matchedPartitionStart = part.startSector;
+                break;
+            }
+        }
+        mbedtls_platform_zeroize(decH, sizeof(decH));
+
+        if (fsFound) {
+            mbedtls_aes_xts_setkey_enc(&candidate.enc, dKey, 512);
+            mbedtls_platform_zeroize(dKey, sizeof(dKey));
+            break; // Found the active, valid filesystem partition; stop search
+        }
+        mbedtls_platform_zeroize(dKey, sizeof(dKey));
+    }
+
+    if (!fsFound) {
+        return false;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
+        if (isDataCtxInitialized[volId]) {
+            mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
+            mbedtls_aes_xts_free(&activeDataCtxEnc[volId]);
+        }
+        activeDataCtxDec[volId] = candidate.dec;
+        activeDataCtxEnc[volId] = candidate.enc;
+        mbedtls_aes_xts_init(&candidate.dec);
+        mbedtls_aes_xts_init(&candidate.enc);
+
+        isUsbSource[volId]                = true;
+        isDataCtxInitialized[volId]       = true;
+        activeFd[volId]                   = -1;
+        activeDataOffset[volId]           = foundDataOffset;
+        activeIsRelTweak[volId]           = foundRelTweak;
+        activePartitionStartSector[volId] = matchedPartitionStart; // Record the matched sector
+    }
+    return true;
+}
 // ----------------------------------------------------------------====
 // SHARED: Directory listing
 // ----------------------------------------------------------------====
@@ -890,6 +1263,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
     activeDataOffset[volId] = 0;
     activeIsRelTweak[volId] = false;
     activeFileSize[volId]   = 0;
+    isUsbSource[volId] = false;
+    activePartitionStartSector[volId] = 0;
 
     if (isDataCtxInitialized[volId]) {
         mbedtls_aes_xts_free(&activeDataCtxDec[volId]);
@@ -1453,10 +1828,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
         JNIEnv* env, jobject, jint volId) {
     if (!requireActiveSession(volId, "getSpaceInfo")) {
         throwNotUnlocked(env, volId, "getSpaceInfo");
-        jlongArray empty = env->NewLongArray(2);
-        const jlong zeros[2] = {0, 0};
-        env->SetLongArrayRegion(empty, 0, 2, zeros);
-        return empty;
+        return nullptr; // Return nullptr immediately; JNI will safely propagate the exception to Kotlin
     }
     jlong totalBytes = 0, freeBytes = 0;
     {
@@ -1471,6 +1843,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
         }
     }
     jlongArray ret = env->NewLongArray(2);
+    if (!ret) return nullptr; // Guard against allocation failures
+    
     const jlong tmp[2] = {totalBytes, freeBytes};
     env->SetLongArrayRegion(ret, 0, 2, tmp);
     return ret;
@@ -1554,4 +1928,30 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
     streams.erase(it);
     f_close(f);
     delete f;
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
+        JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes) {
+
+    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const bool ok = prepareUsbSession(nativePass, pim, volId);
+    env->ReleaseStringUTFChars(password, nativePass);
+    if (!ok) return nullptr;
+
+    {
+        std::lock_guard<std::mutex> lock(volumeMutex[volId]);
+        activeFileSize[volId] = static_cast<uint64_t>(deviceSizeBytes);
+    }
+
+    jobjectArray result = nullptr;
+    {
+        std::lock_guard<std::mutex> fsLock(volumeMutex[volId]);
+        if (ensureMounted(volId)) {
+            result = buildDirectoryListing(env, volId, nullptr);
+        } else {
+            LOGI("FATFS Mount failed on USB volume %d", volId);
+        }
+    }
+    return result;
 }

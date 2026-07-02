@@ -12,6 +12,7 @@ import 'widgets/container_config_sheet.dart';
 import 'widgets/create_container_sheet.dart';
 import 'widgets/empty_state.dart';
 import '../browser/file_browser_screen.dart';
+import '../unlock/usb_unlock_sheet.dart';
 
 class VaultDashboard extends StatefulWidget {
   const VaultDashboard({Key? key}) : super(key: key);
@@ -209,6 +210,20 @@ class _VaultDashboardState extends State<VaultDashboard>
       if (mounted) setState(() => _actionInFlight = false);
     }
   }
+  void _showUsbUnlockSheet() {
+  if (_actionInFlight) return;
+  setState(() => _actionInFlight = true);
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => UsbUnlockSheet(
+      onMounted: _onContainerMounted,
+      documentProvider: _appSettings.defaultDocumentProvider,
+    ),
+  ).whenComplete(() {
+    if (mounted) setState(() => _actionInFlight = false);
+  });
+}
 
   void _showCreateSheet() {
     if (_actionInFlight) return;
@@ -270,6 +285,26 @@ class _VaultDashboardState extends State<VaultDashboard>
                     _showUnlockSheet();
                   },
                 ),
+                ListTile(
+  leading: Container(
+    width: 40,
+    height: 40,
+    decoration: BoxDecoration(
+      color: cs.tertiaryContainer,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Icon(
+      Icons.usb_rounded,
+      color: cs.onTertiaryContainer,
+    ),
+  ),
+  title: const Text('Mount USB Drive'),
+  subtitle: const Text('Unlock a fully-encrypted external drive'),
+  onTap: () {
+    Navigator.pop(context);
+    _showUsbUnlockSheet();
+  },
+),
                 ListTile(
                   leading: Container(
                     width: 40,

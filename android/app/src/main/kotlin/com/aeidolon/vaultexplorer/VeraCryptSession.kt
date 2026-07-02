@@ -6,6 +6,7 @@ data class ContainerSession(
     var cachedFilesList: List<String>,
     var displayName: String? = null,
     var documentProvider: Boolean = false,
+    val isUsbSource: Boolean = false,
 )
 
 object VeraCryptSession {

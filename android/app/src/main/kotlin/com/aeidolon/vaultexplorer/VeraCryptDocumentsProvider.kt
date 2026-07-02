@@ -96,17 +96,17 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
     }
 
     override fun ejectRoot(rootId: String?) {
-        val volId = rootId?.toIntOrNull()
-            ?.takeIf { it in 0 until VeraCryptSession.MAX_VOLUMES }
-            ?: return
-        // lockNative takes only volId — no session required, so direct call
-        // (not via Bridge) is correct here; the Bridge requires an active session.
-        VeraCryptEngine.lockNative(volId)
-        VeraCryptSession.removeSession(volId)
-        context?.contentResolver?.notifyChange(
-            DocumentsContract.buildRootsUri("com.aeidolon.vaultexplorer.documents"), null
-        )
-    }
+    val volId = rootId?.toIntOrNull()
+        ?.takeIf { it in 0 until VeraCryptSession.MAX_VOLUMES }
+        ?: return
+    val session = VeraCryptSession.activeSessions[volId]
+    VeraCryptEngine.lockNative(volId)
+    if (session?.isUsbSource == true) UsbBlockBridge.unregister(volId)
+    VeraCryptSession.removeSession(volId)
+    context?.contentResolver?.notifyChange(
+        DocumentsContract.buildRootsUri("com.aeidolon.vaultexplorer.documents"), null
+    )
+}
 
     // ── Document queries ───────────────────────────────────────────────────
 

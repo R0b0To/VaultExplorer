@@ -39,4 +39,8 @@ abstract final class ChannelMethods {
 
   // ── Security & Privacy ───────────────────────────────────────────────────
   static const setSecureScreen = 'setSecureScreen';
+
+  static const listUsbDevices = 'listUsbDevices';
+  static const requestUsbPermission = 'requestUsbPermission';
+  static const unlockUsbContainer = 'unlockUsbContainer';
 }

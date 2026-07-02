@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:vaultexplorer/models/usb_device_info.dart';
 import '../models/mounted_container.dart';
 import 'channel_methods.dart';
 
@@ -123,6 +124,55 @@ class VaultExplorerApi {
           'displayName': ?displayName,
           'documentProvider': documentProvider,
         });
+    if (raw == null) return null;
+    final volId = raw['volId'] as int;
+    final files = (raw['files'] as List<Object?>).cast<String>();
+    return (volId: volId, files: files);
+  }
+  Future<List<UsbDeviceInfo>> listUsbDevices() async {
+    final raw = await _channel.invokeMethod<List<Object?>>(
+      ChannelMethods.listUsbDevices,
+    );
+    if (raw == null) return [];
+    return raw
+        .cast<Map<Object?, Object?>>()
+        .map((m) => UsbDeviceInfo(
+              deviceName: m['deviceName'] as String,
+              productName: m['productName'] as String,
+              hasPermission: m['hasPermission'] as bool,
+            ))
+        .toList();
+  }
+
+  Future<bool> requestUsbPermission(String deviceName) async {
+    try {
+      final granted = await _channel.invokeMethod<bool>(
+        ChannelMethods.requestUsbPermission,
+        {'deviceName': deviceName},
+      );
+      return granted ?? false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  Future<({int volId, List<String> files})?> unlockUsbContainer(
+    String deviceName,
+    String password,
+    int pim, {
+    String? displayName,
+    bool documentProvider = false,
+  }) async {
+    final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+      ChannelMethods.unlockUsbContainer,
+      {
+        'deviceName': deviceName,
+        'password': password,
+        'pim': pim,
+        'displayName': ?displayName,
+        'documentProvider': documentProvider,
+      },
+    );
     if (raw == null) return null;
     final volId = raw['volId'] as int;
     final files = (raw['files'] as List<Object?>).cast<String>();

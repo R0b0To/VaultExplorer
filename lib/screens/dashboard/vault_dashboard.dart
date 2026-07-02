@@ -5,6 +5,7 @@ import '../../models/mounted_container.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
 import '../../services/vaultexplorer_api.dart';
+import '../../theme.dart';
 import '../settings/app_settings_screen.dart';
 import '../unlock/unlock_sheet.dart';
 import 'widgets/container_card.dart';
@@ -271,7 +272,7 @@ class _VaultDashboardState extends State<VaultDashboard>
                     height: 40,
                     decoration: BoxDecoration(
                       color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: Icon(
                       Icons.lock_open_rounded,
@@ -291,7 +292,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     height: 40,
     decoration: BoxDecoration(
       color: cs.tertiaryContainer,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.md),
     ),
     child: Icon(
       Icons.usb_rounded,
@@ -311,7 +312,7 @@ class _VaultDashboardState extends State<VaultDashboard>
                     height: 40,
                     decoration: BoxDecoration(
                       color: cs.secondaryContainer,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
                     child: Icon(
                       Icons.add_box_rounded,
@@ -452,11 +453,11 @@ class _VaultDashboardState extends State<VaultDashboard>
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
                 border: Border.all(color: cs.outlineVariant.withValues(alpha: 0)),
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(AppRadius.lg - 1),
                 child: Image.asset(
                   'assets/images/app_icon.png',
                   fit: BoxFit.contain,
@@ -474,7 +475,7 @@ class _VaultDashboardState extends State<VaultDashboard>
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
+            icon: Icon(Icons.settings_outlined, size: AppIconSize.action),
             tooltip: 'App Settings',
             onPressed: () async {
               await Navigator.push(
@@ -492,8 +493,8 @@ class _VaultDashboardState extends State<VaultDashboard>
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Vault'),
       ),
-      
-      // --- UPDATED BODY WITH STACK & LISTENABLE BUILDER ---
+
+      // ── Body: list + floating clipboard pill ────────────────────────────
       body: Stack(
         children: [
           // 1. The main list (fills the background)
@@ -501,6 +502,10 @@ class _VaultDashboardState extends State<VaultDashboard>
             child: displayItems.isEmpty
                 ? EmptyState(onAdd: () => _showUnlockSheet())
                 : ListView.separated(
+                    // Bottom padding is taller than AppSpacing.pagePadding's
+                    // default (32) to clear the extended FAB, which itself
+                    // sits above Android 16/17 gesture-nav; horizontal/top
+                    // insets still match the rest of the app.
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                     itemCount: displayItems.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -536,7 +541,7 @@ class _VaultDashboardState extends State<VaultDashboard>
                     },
                   ),
           ),
-          
+
           // 2. The Floating Clipboard Pill
           Positioned(
             left: 0,
@@ -548,7 +553,7 @@ class _VaultDashboardState extends State<VaultDashboard>
                 builder: (context, _) {
                   final clipboard = CrossContainerClipboard.instance;
                   if (!clipboard.hasItems) return const SizedBox.shrink();
-                  
+
                   return _FloatingClipboardDashboardBanner(
                     clipboard: clipboard,
                     onClear: clipboard.clear,
@@ -568,7 +573,7 @@ class _VaultDashboardState extends State<VaultDashboard>
 class _FloatingClipboardDashboardBanner extends StatelessWidget {
   final CrossContainerClipboard clipboard;
   final VoidCallback onClear;
-  
+
   const _FloatingClipboardDashboardBanner({
     required this.clipboard,
     required this.onClear,
@@ -594,7 +599,7 @@ class _FloatingClipboardDashboardBanner extends StatelessWidget {
             children: [
               Icon(
                 clipboard.isCutOperation ? Icons.cut_rounded : Icons.copy_rounded,
-                size: 20,
+                size: AppIconSize.standard,
                 color: cs.onTertiaryContainer,
               ),
               const SizedBox(width: 12),
@@ -633,7 +638,7 @@ class _FloatingClipboardDashboardBanner extends StatelessWidget {
               IconButton(
                 icon: Icon(
                   Icons.close_rounded,
-                  size: 20,
+                  size: AppIconSize.standard,
                   color: cs.onTertiaryContainer,
                 ),
                 tooltip: 'Cancel',

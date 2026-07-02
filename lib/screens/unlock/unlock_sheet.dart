@@ -319,7 +319,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
               // File picker
               GestureDetector(
-                onTap: _pickFile,
+                onTap: _loading ? null : _pickFile,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -361,7 +361,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
                       if (_selectedUri != null &&
                           widget.initialUri == null) ...[
                         GestureDetector(
-                          onTap: () => setState(() {
+                          onTap: _loading ? null : () => setState(() {
                             _selectedUri = null;
                             _selectedName = null;
                           }),
@@ -407,30 +407,56 @@ class _UnlockSheetState extends State<UnlockSheet> {
               else if (_unlockMethod == ContainerUnlockMethod.biometrics &&
                   !_showPasswordFallback) ...[
                 Center(
-                  child: Column(
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      Icon(
-                        Icons.fingerprint_rounded,
-                        size: 56,
-                        color: cs.primary,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Waiting for biometric...',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
+                      Opacity(
+                        opacity: _loading ? 0.3 : 1.0,
+                        child: IgnorePointer(
+                          ignoring: _loading,
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.fingerprint_rounded,
+                                size: 56,
+                                color: cs.primary,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Waiting for biometric...',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              TextButton(
+                                onPressed: _tryBiometric,
+                                child: const Text('Retry'),
+                              ),
+                              TextButton(
+                                onPressed: () =>
+                                    setState(() => _showPasswordFallback = true),
+                                child: const Text('Use Password'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: _tryBiometric,
-                        child: const Text('Retry'),
-                      ),
-                      TextButton(
-                        onPressed: () =>
-                            setState(() => _showPasswordFallback = true),
-                        child: const Text('Use Password'),
-                      ),
+                      if (_loading)
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CircularProgressIndicator(),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Unlocking...',
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -439,118 +465,217 @@ class _UnlockSheetState extends State<UnlockSheet> {
               else if (_unlockMethod == ContainerUnlockMethod.pattern &&
                   !_showPasswordFallback) ...[
                 Center(
-                  child: Column(
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
-                      Text(
-                        _patternError
-                            ? 'Wrong pattern — try again'
-                            : 'Draw your unlock pattern',
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: _patternError ? cs.error : cs.onSurfaceVariant,
-                          fontWeight: _patternError ? FontWeight.bold : null,
+                      Opacity(
+                        opacity: _loading ? 0.3 : 1.0,
+                        child: IgnorePointer(
+                          ignoring: _loading,
+                          child: Column(
+                            children: [
+                              Text(
+                                _patternError
+                                    ? 'Wrong pattern — try again'
+                                    : 'Draw your unlock pattern',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: _patternError ? cs.error : cs.onSurfaceVariant,
+                                  fontWeight: _patternError ? FontWeight.bold : null,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              PatternLockView(
+                                key: ValueKey(_patternResetKey),
+                                onPatternComplete: _onPatternComplete,
+                                showError: _patternError,
+                              ),
+                              const SizedBox(height: 12),
+                              TextButton(
+                                onPressed: () =>
+                                    setState(() => _showPasswordFallback = true),
+                                child: const Text('Use Password'),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      PatternLockView(
-                        key: ValueKey(_patternResetKey),
-                        onPatternComplete: _onPatternComplete,
-                        showError: _patternError,
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: () =>
-                            setState(() => _showPasswordFallback = true),
-                        child: const Text('Use Password'),
-                      ),
+                      if (_loading)
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CircularProgressIndicator(),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Unlocking...',
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
               ]
               // ── Standard password fields ───────────────────────────────
               else if (_showPasswordUI) ...[
-                AutofillGroup(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextField(
-                        controller: _passwordCtrl,
-                        obscureText: _obscure,
-                        autofocus:
-                            widget.initialUri != null &&
-                            widget.prefillPassword?.isEmpty != false,
-                        onChanged: (_) => setState(() {}),
-                        keyboardType: TextInputType.visiblePassword,
-                        autofillHints: const [AutofillHints.password],
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.key_outlined, size: 18),
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (_passwordPrefilled)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 4),
-                                  child: Tooltip(
-                                    message: 'Using saved password',
-                                    child: Icon(
-                                      Icons.bookmark_rounded,
-                                      size: 18,
-                                      color: cs.primary,
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Opacity(
+                      opacity: _loading ? 0.3 : 1.0,
+                      child: IgnorePointer(
+                        ignoring: _loading,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            AutofillGroup(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  TextField(
+                                    controller: _passwordCtrl,
+                                    obscureText: _obscure,
+                                    autofocus:
+                                        widget.initialUri != null &&
+                                        widget.prefillPassword?.isEmpty != false,
+                                    onChanged: (_) => setState(() {}),
+                                    keyboardType: TextInputType.visiblePassword,
+                                    autofillHints: const [AutofillHints.password],
+                                    decoration: InputDecoration(
+                                      labelText: 'Password',
+                                      prefixIcon: const Icon(Icons.key_outlined, size: 18),
+                                      suffixIcon: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (_passwordPrefilled)
+                                            Padding(
+                                              padding: const EdgeInsets.only(right: 4),
+                                              child: Tooltip(
+                                                message: 'Using saved password',
+                                                child: Icon(
+                                                  Icons.bookmark_rounded,
+                                                  size: 18,
+                                                  color: cs.primary,
+                                                ),
+                                              ),
+                                            ),
+                                          IconButton(
+                                            onPressed: () =>
+                                                setState(() => _obscure = !_obscure),
+                                            icon: Icon(
+                                              _obscure
+                                                  ? Icons.visibility_outlined
+                                                  : Icons.visibility_off_outlined,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
+                                  const SizedBox(height: 12),
+                                  TextField(
+                                    controller: _pimCtrl,
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: 'PIM  (leave blank for default)',
+                                      prefixIcon: Icon(Icons.tune_rounded, size: 18),
+                                    ),
+                                  ),
+                                  if (widget.initialUri == null) ...[
+                                    const SizedBox(height: 10),
+                                    Row(
+                                      children: [
+                                        Checkbox(
+                                          value: _remember,
+                                          onChanged: (val) =>
+                                              setState(() => _remember = val ?? false),
+                                          materialTapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        GestureDetector(
+                                          onTap: () =>
+                                              setState(() => _remember = !_remember),
+                                          child: Text(
+                                            'Remember container on dashboard',
+                                            style: textTheme.bodyMedium,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            
+                            // Include error directly in the Stack if it's shown during Password UI
+                            if (_error != null) ...[
+                              const SizedBox(height: 14),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
                                 ),
-                              IconButton(
-                                onPressed: () =>
-                                    setState(() => _obscure = !_obscure),
-                                icon: Icon(
-                                  _obscure
-                                      ? Icons.visibility_outlined
-                                      : Icons.visibility_off_outlined,
-                                  size: 18,
+                                decoration: BoxDecoration(
+                                  color: cs.errorContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline_rounded,
+                                      size: 20,
+                                      color: cs.onErrorContainer,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _error!,
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: cs.onErrorContainer,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _pimCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'PIM  (leave blank for default)',
-                          prefixIcon: Icon(Icons.tune_rounded, size: 18),
-                        ),
-                      ),
-                      if (widget.initialUri == null) ...[
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Checkbox(
-                              value: _remember,
-                              onChanged: (val) =>
-                                  setState(() => _remember = val ?? false),
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            const SizedBox(width: 10),
-                            GestureDetector(
-                              onTap: () =>
-                                  setState(() => _remember = !_remember),
-                              child: Text(
-                                'Remember container on dashboard',
-                                style: textTheme.bodyMedium,
+
+                            const SizedBox(height: 24),
+                            FilledButton(
+                              onPressed: _loading ? null : _unlock,
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 48),
                               ),
+                              child: const Text('Unlock'),
                             ),
                           ],
                         ),
-                      ],
-                    ],
-                  ),
+                      ),
+                    ),
+                    if (_loading)
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Unlocking...',
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
-              ],
-
-              if (_error != null) ...[
+              ]
+              // ── Safety Fallback Error (If error occurs outside password UI) ──
+              else if (_error != null) ...[
                 const SizedBox(height: 14),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -579,27 +704,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
                       ),
                     ],
                   ),
-                ),
-              ],
-
-              // Only show the unlock button when password UI is visible.
-              if (_showPasswordUI) ...[
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _loading ? null : _unlock,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 48),
-                  ),
-                  child: _loading
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation(cs.onPrimary),
-                          ),
-                        )
-                      : const Text('Unlock'),
                 ),
               ],
             ],

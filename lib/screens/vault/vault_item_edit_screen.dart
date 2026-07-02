@@ -155,11 +155,14 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return PopScope(
-      canPop: false,
+return PopScope(
+      canPop: !_dirty, 
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        if (await _confirmDiscard()) Navigator.pop(context, false);
+        final shouldDiscard = await _confirmDiscard();
+        if (shouldDiscard && context.mounted) {
+          Navigator.pop(context); 
+        }
       },
       child: Scaffold(
         appBar: AppBar(

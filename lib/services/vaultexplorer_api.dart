@@ -113,7 +113,7 @@ class VaultExplorerApi {
     );
   }
 
-  Future<({int volId, List<String> files})?> unlockContainer(
+ Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId})?> unlockContainer(
     String filePath,
     String password,
     int pim, {
@@ -135,7 +135,12 @@ class VaultExplorerApi {
     if (raw == null) return null;
     final volId = raw['volId'] as int;
     final files = (raw['files'] as List<Object?>).cast<String>();
-    return (volId: volId, files: files);
+    return (
+      volId: volId,
+      files: files,
+      matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
+      matchedHashId: raw['matchedHashId'] as int? ?? 255,
+    );
   }
   Future<List<UsbDeviceInfo>> listUsbDevices() async {
     final raw = await _channel.invokeMethod<List<Object?>>(
@@ -164,7 +169,7 @@ class VaultExplorerApi {
     }
   }
 
-  Future<({int volId, List<String> files})?> unlockUsbContainer(
+ Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId})?> unlockUsbContainer(
     String deviceName,
     String password,
     int pim, {
@@ -188,7 +193,12 @@ class VaultExplorerApi {
     if (raw == null) return null;
     final volId = raw['volId'] as int;
     final files = (raw['files'] as List<Object?>).cast<String>();
-    return (volId: volId, files: files);
+    return (
+      volId: volId,
+      files: files,
+      matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
+      matchedHashId: raw['matchedHashId'] as int? ?? 255,
+    );
   }
 
   Future<bool> lockContainer(String filePath) async {

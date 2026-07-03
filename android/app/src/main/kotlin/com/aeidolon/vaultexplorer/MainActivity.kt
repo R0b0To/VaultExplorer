@@ -588,7 +588,9 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                     }
                     result.success(mapOf(
                         "volId" to targetVolId,
-                        "files" to files.toList()
+                        "files" to files.toList(),
+                        "matchedCipherId" to VeraCryptEngine.getMatchedCipherId(targetVolId),
+                        "matchedHashId" to VeraCryptEngine.getMatchedHashId(targetVolId)
                     ))
                 } else {
                     UsbBlockBridge.unregister(targetVolId)
@@ -687,7 +689,9 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                         }
                                         result.success(mapOf(
                                             "volId" to targetVolId,
-                                            "files" to files.toList()
+                                            "files" to files.toList(),
+                                            "matchedCipherId" to VeraCryptEngine.getMatchedCipherId(targetVolId),
+                                            "matchedHashId" to VeraCryptEngine.getMatchedHashId(targetVolId)
                                         ))
                                     } else {
                                         result.error("AUTH_FAIL",

@@ -75,7 +75,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
   /// Loads the container record and prepares the appropriate unlock flow.
   Future<void> _initUnlockMethod() async {
     if (widget.initialUri == null) {
-      // Fresh mount — no saved record, just show password field.
       if (mounted) setState(() => _loadingAuth = false);
       return;
     }
@@ -89,6 +88,10 @@ class _UnlockSheetState extends State<UnlockSheet> {
       }
 
       _unlockMethod = record.unlockMethod;
+      // FIX (perf): use the cipher/hash that worked last time instead of
+      // re-running the full 5x8 auto-detect search.
+      _cipherId = record.cipherId;
+      _hashId = record.hashId;
 
       if (_unlockMethod == ContainerUnlockMethod.pattern) {
         _storedPatternHash = await ContainerRepository.instance.getPatternHash(
@@ -98,7 +101,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
       if (mounted) setState(() => _loadingAuth = false);
 
-      // Auto-trigger biometric prompt.
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
         _tryBiometric();
       }
@@ -239,8 +241,25 @@ class _UnlockSheetState extends State<UnlockSheet> {
             uri: _selectedUri!,
             label: name,
             rememberPassword: false,
+            cipherId: result.matchedCipherId,
+            hashId: result.matchedHashId,
           );
           await ContainerRepository.instance.save(record);
+        } else if (widget.initialUri != null) {
+          // FIX (perf): keep the saved record's remembered cipher/hash in
+          // sync with whatever actually unlocked successfully.
+          final records = await ContainerRepository.instance.loadAll();
+          final existing = records[widget.initialUri];
+          if (existing != null &&
+              (existing.cipherId != result.matchedCipherId ||
+                  existing.hashId != result.matchedHashId)) {
+            await ContainerRepository.instance.save(
+              existing.copyWith(
+                cipherId: result.matchedCipherId,
+                hashId: result.matchedHashId,
+              ),
+            );
+          }
         }
 
         final tempContainer = MountedContainer(

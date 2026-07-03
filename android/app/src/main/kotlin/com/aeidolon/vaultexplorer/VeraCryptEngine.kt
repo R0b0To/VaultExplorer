@@ -54,6 +54,9 @@ object VeraCryptEngine {
 
     // ── Tier 2: stateless file operations (volId-only) ─────────────────────
 
+    // ── Matched cipher/hash lookup (perf: skip auto-detect next unlock) ────
+    @JvmStatic external fun getMatchedCipherId(volId: Int): Int
+    @JvmStatic external fun getMatchedHashId(volId: Int): Int
     @JvmStatic external fun listDirectory(dirPath: String, volId: Int): Array<String>?
     @JvmStatic external fun getFileSize(fileName: String, volId: Int): Long
     @JvmStatic external fun getFolderSize(dirPath: String, volId: Int): Long
@@ -79,4 +82,5 @@ object VeraCryptEngine {
     @JvmStatic external fun openStream(targetFileName: String, volId: Int): Long
     @JvmStatic external fun readStream(streamPtr: Long, offset: Long, outBuffer: ByteArray, length: Int, volId: Int): Int
     @JvmStatic external fun closeStream(streamPtr: Long, volId: Int)
+    
 }

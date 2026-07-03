@@ -22,6 +22,7 @@
 #include "ff.h"
 #include "diskio.h"
 #include "crypto/cascade.h"
+#include <thread>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
@@ -156,35 +157,38 @@ struct MdContextGuard {
 // ----------------------------------------------------------------====
 
 struct VolumeState {
-    std::mutex mutex;                    // was volumeMutex[]
-    int        fd = -1;                  // was activeFd[]
-    uint64_t   dataOffset = 0;           // was activeDataOffset[]
-    bool       relTweak = false;         // was activeIsRelTweak[]
-    bool       dataCtxInitialized = false; // was isDataCtxInitialized[]
-    uint64_t   fileSize = 0;             // was activeFileSize[]
-    bool       fsMounted = false;        // was fsMounted[]
-    bool       isUsbSource = false;      // was isUsbSource[]
-    uint64_t   partitionStartSector = 0; // was activePartitionStartSector[]
+    std::mutex mutex;
+    int        fd = -1;
+    uint64_t   dataOffset = 0;
+    bool       relTweak = false;
+    bool       dataCtxInitialized = false;
+    uint64_t   fileSize = 0;
+    bool       fsMounted = false;
+    bool       isUsbSource = false;
+    uint64_t   partitionStartSector = 0;
+
+    // FIX (perf, fix #1): remembers which cipher/hash combo actually
+    // unlocked this volume, so Kotlin can persist it and pass it back
+    // as an explicit cipherId/hashId on the NEXT unlock of the same
+    // container — collapsing the 5x8 auto-detect search space to
+    // exactly one PBKDF2 run. -1 = unknown / not yet unlocked.
+    int matchedCipherId = -1;
+    int matchedHashId = -1;
 
     CascadeContext cascade;
+    FATFS fatfs{};
 
-    FATFS fatfs{};                       // was globalFs[]
+    std::unique_ptr<unsigned char[]> ioBuf;
+    size_t     ioBufSize = 0;
+    std::mutex ioBufMutex;
 
-    std::unique_ptr<unsigned char[]> ioBuf; // was ioVolBuf[]
-    size_t     ioBufSize = 0;               // was ioVolBufSize[]
-    std::mutex ioBufMutex;                  // was ioVolBufMutex[]
-
-    std::vector<FIL*> openStreams;       // was openStreams[]
+    std::vector<FIL*> openStreams;
 
     VolumeState() {}
     ~VolumeState() {}
     VolumeState(const VolumeState&) = delete;
     VolumeState& operator=(const VolumeState&) = delete;
 
-    // Full teardown, including closing the fd. Callers that need to null
-    // out fields WITHOUT closing the fd (because they still own it and will
-    // close it exactly once themselves — see createContainerNative) must NOT
-    // use this; they update the relevant fields directly instead.
     void reset() {
         if (fd >= 0) close(fd);
         fd = -1;
@@ -195,6 +199,8 @@ struct VolumeState {
         partitionStartSector = 0;
         dataCtxInitialized = false;
         cascade.initialized = false;
+        matchedCipherId = -1;
+        matchedHashId = -1;
     }
 };
 
@@ -815,7 +821,38 @@ static bool deriveAndValidateHeader(
 
     const int safePim = clampPim(pim);
 
+    // FIX (perf): AES + SHA-512 is VeraCrypt's default combo and covers the
+    // large majority of real-world containers. Try it once, serially, before
+    // falling back to the full parallel multi-hash search — this avoids
+    // paying for thread spawn + N-way KDF CPU/thermal contention in the
+    // common case, and is strictly cheaper than the parallel path whenever
+    // it succeeds. Only applies to true auto-detect (both unknown); if the
+    // caller already narrowed one axis (e.g. remembered hashId but not
+    // cipherId), the search space is already small enough that this
+    // fast path wouldn't save anything meaningful.
+    if (cipherIdParam == 255 && hashIdParam == 255) {
+        const int fastIter = iterationsForHash(HashId::kSha512, safePim);
+        unsigned char fastKey[192];
+        if (pbkdf2Hmac(HashId::kSha512,
+                        reinterpret_cast<const unsigned char*>(password), strlen(password),
+                        salt, VC_SALT_SIZE, fastIter, fastKey, 192)) {
+            unsigned char decH[VC_HEADER_BODY_SIZE];
+            if (tryDecryptHeader(encH, CascadeId::kAes, fastKey, decH)) {
+                std::memcpy(outKeyMaterial, &decH[VC_KEY_OFFSET_MASTER], 64);
+                outMatchedCipher = CascadeId::kAes;
+                outMatchedHash   = HashId::kSha512;
+                mbedtls_platform_zeroize(decH, sizeof(decH));
+                mbedtls_platform_zeroize(fastKey, sizeof(fastKey));
+                return true;
+            }
+            mbedtls_platform_zeroize(decH, sizeof(decH));
+        }
+        mbedtls_platform_zeroize(fastKey, sizeof(fastKey));
+        // Not AES/SHA-512 — fall through to the full parallel search below.
+    }
+
     std::vector<HashId> hashesToTry;
+    // ... rest unchanged ...
     if (hashIdParam != 255) {
         hashesToTry.push_back(static_cast<HashId>(hashIdParam));
     } else {
@@ -838,32 +875,78 @@ static bool deriveAndValidateHeader(
         };
     }
 
-    unsigned char derivedKeyMaterial[192];
-    unsigned char decH[VC_HEADER_BODY_SIZE];
+    // FIX (perf): the 5 (or fewer) PBKDF2 derivations below are fully
+    // independent of each other — they share no state until a candidate
+    // matches. Previously they ran serially, so an auto-detect unlock paid
+    // for 5x the PBKDF2 cost even though only one hash is ever correct.
+    // Run one worker thread per candidate hash; each worker tries its own
+    // derived key against every candidate cipher (cipher trials are cheap —
+    // one XTS header-block decrypt each — so those stay serial inside the
+    // worker). First worker to find a valid header wins; others notice via
+    // the `found` flag and stop starting new expensive work, but we still
+    // join all threads before returning so no dangling work continues after
+    // this function returns (mbedtls contexts are stack-local per thread).
+    std::atomic<bool> found{false};
+    std::mutex resultMutex;
+    unsigned char resultKeyMaterial[192];
+    CascadeId resultCipher{};
+    HashId resultHash{};
 
-    for (HashId h : hashesToTry) {
+    auto worker = [&](HashId h) {
+        if (found.load(std::memory_order_acquire)) return;
+
         int iter = iterationsForHash(h, safePim);
-
+        unsigned char derivedKeyMaterial[192];
         if (!pbkdf2Hmac(h, reinterpret_cast<const unsigned char*>(password), strlen(password),
                        salt, VC_SALT_SIZE, iter, derivedKeyMaterial, 192)) {
-            continue;
+            return;
         }
 
+        if (found.load(std::memory_order_acquire)) {
+            mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
+            return;
+        }
+
+        unsigned char decH[VC_HEADER_BODY_SIZE];
         for (CascadeId c : ciphersToTry) {
+            if (found.load(std::memory_order_acquire)) break;
             if (tryDecryptHeader(encH, c, derivedKeyMaterial, decH)) {
-                CascadeSpec spec = cascadeSpecFor(c);
-                std::memcpy(outKeyMaterial, &decH[VC_KEY_OFFSET_MASTER], spec.layerCount * 64);
-                outMatchedCipher = c;
-                outMatchedHash = h;
-                mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
+                bool expected = false;
+                if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+                    std::lock_guard<std::mutex> lock(resultMutex);
+                    CascadeSpec spec = cascadeSpecFor(c);
+                    std::memcpy(resultKeyMaterial, &decH[VC_KEY_OFFSET_MASTER], spec.layerCount * 64);
+                    resultCipher = c;
+                    resultHash = h;
+                }
                 mbedtls_platform_zeroize(decH, sizeof(decH));
-                return true;
+                mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
+                return;
             }
         }
+        mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
+    };
+
+    if (hashesToTry.size() <= 1) {
+        // Single explicit hash (the common re-unlock case, see fix #1) —
+        // no thread overhead needed.
+        worker(hashesToTry[0]);
+    } else {
+        std::vector<std::thread> threads;
+        threads.reserve(hashesToTry.size());
+        for (HashId h : hashesToTry) threads.emplace_back(worker, h);
+        for (auto& t : threads) t.join();
     }
 
-    mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
-    return false;
+    if (!found.load(std::memory_order_acquire)) {
+        return false;
+    }
+
+    std::memcpy(outKeyMaterial, resultKeyMaterial, sizeof(resultKeyMaterial));
+    outMatchedCipher = resultCipher;
+    outMatchedHash = resultHash;
+    mbedtls_platform_zeroize(resultKeyMaterial, sizeof(resultKeyMaterial));
+    return true;
 }
 
 static FsScanResult tryKeyCandidate(
@@ -1037,6 +1120,8 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
         v.dataOffset         = scan.dataOffset;
         v.relTweak           = scan.relTweak;
         v.fileSize           = fileSize;
+        v.matchedCipherId    = static_cast<int>(matchedCipher);
+        v.matchedHashId      = static_cast<int>(matchedHash);
     }
 
     derivationInProgress[volId].store(false, std::memory_order_release);
@@ -1146,6 +1231,8 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
     bool foundRelTweak = false;
     CascadeContext candidateCascade;
     uint64_t matchedPartitionStart = 0;
+    CascadeId matchedCipherFound{};
+    HashId matchedHashFound{};
 
     for (const auto& part : partitions) {
         unsigned char headerBuf[VC_FULL_HEADER_SIZE];
@@ -1172,6 +1259,8 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
             foundDataOffset = scan.dataOffset;
             foundRelTweak = scan.relTweak;
             matchedPartitionStart = part.startSector;
+            matchedCipherFound = matchedCipher;
+            matchedHashFound = matchedHash;
             mbedtls_platform_zeroize(dKey, sizeof(dKey));
             break;
         }
@@ -1191,6 +1280,8 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
         v.dataOffset           = foundDataOffset;
         v.relTweak             = foundRelTweak;
         v.partitionStartSector = matchedPartitionStart;
+        v.matchedCipherId      = static_cast<int>(matchedCipherFound);
+        v.matchedHashId        = static_cast<int>(matchedHashFound);
     }
     return true;
 }
@@ -1628,6 +1719,21 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_hashPasswordNative(
 // every function calls; it throws IllegalStateException("NOT_UNLOCKED:…")
 // so Kotlin catches it as a typed signal rather than a silent null/0/false.
 // ----------------------------------------------------------------====
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedCipherId(JNIEnv*, jobject, jint volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return -1;
+    std::lock_guard<std::mutex> lock(volumes[volId].mutex);
+    return volumes[volId].matchedCipherId;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedHashId(JNIEnv*, jobject, jint volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return -1;
+    std::lock_guard<std::mutex> lock(volumes[volId].mutex);
+    return volumes[volId].matchedHashId;
+}
+
 
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectory(

@@ -97,6 +97,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
     if (widget.prefillPassword != null && widget.prefillPassword!.isNotEmpty) {
       _passwordCtrl.text = widget.prefillPassword!;
     }
+     if (widget.existingRecord != null) {
+      _cipherId = widget.existingRecord!.cipherId;
+      _hashId = widget.existingRecord!.hashId;
+    }
     _loadDevices();
     _initUnlockMethod();
   }
@@ -339,9 +343,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         // unrelated-looking dashboard entry every time it drifted again.
         //
         // Migrate the saved settings — label, unlock method, remembered
-        // password/pattern, auto-close, thumbnail cache mode — onto the
-        // new uri and remove the stale one, so the dashboard entry keeps
-        // working across reconnects instead of rotting.
+        // password/pattern, auto-close, thumbnail cache mode, and the
+        // matched cipher/hash — onto the new uri and remove the stale one,
+        // so the dashboard entry keeps working across reconnects instead
+        // of rotting.
         final savedPassword = await ContainerRepository.instance.getPassword(
           existing.uri,
         );
@@ -359,11 +364,45 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
           thumbnailCacheMode: existing.thumbnailCacheMode,
           pendingPassword: savedPassword,
           pendingPatternHash: savedPatternHash,
+          // FIX (perf): carry the resolved cipher/hash through the
+          // migration too, so a path-drifted reconnect doesn't silently
+          // fall back to full auto-detect forever.
+          cipherId: result.matchedCipherId,
+          hashId: result.matchedHashId,
         );
         await ContainerRepository.instance.save(migrated);
 
         widget.onReconnected?.call(finalContainer, migrated, existing.uri);
+      } else if (existing != null) {
+        // Same device, same uri — just keep the remembered cipher/hash in
+        // sync with whatever actually unlocked successfully this time
+        // (covers first-time resolution from 255/auto, and the rare case
+        // where a manually-picked combination differs from what's stored).
+        if (existing.cipherId != result.matchedCipherId ||
+            existing.hashId != result.matchedHashId) {
+          await ContainerRepository.instance.save(
+            existing.copyWith(
+              cipherId: result.matchedCipherId,
+              hashId: result.matchedHashId,
+            ),
+          );
+        }
+        widget.onMounted(finalContainer);
       } else {
+        // Brand-new USB mount with no saved record yet. Create one now
+        // with the resolved cipher/hash already populated, so the default
+        // record VaultDashboard._onContainerMounted would otherwise create
+        // (with cipherId/hashId left at 255/auto) never overwrites it —
+        // that method only fills in a record if one isn't already present.
+        await ContainerRepository.instance.save(
+          ContainerRecord(
+            uri: newUri,
+            label: displayName,
+            documentProvider: widget.documentProvider,
+            cipherId: result.matchedCipherId,
+            hashId: result.matchedHashId,
+          ),
+        );
         widget.onMounted(finalContainer);
       }
 

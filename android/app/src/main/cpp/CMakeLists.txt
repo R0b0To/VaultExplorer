@@ -52,8 +52,6 @@ target_compile_definitions(vaultexplorer PRIVATE
         CRYPTOPP_DISABLE_ASM  # Disables x86 assembly on ARM 
         CRYPTOPP_DISABLE_SSE2
         CRYPTOPP_DISABLE_SSSE3
-        CRYPTOPP_DISABLE_AESNI
-        CRYPTOPP_DISABLE_SHA  # Disables x86 SHA-NI (fixes cpu.c TrySHA256)
 )
 
 # 4. Header search paths

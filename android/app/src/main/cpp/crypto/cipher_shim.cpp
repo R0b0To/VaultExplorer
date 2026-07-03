@@ -11,6 +11,7 @@
 #include <cstring>
 #include <algorithm>
 
+
 struct AesCtxPair {
     mbedtls_aes_context enc;
     mbedtls_aes_context dec;
@@ -122,16 +123,28 @@ static size_t hashDigestSize(HashId hash) {
     return 0;
 }
 
-static void hashHmac(HashId hash, const unsigned char* key, size_t keyLen,
-                     const unsigned char* data, size_t dataLen, unsigned char* out) {
-    size_t digestSize = hashDigestSize(hash);
+// ── Precomputed HMAC key state ──────────────────────────────────────────
+//
+// FIX (perf): hashHmac() previously recomputed the ipad/opad-primed hash
+// state from scratch on EVERY call — and pbkdf2HmacCustom() calls it up to
+// `iterations` times (typically 500,000) per PBKDF2 run. The HMAC key never
+// changes across those calls, only the message does. Prime the inner/outer
+// contexts once here; each per-call site just copies the primed HashCtx
+// (a cheap POD memcpy) instead of re-deriving it every time.
+struct HmacPrecomputed {
+    HashCtx innerCtx; // hashInit + hashUpdate(k_ipad) already applied
+    HashCtx outerCtx; // hashInit + hashUpdate(k_opad) already applied
+};
+
+static void hmacPrecompute(HashId hash, const unsigned char* key, size_t keyLen,
+                            HmacPrecomputed& pre) {
     size_t blockSize = 64;
-    
+
     unsigned char k_ipad[64];
     unsigned char k_opad[64];
     std::memset(k_ipad, 0x36, 64);
     std::memset(k_opad, 0x5C, 64);
-    
+
     unsigned char preparedKey[64] = {0};
     if (keyLen > blockSize) {
         HashCtx ctx;
@@ -141,24 +154,39 @@ static void hashHmac(HashId hash, const unsigned char* key, size_t keyLen,
     } else {
         std::memcpy(preparedKey, key, keyLen);
     }
-    
+
     for (size_t i = 0; i < blockSize; i++) {
         k_ipad[i] ^= preparedKey[i];
         k_opad[i] ^= preparedKey[i];
     }
-    
-    HashCtx innerCtx;
-    hashInit(hash, &innerCtx);
-    hashUpdate(hash, &innerCtx, k_ipad, blockSize);
+
+    hashInit(hash, &pre.innerCtx);
+    hashUpdate(hash, &pre.innerCtx, k_ipad, blockSize);
+
+    hashInit(hash, &pre.outerCtx);
+    hashUpdate(hash, &pre.outerCtx, k_opad, blockSize);
+}
+
+static void hashHmacFast(HashId hash, const HmacPrecomputed& pre,
+                          const unsigned char* data, size_t dataLen, unsigned char* out) {
+    size_t digestSize = hashDigestSize(hash);
+
+    HashCtx innerCtx = pre.innerCtx; // cheap struct copy, no re-priming
     hashUpdate(hash, &innerCtx, data, dataLen);
     unsigned char innerDigest[64];
     hashFinal(hash, &innerCtx, innerDigest);
-    
-    HashCtx outerCtx;
-    hashInit(hash, &outerCtx);
-    hashUpdate(hash, &outerCtx, k_opad, blockSize);
+
+    HashCtx outerCtx = pre.outerCtx; // cheap struct copy, no re-priming
     hashUpdate(hash, &outerCtx, innerDigest, digestSize);
     hashFinal(hash, &outerCtx, out);
+}
+
+// Kept for any one-shot HMAC caller — no longer on the PBKDF2 hot path.
+static void hashHmac(HashId hash, const unsigned char* key, size_t keyLen,
+                     const unsigned char* data, size_t dataLen, unsigned char* out) {
+    HmacPrecomputed pre;
+    hmacPrecompute(hash, key, keyLen, pre);
+    hashHmacFast(hash, pre, data, dataLen, out);
 }
 
 static bool pbkdf2HmacCustom(HashId hash,
@@ -168,31 +196,36 @@ static bool pbkdf2HmacCustom(HashId hash,
                             unsigned char* out, size_t outLen) {
     size_t digestSize = hashDigestSize(hash);
     if (digestSize == 0) return false;
-    
+
+    // Prime the HMAC key state exactly ONCE per PBKDF2 call, not once per
+    // iteration. This is the fix; everything below is otherwise unchanged.
+    HmacPrecomputed pre;
+    hmacPrecompute(hash, password, passwordLen, pre);
+
     unsigned int blockCount = (outLen + digestSize - 1) / digestSize;
     unsigned char U[64];
     unsigned char T[64];
     unsigned char saltWithIndex[256];
     if (saltLen + 4 > sizeof(saltWithIndex)) return false;
     std::memcpy(saltWithIndex, salt, saltLen);
-    
+
     size_t outOffset = 0;
     for (unsigned int block = 1; block <= blockCount; block++) {
         saltWithIndex[saltLen]     = (block >> 24) & 0xFF;
         saltWithIndex[saltLen + 1] = (block >> 16) & 0xFF;
         saltWithIndex[saltLen + 2] = (block >> 8)  & 0xFF;
         saltWithIndex[saltLen + 3] = block         & 0xFF;
-        
-        hashHmac(hash, password, passwordLen, saltWithIndex, saltLen + 4, U);
+
+        hashHmacFast(hash, pre, saltWithIndex, saltLen + 4, U);
         std::memcpy(T, U, digestSize);
-        
+
         for (unsigned int iter = 1; iter < iterations; iter++) {
-            hashHmac(hash, password, passwordLen, U, digestSize, U);
+            hashHmacFast(hash, pre, U, digestSize, U);
             for (size_t i = 0; i < digestSize; i++) {
                 T[i] ^= U[i];
             }
         }
-        
+
         size_t copyLen = std::min(digestSize, outLen - outOffset);
         std::memcpy(out + outOffset, T, copyLen);
         outOffset += copyLen;

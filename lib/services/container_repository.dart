@@ -194,28 +194,20 @@ class ContainerRepository {
 class ContainerRecord {
   final String uri;
   final String label;
-
-  /// Kept for backward compatibility with serialised JSON.
-  /// Canonical source of truth is [unlockMethod].
   final bool rememberPassword;
-
-  /// How the user authenticates before this container is unlocked.
   final ContainerUnlockMethod unlockMethod;
-
   final int autoCloseMins;
   final bool documentProvider;
-
-  /// Per-container thumbnail cache override.
-  /// `null` means "use [AppSettings.defaultThumbnailCacheMode]".
   final ThumbnailCacheMode? thumbnailCacheMode;
-
-  /// Only populated when the caller wants to update the stored password.
-  /// Not persisted to JSON.
   final String? pendingPassword;
-
-  /// Only populated when the caller wants to update the stored pattern hash.
-  /// Not persisted to JSON.
   final String? pendingPatternHash;
+
+  // FIX (perf): the cipher/hash combo that successfully unlocked this
+  // container last time. 255 = unknown / never resolved — falls back to
+  // full auto-detect. Persisting this collapses a 5x8-combination search
+  // down to exactly one KDF run on every subsequent unlock.
+  final int cipherId;
+  final int hashId;
 
   const ContainerRecord({
     required this.uri,
@@ -224,9 +216,11 @@ class ContainerRecord {
     this.unlockMethod = ContainerUnlockMethod.password,
     this.autoCloseMins = 0,
     this.documentProvider = false,
-    this.thumbnailCacheMode, // null = inherit app default
+    this.thumbnailCacheMode,
     this.pendingPassword,
     this.pendingPatternHash,
+    this.cipherId = 255,
+    this.hashId = 255,
   });
 
   /// True for containers mounted from a USB mass-storage device (uri format
@@ -250,10 +244,11 @@ class ContainerRecord {
     ContainerUnlockMethod? unlockMethod,
     int? autoCloseMins,
     bool? documentProvider,
-    // Use an explicit sentinel so callers can set thumbnailCacheMode to null.
     Object? thumbnailCacheMode = _keep,
     String? pendingPassword,
     String? pendingPatternHash,
+    int? cipherId,
+    int? hashId,
   }) {
     return ContainerRecord(
       uri: uri,
@@ -267,10 +262,12 @@ class ContainerRecord {
           : thumbnailCacheMode as ThumbnailCacheMode?,
       pendingPassword: pendingPassword,
       pendingPatternHash: pendingPatternHash,
+      cipherId: cipherId ?? this.cipherId,
+      hashId: hashId ?? this.hashId,
     );
   }
 
-  Map<String, dynamic> toJson() => {
+ Map<String, dynamic> toJson() => {
     'uri': uri,
     'label': label,
     'rememberPassword': rememberPassword,
@@ -279,13 +276,11 @@ class ContainerRecord {
     'documentProvider': documentProvider,
     if (thumbnailCacheMode != null)
       'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
-    // pendingPassword and pendingPatternHash are intentionally NOT serialised.
+    'cipherId': cipherId,
+    'hashId': hashId,
   };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
-    // ── Backward-compatible migration ─────────────────────────────────────
-    // Old data has no 'unlockMethod' key.  Derive it from the legacy
-    // 'rememberPassword' boolean.
     final ContainerUnlockMethod method;
     if (j.containsKey('unlockMethod')) {
       method = ContainerUnlockMethod.fromJson(j['unlockMethod'] as String?);
@@ -307,7 +302,9 @@ class ContainerRecord {
           false,
       thumbnailCacheMode: j.containsKey('thumbnailCacheMode')
           ? ThumbnailCacheMode.fromJson(j['thumbnailCacheMode'] as String?)
-          : null, // null = inherit app default
+          : null,
+      cipherId: j['cipherId'] as int? ?? 255,
+      hashId: j['hashId'] as int? ?? 255,
     );
   }
 }

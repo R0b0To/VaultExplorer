@@ -17,7 +17,7 @@ FetchContent_MakeAvailable(mbedtls)
 FetchContent_Declare(
         fatfs
         GIT_REPOSITORY https://github.com/stm32duino/FatFs.git
-        GIT_TAG        main
+        GIT_TAG        4.0.4
 )
 FetchContent_MakeAvailable(fatfs)
 
@@ -52,4 +52,4 @@ if(NOT ANDROID)
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)
     add_test(NAME fs_scan_test COMMAND fs_scan_test)
-endif()     
+endif()

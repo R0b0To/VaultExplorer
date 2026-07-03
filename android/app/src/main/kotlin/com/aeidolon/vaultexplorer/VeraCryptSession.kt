@@ -10,11 +10,10 @@ data class ContainerSession(
 )
 
 object VeraCryptSession {
-    // IMPORTANT: must equal FF_VOLUMES in ffconf.h AND MAX_VOLUMES in vaultexplorer.cpp
-    // (which derives itself from FF_VOLUMES).  Change all three together.
-    const val MAX_VOLUMES = 8
 
-    val locks: Array<Any> = Array(MAX_VOLUMES) { Any() }
+    val MAX_VOLUMES: Int by lazy { VeraCryptEngine.getMaxVolumesNative() }
+
+    val locks: Array<Any> by lazy { Array(MAX_VOLUMES) { Any() } }
     val activeSessions = mutableMapOf<Int, ContainerSession>()
 
     fun isUnlocked(volId: Int) = activeSessions.containsKey(volId)

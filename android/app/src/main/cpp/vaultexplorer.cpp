@@ -86,6 +86,7 @@ static constexpr uint64_t SCAN_SECTORS          = 2048;
 static constexpr uint64_t SCAN_BATCH            = 64;
 static constexpr int    MKFS_WORK_BUF_SIZE      = 4096;
 static constexpr size_t MAX_CHUNK_SIZE          = 64 * 1024 * 1024; // 64 MB safety cap
+static constexpr uint64_t FALLBACK_SECTOR_COUNT_UNINITIALIZED = 1000000; // see disk_ioctl GET_SECTOR_COUNT
 
 // Named positions of the remaining header fields written by
 // createContainerNative(). All offsets are body-relative (body[0] ==
@@ -530,7 +531,13 @@ static void decryptSector(mbedtls_aes_xts_context* ctx, uint64_t sectorNum,
 // ----------------------------------------------------------------====
 // FIX P12: Per-volume IO buffer accessor
 // Returns a pointer to a buffer of at least `neededBytes` for `v`.
-// The buffer is allocated once and grown if needed; never shrunk.
+// The buffer is allocated once and grown if needed; never shrunk during an
+// active session (it IS released entirely on lock, via unmountVolume()).
+// This is bounded and intentional, not a leak: disk_read/disk_write cap a
+// single batch at MAX_SECTORS_PER_BATCH (8192 sectors = 4MB), so this
+// buffer never exceeds 4MB per volume regardless of how much I/O flows
+// through it — shrinking mid-session would just cause repeated realloc
+// churn on the next large read for no real memory benefit.
 // MUST be called with v.ioBufMutex held.
 // ----------------------------------------------------------------====
 static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
@@ -670,7 +677,7 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
                 *(LBA_t*)buff = static_cast<LBA_t>(
                     (volumes[pdrv].fileSize - VC_DATA_AREA_OFFSET * 2) / 512);
             } else {
-                *(LBA_t*)buff = 1000000;
+                *(LBA_t*)buff = FALLBACK_SECTOR_COUNT_UNINITIALIZED;
             }
             return RES_OK;
 

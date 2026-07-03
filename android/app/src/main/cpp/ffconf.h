@@ -40,7 +40,7 @@
 #define FF_MULTI_PARTITION 0   /* 0: Single partition drives */
 #define FF_MIN_SS       512    /* Minimum sector size */
 #define FF_MAX_SS       512    /* Maximum sector size (VeraCrypt standard) */
-#define FF_LBA64        0      /* 0: Disable 64-bit LBA (Solves the compilation error!) */
+#define FF_LBA64        1      /* 1: Enable 64-bit LBA (supports volumes > 2TB) */
 #define FF_MIN_GPT      0x10000000 /* Minimum sectors to use GPT partition tables */
 #define FF_USE_TRIM     0      /* Disable ATA Trim */
 #define FF_FS_NOFSINFO  0      /* Check FAT info sectors */
@@ -52,9 +52,6 @@
 #define FF_FS_TINY      0      /* Normal buffer system */
 #define FF_FS_EXFAT     1      /* 1: Enable exFAT support! */
 #define FF_FS_NORTC     0      /* 0: System clock */
-#define FF_NORTC_YEAR   2026
-#define FF_NORTC_MON    6
-#define FF_NORTC_MDAY   17
 
 #define FF_FS_LOCK      0      /* Disable file locking */
 #define FF_FS_REENTRANT 0      /* Disable re-entrancy (We protect this via locks) */

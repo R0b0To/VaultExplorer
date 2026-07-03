@@ -12,14 +12,16 @@ package com.aeidolon.vaultexplorer
  *      session exists via requireActiveSession() and throws
  *      IllegalStateException("NOT_UNLOCKED: ...") if it doesn't.
  *
- * The old fd/password/pim-carrying variants of the stateless calls have been
- * removed. All call sites now go through VeraCryptBridge which holds the
- * single synchronized(VeraCryptSession.locks[volId]) wrapper.
  */
 object VeraCryptEngine {
     init {
         System.loadLibrary("vaultexplorer")
     }
+
+    // ── Config ───────────────────────────────────────────────────────────
+
+    @JvmStatic
+    external fun getMaxVolumesNative(): Int
 
     // ── Tier 1: session establishment ──────────────────────────────────────
 

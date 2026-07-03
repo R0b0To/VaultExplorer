@@ -13,8 +13,10 @@
 // Twofish-then-AES.
 #pragma once
 #include "cipher_shim.h"
+#include "mbedtls/aes.h" 
 #include <cstdint>
 #include <array>
+
 
 static constexpr int kMaxCascadeLayers = 3;
 
@@ -43,9 +45,7 @@ CascadeSpec cascadeSpecFor(CascadeId id);
 struct XtsLayerKey {
     BlockCipherContext dataKeyEnc;
     BlockCipherContext dataKeyDec;
-    BlockCipherContext tweakKey;   // XTS tweak-key schedule is a second,
-                                    // independently-keyed block cipher of
-                                    // the SAME algorithm as the data key.
+    BlockCipherContext tweakKey;  
 };
 
 // Full cascade context — this is what replaces the bare
@@ -54,6 +54,14 @@ struct CascadeContext {
     CascadeId id;
     int layerCount;
     std::array<XtsLayerKey, kMaxCascadeLayers> layers; // in ENCRYPT order
+    // FIX (perf): real mbedTLS AES-XTS context, populated only when this
+    // cascade is single-layer AES (the common case). Lets
+    // cascadeEncryptSector/cascadeDecryptSector skip the generic per-block
+    // dispatch loop and call mbedTLS's own (possibly hardware-accelerated)
+    // XTS routine directly. Unused/uninitialized for every other cascade.
+    mbedtls_aes_xts_context aesXtsEncCtx;
+    mbedtls_aes_xts_context aesXtsDecCtx;
+    bool aesXtsFastPathReady = false;
 
     bool initialized = false;
 };

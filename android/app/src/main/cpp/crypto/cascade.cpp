@@ -61,6 +61,20 @@ bool cascadeSetKeys(CascadeContext& ctx, CascadeId id,
         if (!blockCipherSetKey(ctx.layers[i].dataKeyDec, cipher, layerKey)) return false;
         if (!blockCipherSetKey(ctx.layers[i].tweakKey, cipher, layerKey + 32)) return false;
     }
+    // FIX (perf): single-layer AES also gets a real mbedTLS XTS context.
+    // mbedtls_aes_crypt_xts wants a 512-bit key = 32-byte data key +
+    // 32-byte tweak key concatenated — exactly what keyMaterial[0..63]
+    // already is for layer 0, same bytes the generic path above just used.
+    ctx.aesXtsFastPathReady = false;
+    if (ctx.layerCount == 1 && id == CascadeId::kAes) {
+        mbedtls_aes_xts_init(&ctx.aesXtsEncCtx);
+        mbedtls_aes_xts_init(&ctx.aesXtsDecCtx);
+        bool ok = (mbedtls_aes_xts_setkey_enc(&ctx.aesXtsEncCtx, keyMaterial, 512) == 0) &&
+                  (mbedtls_aes_xts_setkey_dec(&ctx.aesXtsDecCtx, keyMaterial, 512) == 0);
+        ctx.aesXtsFastPathReady = ok;
+        if (!ok) return false;
+    }
+
     ctx.initialized = true;
     return true;
 }
@@ -84,6 +98,14 @@ static void multiplyTweak(unsigned char T[16]) {
 
 void cascadeDecryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
                            const unsigned char in[512], unsigned char out[512]) {
+    if (ctx.aesXtsFastPathReady) {
+        unsigned char tweakBuf[16];
+        setTweak(tweakBuf, sectorNumber);
+        mbedtls_aes_xts_context* decCtx = const_cast<mbedtls_aes_xts_context*>(&ctx.aesXtsDecCtx);
+        mbedtls_aes_crypt_xts(decCtx, MBEDTLS_AES_DECRYPT, 512, tweakBuf, in, out);
+        return;
+    }
+
     unsigned char temp[512];
     std::memcpy(temp, in, 512);
     
@@ -114,6 +136,14 @@ void cascadeDecryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
 
 void cascadeEncryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
                            const unsigned char in[512], unsigned char out[512]) {
+    if (ctx.aesXtsFastPathReady) {
+        unsigned char tweakBuf[16];
+        setTweak(tweakBuf, sectorNumber);
+        mbedtls_aes_xts_context* encCtx = const_cast<mbedtls_aes_xts_context*>(&ctx.aesXtsEncCtx);
+        mbedtls_aes_crypt_xts(encCtx, MBEDTLS_AES_ENCRYPT, 512, tweakBuf, in, out);
+        return;
+    }
+
     unsigned char temp[512];
     std::memcpy(temp, in, 512);
     

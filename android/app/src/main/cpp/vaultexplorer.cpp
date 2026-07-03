@@ -505,8 +505,6 @@ static uint32_t crc32(const unsigned char* data, size_t len) {
     return crc ^ 0xFFFFFFFFu;
 }
 
-// (Old encryptSector/decryptSector helpers removed — replaced by
-// cascadeEncryptSector/cascadeDecryptSector in cascade.cpp.)
 
 // ----------------------------------------------------------------====
 // FIX P12: Per-volume IO buffer accessor

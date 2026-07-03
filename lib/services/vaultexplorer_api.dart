@@ -86,6 +86,8 @@ class VaultExplorerApi {
     required String password,
     required int pim,
     required String fileSystem,
+    int? cipherId,
+    int? hashId,
   }) async {
     final bool? success = await _channel
         .invokeMethod<bool>(ChannelMethods.createContainer, {
@@ -94,6 +96,8 @@ class VaultExplorerApi {
           'password': password,
           'pim': pim,
           'fileSystem': fileSystem,
+          'cipherId': cipherId ?? 255,
+          'hashId': hashId ?? 255,
         });
     return success ?? false;
   }
@@ -115,14 +119,18 @@ class VaultExplorerApi {
     int pim, {
     String? displayName,
     bool documentProvider = false,
+    int? cipherId,
+    int? hashId,
   }) async {
     final raw = await _channel
         .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockContainer, {
           'filePath': filePath,
           'password': password,
           'pim': pim,
-          'displayName': ?displayName,
+          'displayName': displayName,
           'documentProvider': documentProvider,
+          'cipherId': cipherId ?? 255,
+          'hashId': hashId ?? 255,
         });
     if (raw == null) return null;
     final volId = raw['volId'] as int;
@@ -162,6 +170,8 @@ class VaultExplorerApi {
     int pim, {
     String? displayName,
     bool documentProvider = false,
+    int? cipherId,
+    int? hashId,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockUsbContainer,
@@ -169,8 +179,10 @@ class VaultExplorerApi {
         'deviceName': deviceName,
         'password': password,
         'pim': pim,
-        'displayName': ?displayName,
+        'displayName': displayName,
         'documentProvider': documentProvider,
+        'cipherId': cipherId ?? 255,
+        'hashId': hashId ?? 255,
       },
     );
     if (raw == null) return null;

@@ -21,6 +21,7 @@
 
 #include "ff.h"
 #include "diskio.h"
+#include "crypto/cascade.h"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
@@ -165,8 +166,7 @@ struct VolumeState {
     bool       isUsbSource = false;      // was isUsbSource[]
     uint64_t   partitionStartSector = 0; // was activePartitionStartSector[]
 
-    mbedtls_aes_xts_context dataCtxDec;  // was activeDataCtxDec[]
-    mbedtls_aes_xts_context dataCtxEnc;  // was activeDataCtxEnc[]
+    CascadeContext cascade;
 
     FATFS fatfs{};                       // was globalFs[]
 
@@ -176,14 +176,8 @@ struct VolumeState {
 
     std::vector<FIL*> openStreams;       // was openStreams[]
 
-    VolumeState() {
-        mbedtls_aes_xts_init(&dataCtxDec);
-        mbedtls_aes_xts_init(&dataCtxEnc);
-    }
-    ~VolumeState() {
-        mbedtls_aes_xts_free(&dataCtxDec);
-        mbedtls_aes_xts_free(&dataCtxEnc);
-    }
+    VolumeState() {}
+    ~VolumeState() {}
     VolumeState(const VolumeState&) = delete;
     VolumeState& operator=(const VolumeState&) = delete;
 
@@ -199,13 +193,8 @@ struct VolumeState {
         fileSize = 0;
         isUsbSource = false;
         partitionStartSector = 0;
-        if (dataCtxInitialized) {
-            mbedtls_aes_xts_free(&dataCtxDec);
-            mbedtls_aes_xts_free(&dataCtxEnc);
-            mbedtls_aes_xts_init(&dataCtxDec);
-            mbedtls_aes_xts_init(&dataCtxEnc);
-            dataCtxInitialized = false;
-        }
+        dataCtxInitialized = false;
+        cascade.initialized = false;
     }
 };
 
@@ -510,23 +499,8 @@ static uint32_t crc32(const unsigned char* data, size_t len) {
     return crc ^ 0xFFFFFFFFu;
 }
 
-// ----------------------------------------------------------------====
-// CRYPTO HELPERS
-// ----------------------------------------------------------------====
-
-static void encryptSector(mbedtls_aes_xts_context* ctx, uint64_t sectorNum,
-                           const unsigned char* in, unsigned char* out) {
-    unsigned char tweak[16];
-    setTweak(tweak, sectorNum);
-    mbedtls_aes_crypt_xts(ctx, MBEDTLS_AES_ENCRYPT, 512, tweak, in, out);
-}
-
-static void decryptSector(mbedtls_aes_xts_context* ctx, uint64_t sectorNum,
-                           const unsigned char* in, unsigned char* out) {
-    unsigned char tweak[16];
-    setTweak(tweak, sectorNum);
-    mbedtls_aes_crypt_xts(ctx, MBEDTLS_AES_DECRYPT, 512, tweak, in, out);
-}
+// (Old encryptSector/decryptSector helpers removed — replaced by
+// cascadeEncryptSector/cascadeDecryptSector in cascade.cpp.)
 
 // ----------------------------------------------------------------====
 // FIX P12: Per-volume IO buffer accessor
@@ -602,8 +576,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             const uint64_t physSector = firstPhysical + i;
             const uint64_t sectorInPartition = physSector - v.partitionStartSector;
             const uint64_t tweak = relTweak ? (physSector - basePhysical) : sectorInPartition;
-            decryptSector(&v.dataCtxDec, tweak,
-                          encBuf + (i * 512), curBuf + (i * 512));
+            cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512), curBuf + (i*512));
         }
 
         remaining -= batchCount;
@@ -654,7 +627,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             const uint64_t physSector = firstPhysical + i;
             const uint64_t sectorInPartition = physSector - v.partitionStartSector;
             const uint64_t tweak = relTweak ? (physSector - basePhysical) : sectorInPartition;
-            encryptSector(&v.dataCtxEnc, tweak,
+            cascadeEncryptSector(v.cascade, tweak,
                           curBuf + (i * 512), encBuf + (i * 512));
         }
 
@@ -761,36 +734,51 @@ struct FsScanResult {
 // header bytes, password, and pim — so it has no dependency on JNI or any
 // of the VolumeState machinery.
 // ----------------------------------------------------------------====
-static bool deriveAndValidateHeader(
-    const unsigned char headerSector[VC_FULL_HEADER_SIZE],
-    const char* password, int pim,
-    unsigned char outKey[VC_KEY_MATERIAL_LEN])
-{
-    const unsigned char* salt = headerSector;
-    const unsigned char* encH = headerSector + VC_SALT_SIZE;
-
-    const int safePim = clampPim(pim);
-    const int iter = (safePim > 0) ? (15000 + (safePim * 1000)) : 500000;
-
-    MdContextGuard mdGuard;
-    mbedtls_md_setup(&mdGuard.ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1);
-
-    unsigned char hKey[VC_KEY_MATERIAL_LEN];
-    mbedtls_pkcs5_pbkdf2_hmac(&mdGuard.ctx,
-        reinterpret_cast<const unsigned char*>(password), strlen(password),
-        salt, VC_SALT_SIZE, iter, VC_KEY_MATERIAL_LEN, hKey);
-
-    unsigned char decH[VC_HEADER_BODY_SIZE];
-    {
-        XtsContextPair hdrXts;
-        mbedtls_aes_xts_setkey_dec(&hdrXts.dec, hKey, 512);
-        const unsigned char zTw[16] = {0};
-        mbedtls_aes_crypt_xts(&hdrXts.dec, MBEDTLS_AES_DECRYPT,
-                               VC_HEADER_BODY_SIZE, zTw, encH, decH);
+static void localMultiplyTweak(unsigned char T[16]) {
+    unsigned char carry = 0;
+    for (int i = 0; i < 16; i++) {
+        unsigned char nextCarry = (T[i] & 0x80) ? 1 : 0;
+        T[i] = (T[i] << 1) | carry;
+        carry = nextCarry;
     }
-    mbedtls_platform_zeroize(hKey, sizeof(hKey));
+    if (carry) {
+        T[0] ^= 0x87;
+    }
+}
 
-    bool ok = (decH[0] == 'V' && decH[1] == 'E' && decH[2] == 'R' && decH[3] == 'A');
+static bool tryDecryptHeader(
+    const unsigned char encH[VC_HEADER_BODY_SIZE],
+    CascadeId cipherId,
+    const unsigned char* derivedKeyMaterial,
+    unsigned char decH[VC_HEADER_BODY_SIZE]
+) {
+    CascadeContext tempCtx;
+    CascadeSpec spec = cascadeSpecFor(cipherId);
+    if (!cascadeSetKeys(tempCtx, cipherId, derivedKeyMaterial, spec.layerCount * 64)) {
+        return false;
+    }
+
+    std::memcpy(decH, encH, VC_HEADER_BODY_SIZE);
+
+    for (int i = spec.layerCount - 1; i >= 0; i--) {
+        const XtsLayerKey& layer = tempCtx.layers[i];
+        unsigned char T[16] = {0};
+        blockCipherEncryptBlock(layer.tweakKey, T, T);
+
+        for (int block = 0; block < 28; block++) {
+            unsigned char* blockPtr = decH + block * 16;
+            unsigned char tmp[16];
+            for (int j = 0; j < 16; j++) tmp[j] = blockPtr[j] ^ T[j];
+            blockCipherDecryptBlock(layer.dataKeyDec, tmp, tmp);
+            for (int j = 0; j < 16; j++) blockPtr[j] = tmp[j] ^ T[j];
+
+            localMultiplyTweak(T);
+        }
+    }
+
+    if (decH[0] != 'V' || decH[1] != 'E' || decH[2] != 'R' || decH[3] != 'A') {
+        return false;
+    }
 
     auto readBE32 = [&decH](int off) -> uint32_t {
         return (static_cast<uint32_t>(decH[off])     << 24) |
@@ -799,49 +787,92 @@ static bool deriveAndValidateHeader(
                 static_cast<uint32_t>(decH[off + 3]);
     };
 
-    if (ok) {
-        const uint32_t computedHdrCrc = crc32(decH, VC_HDR_CRC_COVERAGE_LEN);
-        const uint32_t storedHdrCrc   = readBE32(VC_HDR_OFF_HEADER_CRC);
-        ok = (computedHdrCrc == storedHdrCrc);
-        if (!ok) LOGI("deriveAndValidateHeader: header CRC mismatch (wrong password or corrupt header)");
+    const uint32_t computedHdrCrc = crc32(decH, VC_HDR_CRC_COVERAGE_LEN);
+    const uint32_t storedHdrCrc   = readBE32(VC_HDR_OFF_HEADER_CRC);
+    if (computedHdrCrc != storedHdrCrc) {
+        return false;
     }
 
-    if (ok) {
-        const uint32_t computedKeyCrc =
-            crc32(&decH[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
-        const uint32_t storedKeyCrc = readBE32(VC_HDR_OFF_KEY_CRC);
-        ok = (computedKeyCrc == storedKeyCrc);
-        if (!ok) LOGI("deriveAndValidateHeader: key-data CRC mismatch (wrong password or corrupt header)");
+    const uint32_t computedKeyCrc = crc32(&decH[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
+    const uint32_t storedKeyCrc = readBE32(VC_HDR_OFF_KEY_CRC);
+    if (computedKeyCrc != storedKeyCrc) {
+        return false;
     }
 
-    if (ok) {
-        memcpy(outKey, &decH[VC_KEY_OFFSET_MASTER], VC_KEY_MATERIAL_LEN);
-    }
-
-    mbedtls_platform_zeroize(decH, sizeof(decH));
-    return ok;
+    return true;
 }
 
-// Tries one 64-byte master key against up to SCAN_SECTORS sectors, looking
-// for the 0x55AA boot-sector signature. Returns immediately on first hit.
-//
-// Factored out of prepareSession() so the dual-tweak-check inner body exists
-// in exactly one place — previously this logic was correct but implicitly
-// duplicated by virtue of being inside a `for (int kOff : keyOffsets)` loop
-// with no named boundary, making it easy to accidentally diverge the two
-// iterations during a future edit. (That loop is gone now — see
-// VC_KEY_OFFSET_MASTER above — but this function stays factored out since
-// it's also called exactly once per candidate.)
+static bool deriveAndValidateHeader(
+    const unsigned char headerSector[VC_FULL_HEADER_SIZE],
+    const char* password, int pim,
+    int cipherIdParam, int hashIdParam,
+    unsigned char outKeyMaterial[192],
+    CascadeId& outMatchedCipher,
+    HashId& outMatchedHash
+) {
+    const unsigned char* salt = headerSector;
+    const unsigned char* encH = headerSector + VC_SALT_SIZE;
+
+    const int safePim = clampPim(pim);
+
+    std::vector<HashId> hashesToTry;
+    if (hashIdParam != 255) {
+        hashesToTry.push_back(static_cast<HashId>(hashIdParam));
+    } else {
+        hashesToTry = { HashId::kSha512, HashId::kSha256, HashId::kWhirlpool, HashId::kStreebog, HashId::kBlake2s256 };
+    }
+
+    std::vector<CascadeId> ciphersToTry;
+    if (cipherIdParam != 255) {
+        ciphersToTry.push_back(static_cast<CascadeId>(cipherIdParam));
+    } else {
+        ciphersToTry = {
+            CascadeId::kAes,
+            CascadeId::kSerpent,
+            CascadeId::kTwofish,
+            CascadeId::kAesTwofish,
+            CascadeId::kSerpentAes,
+            CascadeId::kTwofishSerpent,
+            CascadeId::kAesTwofishSerpent,
+            CascadeId::kSerpentTwofishAes
+        };
+    }
+
+    unsigned char derivedKeyMaterial[192];
+    unsigned char decH[VC_HEADER_BODY_SIZE];
+
+    for (HashId h : hashesToTry) {
+        int iter = iterationsForHash(h, safePim);
+
+        if (!pbkdf2Hmac(h, reinterpret_cast<const unsigned char*>(password), strlen(password),
+                       salt, VC_SALT_SIZE, iter, derivedKeyMaterial, 192)) {
+            continue;
+        }
+
+        for (CascadeId c : ciphersToTry) {
+            if (tryDecryptHeader(encH, c, derivedKeyMaterial, decH)) {
+                CascadeSpec spec = cascadeSpecFor(c);
+                std::memcpy(outKeyMaterial, &decH[VC_KEY_OFFSET_MASTER], spec.layerCount * 64);
+                outMatchedCipher = c;
+                outMatchedHash = h;
+                mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
+                mbedtls_platform_zeroize(decH, sizeof(decH));
+                return true;
+            }
+        }
+    }
+
+    mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
+    return false;
+}
+
 static FsScanResult tryKeyCandidate(
     int fd,
-    const unsigned char* keyMaterial, // 64 bytes, VC_KEY_MATERIAL_LEN
-    mbedtls_aes_xts_context& candidateDecCtx // already keyed via setkey_dec
+    const CascadeContext& candidateCascade
 ) {
     FsScanResult result;
-
     std::unique_ptr<unsigned char[]> encBatch(new unsigned char[SCAN_BATCH * 512]);
     unsigned char decS[512];
-    unsigned char tweak[16];
 
     uint64_t s = 0;
     while (s < SCAN_SECTORS) {
@@ -857,10 +888,7 @@ static FsScanResult tryKeyCandidate(
             const uint64_t sectorIdx = s + i;
             const unsigned char* enc = encBatch.get() + (i * 512);
 
-            // Convention A: tweak = absolute physical sector index.
-            setTweak(tweak, sectorIdx);
-            mbedtls_aes_crypt_xts(&candidateDecCtx, MBEDTLS_AES_DECRYPT,
-                                  512, tweak, enc, decS);
+            cascadeDecryptSector(candidateCascade, sectorIdx, enc, decS);
             if (isValidBootSector(decS)) {
                 result.found      = true;
                 result.dataOffset = sectorIdx * 512;
@@ -868,11 +896,7 @@ static FsScanResult tryKeyCandidate(
                 return result;
             }
 
-            // Convention B: tweak = sector index relative to the data area
-            // (i.e. zero at the first scanned sector).
-            memset(tweak, 0, 16);
-            mbedtls_aes_crypt_xts(&candidateDecCtx, MBEDTLS_AES_DECRYPT,
-                                  512, tweak, enc, decS);
+            cascadeDecryptSector(candidateCascade, 0, enc, decS);
             if (isValidBootSector(decS)) {
                 result.found      = true;
                 result.dataOffset = sectorIdx * 512;
@@ -917,7 +941,7 @@ static FsScanResult tryKeyCandidate(
 // invariants (call ordering vs. memory state), and the safety argument above
 // depends on both being present.
 // ----------------------------------------------------------------====
-bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive) {
+bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive, int cipherId, int hashId) {
     if (volId < 0 || volId >= MAX_VOLUMES) {
         if (fd >= 0) close(fd);
         return false;
@@ -977,45 +1001,37 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
             fileSize = static_cast<uint64_t>(st.st_size);
     }
 
-    // FIX P11: PBKDF2 + header decrypt + CRC validation now live in
-    // deriveAndValidateHeader(), shared with prepareUsbSession() below.
-    // Still runs completely outside the volume mutex — other volume
-    // operations are entirely unaffected while this runs.
-    unsigned char dKey[VC_KEY_MATERIAL_LEN];
-    if (!deriveAndValidateHeader(headerBuf, password, pim, dKey)) {
+    unsigned char dKey[192];
+    CascadeId matchedCipher;
+    HashId matchedHash;
+    if (!deriveAndValidateHeader(headerBuf, password, pim, cipherId, hashId, dKey, matchedCipher, matchedHash)) {
         close(fd);
         derivationInProgress[volId].store(false, std::memory_order_release);
         return false;
     }
 
-    XtsContextPair candidate;
-    mbedtls_aes_xts_setkey_dec(&candidate.dec, dKey, 512);
-
-    FsScanResult scan = tryKeyCandidate(fd, dKey, candidate.dec);
-    if (!scan.found) {
+    CascadeContext candidateCascade;
+    CascadeSpec spec = cascadeSpecFor(matchedCipher);
+    if (!cascadeSetKeys(candidateCascade, matchedCipher, dKey, spec.layerCount * 64)) {
         mbedtls_platform_zeroize(dKey, sizeof(dKey));
         close(fd);
         derivationInProgress[volId].store(false, std::memory_order_release);
         return false;
     }
-
-    mbedtls_aes_xts_setkey_enc(&candidate.enc, dKey, 512);
     mbedtls_platform_zeroize(dKey, sizeof(dKey));
+
+    FsScanResult scan = tryKeyCandidate(fd, candidateCascade);
+    if (!scan.found) {
+        close(fd);
+        derivationInProgress[volId].store(false, std::memory_order_release);
+        return false;
+    }
 
     // FIX P11: Now acquire the mutex ONLY for the brief context swap.
     // All the slow crypto work is already done above.
     {
         std::lock_guard<std::mutex> lock(v.mutex);
-
-        if (v.dataCtxInitialized) {
-            mbedtls_aes_xts_free(&v.dataCtxDec);
-            mbedtls_aes_xts_free(&v.dataCtxEnc);
-        }
-        v.dataCtxDec = candidate.dec;
-        v.dataCtxEnc = candidate.enc;
-        mbedtls_aes_xts_init(&candidate.dec);
-        mbedtls_aes_xts_init(&candidate.enc);
-
+        v.cascade            = candidateCascade;
         v.dataCtxInitialized = true;
         v.fd                 = fd;
         v.dataOffset         = scan.dataOffset;
@@ -1034,11 +1050,10 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
 // (pread vs JNI upcall) are different enough that folding them into one
 // function would make the already-delicate unlock flow harder to reason
 // about, not easier.
-static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector, mbedtls_aes_xts_context& candidateDecCtx) {
+static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector, const CascadeContext& candidateCascade) {
     FsScanResult result;
     std::unique_ptr<unsigned char[]> encBatch(new unsigned char[SCAN_BATCH * 512]);
     unsigned char decS[512];
-    unsigned char tweak[16];
 
     uint64_t s = 0;
     while (s < SCAN_SECTORS) {
@@ -1049,9 +1064,7 @@ static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector,
             const uint64_t sectorIdx = s + i;
             const unsigned char* enc = encBatch.get() + (i * 512);
 
-            // Absolute physical sector tweak (relative to partition start)
-            setTweak(tweak, sectorIdx);
-            mbedtls_aes_crypt_xts(&candidateDecCtx, MBEDTLS_AES_DECRYPT, 512, tweak, enc, decS);
+            cascadeDecryptSector(candidateCascade, sectorIdx, enc, decS);
             if (isValidBootSector(decS)) {
                 result.found = true; 
                 result.dataOffset = (partitionStartSector + sectorIdx) * 512;
@@ -1059,9 +1072,7 @@ static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector,
                 return result;
             }
 
-            // Zero relative tweak
-            memset(tweak, 0, 16);
-            mbedtls_aes_crypt_xts(&candidateDecCtx, MBEDTLS_AES_DECRYPT, 512, tweak, enc, decS);
+            cascadeDecryptSector(candidateCascade, 0, enc, decS);
             if (isValidBootSector(decS)) {
                 result.found = true; 
                 result.dataOffset = (partitionStartSector + sectorIdx) * 512;
@@ -1074,20 +1085,12 @@ static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector,
     return result; // found == false
 }
 
-// USB-backed equivalent of prepareSession(). There is no fd — Kotlin must
-// already have opened the USB device, granted permission, run READ CAPACITY,
-// and called UsbBlockBridge.register(volId, device) BEFORE this is invoked,
-// since PBKDF2 + the header/boot-sector reads below both go through the
-// upcall immediately.
-static bool prepareUsbSession(const char* password, int pim, int volId) {
+static bool prepareUsbSession(const char* password, int pim, int volId, int cipherId, int hashId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
     VolumeState& v = volumes[volId];
 
-    // Collect partition candidates. Start with raw disk (LBA 0)
     std::vector<PartitionCandidate> partitions;
-    partitions.push_back({0, 0});
 
-    // Read the first 34 sectors to scan MBR and primary GPT entries (17 KB)
     std::unique_ptr<unsigned char[]> diskBuf(new unsigned char[34 * 512]);
     if (usbReadSectors(volId, 0, 34, diskBuf.get())) {
         const unsigned char* sector0 = diskBuf.get();
@@ -1097,7 +1100,6 @@ static bool prepareUsbSession(const char* password, int pim, int volId) {
         if (sector0[510] == 0x55 && sector0[511] == 0xAA) {
             bool isGpt = false;
             
-            // 1. Scan MBR entries
             for (int i = 0; i < 4; i++) {
                 const unsigned char* entry = &sector0[446 + i * 16];
                 uint8_t type = entry[4];
@@ -1112,7 +1114,6 @@ static bool prepareUsbSession(const char* password, int pim, int volId) {
                 }
             }
 
-            // 2. Scan GPT partition table (if protective MBR is detected)
             if (isGpt && memcmp(sector1, "EFI PART", 8) == 0) {
                 uint32_t numEntries = readUint32LE(&sector1[80]);
                 uint32_t entrySize = readUint32LE(&sector1[84]);
@@ -1138,36 +1139,41 @@ static bool prepareUsbSession(const char* password, int pim, int volId) {
         }
     }
 
+    partitions.push_back({0, 0});
+
     bool fsFound = false;
     uint64_t foundDataOffset = 0;
     bool foundRelTweak = false;
-    XtsContextPair candidate;
+    CascadeContext candidateCascade;
     uint64_t matchedPartitionStart = 0;
 
-    // Loop through candidates; the first one that successfully validates with the password wins
     for (const auto& part : partitions) {
         unsigned char headerBuf[VC_FULL_HEADER_SIZE];
         if (!usbReadSectors(volId, part.startSector, 1, headerBuf)) {
             continue;
         }
 
-        // FIX P11: shared with prepareSession() — see deriveAndValidateHeader().
-        unsigned char dKey[VC_KEY_MATERIAL_LEN];
-        if (!deriveAndValidateHeader(headerBuf, password, pim, dKey)) {
-            continue; // Wrong password/corrupt header for this candidate; try next partition
+        unsigned char dKey[192];
+        CascadeId matchedCipher;
+        HashId matchedHash;
+        if (!deriveAndValidateHeader(headerBuf, password, pim, cipherId, hashId, dKey, matchedCipher, matchedHash)) {
+            continue;
         }
 
-        mbedtls_aes_xts_setkey_dec(&candidate.dec, dKey, 512);
+        CascadeSpec spec = cascadeSpecFor(matchedCipher);
+        if (!cascadeSetKeys(candidateCascade, matchedCipher, dKey, spec.layerCount * 64)) {
+            mbedtls_platform_zeroize(dKey, sizeof(dKey));
+            continue;
+        }
 
-        FsScanResult scan = tryKeyCandidateUsb(volId, part.startSector, candidate.dec);
+        FsScanResult scan = tryKeyCandidateUsb(volId, part.startSector, candidateCascade);
         if (scan.found) {
             fsFound = true;
             foundDataOffset = scan.dataOffset;
             foundRelTweak = scan.relTweak;
             matchedPartitionStart = part.startSector;
-            mbedtls_aes_xts_setkey_enc(&candidate.enc, dKey, 512);
             mbedtls_platform_zeroize(dKey, sizeof(dKey));
-            break; // Found the active, valid filesystem partition; stop search
+            break;
         }
         mbedtls_platform_zeroize(dKey, sizeof(dKey));
     }
@@ -1178,21 +1184,13 @@ static bool prepareUsbSession(const char* password, int pim, int volId) {
 
     {
         std::lock_guard<std::mutex> lock(v.mutex);
-        if (v.dataCtxInitialized) {
-            mbedtls_aes_xts_free(&v.dataCtxDec);
-            mbedtls_aes_xts_free(&v.dataCtxEnc);
-        }
-        v.dataCtxDec = candidate.dec;
-        v.dataCtxEnc = candidate.enc;
-        mbedtls_aes_xts_init(&candidate.dec);
-        mbedtls_aes_xts_init(&candidate.enc);
-
+        v.cascade = candidateCascade;
         v.isUsbSource          = true;
         v.dataCtxInitialized   = true;
         v.fd                   = -1;
         v.dataOffset           = foundDataOffset;
         v.relTweak             = foundRelTweak;
-        v.partitionStartSector = matchedPartitionStart; // Record the matched sector
+        v.partitionStartSector = matchedPartitionStart;
     }
     return true;
 }
@@ -1293,10 +1291,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMaxVolumesNative(JNIEnv*, job
 
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
-        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId) {
+        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId) {
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    if (!prepareSession(fd, nativePass, pim, volId, true)) {
+    if (!prepareSession(fd, nativePass, pim, volId, true, cipherId, hashId)) {
         env->ReleaseStringUTFChars(password, nativePass);
         return nullptr;
     }
@@ -1340,15 +1338,22 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim, jlong sizeBytes, jstring fileSystem) {
+        jint fd, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
+        jint cipherId, jint hashId) {
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* nativeFS   = env->GetStringUTFChars(fileSystem, nullptr);
 
     bool success = false;
 
-    unsigned char salt[VC_SALT_SIZE]               = {0};
-    unsigned char combinedMasterKey[VC_KEY_MATERIAL_LEN] = {0};
+    // Resolve selected cipher and hash (255 = auto, default to AES + SHA-512 for creation)
+    CascadeId createCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
+    HashId    createHash   = (hashId   != 255) ? static_cast<HashId>(hashId)      : HashId::kSha512;
+    CascadeSpec cSpec      = cascadeSpecFor(createCipher);
+    const int masterKeyLen = cSpec.layerCount * 64;
+
+    unsigned char salt[VC_SALT_SIZE]   = {0};
+    unsigned char combinedMasterKey[192] = {0};
 
     do {
         if (sizeBytes < static_cast<jlong>(300 * 1024)) {
@@ -1373,27 +1378,21 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             FILE* urnd = fopen("/dev/urandom", "rb");
             if (!urnd) { LOGI("createContainer: cannot open /dev/urandom"); break; }
             bool ok = (fread(salt,              1, VC_SALT_SIZE, urnd) == VC_SALT_SIZE) &&
-                      (fread(combinedMasterKey, 1, VC_KEY_MATERIAL_LEN, urnd) == VC_KEY_MATERIAL_LEN);
+                      (fread(combinedMasterKey, 1, static_cast<size_t>(masterKeyLen), urnd) == static_cast<size_t>(masterKeyLen));
             fclose(urnd);
             if (!ok) { LOGI("createContainer: urandom read failed"); break; }
         }
 
         const int safePim = clampPim(pim);
-        const int iter = (safePim > 0) ? (15000 + safePim * 1000) : 500000;
+        const int iter = iterationsForHash(createHash, safePim);
 
-        unsigned char headerKey[VC_KEY_MATERIAL_LEN] = {0};
-        {
-            MdContextGuard mdGuard;
-            if (mbedtls_md_setup(&mdGuard.ctx,
-                    mbedtls_md_info_from_type(MBEDTLS_MD_SHA512), 1) != 0) {
-                LOGI("createContainer: mbedtls_md_setup failed");
-                break;
-            }
-            mbedtls_pkcs5_pbkdf2_hmac(&mdGuard.ctx,
-                reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass),
-                salt, VC_SALT_SIZE,
-                static_cast<unsigned int>(iter),
-                VC_KEY_MATERIAL_LEN, headerKey);
+        // Derive 192 bytes of header key material (enough for any cascade)
+        unsigned char headerKey[192] = {0};
+        if (!pbkdf2Hmac(createHash,
+                        reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass),
+                        salt, VC_SALT_SIZE, iter, headerKey, 192)) {
+            LOGI("createContainer: PBKDF2 failed");
+            break;
         }
 
         const uint64_t VOLUME_SIZE = static_cast<uint64_t>(sizeBytes);
@@ -1423,7 +1422,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         // master-key position for a single-cipher AES volume, not one of
         // two candidates. See the constant's doc comment at the top of
         // this file for the full explanation.
-        memcpy(&body[VC_KEY_OFFSET_MASTER], combinedMasterKey, VC_KEY_MATERIAL_LEN);
+        memcpy(&body[VC_KEY_OFFSET_MASTER], combinedMasterKey, masterKeyLen);
 
         uint32_t keyCrc = crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
         body[VC_HDR_OFF_KEY_CRC]     = (keyCrc >> 24) & 0xFF;
@@ -1437,13 +1436,30 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         body[VC_HDR_OFF_HEADER_CRC + 2] = (hdrCrc >>  8) & 0xFF;
         body[VC_HDR_OFF_HEADER_CRC + 3] = (hdrCrc      ) & 0xFF;
 
+        // Encrypt header body using the selected cascade cipher (XTS with zero tweak)
         unsigned char encBody[VC_HEADER_BODY_SIZE];
         {
-            XtsContextPair hdrXts;
-            mbedtls_aes_xts_setkey_enc(&hdrXts.enc, headerKey, 512);
-            const unsigned char zeroTweak[16] = {0};
-            mbedtls_aes_crypt_xts(&hdrXts.enc, MBEDTLS_AES_ENCRYPT,
-                                  VC_HEADER_BODY_SIZE, zeroTweak, body, encBody);
+            CascadeContext hdrCtx;
+            if (!cascadeSetKeys(hdrCtx, createCipher, headerKey, masterKeyLen)) {
+                LOGI("createContainer: cascadeSetKeys failed for header");
+                break;
+            }
+            // Header is encrypted as a single "sector 0" with zero tweak
+            // We need to handle the 448-byte body (28 blocks of 16 bytes)
+            std::memcpy(encBody, body, VC_HEADER_BODY_SIZE);
+            for (int layer = cSpec.layerCount - 1; layer >= 0; layer--) {
+                const XtsLayerKey& lk = hdrCtx.layers[layer];
+                unsigned char T[16] = {0};
+                blockCipherEncryptBlock(lk.tweakKey, T, T);
+                for (int blk = 0; blk < 28; blk++) {
+                    unsigned char* bp = encBody + blk * 16;
+                    unsigned char tmp[16];
+                    for (int j = 0; j < 16; j++) tmp[j] = bp[j] ^ T[j];
+                    blockCipherEncryptBlock(lk.dataKeyEnc, tmp, tmp);
+                    for (int j = 0; j < 16; j++) bp[j] = tmp[j] ^ T[j];
+                    localMultiplyTweak(T);
+                }
+            }
         }
 
         mbedtls_platform_zeroize(headerKey, sizeof(headerKey));
@@ -1462,19 +1478,18 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         }
 
         {
-            XtsContextPair dataXts;
-            mbedtls_aes_xts_setkey_enc(&dataXts.enc, combinedMasterKey, 512);
+            CascadeContext dataCtx;
+            if (!cascadeSetKeys(dataCtx, createCipher, combinedMasterKey, masterKeyLen)) {
+                LOGI("createContainer: cascadeSetKeys failed for data");
+                break;
+            }
 
             const uint64_t START_SECTOR  = VC_DATA_AREA_OFFSET / 512;
             const uint64_t TOTAL_SECTORS = (VOLUME_SIZE - VC_DATA_AREA_OFFSET) / 512;
 
-            // FIX P14: Use CREATE_FILL_BATCH (4096 sectors = 2 MB) instead of
-            // SCAN_BATCH (64 sectors = 32 KB). For a 1 GB container this reduces
-            // pwrite() syscalls from 32,768 → 512, cutting creation time noticeably.
             const unsigned char ZERO_SECTOR[512] = {0};
             const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
             std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
-            unsigned char tweak[16];
             bool writeOk = true;
 
             for (uint64_t s = START_SECTOR; s < TOTAL_SECTORS && writeOk; ) {
@@ -1482,10 +1497,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
                 const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
 
                 for (uint64_t i = 0; i < count; ++i) {
-                    setTweak(tweak, (s + i));
-                    mbedtls_aes_crypt_xts(&dataXts.enc, MBEDTLS_AES_ENCRYPT,
-                                          512, tweak, ZERO_SECTOR,
-                                          batch.get() + i * 512);
+                    cascadeEncryptSector(dataCtx, s + i, ZERO_SECTOR,
+                                        batch.get() + i * 512);
                 }
 
                 const ssize_t want = static_cast<ssize_t>(count * 512);
@@ -1506,14 +1519,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         {
             std::lock_guard<std::mutex> vlock(v.mutex);
 
-            if (v.dataCtxInitialized) {
-                mbedtls_aes_xts_free(&v.dataCtxDec);
-                mbedtls_aes_xts_free(&v.dataCtxEnc);
-            }
-            mbedtls_aes_xts_init(&v.dataCtxDec);
-            mbedtls_aes_xts_init(&v.dataCtxEnc);
-            mbedtls_aes_xts_setkey_dec(&v.dataCtxDec, combinedMasterKey, 512);
-            mbedtls_aes_xts_setkey_enc(&v.dataCtxEnc, combinedMasterKey, 512);
+            cascadeSetKeys(v.cascade, createCipher, combinedMasterKey, masterKeyLen);
             v.dataCtxInitialized = true;
             v.fd                 = fd;
             v.dataOffset         = VC_DATA_AREA_OFFSET;
@@ -1537,18 +1543,12 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
                  (int)fr, (int)mp.fmt, (int)useExFat);
 
             f_mount(nullptr, drivePaths[volId], 0);
-            // NOTE: intentionally NOT calling v.reset() here — reset() would
-            // close(fd), but this function still owns `fd` and closes it
-            // exactly once at the very end (see close(fd) below), covering
-            // every exit path including the early `break`s above. Fields
-            // are cleared individually instead, matching that contract.
             v.fsMounted          = false;
             v.fd                 = -1;
             v.dataOffset         = 0;
             v.relTweak           = false;
             v.fileSize           = 0;
-            mbedtls_aes_xts_free(&v.dataCtxDec);
-            mbedtls_aes_xts_free(&v.dataCtxEnc);
+            v.cascade.initialized = false;
             v.dataCtxInitialized = false;
 
             if (fr != FR_OK) {
@@ -1998,10 +1998,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
 
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
-        JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes) {
+        JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId) {
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const bool ok = prepareUsbSession(nativePass, pim, volId);
+    const bool ok = prepareUsbSession(nativePass, pim, volId, cipherId, hashId);
     env->ReleaseStringUTFChars(password, nativePass);
     if (!ok) return nullptr;
 

@@ -25,16 +25,20 @@ object VeraCryptEngine {
 
     // ── Tier 1: session establishment ──────────────────────────────────────
 
-    /** Opens fd, runs PBKDF2, mounts the FAT layer, returns root listing. */
+    /** Opens fd, runs PBKDF2, mounts the FAT layer, returns root listing.
+     *  cipherId/hashId: 255 = auto-detect (try all combinations). */
     @JvmStatic
     external fun unlockAndListNative(
-        fd: Int, password: String, pim: Int, volId: Int
+        fd: Int, password: String, pim: Int, volId: Int,
+        cipherId: Int = 255, hashId: Int = 255
     ): Array<String>?
 
-    /** Writes a new VeraCrypt container to fd, formats it. */
+    /** Writes a new VeraCrypt container to fd, formats it.
+     *  cipherId/hashId: 255 = auto (defaults to AES + SHA-512). */
     @JvmStatic
     external fun createContainerNative(
-        fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String
+        fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
+        cipherId: Int = 255, hashId: Int = 255
     ): Boolean
 
     /** PBKDF2-SHA512 via mbedTLS; no volId, no session required. */
@@ -61,7 +65,11 @@ object VeraCryptEngine {
     @JvmStatic external fun createDirectory(dirPath: String, volId: Int): Boolean
     @JvmStatic external fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean
     @JvmStatic external fun getSpaceInfo(volId: Int): LongArray?
-    @JvmStatic external fun unlockUsbAndListNative(password: String, pim: Int, volId: Int, deviceSizeBytes: Long): Array<String>?
+    /** USB unlock + list. cipherId/hashId: 255 = auto-detect. */
+    @JvmStatic external fun unlockUsbAndListNative(
+        password: String, pim: Int, volId: Int, deviceSizeBytes: Long,
+        cipherId: Int = 255, hashId: Int = 255
+    ): Array<String>?
 
     // ── Tier 2: stream lifecycle ───────────────────────────────────────────
     // Used exclusively by VeraCryptProxyCallback. Passes a raw C++ FIL*

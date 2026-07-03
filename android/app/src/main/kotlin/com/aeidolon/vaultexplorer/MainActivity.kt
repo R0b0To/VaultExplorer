@@ -119,6 +119,7 @@ private var pendingUsbPermissionDeviceName: String? = null
     private data class PendingCreate(
         val name: String, val sizeBytes: Long, val password: String,
         val pim: Int, val fileSystem: String,
+        val cipherId: Int = 255, val hashId: Int = 255,
     )
     private var pendingCreate: PendingCreate? = null
 
@@ -139,7 +140,8 @@ private var pendingUsbPermissionDeviceName: String? = null
                         ?: throw Exception("Could not open file descriptor")
                     val success = synchronized(createContainerLock) {
                         VeraCryptEngine.createContainerNative(
-                            pfd.detachFd(), create.password, create.pim, create.sizeBytes, create.fileSystem
+                            pfd.detachFd(), create.password, create.pim, create.sizeBytes, create.fileSystem,
+                            create.cipherId, create.hashId
                         )
                     }
                     runOnUiThread { res.success(success) }
@@ -531,6 +533,8 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
     val pim           = call.argument<Number>("pim")?.toInt() ?: 0
     val displayName   = call.argument<String>("displayName")
     val docProvider   = call.argument<Boolean>("documentProvider") ?: false
+    val cipherId      = call.argument<Number>("cipherId")?.toInt() ?: 255
+    val hashId        = call.argument<Number>("hashId")?.toInt() ?: 255
 
     if (deviceName == null || password == null) {
         result.error("INVALID_ARGS", "deviceName and password required", null)
@@ -564,7 +568,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
             UsbBlockBridge.register(targetVolId, msd)
 
             val files = VeraCryptEngine.unlockUsbAndListNative(
-                password, pim, targetVolId, sizeBytes
+                password, pim, targetVolId, sizeBytes, cipherId, hashId
             )
 
             runOnUiThread {
@@ -623,7 +627,9 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                 return@setMethodCallHandler
                             },
                             pim         = call.argument<Number>("pim")?.toInt() ?: 0,
-                            fileSystem  = call.argument<String>("fileSystem") ?: "fat"
+                            fileSystem  = call.argument<String>("fileSystem") ?: "fat",
+                            cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255,
+                            hashId      = call.argument<Number>("hashId")?.toInt() ?: 255,
                         )
                         pendingResultCheck(result)
                         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
@@ -633,13 +639,14 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                         }
                         createContainerLauncher.launch(intent)
                     }
-
                     ChannelMethods.UNLOCK_CONTAINER -> {
                         val uriString   = call.argument<String>("filePath")
                         val password    = call.argument<String>("password")
                         val pim         = call.argument<Number>("pim")?.toInt() ?: 0
                         val displayName = call.argument<String>("displayName")
                         val docProvider = call.argument<Boolean>("documentProvider") ?: false
+                        val cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255
+                        val hashId      = call.argument<Number>("hashId")?.toInt() ?: 255
 
                         if (uriString == null || password == null) {
                             result.error("INVALID_ARGS", "filePath and password required", null)
@@ -661,7 +668,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                 val fd = pfd.detachFd()
 
                                 val files = synchronized(VeraCryptSession.locks[targetVolId]) {
-                                    VeraCryptEngine.unlockAndListNative(fd, password, pim, targetVolId)
+                                    VeraCryptEngine.unlockAndListNative(fd, password, pim, targetVolId, cipherId, hashId)
                                 }
 
                                 runOnUiThread {

@@ -38,6 +38,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
   bool _loading = false;
   bool _remember = false;
   String? _error;
+  int _cipherId = 255; // Auto
+  int _hashId = 255; // Auto
 
   // ── Unlock method state ──────────────────────────────────────────────────
   ContainerUnlockMethod _unlockMethod = ContainerUnlockMethod.password;
@@ -227,6 +229,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
         pim,
         displayName: name,
         documentProvider: widget.documentProvider,
+        cipherId: _cipherId,
+        hashId: _hashId,
       );
 
       if (result != null) {
@@ -578,6 +582,49 @@ class _UnlockSheetState extends State<UnlockSheet> {
                                   labelText: 'PIM  (leave blank for default)',
                                   prefixIcon: Icon(Icons.tune_rounded, size: AppIconSize.small),
                                 ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              DropdownButtonFormField<int>(
+                                initialValue: _cipherId,
+                                decoration: InputDecoration(
+                                  labelText: 'Encryption Algorithm',
+                                  prefixIcon: Icon(Icons.lock_outline_rounded, size: AppIconSize.small),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 255, child: Text('Auto-detect')),
+                                  DropdownMenuItem(value: 0, child: Text('AES')),
+                                  DropdownMenuItem(value: 1, child: Text('Serpent')),
+                                  DropdownMenuItem(value: 2, child: Text('Twofish')),
+                                  DropdownMenuItem(value: 3, child: Text('AES-Twofish')),
+                                  DropdownMenuItem(value: 4, child: Text('Serpent-AES')),
+                                  DropdownMenuItem(value: 5, child: Text('Twofish-Serpent')),
+                                  DropdownMenuItem(value: 6, child: Text('AES-Twofish-Serpent')),
+                                  DropdownMenuItem(value: 7, child: Text('Serpent-Twofish-AES')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _cipherId = val);
+                                },
+                              ),
+                              const SizedBox(height: 12),
+
+                              DropdownButtonFormField<int>(
+                                initialValue: _hashId,
+                                decoration: InputDecoration(
+                                  labelText: 'Hash Algorithm',
+                                  prefixIcon: Icon(Icons.tag_rounded, size: AppIconSize.small),
+                                ),
+                                items: const [
+                                  DropdownMenuItem(value: 255, child: Text('Auto-detect')),
+                                  DropdownMenuItem(value: 0, child: Text('SHA-512')),
+                                  DropdownMenuItem(value: 1, child: Text('SHA-256')),
+                                  DropdownMenuItem(value: 2, child: Text('Whirlpool')),
+                                  DropdownMenuItem(value: 3, child: Text('Streebog')),
+                                  DropdownMenuItem(value: 4, child: Text('BLAKE2s-256')),
+                                ],
+                                onChanged: (val) {
+                                  if (val != null) setState(() => _hashId = val);
+                                },
                               ),
                               if (widget.initialUri == null) ...[
                                 const SizedBox(height: 10),

@@ -20,6 +20,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
 
   String _sizeUnit = 'MB';
   String _fileSystem = 'FAT'; // FAT (FAT32) or exFAT
+  int _cipherId = 0; // AES
+  int _hashId = 0; // SHA-512
   bool _obscure = true;
   bool _loading = false;
   String? _error;
@@ -67,6 +69,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
         password: _passwordCtrl.text,
         pim: pim,
         fileSystem: _fileSystem.toLowerCase(),
+        cipherId: _cipherId,
+        hashId: _hashId,
       );
 
       if (success) {
@@ -204,6 +208,49 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                 ],
                 onChanged: (val) {
                   if (val != null) setState(() => _fileSystem = val);
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Encryption Algorithm selection
+              DropdownButtonFormField<int>(
+                initialValue: _cipherId,
+                decoration: InputDecoration(
+                  labelText: 'Encryption Algorithm',
+                  prefixIcon: Icon(Icons.lock_outline_rounded, size: AppIconSize.small),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 0, child: Text('AES')),
+                  DropdownMenuItem(value: 1, child: Text('Serpent')),
+                  DropdownMenuItem(value: 2, child: Text('Twofish')),
+                  DropdownMenuItem(value: 3, child: Text('AES-Twofish')),
+                  DropdownMenuItem(value: 4, child: Text('Serpent-AES')),
+                  DropdownMenuItem(value: 5, child: Text('Twofish-Serpent')),
+                  DropdownMenuItem(value: 6, child: Text('AES-Twofish-Serpent')),
+                  DropdownMenuItem(value: 7, child: Text('Serpent-Twofish-AES')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _cipherId = val);
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Hash Algorithm selection
+              DropdownButtonFormField<int>(
+                initialValue: _hashId,
+                decoration: InputDecoration(
+                  labelText: 'Hash Algorithm',
+                  prefixIcon: Icon(Icons.tag_rounded, size: AppIconSize.small),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 0, child: Text('SHA-512')),
+                  DropdownMenuItem(value: 1, child: Text('SHA-256')),
+                  DropdownMenuItem(value: 2, child: Text('Whirlpool')),
+                  DropdownMenuItem(value: 3, child: Text('Streebog')),
+                  DropdownMenuItem(value: 4, child: Text('BLAKE2s-256')),
+                ],
+                onChanged: (val) {
+                  if (val != null) setState(() => _hashId = val);
                 },
               ),
 

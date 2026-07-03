@@ -1,25 +1,22 @@
 import 'package:flutter/material.dart';
 import '../../../models/file_operation.dart';
 
-/// Full bottom sheet for all in-flight and recent file operations.
-///
-/// Open it with:
-/// ```dart
-/// FileOperationsSheet.show(context);
-/// ```
-///
-/// The sheet listens to [FileOperationService] for the top-level list and to
-/// each [FileOperation] for per-row progress. No state is stored here —
-/// everything is derived from the service.
 class FileOperationsSheet extends StatelessWidget {
   const FileOperationsSheet({super.key});
 
+  /// True while the sheet is on screen. [OperationActivityPill] watches this
+  /// to pause its auto-hide linger timer — otherwise a finished transfer
+  /// could clear itself out from under the person while they're actively
+  /// looking at "Recent transfers".
+  static final isOpenNotifier = ValueNotifier<bool>(false);
+
   static void show(BuildContext context) {
+    isOpenNotifier.value = true;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => const FileOperationsSheet(),
-    );
+    ).whenComplete(() => isOpenNotifier.value = false);
   }
 
   @override

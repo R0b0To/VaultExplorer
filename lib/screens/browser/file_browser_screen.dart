@@ -12,6 +12,7 @@ import '../../services/vault_items_service.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../utils/format_utils.dart';
 import '../../utils/raw_entry.dart';
+import '../../widgets/floating_activity_stack.dart';
 import 'browser_dialogs.dart';
 import 'viewer/media_viewer_constants.dart';
 import 'viewer/media_viewer_screen.dart';
@@ -19,11 +20,9 @@ import 'viewer/text_editor_screen.dart';
 import 'mixins/selection_mixin.dart';
 import 'mixins/sort_mixin.dart';
 import 'widgets/breadcrumb_bar.dart';
-import 'widgets/clipboard_banner.dart';
 import 'widgets/conflict_resolution_sheet.dart';
 import 'widgets/file_grid_view.dart';
 import 'widgets/file_list_view.dart';
-import 'widgets/operation_progress_bar.dart';
 import 'widgets/selection_app_bar.dart';
 import '../vault/vault_item_detail_screen.dart';
 import '../vault/vault_item_edit_screen.dart';
@@ -1051,45 +1050,50 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       },
       child: Scaffold(
         appBar: _buildAppBar(context, filteredDirs, filteredFiles),
-        
-        // --- ADDED THIS FOR THE FLOATING BANNER ---
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-        floatingActionButton: _clip.hasItems
-            ? ClipboardBanner(
-                isCutOperation: _clip.isCutOperation,
-                itemCount: _clip.items.length,
-                sourceLabel: _clip.isFromVolume(widget.container.volId)
-                    ? null
-                    : _clip.sourceDisplayName,
-                onCancel: () => setState(() => _clip.clear()),
-                onPaste: _paste,
-              )
-            : null,
-            
-        body: Column(
+
+        // ── Floating activity stack ───────────────────────────────────────
+        //
+        // FIX: previously the clipboard pill was a `floatingActionButton`
+        // (centerFloat) while the operation progress bar was a *different*,
+        // differently-styled widget docked in-flow inside the body Column
+        // above the status bar. The two could overlap unpredictably and
+        // shared no color language. Both now live in one FloatingActivityStack
+        // overlaid via Stack, matching the exact pattern used on the
+        // dashboard, so the two screens now feel like one coherent system.
+        body: Stack(
           children: [
-            BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-            // REMOVED: ClipboardBanner was previously here, causing the layout shift.
-            _StatsBar(
-              dirCount: filteredDirs.length,
-              fileCount: filteredFiles.length,
-              freeSpaceBytes: _freeSpace,
-              isFiltered: query.isNotEmpty || _currentFilter != null,
+            Column(
+              children: [
+                BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+                _StatsBar(
+                  dirCount: filteredDirs.length,
+                  fileCount: filteredFiles.length,
+                  freeSpaceBytes: _freeSpace,
+                  isFiltered: query.isNotEmpty || _currentFilter != null,
+                ),
+                _FilterChipsBar(
+                  currentFilter: _currentFilter,
+                  onFilterChanged: (filter) =>
+                      setState(() => _currentFilter = filter),
+                ),
+                const Divider(),
+                Expanded(child: _buildBody(filteredDirs, filteredFiles)),
+                if (_statusMessage != null)
+                  _StatusBar(
+                    message: _statusMessage!,
+                    isError: _statusIsError,
+                    onDismiss: _clearStatus,
+                  ),
+              ],
             ),
-            _FilterChipsBar(
-              currentFilter: _currentFilter,
-              onFilterChanged: (filter) =>
-                  setState(() => _currentFilter = filter),
-            ),
-            const Divider(),
-            Expanded(child: _buildBody(filteredDirs, filteredFiles)),
-            const OperationProgressBar(),
-            if (_statusMessage != null)
-              _StatusBar(
-                message: _statusMessage!,
-                isError: _statusIsError,
-                onDismiss: _clearStatus,
+Positioned(
+              left: 0,
+              right: 0,
+              bottom: 16,
+              child: Center(
+                child: FloatingActivityStack(onPaste: _paste),
               ),
+            ),
           ],
         ),
       ),

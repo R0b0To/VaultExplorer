@@ -6,6 +6,7 @@ import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../theme.dart';
+import '../../widgets/floating_activity_stack.dart';
 import '../settings/app_settings_screen.dart';
 import '../unlock/unlock_sheet.dart';
 import 'widgets/container_card.dart';
@@ -13,7 +14,6 @@ import 'widgets/container_config_sheet.dart';
 import 'widgets/create_container_sheet.dart';
 import 'widgets/empty_state.dart';
 import '../browser/file_browser_screen.dart';
-import '../unlock/usb_unlock_sheet.dart';
 
 class VaultDashboard extends StatefulWidget {
   const VaultDashboard({Key? key}) : super(key: key);
@@ -211,20 +211,6 @@ class _VaultDashboardState extends State<VaultDashboard>
       if (mounted) setState(() => _actionInFlight = false);
     }
   }
-  void _showUsbUnlockSheet() {
-  if (_actionInFlight) return;
-  setState(() => _actionInFlight = true);
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    builder: (_) => UsbUnlockSheet(
-      onMounted: _onContainerMounted,
-      documentProvider: _appSettings.defaultDocumentProvider,
-    ),
-  ).whenComplete(() {
-    if (mounted) setState(() => _actionInFlight = false);
-  });
-}
 
   void _showCreateSheet() {
     if (_actionInFlight) return;
@@ -286,26 +272,6 @@ class _VaultDashboardState extends State<VaultDashboard>
                     _showUnlockSheet();
                   },
                 ),
-                ListTile(
-  leading: Container(
-    width: 40,
-    height: 40,
-    decoration: BoxDecoration(
-      color: cs.tertiaryContainer,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-    ),
-    child: Icon(
-      Icons.usb_rounded,
-      color: cs.onTertiaryContainer,
-    ),
-  ),
-  title: const Text('Mount USB Drive'),
-  subtitle: const Text('Unlock a fully-encrypted external drive'),
-  onTap: () {
-    Navigator.pop(context);
-    _showUsbUnlockSheet();
-  },
-),
                 ListTile(
                   leading: Container(
                     width: 40,
@@ -494,18 +460,20 @@ class _VaultDashboardState extends State<VaultDashboard>
         label: const Text('Add Vault'),
       ),
 
-      // ── Body: list + floating clipboard pill ────────────────────────────
+      // ── Body: list + floating activity stack ────────────────────────────
+      //
+      // FIX: previously this Positioned block only ever showed the clipboard
+      // pill (_FloatingClipboardDashboardBanner). A file operation started in
+      // a browser session and left running while the user backed out to the
+      // dashboard was completely invisible until they re-entered a
+      // container. FloatingActivityStack now surfaces both, stacked with
+      // consistent spacing and color, exactly as it does in the browser.
       body: Stack(
         children: [
-          // 1. The main list (fills the background)
           Positioned.fill(
             child: displayItems.isEmpty
                 ? EmptyState(onAdd: () => _showUnlockSheet())
                 : ListView.separated(
-                    // Bottom padding is taller than AppSpacing.pagePadding's
-                    // default (32) to clear the extended FAB, which itself
-                    // sits above Android 16/17 gesture-nav; horizontal/top
-                    // insets still match the rest of the app.
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                     itemCount: displayItems.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -542,114 +510,18 @@ class _VaultDashboardState extends State<VaultDashboard>
                   ),
           ),
 
-          // 2. The Floating Clipboard Pill
-          Positioned(
+Positioned(
             left: 0,
             right: 0,
-            bottom: 88, // Sits cleanly above the Floating Action Button
+            bottom: 88, // Sits cleanly above the extended FAB
             child: Center(
-              child: ListenableBuilder(
-                listenable: CrossContainerClipboard.instance,
-                builder: (context, _) {
-                  final clipboard = CrossContainerClipboard.instance;
-                  if (!clipboard.hasItems) return const SizedBox.shrink();
-
-                  return _FloatingClipboardDashboardBanner(
-                    clipboard: clipboard,
-                    onClear: clipboard.clear,
-                  );
-                },
-              ),
+              // onPaste intentionally omitted — no active container to
+              // paste into from the dashboard, so the pill shows the
+              // "Open a container to paste" hint instead of a Paste button.
+              child: FloatingActivityStack(),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Floating Clipboard Banner for Dashboard (MD3 Pill) ──────────────────────
-
-class _FloatingClipboardDashboardBanner extends StatelessWidget {
-  final CrossContainerClipboard clipboard;
-  final VoidCallback onClear;
-
-  const _FloatingClipboardDashboardBanner({
-    required this.clipboard,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Material(
-        color: cs.tertiaryContainer,
-        elevation: 6,
-        shadowColor: cs.shadow.withValues(alpha: 0.4),
-        shape: const StadiumBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(
-            mainAxisSize: MainAxisSize.min, // Shrink-wrap to content width
-            children: [
-              Icon(
-                clipboard.isCutOperation ? Icons.cut_rounded : Icons.copy_rounded,
-                size: AppIconSize.standard,
-                color: cs.onTertiaryContainer,
-              ),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      clipboard.summary,
-                      style: textTheme.labelLarge?.copyWith(
-                        color: cs.onTertiaryContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      'Open a container to paste',
-                      style: textTheme.labelSmall?.copyWith(
-                        color: cs.onTertiaryContainer.withValues(alpha: 0.8),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                width: 1,
-                height: 24,
-                color: cs.onTertiaryContainer.withValues(alpha: 0.2),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: Icon(
-                  Icons.close_rounded,
-                  size: AppIconSize.standard,
-                  color: cs.onTertiaryContainer,
-                ),
-                tooltip: 'Cancel',
-                onPressed: onClear,
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                padding: EdgeInsets.zero,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

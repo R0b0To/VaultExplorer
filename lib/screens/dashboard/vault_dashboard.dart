@@ -6,7 +6,6 @@ import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../theme.dart';
-import '../../widgets/floating_activity_stack.dart';
 import '../settings/app_settings_screen.dart';
 import '../unlock/unlock_sheet.dart';
 import 'widgets/container_card.dart';
@@ -14,6 +13,7 @@ import 'widgets/container_config_sheet.dart';
 import 'widgets/create_container_sheet.dart';
 import 'widgets/empty_state.dart';
 import '../browser/file_browser_screen.dart';
+import '../unlock/usb_unlock_sheet.dart';
 
 class VaultDashboard extends StatefulWidget {
   const VaultDashboard({Key? key}) : super(key: key);
@@ -141,6 +141,29 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
   }
 
+  /// Used instead of [_onContainerMounted] when [UsbUnlockSheet] detects
+  /// that a saved USB entry's device path changed since it was last mounted
+  /// (see [ContainerRecord.isUsbSource] doc comment for why that happens)
+  /// and has already migrated the persisted record onto the new uri.
+  ///
+  /// This just reconciles our own in-memory [_records]/[_mounted] state to
+  /// match what's now on disk — it must NOT re-run [_onContainerMounted]'s
+  /// "create a default record if one doesn't exist" logic, since that would
+  /// immediately clobber the just-migrated record (carrying the original
+  /// label/unlock method/remembered password) with a fresh default one.
+  void _onUsbContainerReconnected(
+    MountedContainer container,
+    ContainerRecord migratedRecord,
+    String oldUri,
+  ) {
+    setState(() {
+      _mounted.add(container);
+      _records.remove(oldUri);
+      _records[container.uri] = migratedRecord;
+    });
+    _scheduleAutoClose(container);
+  }
+
   void _onContainerLocked(int volId) {
     _cancelAutoClose(volId);
 
@@ -212,6 +235,48 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
   }
 
+  /// FIX: previously always opened a fresh "pick any connected USB drive"
+  /// sheet with no way to target a specific saved drive, and the dashboard's
+  /// saved-container tile always routed to [_showUnlockSheet] (the
+  /// file-based sheet) regardless of uri scheme — which handed a `usb:...`
+  /// string to `contentResolver.openFileDescriptor()` and failed with "no
+  /// content provider for usb:...". Now accepts an optional [existingRecord]
+  /// to drive [UsbUnlockSheet]'s reconnect flow: auto-selecting the
+  /// previously used device, prefilling a remembered password, and
+  /// reconciling the saved record if the device's bus path has changed
+  /// since it was last mounted.
+  Future<void> _showUsbUnlockSheet({ContainerRecord? existingRecord}) async {
+    if (_actionInFlight) return;
+    setState(() => _actionInFlight = true);
+
+    String? rememberedPassword;
+    if (existingRecord != null &&
+        existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
+      rememberedPassword = await ContainerRepository.instance.getPassword(
+        existingRecord.uri,
+      );
+    }
+
+    try {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => UsbUnlockSheet(
+          onMounted: _onContainerMounted,
+          onReconnected: _onUsbContainerReconnected,
+          documentProvider:
+              existingRecord?.documentProvider ??
+              _appSettings.defaultDocumentProvider,
+          existingRecord: existingRecord,
+          prefillPassword: rememberedPassword,
+        ),
+      );
+      await _loadAll();
+    } finally {
+      if (mounted) setState(() => _actionInFlight = false);
+    }
+  }
+
   void _showCreateSheet() {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
@@ -272,6 +337,26 @@ class _VaultDashboardState extends State<VaultDashboard>
                     _showUnlockSheet();
                   },
                 ),
+                ListTile(
+  leading: Container(
+    width: 40,
+    height: 40,
+    decoration: BoxDecoration(
+      color: cs.tertiaryContainer,
+      borderRadius: BorderRadius.circular(AppRadius.md),
+    ),
+    child: Icon(
+      Icons.usb_rounded,
+      color: cs.onTertiaryContainer,
+    ),
+  ),
+  title: const Text('Mount USB Drive'),
+  subtitle: const Text('Unlock a fully-encrypted external drive'),
+  onTap: () {
+    Navigator.pop(context);
+    _showUsbUnlockSheet();
+  },
+),
                 ListTile(
                   leading: Container(
                     width: 40,
@@ -460,20 +545,18 @@ class _VaultDashboardState extends State<VaultDashboard>
         label: const Text('Add Vault'),
       ),
 
-      // ── Body: list + floating activity stack ────────────────────────────
-      //
-      // FIX: previously this Positioned block only ever showed the clipboard
-      // pill (_FloatingClipboardDashboardBanner). A file operation started in
-      // a browser session and left running while the user backed out to the
-      // dashboard was completely invisible until they re-entered a
-      // container. FloatingActivityStack now surfaces both, stacked with
-      // consistent spacing and color, exactly as it does in the browser.
+      // ── Body: list + floating clipboard pill ────────────────────────────
       body: Stack(
         children: [
+          // 1. The main list (fills the background)
           Positioned.fill(
             child: displayItems.isEmpty
                 ? EmptyState(onAdd: () => _showUnlockSheet())
                 : ListView.separated(
+                    // Bottom padding is taller than AppSpacing.pagePadding's
+                    // default (32) to clear the extended FAB, which itself
+                    // sits above Android 16/17 gesture-nav; horizontal/top
+                    // insets still match the rest of the app.
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                     itemCount: displayItems.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -496,10 +579,17 @@ class _VaultDashboardState extends State<VaultDashboard>
                               ? record.label
                               : record.uri.split('/').last,
                           uri: record.uri,
-                          onUnlock: () => _showUnlockSheet(
-                            uri: record.uri,
-                            name: record.label,
-                          ),
+                          // FIX: was always _showUnlockSheet (file-based),
+                          // which sent usb:... uris to
+                          // contentResolver.openFileDescriptor() and failed
+                          // with "no content provider for usb:...". Route by
+                          // scheme instead.
+                          onUnlock: () => record.isUsbSource
+                              ? _showUsbUnlockSheet(existingRecord: record)
+                              : _showUnlockSheet(
+                                  uri: record.uri,
+                                  name: record.label,
+                                ),
                           onLongPress: () => _showContainerConfig(
                             uri: record.uri,
                             currentLabel: record.label,
@@ -510,18 +600,114 @@ class _VaultDashboardState extends State<VaultDashboard>
                   ),
           ),
 
-Positioned(
+          // 2. The Floating Clipboard Pill
+          Positioned(
             left: 0,
             right: 0,
-            bottom: 88, // Sits cleanly above the extended FAB
+            bottom: 88, // Sits cleanly above the Floating Action Button
             child: Center(
-              // onPaste intentionally omitted — no active container to
-              // paste into from the dashboard, so the pill shows the
-              // "Open a container to paste" hint instead of a Paste button.
-              child: FloatingActivityStack(),
+              child: ListenableBuilder(
+                listenable: CrossContainerClipboard.instance,
+                builder: (context, _) {
+                  final clipboard = CrossContainerClipboard.instance;
+                  if (!clipboard.hasItems) return const SizedBox.shrink();
+
+                  return _FloatingClipboardDashboardBanner(
+                    clipboard: clipboard,
+                    onClear: clipboard.clear,
+                  );
+                },
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Floating Clipboard Banner for Dashboard (MD3 Pill) ──────────────────────
+
+class _FloatingClipboardDashboardBanner extends StatelessWidget {
+  final CrossContainerClipboard clipboard;
+  final VoidCallback onClear;
+
+  const _FloatingClipboardDashboardBanner({
+    required this.clipboard,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Material(
+        color: cs.tertiaryContainer,
+        elevation: 6,
+        shadowColor: cs.shadow.withValues(alpha: 0.4),
+        shape: const StadiumBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min, // Shrink-wrap to content width
+            children: [
+              Icon(
+                clipboard.isCutOperation ? Icons.cut_rounded : Icons.copy_rounded,
+                size: AppIconSize.standard,
+                color: cs.onTertiaryContainer,
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      clipboard.summary,
+                      style: textTheme.labelLarge?.copyWith(
+                        color: cs.onTertiaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'Open a container to paste',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: cs.onTertiaryContainer.withValues(alpha: 0.8),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 1,
+                height: 24,
+                color: cs.onTertiaryContainer.withValues(alpha: 0.2),
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: AppIconSize.standard,
+                  color: cs.onTertiaryContainer,
+                ),
+                tooltip: 'Cancel',
+                onPressed: onClear,
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

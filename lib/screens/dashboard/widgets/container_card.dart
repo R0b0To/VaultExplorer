@@ -117,11 +117,12 @@ class ContainerCard extends StatelessWidget {
         ? (usedBytes / container.totalSpace).clamp(0.0, 1.0)
         : 0.0;
     final hasSpace = container.totalSpace > 0;
+    final isUsb = container.uri.startsWith('usb:');
 
     return _BaseContainerCard(
       onTap: onBrowse,
       onLongPress: onLongPress,
-      icon: Icons.folder_zip_outlined,
+      icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_outlined,
       iconColor: cs.onPrimaryContainer,
       iconBackgroundColor: cs.primaryContainer,
       title: container.displayName,
@@ -247,20 +248,26 @@ class SavedContainerCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    final isUsb = uri.startsWith('usb:');
+
     return _BaseContainerCard(
       onTap: onUnlock,
       onLongPress: onLongPress,
-      icon: Icons.folder_zip_outlined,
+      icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_outlined,
       iconColor: cs.onSurfaceVariant,
       iconBackgroundColor: cs.surfaceContainerHighest,
       title: name,
       subtitle: Row(
         children: [
           // STATUS: Currently Locked
-          Icon(Icons.lock, size: 14, color: cs.onSurfaceVariant),
+          Icon(
+            isUsb ? Icons.usb_off_rounded : Icons.lock,
+            size: 14,
+            color: cs.onSurfaceVariant,
+          ),
           const SizedBox(width: 6),
           Text(
-            'Locked',
+            isUsb ? 'USB · reconnect to unlock' : 'Locked',
             style: textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
             ),
@@ -269,8 +276,11 @@ class SavedContainerCard extends StatelessWidget {
       ),
       // ACTION ICON: Represents what happens when tapped (it unlocks)
       trailingAction: IconButton(
-        icon: Icon(Icons.lock_open_outlined, color: cs.primary),
-        tooltip: 'Unlock container',
+        icon: Icon(
+          isUsb ? Icons.usb_rounded : Icons.lock_open_outlined,
+          color: cs.primary,
+        ),
+        tooltip: isUsb ? 'Reconnect USB drive' : 'Unlock container',
         onPressed: onUnlock,
       ),
     );

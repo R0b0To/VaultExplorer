@@ -811,7 +811,7 @@ static bool tryDecryptHeader(
 
     return true;
 }
-
+std::mutex derivationMutexes[MAX_VOLUMES];
 static bool deriveAndValidateHeader(
     const unsigned char headerSector[VC_FULL_HEADER_SIZE],
     const char* password, int pim,
@@ -826,13 +826,16 @@ static bool deriveAndValidateHeader(
 
     const int safePim = clampPim(pim);
 
-
-if (cipherIdParam == 255 && hashIdParam == 255) {
+    // --- FIX 1: The 64-byte Fast Path ---
+    if (cipherIdParam == 255 && hashIdParam == 255) {
         const int fastIter = iterationsForHash(HashId::kSha512, safePim);
-        unsigned char fastKey[VC_KEY_MATERIAL_LEN];   // was: unsigned char fastKey[192];
+        
+        // PBKDF2 with SHA-512 outputs 64 bytes per block. 
+        // Requesting 64 bytes instead of 192 makes this EXACTLY 3x faster.
+        unsigned char fastKey[64]; 
         if (pbkdf2Hmac(HashId::kSha512,
                         reinterpret_cast<const unsigned char*>(password), strlen(password),
-                        salt, VC_SALT_SIZE, fastIter, fastKey, VC_KEY_MATERIAL_LEN)) {  // was: 192
+                        salt, VC_SALT_SIZE, fastIter, fastKey, 64)) {
             unsigned char decH[VC_HEADER_BODY_SIZE];
             if (tryDecryptHeader(encH, CascadeId::kAes, fastKey, decH)) {
                 std::memcpy(outKeyMaterial, &decH[VC_KEY_OFFSET_MASTER], 64);
@@ -849,7 +852,6 @@ if (cipherIdParam == 255 && hashIdParam == 255) {
     }
 
     std::vector<HashId> hashesToTry;
-    // ... rest unchanged ...
     if (hashIdParam != 255) {
         hashesToTry.push_back(static_cast<HashId>(hashIdParam));
     } else {
@@ -878,11 +880,6 @@ if (cipherIdParam == 255 && hashIdParam == 255) {
     CascadeId resultCipher{};
     HashId resultHash{};
 
-    // FIX (perf): deriving 192 bytes unconditionally makes every PBKDF2
-    // call cost 3x what a single-cipher (64-byte key) candidate needs —
-    // each extra 64-byte output block costs a full extra `iterations`
-    // pass. Only derive as many bytes as the widest candidate cascade
-    // in ciphersToTry actually requires.
     int maxLayersToTry = 1;
     for (CascadeId c : ciphersToTry) {
         maxLayersToTry = std::max(maxLayersToTry, cascadeSpecFor(c).layerCount);
@@ -894,6 +891,9 @@ if (cipherIdParam == 255 && hashIdParam == 255) {
 
         int iter = iterationsForHash(h, safePim);
         unsigned char derivedKeyMaterial[192] = {0};
+        
+        // FIX: Removed `&found` (9th argument) to resolve the undefined symbol linker error.
+        // It now correctly passes 8 arguments matching your original crypto implementation.
         if (!pbkdf2Hmac(h, reinterpret_cast<const unsigned char*>(password), strlen(password),
                        salt, VC_SALT_SIZE, iter, derivedKeyMaterial, neededKeyBytes)) {
             return;
@@ -925,8 +925,6 @@ if (cipherIdParam == 255 && hashIdParam == 255) {
     };
 
     if (hashesToTry.size() <= 1) {
-        // Single explicit hash (the common re-unlock case, see fix #1) —
-        // no thread overhead needed.
         worker(hashesToTry[0]);
     } else {
         std::vector<std::thread> threads;
@@ -1028,6 +1026,7 @@ static FsScanResult tryKeyCandidate(
 bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive, int cipherId, int hashId) {
     const auto opStart = std::chrono::steady_clock::now();
     const auto headerReadStart = std::chrono::steady_clock::now();
+    
     if (volId < 0 || volId >= MAX_VOLUMES) {
         if (fd >= 0) close(fd);
         return false;
@@ -1059,17 +1058,17 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
         return false;
     }
 
-    // FIX P11: Prevent two threads from deriving simultaneously for the same
-    // volume (e.g., rapid double-tap unlock). Second thread waits via spinlock.
-    bool expected = false;
-    while (!derivationInProgress[volId].compare_exchange_weak(
-               expected, true, std::memory_order_acquire)) {
-        expected = false;
-        // Re-check: the first thread may have finished by now.
+    // --- FIX 2: Mutex Wait System instead of Spinlock ---
+    // If a double-tap hits, Thread B gracefully goes to sleep here 
+    // without wasting battery or blocking CPU cores until Thread A finishes.
+    std::lock_guard<std::mutex> derivationLock(derivationMutexes[volId]);
+
+    // Re-check: Thread A may have successfully initialized the session while we slept.
+    if (!forceDerive) {
         std::lock_guard<std::mutex> lock(v.mutex);
         if (v.dataCtxInitialized) {
             if (fd >= 0) close(fd);
-            derivationInProgress[volId].store(false, std::memory_order_release);
+            LOGI("prepareSession(vol=%d): session prepared by another thread in %lld ms", volId, elapsedMs(opStart));
             return true;
         }
     }
@@ -1080,7 +1079,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     unsigned char headerBuf[VC_FULL_HEADER_SIZE];
     if (pread(fd, headerBuf, VC_FULL_HEADER_SIZE, 0) != VC_FULL_HEADER_SIZE) {
         close(fd);
-        derivationInProgress[volId].store(false, std::memory_order_release);
         LOGI("prepareSession(vol=%d): header read failed in %lld ms", volId, elapsedMs(opStart));
         return false;
     }
@@ -1097,9 +1095,9 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     CascadeId matchedCipher;
     HashId matchedHash;
     const auto deriveStart = std::chrono::steady_clock::now();
+    
     if (!deriveAndValidateHeader(headerBuf, password, pim, cipherId, hashId, dKey, matchedCipher, matchedHash)) {
         close(fd);
-        derivationInProgress[volId].store(false, std::memory_order_release);
         LOGI("prepareSession(vol=%d): deriveAndValidateHeader failed in %lld ms (headerRead=%lld ms, derive=%lld ms)",
              volId, elapsedMs(opStart), headerReadMs, elapsedMs(deriveStart));
         return false;
@@ -1111,7 +1109,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     if (!cascadeSetKeys(candidateCascade, matchedCipher, dKey, spec.layerCount * 64)) {
         mbedtls_platform_zeroize(dKey, sizeof(dKey));
         close(fd);
-        derivationInProgress[volId].store(false, std::memory_order_release);
         LOGI("prepareSession(vol=%d): cascade key setup failed in %lld ms (headerRead=%lld ms, derive=%lld ms)",
              volId, elapsedMs(opStart), headerReadMs, deriveMs);
         return false;
@@ -1123,14 +1120,13 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     const auto scanMs = elapsedMs(scanStart);
     if (!scan.found) {
         close(fd);
-        derivationInProgress[volId].store(false, std::memory_order_release);
         LOGI("prepareSession(vol=%d): scan failed in %lld ms (headerRead=%lld ms, derive=%lld ms, scan=%lld ms)",
              volId, elapsedMs(opStart), headerReadMs, deriveMs, scanMs);
         return false;
     }
 
-    // FIX P11: Now acquire the mutex ONLY for the brief context swap.
-    // All the slow crypto work is already done above.
+    // Derivation & validation strictly complete. 
+    // Now acquire the volume mutex ONLY for the brief assignment swap.
     {
         std::lock_guard<std::mutex> lock(v.mutex);
         v.cascade            = candidateCascade;
@@ -1143,7 +1139,6 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
         v.matchedHashId      = static_cast<int>(matchedHash);
     }
 
-    derivationInProgress[volId].store(false, std::memory_order_release);
     LOGI("prepareSession(vol=%d): success in %lld ms (headerRead=%lld ms, derive=%lld ms, scan=%lld ms)",
          volId, elapsedMs(opStart), headerReadMs, deriveMs, scanMs);
     return true;

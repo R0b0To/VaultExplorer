@@ -28,9 +28,18 @@ object VeraCryptEngine {
     /** Opens fd, runs PBKDF2, mounts the FAT layer, returns root listing.
      *  cipherId/hashId: 255 = auto-detect (try all combinations). */
     @JvmStatic
+    external fun deriveKeyMaterialNative(
+        fd: Int, password: String, pim: Int,
+        cipherId: Int = 255, hashId: Int = 255
+    ): ByteArray?
+
+    @JvmStatic
+    external fun getLastDerivedKeyMaterialNative(volId: Int): ByteArray?
+
+    @JvmStatic
     external fun unlockAndListNative(
         fd: Int, password: String, pim: Int, volId: Int,
-        cipherId: Int = 255, hashId: Int = 255
+        cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null
     ): Array<String>?
 
     /** Writes a new VeraCrypt container to fd, formats it.
@@ -71,7 +80,7 @@ object VeraCryptEngine {
     /** USB unlock + list. cipherId/hashId: 255 = auto-detect. */
     @JvmStatic external fun unlockUsbAndListNative(
         password: String, pim: Int, volId: Int, deviceSizeBytes: Long,
-        cipherId: Int = 255, hashId: Int = 255
+        cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null
     ): Array<String>?
 
     // ── Tier 2: stream lifecycle ───────────────────────────────────────────

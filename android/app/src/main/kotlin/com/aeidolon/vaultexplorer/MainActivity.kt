@@ -24,11 +24,22 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaDataSource
 import android.media.MediaMetadataRetriever
+import android.util.Base64
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import androidx.activity.result.contract.ActivityResultContracts
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
+import android.security.keystore.KeyGenParameterSpec
+import android.util.Log
+import android.security.keystore.KeyProperties
+import java.security.KeyStore
+import java.security.MessageDigest
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 private object ChannelMethods {
     const val PICK_CONTAINER      = "pickContainer"
@@ -54,6 +65,10 @@ private object ChannelMethods {
     const val GENERATE_AND_CACHE_THUMBNAIL = "generateAndCacheThumbnail"
     const val GET_FOLDER_SIZE = "getFolderSize"
     const val HASH_PASSWORD       = "hashPassword"
+    const val DERIVE_DERIVED_KEY  = "deriveDerivedKey"
+    const val STORE_DERIVED_KEY   = "storeDerivedKey"
+    const val LOAD_DERIVED_KEY    = "loadDerivedKey"
+    const val CLEAR_DERIVED_KEY   = "clearDerivedKey"
     const val WRITE_FILE_CHUNK    = "writeFileChunk"
     const val SET_SECURE_SCREEN   = "setSecureScreen"
     const val UPDATE_CONTAINER_SETTINGS = "updateContainerSettings"
@@ -414,6 +429,146 @@ private var pendingUsbPermissionDeviceName: String? = null
         return if (trimmed.length > 180) trimmed.substring(0, 180) else trimmed
     }
 
+    private fun legacyDerivedKeyAlias(filePath: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(filePath.toByteArray(Charsets.UTF_8))
+        val encoded = android.util.Base64.encodeToString(digest, android.util.Base64.NO_WRAP)
+        return "vc2_derived_${encoded}"
+    }
+
+    private fun containerFingerprint(filePath: String): String? {
+        return try {
+            val uri = Uri.parse(filePath)
+            when (uri.scheme) {
+                "content" -> {
+                    contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                        val digest = MessageDigest.getInstance("SHA-256")
+                        val buffer = ByteArray(8192)
+                        var totalRead = 0
+                        ParcelFileDescriptor.AutoCloseInputStream(pfd).use { stream ->
+                            while (true) {
+                                val read = stream.read(buffer)
+                                if (read <= 0) break
+                                digest.update(buffer, 0, read)
+                                totalRead += read
+                                if (totalRead >= 8192) break
+                            }
+                        }
+                        android.util.Base64.encodeToString(digest.digest(), android.util.Base64.NO_WRAP)
+                    }
+                }
+                "file" -> {
+                    val file = java.io.File(uri.path ?: return null)
+                    file.inputStream().use { stream ->
+                        val digest = MessageDigest.getInstance("SHA-256")
+                        val buffer = ByteArray(8192)
+                        var totalRead = 0
+                        while (true) {
+                            val read = stream.read(buffer)
+                            if (read <= 0) break
+                            digest.update(buffer, 0, read)
+                            totalRead += read
+                            if (totalRead >= 8192) break
+                        }
+                        android.util.Base64.encodeToString(digest.digest(), android.util.Base64.NO_WRAP)
+                    }
+                }
+                else -> null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun derivedKeyAlias(filePath: String): String {
+        val fingerprint = containerFingerprint(filePath)
+        val root = fingerprint ?: legacyDerivedKeyAlias(filePath)
+        return "vc2_derived_${root}"
+    }
+
+    private fun getOrCreateDerivedKey(alias: String): SecretKey {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val existing = keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry
+        if (existing != null) return existing.secretKey
+
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        val spec = KeyGenParameterSpec.Builder(
+            alias,
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+        )
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .build()
+        generator.init(spec)
+        return generator.generateKey()
+    }
+
+    private fun encryptDerivedKey(plain: ByteArray, alias: String): ByteArray? {
+        return try {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            val key = getOrCreateDerivedKey(alias)
+            cipher.init(Cipher.ENCRYPT_MODE, key)
+            val iv = cipher.iv
+            val encrypted = cipher.doFinal(plain)
+            val out = ByteArray(iv.size + encrypted.size)
+            System.arraycopy(iv, 0, out, 0, iv.size)
+            System.arraycopy(encrypted, 0, out, iv.size, encrypted.size)
+            out
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun decryptDerivedKey(blob: ByteArray, alias: String): ByteArray? {
+        return try {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            val key = getOrCreateDerivedKey(alias)
+            val iv = blob.copyOfRange(0, 12)
+            val payload = blob.copyOfRange(12, blob.size)
+            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, iv))
+            cipher.doFinal(payload)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun storeDerivedKeyBytes(filePath: String, derivedKey: ByteArray): Boolean {
+        val alias = derivedKeyAlias(filePath)
+        val legacyAlias = legacyDerivedKeyAlias(filePath)
+        Log.i("VaultExplorer_C++", "Storing derived key for ${filePath} (${derivedKey.size} bytes)")
+        val encrypted = encryptDerivedKey(derivedKey, alias) ?: return false
+        val encoded = android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP)
+        return getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
+            .edit()
+            .putString(alias, encoded)
+            .putString(legacyAlias, encoded)
+            .commit()
+    }
+
+    private fun loadDerivedKeyBytes(filePath: String): ByteArray? {
+        val aliases = listOf(derivedKeyAlias(filePath), legacyDerivedKeyAlias(filePath))
+        for (alias in aliases) {
+            val encoded = getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
+                .getString(alias, null) ?: continue
+            val encrypted = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
+            val decrypted = decryptDerivedKey(encrypted, alias)
+            if (decrypted != null) {
+                Log.i("VaultExplorer_C++", "Loaded derived key for ${filePath} from Keystore-backed storage (${decrypted.size} bytes)")
+                return decrypted
+            }
+        }
+        return null
+    }
+
+    private fun clearDerivedKeyBytes(filePath: String): Boolean {
+        val aliases = listOf(derivedKeyAlias(filePath), legacyDerivedKeyAlias(filePath))
+        val editor = getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE).edit()
+        for (alias in aliases) {
+            editor.remove(alias)
+        }
+        return editor.commit()
+    }
+
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -535,6 +690,12 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
     val docProvider   = call.argument<Boolean>("documentProvider") ?: false
     val cipherId      = call.argument<Number>("cipherId")?.toInt() ?: 255
     val hashId        = call.argument<Number>("hashId")?.toInt() ?: 255
+    val preservedKeyBase64 = call.argument<String>("preservedKey")
+    val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+    if (preservedKey != null) {
+        Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
+    }
+    val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
 
     if (deviceName == null || password == null) {
         result.error("INVALID_ARGS", "deviceName and password required", null)
@@ -567,8 +728,20 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
             val sizeBytes = msd.sectorCount * msd.sectorSize
             UsbBlockBridge.register(targetVolId, msd)
 
+            if (preservedKey != null) {
+                Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${preservedKey.size})")
+            } else if (cacheDerivedKey) {
+                Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
+            }
+
+            if (preservedKey != null) {
+                Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${preservedKey.size})")
+            } else if (cacheDerivedKey) {
+                Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
+            }
+
             val files = VeraCryptEngine.unlockUsbAndListNative(
-                password, pim, targetVolId, sizeBytes, cipherId, hashId
+                password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey
             )
 
             runOnUiThread {
@@ -649,6 +822,12 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                         val docProvider = call.argument<Boolean>("documentProvider") ?: false
                         val cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255
                         val hashId      = call.argument<Number>("hashId")?.toInt() ?: 255
+                        val preservedKeyBase64 = call.argument<String>("preservedKey")
+                        val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+                        if (preservedKey != null) {
+                            Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
+                        }
+                        val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
 
                         if (uriString == null || password == null) {
                             result.error("INVALID_ARGS", "filePath and password required", null)
@@ -669,12 +848,24 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                     ?: throw Exception("Could not open file descriptor")
                                 val fd = pfd.detachFd()
 
+                                if (preservedKey != null) {
+                                    Log.i("VaultExplorer_C++", "File unlock using preserved derived key (len=${preservedKey.size})")
+                                } else if (cacheDerivedKey) {
+                                    Log.i("VaultExplorer_C++", "File unlock will derive and cache a fresh key")
+                                }
+
                                 val files = synchronized(VeraCryptSession.locks[targetVolId]) {
-                                    VeraCryptEngine.unlockAndListNative(fd, password, pim, targetVolId, cipherId, hashId)
+                                    VeraCryptEngine.unlockAndListNative(fd, password, pim, targetVolId, cipherId, hashId, preservedKey)
                                 }
 
                                 runOnUiThread {
                                     if (files != null) {
+                                        if (cacheDerivedKey && preservedKey == null) {
+                                            val derived = VeraCryptEngine.getLastDerivedKeyMaterialNative(targetVolId)
+                                            if (derived != null) {
+                                                storeDerivedKeyBytes(uriString, derived)
+                                            }
+                                        }
                                         VeraCryptSession.activeSessions[targetVolId] = ContainerSession(
                                             uri = uriString,
                                             volId = targetVolId,
@@ -702,6 +893,63 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                 runOnUiThread { dispatchNativeError(e, result) }
                             }
                         }.start()
+                    }
+
+                    ChannelMethods.DERIVE_DERIVED_KEY -> {
+                        val filePath = call.argument<String>("filePath")
+                        val password = call.argument<String>("password")
+                        val pim = call.argument<Number>("pim")?.toInt() ?: 0
+                        val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
+                        val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
+
+                        if (filePath == null || password == null) {
+                            result.error("INVALID_ARGS", "filePath and password required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        Thread {
+                            try {
+                                val pfd = contentResolver.openFileDescriptor(Uri.parse(filePath), "r")
+                                    ?: throw Exception("Could not open file descriptor")
+                                val fd = pfd.detachFd()
+                                val derived = VeraCryptEngine.deriveKeyMaterialNative(fd, password, pim, cipherId, hashId)
+                                pfd.close()
+                                val encoded = derived?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
+                                runOnUiThread { result.success(encoded) }
+                            } catch (e: Exception) {
+                                runOnUiThread { dispatchNativeError(e, result) }
+                            }
+                        }.start()
+                    }
+
+                    ChannelMethods.STORE_DERIVED_KEY -> {
+                        val filePath = call.argument<String>("filePath")
+                        val derivedKeyBase64 = call.argument<String>("derivedKey")
+                        val derived = derivedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+                        if (filePath == null || derived == null) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
+                        result.success(storeDerivedKeyBytes(filePath, derived))
+                    }
+
+                    ChannelMethods.LOAD_DERIVED_KEY -> {
+                        val filePath = call.argument<String>("filePath")
+                        if (filePath == null) {
+                            result.success(null)
+                            return@setMethodCallHandler
+                        }
+                        val derivedKey = loadDerivedKeyBytes(filePath)
+                        result.success(derivedKey?.let { Base64.encodeToString(it, Base64.NO_WRAP) })
+                    }
+
+                    ChannelMethods.CLEAR_DERIVED_KEY -> {
+                        val filePath = call.argument<String>("filePath")
+                        if (filePath == null) {
+                            result.success(false)
+                            return@setMethodCallHandler
+                        }
+                        result.success(clearDerivedKeyBytes(filePath))
                     }
 
                     ChannelMethods.HASH_PASSWORD -> {

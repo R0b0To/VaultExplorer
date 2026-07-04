@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../../models/thumbnail_cache_mode.dart';
 import '../../../services/app_settings_service.dart';
+import '../../../services/vaultexplorer_api.dart';
 import '../../../theme.dart';
 import '../../../widgets/common_widgets.dart';
 import '../../lock/pattern_setup_sheet.dart';
@@ -41,6 +42,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
   late int  _autoCloseMins;
   late bool _documentProvider;
   ThumbnailCacheMode? _thumbnailCacheMode;
+  bool _cacheDerivedKey = false;
   String? _patternHash;   // stored pattern hash (from Keystore or newly set)
   bool _biometricAvailable = false;
   late bool _settingsLocked;
@@ -63,6 +65,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
     _autoCloseMins    = rec?.autoCloseMins ?? 0;
     _documentProvider = rec?.documentProvider ?? false;
     _thumbnailCacheMode = rec?.thumbnailCacheMode;
+    _cacheDerivedKey = rec?.cacheDerivedKey ?? widget.appSettings?.defaultDerivedKeyCacheEnabled ?? false;
     _settingsLocked   = rec != null && rec.unlockMethod != ContainerUnlockMethod.password;
     _initAsync();
   }
@@ -121,22 +124,27 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
     final shouldSavePassword = needsPassword && (wasNone || _changePassword);
 
     final record = ContainerRecord(
-      uri: widget.uri,
-      label: label,
-      rememberPassword: needsPassword,
-      unlockMethod: _unlockMethod,
-      autoCloseMins: _autoCloseMins,
-      documentProvider: _documentProvider,
-      thumbnailCacheMode: _thumbnailCacheMode,
-      pendingPassword: shouldSavePassword && _passwordCtrl.text.isNotEmpty
-          ? _passwordCtrl.text
-          : null,
-      pendingPatternHash: _unlockMethod == ContainerUnlockMethod.pattern
-          ? _patternHash
-          : null,
-    );
-
+  uri: widget.uri,
+  label: label,
+  rememberPassword: needsPassword,
+  unlockMethod: _unlockMethod,
+  autoCloseMins: _autoCloseMins,
+  documentProvider: _documentProvider,
+  thumbnailCacheMode: _thumbnailCacheMode,
+  cacheDerivedKey: _cacheDerivedKey,
+  pendingPassword: shouldSavePassword && _passwordCtrl.text.isNotEmpty
+      ? _passwordCtrl.text
+      : null,
+  pendingPatternHash: _unlockMethod == ContainerUnlockMethod.pattern
+      ? _patternHash
+      : null,
+  cipherId: widget.existingRecord?.cipherId ?? 255,
+  hashId: widget.existingRecord?.hashId ?? 255,
+);
     await ContainerRepository.instance.save(record);
+    if (!_cacheDerivedKey) {
+      await vaultExplorerApi.clearDerivedKey(widget.uri);
+    }
 
     widget.onSaved(record);
     if (mounted) Navigator.pop(context);
@@ -403,6 +411,15 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                   ),
                 ),
               ],
+
+              const SizedBox(height: 14),
+              SettingsToggleRow(
+                icon: Icons.security,
+                title: 'Cache Derived Key',
+                subtitle: 'Store derived key material in Android Keystore and reuse it for biometric, pattern, and password unlocks',
+                value: _cacheDerivedKey,
+                onChanged: (v) => setState(() => _cacheDerivedKey = v),
+              ),
             ],
             const SizedBox(height: 16),
 

@@ -1,7 +1,9 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../services/container_repository.dart';
+import '../../services/app_settings_service.dart';
 import '../../models/mounted_container.dart';
 import '../../models/usb_device_info.dart';
 import '../../utils/validation_utils.dart';
@@ -145,12 +147,30 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         ),
       );
       if (ok && mounted) {
+        final appSettings = await AppSettingsService.loadSettings();
+        final shouldUseCachedKey = record.cacheDerivedKey ||
+            appSettings.defaultDerivedKeyCacheEnabled;
+        final cachedKey = shouldUseCachedKey
+            ? await vaultExplorerApi.loadDerivedKey(record.uri)
+            : null;
+        debugPrint('usb unlock: biometric cached-key present=${cachedKey != null && cachedKey.isNotEmpty} for ${record.uri}');
+        if (cachedKey != null && cachedKey.isNotEmpty) {
+          await _unlock(
+            preservedKey: cachedKey,
+            shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+          );
+          return;
+        }
+
         final pw = await ContainerRepository.instance.getPassword(
           record.uri,
         );
         if (pw != null && pw.isNotEmpty) {
           _passwordCtrl.text = pw;
-          _unlock();
+          await _unlock(
+            shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+            passwordOverride: pw,
+          );
         } else {
           setState(() {
             _error = 'No saved password found. Please enter it manually.';
@@ -262,13 +282,18 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
     if (granted) await _loadDevices();
   }
 
-  Future<void> _unlock() async {
+  Future<void> _unlock({
+    Uint8List? preservedKey,
+    bool? shouldCacheDerivedKeyOverride,
+    String? passwordOverride,
+  }) async {
     final device = _selected;
     if (device == null) {
       setState(() => _error = 'Select a USB drive first');
       return;
     }
-    if (_passwordCtrl.text.isEmpty) {
+    final effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
+    if (effectivePassword.isEmpty && preservedKey == null) {
       setState(() => _error = 'Password is required');
       return;
     }
@@ -299,14 +324,23 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       // than reverting to the raw USB product-name string every time.
       final displayName = widget.existingRecord?.label ?? device.productName;
 
+      final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+          (widget.existingRecord?.cacheDerivedKey ?? false);
+      final resolvedPreservedKey = preservedKey ??
+          (shouldCacheDerivedKey
+              ? await vaultExplorerApi.loadDerivedKey(device.deviceName)
+              : null);
+      debugPrint('usb unlock: shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
       final result = await vaultExplorerApi.unlockUsbContainer(
         device.deviceName,
-        _passwordCtrl.text,
+        effectivePassword,
         pim,
         displayName: displayName,
         documentProvider: widget.documentProvider,
         cipherId: _cipherId,
         hashId: _hashId,
+        preservedKey: resolvedPreservedKey,
+        cacheDerivedKey: shouldCacheDerivedKey,
       );
 
       if (result == null) {
@@ -362,6 +396,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
           autoCloseMins: existing.autoCloseMins,
           documentProvider: existing.documentProvider,
           thumbnailCacheMode: existing.thumbnailCacheMode,
+          cacheDerivedKey: shouldCacheDerivedKey,
           pendingPassword: savedPassword,
           pendingPatternHash: savedPatternHash,
           // FIX (perf): carry the resolved cipher/hash through the
@@ -382,6 +417,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
             existing.hashId != result.matchedHashId) {
           await ContainerRepository.instance.save(
             existing.copyWith(
+              cacheDerivedKey: shouldCacheDerivedKey,
               cipherId: result.matchedCipherId,
               hashId: result.matchedHashId,
             ),
@@ -399,6 +435,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
             uri: newUri,
             label: displayName,
             documentProvider: widget.documentProvider,
+            cacheDerivedKey: shouldCacheDerivedKey,
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
           ),

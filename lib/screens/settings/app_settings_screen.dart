@@ -354,6 +354,29 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                         await vaultExplorerApi.setSecureScreen(v);
                       },
                     ),
+                    const Divider(height: 24),
+                    SettingsToggleRow(
+                      icon: Icons.lock_clock_rounded,
+                      title: 'Lock Containers on Screen Lock',
+                      subtitle:
+                          'Automatically lock all open containers when the '
+                          'screen turns off or the app is backgrounded.',
+                      value: _settings.lockContainersOnScreenLock,
+                      onChanged: (v) => setState(
+                        () => _settings.lockContainersOnScreenLock = v,
+                      ),
+                    ),
+                    const Divider(height: 24),
+                    SettingsToggleRow(
+                      icon: Icons.key_rounded,
+                      title: 'Cache derived keys by default',
+                      subtitle:
+                          'Reuse the last derived key in Android Keystore for faster unlocks across supported methods.',
+                      value: _settings.defaultDerivedKeyCacheEnabled,
+                      onChanged: (v) => setState(
+                        () => _settings.defaultDerivedKeyCacheEnabled = v,
+                      ),
+                    ),
                   ],
                 ),
 

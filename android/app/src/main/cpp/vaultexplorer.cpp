@@ -13,6 +13,7 @@
 #include <mutex>
 #include <atomic>  // std::atomic<bool> derivationInProgress[] below relies on this directly,
                    // not on a transitive include from <mutex>/<memory>.
+#include <chrono>
 #include <ctime>   // mktime, struct tm, time_t
 
 #include "mbedtls/md.h"
@@ -25,6 +26,11 @@
 #include <thread>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+
+static inline long long elapsedMs(const std::chrono::steady_clock::time_point& start) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start).count();
+}
 
 #define MAX_VOLUMES FF_VOLUMES
 
@@ -814,6 +820,7 @@ static bool deriveAndValidateHeader(
     CascadeId& outMatchedCipher,
     HashId& outMatchedHash
 ) {
+    const auto timingStart = std::chrono::steady_clock::now();
     const unsigned char* salt = headerSector;
     const unsigned char* encH = headerSector + VC_SALT_SIZE;
 
@@ -929,6 +936,8 @@ if (cipherIdParam == 255 && hashIdParam == 255) {
     }
 
     if (!found.load(std::memory_order_acquire)) {
+        LOGI("deriveAndValidateHeader: failed after %lld ms (cipher=%d hash=%d)",
+             elapsedMs(timingStart), cipherIdParam, hashIdParam);
         return false;
     }
 
@@ -936,6 +945,8 @@ if (cipherIdParam == 255 && hashIdParam == 255) {
     outMatchedCipher = resultCipher;
     outMatchedHash = resultHash;
     mbedtls_platform_zeroize(resultKeyMaterial, sizeof(resultKeyMaterial));
+    LOGI("deriveAndValidateHeader: success in %lld ms (cipher=%d hash=%d)",
+         elapsedMs(timingStart), static_cast<int>(resultCipher), static_cast<int>(resultHash));
     return true;
 }
 
@@ -1015,6 +1026,8 @@ static FsScanResult tryKeyCandidate(
 // depends on both being present.
 // ----------------------------------------------------------------====
 bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive, int cipherId, int hashId) {
+    const auto opStart = std::chrono::steady_clock::now();
+    const auto headerReadStart = std::chrono::steady_clock::now();
     if (volId < 0 || volId >= MAX_VOLUMES) {
         if (fd >= 0) close(fd);
         return false;
@@ -1026,6 +1039,7 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
         std::lock_guard<std::mutex> lock(v.mutex);
         if (v.dataCtxInitialized && v.fd >= 0) {
             if (fd >= 0) close(fd);
+            LOGI("prepareSession(vol=%d): reused existing session in %lld ms", volId, elapsedMs(opStart));
             return true;
         }
         if (v.dataCtxInitialized) {
@@ -1040,7 +1054,10 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
         }
     }
 
-    if (fd < 0) return false;
+    if (fd < 0) {
+        LOGI("prepareSession(vol=%d): missing fd before derivation in %lld ms", volId, elapsedMs(opStart));
+        return false;
+    }
 
     // FIX P11: Prevent two threads from deriving simultaneously for the same
     // volume (e.g., rapid double-tap unlock). Second thread waits via spinlock.
@@ -1064,6 +1081,7 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     if (pread(fd, headerBuf, VC_FULL_HEADER_SIZE, 0) != VC_FULL_HEADER_SIZE) {
         close(fd);
         derivationInProgress[volId].store(false, std::memory_order_release);
+        LOGI("prepareSession(vol=%d): header read failed in %lld ms", volId, elapsedMs(opStart));
         return false;
     }
 
@@ -1074,29 +1092,40 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
             fileSize = static_cast<uint64_t>(st.st_size);
     }
 
+    const auto headerReadMs = elapsedMs(headerReadStart);
     unsigned char dKey[192];
     CascadeId matchedCipher;
     HashId matchedHash;
+    const auto deriveStart = std::chrono::steady_clock::now();
     if (!deriveAndValidateHeader(headerBuf, password, pim, cipherId, hashId, dKey, matchedCipher, matchedHash)) {
         close(fd);
         derivationInProgress[volId].store(false, std::memory_order_release);
+        LOGI("prepareSession(vol=%d): deriveAndValidateHeader failed in %lld ms (headerRead=%lld ms, derive=%lld ms)",
+             volId, elapsedMs(opStart), headerReadMs, elapsedMs(deriveStart));
         return false;
     }
 
+    const auto deriveMs = elapsedMs(deriveStart);
     CascadeContext candidateCascade;
     CascadeSpec spec = cascadeSpecFor(matchedCipher);
     if (!cascadeSetKeys(candidateCascade, matchedCipher, dKey, spec.layerCount * 64)) {
         mbedtls_platform_zeroize(dKey, sizeof(dKey));
         close(fd);
         derivationInProgress[volId].store(false, std::memory_order_release);
+        LOGI("prepareSession(vol=%d): cascade key setup failed in %lld ms (headerRead=%lld ms, derive=%lld ms)",
+             volId, elapsedMs(opStart), headerReadMs, deriveMs);
         return false;
     }
     mbedtls_platform_zeroize(dKey, sizeof(dKey));
 
+    const auto scanStart = std::chrono::steady_clock::now();
     FsScanResult scan = tryKeyCandidate(fd, candidateCascade);
+    const auto scanMs = elapsedMs(scanStart);
     if (!scan.found) {
         close(fd);
         derivationInProgress[volId].store(false, std::memory_order_release);
+        LOGI("prepareSession(vol=%d): scan failed in %lld ms (headerRead=%lld ms, derive=%lld ms, scan=%lld ms)",
+             volId, elapsedMs(opStart), headerReadMs, deriveMs, scanMs);
         return false;
     }
 
@@ -1115,6 +1144,8 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     }
 
     derivationInProgress[volId].store(false, std::memory_order_release);
+    LOGI("prepareSession(vol=%d): success in %lld ms (headerRead=%lld ms, derive=%lld ms, scan=%lld ms)",
+         volId, elapsedMs(opStart), headerReadMs, deriveMs, scanMs);
     return true;
 }
 
@@ -1126,6 +1157,7 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
 // function would make the already-delicate unlock flow harder to reason
 // about, not easier.
 static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector, const CascadeContext& candidateCascade) {
+    const auto timingStart = std::chrono::steady_clock::now();
     FsScanResult result;
     std::unique_ptr<unsigned char[]> encBatch(new unsigned char[SCAN_BATCH * 512]);
     unsigned char decS[512];
@@ -1144,6 +1176,7 @@ static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector,
                 result.found = true; 
                 result.dataOffset = (partitionStartSector + sectorIdx) * 512;
                 result.relTweak = false;
+                LOGI("tryKeyCandidateUsb(vol=%d): found candidate in %lld ms", volId, elapsedMs(timingStart));
                 return result;
             }
 
@@ -1152,6 +1185,7 @@ static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector,
                 result.found = true; 
                 result.dataOffset = (partitionStartSector + sectorIdx) * 512;
                 result.relTweak = true;
+                LOGI("tryKeyCandidateUsb(vol=%d): found candidate in %lld ms", volId, elapsedMs(timingStart));
                 return result;
             }
         }

@@ -1231,7 +1231,32 @@ static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector,
     return result; // found == false
 }
 
-static bool prepareUsbSession(const char* password, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0) {
+// FIX (perf, fix #2): prepareSession() (file-backed) always knows exactly
+// where its header lives (offset 0 of the fd) and calls
+// deriveAndValidateHeader() exactly once. prepareUsbSession() does NOT have
+// that luxury — a raw USB block device may have its VeraCrypt header at the
+// start of the disk (`{0,0}`, the common case for this app's own "encrypt
+// whole USB drive" flow) OR at the start of a partition read off a real
+// MBR/GPT table (the common case for a drive that came from official
+// VeraCrypt "encrypt a partition/drive"). Since we can't tell which without
+// trying, every unlock loops over every candidate offset and calls the
+// (already fully-optimized, see deriveAndValidateHeader's `neededKeyBytes`)
+// derivation once per candidate — so a device with, say, one real partition
+// plus the always-appended {0,0} fallback pays for it TWICE what a file
+// container pays, even once cipherId/hashId are cached from a previous
+// unlock via matchedCipherId/matchedHashId (fix #1 above). This is the
+// actual source of "USB unlock feels slower than file unlock" — it was
+// never a missing byte-length optimization (that part is shared code and
+// already applies equally to both paths).
+//
+// [partitionOffsetHint] lets a caller who already knows the answer (Kotlin
+// persists it the same way it persists matchedCipherId/matchedHashId, see
+// getMatchedPartitionOffset() below) skip the search entirely: we move that
+// offset to the front of the candidate list so the common "already unlocked
+// this device before" case costs exactly one derivation, matching the file
+// path. -1 means "unknown / first unlock" and preserves the old
+// try-everything behaviour.
+static bool prepareUsbSession(const char* password, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0, int64_t partitionOffsetHint = -1) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
     VolumeState& v = volumes[volId];
 
@@ -1286,6 +1311,22 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
     }
 
     partitions.push_back({0, 0});
+
+    // Move the previously-successful offset (if any) to the front so the
+    // common "reconnecting the same drive" case does exactly one derivation
+    // instead of re-walking every candidate from scratch. Falls back to
+    // trying it as an extra first candidate if the current MBR/GPT scan
+    // didn't happen to surface it (e.g. read a truncated sector0 this time).
+    if (partitionOffsetHint >= 0) {
+        const uint64_t hint = static_cast<uint64_t>(partitionOffsetHint);
+        auto hintIt = std::find_if(partitions.begin(), partitions.end(),
+            [hint](const PartitionCandidate& p) { return p.startSector == hint; });
+        if (hintIt != partitions.end()) {
+            std::iter_swap(partitions.begin(), hintIt);
+        } else {
+            partitions.insert(partitions.begin(), {hint, 0});
+        }
+    }
 
     bool fsFound = false;
     uint64_t foundDataOffset = 0;
@@ -1879,6 +1920,23 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedHashId(JNIEnv*, jobjec
     return volumes[volId].matchedHashId;
 }
 
+// FIX (perf, fix #2): USB counterpart to getMatchedCipherId/getMatchedHashId
+// above. Kotlin should read this after a successful unlockUsbContainer and
+// persist it (ContainerRecord-side) exactly the way it already persists
+// matchedCipherId/matchedHashId, then pass it back as `partitionOffsetHint`
+// on the next unlockUsbAndListNative call for the same device. Without this,
+// every USB unlock re-walks every MBR/GPT partition candidate from scratch
+// even when the cipher/hash are already known — see the comment on
+// prepareUsbSession() for why that's the real cost, not PBKDF2 output size.
+// Only meaningful for USB volumes (v.isUsbSource); returns -1 for anything
+// else, same "unknown" sentinel used by the other two getters.
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedPartitionOffset(JNIEnv*, jobject, jint volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return -1;
+    std::lock_guard<std::mutex> lock(volumes[volId].mutex);
+    if (!volumes[volId].isUsbSource) return -1;
+    return static_cast<jlong>(volumes[volId].partitionStartSector);
+}
 
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectory(
@@ -2249,7 +2307,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
 
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
-        JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey) {
+        JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
+        jlong partitionOffsetHint) {
 
     const unsigned char* preservedBytes = nullptr;
     size_t preservedLen = 0;
@@ -2259,7 +2318,11 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
     }
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const bool ok = prepareUsbSession(nativePass, pim, volId, cipherId, hashId, preservedBytes, preservedLen);
+    // FIX (perf, fix #2): pass the cached offset (-1 if this is the first
+    // unlock / device has never resolved one) so prepareUsbSession() can
+    // skip straight to it instead of re-walking every MBR/GPT candidate.
+    const bool ok = prepareUsbSession(nativePass, pim, volId, cipherId, hashId, preservedBytes, preservedLen,
+                                       static_cast<int64_t>(partitionOffsetHint));
     if (preservedKey != nullptr) {
         env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
     }

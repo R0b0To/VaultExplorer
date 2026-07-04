@@ -181,6 +181,11 @@ struct VolumeState {
     int matchedCipherId = -1;
     int matchedHashId = -1;
 
+    // Optional preserved derived key material for one-time caching by Kotlin.
+    // This is only kept when an unlock request specifically asks for it.
+    unsigned char* preservedDerivedKey = nullptr;
+    size_t        preservedDerivedKeyLen = 0;
+
     CascadeContext cascade;
     FATFS fatfs{};
 
@@ -207,6 +212,12 @@ struct VolumeState {
         cascade.initialized = false;
         matchedCipherId = -1;
         matchedHashId = -1;
+        if (preservedDerivedKey != nullptr) {
+            mbedtls_platform_zeroize(preservedDerivedKey, preservedDerivedKeyLen);
+            delete[] preservedDerivedKey;
+            preservedDerivedKey = nullptr;
+            preservedDerivedKeyLen = 0;
+        }
     }
 };
 
@@ -876,7 +887,7 @@ static bool deriveAndValidateHeader(
 
     std::atomic<bool> found{false};
     std::mutex resultMutex;
-    unsigned char resultKeyMaterial[192];
+    unsigned char resultKeyMaterial[192] = {0};
     CascadeId resultCipher{};
     HashId resultHash{};
 
@@ -1023,7 +1034,7 @@ static FsScanResult tryKeyCandidate(
 // invariants (call ordering vs. memory state), and the safety argument above
 // depends on both being present.
 // ----------------------------------------------------------------====
-bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive, int cipherId, int hashId) {
+bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0) {
     const auto opStart = std::chrono::steady_clock::now();
     const auto headerReadStart = std::chrono::steady_clock::now();
     
@@ -1096,7 +1107,27 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     HashId matchedHash;
     const auto deriveStart = std::chrono::steady_clock::now();
     
-    if (!deriveAndValidateHeader(headerBuf, password, pim, cipherId, hashId, dKey, matchedCipher, matchedHash)) {
+    bool derivedSuccessfully = false;
+    if (preservedKey != nullptr && preservedKeyLen > 0) {
+        LOGI("prepareSession(vol=%d): using cached master-key material len=%zu (cipher=%d hash=%d)",
+             volId, preservedKeyLen, cipherId, hashId);
+        matchedCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
+        matchedHash = (hashId != 255) ? static_cast<HashId>(hashId) : HashId::kSha512;
+        const size_t bytesToCopy = std::min(preservedKeyLen, sizeof(dKey));
+        std::memcpy(dKey, preservedKey, bytesToCopy);
+        if (bytesToCopy < sizeof(dKey)) {
+            std::memset(dKey + bytesToCopy, 0, sizeof(dKey) - bytesToCopy);
+        }
+        derivedSuccessfully = true;
+    } else {
+        LOGI("prepareSession(vol=%d): no preserved key available, falling back to PBKDF2", volId);
+        derivedSuccessfully = deriveAndValidateHeader(
+            headerBuf, password, pim, cipherId, hashId,
+            dKey, matchedCipher, matchedHash);
+    }
+
+    if (!derivedSuccessfully) {
+        LOGI("prepareSession(vol=%d): preserved-key path failed, falling back to PBKDF2 result=false", volId);
         close(fd);
         LOGI("prepareSession(vol=%d): deriveAndValidateHeader failed in %lld ms (headerRead=%lld ms, derive=%lld ms)",
              volId, elapsedMs(opStart), headerReadMs, elapsedMs(deriveStart));
@@ -1104,6 +1135,7 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
     }
 
     const auto deriveMs = elapsedMs(deriveStart);
+    LOGI("prepareSession(vol=%d): derived key branch succeeded in %lld ms", volId, deriveMs);
     CascadeContext candidateCascade;
     CascadeSpec spec = cascadeSpecFor(matchedCipher);
     if (!cascadeSetKeys(candidateCascade, matchedCipher, dKey, spec.layerCount * 64)) {
@@ -1112,6 +1144,16 @@ bool prepareSession(int fd, const char* password, int pim, int volId, bool force
         LOGI("prepareSession(vol=%d): cascade key setup failed in %lld ms (headerRead=%lld ms, derive=%lld ms)",
              volId, elapsedMs(opStart), headerReadMs, deriveMs);
         return false;
+    }
+    if (preservedKey == nullptr || preservedKeyLen == 0) {
+        std::lock_guard<std::mutex> lock(v.mutex);
+        if (v.preservedDerivedKey != nullptr) {
+            mbedtls_platform_zeroize(v.preservedDerivedKey, v.preservedDerivedKeyLen);
+            delete[] v.preservedDerivedKey;
+        }
+        v.preservedDerivedKey = new unsigned char[sizeof(dKey)];
+        std::memcpy(v.preservedDerivedKey, dKey, sizeof(dKey));
+        v.preservedDerivedKeyLen = sizeof(dKey);
     }
     mbedtls_platform_zeroize(dKey, sizeof(dKey));
 
@@ -1189,7 +1231,7 @@ static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector,
     return result; // found == false
 }
 
-static bool prepareUsbSession(const char* password, int pim, int volId, int cipherId, int hashId) {
+static bool prepareUsbSession(const char* password, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
     VolumeState& v = volumes[volId];
 
@@ -1252,6 +1294,7 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
     uint64_t matchedPartitionStart = 0;
     CascadeId matchedCipherFound{};
     HashId matchedHashFound{};
+    std::vector<unsigned char> derivedKeyBytes;
 
     for (const auto& part : partitions) {
         unsigned char headerBuf[VC_FULL_HEADER_SIZE];
@@ -1259,10 +1302,27 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
             continue;
         }
 
-        unsigned char dKey[192];
+        unsigned char dKey[192]{};
         CascadeId matchedCipher;
         HashId matchedHash;
-        if (!deriveAndValidateHeader(headerBuf, password, pim, cipherId, hashId, dKey, matchedCipher, matchedHash)) {
+        bool derivedSuccessfully = false;
+
+        if (preservedKey != nullptr && preservedKeyLen > 0) {
+            LOGI("prepareUsbSession(vol=%d): using cached master-key material len=%zu", volId, preservedKeyLen);
+            matchedCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
+            matchedHash = (hashId != 255) ? static_cast<HashId>(hashId) : HashId::kSha512;
+            const size_t bytesToCopy = std::min(preservedKeyLen, sizeof(dKey));
+            std::memcpy(dKey, preservedKey, bytesToCopy);
+            if (bytesToCopy < sizeof(dKey)) {
+                std::memset(dKey + bytesToCopy, 0, sizeof(dKey) - bytesToCopy);
+            }
+            derivedSuccessfully = true;
+        } else {
+            LOGI("prepareUsbSession(vol=%d): no preserved key available, falling back to PBKDF2", volId);
+            derivedSuccessfully = deriveAndValidateHeader(headerBuf, password, pim, cipherId, hashId, dKey, matchedCipher, matchedHash);
+        }
+
+        if (!derivedSuccessfully) {
             continue;
         }
 
@@ -1280,6 +1340,7 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
             matchedPartitionStart = part.startSector;
             matchedCipherFound = matchedCipher;
             matchedHashFound = matchedHash;
+            derivedKeyBytes.assign(dKey, dKey + sizeof(dKey));
             mbedtls_platform_zeroize(dKey, sizeof(dKey));
             break;
         }
@@ -1292,6 +1353,15 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
 
     {
         std::lock_guard<std::mutex> lock(v.mutex);
+        if (preservedKey == nullptr || preservedKeyLen == 0) {
+            if (v.preservedDerivedKey != nullptr) {
+                mbedtls_platform_zeroize(v.preservedDerivedKey, v.preservedDerivedKeyLen);
+                delete[] v.preservedDerivedKey;
+            }
+            v.preservedDerivedKey = new unsigned char[derivedKeyBytes.size()];
+            std::memcpy(v.preservedDerivedKey, derivedKeyBytes.data(), derivedKeyBytes.size());
+            v.preservedDerivedKeyLen = derivedKeyBytes.size();
+        }
         v.cascade = candidateCascade;
         v.isUsbSource          = true;
         v.dataCtxInitialized   = true;
@@ -1399,12 +1469,65 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMaxVolumesNative(JNIEnv*, job
     return static_cast<jint>(MAX_VOLUMES);
 }
 
-extern "C" JNIEXPORT jobjectArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
-        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId) {
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getLastDerivedKeyMaterialNative(
+        JNIEnv* env, jobject, jint volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return nullptr;
+
+    VolumeState& v = volumes[volId];
+    std::lock_guard<std::mutex> lock(v.mutex);
+    if (v.preservedDerivedKey == nullptr || v.preservedDerivedKeyLen == 0) return nullptr;
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(v.preservedDerivedKeyLen));
+    env->SetByteArrayRegion(result, 0, static_cast<jsize>(v.preservedDerivedKeyLen),
+                            reinterpret_cast<const jbyte*>(v.preservedDerivedKey));
+    return result;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring password, jint pim, jint cipherId, jint hashId) {
+    if (fd < 0 || password == nullptr) return nullptr;
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    if (!prepareSession(fd, nativePass, pim, volId, true, cipherId, hashId)) {
+    unsigned char headerBuf[VC_FULL_HEADER_SIZE];
+    if (pread(fd, headerBuf, VC_FULL_HEADER_SIZE, 0) != VC_FULL_HEADER_SIZE) {
+        env->ReleaseStringUTFChars(password, nativePass);
+        return nullptr;
+    }
+
+    unsigned char dKey[192];
+    CascadeId matchedCipher{};
+    HashId matchedHash{};
+    const bool ok = deriveAndValidateHeader(
+        headerBuf, nativePass, pim, cipherId, hashId, dKey, matchedCipher, matchedHash);
+    env->ReleaseStringUTFChars(password, nativePass);
+
+    if (!ok) return nullptr;
+
+    jbyteArray result = env->NewByteArray(192);
+    env->SetByteArrayRegion(result, 0, 192, reinterpret_cast<jbyte*>(dKey));
+    mbedtls_platform_zeroize(dKey, sizeof(dKey));
+    return result;
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
+        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey) {
+
+    const unsigned char* preservedBytes = nullptr;
+    size_t preservedLen = 0;
+    if (preservedKey != nullptr) {
+        preservedBytes = reinterpret_cast<const unsigned char*>(env->GetByteArrayElements(preservedKey, nullptr));
+        preservedLen = static_cast<size_t>(env->GetArrayLength(preservedKey));
+    }
+
+    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    if (!prepareSession(fd, nativePass, pim, volId, true, cipherId, hashId, preservedBytes, preservedLen)) {
+        if (preservedKey != nullptr) {
+            env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
+        }
         env->ReleaseStringUTFChars(password, nativePass);
         return nullptr;
     }
@@ -1419,6 +1542,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
         }
     }
 
+    if (preservedKey != nullptr) {
+        env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
+    }
     env->ReleaseStringUTFChars(password, nativePass);
     return result;
 }
@@ -2123,10 +2249,20 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
 
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
-        JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId) {
+        JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey) {
+
+    const unsigned char* preservedBytes = nullptr;
+    size_t preservedLen = 0;
+    if (preservedKey != nullptr) {
+        preservedBytes = reinterpret_cast<const unsigned char*>(env->GetByteArrayElements(preservedKey, nullptr));
+        preservedLen = static_cast<size_t>(env->GetArrayLength(preservedKey));
+    }
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    const bool ok = prepareUsbSession(nativePass, pim, volId, cipherId, hashId);
+    const bool ok = prepareUsbSession(nativePass, pim, volId, cipherId, hashId, preservedBytes, preservedLen);
+    if (preservedKey != nullptr) {
+        env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
+    }
     env->ReleaseStringUTFChars(password, nativePass);
     if (!ok) return nullptr;
 

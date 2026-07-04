@@ -1,8 +1,10 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../services/container_repository.dart';
+import '../../services/app_settings_service.dart';
 import '../../models/mounted_container.dart';
 import '../../utils/validation_utils.dart';
 import '../../theme.dart';
@@ -122,13 +124,33 @@ class _UnlockSheetState extends State<UnlockSheet> {
         ),
       );
       if (ok && mounted) {
+        final records = await ContainerRepository.instance.loadAll();
+        final record = records[widget.initialUri!];
+        final appSettings = await AppSettingsService.loadSettings();
+        final shouldUseCachedKey = (record?.cacheDerivedKey ?? false) ||
+            appSettings.defaultDerivedKeyCacheEnabled;
+        final cachedKey = shouldUseCachedKey
+            ? await vaultExplorerApi.loadDerivedKey(widget.initialUri!)
+            : null;
+        debugPrint('unlock: biometric cached-key present=${cachedKey != null && cachedKey.isNotEmpty} for ${widget.initialUri}');
+        if (cachedKey != null && cachedKey.isNotEmpty) {
+          await _unlock(
+            preservedKey: cachedKey,
+            shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+          );
+          return;
+        }
+
         // Fetch saved password and auto-unlock.
         final pw = await ContainerRepository.instance.getPassword(
           widget.initialUri!,
         );
         if (pw != null && pw.isNotEmpty) {
           _passwordCtrl.text = pw;
-          _unlock();
+          await _unlock(
+            shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+            passwordOverride: pw,
+          );
         } else {
           setState(() {
             _error = 'No saved password found. Please enter it manually.';
@@ -159,13 +181,32 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
     final attempt = hashPattern(pattern);
     if (attempt == _storedPatternHash) {
-      // Pattern matches — fetch saved password and unlock.
+      final records = await ContainerRepository.instance.loadAll();
+      final record = records[widget.initialUri!];
+      final appSettings = await AppSettingsService.loadSettings();
+      final shouldUseCachedKey = (record?.cacheDerivedKey ?? false) ||
+          appSettings.defaultDerivedKeyCacheEnabled;
+      final cachedKey = shouldUseCachedKey
+          ? await vaultExplorerApi.loadDerivedKey(widget.initialUri!)
+          : null;
+
+      if (cachedKey != null && cachedKey.isNotEmpty) {
+        await _unlock(
+          preservedKey: cachedKey,
+          shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+        );
+        return;
+      }
+
       final pw = await ContainerRepository.instance.getPassword(
         widget.initialUri!,
       );
       if (pw != null && pw.isNotEmpty) {
         _passwordCtrl.text = pw;
-        _unlock();
+        await _unlock(
+          shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+          passwordOverride: pw,
+        );
       } else {
         setState(() {
           _error = 'No saved password found. Please enter it manually.';
@@ -205,12 +246,17 @@ class _UnlockSheetState extends State<UnlockSheet> {
     }
   }
 
-  Future<void> _unlock() async {
+  Future<void> _unlock({
+    Uint8List? preservedKey,
+    bool? shouldCacheDerivedKeyOverride,
+    String? passwordOverride,
+  }) async {
     if (_selectedUri == null) {
       setState(() => _error = 'Select a container first');
       return;
     }
-    if (_passwordCtrl.text.isEmpty) {
+    final effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
+    if (effectivePassword.isEmpty && preservedKey == null) {
       setState(() => _error = 'Password is required');
       return;
     }
@@ -225,14 +271,28 @@ class _UnlockSheetState extends State<UnlockSheet> {
       );
       final name = _selectedName ?? 'Container';
 
+      final records = await ContainerRepository.instance.loadAll();
+      final record = records[_selectedUri!];
+      final appSettings = await AppSettingsService.loadSettings();
+      final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+          ((record?.cacheDerivedKey ?? false) ||
+              appSettings.defaultDerivedKeyCacheEnabled);
+      final resolvedPreservedKey = preservedKey ??
+          (shouldCacheDerivedKey
+              ? await vaultExplorerApi.loadDerivedKey(_selectedUri!)
+              : null);
+      debugPrint('unlock: shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
+
       final result = await vaultExplorerApi.unlockContainer(
         _selectedUri!,
-        _passwordCtrl.text,
+        effectivePassword,
         pim,
         displayName: name,
         documentProvider: widget.documentProvider,
         cipherId: _cipherId,
         hashId: _hashId,
+        preservedKey: resolvedPreservedKey,
+        cacheDerivedKey: shouldCacheDerivedKey,
       );
 
       if (result != null) {
@@ -241,6 +301,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
             uri: _selectedUri!,
             label: name,
             rememberPassword: false,
+            cacheDerivedKey: shouldCacheDerivedKey,
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
           );
@@ -255,6 +316,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
                   existing.hashId != result.matchedHashId)) {
             await ContainerRepository.instance.save(
               existing.copyWith(
+                cacheDerivedKey: shouldCacheDerivedKey,
                 cipherId: result.matchedCipherId,
                 hashId: result.matchedHashId,
               ),

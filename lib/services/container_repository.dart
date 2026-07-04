@@ -199,6 +199,7 @@ class ContainerRecord {
   final int autoCloseMins;
   final bool documentProvider;
   final ThumbnailCacheMode? thumbnailCacheMode;
+  final bool cacheDerivedKey;
   final String? pendingPassword;
   final String? pendingPatternHash;
 
@@ -217,6 +218,7 @@ class ContainerRecord {
     this.autoCloseMins = 0,
     this.documentProvider = false,
     this.thumbnailCacheMode,
+    this.cacheDerivedKey = false,
     this.pendingPassword,
     this.pendingPatternHash,
     this.cipherId = 255,
@@ -245,6 +247,7 @@ class ContainerRecord {
     int? autoCloseMins,
     bool? documentProvider,
     Object? thumbnailCacheMode = _keep,
+    bool? cacheDerivedKey,
     String? pendingPassword,
     String? pendingPatternHash,
     int? cipherId,
@@ -260,6 +263,7 @@ class ContainerRecord {
       thumbnailCacheMode: thumbnailCacheMode == _keep
           ? this.thumbnailCacheMode
           : thumbnailCacheMode as ThumbnailCacheMode?,
+      cacheDerivedKey: cacheDerivedKey ?? this.cacheDerivedKey,
       pendingPassword: pendingPassword,
       pendingPatternHash: pendingPatternHash,
       cipherId: cipherId ?? this.cipherId,
@@ -267,7 +271,7 @@ class ContainerRecord {
     );
   }
 
- Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson() => {
     'uri': uri,
     'label': label,
     'rememberPassword': rememberPassword,
@@ -276,6 +280,7 @@ class ContainerRecord {
     'documentProvider': documentProvider,
     if (thumbnailCacheMode != null)
       'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
+    'cacheDerivedKey': cacheDerivedKey,
     'cipherId': cipherId,
     'hashId': hashId,
   };
@@ -303,6 +308,7 @@ class ContainerRecord {
       thumbnailCacheMode: j.containsKey('thumbnailCacheMode')
           ? ThumbnailCacheMode.fromJson(j['thumbnailCacheMode'] as String?)
           : null,
+      cacheDerivedKey: j['cacheDerivedKey'] as bool? ?? false,
       cipherId: j['cipherId'] as int? ?? 255,
       hashId: j['hashId'] as int? ?? 255,
     );

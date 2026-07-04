@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -78,6 +79,52 @@ class VaultExplorerApi {
     return result;
   }
 
+  Future<Uint8List?> deriveDerivedKey({
+    required String filePath,
+    required String password,
+    required int pim,
+    int? cipherId,
+    int? hashId,
+  }) async {
+    final result = await _channel.invokeMethod<String>(
+      ChannelMethods.deriveDerivedKey,
+      {
+        'filePath': filePath,
+        'password': password,
+        'pim': pim,
+        'cipherId': cipherId ?? 255,
+        'hashId': hashId ?? 255,
+      },
+    );
+    if (result == null || result.isEmpty) return null;
+    return base64Decode(result);
+  }
+
+  Future<bool> storeDerivedKey(String filePath, Uint8List derivedKey) async {
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.storeDerivedKey,
+      {'filePath': filePath, 'derivedKey': base64Encode(derivedKey)},
+    );
+    return result ?? false;
+  }
+
+  Future<Uint8List?> loadDerivedKey(String filePath) async {
+    final result = await _channel.invokeMethod<String>(
+      ChannelMethods.loadDerivedKey,
+      {'filePath': filePath},
+    );
+    if (result == null || result.isEmpty) return null;
+    return base64Decode(result);
+  }
+
+  Future<bool> clearDerivedKey(String filePath) async {
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.clearDerivedKey,
+      {'filePath': filePath},
+    );
+    return result ?? false;
+  }
+
   // ── Container lifecycle ───────────────────────────────────────────────────
 
   Future<bool> createContainer({
@@ -121,6 +168,8 @@ class VaultExplorerApi {
     bool documentProvider = false,
     int? cipherId,
     int? hashId,
+    Uint8List? preservedKey,
+    bool cacheDerivedKey = false,
   }) async {
     final raw = await _channel
         .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockContainer, {
@@ -131,6 +180,8 @@ class VaultExplorerApi {
           'documentProvider': documentProvider,
           'cipherId': cipherId ?? 255,
           'hashId': hashId ?? 255,
+          if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
+          'cacheDerivedKey': cacheDerivedKey,
         });
     if (raw == null) return null;
     final volId = raw['volId'] as int;
@@ -177,6 +228,8 @@ class VaultExplorerApi {
     bool documentProvider = false,
     int? cipherId,
     int? hashId,
+    Uint8List? preservedKey,
+    bool cacheDerivedKey = false,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockUsbContainer,
@@ -188,6 +241,8 @@ class VaultExplorerApi {
         'documentProvider': documentProvider,
         'cipherId': cipherId ?? 255,
         'hashId': hashId ?? 255,
+        if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
+        'cacheDerivedKey': cacheDerivedKey,
       },
     );
     if (raw == null) return null;

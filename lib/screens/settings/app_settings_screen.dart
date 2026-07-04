@@ -354,6 +354,17 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                         await vaultExplorerApi.setSecureScreen(v);
                       },
                     ),
+                    const Divider(height: 24),
+                    SettingsToggleRow(
+                      icon: Icons.key_rounded,
+                      title: 'Cache derived keys by default',
+                      subtitle:
+                          'Reuse the last derived key in Android Keystore for faster unlocks across supported methods.',
+                      value: _settings.defaultDerivedKeyCacheEnabled,
+                      onChanged: (v) => setState(
+                        () => _settings.defaultDerivedKeyCacheEnabled = v,
+                      ),
+                    ),
                   ],
                 ),
 

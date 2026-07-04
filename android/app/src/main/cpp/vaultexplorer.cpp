@@ -871,7 +871,7 @@ if (cipherIdParam == 255 && hashIdParam == 255) {
     CascadeId resultCipher{};
     HashId resultHash{};
 
-   // FIX (perf): deriving 192 bytes unconditionally makes every PBKDF2
+    // FIX (perf): deriving 192 bytes unconditionally makes every PBKDF2
     // call cost 3x what a single-cipher (64-byte key) candidate needs —
     // each extra 64-byte output block costs a full extra `iterations`
     // pass. Only derive as many bytes as the widest candidate cascade

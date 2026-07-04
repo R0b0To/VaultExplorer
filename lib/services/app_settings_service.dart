@@ -25,6 +25,7 @@ class AppSettings {
   bool videoAutoPlay;
   bool blockScreenshots;
   bool defaultDerivedKeyCacheEnabled;
+  bool lockContainersOnScreenLock;
 
   /// App-wide default thumbnail cache mode, applied to every container whose
   /// [ContainerRecord.thumbnailCacheMode] is null.
@@ -41,6 +42,7 @@ class AppSettings {
     this.defaultDocumentProvider = false,
     this.videoAutoPlay = true,
     this.blockScreenshots = false,
+    this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
     Map<String, String>? extensionPreferences,
@@ -79,6 +81,7 @@ class AppSettings {
     'videoAutoPlay': videoAutoPlay,
     'blockScreenshots': blockScreenshots,
     'defaultDerivedKeyCacheEnabled': defaultDerivedKeyCacheEnabled,
+    'lockContainersOnScreenLock': lockContainersOnScreenLock,
     'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
     'extensionPreferences': extensionPreferences,
   };
@@ -95,6 +98,8 @@ class AppSettings {
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
     defaultDerivedKeyCacheEnabled:
         j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
+    lockContainersOnScreenLock:
+        j['lockContainersOnScreenLock'] as bool? ?? false,
 
     // Resolve nullable parsed mode and default to appCache if null
     defaultThumbnailCacheMode:

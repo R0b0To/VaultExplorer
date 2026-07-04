@@ -124,21 +124,23 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
     final shouldSavePassword = needsPassword && (wasNone || _changePassword);
 
     final record = ContainerRecord(
-      uri: widget.uri,
-      label: label,
-      rememberPassword: needsPassword,
-      unlockMethod: _unlockMethod,
-      autoCloseMins: _autoCloseMins,
-      documentProvider: _documentProvider,
-      thumbnailCacheMode: _thumbnailCacheMode,
-      cacheDerivedKey: _cacheDerivedKey,
-      pendingPassword: shouldSavePassword && _passwordCtrl.text.isNotEmpty
-          ? _passwordCtrl.text
-          : null,
-      pendingPatternHash: _unlockMethod == ContainerUnlockMethod.pattern
-          ? _patternHash
-          : null,
-    );
+  uri: widget.uri,
+  label: label,
+  rememberPassword: needsPassword,
+  unlockMethod: _unlockMethod,
+  autoCloseMins: _autoCloseMins,
+  documentProvider: _documentProvider,
+  thumbnailCacheMode: _thumbnailCacheMode,
+  cacheDerivedKey: _cacheDerivedKey,
+  pendingPassword: shouldSavePassword && _passwordCtrl.text.isNotEmpty
+      ? _passwordCtrl.text
+      : null,
+  pendingPatternHash: _unlockMethod == ContainerUnlockMethod.pattern
+      ? _patternHash
+      : null,
+  cipherId: widget.existingRecord?.cipherId ?? 255,
+  hashId: widget.existingRecord?.hashId ?? 255,
+);
     await ContainerRepository.instance.save(record);
     if (!_cacheDerivedKey) {
       await vaultExplorerApi.clearDerivedKey(widget.uri);

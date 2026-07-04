@@ -54,6 +54,38 @@ class _VaultDashboardState extends State<VaultDashboard>
       for (final c in List<MountedContainer>.from(_mounted)) {
         _refreshContainerSpace(c.volId);
       }
+    } else if (state == AppLifecycleState.paused) {
+      // FIX: "paused" fires both when the app is backgrounded and when the
+      // screen is turned off while this app is foreground — the closest
+      // proxy Flutter exposes to a screen-lock event. Locking here honours
+      // AppSettings.lockContainersOnScreenLock (default: enabled).
+      if (_appSettings.lockContainersOnScreenLock) {
+        _lockAllContainersOnScreenOff();
+      }
+    }
+  }
+
+  /// Locks every currently-mounted container in response to the screen
+  /// turning off / the app being backgrounded, when
+  /// [AppSettings.lockContainersOnScreenLock] is enabled.
+  ///
+  /// Containers with an in-flight file operation are skipped (the lock
+  /// guard fails to acquire) rather than interrupting a copy/move — they'll
+  /// remain unlocked until the operation finishes and the user locks
+  /// manually, same as the existing auto-close behavior.
+  Future<void> _lockAllContainersOnScreenOff() async {
+    for (final c in List<MountedContainer>.from(_mounted)) {
+      if (!vaultExplorerApi.acquireLockGuard(c.volId)) continue;
+      try {
+        await vaultExplorerApi.lockContainer(c.uri);
+        _onContainerLocked(c.volId);
+      } catch (e) {
+        debugPrint(
+          'Lock-on-screen-off failed for volId=${c.volId}: $e',
+        );
+      } finally {
+        vaultExplorerApi.releaseLockGuard(c.volId);
+      }
     }
   }
 

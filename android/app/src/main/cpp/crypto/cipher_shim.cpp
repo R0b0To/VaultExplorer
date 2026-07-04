@@ -251,7 +251,7 @@ bool pbkdf2Hmac(HashId hash,
         int ret = mbedtls_pkcs5_pbkdf2_hmac(&ctx, password, passwordLen, salt, saltLen, iterations, outLen, out);
         mbedtls_md_free(&ctx);
         return ret == 0;
-    } else {
-        return pbkdf2HmacCustom(hash, password, passwordLen, salt, saltLen, iterations, out, outLen);
     }
+
+    return pbkdf2HmacCustom(hash, password, passwordLen, salt, saltLen, iterations, out, outLen);
 }

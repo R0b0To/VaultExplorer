@@ -47,7 +47,7 @@ class _VaultDashboardState extends State<VaultDashboard>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    VaultExplorerApi.onUsbContainerDetachedCallback = _onUsbContainerDetached;
+    VaultExplorerApi.addUsbContainerDetachedListener(_onUsbContainerDetached);
     _loadAll();
   }
 
@@ -57,9 +57,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     for (final t in _autoCloseTimers.values) t.cancel();
     _autoCloseTimers.clear();
     _autoLockTimer?.cancel();
-    if (identical(VaultExplorerApi.onUsbContainerDetachedCallback, _onUsbContainerDetached)) {
-      VaultExplorerApi.onUsbContainerDetachedCallback = null;
-    }
+    VaultExplorerApi.removeUsbContainerDetachedListener(_onUsbContainerDetached);
     super.dispose();
   }
 
@@ -261,6 +259,9 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (!mounted) return;
     if (!_mounted.any((c) => c.volId == volId)) return;
     _onContainerLocked(volId);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('USB drive disconnected — container locked')),
+    );
   }
 
   /// Used instead of [_onContainerMounted] when [UsbUnlockSheet] detects

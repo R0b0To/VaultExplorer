@@ -27,7 +27,6 @@ import 'widgets/selection_app_bar.dart';
 import '../vault/vault_item_detail_screen.dart';
 import '../vault/vault_item_edit_screen.dart';
 import '../../utils/file_type_utils.dart';
-import '../../theme.dart'; // Design tokens for AppRadius, AppIconSize, AppSpacing
 
 // ── Layout mode ───────────────────────────────────────────────────────────────
 
@@ -102,15 +101,23 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     super.initState();
     _freeSpace = widget.container.freeSpace;
     _initSettingsAndContents();
+    VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
   }
 
   @override
   void dispose() {
+    VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
     _searchController.dispose();
     super.dispose();
   }
 
   void _signalActivity() => widget.onUserActivity?.call();
+
+
+  void _onContainerDetached(int volId) {
+    if (!mounted || volId != widget.container.volId) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -245,11 +252,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   void _handleDirTap(String rawItem) {
     _signalActivity();
-    if (isSelectionMode) {
+    if (isSelectionMode)
       toggleSelectItem(rawItem);
-    } else {
+    else
       _enterDirectory(rawItem);
-    }
   }
 
   Future<void> _handleFileTap(String rawItem) async {
@@ -383,13 +389,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   InkWell(
                     onTap: () =>
                         Navigator.of(context).pop(isMedia ? 'media' : 'editor'),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderRadius: BorderRadius.circular(12),
                     child: Ink(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: cs.surfaceContainerLow,
                         border: Border.all(color: cs.outlineVariant),
-                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
@@ -398,7 +404,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                                 ? Icons.play_circle_outline_rounded
                                 : Icons.edit_note_rounded,
                             color: cs.primary,
-                            size: AppIconSize.action,
+                            size: 28,
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -409,7 +415,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                                   isMedia
                                       ? 'In-app Media Viewer'
                                       : 'In-app Text Editor',
-                                  style: textTheme.titleMedium,
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 Text(
                                   isMedia
@@ -433,20 +441,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   const SizedBox(height: 12),
                   InkWell(
                     onTap: () => Navigator.of(context).pop('external'),
-                    borderRadius: BorderRadius.circular(AppRadius.md),
+                    borderRadius: BorderRadius.circular(12),
                     child: Ink(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: cs.surfaceContainerLow,
                         border: Border.all(color: cs.outlineVariant),
-                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             Icons.open_in_new_rounded,
                             color: cs.secondary,
-                            size: AppIconSize.action,
+                            size: 28,
                           ),
                           const SizedBox(width: 16),
                           Expanded(
@@ -455,7 +463,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                               children: [
                                 Text(
                                   'External App',
-                                  style: textTheme.titleMedium,
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                                 Text(
                                   'Send file to third-party app',
@@ -985,7 +995,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   ? Icons.arrow_upward_rounded
                   : Icons.arrow_downward_rounded)
             : Icons.sort_rounded,
-        size: AppIconSize.small,
+        size: 16,
         color: isActive ? cs.primary : cs.onSurfaceVariant,
       ),
       child: Text(
@@ -999,7 +1009,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
-  @override
+ @override
   Widget build(BuildContext context) {
     final dirs = _currentItems.where((f) => f.startsWith('[DIR]')).toList()
       ..sort(compareItems);
@@ -1050,6 +1060,14 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         appBar: _buildAppBar(context, filteredDirs, filteredFiles),
 
         // ── Floating activity stack ───────────────────────────────────────
+        //
+        // FIX: previously the clipboard pill was a `floatingActionButton`
+        // (centerFloat) while the operation progress bar was a *different*,
+        // differently-styled widget docked in-flow inside the body Column
+        // above the status bar. The two could overlap unpredictably and
+        // shared no color language. Both now live in one FloatingActivityStack
+        // overlaid via Stack, matching the exact pattern used on the
+        // dashboard, so the two screens now feel like one coherent system.
         body: Stack(
           children: [
             Column(
@@ -1069,21 +1087,17 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                 const Divider(),
                 Expanded(child: _buildBody(filteredDirs, filteredFiles)),
                 if (_statusMessage != null)
-                  SafeArea(
-                    top: false,
-                    child: _StatusBar(
-                      message: _statusMessage!,
-                      isError: _statusIsError,
-                      onDismiss: _clearStatus,
-                    ),
+                  _StatusBar(
+                    message: _statusMessage!,
+                    isError: _statusIsError,
+                    onDismiss: _clearStatus,
                   ),
               ],
             ),
-            Positioned(
+Positioned(
               left: 0,
               right: 0,
-              // MD3 Edge-to-edge calculation for bottom elements
-              bottom: 16 + MediaQuery.paddingOf(context).bottom,
+              bottom: 16,
               child: Center(
                 child: FloatingActivityStack(onPaste: _paste),
               ),
@@ -1188,12 +1202,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           style: textTheme.bodyMedium?.copyWith(color: cs.onSurface),
           decoration: InputDecoration(
             hintText: 'Search in this folder…',
-            hintStyle: textTheme.bodyMedium?.copyWith(color: cs.outline),
+            hintStyle: TextStyle(color: cs.outline, fontSize: 14),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
-            errorBorder: InputBorder.none,
-            focusedErrorBorder: InputBorder.none,
             filled: false,
             contentPadding: EdgeInsets.zero,
           ),
@@ -1225,55 +1237,80 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           tooltip: 'Search in this folder',
           onPressed: () => setState(() => _isSearchActive = true),
         ),
-        // ── + menu (Migrated to MenuAnchor for perfectly consistent component styling) ───
-        MenuAnchor(
-          builder: (ctx, controller, child) => IconButton(
-            onPressed: () =>
-                controller.isOpen ? controller.close() : controller.open(),
-            icon: const Icon(Icons.add),
-            tooltip: 'New item',
-          ),
-          menuChildren: [
-            MenuItemButton(
-              onPressed: () {
-                _signalActivity();
+        // ── + menu ────────────────────────────────────────────────────────
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.add),
+          tooltip: 'New item',
+          onSelected: (v) {
+            _signalActivity();
+            switch (v) {
+              case 'folder':
                 BrowserDialogs.showCreateFolder(
                   context,
                   container: widget.container,
                   currentDirPath: _currentDirPath,
                   onSuccess: () => _loadDirectoryContents(_currentDirPath),
                 );
-              },
-              leadingIcon: Icon(Icons.create_new_folder_outlined, color: cs.onSurfaceVariant, size: AppIconSize.standard),
-              child: const Text('New Folder'),
-            ),
-            MenuItemButton(
-              onPressed: () {
-                _signalActivity();
+              case 'file':
                 BrowserDialogs.showCreateFile(
                   context,
                   container: widget.container,
                   currentDirPath: _currentDirPath,
                   onSuccess: () => _loadDirectoryContents(_currentDirPath),
                 );
-              },
-              leadingIcon: Icon(Icons.insert_drive_file_outlined, color: cs.onSurfaceVariant, size: AppIconSize.standard),
-              child: const Text('New File'),
+              case 'import':
+                _importFilesFromDevice();
+              case 'import_folder':
+                _importFolderFromDevice();
+              // vault item types — value is 'vault:password', 'vault:paymentCard', etc.
+              default:
+                if (v.startsWith('vault:')) {
+                  final type = VaultItemType.fromJson(v.substring(6));
+                  _addVaultItem(type);
+                }
+            }
+          },
+          itemBuilder: (_) => [
+            // ── Files section ──────────────────────────────────────────────
+            PopupMenuItem(
+              value: 'folder',
+              child: Row(children: [
+                Icon(Icons.create_new_folder_outlined, color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('New Folder'),
+              ]),
+            ),
+            PopupMenuItem(
+              value: 'file',
+              child: Row(children: [
+                Icon(Icons.insert_drive_file_outlined, color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('New File'),
+              ]),
             ),
             const PopupMenuDivider(),
-            MenuItemButton(
-              onPressed: () => _importFilesFromDevice(),
-              leadingIcon: Icon(Icons.upload_file_outlined, color: cs.onSurfaceVariant, size: AppIconSize.standard),
-              child: const Text('Import Files'),
+            PopupMenuItem(
+              value: 'import',
+              child: Row(children: [
+                Icon(Icons.upload_file_outlined, color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('Import Files'),
+              ]),
             ),
-            MenuItemButton(
-              onPressed: () => _importFolderFromDevice(),
-              leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.onSurfaceVariant, size: AppIconSize.standard),
-              child: const Text('Import Folder'),
+            PopupMenuItem(
+              value: 'import_folder',
+              child: Row(children: [
+                Icon(Icons.drive_folder_upload_outlined, color: cs.onSurfaceVariant),
+                const SizedBox(width: 12),
+                const Text('Import Folder'),
+              ]),
             ),
+            // ── Vault section ──────────────────────────────────────────────
             const PopupMenuDivider(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            // Non-interactive label row
+            PopupMenuItem(
+              enabled: false,
+              height: 28,
               child: Text(
                 'SECURE ITEM',
                 style: textTheme.labelSmall?.copyWith(
@@ -1284,15 +1321,17 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               ),
             ),
             ...VaultItemType.values.map(
-              (type) => MenuItemButton(
-                onPressed: () => _addVaultItem(type),
-                leadingIcon: _VaultTypeIcon(type: type),
-                child: Text(type.label),
+              (type) => PopupMenuItem(
+                value: 'vault:${type.toJson()}',
+                child: Row(children: [
+                  _VaultTypeIcon(type: type),
+                  const SizedBox(width: 12),
+                  Text(type.label),
+                ]),
               ),
             ),
           ],
         ),
-        // ── ... (Folder Options) ────────────────────────────────────────────────────────
         MenuAnchor(
           builder: (ctx, controller, child) => IconButton(
             onPressed: () =>
@@ -1319,7 +1358,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               leadingIcon: Icon(
                 Icons.play_circle_outline_rounded,
                 color: cs.primary,
-                size: AppIconSize.standard,
               ),
               child: const Text('Play Media Here'),
             ),
@@ -1334,7 +1372,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                 _layoutMode == BrowserLayoutMode.list
                     ? Icons.grid_view_rounded
                     : Icons.view_list_rounded,
-                size: AppIconSize.standard,
               ),
               child: Text(
                 _layoutMode == BrowserLayoutMode.list
@@ -1411,7 +1448,7 @@ class _VaultTypeIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     final icon  = vaultIconForExt(type.name)  ?? Icons.lock_rounded;
     final color = vaultColorForExt(type.name) ?? Theme.of(context).colorScheme.primary;
-    return Icon(icon, size: AppIconSize.standard, color: color.withValues(alpha: 0.85));
+    return Icon(icon, size: 18, color: color.withValues(alpha: 0.85));
   }
 }
 
@@ -1428,7 +1465,7 @@ class _TruncatedBanner extends StatelessWidget {
       color: cs.tertiaryContainer,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(children: [
-        Icon(Icons.warning_amber_rounded, size: AppIconSize.small, color: cs.onTertiaryContainer),
+        Icon(Icons.warning_amber_rounded, size: 16, color: cs.onTertiaryContainer),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
@@ -1483,7 +1520,7 @@ class _FilterChipsBar extends StatelessWidget {
     final isSelected = currentFilter == filter;
     return FilterChip(
       showCheckmark: false,
-      avatar: Icon(icon, size: AppIconSize.small,
+      avatar: Icon(icon, size: 16,
           color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant),
       label: Text(label),
       selected: isSelected,
@@ -1514,27 +1551,16 @@ class _StatusBar extends StatelessWidget {
       duration: const Duration(milliseconds: 200),
       child: Container(
         key: ValueKey(message),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        color: bg,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
             Icon(
               isError ? Icons.error_outline_rounded : Icons.info_outline_rounded,
-              size: AppIconSize.standard,
+              size: 16,
               color: fg,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 message,
@@ -1546,7 +1572,7 @@ class _StatusBar extends StatelessWidget {
             ),
             GestureDetector(
               onTap: onDismiss,
-              child: Icon(Icons.close_rounded, size: AppIconSize.small, color: fg),
+              child: Icon(Icons.close_rounded, size: 16, color: fg),
             ),
           ],
         ),
@@ -1587,7 +1613,7 @@ class _StatsBar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
+                borderRadius: BorderRadius.circular(100),
               ),
               child: Text(
                 'filtered',
@@ -1612,7 +1638,7 @@ class _StatsBar extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: AppIconSize.inline, color: cs.onSurfaceVariant),
+        Icon(icon, size: 14, color: cs.onSurfaceVariant),
         const SizedBox(width: 6),
         Text(text, style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
       ],
@@ -1633,11 +1659,11 @@ class _EmptyPlaceholder extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Center(
       child: Padding(
-        padding: AppSpacing.pagePadding,
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.folder_open_rounded, size: AppIconSize.hero, color: cs.outline),
+            Icon(Icons.folder_open_rounded, size: 48, color: cs.outline),
             const SizedBox(height: 16),
             Text('Empty Folder',
                 style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
@@ -1649,7 +1675,7 @@ class _EmptyPlaceholder extends StatelessWidget {
               const SizedBox(height: 20),
               TextButton.icon(
                 onPressed: onBack,
-                icon: const Icon(Icons.arrow_upward_rounded, size: AppIconSize.small),
+                icon: const Icon(Icons.arrow_upward_rounded, size: 16),
                 label: const Text('Go back'),
               ),
             ],
@@ -1670,11 +1696,11 @@ class _SearchEmptyState extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Center(
       child: Padding(
-        padding: AppSpacing.pagePadding,
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.search_off_rounded, size: AppIconSize.hero, color: cs.outline),
+            Icon(Icons.search_off_rounded, size: 48, color: cs.outline),
             const SizedBox(height: 16),
             Text('No results',
                 style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),

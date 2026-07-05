@@ -100,6 +100,7 @@ static constexpr uint64_t FALLBACK_SECTOR_COUNT_UNINITIALIZED = 1000000; // see 
 // createContainerNative(). All offsets are body-relative (body[0] ==
 // absolute header byte 64, i.e. the first byte after the 64-byte salt).
 static constexpr int VC_HDR_OFF_KEY_CRC          = 8;    // 4 bytes: CRC-32 of the key-data area
+static constexpr int VC_HDR_OFF_HIDDEN_VOL_SIZE  = 28;   // 8 bytes: hidden-volume size (0 = normal-volume header)
 static constexpr int VC_HDR_OFF_VOLUME_SIZE      = 36;   // 8 bytes: total volume size
 static constexpr int VC_HDR_OFF_KEY_SCOPE_START  = 44;   // 8 bytes: byte offset of encrypted data area
 static constexpr int VC_HDR_OFF_KEY_SCOPE_SIZE   = 52;   // 8 bytes: size of encrypted data area
@@ -107,6 +108,39 @@ static constexpr int VC_HDR_OFF_SECTOR_SIZE      = 64;   // 4 bytes: sector size
 static constexpr int VC_HDR_OFF_HEADER_CRC       = 188;  // 4 bytes: CRC-32 of body[0..187]
 static constexpr int VC_HDR_CRC_COVERAGE_LEN     = 188;  // bytes [0,188) covered by the header CRC
 static constexpr int VC_HDR_KEY_CRC_COVERAGE_LEN = 256;  // bytes [192,448) covered by the key-data CRC
+
+// FIX (hidden volumes): a container's layout is
+//   [0,      65536)  primary header slot        (header lives at byte 0)
+//   [65536, 131072)  hidden-volume header slot   (header lives at byte 65536)
+//   [131072, ...)     data area
+// A hidden volume is unlocked with the SAME password field as the outer
+// volume — whichever header slot it decrypts against determines which
+// volume gets mounted (see Common/Volumes.h: TC_HIDDEN_VOLUME_HEADER_OFFSET
+// == TC_VOLUME_HEADER_SIZE). VC_DATA_AREA_OFFSET above is exactly
+// 2 * VC_HIDDEN_HEADER_OFFSET, i.e. "one primary + one hidden slot pair".
+static constexpr uint64_t VC_HIDDEN_HEADER_OFFSET = 65536ULL;
+
+// FatFs in this project is fixed at FF_MIN_SS == FF_MAX_SS == 512 (see
+// ffconf.h) — a perfectly valid VeraCrypt volume with a different
+// SectorSize field simply can't be mounted here, and unlock should say so
+// cleanly rather than silently misinterpreting sector boundaries.
+static constexpr uint32_t VC_SUPPORTED_SECTOR_SIZE = 512;
+
+// ── VeraCrypt-compatible keyfile "pool mixing" (Common/Keyfiles.c) ──────
+//
+// Faithful reimplementation of upstream KeyFileProcess()/KeyFilesApply().
+// This is NOT a KDF — it's a deterministic, order-dependent whitening step
+// applied to the raw password BEFORE that (possibly-extended, possibly
+// binary) password is handed to PBKDF2. Any deviation (pool size, per-file
+// CRC reset, additive-not-XOR mixing, the final combine-into-password step)
+// silently produces a different derived key than real VeraCrypt would for
+// the same password+keyfiles — i.e. a container that looks like "wrong
+// password" even though it's correct. Do not simplify this.
+static constexpr size_t KEYFILE_POOL_LEGACY_SIZE = 64;
+static constexpr size_t KEYFILE_POOL_SIZE        = 128;
+static constexpr size_t KEYFILE_MAX_READ_LEN     = 1024 * 1024;
+static constexpr size_t MAX_LEGACY_PASSWORD      = 64;  // pool-size selector threshold, matches upstream
+static constexpr size_t MAX_PASSWORD_LEN         = 128; // current VeraCrypt max password length
 
 // FIX P14: Use a much larger batch for container creation to reduce pwrite()
 // syscall count. 4096 sectors = 2 MB per write vs 32 KB — 64× fewer syscalls
@@ -167,6 +201,26 @@ struct VolumeState {
     int        fd = -1;
     uint64_t   dataOffset = 0;
     bool       relTweak = false;
+
+    // FIX (hidden volumes): EncryptedAreaLength read directly out of the
+    // header that unlocked this volume. Drives GET_SECTOR_COUNT so a
+    // hidden volume's filesystem never sees space belonging to the outer
+    // volume (which would corrupt the outer volume on write). 0 only
+    // between createContainerNative()'s format step and its post-format
+    // reset, where the file-size-based fallback in disk_ioctl is correct.
+    uint64_t   dataAreaLengthBytes = 0;
+    // True iff the header that unlocked this volume had a nonzero
+    // HiddenVolumeSize field, i.e. this IS a hidden volume, not the outer
+    // one. Purely informational (UI badge) — nothing else branches on it.
+    bool       isHiddenVolume = false;
+
+    // NOTE: there used to be a `relTweak` flag here, guessed by scanning
+    // sectors for a 0x55AA boot signature under two different tweak
+    // conventions. Removed: the VeraCrypt XTS tweak (data-unit number) is
+    // ALWAYS relative to this volume's own dataOffset — that's what lets a
+    // hidden volume carry a tweak schedule starting fresh at 0, identical
+    // to a standalone volume, entirely independent of where its data area
+    // physically sits inside the outer container. See disk_read/disk_write.
     bool       dataCtxInitialized = false;
     uint64_t   fileSize = 0;
     bool       fsMounted = false;
@@ -205,6 +259,8 @@ struct VolumeState {
         fd = -1;
         dataOffset = 0;
         relTweak = false;
+        dataAreaLengthBytes = 0;
+        isHiddenVolume = false;
         fileSize = 0;
         isUsbSource = false;
         partitionStartSector = 0;
@@ -239,7 +295,6 @@ static JavaVM*   g_vm             = nullptr;
 static jclass    g_usbBridgeClass = nullptr;
 static jmethodID g_usbReadMethod  = nullptr;  // static byte[]  readSectors(int, long, int)
 static jmethodID g_usbWriteMethod = nullptr;  // static boolean writeSectors(int, long, int, byte[])
-
 static bool isValidBootSector(const unsigned char* decS) {
     // End of sector signature must be 0x55AA
     if (decS[510] != 0x55 || decS[511] != 0xAA) {
@@ -264,6 +319,134 @@ static bool isValidBootSector(const unsigned char* decS) {
     }
 
     return false;
+}
+// ── VeraCrypt-compatible keyfile pool mixing ─────────────────────────────
+//
+// See the constants block above for the "why this exists / do not simplify"
+// rationale. This mirrors Common/Keyfiles.c's KeyFileProcess()/
+// KeyFilesApply() exactly.
+
+// Same reflected CRC-32 (IEEE 802.3, polynomial 0xEDB88320) construction
+// crc32() below uses, run one byte at a time instead of table-driven — a
+// CRC table entry IS the result of running this exact bit loop 8 times
+// over (crc_low_byte XOR input_byte), so this is bit-identical to the
+// table-driven "UPDC32" macro upstream's Crc.c defines, just without
+// needing to vendor that table. Deliberately NOT XORed with 0xFFFFFFFF at
+// the end: upstream keyfile mixing uses the raw running CRC register value
+// directly as mixing entropy (`crc = UPDC32(byte, crc);` immediately
+// followed by using crc's individual bytes) — unlike a "report this as the
+// file's checksum" use of CRC-32, there is no final inversion here.
+static inline uint32_t crc32UpdateByte(uint32_t crc, unsigned char b) {
+    crc ^= b;
+    for (int i = 0; i < 8; i++)
+        crc = (crc >> 1) ^ (0xEDB88320u & ~((crc & 1) - 1));
+    return crc;
+}
+
+// Mirrors KeyFileProcess(): reads up to KEYFILE_MAX_READ_LEN bytes from
+// [fd], maintaining its OWN fresh CRC state (starting at 0xFFFFFFFF, reset
+// per keyfile call — deliberate; each keyfile's contribution uses an
+// independent running CRC, only the additive writes into [keyPool] are
+// shared/cumulative across keyfiles). Every byte read advances the CRC and
+// adds 4 bytes (crc>>24, crc>>16, crc>>8, crc) into keyPool at a rotating
+// position, wrapping at keyPoolSize. Does NOT close fd.
+static bool mixKeyfileIntoPool(int fd, unsigned char* keyPool, size_t keyPoolSize) {
+    unsigned char buffer[64 * 1024];
+    uint32_t crc = 0xFFFFFFFFu;
+    uint32_t writePos = 0;
+    size_t totalRead = 0;
+    bool sawAnyByte = false;
+
+    while (totalRead < KEYFILE_MAX_READ_LEN) {
+        ssize_t n = read(fd, buffer, sizeof(buffer));
+        if (n < 0) return false; // read error
+        if (n == 0) break;       // EOF
+
+        for (ssize_t i = 0; i < n; i++) {
+            sawAnyByte = true;
+            crc = crc32UpdateByte(crc, buffer[i]);
+
+            keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + ((crc >> 24) & 0xFF));
+            writePos = (writePos + 1) % keyPoolSize;
+            keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + ((crc >> 16) & 0xFF));
+            writePos = (writePos + 1) % keyPoolSize;
+            keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + ((crc >> 8) & 0xFF));
+            writePos = (writePos + 1) % keyPoolSize;
+            keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + (crc & 0xFF));
+            writePos = (writePos + 1) % keyPoolSize;
+
+            if (++totalRead >= KEYFILE_MAX_READ_LEN) break;
+        }
+    }
+
+    // Upstream treats a keyfile that produced zero bytes as ERR_HANDLE_EOF
+    // (a hard error, not a no-op) — an empty keyfile is almost certainly a
+    // mistake, and silently ignoring it would mean the derived key doesn't
+    // match what the user expects, so we surface it the same way.
+    return sawAnyByte;
+}
+
+// Mixes the readable contents of keyfileFds[0..keyfileCount) into
+// [password]/[passwordLen] IN PLACE, exactly matching KeyFilesApply()'s
+// keyfile-pool step followed by its "mix pool into password" step.
+//
+//  - [password] must point at a buffer of at least MAX_PASSWORD_LEN bytes.
+//  - [passwordLen] is both the CURRENT password length and an out-param:
+//    it may grow (never shrink) if the keyfile pool is larger than the
+//    original password, exactly as upstream does.
+//  - After this call [password] is arbitrary binary data — it can contain
+//    embedded 0x00 bytes and MUST NOT be treated as a C string from here
+//    on; always carry it with [passwordLen] explicitly, never strlen().
+//  - Every fd in [keyfileFds] is read once and then CLOSED by this
+//    function, matching this file's existing single-use-fd convention for
+//    descriptors crossing the JNI boundary (see e.g. createContainerNative's
+//    `close(fd)`). Callers should hand over fds obtained via e.g.
+//    ParcelFileDescriptor.detachFd() on the Kotlin side.
+//  - Returns false if keyfileCount > 0 and ANY keyfile could not be read
+//    (bad fd, permission error, or a genuinely empty file). On false,
+//    [password]/[passwordLen] are left untouched.
+static bool applyKeyfilesToPassword(const int* keyfileFds, int keyfileCount,
+                                     unsigned char* password, size_t* passwordLen) {
+    if (keyfileCount <= 0) return true;
+    if (!keyfileFds || !password || !passwordLen) return false;
+
+    // Pool size selection is based on the password length AS TYPED, before
+    // any mixing — matches upstream's (slightly quirky, but real) behavior.
+    const size_t keyPoolSize = (*passwordLen <= MAX_LEGACY_PASSWORD)
+        ? KEYFILE_POOL_LEGACY_SIZE : KEYFILE_POOL_SIZE;
+
+    unsigned char keyPool[KEYFILE_POOL_SIZE] = {0};
+    bool ok = true;
+
+    // Every fd is consumed (read + closed) regardless of an earlier
+    // failure, so callers never leak descriptors on a partial-failure path.
+    for (int i = 0; i < keyfileCount; i++) {
+        int fd = keyfileFds[i];
+        if (fd < 0) { ok = false; continue; }
+        if (!mixKeyfileIntoPool(fd, keyPool, keyPoolSize)) ok = false;
+        close(fd);
+    }
+
+    if (!ok) {
+        mbedtls_platform_zeroize(keyPool, sizeof(keyPool));
+        return false;
+    }
+
+    // KeyFilesApply()'s final step: additively mix the pool into the
+    // existing password bytes, then extend (never truncate) the password
+    // with the remaining pool bytes if the pool is larger than it.
+    const size_t applyLen = std::min(keyPoolSize, MAX_PASSWORD_LEN);
+    for (size_t i = 0; i < applyLen; i++) {
+        if (i < *passwordLen)
+            password[i] = static_cast<unsigned char>(password[i] + keyPool[i]);
+        else
+            password[i] = keyPool[i];
+    }
+    if (*passwordLen < applyLen)
+        *passwordLen = applyLen;
+
+    mbedtls_platform_zeroize(keyPool, sizeof(keyPool));
+    return true;
 }
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
@@ -1231,34 +1414,18 @@ static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector,
     return result; // found == false
 }
 
-// FIX (perf, fix #2): prepareSession() (file-backed) always knows exactly
-// where its header lives (offset 0 of the fd) and calls
-// deriveAndValidateHeader() exactly once. prepareUsbSession() does NOT have
-// that luxury — a raw USB block device may have its VeraCrypt header at the
-// start of the disk (`{0,0}`, the common case for this app's own "encrypt
-// whole USB drive" flow) OR at the start of a partition read off a real
-// MBR/GPT table (the common case for a drive that came from official
-// VeraCrypt "encrypt a partition/drive"). Since we can't tell which without
-// trying, every unlock loops over every candidate offset and calls the
-// (already fully-optimized, see deriveAndValidateHeader's `neededKeyBytes`)
-// derivation once per candidate — so a device with, say, one real partition
-// plus the always-appended {0,0} fallback pays for it TWICE what a file
-// container pays, even once cipherId/hashId are cached from a previous
-// unlock via matchedCipherId/matchedHashId (fix #1 above). This is the
-// actual source of "USB unlock feels slower than file unlock" — it was
-// never a missing byte-length optimization (that part is shared code and
-// already applies equally to both paths).
-//
-// [partitionOffsetHint] lets a caller who already knows the answer (Kotlin
-// persists it the same way it persists matchedCipherId/matchedHashId, see
-// getMatchedPartitionOffset() below) skip the search entirely: we move that
-// offset to the front of the candidate list so the common "already unlocked
-// this device before" case costs exactly one derivation, matching the file
-// path. -1 means "unknown / first unlock" and preserves the old
-// try-everything behaviour.
+
 static bool prepareUsbSession(const char* password, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0, int64_t partitionOffsetHint = -1) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
     VolumeState& v = volumes[volId];
+    std::lock_guard<std::mutex> derivationLock(derivationMutexes[volId]);
+    {
+        std::lock_guard<std::mutex> lock(v.mutex);
+        if (v.dataCtxInitialized && v.isUsbSource) {
+            LOGI("prepareUsbSession(vol=%d): session prepared by another thread", volId);
+            return true;
+        }
+    }
 
     std::vector<PartitionCandidate> partitions;
 
@@ -1312,11 +1479,7 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
 
     partitions.push_back({0, 0});
 
-    // Move the previously-successful offset (if any) to the front so the
-    // common "reconnecting the same drive" case does exactly one derivation
-    // instead of re-walking every candidate from scratch. Falls back to
-    // trying it as an extra first candidate if the current MBR/GPT scan
-    // didn't happen to surface it (e.g. read a truncated sector0 this time).
+    // Move the previously-successful offset (if any) to the front
     if (partitionOffsetHint >= 0) {
         const uint64_t hint = static_cast<uint64_t>(partitionOffsetHint);
         auto hintIt = std::find_if(partitions.begin(), partitions.end(),
@@ -1338,11 +1501,6 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
     std::vector<unsigned char> derivedKeyBytes;
 
     for (const auto& part : partitions) {
-        unsigned char headerBuf[VC_FULL_HEADER_SIZE];
-        if (!usbReadSectors(volId, part.startSector, 1, headerBuf)) {
-            continue;
-        }
-
         unsigned char dKey[192]{};
         CascadeId matchedCipher;
         HashId matchedHash;
@@ -1359,6 +1517,12 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
             }
             derivedSuccessfully = true;
         } else {
+            // --- OPTIMIZATION 2: Bypass USB Header Read ---
+            // Only pay the USB latency cost of reading the header if we actually need to PBKDF2 it.
+            unsigned char headerBuf[VC_FULL_HEADER_SIZE];
+            if (!usbReadSectors(volId, part.startSector, 1, headerBuf)) {
+                continue;
+            }
             LOGI("prepareUsbSession(vol=%d): no preserved key available, falling back to PBKDF2", volId);
             derivedSuccessfully = deriveAndValidateHeader(headerBuf, password, pim, cipherId, hashId, dKey, matchedCipher, matchedHash);
         }

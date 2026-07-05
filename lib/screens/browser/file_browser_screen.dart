@@ -332,8 +332,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   void _openMediaViewer(String fileName, String fullPath) {
-    final mediaEntries = _currentItems
+
+    final sortedItems = _currentItems
         .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
+        .toList()
+      ..sort(compareItems);
+
+    final mediaEntries = sortedItems
         .map((f) => RawEntry.parse(f).name)
         .where(_isSupportedMedia)
         .toList();
@@ -555,8 +560,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
-    final localMedia = _currentItems
+    final sortedItems = _currentItems
         .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
+        .toList()
+      ..sort(compareItems);
+    final localMedia = sortedItems
         .map((f) => RawEntry.parse(f).name)
         .where(_isSupportedMedia)
         .toList();

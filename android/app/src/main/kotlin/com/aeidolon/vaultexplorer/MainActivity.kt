@@ -75,6 +75,7 @@ private object ChannelMethods {
     const val LIST_USB_DEVICES     = "listUsbDevices"
     const val REQUEST_USB_PERMISSION = "requestUsbPermission"
     const val UNLOCK_USB_CONTAINER = "unlockUsbContainer"
+    const val DOCUMENT_EXISTS = "documentExists"
 }
 
 private const val MAX_CHUNK_BYTES = 64 * 1024 * 1024  // 64 MB
@@ -919,6 +920,38 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             } catch (e: Exception) {
                                 runOnUiThread { dispatchNativeError(e, result) }
                             }
+                        }.start()
+                    }
+
+                    ChannelMethods.DOCUMENT_EXISTS -> {
+                        val filePath = call.argument<String>("filePath")
+
+                        if (filePath == null) {
+                            result.error("INVALID_ARGS", "filePath required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        Thread {
+                            // FIX: an exception here (revoked SAF grant, IO error,
+                            // etc.) is treated as "doesn't exist" rather than a hard
+                            // failure via result.error — unlike the crypto calls
+                            // above, the Dart side only needs a yes/no to decide
+                            // whether to show "container not found", and a failed
+                            // check IS effectively "not currently reachable" for
+                            // that purpose. See VaultExplorerApi.documentExists's
+                            // own catch block for the corresponding Dart-side
+                            // fallback if the channel call itself throws.
+                            val exists = try {
+                                if (filePath.startsWith("content://")) {
+                                    DocumentFile.fromSingleUri(this, Uri.parse(filePath))
+                                        ?.exists() == true
+                                } else {
+                                    File(filePath).exists()
+                                }
+                            } catch (e: Exception) {
+                                false
+                            }
+                            runOnUiThread { result.success(exists) }
                         }.start()
                     }
 

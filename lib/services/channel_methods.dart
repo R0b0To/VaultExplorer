@@ -47,4 +47,6 @@ abstract final class ChannelMethods {
   static const listUsbDevices = 'listUsbDevices';
   static const requestUsbPermission = 'requestUsbPermission';
   static const unlockUsbContainer = 'unlockUsbContainer';
+  static const documentExists = 'documentExists';
 }
+

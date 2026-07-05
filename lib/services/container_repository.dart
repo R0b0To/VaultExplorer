@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/thumbnail_cache_mode.dart';
+import 'vaultexplorer_api.dart';
 
 // ── ContainerUnlockMethod ─────────────────────────────────────────────────────
 
@@ -118,14 +119,14 @@ class ContainerRepository {
     await _persist();
   }
 
-  /// Completely removes a container — JSON entry, config, and Keystore entry.
-  Future<void> remove(String uri) async {
+Future<void> remove(String uri) async {
     await _ensureLoaded();
     _cache!.remove(uri);
-    // Always attempt Keystore deletion — even if rememberPassword was false,
-    // a stale entry might exist from a previous state.
     await _secure.delete(key: _keystoreKey(uri));
     await _secure.delete(key: _patternHashKey(uri));
+    try {
+      await vaultExplorerApi.clearDerivedKey(uri);
+    } catch (_) {}
     await _persist();
   }
 

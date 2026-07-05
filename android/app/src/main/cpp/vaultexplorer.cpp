@@ -23,6 +23,8 @@
 #include "ff.h"
 #include "diskio.h"
 #include "crypto/cascade.h"
+#include "crypto/vc_header_layout.h"
+#include "crypto/keyfile_mixing.h"
 #include <thread>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
@@ -82,65 +84,21 @@ static inline long long elapsedMs(const std::chrono::steady_clock::time_point& s
 //      supported; cascaded ciphers (Serpent, Twofish, ...) would need
 //      additional 64-byte keys at body offsets 256 and 320.
 //
-static constexpr size_t VC_SALT_SIZE            = 64;
-static constexpr size_t VC_HEADER_BODY_SIZE     = 448;
-static constexpr size_t VC_FULL_HEADER_SIZE     = 512;
-static constexpr uint64_t VC_DATA_AREA_OFFSET   = 131072ULL;
+// VC_SALT_SIZE, VC_HEADER_BODY_SIZE, VC_FULL_HEADER_SIZE, VC_DATA_AREA_OFFSET,
+// VC_KEY_OFFSET_MASTER, VC_HDR_OFF_*, VC_HDR_CRC_COVERAGE_LEN,
+// VC_HDR_KEY_CRC_COVERAGE_LEN, VC_HIDDEN_HEADER_OFFSET, and
+// VC_SUPPORTED_SECTOR_SIZE now live in crypto/vc_header_layout.h (named,
+// spec-cross-checked constants — see that file for the "why this number"
+// derivation from upstream Common/Volumes.h). KEYFILE_POOL_SIZE,
+// KEYFILE_POOL_LEGACY_SIZE, KEYFILE_MAX_READ_LEN, MAX_LEGACY_PASSWORD, and
+// MAX_PASSWORD_LEN live in crypto/keyfile_mixing.h alongside the mixing
+// function that uses them. What's left here is genuinely local to this file.
 static constexpr size_t IO_BUFFER_SIZE          = 262144;   // 256 KB
-static constexpr int    VC_KEY_OFFSET_MASTER    = 192;
 static constexpr int    VC_KEY_MATERIAL_LEN     = 64;
 static constexpr size_t MAX_DIR_ENTRIES         = 50000;
-static constexpr uint64_t SCAN_SECTORS          = 2048;
-static constexpr uint64_t SCAN_BATCH            = 64;
 static constexpr int    MKFS_WORK_BUF_SIZE      = 4096;
 static constexpr size_t MAX_CHUNK_SIZE          = 64 * 1024 * 1024; // 64 MB safety cap
 static constexpr uint64_t FALLBACK_SECTOR_COUNT_UNINITIALIZED = 1000000; // see disk_ioctl GET_SECTOR_COUNT
-
-// Named positions of the remaining header fields written by
-// createContainerNative(). All offsets are body-relative (body[0] ==
-// absolute header byte 64, i.e. the first byte after the 64-byte salt).
-static constexpr int VC_HDR_OFF_KEY_CRC          = 8;    // 4 bytes: CRC-32 of the key-data area
-static constexpr int VC_HDR_OFF_HIDDEN_VOL_SIZE  = 28;   // 8 bytes: hidden-volume size (0 = normal-volume header)
-static constexpr int VC_HDR_OFF_VOLUME_SIZE      = 36;   // 8 bytes: total volume size
-static constexpr int VC_HDR_OFF_KEY_SCOPE_START  = 44;   // 8 bytes: byte offset of encrypted data area
-static constexpr int VC_HDR_OFF_KEY_SCOPE_SIZE   = 52;   // 8 bytes: size of encrypted data area
-static constexpr int VC_HDR_OFF_SECTOR_SIZE      = 64;   // 4 bytes: sector size
-static constexpr int VC_HDR_OFF_HEADER_CRC       = 188;  // 4 bytes: CRC-32 of body[0..187]
-static constexpr int VC_HDR_CRC_COVERAGE_LEN     = 188;  // bytes [0,188) covered by the header CRC
-static constexpr int VC_HDR_KEY_CRC_COVERAGE_LEN = 256;  // bytes [192,448) covered by the key-data CRC
-
-// FIX (hidden volumes): a container's layout is
-//   [0,      65536)  primary header slot        (header lives at byte 0)
-//   [65536, 131072)  hidden-volume header slot   (header lives at byte 65536)
-//   [131072, ...)     data area
-// A hidden volume is unlocked with the SAME password field as the outer
-// volume — whichever header slot it decrypts against determines which
-// volume gets mounted (see Common/Volumes.h: TC_HIDDEN_VOLUME_HEADER_OFFSET
-// == TC_VOLUME_HEADER_SIZE). VC_DATA_AREA_OFFSET above is exactly
-// 2 * VC_HIDDEN_HEADER_OFFSET, i.e. "one primary + one hidden slot pair".
-static constexpr uint64_t VC_HIDDEN_HEADER_OFFSET = 65536ULL;
-
-// FatFs in this project is fixed at FF_MIN_SS == FF_MAX_SS == 512 (see
-// ffconf.h) — a perfectly valid VeraCrypt volume with a different
-// SectorSize field simply can't be mounted here, and unlock should say so
-// cleanly rather than silently misinterpreting sector boundaries.
-static constexpr uint32_t VC_SUPPORTED_SECTOR_SIZE = 512;
-
-// ── VeraCrypt-compatible keyfile "pool mixing" (Common/Keyfiles.c) ──────
-//
-// Faithful reimplementation of upstream KeyFileProcess()/KeyFilesApply().
-// This is NOT a KDF — it's a deterministic, order-dependent whitening step
-// applied to the raw password BEFORE that (possibly-extended, possibly
-// binary) password is handed to PBKDF2. Any deviation (pool size, per-file
-// CRC reset, additive-not-XOR mixing, the final combine-into-password step)
-// silently produces a different derived key than real VeraCrypt would for
-// the same password+keyfiles — i.e. a container that looks like "wrong
-// password" even though it's correct. Do not simplify this.
-static constexpr size_t KEYFILE_POOL_LEGACY_SIZE = 64;
-static constexpr size_t KEYFILE_POOL_SIZE        = 128;
-static constexpr size_t KEYFILE_MAX_READ_LEN     = 1024 * 1024;
-static constexpr size_t MAX_LEGACY_PASSWORD      = 64;  // pool-size selector threshold, matches upstream
-static constexpr size_t MAX_PASSWORD_LEN         = 128; // current VeraCrypt max password length
 
 // FIX P14: Use a much larger batch for container creation to reduce pwrite()
 // syscall count. 4096 sectors = 2 MB per write vs 32 KB — 64× fewer syscalls
@@ -320,133 +278,41 @@ static bool isValidBootSector(const unsigned char* decS) {
 
     return false;
 }
-// ── VeraCrypt-compatible keyfile pool mixing ─────────────────────────────
-//
-// See the constants block above for the "why this exists / do not simplify"
-// rationale. This mirrors Common/Keyfiles.c's KeyFileProcess()/
-// KeyFilesApply() exactly.
 
-// Same reflected CRC-32 (IEEE 802.3, polynomial 0xEDB88320) construction
-// crc32() below uses, run one byte at a time instead of table-driven — a
-// CRC table entry IS the result of running this exact bit loop 8 times
-// over (crc_low_byte XOR input_byte), so this is bit-identical to the
-// table-driven "UPDC32" macro upstream's Crc.c defines, just without
-// needing to vendor that table. Deliberately NOT XORed with 0xFFFFFFFF at
-// the end: upstream keyfile mixing uses the raw running CRC register value
-// directly as mixing entropy (`crc = UPDC32(byte, crc);` immediately
-// followed by using crc's individual bytes) — unlike a "report this as the
-// file's checksum" use of CRC-32, there is no final inversion here.
-static inline uint32_t crc32UpdateByte(uint32_t crc, unsigned char b) {
-    crc ^= b;
-    for (int i = 0; i < 8; i++)
-        crc = (crc >> 1) ^ (0xEDB88320u & ~((crc & 1) - 1));
-    return crc;
+// isValidBootSector() used to live here — it backed the boot-sector scan
+// that guessed a volume's data offset. That scan is gone (see prepareSession
+// / prepareUsbSession): dataOffset now comes straight from the CRC-validated
+// header's own EncryptedAreaStart field, exactly like upstream VeraCrypt's
+// ReadVolumeHeaderWithAbort() does, which is also what makes hidden volumes
+// (whose data area can start anywhere inside a multi-GB outer volume, far
+// past any small scan window) actually discoverable. See ParsedHeaderFields
+// and tryDecryptHeader() below. Keyfile pool mixing (the other half of this
+// change) lives in crypto/keyfile_mixing.h, included above.
+
+// Header fields this app needs beyond the master key material itself, all
+// read directly out of a CRC-validated header body — see
+// crypto/vc_header_layout.h for field offsets and upstream
+// Common/Volumes.c's ReadVolumeHeaderWithAbort() for the reference logic
+// this mirrors.
+struct ParsedHeaderFields {
+    uint64_t volumeSize          = 0; // total size of the volume this header describes
+    uint64_t hiddenVolumeSize    = 0; // 0 for a normal volume; nonzero => this header IS a hidden volume's
+    uint64_t encryptedAreaStart  = 0; // byte offset (from file/partition start) of THIS volume's data area
+    uint64_t encryptedAreaLength = 0; // byte length of that data area
+    uint32_t sectorSize          = 0;
+    bool isHiddenVolume() const { return hiddenVolumeSize != 0; }
+};
+
+static uint64_t readHeaderBE64(const unsigned char* body, int bodyOffset) {
+    uint64_t v = 0;
+    for (int i = 0; i < 8; i++) v = (v << 8) | body[bodyOffset + i];
+    return v;
 }
-
-// Mirrors KeyFileProcess(): reads up to KEYFILE_MAX_READ_LEN bytes from
-// [fd], maintaining its OWN fresh CRC state (starting at 0xFFFFFFFF, reset
-// per keyfile call — deliberate; each keyfile's contribution uses an
-// independent running CRC, only the additive writes into [keyPool] are
-// shared/cumulative across keyfiles). Every byte read advances the CRC and
-// adds 4 bytes (crc>>24, crc>>16, crc>>8, crc) into keyPool at a rotating
-// position, wrapping at keyPoolSize. Does NOT close fd.
-static bool mixKeyfileIntoPool(int fd, unsigned char* keyPool, size_t keyPoolSize) {
-    unsigned char buffer[64 * 1024];
-    uint32_t crc = 0xFFFFFFFFu;
-    uint32_t writePos = 0;
-    size_t totalRead = 0;
-    bool sawAnyByte = false;
-
-    while (totalRead < KEYFILE_MAX_READ_LEN) {
-        ssize_t n = read(fd, buffer, sizeof(buffer));
-        if (n < 0) return false; // read error
-        if (n == 0) break;       // EOF
-
-        for (ssize_t i = 0; i < n; i++) {
-            sawAnyByte = true;
-            crc = crc32UpdateByte(crc, buffer[i]);
-
-            keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + ((crc >> 24) & 0xFF));
-            writePos = (writePos + 1) % keyPoolSize;
-            keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + ((crc >> 16) & 0xFF));
-            writePos = (writePos + 1) % keyPoolSize;
-            keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + ((crc >> 8) & 0xFF));
-            writePos = (writePos + 1) % keyPoolSize;
-            keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + (crc & 0xFF));
-            writePos = (writePos + 1) % keyPoolSize;
-
-            if (++totalRead >= KEYFILE_MAX_READ_LEN) break;
-        }
-    }
-
-    // Upstream treats a keyfile that produced zero bytes as ERR_HANDLE_EOF
-    // (a hard error, not a no-op) — an empty keyfile is almost certainly a
-    // mistake, and silently ignoring it would mean the derived key doesn't
-    // match what the user expects, so we surface it the same way.
-    return sawAnyByte;
-}
-
-// Mixes the readable contents of keyfileFds[0..keyfileCount) into
-// [password]/[passwordLen] IN PLACE, exactly matching KeyFilesApply()'s
-// keyfile-pool step followed by its "mix pool into password" step.
-//
-//  - [password] must point at a buffer of at least MAX_PASSWORD_LEN bytes.
-//  - [passwordLen] is both the CURRENT password length and an out-param:
-//    it may grow (never shrink) if the keyfile pool is larger than the
-//    original password, exactly as upstream does.
-//  - After this call [password] is arbitrary binary data — it can contain
-//    embedded 0x00 bytes and MUST NOT be treated as a C string from here
-//    on; always carry it with [passwordLen] explicitly, never strlen().
-//  - Every fd in [keyfileFds] is read once and then CLOSED by this
-//    function, matching this file's existing single-use-fd convention for
-//    descriptors crossing the JNI boundary (see e.g. createContainerNative's
-//    `close(fd)`). Callers should hand over fds obtained via e.g.
-//    ParcelFileDescriptor.detachFd() on the Kotlin side.
-//  - Returns false if keyfileCount > 0 and ANY keyfile could not be read
-//    (bad fd, permission error, or a genuinely empty file). On false,
-//    [password]/[passwordLen] are left untouched.
-static bool applyKeyfilesToPassword(const int* keyfileFds, int keyfileCount,
-                                     unsigned char* password, size_t* passwordLen) {
-    if (keyfileCount <= 0) return true;
-    if (!keyfileFds || !password || !passwordLen) return false;
-
-    // Pool size selection is based on the password length AS TYPED, before
-    // any mixing — matches upstream's (slightly quirky, but real) behavior.
-    const size_t keyPoolSize = (*passwordLen <= MAX_LEGACY_PASSWORD)
-        ? KEYFILE_POOL_LEGACY_SIZE : KEYFILE_POOL_SIZE;
-
-    unsigned char keyPool[KEYFILE_POOL_SIZE] = {0};
-    bool ok = true;
-
-    // Every fd is consumed (read + closed) regardless of an earlier
-    // failure, so callers never leak descriptors on a partial-failure path.
-    for (int i = 0; i < keyfileCount; i++) {
-        int fd = keyfileFds[i];
-        if (fd < 0) { ok = false; continue; }
-        if (!mixKeyfileIntoPool(fd, keyPool, keyPoolSize)) ok = false;
-        close(fd);
-    }
-
-    if (!ok) {
-        mbedtls_platform_zeroize(keyPool, sizeof(keyPool));
-        return false;
-    }
-
-    // KeyFilesApply()'s final step: additively mix the pool into the
-    // existing password bytes, then extend (never truncate) the password
-    // with the remaining pool bytes if the pool is larger than it.
-    const size_t applyLen = std::min(keyPoolSize, MAX_PASSWORD_LEN);
-    for (size_t i = 0; i < applyLen; i++) {
-        if (i < *passwordLen)
-            password[i] = static_cast<unsigned char>(password[i] + keyPool[i]);
-        else
-            password[i] = keyPool[i];
-    }
-    if (*passwordLen < applyLen)
-        *passwordLen = applyLen;
-
-    mbedtls_platform_zeroize(keyPool, sizeof(keyPool));
-    return true;
+static uint32_t readHeaderBE32Body(const unsigned char* body, int bodyOffset) {
+    return (static_cast<uint32_t>(body[bodyOffset])     << 24) |
+           (static_cast<uint32_t>(body[bodyOffset + 1]) << 16) |
+           (static_cast<uint32_t>(body[bodyOffset + 2]) <<  8) |
+            static_cast<uint32_t>(body[bodyOffset + 3]);
 }
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
@@ -1479,7 +1345,6 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
 
     partitions.push_back({0, 0});
 
-    // Move the previously-successful offset (if any) to the front
     if (partitionOffsetHint >= 0) {
         const uint64_t hint = static_cast<uint64_t>(partitionOffsetHint);
         auto hintIt = std::find_if(partitions.begin(), partitions.end(),
@@ -1501,6 +1366,11 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
     std::vector<unsigned char> derivedKeyBytes;
 
     for (const auto& part : partitions) {
+        unsigned char headerBuf[VC_FULL_HEADER_SIZE];
+        if (!usbReadSectors(volId, part.startSector, 1, headerBuf)) {
+            continue;
+        }
+
         unsigned char dKey[192]{};
         CascadeId matchedCipher;
         HashId matchedHash;

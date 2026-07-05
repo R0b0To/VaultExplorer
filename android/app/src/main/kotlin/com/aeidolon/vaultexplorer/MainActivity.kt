@@ -101,9 +101,17 @@ private var usbPermissionReceiver: BroadcastReceiver? = null
 private var pendingUsbPermissionResult: MethodChannel.Result? = null
 private var pendingUsbPermissionDeviceName: String? = null
 
+// FIX: nothing previously listened for a USB drive being physically
+// unplugged, so a container mounted from it stayed in Dart's _mounted
+// list (shown as unlocked) forever after a real disconnect. This is a
+// protected system broadcast — only the OS can send it — fired the
+// instant the drive goes away, independent of any lock/unlock call.
+private var usbDetachReceiver: BroadcastReceiver? = null
+
     override fun onDestroy() {
     chooserReceiver?.let { unregisterReceiver(it) }
     usbPermissionReceiver?.let { unregisterReceiver(it) }
+    usbDetachReceiver?.let { unregisterReceiver(it) }
     super.onDestroy()
 }
 
@@ -570,6 +578,51 @@ private var pendingUsbPermissionDeviceName: String? = null
         return editor.commit()
     }
 
+    /**
+     * Fires the instant a USB drive is physically unplugged — no polling,
+     * no waiting for the next file operation to fail. If the detached
+     * device backs a currently-mounted container, force-cleans-up native
+     * state exactly like a manual lock would, then pushes
+     * "onUsbContainerDetached" to Dart so the dashboard can immediately
+     * drop it from the mounted list.
+     *
+     * No-ops for any device that isn't the backing store of an active
+     * session (e.g. an unrelated USB peripheral, or a mass-storage drive
+     * that was never unlocked in this app).
+     */
+    private fun handleUsbDeviceDetached(device: UsbDevice) {
+        val containerUri = "usb:${device.deviceName}"
+        val volId = VeraCryptSession.getVolumeIdByUri(containerUri) ?: return
+        val session = VeraCryptSession.activeSessions[volId]
+        if (session?.isUsbSource != true) return
+
+        Thread {
+            // Unregister first: the device is already gone, so this just
+            // guarantees the lockNative call below hits UsbBlockBridge's
+            // "not registered" null/false path instead of attempting real
+            // I/O against a dead USB connection.
+            UsbBlockBridge.unregister(volId)
+            try {
+                synchronized(VeraCryptSession.locks[volId]) {
+                    VeraCryptEngine.lockNative(volId)
+                }
+            } catch (e: Exception) {
+                // Best-effort — the device is gone either way, so a clean
+                // native unmount/flush isn't possible. Still fall through
+                // to free the session rather than leaving it stuck.
+                Log.w("VaultExplorer_C++", "lockNative on USB detach failed for volId=$volId: ${e.message}")
+            }
+            VeraCryptSession.removeSession(volId)
+            runOnUiThread {
+                contentResolver.notifyChange(
+                    DocumentsContract.buildRootsUri(
+                        "com.aeidolon.vaultexplorer.documents"), null)
+                methodChannel?.invokeMethod(
+                    "onUsbContainerDetached", mapOf("volId" to volId))
+            }
+        }.start()
+    }
+
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -623,6 +676,29 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 } else {
     @Suppress("UnspecifiedRegisterReceiverFlag")
     registerReceiver(usbPermissionReceiver, usbFilter)
+}
+
+usbDetachReceiver = object : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        if (intent?.action != UsbManager.ACTION_USB_DEVICE_DETACHED) return
+        val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
+        } ?: return
+        handleUsbDeviceDetached(device)
+    }
+}
+val detachFilter = IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED)
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    // Unlike usbFilter/filter above (custom actions we fire ourselves via
+    // PendingIntent/broadcast), this is a protected system broadcast that
+    // only the OS can send, so it doesn't need to be exported.
+    registerReceiver(usbDetachReceiver, detachFilter, RECEIVER_NOT_EXPORTED)
+} else {
+    @Suppress("UnspecifiedRegisterReceiverFlag")
+    registerReceiver(usbDetachReceiver, detachFilter)
 }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(chooserReceiver, filter, RECEIVER_EXPORTED)

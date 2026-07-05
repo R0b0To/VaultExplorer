@@ -9,7 +9,14 @@ import 'package:local_auth/local_auth.dart';
 import '../lock/pattern_lock_view.dart';
 
 class UsbUnlockSheet extends StatefulWidget {
-  final ValueChanged<MountedContainer> onMounted;
+  /// Called on every successful mount. [remember] reports whether the
+  /// caller should persist a fresh ContainerRecord for this uri — mirrors
+  /// the "Remember drive on dashboard" checkbox. It only matters for a
+  /// brand-new mount (no [existingRecord]); reconnects of an
+  /// already-saved record always pass true, since a record already exists
+  /// either way. Defaults to true so this stays a drop-in ValueChanged for
+  /// the file-based unlock flow, which has no such checkbox.
+  final void Function(MountedContainer container, {bool remember}) onMounted;
   final bool documentProvider;
 
   /// Set when unlocking from a saved dashboard entry (a "reconnect") rather
@@ -505,7 +512,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       ),
     );
   }
-        widget.onMounted(finalContainer);
+        // FIX: previously always onMounted(finalContainer) with no way for
+        // the dashboard to know whether _remember was checked — it would
+        // then persist a default ContainerRecord itself the first time it
+        // saw this uri, saving the drive to the dashboard even when the
+        // user left the checkbox unchecked. Pass _remember through so the
+        // dashboard's own "first time seeing this uri" save honors it.
+        widget.onMounted(finalContainer, remember: _remember);
       }
 
       HapticFeedback.lightImpact();

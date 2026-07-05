@@ -14,6 +14,12 @@ class VaultExplorerApi {
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;
 
+  /// Fired by MainActivity's ACTION_USB_DEVICE_DETACHED receiver the
+  /// instant a mounted USB drive is physically unplugged — native has
+  /// already force-locked and torn down the session by the time this
+  /// arrives, so the callback only needs to reconcile UI-side state.
+  static void Function(int volId)? onUsbContainerDetachedCallback;
+
   static void initMethodCallHandler() {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onAppSelected') {
@@ -21,6 +27,11 @@ class VaultExplorerApi {
         final pkg = call.arguments['package'] as String?;
         if (ext != null && pkg != null) {
           onAppSelectedCallback?.call(ext, pkg);
+        }
+      } else if (call.method == 'onUsbContainerDetached') {
+        final volId = call.arguments['volId'] as int?;
+        if (volId != null) {
+          onUsbContainerDetachedCallback?.call(volId);
         }
       }
     });

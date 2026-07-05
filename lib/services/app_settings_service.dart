@@ -84,7 +84,7 @@ class AppSettings {
     'blockScreenshots': blockScreenshots,
     'defaultDerivedKeyCacheEnabled': defaultDerivedKeyCacheEnabled,
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
-    'masterPasswordAutoLockMins': autoLockMins,
+    'autoLockMins': autoLockMins,
     'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
     'extensionPreferences': extensionPreferences,
   };

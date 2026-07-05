@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../utils/file_type_utils.dart';
 import '../../../utils/format_utils.dart';
 import '../../../utils/raw_entry.dart';
+import '../../../theme.dart'; // Design tokens for AppRadius, AppIconSize, AppSpacing
 import 'tile_selection_style.dart';
 
 /// Stateless renderer for a flat columned list of directory entries.
@@ -63,10 +64,15 @@ class FileListView extends StatelessWidget {
 
     return Column(
       children: [
-        const Divider(height: 1),
+        const Divider(),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            // Apply generous bottom padding so the last item can be scrolled fully 
+            // into view above the FloatingActivityStack and the system gesture pill.
+            padding: EdgeInsets.only(
+              top: 4, 
+              bottom: 100 + MediaQuery.paddingOf(context).bottom,
+            ),
             itemCount: total,
             itemBuilder: (_, index) {
               final isDir = index < dirs.length;
@@ -112,19 +118,20 @@ class FileListView extends StatelessWidget {
               return InkWell(
                 onTap: () => isDir ? onDirTap(rawItem) : onFileTap(rawItem),
                 onLongPress: () => onItemLongPress(rawItem),
-                child: Container(
+                // Ink allows the MD3 ripple effect to render correctly over colored backgrounds
+                child: Ink(
                   color: isSelected
                       ? TileSelectionStyle.selectedBackground(cs)
                       : Colors.transparent,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 10,
+                    vertical: 14, // Increased to meet MD3 48dp minimum touch target height
                   ),
                   child: Row(
                     children: [
                       Icon(
                         displayIcon,
-                        size: 22,
+                        size: AppIconSize.action,
                         color: TileSelectionStyle.leadingIconColor(
                           cs,
                           selected: isSelected,

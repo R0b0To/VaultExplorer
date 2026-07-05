@@ -47,6 +47,7 @@ class _VaultDashboardState extends State<VaultDashboard>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    VaultExplorerApi.onUsbContainerDetachedCallback = _onUsbContainerDetached;
     _loadAll();
   }
 
@@ -56,6 +57,9 @@ class _VaultDashboardState extends State<VaultDashboard>
     for (final t in _autoCloseTimers.values) t.cancel();
     _autoCloseTimers.clear();
     _autoLockTimer?.cancel();
+    if (identical(VaultExplorerApi.onUsbContainerDetachedCallback, _onUsbContainerDetached)) {
+      VaultExplorerApi.onUsbContainerDetachedCallback = null;
+    }
     super.dispose();
   }
 
@@ -220,11 +224,18 @@ class _VaultDashboardState extends State<VaultDashboard>
 
   // ── Container lifecycle ───────────────────────────────────────────────────
 
-  void _onContainerMounted(MountedContainer container) {
+  // FIX: previously always persisted a default ContainerRecord the first
+  // time it saw a new uri, regardless of whether the user had checked
+  // "Remember drive on dashboard" in UsbUnlockSheet — that checkbox only
+  // gated the sheet's own save call, so this one saved it right back
+  // anyway. [remember] defaults to true so file-based mounts (which have
+  // no such checkbox, and are always meant to persist) are unaffected;
+  // UsbUnlockSheet now passes the checkbox's actual value through.
+  void _onContainerMounted(MountedContainer container, {bool remember = true}) {
     setState(() => _mounted.add(container));
     _scheduleAutoClose(container);
 
-    if (!_records.containsKey(container.uri)) {
+    if (remember && !_records.containsKey(container.uri)) {
       final record = ContainerRecord(
         uri: container.uri,
         label: container.displayName,
@@ -233,6 +244,23 @@ class _VaultDashboardState extends State<VaultDashboard>
       _records[container.uri] = record;
       ContainerRepository.instance.save(record);
     }
+  }
+
+  // ── USB disconnect handling ──────────────────────────────────────────────
+
+  /// Pushed by MainActivity's ACTION_USB_DEVICE_DETACHED receiver the
+  /// instant a mounted USB drive is physically unplugged. Native has
+  /// already force-locked the volume and torn down its session by the
+  /// time this arrives, so this only needs to reconcile Dart-side state —
+  /// [_onContainerLocked]'s existing behavior already gives the right
+  /// end result: it drops the volId from [_mounted] and, since it never
+  /// touches [_records], the dashboard naturally shows a locked,
+  /// reconnectable entry if this uri was saved, or nothing at all if it
+  /// wasn't — i.e. "lock if remembered, lock-and-forget if not".
+  void _onUsbContainerDetached(int volId) {
+    if (!mounted) return;
+    if (!_mounted.any((c) => c.volId == volId)) return;
+    _onContainerLocked(volId);
   }
 
   /// Used instead of [_onContainerMounted] when [UsbUnlockSheet] detects

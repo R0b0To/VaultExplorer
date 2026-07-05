@@ -9,6 +9,7 @@ import '../../../utils/file_type_utils.dart';
 import '../../../utils/lru_cache.dart';
 import '../../../utils/raw_entry.dart';
 import '../viewer/media_viewer_constants.dart';
+import '../../../theme.dart'; // Design tokens for AppRadius, AppIconSize, AppSpacing
 
 /// A dynamic gallery grid for the file browser supporting pinch-to-zoom.
 class FileGridView extends StatefulWidget {
@@ -92,7 +93,13 @@ class _FileGridViewState extends State<FileGridView> {
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
       child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(10, 12, 10, 24),
+        // Generous bottom padding for Edge-to-Edge compliance and FloatingActivityStack clearance
+        padding: EdgeInsets.fromLTRB(
+          10, 
+          12, 
+          10, 
+          100 + MediaQuery.paddingOf(context).bottom,
+        ),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _crossAxisCount,
           crossAxisSpacing: 8,
@@ -126,7 +133,7 @@ class _FileGridViewState extends State<FileGridView> {
       preview: Center(
         child: Icon(
           Icons.folder_rounded,
-          size: _crossAxisCount == 1 ? 72 : 56,
+          size: _crossAxisCount == 1 ? AppIconSize.hero + 16 : AppIconSize.hero,
           color: isSelected ? cs.primary : cs.secondary,
         ),
       ),
@@ -166,7 +173,7 @@ class _FileGridViewState extends State<FileGridView> {
       previewWidget = Center(
         child: Icon(
           vaultIcon,
-          size: _crossAxisCount == 1 ? 52 : 40,
+          size: _crossAxisCount == 1 ? AppIconSize.hero : AppIconSize.feature,
           color: vaultColor,
         ),
       );
@@ -186,7 +193,7 @@ class _FileGridViewState extends State<FileGridView> {
       previewWidget = Center(
         child: Icon(
           iconForFile(cleanName),
-          size: _crossAxisCount == 1 ? 52 : 40,
+          size: _crossAxisCount == 1 ? AppIconSize.hero : AppIconSize.feature,
           color: colorForFile(cleanName),
         ),
       );
@@ -236,82 +243,80 @@ class _GridCell extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? cs.primaryContainer.withValues(alpha: 0.3)
-              : cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? cs.primary : cs.outlineVariant,
-            width: isSelected ? 1.5 : 1.0,
-          ),
+    return Card(
+      clipBehavior: Clip.antiAlias, // Ensures internal components match the Card's radii
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        side: BorderSide(
+          color: isSelected ? cs.primary : cs.outlineVariant,
+          width: isSelected ? 2.0 : 1.0, // MD3 active border is generally 2dp
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(11.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    preview,
-                    if (isSelected)
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: cs.primary.withValues(alpha: 0.12),
-                        ),
-                        child: Align(
-                          alignment: Alignment.topRight,
-                          child: Padding(
-                            padding: const EdgeInsets.all(6),
-                            child: _CheckBadge(
-                              color: cs.primary,
-                              onColor: cs.onPrimary,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-                color: isSelected
-                    ? cs.primaryContainer.withValues(alpha: 0.3)
-                    : cs.surfaceContainer,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: cs.onSurface,
+      ),
+      color: isSelected
+          ? cs.primaryContainer.withValues(alpha: 0.3)
+          : cs.surfaceContainerLow,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  preview,
+                  if (isSelected)
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: cs.primary.withValues(alpha: 0.12),
                       ),
                     ),
-                    if (sublabel != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        sublabel!,
-                        style: textTheme.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant,
+                  if (isSelected)
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: _CheckBadge(
+                          color: cs.primary,
+                          onColor: cs.onPrimary,
                         ),
                       ),
-                    ],
-                  ],
-                ),
+                    ),
+                ],
               ),
-            ],
-          ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              color: isSelected
+                  ? Colors.transparent // Card color handles background
+                  : cs.surfaceContainer,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  if (sublabel != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      sublabel!,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -325,9 +330,9 @@ class _CheckBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(3),
+    padding: const EdgeInsets.all(4),
     decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    child: Icon(Icons.check_rounded, size: 12, color: onColor),
+    child: Icon(Icons.check_rounded, size: AppIconSize.inline, color: onColor),
   );
 }
 
@@ -541,7 +546,7 @@ class _AsyncThumbState extends State<_AsyncThumb> {
   Widget _errorPlaceholder(ColorScheme cs) => Container(
     color: cs.surfaceContainerLow,
     child: Center(
-      child: Icon(Icons.broken_image_rounded, size: 28, color: cs.outline),
+      child: Icon(Icons.broken_image_rounded, size: AppIconSize.feature, color: cs.outline),
     ),
   );
 }
@@ -699,11 +704,11 @@ class _VideoThumb extends StatelessWidget {
         Align(
           alignment: Alignment.bottomRight,
           child: Padding(
-            padding: const EdgeInsets.all(6.0),
+            padding: const EdgeInsets.all(8.0),
             child: Icon(
               Icons.play_circle_outline_rounded,
-              size: 16,
-              color: cs.onSurface.withValues(alpha: 0.7),
+              size: AppIconSize.action,
+              color: cs.onSurface.withValues(alpha: 0.85),
             ),
           ),
         ),

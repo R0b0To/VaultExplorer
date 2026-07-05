@@ -76,6 +76,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   int _hashId = 255; // Auto
   bool _remember = false;
 
+  Future<void>? _loadDevicesFuture;
+
   // ── Unlock method state ──────────────────────────────────────────────────
   ContainerUnlockMethod _unlockMethod = ContainerUnlockMethod.password;
   bool _showPasswordFallback = false;
@@ -113,7 +115,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       _cipherId = widget.existingRecord!.cipherId;
       _hashId = widget.existingRecord!.hashId;
     }
-    _loadDevices();
+    _loadDevicesFuture = _loadDevices();
     _initUnlockMethod();
   }
 
@@ -137,7 +139,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
 
       // Auto-trigger biometric prompt.
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
-        _tryBiometric();
+        if (_loadDevicesFuture != null) {
+          await _loadDevicesFuture;
+        }
+        // Only trigger automatically if the target drive is actually present and selected
+        if (mounted && _selected != null && !_reconnectTargetMissing) {
+          _tryBiometric();
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _loadingAuth = false);
@@ -147,6 +155,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   Future<void> _tryBiometric() async {
     final record = widget.existingRecord;
     if (record == null) return;
+    
+    if (_selected == null) {
+      setState(() {
+        _error = 'Select a USB drive first';
+      });
+      return;
+    }
+
     try {
       final localAuth = LocalAuthentication();
       final ok = await localAuth.authenticate(

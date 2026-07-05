@@ -112,17 +112,50 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
     super.dispose();
   }
 
+  bool get _wasPasswordless =>
+      widget.existingRecord == null ||
+      widget.existingRecord!.unlockMethod == ContainerUnlockMethod.password;
+
+  bool get _unlockMethodNeedsPassword =>
+      _unlockMethod != ContainerUnlockMethod.password;
+
+  bool get _needsPasswordSetup =>
+      _unlockMethodNeedsPassword &&
+      (_wasPasswordless || _changePassword) &&
+      _passwordCtrl.text.trim().isEmpty;
+
+
+  bool get _needsPatternSetup =>
+      _unlockMethod == ContainerUnlockMethod.pattern && _patternHash == null;
+
+  bool get _canSave => !_needsPasswordSetup && !_needsPatternSetup;
+
   Future<void> _save() async {
+
+    if (_needsPatternSetup) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Set up a pattern before saving.')),
+      );
+      return;
+    }
+    if (_needsPasswordSetup) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter the container password before saving.'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _saving = true);
 
     final label = _labelCtrl.text.trim().isEmpty
         ? widget.currentLabel
         : _labelCtrl.text.trim();
 
-    final wasNone = widget.existingRecord == null ||
-        widget.existingRecord!.unlockMethod == ContainerUnlockMethod.password;
-    final needsPassword = _unlockMethod != ContainerUnlockMethod.password;
-    final shouldSavePassword = needsPassword && (wasNone || _changePassword);
+    final needsPassword = _unlockMethodNeedsPassword;
+    final shouldSavePassword =
+        needsPassword && (_wasPasswordless || _changePassword);
 
     final record = ContainerRecord(
   uri: widget.uri,
@@ -178,17 +211,29 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
         }
       } catch (_) {}
     } else if (record.unlockMethod == ContainerUnlockMethod.pattern) {
+
+      if (_patternHash == null) {
+        if (mounted) setState(() => _settingsLocked = false);
+        return;
+      }
       final hash = await showModalBottomSheet<String>(
         context: context,
         isScrollControlled: true,
         builder: (context) => _PatternVerifySheet(
-          storedHash: _patternHash ?? '',
+          storedHash: _patternHash!,
         ),
       );
       if (hash != null && mounted) {
         setState(() => _settingsLocked = false);
       }
     } else if (record.unlockMethod == ContainerUnlockMethod.rememberPassword) {
+
+      final savedPassword =
+          await ContainerRepository.instance.getPassword(widget.uri);
+      if (savedPassword == null || savedPassword.isEmpty) {
+        if (mounted) setState(() => _settingsLocked = false);
+        return;
+      }
       final ok = await showDialog<bool>(
         context: context,
         builder: (context) => _PasswordVerifyDialog(uri: widget.uri),
@@ -379,6 +424,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
                   controller: _passwordCtrl,
                   obscureText: !_showPassword,
                   autofillHints: null,
+                  onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     labelText: 'Container password',
                     prefixIcon: Icon(Icons.lock_rounded, size: AppIconSize.small),
@@ -527,8 +573,28 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
               const SizedBox(height: 12),
             ],
 
+            if (!_canSave) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: AppIconSize.inline, color: cs.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _needsPatternSetup
+                          ? 'Set up a pattern above before saving.'
+                          : 'Enter the container password above before saving.',
+                      style: textTheme.bodySmall?.copyWith(color: cs.error),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+
             FilledButton(
-              onPressed: _saving ? null : _save,
+              onPressed: (_saving || !_canSave) ? null : _save,
               child: _saving
                   ? const SizedBox(
                       width: 20,

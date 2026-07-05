@@ -193,6 +193,28 @@ class VaultExplorerApi {
       matchedHashId: raw['matchedHashId'] as int? ?? 255,
     );
   }
+
+  /// Checks whether the document/file at [filePath] (a content:// SAF uri
+  /// or a plain file:// path) can currently be resolved — without
+  /// attempting to unlock it. Returns false for a container living on
+  /// removable storage that's been disconnected or a file that was moved
+  /// or deleted, and also false if a previously-granted content:// SAF
+  /// permission was revoked (e.g. after removing and re-inserting an SD
+  /// card resets the grant).
+  Future<bool> documentExists(String filePath) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.documentExists,
+        {'filePath': filePath},
+      );
+      return result ?? false;
+    } catch (_) {
+      // Treat a failed check as "unknown", not "missing" — let the normal
+      // unlock attempt surface the real error rather than blocking access
+      // to a container that might actually be fine.
+      return true;
+    }
+  }
   Future<List<UsbDeviceInfo>> listUsbDevices() async {
     final raw = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.listUsbDevices,

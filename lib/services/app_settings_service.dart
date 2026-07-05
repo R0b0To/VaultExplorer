@@ -26,6 +26,7 @@ class AppSettings {
   bool blockScreenshots;
   bool defaultDerivedKeyCacheEnabled;
   bool lockContainersOnScreenLock;
+   int autoLockMins;
 
   /// App-wide default thumbnail cache mode, applied to every container whose
   /// [ContainerRecord.thumbnailCacheMode] is null.
@@ -44,6 +45,7 @@ class AppSettings {
     this.blockScreenshots = false,
     this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
+    this.autoLockMins = 0,
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
     Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
@@ -82,6 +84,7 @@ class AppSettings {
     'blockScreenshots': blockScreenshots,
     'defaultDerivedKeyCacheEnabled': defaultDerivedKeyCacheEnabled,
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
+    'masterPasswordAutoLockMins': autoLockMins,
     'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
     'extensionPreferences': extensionPreferences,
   };
@@ -96,10 +99,9 @@ class AppSettings {
         false,
     videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
-    defaultDerivedKeyCacheEnabled:
-        j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
-    lockContainersOnScreenLock:
-        j['lockContainersOnScreenLock'] as bool? ?? false,
+    defaultDerivedKeyCacheEnabled:j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
+    lockContainersOnScreenLock:j['lockContainersOnScreenLock'] as bool? ?? true,
+    autoLockMins: j['autoLockMins'] as int? ?? 0,
 
     // Resolve nullable parsed mode and default to appCache if null
     defaultThumbnailCacheMode:

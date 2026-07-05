@@ -31,6 +31,18 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   bool _biometricAvailable = false;
   final _localAuth = LocalAuthentication();
 
+Future<void> _persist() async {
+    try {
+      await AppSettingsService.saveSettings(_settings);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save settings')),
+        );
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -61,16 +73,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     }
   }
 
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    await AppSettingsService.saveSettings(_settings);
-    if (mounted) {
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Settings saved')));
-    }
-  }
+
 
   void _toggleMasterPassword(bool enabled) {
     setState(() {
@@ -86,6 +89,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
         _showPwFields = true;
       }
     });
+    if (!enabled) _persist();
   }
 
   /// Derives PBKDF2-SHA512 via [PasswordHasher] and persists hash to Android Keystore.
@@ -146,29 +150,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('App Settings'),
-        actions: [
-          if (!_loading && !_showPwFields)
-            TextButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: cs.primary,
-                      ),
-                    )
-                  : Text(
-                      'Save',
-                      style: TextStyle(
-                        color: cs.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
@@ -309,10 +290,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                           title: 'Biometric Unlock',
                           subtitle: 'Use fingerprint or face instead of typing',
                           value: _settings.masterPasswordIsFingerprint,
-                          onChanged: (v) => setState(
-                            () => _settings.masterPasswordIsFingerprint = v,
-                          ),
-                        ),
+  onChanged: (v) {
+    setState(() => _settings.masterPasswordIsFingerprint = v);
+    _persist();
+  },
+),
                       if (!_biometricAvailable)
                         Padding(
                           padding: const EdgeInsets.only(left: 32, top: 4),
@@ -340,43 +322,84 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 const SizedBox(height: 24),
 
                 const SectionLabel('Privacy'),
-                _Card(
-                  cs: cs,
-                  children: [
-                    SettingsToggleRow(
-                      icon: Icons.security_rounded,
-                      title: 'Block Screenshots',
-                      subtitle:
-                          'Prevent screenshots and hide content in recent apps preview.',
-                      value: _settings.blockScreenshots,
-                      onChanged: (v) async {
-                        setState(() => _settings.blockScreenshots = v);
-                        await vaultExplorerApi.setSecureScreen(v);
-                      },
-                    ),
-                    const Divider(height: 24),
-                    SettingsToggleRow(
-                      icon: Icons.lock_clock_rounded,
-                      title: 'Lock Containers on Screen Lock',
-                      subtitle:
-                          'Automatically lock all open containers when the '
-                          'screen turns off or the app is backgrounded.',
-                      value: _settings.lockContainersOnScreenLock,
-                      onChanged: (v) => setState(
-                        () => _settings.lockContainersOnScreenLock = v,
-                      ),
-                    ),
-                    const Divider(height: 24),
-                    SettingsToggleRow(
+_Card(
+  cs: cs,
+  children: [
+    SettingsToggleRow(
+      icon: Icons.security_rounded,
+      title: 'Block Screenshots',
+      subtitle: 'Prevent screenshots and hide content in recent apps preview.',
+      value: _settings.blockScreenshots,
+      onChanged: (v) async {
+    setState(() => _settings.blockScreenshots = v);
+    await vaultExplorerApi.setSecureScreen(v);
+    await _persist();
+  },
+),
+    const Divider(height: 24),
+    SettingsToggleRow(
+      icon: Icons.lock_clock_rounded,
+      title: 'Lock Containers on Auto-Lock',
+      subtitle:
+          'Lock every open container — and return to the dashboard, or '
+          'the master password screen if one is set — once the Auto-Lock '
+          'timer below elapses. Has no effect while Auto-Lock is Never.',
+      value: _settings.lockContainersOnScreenLock,
+      onChanged: (v) {
+    setState(() => _settings.lockContainersOnScreenLock = v);
+    _persist();
+  },
+),
+    const Divider(height: 24),
+    DropdownButtonFormField<int>(
+      initialValue: _settings.autoLockMins,
+      decoration: InputDecoration(
+        labelText: 'Auto-Lock After Inactivity',
+        prefixIcon: Icon(Icons.timer_rounded, size: AppIconSize.small),
+      ),
+      items: const [
+        DropdownMenuItem(value: 0, child: Text('Never')),
+        DropdownMenuItem(value: 1, child: Text('1 minute')),
+        DropdownMenuItem(value: 2, child: Text('2 minutes')),
+        DropdownMenuItem(value: 5, child: Text('5 minutes')),
+        DropdownMenuItem(value: 10, child: Text('10 minutes')),
+        DropdownMenuItem(value: 15, child: Text('15 minutes')),
+        DropdownMenuItem(value: 30, child: Text('30 minutes')),
+        DropdownMenuItem(value: 60, child: Text('60 minutes')),
+      ],
+      onChanged: (v) {
+    if (v != null) {
+      setState(() => _settings.autoLockMins = v);
+      _persist();
+    }
+  },
+),
+    const SizedBox(height: 8),
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        _settings.autoLockMins == 0
+            ? 'Everything stays open until you lock it manually, no matter '
+                  'how long you switch away or leave the screen off.'
+            : 'Switching away briefly and coming back is fine — this only '
+                  'fires after ${_settings.autoLockMins} minute'
+                  '${_settings.autoLockMins == 1 ? '' : 's'} of not using the '
+                  'app, whether the screen was off or you were elsewhere.',
+        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
+      ),
+    ),
+    const Divider(height: 24),
+    SettingsToggleRow(
                       icon: Icons.key_rounded,
                       title: 'Cache derived keys by default',
                       subtitle:
                           'Reuse the last derived key in Android Keystore for faster unlocks across supported methods.',
                       value: _settings.defaultDerivedKeyCacheEnabled,
-                      onChanged: (v) => setState(
-                        () => _settings.defaultDerivedKeyCacheEnabled = v,
-                      ),
-                    ),
+                      onChanged: (v) {
+    setState(() => _settings.defaultDerivedKeyCacheEnabled = v);
+    _persist();
+  },
+),
                   ],
                 ),
 
@@ -393,9 +416,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                           'New containers will be exposed in Android\'s file '
                           'picker by default.',
                       value: _settings.defaultDocumentProvider,
-                      onChanged: (v) =>
-                          setState(() => _settings.defaultDocumentProvider = v),
-                    ),
+                      onChanged: (v) {
+    setState(() => _settings.defaultDocumentProvider = v);
+    _persist();
+  },
+),
                     const Divider(height: 24),
                     DropdownButtonFormField<ThumbnailCacheMode>(
                       initialValue: _settings.defaultThumbnailCacheMode,
@@ -410,13 +435,12 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                         );
                       }).toList(),
                       onChanged: (v) {
-                        if (v != null) {
-                          setState(
-                            () => _settings.defaultThumbnailCacheMode = v,
-                          );
-                        }
-                      },
-                    ),
+    if (v != null) {
+      setState(() => _settings.defaultThumbnailCacheMode = v);
+      _persist();
+    }
+  },
+),
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -508,13 +532,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                                 ),
                                 tooltip: 'Remove association',
                                 onPressed: () {
-                                  setState(() {
-                                    _settings.extensionPreferences.remove(
-                                      entry.key,
-                                    );
-                                  });
-                                  _save(); // Auto-save after removing
-                                },
+  setState(() => _settings.extensionPreferences.remove(entry.key));
+  _persist();
+},
                               ),
                             ],
                           ),

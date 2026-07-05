@@ -1,8 +1,6 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/vaultexplorer_api.dart';
-import '../../services/container_repository.dart';
 import '../../services/app_settings_service.dart';
 import '../../models/mounted_container.dart';
 import '../../models/usb_device_info.dart';
@@ -69,6 +67,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   String? _error;
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
+  bool _remember = false;
 
   // ── Unlock method state ──────────────────────────────────────────────────
   ContainerUnlockMethod _unlockMethod = ContainerUnlockMethod.password;
@@ -92,6 +91,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
     if (uri == null || !uri.startsWith('usb:')) return null;
     return uri.substring(4);
   }
+
+  bool get _passwordPrefilled =>
+      widget.prefillPassword?.isNotEmpty == true &&
+      _passwordCtrl.text == widget.prefillPassword;
 
   @override
   void initState() {
@@ -150,8 +153,15 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         final appSettings = await AppSettingsService.loadSettings();
         final shouldUseCachedKey = record.cacheDerivedKey ||
             appSettings.defaultDerivedKeyCacheEnabled;
-        final cachedKey = shouldUseCachedKey
-            ? await vaultExplorerApi.loadDerivedKey(record.uri)
+        // FIX: the derived-key cache is keyed by the bare device name
+        // everywhere else in this file (_unlock()'s own preload lookup,
+        // the 'deviceName' passed to unlockUsbContainer) — never by the
+        // "usb:"-prefixed record uri. Looking it up under record.uri here
+        // was a guaranteed cache miss, so this silently fell through to a
+        // full password-based derivation on every biometric unlock.
+        final deviceName = _expectedDeviceName;
+        final cachedKey = shouldUseCachedKey && deviceName != null
+            ? await vaultExplorerApi.loadDerivedKey(deviceName)
             : null;
         debugPrint('usb unlock: biometric cached-key present=${cachedKey != null && cachedKey.isNotEmpty} for ${record.uri}');
         if (cachedKey != null && cachedKey.isNotEmpty) {
@@ -201,12 +211,40 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
 
     final attempt = hashPattern(pattern);
     if (attempt == _storedPatternHash) {
+      // FIX: this used to skip straight to the saved password, always
+      // doing a full password-based derivation — unlike the file-based
+      // sheet's equivalent pattern handler (and this sheet's own
+      // _tryBiometric), which try the cached derived key first.
+      // _unlock() itself won't do this preload on our behalf here: its
+      // internal check only fires when _unlockMethod == rememberPassword,
+      // not pattern, so pattern/biometric are expected to look the key up
+      // themselves and hand it in via preservedKey.
+      final appSettings = await AppSettingsService.loadSettings();
+      final shouldUseCachedKey = record.cacheDerivedKey ||
+          appSettings.defaultDerivedKeyCacheEnabled;
+      final deviceName = _expectedDeviceName;
+      final cachedKey = shouldUseCachedKey && deviceName != null
+          ? await vaultExplorerApi.loadDerivedKey(deviceName)
+          : null;
+      debugPrint('usb unlock: pattern cached-key present=${cachedKey != null && cachedKey.isNotEmpty} for ${record.uri}');
+
+      if (cachedKey != null && cachedKey.isNotEmpty) {
+        await _unlock(
+          preservedKey: cachedKey,
+          shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+        );
+        return;
+      }
+
       final pw = await ContainerRepository.instance.getPassword(
         record.uri,
       );
       if (pw != null && pw.isNotEmpty) {
         _passwordCtrl.text = pw;
-        _unlock();
+        await _unlock(
+          shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+          passwordOverride: pw,
+        );
       } else {
         setState(() {
           _error = 'No saved password found. Please enter it manually.';
@@ -292,46 +330,45 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       setState(() => _error = 'Select a USB drive first');
       return;
     }
-    final effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
+    var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
     if (effectivePassword.isEmpty && preservedKey == null) {
       setState(() => _error = 'Password is required');
       return;
     }
 
-    setState(() {
-      _unlocking = true;
-      _error = null;
-    });
+    setState(() { _unlocking = true; _error = null; });
 
     try {
       if (!device.hasPermission) {
         await _ensurePermission(device);
-        final refreshed = _devices.firstWhere(
-          (d) => d.deviceName == device.deviceName,
-          orElse: () => device,
-        );
+        final refreshed = _devices.firstWhere((d) => d.deviceName == device.deviceName, orElse: () => device);
         if (!refreshed.hasPermission) {
           setState(() => _error = 'USB permission is required to continue');
           return;
         }
       }
 
-      final pim = clampPim(
-        _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0,
-      );
-
-      // Preserve a previously-chosen display name across reconnects rather
-      // than reverting to the raw USB product-name string every time.
+      final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final displayName = widget.existingRecord?.label ?? device.productName;
 
+      final appSettings = await AppSettingsService.loadSettings();
+      final isReconnect = widget.existingRecord != null;
       final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+          ((isReconnect || _remember) &&
+              ((widget.existingRecord?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
+
+
+      final shouldPreloadCachedKey = preservedKey == null &&
+          _unlockMethod == ContainerUnlockMethod.rememberPassword &&
+          _passwordPrefilled &&
           (widget.existingRecord?.cacheDerivedKey ?? false);
       final resolvedPreservedKey = preservedKey ??
-          (shouldCacheDerivedKey
+          (shouldPreloadCachedKey
               ? await vaultExplorerApi.loadDerivedKey(device.deviceName)
               : null);
-      debugPrint('usb unlock: shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
-      final result = await vaultExplorerApi.unlockUsbContainer(
+      debugPrint('usb unlock: method=$_unlockMethod shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
+
+      var result = await vaultExplorerApi.unlockUsbContainer(
         device.deviceName,
         effectivePassword,
         pim,
@@ -343,10 +380,36 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         cacheDerivedKey: shouldCacheDerivedKey,
       );
 
+      // FIX: same stale-key fallback as the file-based sheet — a bus path
+      // that re-enumerated onto a different drive would otherwise fail
+      // outright instead of falling back to the actual password.
+      if (result == null && resolvedPreservedKey != null) {
+        await vaultExplorerApi.clearDerivedKey(device.deviceName);
+        if (effectivePassword.isEmpty && widget.existingRecord != null) {
+          effectivePassword =
+              (await ContainerRepository.instance.getPassword(widget.existingRecord!.uri))?.trim() ?? '';
+        }
+        if (effectivePassword.isNotEmpty) {
+          result = await vaultExplorerApi.unlockUsbContainer(
+            device.deviceName,
+            effectivePassword,
+            pim,
+            displayName: displayName,
+            documentProvider: widget.documentProvider,
+            cipherId: _cipherId,
+            hashId: _hashId,
+            preservedKey: null,
+            cacheDerivedKey: shouldCacheDerivedKey,
+          );
+        }
+      }
+
       if (result == null) {
         setState(() => _error = 'Incorrect password or unsupported drive');
         return;
       }
+
+  
 
       final newUri = 'usb:${device.deviceName}';
       final tempContainer = MountedContainer(
@@ -430,16 +493,18 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         // record VaultDashboard._onContainerMounted would otherwise create
         // (with cipherId/hashId left at 255/auto) never overwrites it —
         // that method only fills in a record if one isn't already present.
-        await ContainerRepository.instance.save(
-          ContainerRecord(
-            uri: newUri,
-            label: displayName,
-            documentProvider: widget.documentProvider,
-            cacheDerivedKey: shouldCacheDerivedKey,
-            cipherId: result.matchedCipherId,
-            hashId: result.matchedHashId,
-          ),
-        );
+        if (_remember) {
+    await ContainerRepository.instance.save(
+      ContainerRecord(
+        uri: newUri,
+        label: displayName,
+        documentProvider: widget.documentProvider,
+        cacheDerivedKey: shouldCacheDerivedKey,
+        cipherId: result.matchedCipherId,
+        hashId: result.matchedHashId,
+      ),
+    );
+  }
         widget.onMounted(finalContainer);
       }
 
@@ -477,6 +542,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                       : 'Unlock USB Drive',
                   style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
+                
                 const SizedBox(height: 16),
 
                 if (_loadingDevices)
@@ -741,7 +807,25 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                           if (val != null) setState(() => _hashId = val);
                         },
                       ),
-                      
+                      const SizedBox(height: 12),
+
+                      if (!isReconnect) ...[
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _remember,
+                              onChanged: busy ? null : (v) => setState(() => _remember = v ?? false),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            const SizedBox(width: 10),
+                            GestureDetector(
+                              onTap: busy ? null : () => setState(() => _remember = !_remember),
+                              child: Text('Remember drive on dashboard', style: textTheme.bodyMedium),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                      ],
                       if (_error != null) ...[
                         const SizedBox(height: 14),
                         Container(

@@ -7,6 +7,7 @@ import '../../../theme.dart';
 import '../../../widgets/common_widgets.dart';
 import '../../lock/pattern_setup_sheet.dart';
 import '../../lock/pattern_lock_view.dart';
+import '../../../utils/validation_utils.dart';
 
 class ContainerConfigSheet extends StatefulWidget {
   final String uri;
@@ -66,7 +67,7 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
     _documentProvider = rec?.documentProvider ?? false;
     _thumbnailCacheMode = rec?.thumbnailCacheMode;
     _cacheDerivedKey = rec?.cacheDerivedKey ?? widget.appSettings?.defaultDerivedKeyCacheEnabled ?? false;
-    _settingsLocked   = rec != null && rec.unlockMethod != ContainerUnlockMethod.password;
+    _settingsLocked   = rec != null;
     _initAsync();
   }
 
@@ -190,15 +191,34 @@ class _ContainerConfigSheetState extends State<ContainerConfigSheet> {
     } else if (record.unlockMethod == ContainerUnlockMethod.rememberPassword) {
       final ok = await showDialog<bool>(
         context: context,
-        builder: (context) => _PasswordVerifyDialog(
-          uri: widget.uri,
-        ),
+        builder: (context) => _PasswordVerifyDialog(uri: widget.uri),
       );
       if (ok == true && mounted) {
         setState(() => _settingsLocked = false);
       }
+    } else if (record.unlockMethod == ContainerUnlockMethod.password) {
+      final verifiedPassword = await showDialog<String>(
+        context: context,
+        builder: (context) => _RealPasswordGateDialog(
+          uri: widget.uri,
+          cipherId: record.cipherId,
+          hashId: record.hashId,
+          documentProvider: _documentProvider,
+        ),
+      );
+      // FIX: previously this only checked `ok == true` and discarded the
+      // password the user just typed to pass verification — they'd then
+      // have to type it again in the "Container password" field below to
+      // actually set up biometrics/pattern/remember-password. Reuse it.
+      if (verifiedPassword != null && mounted) {
+        setState(() {
+          _settingsLocked = false;
+          _passwordCtrl.text = verifiedPassword;
+        });
+      }
     }
   }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -673,6 +693,149 @@ class _PasswordVerifyDialogState extends State<_PasswordVerifyDialog> {
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Verify'),
+        ),
+      ],
+    );
+  }
+}
+
+class _RealPasswordGateDialog extends StatefulWidget {
+  final String uri;
+  final int cipherId;
+  final int hashId;
+  final bool documentProvider;
+  const _RealPasswordGateDialog({
+    required this.uri,
+    required this.cipherId,
+    required this.hashId,
+    required this.documentProvider,
+  });
+
+  @override
+  State<_RealPasswordGateDialog> createState() => _RealPasswordGateDialogState();
+}
+
+class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
+  final _pwCtrl = TextEditingController();
+  final _pimCtrl = TextEditingController();
+  String? _error;
+  bool _obscure = true;
+  bool _loading = false;
+
+  // USB-backed containers are unlocked/locked through a separate native
+  // call keyed by the bare device name (no "usb:" prefix) — see
+  // unlockUsbContainer / _expectedDeviceName in usb_unlock_sheet.dart.
+  // widget.uri here is the ContainerRecord uri, which for USB entries is
+  // stored as "usb:<deviceName>".
+  bool get _isUsb => widget.uri.startsWith('usb:');
+  String get _usbDeviceName => widget.uri.substring(4);
+
+  @override
+  void dispose() {
+    _pwCtrl.dispose();
+    _pimCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _verify() async {
+    if (_pwCtrl.text.isEmpty) {
+      setState(() => _error = 'Password is required');
+      return;
+    }
+    setState(() { _loading = true; _error = null; });
+    try {
+      final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
+      // FIX: "password" method stores nothing to compare a re-entry
+      // against — a genuine unlock attempt is the only real proof. Lock
+      // it straight back down afterward; this exists purely to gate
+      // settings access, not to leave the container mounted.
+      //
+      // FIX: this used to always call unlockContainer(widget.uri, ...),
+      // which only understands content:// / file:// document uris. For a
+      // USB-backed container widget.uri is "usb:<deviceName>", so that
+      // call would never succeed — it needs unlockUsbContainer with the
+      // bare device name instead, and the matching lockContainer identifier
+      // afterward.
+      final result = _isUsb
+          ? await vaultExplorerApi.unlockUsbContainer(
+              _usbDeviceName,
+              _pwCtrl.text,
+              pim,
+              displayName: '',
+              documentProvider: widget.documentProvider,
+              cipherId: widget.cipherId,
+              hashId: widget.hashId,
+              preservedKey: null,
+              cacheDerivedKey: false,
+            )
+          : await vaultExplorerApi.unlockContainer(
+              widget.uri,
+              _pwCtrl.text,
+              pim,
+              displayName: '',
+              documentProvider: widget.documentProvider,
+              cipherId: widget.cipherId,
+              hashId: widget.hashId,
+              preservedKey: null,
+              cacheDerivedKey: false,
+            );
+      if (result == null) {
+        if (mounted) setState(() { _loading = false; _error = 'Incorrect password'; });
+        return;
+      }
+      await vaultExplorerApi.lockContainer(_isUsb ? _usbDeviceName : widget.uri);
+      // Return the verified password itself (not just a bool) so the
+      // caller can reuse it — the user already proved they know it via a
+      // genuine unlock, no need to make them type it a second time to set
+      // up biometrics/pattern/remember-password.
+      if (mounted) Navigator.pop(context, _pwCtrl.text);
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _error = 'Verification failed'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Confirm Container Password'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'This container has no stored password to check against — '
+            'enter it directly to confirm before changing security settings.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _pwCtrl,
+            obscureText: _obscure,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Container password',
+              suffixIcon: PasswordVisibilityToggle(
+                obscured: _obscure,
+                onToggle: () => setState(() => _obscure = !_obscure),
+              ),
+              errorText: _error,
+            ),
+            onSubmitted: (_) => _verify(),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _pimCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'PIM (leave blank if not used)'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: _loading ? null : _verify,
+          child: _loading
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
               : const Text('Verify'),
         ),
       ],

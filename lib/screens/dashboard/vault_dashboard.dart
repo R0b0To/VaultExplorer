@@ -14,6 +14,7 @@ import 'widgets/create_container_sheet.dart';
 import 'widgets/empty_state.dart';
 import '../browser/file_browser_screen.dart';
 import '../unlock/usb_unlock_sheet.dart';
+import '../lock/lock_gate_screen.dart';
 
 class VaultDashboard extends StatefulWidget {
   const VaultDashboard({Key? key}) : super(key: key);
@@ -31,6 +32,17 @@ class _VaultDashboardState extends State<VaultDashboard>
 
   final Map<int, Timer> _autoCloseTimers = {};
 
+  /// Wall-clock timestamp of the last `paused` transition. Compared against
+  /// on resume, not acted on at the time it happens — a quick app switch
+  /// must never trigger a lock by itself.
+  DateTime? _pausedAt;
+
+  /// Foreground countdown, reset on any activity. This covers the "left
+  /// the app open on screen but stopped touching it" case; the resume-time
+  /// elapsed check below covers backgrounded/screen-off time, since a Timer
+  /// isn't guaranteed to keep firing while suspended.
+  Timer? _autoLockTimer;
+
   @override
   void initState() {
     super.initState();
@@ -41,10 +53,9 @@ class _VaultDashboardState extends State<VaultDashboard>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    for (final t in _autoCloseTimers.values) {
-      t.cancel();
-    }
+    for (final t in _autoCloseTimers.values) t.cancel();
     _autoCloseTimers.clear();
+    _autoLockTimer?.cancel();
     super.dispose();
   }
 
@@ -54,42 +65,91 @@ class _VaultDashboardState extends State<VaultDashboard>
       for (final c in List<MountedContainer>.from(_mounted)) {
         _refreshContainerSpace(c.volId);
       }
-    } else if (state == AppLifecycleState.paused) {
-      // FIX: "paused" fires both when the app is backgrounded and when the
-      // screen is turned off while this app is foreground — the closest
-      // proxy Flutter exposes to a screen-lock event. Locking here honours
-      // AppSettings.lockContainersOnScreenLock (default: enabled).
-      if (_appSettings.lockContainersOnScreenLock) {
-        _lockAllContainersOnScreenOff();
+
+      final pausedAt = _pausedAt;
+      _pausedAt = null;
+
+      final mins = _appSettings.autoLockMins;
+      final wasAwayTooLong = pausedAt != null &&
+          mins > 0 &&
+          DateTime.now().difference(pausedAt) >= Duration(minutes: mins);
+
+      // FIX: previously this branch locked containers and reset navigation
+      // the instant `paused` fired — meaning switching apps for a second
+      // logged the user out every time. Now it only acts if the time away
+      // actually exceeded the configured Auto-Lock window; otherwise it's
+      // a no-op and everything stays exactly as the user left it, same as
+      // a password manager.
+      if (wasAwayTooLong) {
+        _performAutoLock();
+      } else {
+        _scheduleAutoLock();
       }
+    } else if (state == AppLifecycleState.paused) {
+      _pausedAt = DateTime.now();
     }
   }
 
-  /// Locks every currently-mounted container in response to the screen
-  /// turning off / the app being backgrounded, when
-  /// [AppSettings.lockContainersOnScreenLock] is enabled.
-  ///
-  /// Containers with an in-flight file operation are skipped (the lock
-  /// guard fails to acquire) rather than interrupting a copy/move — they'll
-  /// remain unlocked until the operation finishes and the user locks
-  /// manually, same as the existing auto-close behavior.
-  Future<void> _lockAllContainersOnScreenOff() async {
+  /// (Re)starts the foreground idle countdown from now. Call on any sign
+  /// of activity — resuming, touching the dashboard, container activity.
+  void _scheduleAutoLock() {
+    _autoLockTimer?.cancel();
+    final mins = _appSettings.autoLockMins;
+    final hasMasterPassword =
+        _appSettings.useMasterPassword && _appSettings.masterPasswordHash != null;
+    if (mins <= 0 || (!hasMasterPassword && !_appSettings.lockContainersOnScreenLock)) {
+      return;
+    }
+    _autoLockTimer = Timer(Duration(minutes: mins), _performAutoLock);
+  }
+
+  Future<void> _performAutoLock() async {
+    _autoLockTimer?.cancel();
+    if (_appSettings.lockContainersOnScreenLock) {
+      await _lockAllMountedContainers();
+    }
+    if (!mounted) return;
+    final hasMasterPassword =
+        _appSettings.useMasterPassword && _appSettings.masterPasswordHash != null;
+    // Unwind the nav stack whenever containers just got yanked out from
+    // under an open browser/viewer/editor (their volId is now invalid even
+    // without a master password to re-enter), or when master password
+    // re-entry is required.
+    if (_appSettings.lockContainersOnScreenLock || hasMasterPassword) {
+      await _enforceAppLock();
+    }
+  }
+
+  Future<void> _enforceAppLock() async {
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    if (_appSettings.useMasterPassword && _appSettings.masterPasswordHash != null) {
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LockGateScreen()),
+        (route) => false,
+      );
+    }
+  }
+
+  /// Shared by the idle auto-lock and (still) by manual per-container lock
+  /// callers — locks every currently-mounted container, skipping any with
+  /// an in-flight file operation.
+  Future<void> _lockAllMountedContainers() async {
     for (final c in List<MountedContainer>.from(_mounted)) {
       if (!vaultExplorerApi.acquireLockGuard(c.volId)) continue;
       try {
         await vaultExplorerApi.lockContainer(c.uri);
         _onContainerLocked(c.volId);
       } catch (e) {
-        debugPrint(
-          'Lock-on-screen-off failed for volId=${c.volId}: $e',
-        );
+        debugPrint('Auto-lock failed for volId=${c.volId}: $e');
       } finally {
         vaultExplorerApi.releaseLockGuard(c.volId);
       }
     }
   }
 
-  Future<void> _loadAll() async {
+ Future<void> _loadAll() async {
     final settings = await AppSettingsService.loadSettings();
     final records = await ContainerRepository.instance.loadAll();
     if (mounted) {
@@ -97,6 +157,7 @@ class _VaultDashboardState extends State<VaultDashboard>
         _appSettings = settings;
         _records = Map.from(records);
       });
+      _scheduleAutoLock();
     }
   }
 
@@ -141,7 +202,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     );
   }
 
-  void _onUserActivityForContainer(int volId) {
+ void _onUserActivityForContainer(int volId) {
     final idx = _mounted.indexWhere((c) => c.volId == volId);
     if (idx == -1) return;
     final container = _mounted[idx];
@@ -149,6 +210,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     if ((record?.autoCloseMins ?? 0) > 0) {
       _scheduleAutoClose(container);
     }
+    _scheduleAutoLock();
   }
 
   void _cancelAutoClose(int volId) {
@@ -527,7 +589,10 @@ class _VaultDashboardState extends State<VaultDashboard>
       }
     }
 
-    return Scaffold(
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _scheduleAutoLock(),
+      child: Scaffold(
       appBar: AppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
@@ -652,7 +717,7 @@ class _VaultDashboardState extends State<VaultDashboard>
               ),
             ),
           ),
-        ],
+        ],)
       ),
     );
   }

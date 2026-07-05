@@ -735,18 +735,18 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                 Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
             }
 
-            if (preservedKey != null) {
-                Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${preservedKey.size})")
-            } else if (cacheDerivedKey) {
-                Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
-            }
-
             val files = VeraCryptEngine.unlockUsbAndListNative(
                 password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey
             )
 
             runOnUiThread {
                 if (files != null) {
+                    if (cacheDerivedKey && preservedKey == null) {
+                        val derived = VeraCryptEngine.getLastDerivedKeyMaterialNative(targetVolId)
+                        if (derived != null) {
+                            storeDerivedKeyBytes(deviceName, derived)
+                        }
+                    }
                     VeraCryptSession.activeSessions[targetVolId] = ContainerSession(
                         uri = containerUri,
                         volId = targetVolId,

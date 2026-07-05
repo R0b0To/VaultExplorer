@@ -267,7 +267,7 @@ class SavedContainerCard extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            isUsb ? 'USB · reconnect to unlock' : 'Locked',
+            isUsb ? 'USB · Locked' : 'Locked',
             style: textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
             ),

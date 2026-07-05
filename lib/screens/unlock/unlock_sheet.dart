@@ -50,6 +50,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
   int _patternResetKey = 0;
   String? _storedPatternHash;
   bool _loadingAuth = true;
+  bool _containerMissing = false;
 
   bool get _passwordPrefilled =>
       widget.prefillPassword?.isNotEmpty == true &&
@@ -74,8 +75,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
     super.dispose();
   }
 
-  /// Loads the container record and prepares the appropriate unlock flow.
-  Future<void> _initUnlockMethod() async {
+Future<void> _initUnlockMethod() async {
     if (widget.initialUri == null) {
       if (mounted) setState(() => _loadingAuth = false);
       return;
@@ -89,9 +89,32 @@ class _UnlockSheetState extends State<UnlockSheet> {
         return;
       }
 
+      // FIX: verify the file/document is actually reachable BEFORE doing
+      // anything unlock-method-specific. Previously a container on
+      // since-removed or relocated removable storage fell straight into
+      // the password-lookup logic below — which only knows about locally
+      // stored secrets, not file presence — and reported "No saved
+      // password found" even when one WAS saved. The real problem was
+      // simply that there was nothing there to unlock.
+      var exists = true;
+      try {
+        exists = await vaultExplorerApi.documentExists(widget.initialUri!);
+      } catch (_) {
+        // If the check itself fails, don't block on our own uncertainty —
+        // fall through and let the real unlock attempt surface the error.
+        exists = true;
+      }
+      if (!exists) {
+        if (mounted) {
+          setState(() {
+            _containerMissing = true;
+            _loadingAuth = false;
+          });
+        }
+        return;
+      }
+
       _unlockMethod = record.unlockMethod;
-      // FIX (perf): use the cipher/hash that worked last time instead of
-      // re-running the full 5x8 auto-detect search.
       _cipherId = record.cipherId;
       _hashId = record.hashId;
 
@@ -111,46 +134,109 @@ class _UnlockSheetState extends State<UnlockSheet> {
     }
   }
 
-  // ── Biometric ────────────────────────────────────────────────────────────
+/// Lets the user point at the same container's new location (moved file,
+  /// or re-inserted removable storage now enumerating differently) and
+  /// migrates the saved settings onto the new uri — same idea as the USB
+  /// sheet's reconnect migration.
+  Future<void> _relocateContainer() async {
+    final oldUri = widget.initialUri;
+    if (oldUri == null) return;
+    try {
+      final result = await vaultExplorerApi.pickContainer();
+      if (result == null || !mounted) return;
 
-  Future<void> _tryBiometric() async {
+      setState(() => _loadingAuth = true);
+
+      final records = await ContainerRepository.instance.loadAll();
+      final existing = records[oldUri];
+      if (existing == null) {
+        if (mounted) {
+          setState(() {
+            _loadingAuth = false;
+            _error = 'Saved settings for this container could not be found.';
+          });
+        }
+        return;
+      }
+
+      final savedPassword = await ContainerRepository.instance.getPassword(oldUri);
+      final savedPatternHash = await ContainerRepository.instance.getPatternHash(oldUri);
+      await ContainerRepository.instance.remove(oldUri);
+
+      final migrated = ContainerRecord(
+        uri: result.uri,
+        label: existing.label,
+        rememberPassword: existing.rememberPassword,
+        unlockMethod: existing.unlockMethod,
+        autoCloseMins: existing.autoCloseMins,
+        documentProvider: existing.documentProvider,
+        thumbnailCacheMode: existing.thumbnailCacheMode,
+        cacheDerivedKey: existing.cacheDerivedKey,
+        pendingPassword: savedPassword,
+        pendingPatternHash: savedPatternHash,
+        cipherId: existing.cipherId,
+        hashId: existing.hashId,
+      );
+      await ContainerRepository.instance.save(migrated);
+      if (!mounted) return;
+
+      setState(() {
+        _selectedUri = migrated.uri;
+        _selectedName = result.displayName;
+        _unlockMethod = migrated.unlockMethod;
+        _cipherId = migrated.cipherId;
+        _hashId = migrated.hashId;
+        _storedPatternHash = savedPatternHash;
+        _containerMissing = false;
+        _loadingAuth = false;
+      });
+
+      if (_unlockMethod == ContainerUnlockMethod.biometrics) {
+        _tryBiometric();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingAuth = false;
+          _error = 'Could not update the container location: $e';
+        });
+      }
+    }
+  }
+Future<void>_tryBiometric() async {
     try {
       final localAuth = LocalAuthentication();
       final ok = await localAuth.authenticate(
         localizedReason: 'Authenticate to unlock container',
-        options: const AuthenticationOptions(
-          biometricOnly: false,
-          stickyAuth: true,
-        ),
+        options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
       );
       if (ok && mounted) {
         final records = await ContainerRepository.instance.loadAll();
         final record = records[widget.initialUri!];
         final appSettings = await AppSettingsService.loadSettings();
-        final shouldUseCachedKey = (record?.cacheDerivedKey ?? false) ||
-            appSettings.defaultDerivedKeyCacheEnabled;
-        final cachedKey = shouldUseCachedKey
+        final shouldCacheGoingForward =
+            (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
+        // FIX: only attempt to reuse a stored key if THIS container record
+        // has previously cached one itself. The global default alone must
+        // never justify preloading a key for a uri we've never personally
+        // derived one for — see the class-level rationale in _unlock().
+        final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
+        final cachedKey = shouldPreloadCachedKey
             ? await vaultExplorerApi.loadDerivedKey(widget.initialUri!)
             : null;
         debugPrint('unlock: biometric cached-key present=${cachedKey != null && cachedKey.isNotEmpty} for ${widget.initialUri}');
         if (cachedKey != null && cachedKey.isNotEmpty) {
           await _unlock(
             preservedKey: cachedKey,
-            shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+            shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
           );
           return;
         }
 
-        // Fetch saved password and auto-unlock.
-        final pw = await ContainerRepository.instance.getPassword(
-          widget.initialUri!,
-        );
+        final pw = await ContainerRepository.instance.getPassword(widget.initialUri!);
         if (pw != null && pw.isNotEmpty) {
           _passwordCtrl.text = pw;
-          await _unlock(
-            shouldCacheDerivedKeyOverride: shouldUseCachedKey,
-            passwordOverride: pw,
-          );
+          await _unlock(shouldCacheDerivedKeyOverride: shouldCacheGoingForward, passwordOverride: pw);
         } else {
           setState(() {
             _error = 'No saved password found. Please enter it manually.';
@@ -168,8 +254,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
     }
   }
 
-  // ── Pattern ──────────────────────────────────────────────────────────────
-
   Future<void> _onPatternComplete(List<int> pattern) async {
     if (_storedPatternHash == null) {
       setState(() {
@@ -184,29 +268,22 @@ class _UnlockSheetState extends State<UnlockSheet> {
       final records = await ContainerRepository.instance.loadAll();
       final record = records[widget.initialUri!];
       final appSettings = await AppSettingsService.loadSettings();
-      final shouldUseCachedKey = (record?.cacheDerivedKey ?? false) ||
-          appSettings.defaultDerivedKeyCacheEnabled;
-      final cachedKey = shouldUseCachedKey
+      final shouldCacheGoingForward =
+          (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
+      final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
+      final cachedKey = shouldPreloadCachedKey
           ? await vaultExplorerApi.loadDerivedKey(widget.initialUri!)
           : null;
 
       if (cachedKey != null && cachedKey.isNotEmpty) {
-        await _unlock(
-          preservedKey: cachedKey,
-          shouldCacheDerivedKeyOverride: shouldUseCachedKey,
-        );
+        await _unlock(preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldCacheGoingForward);
         return;
       }
 
-      final pw = await ContainerRepository.instance.getPassword(
-        widget.initialUri!,
-      );
+      final pw = await ContainerRepository.instance.getPassword(widget.initialUri!);
       if (pw != null && pw.isNotEmpty) {
         _passwordCtrl.text = pw;
-        await _unlock(
-          shouldCacheDerivedKeyOverride: shouldUseCachedKey,
-          passwordOverride: pw,
-        );
+        await _unlock(shouldCacheDerivedKeyOverride: shouldCacheGoingForward, passwordOverride: pw);
       } else {
         setState(() {
           _error = 'No saved password found. Please enter it manually.';
@@ -214,19 +291,13 @@ class _UnlockSheetState extends State<UnlockSheet> {
         });
       }
     } else {
-      setState(() {
-        _patternError = true;
-      });
+      setState(() => _patternError = true);
       Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          setState(() {
-            _patternError = false;
-            _patternResetKey++;
-          });
-        }
+        if (mounted) setState(() { _patternError = false; _patternResetKey++; });
       });
     }
   }
+
 
   // ── File picking ─────────────────────────────────────────────────────────
 
@@ -255,35 +326,35 @@ class _UnlockSheetState extends State<UnlockSheet> {
       setState(() => _error = 'Select a container first');
       return;
     }
-    final effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
+    var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
     if (effectivePassword.isEmpty && preservedKey == null) {
       setState(() => _error = 'Password is required');
       return;
     }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() { _loading = true; _error = null; });
 
     try {
-      final pim = clampPim(
-        _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0,
-      );
+      final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final name = _selectedName ?? 'Container';
 
       final records = await ContainerRepository.instance.loadAll();
       final record = records[_selectedUri!];
       final appSettings = await AppSettingsService.loadSettings();
       final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
-          ((record?.cacheDerivedKey ?? false) ||
-              appSettings.defaultDerivedKeyCacheEnabled);
+          ((record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled);
+
+
+      final shouldPreloadCachedKey = preservedKey == null &&
+          _unlockMethod == ContainerUnlockMethod.rememberPassword &&
+          _passwordPrefilled &&
+          (record?.cacheDerivedKey ?? false);
       final resolvedPreservedKey = preservedKey ??
-          (shouldCacheDerivedKey
+          (shouldPreloadCachedKey
               ? await vaultExplorerApi.loadDerivedKey(_selectedUri!)
               : null);
-      debugPrint('unlock: shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
+      debugPrint('unlock: method=$_unlockMethod shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
 
-      final result = await vaultExplorerApi.unlockContainer(
+      var result = await vaultExplorerApi.unlockContainer(
         _selectedUri!,
         effectivePassword,
         pim,
@@ -294,6 +365,32 @@ class _UnlockSheetState extends State<UnlockSheet> {
         preservedKey: resolvedPreservedKey,
         cacheDerivedKey: shouldCacheDerivedKey,
       );
+
+      // FIX: a preserved key can go stale (uri reused for a new container).
+      // Treat that failure as "the cache was wrong," not "the password was
+      // wrong" — purge it and retry with a normal password-based unlock
+      // before surfacing an error. Recovers the saved password ourselves if
+      // we were only ever handed a key (biometric/pattern path never set one).
+      if (result == null && resolvedPreservedKey != null) {
+        await vaultExplorerApi.clearDerivedKey(_selectedUri!);
+        if (effectivePassword.isEmpty) {
+          effectivePassword =
+              (await ContainerRepository.instance.getPassword(_selectedUri!))?.trim() ?? '';
+        }
+        if (effectivePassword.isNotEmpty) {
+          result = await vaultExplorerApi.unlockContainer(
+            _selectedUri!,
+            effectivePassword,
+            pim,
+            displayName: name,
+            documentProvider: widget.documentProvider,
+            cipherId: _cipherId,
+            hashId: _hashId,
+            preservedKey: null,
+            cacheDerivedKey: shouldCacheDerivedKey,
+          );
+        }
+      }
 
       if (result != null) {
         if (_remember && widget.initialUri == null) {
@@ -477,13 +574,78 @@ class _UnlockSheetState extends State<UnlockSheet> {
             const Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+                child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
               ),
             )
+          // ── Container file unreachable ─────────────────────────────
+          else if (_containerMissing) ...[
+  Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: cs.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.find_in_page_outlined,
+              color: cs.error,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Container file not found',
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        Text(
+          'The container may have been moved, deleted, or its storage is disconnected.',
+          style: textTheme.bodyMedium?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    _loadingAuth = true;
+                    _containerMissing = false;
+                  });
+                  _initUnlockMethod();
+                },
+                child: const Text('Retry'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(
+                onPressed: _relocateContainer,
+                child: const Text('Locate file'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  ),
+]
           // ── Biometric prompt feedback ──────────────────────────────
           else if (_unlockMethod == ContainerUnlockMethod.biometrics &&
               !_showPasswordFallback) ...[

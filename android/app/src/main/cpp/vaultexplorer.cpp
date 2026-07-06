@@ -139,6 +139,34 @@ struct MdContextGuard {
     ~MdContextGuard() { mbedtls_md_free(&ctx); }
 };
 
+// Zeroizes [buf] on scope exit no matter which of a function's several
+// early-return paths is taken. Used for the mixed-password buffers built
+// in prepareSession()/prepareUsbSession()/deriveKeyMaterialNative() —
+// those functions have too many return points to safely rely on a manual
+// mbedtls_platform_zeroize() call before each one (a new return path added
+// later could easily forget it).
+struct ScopeZeroize {
+    unsigned char* buf; size_t len;
+    ScopeZeroize(unsigned char* b, size_t l) : buf(b), len(l) {}
+    ~ScopeZeroize() { mbedtls_platform_zeroize(buf, len); }
+    ScopeZeroize(const ScopeZeroize&) = delete;
+    ScopeZeroize& operator=(const ScopeZeroize&) = delete;
+};
+
+// applyKeyfilesToPassword() (crypto/keyfile_mixing.h) takes ownership of
+// every fd in a keyfileFds[] array and closes it, whether mixing succeeds
+// or fails. Some call paths (a cache-hit early return, or the
+// preserved-derived-key path that skips password derivation entirely)
+// never reach that call, but Kotlin has already handed over ownership of
+// those fds regardless — this closes them on those paths so they don't
+// leak.
+static void closeUnusedKeyfileFds(const int* keyfileFds, int keyfileCount) {
+    if (!keyfileFds) return;
+    for (int i = 0; i < keyfileCount; i++) {
+        if (keyfileFds[i] >= 0) close(keyfileFds[i]);
+    }
+}
+
 // ----------------------------------------------------------------====
 // PER-VOLUME STATE
 //
@@ -1049,16 +1077,16 @@ static bool deriveAndValidateHeader(
 // invariants (call ordering vs. memory state), and the safety argument above
 // depends on both being present.
 // ----------------------------------------------------------------====
-bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0) {
+bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0, const int* keyfileFds = nullptr, int keyfileCount = 0) {
     const auto opStart = std::chrono::steady_clock::now();
-    if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); return false; }
+    if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
     VolumeState& v = volumes[volId];
 
     if (!forceDerive) {
         std::lock_guard<std::mutex> lock(v.mutex);
-        if (v.dataCtxInitialized && v.fd >= 0) { if (fd >= 0) close(fd); return true; }
+        if (v.dataCtxInitialized && v.fd >= 0) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return true; }
     }
-    if (fd < 0) return false;
+    if (fd < 0) { closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
 
     std::lock_guard<std::mutex> derivationLock(derivationMutexes[volId]);
     
@@ -1076,11 +1104,35 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     ParsedHeaderFields fields;
     bool matched = false;
 
+    // Keyfile mixing happens ONCE here, before the header-slot loop, not
+    // per-slot — it's a transform of the password itself, independent of
+    // which header slot ends up matching. Only needed on the
+    // password-derivation path: the preservedKey path below never touches
+    // [password] at all, so mixing it would be wasted work — but the fds
+    // still arrived from Kotlin under the same "you own them now, close
+    // them" contract applyKeyfilesToPassword() documents, so they're
+    // closed either way via closeUnusedKeyfileFds().
+    unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
+    size_t mixedPasswordLen = 0;
+    const bool usingPreservedKey = (preservedKey != nullptr && preservedKeyLen > 0);
+    if (!usingPreservedKey) {
+        mixedPasswordLen = std::min(passwordLen, sizeof(mixedPassword));
+        memcpy(mixedPassword, password, mixedPasswordLen);
+        if (keyfileCount > 0 && !applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedPasswordLen)) {
+            LOGI("prepareSession(vol=%d): keyfile mixing failed (unreadable/empty keyfile)", volId);
+            close(fd);
+            return false;
+        }
+    } else {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+    }
+
     for (const auto& slot : kHeaderSlots) {
         unsigned char headerSector[VC_FULL_HEADER_SIZE];
         if (pread(fd, headerSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(slot.fileOffset)) != VC_FULL_HEADER_SIZE) continue;
 
-        if (preservedKey != nullptr && preservedKeyLen > 0) {
+        if (usingPreservedKey) {
             CascadeId candidateCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
             unsigned char candidateKey[192];
             memset(candidateKey, 0, 192);
@@ -1094,7 +1146,7 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
                 break;
             }
         } else {
-            if (deriveAndValidateHeader(headerSector, password, passwordLen, pim, cipherId, hashId, dKey, decH, matchedCipher, matchedHash, fields)) {
+            if (deriveAndValidateHeader(headerSector, mixedPassword, mixedPasswordLen, pim, cipherId, hashId, dKey, decH, matchedCipher, matchedHash, fields)) {
                 matched = true;
                 break;
             }
@@ -1140,16 +1192,36 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
 // validated header via ParsedHeaderFields, for both the file-backed and
 // USB-backed paths.
 
-static bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0, int64_t partitionOffsetHint = -1) {
-    if (volId < 0 || volId >= MAX_VOLUMES) return false;
+static bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0, int64_t partitionOffsetHint = -1, const int* keyfileFds = nullptr, int keyfileCount = 0) {
+    if (volId < 0 || volId >= MAX_VOLUMES) { closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
     VolumeState& v = volumes[volId];
     std::lock_guard<std::mutex> derivationLock(derivationMutexes[volId]);
     {
         std::lock_guard<std::mutex> lock(v.mutex);
         if (v.dataCtxInitialized && v.isUsbSource) {
             LOGI("prepareUsbSession(vol=%d): session prepared by another thread", volId);
+            closeUnusedKeyfileFds(keyfileFds, keyfileCount);
             return true;
         }
+    }
+
+    // Keyfile mixing happens ONCE here, before the partition/header-slot
+    // search below — see the matching comment in prepareSession() for why
+    // this isn't done per-candidate and why the preservedKey path still
+    // needs to close these fds even though it never reads mixedPassword.
+    unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
+    size_t mixedPasswordLen = 0;
+    const bool usingPreservedKey = (preservedKey != nullptr && preservedKeyLen > 0);
+    if (!usingPreservedKey) {
+        mixedPasswordLen = std::min(passwordLen, sizeof(mixedPassword));
+        memcpy(mixedPassword, password, mixedPasswordLen);
+        if (keyfileCount > 0 && !applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedPasswordLen)) {
+            LOGI("prepareUsbSession(vol=%d): keyfile mixing failed (unreadable/empty keyfile)", volId);
+            return false;
+        }
+    } else {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
     }
 
     std::vector<PartitionCandidate> partitions;
@@ -1248,7 +1320,7 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
             ParsedHeaderFields fields;
             bool derivedSuccessfully = false;
 
-            if (preservedKey != nullptr && preservedKeyLen > 0) {
+            if (usingPreservedKey) {
                 unsigned char headerBuf[VC_FULL_HEADER_SIZE];
                 if (!usbReadSectors(volId, headerSector, 1, headerBuf)) continue;
 
@@ -1267,7 +1339,7 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
                 if (!usbReadSectors(volId, headerSector, 1, headerBuf)) continue;
 
                 // PASS decH here
-                derivedSuccessfully = deriveAndValidateHeader(headerBuf, password, passwordLen, pim, cipherId, hashId,
+                derivedSuccessfully = deriveAndValidateHeader(headerBuf, mixedPassword, mixedPasswordLen, pim, cipherId, hashId,
                                          dKey, decH, matchedCipher, matchedHash, fields);
             }
 
@@ -1411,6 +1483,25 @@ static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pa
 // JNI API
 // ----------------------------------------------------------------====
 
+// Copies a Kotlin-side IntArray of raw fds (obtained via
+// ParcelFileDescriptor.detachFd(), same convention as every other fd
+// crossing this JNI boundary) into a std::vector<int> Claude can hand to
+// applyKeyfilesToPassword()/prepareSession()/prepareUsbSession(). [arr]
+// may legitimately be null (no keyfiles) or empty — both just yield an
+// empty vector, and every call site below already treats keyfileCount<=0
+// as "no keyfiles" (a no-op for applyKeyfilesToPassword).
+static std::vector<int> extractKeyfileFds(JNIEnv* env, jintArray arr) {
+    std::vector<int> fds;
+    if (!arr) return fds;
+    jsize len = env->GetArrayLength(arr);
+    if (len <= 0) return fds;
+    jint* elems = env->GetIntArrayElements(arr, nullptr);
+    if (!elems) return fds;
+    fds.assign(elems, elems + len);
+    env->ReleaseIntArrayElements(arr, elems, JNI_ABORT); // read-only access, nothing to copy back
+    return fds;
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMaxVolumesNative(JNIEnv*, jobject) {
     // FIX: previously MAX_VOLUMES had to be manually kept in sync across
@@ -1440,13 +1531,31 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getLastDerivedKeyMaterialNative(
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
         JNIEnv* env, jobject,
-        jint fd, jstring password, jint pim, jint cipherId, jint hashId) {
+        jint fd, jstring password, jint pim, jint cipherId, jint hashId, jintArray keyfileFds) {
     if (fd < 0 || password == nullptr) return nullptr;
+
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     unsigned char headerBuf[VC_FULL_HEADER_SIZE];
     if (pread(fd, headerBuf, VC_FULL_HEADER_SIZE, 0) != VC_FULL_HEADER_SIZE) {
         env->ReleaseStringUTFChars(password, nativePass);
+        closeUnusedKeyfileFds(kfFds.data(), static_cast<int>(kfFds.size()));
+        return nullptr;
+    }
+
+    // Same "mix keyfiles into a fixed-size password buffer before
+    // deriving" step as prepareSession()/prepareUsbSession() — see the
+    // comment there. This JNI export skips prepareSession() entirely (no
+    // volume/session gets created; it just returns raw key material), so
+    // the mixing has to happen here too rather than being inherited.
+    unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
+    size_t mixedPasswordLen = std::min(strlen(nativePass), sizeof(mixedPassword));
+    memcpy(mixedPassword, nativePass, mixedPasswordLen);
+    env->ReleaseStringUTFChars(password, nativePass);
+
+    if (!kfFds.empty() && !applyKeyfilesToPassword(kfFds.data(), static_cast<int>(kfFds.size()), mixedPassword, &mixedPasswordLen)) {
         return nullptr;
     }
 
@@ -1459,8 +1568,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
     // Add dummyDecH as the 8th parameter
     const bool ok = deriveAndValidateHeader(
         headerBuf, 
-        reinterpret_cast<const unsigned char*>(nativePass), 
-        strlen(nativePass), 
+        mixedPassword, 
+        mixedPasswordLen, 
         pim, 
         cipherId, 
         hashId, 
@@ -1470,7 +1579,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
         matchedHash, 
         fields
     );
-    env->ReleaseStringUTFChars(password, nativePass);
 
     if (!ok) return nullptr;
 
@@ -1482,7 +1590,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
 
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
-        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey) {
+        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds) {
 
     const unsigned char* preservedBytes = nullptr;
     size_t preservedLen = 0;
@@ -1491,10 +1599,12 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
         preservedLen = static_cast<size_t>(env->GetArrayLength(preservedKey));
     }
 
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     
     // FIX: Insert missing password length parameter and cast correctly
-    if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, true, cipherId, hashId, preservedBytes, preservedLen)) {
+    if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, true, cipherId, hashId, preservedBytes, preservedLen,
+                         kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()))) {
         if (preservedKey != nullptr) {
             env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
         }
@@ -2237,7 +2347,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
-        jlong partitionOffsetHint) {
+        jlong partitionOffsetHint, jintArray keyfileFds) {
 
     const unsigned char* preservedBytes = nullptr;
     size_t preservedLen = 0;
@@ -2246,11 +2356,13 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
         preservedLen = static_cast<size_t>(env->GetArrayLength(preservedKey));
     }
 
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     
     // FIX: Insert missing password length parameter and cast correctly
     const bool ok = prepareUsbSession(reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, cipherId, hashId, preservedBytes, preservedLen,
-                                       static_cast<int64_t>(partitionOffsetHint));
+                                       static_cast<int64_t>(partitionOffsetHint),
+                                       kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()));
     
     if (preservedKey != nullptr) {
         env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);

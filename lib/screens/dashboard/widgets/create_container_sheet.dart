@@ -97,183 +97,176 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return AppBottomSheet(
-      child: SingleChildScrollView(
-        child: AutofillGroup(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Create VeraCrypt Container',
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // File name
-              TextField(
-                controller: _nameCtrl,
-                decoration: InputDecoration(
-                  labelText: 'File Name',
-                  prefixIcon: Icon(
-                    Icons.drive_file_rename_outline_rounded,
-                    size: AppIconSize.small,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Size and unit selection
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: _sizeCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: InputDecoration(
-                        labelText: 'Container Size',
-                        prefixIcon: Icon(Icons.sd_card_outlined, size: AppIconSize.small),
-                      ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Create VeraCrypt Container'),
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: AutofillGroup(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // File name
+                TextField(
+                  controller: _nameCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'File Name',
+                    prefixIcon: Icon(
+                      Icons.drive_file_rename_outline_rounded,
+                      size: AppIconSize.small,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _sizeUnit,
-                      decoration: const InputDecoration(labelText: 'Unit'),
-                      items: const [
-                        DropdownMenuItem(value: 'MB', child: Text('MB')),
-                        DropdownMenuItem(value: 'GB', child: Text('GB')),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) {
-                          setState(() => _sizeUnit = val);
-                        }
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Password
-              TextField(
-                controller: _passwordCtrl,
-                obscureText: _obscure,
-                autofillHints: const [AutofillHints.password],
-                decoration: InputDecoration(
-                  labelText: 'Password',
-                  prefixIcon: Icon(Icons.key_rounded, size: AppIconSize.small),
-                  // FIX: previously a hand-rolled IconButton with the same
-                  // outlined icon pair used correctly here — now routed
-                  // through the shared widget so it can't drift from the
-                  // other password fields in the app.
-                  suffixIcon: PasswordVisibilityToggle(
-                    obscured: _obscure,
-                    onToggle: () => setState(() => _obscure = !_obscure),
-                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 12),
 
-              // PIM
-              TextField(
-                controller: _pimCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'PIM  (leave blank for default)',
-                  prefixIcon: Icon(Icons.tune_rounded, size: AppIconSize.small),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // File System selection
-              DropdownButtonFormField<String>(
-                initialValue: _fileSystem,
-                decoration: InputDecoration(
-                  labelText: 'Format File System',
-                  prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
-                ),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'FAT',
-                    child: Text('FAT (FAT32)'),
-                  ),
-                  DropdownMenuItem(value: 'exFAT', child: Text('exFAT')),
-                ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _fileSystem = val);
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // Encryption Algorithm selection
-              DropdownButtonFormField<int>(
-                initialValue: _cipherId,
-                decoration: InputDecoration(
-                  labelText: 'Encryption Algorithm',
-                  prefixIcon: Icon(Icons.lock_outline_rounded, size: AppIconSize.small),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 0, child: Text('AES')),
-                  DropdownMenuItem(value: 1, child: Text('Serpent')),
-                  DropdownMenuItem(value: 2, child: Text('Twofish')),
-                  DropdownMenuItem(value: 3, child: Text('AES-Twofish')),
-                  DropdownMenuItem(value: 4, child: Text('Serpent-AES')),
-                  DropdownMenuItem(value: 5, child: Text('Twofish-Serpent')),
-                  DropdownMenuItem(value: 6, child: Text('AES-Twofish-Serpent')),
-                  DropdownMenuItem(value: 7, child: Text('Serpent-Twofish-AES')),
-                ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _cipherId = val);
-                },
-              ),
-              const SizedBox(height: 12),
-
-              // Hash Algorithm selection
-              DropdownButtonFormField<int>(
-                initialValue: _hashId,
-                decoration: InputDecoration(
-                  labelText: 'Hash Algorithm',
-                  prefixIcon: Icon(Icons.tag_rounded, size: AppIconSize.small),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 0, child: Text('SHA-512')),
-                  DropdownMenuItem(value: 1, child: Text('SHA-256')),
-                  DropdownMenuItem(value: 2, child: Text('Whirlpool')),
-                  DropdownMenuItem(value: 3, child: Text('Streebog')),
-                  DropdownMenuItem(value: 4, child: Text('BLAKE2s-256')),
-                ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _hashId = val);
-                },
-              ),
-
-              if (_error != null) ...[
-                const SizedBox(height: 14),
-                InlineErrorBanner(_error!),
-              ],
-
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _loading ? null : _create,
-                child: _loading
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                // Size and unit selection
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _sizeCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
                         ),
-                      )
-                    : const Text('Create Container'),
-              ),
-            ],
+                        decoration: InputDecoration(
+                          labelText: 'Container Size',
+                          prefixIcon: Icon(Icons.sd_card_outlined, size: AppIconSize.small),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _sizeUnit,
+                        decoration: const InputDecoration(labelText: 'Unit'),
+                        items: const [
+                          DropdownMenuItem(value: 'MB', child: Text('MB')),
+                          DropdownMenuItem(value: 'GB', child: Text('GB')),
+                        ],
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() => _sizeUnit = val);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Password
+                TextField(
+                  controller: _passwordCtrl,
+                  obscureText: _obscure,
+                  autofillHints: const [AutofillHints.password],
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    prefixIcon: Icon(Icons.key_rounded, size: AppIconSize.small),
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _obscure,
+                      onToggle: () => setState(() => _obscure = !_obscure),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // PIM
+                TextField(
+                  controller: _pimCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'PIM  (leave blank for default)',
+                    prefixIcon: Icon(Icons.tune_rounded, size: AppIconSize.small),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // File System selection
+                DropdownButtonFormField<String>(
+                  initialValue: _fileSystem,
+                  decoration: InputDecoration(
+                    labelText: 'Format File System',
+                    prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'FAT',
+                      child: Text('FAT (FAT32)'),
+                    ),
+                    DropdownMenuItem(value: 'exFAT', child: Text('exFAT')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _fileSystem = val);
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // Encryption Algorithm selection
+                DropdownButtonFormField<int>(
+                  initialValue: _cipherId,
+                  decoration: InputDecoration(
+                    labelText: 'Encryption Algorithm',
+                    prefixIcon: Icon(Icons.lock_outline_rounded, size: AppIconSize.small),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 0, child: Text('AES')),
+                    DropdownMenuItem(value: 1, child: Text('Serpent')),
+                    DropdownMenuItem(value: 2, child: Text('Twofish')),
+                    DropdownMenuItem(value: 3, child: Text('AES-Twofish')),
+                    DropdownMenuItem(value: 4, child: Text('Serpent-AES')),
+                    DropdownMenuItem(value: 5, child: Text('Twofish-Serpent')),
+                    DropdownMenuItem(value: 6, child: Text('AES-Twofish-Serpent')),
+                    DropdownMenuItem(value: 7, child: Text('Serpent-Twofish-AES')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _cipherId = val);
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // Hash Algorithm selection
+                DropdownButtonFormField<int>(
+                  initialValue: _hashId,
+                  decoration: InputDecoration(
+                    labelText: 'Hash Algorithm',
+                    prefixIcon: Icon(Icons.tag_rounded, size: AppIconSize.small),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 0, child: Text('SHA-512')),
+                    DropdownMenuItem(value: 1, child: Text('SHA-256')),
+                    DropdownMenuItem(value: 2, child: Text('Whirlpool')),
+                    DropdownMenuItem(value: 3, child: Text('Streebog')),
+                    DropdownMenuItem(value: 4, child: Text('BLAKE2s-256')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _hashId = val);
+                  },
+                ),
+
+                if (_error != null) ...[
+                  const SizedBox(height: 14),
+                  InlineErrorBanner(_error!),
+                ],
+
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: _loading ? null : _create,
+                  child: _loading
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                          ),
+                        )
+                      : const Text('Create Container'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

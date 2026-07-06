@@ -889,7 +889,6 @@ static bool deriveAndValidateHeader(
     const auto timingStart = std::chrono::steady_clock::now();
     const unsigned char* salt = headerSector;
     const unsigned char* encH = headerSector + VC_SALT_SIZE;
-
     const int safePim = clampPim(pim);
 
     // --- FIX 1: The 64-byte Fast Path ---
@@ -905,6 +904,7 @@ static bool deriveAndValidateHeader(
             ParsedHeaderFields fastFields;
             if (tryDecryptHeader(encH, CascadeId::kAes, fastKey, decH, &fastFields)) {
                 std::memcpy(outKeyMaterial, &decH[VC_KEY_OFFSET_MASTER], 64);
+                std::memcpy(outDecryptedHeader, decH, VC_HEADER_BODY_SIZE);
                 outMatchedCipher = CascadeId::kAes;
                 outMatchedHash   = HashId::kSha512;
                 outFields        = fastFields;
@@ -960,8 +960,6 @@ static bool deriveAndValidateHeader(
         int iter = iterationsForHash(h, safePim);
         unsigned char derivedKeyMaterial[192] = {0};
         
-        // FIX: Removed `&found` (9th argument) to resolve the undefined symbol linker error.
-        // It now correctly passes 8 arguments matching your original crypto implementation.
         if (!pbkdf2Hmac(h, password, passwordLen,
                        salt, VC_SALT_SIZE, iter, derivedKeyMaterial, neededKeyBytes)) {
             return;
@@ -977,10 +975,9 @@ static bool deriveAndValidateHeader(
             if (found.load(std::memory_order_acquire)) break;
             ParsedHeaderFields candidateFields;
             if (tryDecryptHeader(encH, c, derivedKeyMaterial, decH, &candidateFields)) {
-        bool expected = false;
+                bool expected = false;
         if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
             std::lock_guard<std::mutex> lock(resultMutex);
-            // FIX: Store the PBKDF2 derived material, not the master key
             std::memcpy(resultKeyMaterial, derivedKeyMaterial, 192); 
             std::memcpy(outDecryptedHeader, decH, VC_HEADER_BODY_SIZE);
             resultCipher = c;

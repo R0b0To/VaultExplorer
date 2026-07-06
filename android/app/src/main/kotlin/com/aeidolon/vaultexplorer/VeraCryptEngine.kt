@@ -26,20 +26,27 @@ object VeraCryptEngine {
     // ── Tier 1: session establishment ──────────────────────────────────────
 
     /** Opens fd, runs PBKDF2, mounts the FAT layer, returns root listing.
-     *  cipherId/hashId: 255 = auto-detect (try all combinations). */
+     *  cipherId/hashId: 255 = auto-detect (try all combinations).
+     *  keyfileFds: raw fds (already ParcelFileDescriptor.detachFd()'d on the
+     *  Kotlin side) for any keyfiles to mix into the password before
+     *  derivation. The native side takes ownership and closes every fd in
+     *  this array, whether derivation succeeds or fails — callers must not
+     *  touch or close them again afterward. Pass null/empty for no keyfiles. */
     @JvmStatic
     external fun deriveKeyMaterialNative(
         fd: Int, password: String, pim: Int,
-        cipherId: Int = 255, hashId: Int = 255
+        cipherId: Int = 255, hashId: Int = 255, keyfileFds: IntArray? = null
     ): ByteArray?
 
     @JvmStatic
     external fun getLastDerivedKeyMaterialNative(volId: Int): ByteArray?
 
+    /** keyfileFds: see [deriveKeyMaterialNative] — same detach/ownership contract. */
     @JvmStatic
     external fun unlockAndListNative(
         fd: Int, password: String, pim: Int, volId: Int,
-        cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null
+        cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null,
+        keyfileFds: IntArray? = null
     ): Array<String>?
 
     /** Writes a new VeraCrypt container to fd, formats it.
@@ -77,10 +84,12 @@ object VeraCryptEngine {
     @JvmStatic external fun createDirectory(dirPath: String, volId: Int): Boolean
     @JvmStatic external fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean
     @JvmStatic external fun getSpaceInfo(volId: Int): LongArray?
-    /** USB unlock + list. cipherId/hashId: 255 = auto-detect. */
+    /** USB unlock + list. cipherId/hashId: 255 = auto-detect.
+     *  keyfileFds: see [deriveKeyMaterialNative] — same detach/ownership contract. */
     @JvmStatic external fun unlockUsbAndListNative(
         password: String, pim: Int, volId: Int, deviceSizeBytes: Long,
-        cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null
+        cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null,
+        partitionOffsetHint: Long = -1L, keyfileFds: IntArray? = null
     ): Array<String>?
 
     // ── Tier 2: stream lifecycle ───────────────────────────────────────────

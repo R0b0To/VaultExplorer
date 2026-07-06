@@ -43,6 +43,7 @@ import javax.crypto.spec.SecretKeySpec
 
 private object ChannelMethods {
     const val PICK_CONTAINER      = "pickContainer"
+    const val PICK_KEYFILES       = "pickKeyfiles"
     const val CREATE_CONTAINER    = "createContainer"
     const val UNLOCK_CONTAINER    = "unlockContainer"
     const val LOCK_CONTAINER      = "lockContainer"
@@ -137,6 +138,48 @@ private var usbDetachReceiver: BroadcastReceiver? = null
         } else {
             res.success(null)
         }
+    }
+
+    // 1b. Pick Keyfiles Launcher — multi-select, read-only. Unlike container
+    // picking, a keyfile is often something generic (a photo, a random
+    // binary blob) the user keeps elsewhere and reuses across containers,
+    // so we still take a persistable grant (read-only) to let Dart offer
+    // "remember these keyfiles for this container" without re-prompting
+    // every unlock — but nothing here requires that Dart actually persist
+    // the paths; it's free to treat them as one-shot.
+    private val pickKeyfilesLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingFlutterResult ?: return@registerForActivityResult
+        pendingFlutterResult = null
+        val data = activityResult.data
+        if (activityResult.resultCode != Activity.RESULT_OK || data == null) {
+            res.success(null)
+            return@registerForActivityResult
+        }
+        val uris = mutableListOf<Uri>()
+        data.clipData?.let { clip ->
+            for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri)
+        }
+        if (uris.isEmpty()) data.data?.let { uris.add(it) }
+
+        val picked = uris.mapNotNull { uri ->
+            try {
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: SecurityException) {
+                // Some providers (e.g. some USB/SD document providers) don't
+                // support persistable grants at all — fine, the grant is
+                // still valid for this activity's lifetime, which covers
+                // the immediate unlock flow that's about to use it.
+            }
+            try {
+                mapOf(
+                    "uri" to uri.toString(),
+                    "displayName" to UriNameResolver.resolve(contentResolver, uri)
+                )
+            } catch (_: Exception) { null }
+        }
+        res.success(picked)
     }
 
     // 2. Create Container Launcher
@@ -374,6 +417,42 @@ private var usbDetachReceiver: BroadcastReceiver? = null
             result.error("NOT_UNLOCKED", e.message, null)
         } else {
             result.error("C++_ERROR", e.message, null)
+        }
+    }
+
+    /**
+     * Opens each keyfile uri string in [paths] read-only and detaches its
+     * fd, returning them as an IntArray ready to hand to
+     * VeraCryptEngine.{unlockAndListNative,unlockUsbAndListNative,
+     * deriveKeyMaterialNative} — those native calls take ownership of every
+     * fd in the array and close it themselves (see keyfile_mixing.h's
+     * applyKeyfilesToPassword contract), whether the unlock succeeds or
+     * fails, so callers must not touch or close them again afterward.
+     *
+     * Returns null for a null/empty [paths] (the "no keyfiles" case — pass
+     * that straight through as the keyfileFds argument, native treats a
+     * null/empty array as a no-op).
+     *
+     * On failure to open any one of them, every fd already opened for
+     * EARLIER entries in [paths] is closed here (native never gets to see
+     * them, so nothing else will), and the triggering exception propagates
+     * to the caller's existing catch block.
+     */
+    private fun openKeyfileFds(paths: List<String>?): IntArray? {
+        if (paths.isNullOrEmpty()) return null
+        val opened = mutableListOf<ParcelFileDescriptor>()
+        try {
+            for (path in paths) {
+                val pfd = contentResolver.openFileDescriptor(Uri.parse(path), "r")
+                    ?: throw Exception("Could not open keyfile: $path")
+                opened.add(pfd)
+            }
+            return IntArray(opened.size) { i -> opened[i].detachFd() }
+        } catch (e: Exception) {
+            for (pfd in opened) {
+                try { pfd.close() } catch (_: Exception) {}
+            }
+            throw e
         }
     }
 
@@ -773,9 +852,16 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
         Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
     }
     val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
+    val keyfilePaths = call.argument<List<String>>("keyfilePaths")
 
     if (deviceName == null || password == null) {
         result.error("INVALID_ARGS", "deviceName and password required", null)
+        return@setMethodCallHandler
+    }
+    // See UNLOCK_CONTAINER for why this only rejects when BOTH a password
+    // and keyfiles are absent — VeraCrypt supports keyfile-only unlock.
+    if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
+        result.error("INVALID_ARGS", "password or keyfiles required", null)
         return@setMethodCallHandler
     }
     val device = usbManager.deviceList[deviceName]
@@ -805,14 +891,20 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
             val sizeBytes = msd.sectorCount * msd.sectorSize
             UsbBlockBridge.register(targetVolId, msd)
 
+            val keyfileFds = openKeyfileFds(keyfilePaths)
+
             if (preservedKey != null) {
                 Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${preservedKey.size})")
             } else if (cacheDerivedKey) {
                 Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
             }
+            if (keyfileFds != null && keyfileFds.isNotEmpty()) {
+                Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
+            }
 
             val files = VeraCryptEngine.unlockUsbAndListNative(
-                password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey
+                password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
+                keyfileFds = keyfileFds
             )
 
             runOnUiThread {
@@ -844,7 +936,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                     ))
                 } else {
                     UsbBlockBridge.unregister(targetVolId)
-                    result.error("AUTH_FAIL", "Incorrect password or invalid drive", null)
+                    result.error("AUTH_FAIL", "Incorrect password/keyfiles or invalid drive", null)
                 }
             }
         } catch (e: Exception) {
@@ -861,6 +953,16 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             type = "*/*"
                         }
                         pickContainerLauncher.launch(intent)
+                    }
+
+                    ChannelMethods.PICK_KEYFILES -> {
+                        pendingResultCheck(result)
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        }
+                        pickKeyfilesLauncher.launch(intent)
                     }
 
                     ChannelMethods.CREATE_CONTAINER -> {
@@ -905,9 +1007,18 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
                         }
                         val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
+                        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
 
                         if (uriString == null || password == null) {
                             result.error("INVALID_ARGS", "filePath and password required", null)
+                            return@setMethodCallHandler
+                        }
+                        // VeraCrypt allows a keyfile-only unlock (empty password + at
+                        // least one keyfile) — only reject when BOTH are absent, and
+                        // only when we're not just reusing a preserved derived key
+                        // (which needs neither).
+                        if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
+                            result.error("INVALID_ARGS", "password or keyfiles required", null)
                             return@setMethodCallHandler
                         }
 
@@ -919,10 +1030,17 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                         }
 
                         Thread {
+                            var pfd: ParcelFileDescriptor? = null
                             try {
                                 val uri = Uri.parse(uriString)
-                                val pfd = contentResolver.openFileDescriptor(uri, "rw")
+                                pfd = contentResolver.openFileDescriptor(uri, "rw")
                                     ?: throw Exception("Could not open file descriptor")
+
+                                // Resolve keyfiles BEFORE detaching the container fd: if a
+                                // keyfile path is bad, `pfd` is still an intact
+                                // ParcelFileDescriptor here and the catch block below can
+                                // close it normally — nothing has been handed to native yet.
+                                val keyfileFds = openKeyfileFds(keyfilePaths)
                                 val fd = pfd.detachFd()
 
                                 if (preservedKey != null) {
@@ -930,9 +1048,12 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                 } else if (cacheDerivedKey) {
                                     Log.i("VaultExplorer_C++", "File unlock will derive and cache a fresh key")
                                 }
+                                if (keyfileFds != null && keyfileFds.isNotEmpty()) {
+                                    Log.i("VaultExplorer_C++", "File unlock using ${keyfileFds.size} keyfile(s)")
+                                }
 
                                 val files = synchronized(VeraCryptSession.locks[targetVolId]) {
-                                    VeraCryptEngine.unlockAndListNative(fd, password, pim, targetVolId, cipherId, hashId, preservedKey)
+                                    VeraCryptEngine.unlockAndListNative(fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds)
                                 }
 
                                 runOnUiThread {
@@ -963,10 +1084,15 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                         ))
                                     } else {
                                         result.error("AUTH_FAIL",
-                                            "Incorrect password or invalid container", null)
+                                            "Incorrect password/keyfiles or invalid container", null)
                                     }
                                 }
                             } catch (e: Exception) {
+                                // No-op if `fd` was already detached and handed to native
+                                // above (detachFd() makes close() on this object a no-op);
+                                // actually closes it if we threw before ever reaching that
+                                // point (e.g. a bad keyfile path).
+                                try { pfd?.close() } catch (_: Exception) {}
                                 runOnUiThread { dispatchNativeError(e, result) }
                             }
                         }.start()
@@ -978,6 +1104,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                         val pim = call.argument<Number>("pim")?.toInt() ?: 0
                         val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
                         val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
+                        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
 
                         if (filePath == null || password == null) {
                             result.error("INVALID_ARGS", "filePath and password required", null)
@@ -985,15 +1112,20 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                         }
 
                         Thread {
+                            var pfd: ParcelFileDescriptor? = null
                             try {
-                                val pfd = contentResolver.openFileDescriptor(Uri.parse(filePath), "r")
+                                pfd = contentResolver.openFileDescriptor(Uri.parse(filePath), "r")
                                     ?: throw Exception("Could not open file descriptor")
+                                // Same ordering as UNLOCK_CONTAINER: resolve keyfiles
+                                // before detaching, so a bad keyfile path still leaves
+                                // `pfd` closable in the catch block below.
+                                val keyfileFds = openKeyfileFds(keyfilePaths)
                                 val fd = pfd.detachFd()
-                                val derived = VeraCryptEngine.deriveKeyMaterialNative(fd, password, pim, cipherId, hashId)
-                                pfd.close()
+                                val derived = VeraCryptEngine.deriveKeyMaterialNative(fd, password, pim, cipherId, hashId, keyfileFds)
                                 val encoded = derived?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
                                 runOnUiThread { result.success(encoded) }
                             } catch (e: Exception) {
+                                try { pfd?.close() } catch (_: Exception) {}
                                 runOnUiThread { dispatchNativeError(e, result) }
                             }
                         }.start()

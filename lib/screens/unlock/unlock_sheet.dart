@@ -42,6 +42,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
   String? _error;
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
+  final List<KeyfileRef> _keyfiles = [];
+  bool _pickingKeyfiles = false;
 
   // ── Unlock method state ──────────────────────────────────────────────────
   ContainerUnlockMethod _unlockMethod = ContainerUnlockMethod.password;
@@ -327,8 +329,8 @@ Future<void>_tryBiometric() async {
       return;
     }
     var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
-    if (effectivePassword.isEmpty && preservedKey == null) {
-      setState(() => _error = 'Password is required');
+    if (effectivePassword.isEmpty && preservedKey == null && _keyfiles.isEmpty) {
+      setState(() => _error = 'Password or keyfiles required');
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -336,6 +338,7 @@ Future<void>_tryBiometric() async {
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final name = _selectedName ?? 'Container';
+      final keyfilePaths = _keyfiles.map((k) => k.uri).toList();
 
       final records = await ContainerRepository.instance.loadAll();
       final record = records[_selectedUri!];
@@ -364,6 +367,7 @@ Future<void>_tryBiometric() async {
         hashId: _hashId,
         preservedKey: resolvedPreservedKey,
         cacheDerivedKey: shouldCacheDerivedKey,
+        keyfilePaths: keyfilePaths,
       );
 
       // FIX: a preserved key can go stale (uri reused for a new container).
@@ -377,7 +381,7 @@ Future<void>_tryBiometric() async {
           effectivePassword =
               (await ContainerRepository.instance.getPassword(_selectedUri!))?.trim() ?? '';
         }
-        if (effectivePassword.isNotEmpty) {
+        if (effectivePassword.isNotEmpty || keyfilePaths.isNotEmpty) {
           result = await vaultExplorerApi.unlockContainer(
             _selectedUri!,
             effectivePassword,
@@ -388,6 +392,7 @@ Future<void>_tryBiometric() async {
             hashId: _hashId,
             preservedKey: null,
             cacheDerivedKey: shouldCacheDerivedKey,
+            keyfilePaths: keyfilePaths,
           );
         }
       }
@@ -462,7 +467,31 @@ Future<void>_tryBiometric() async {
     }
   }
 
-  // ── Whether to show the standard password UI ────────────────────────────
+  // ── Keyfiles ─────────────────────────────────────────────────────────────
+
+  Future<void> _pickKeyfiles() async {
+    setState(() => _pickingKeyfiles = true);
+    try {
+      final picked = await vaultExplorerApi.pickKeyfiles();
+      if (!mounted) return;
+      setState(() {
+        for (final k in picked) {
+          if (!_keyfiles.any((existing) => existing.uri == k.uri)) {
+            _keyfiles.add(k);
+          }
+        }
+      });
+    } on PlatformException catch (e) {
+      if (mounted) setState(() => _error = e.message ?? 'Could not pick keyfiles');
+    } finally {
+      if (mounted) setState(() => _pickingKeyfiles = false);
+    }
+  }
+
+  void _removeKeyfile(KeyfileRef keyfile) {
+    setState(() => _keyfiles.removeWhere((k) => k.uri == keyfile.uri));
+  }
+
 
   bool get _showPasswordUI {
     if (_showPasswordFallback) return true;
@@ -817,6 +846,64 @@ Future<void>_tryBiometric() async {
                                   ),
                                 ),
                               ),
+                              const SizedBox(height: 12),
+
+                              // Keyfiles (optional) — VeraCrypt lets you mix
+                              // one or more keyfiles into the password
+                              // before derivation, and even supports a
+                              // keyfile-only unlock (password left empty).
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Keyfiles (optional)',
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed:
+                                        _pickingKeyfiles ? null : _pickKeyfiles,
+                                    icon: _pickingKeyfiles
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : Icon(
+                                            Icons.attach_file_rounded,
+                                            size: AppIconSize.small,
+                                          ),
+                                    label: const Text('Add'),
+                                  ),
+                                ],
+                              ),
+                              if (_keyfiles.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 4,
+                                    children: _keyfiles
+                                        .map(
+                                          (k) => InputChip(
+                                            avatar: Icon(
+                                              Icons.description_outlined,
+                                              size: AppIconSize.small,
+                                            ),
+                                            label: Text(
+                                              k.displayName,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            onDeleted: () => _removeKeyfile(k),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                                ),
                               const SizedBox(height: 12),
                               TextField(
                                 controller: _pimCtrl,

@@ -7,6 +7,13 @@ import 'package:vaultexplorer/models/usb_device_info.dart';
 import '../models/mounted_container.dart';
 import 'channel_methods.dart';
 
+/// A single keyfile picked via [VaultExplorerApi.pickKeyfiles]: [uri] is
+/// what gets sent back to native (and round-tripped through
+/// [VaultExplorerApi.unlockContainer]/[unlockUsbContainer]/[deriveDerivedKey]
+/// as a `keyfilePaths` entry); [displayName] is purely for showing a chip
+/// or list entry in the unlock UI.
+typedef KeyfileRef = ({String uri, String displayName});
+
 class VaultExplorerApi {
   const VaultExplorerApi();
 
@@ -108,6 +115,7 @@ class VaultExplorerApi {
     required int pim,
     int? cipherId,
     int? hashId,
+    List<String>? keyfilePaths,
   }) async {
     final result = await _channel.invokeMethod<String>(
       ChannelMethods.deriveDerivedKey,
@@ -117,6 +125,8 @@ class VaultExplorerApi {
         'pim': pim,
         'cipherId': cipherId ?? 255,
         'hashId': hashId ?? 255,
+        if (keyfilePaths != null && keyfilePaths.isNotEmpty)
+          'keyfilePaths': keyfilePaths,
       },
     );
     if (result == null || result.isEmpty) return null;
@@ -183,6 +193,25 @@ class VaultExplorerApi {
     );
   }
 
+  /// Opens a multi-select document picker for keyfiles. Returns an empty
+  /// list if the user cancels. Any file type is a valid keyfile (VeraCrypt
+  /// keyfile mixing just hashes the raw bytes — a photo, an mp3, a random
+  /// binary blob are all equally valid), so this doesn't filter by
+  /// extension or mime type.
+  Future<List<KeyfileRef>> pickKeyfiles() async {
+    final raw = await _channel.invokeMethod<List<Object?>>(
+      ChannelMethods.pickKeyfiles,
+    );
+    if (raw == null) return [];
+    return raw
+        .cast<Map<Object?, Object?>>()
+        .map((m) => (
+              uri: m['uri'] as String,
+              displayName: m['displayName'] as String,
+            ))
+        .toList();
+  }
+
  Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId})?> unlockContainer(
     String filePath,
     String password,
@@ -193,6 +222,7 @@ class VaultExplorerApi {
     int? hashId,
     Uint8List? preservedKey,
     bool cacheDerivedKey = false,
+    List<String>? keyfilePaths,
   }) async {
     final raw = await _channel
         .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockContainer, {
@@ -205,6 +235,8 @@ class VaultExplorerApi {
           'hashId': hashId ?? 255,
           if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
           'cacheDerivedKey': cacheDerivedKey,
+          if (keyfilePaths != null && keyfilePaths.isNotEmpty)
+            'keyfilePaths': keyfilePaths,
         });
     if (raw == null) return null;
     final volId = raw['volId'] as int;
@@ -275,6 +307,7 @@ class VaultExplorerApi {
     int? hashId,
     Uint8List? preservedKey,
     bool cacheDerivedKey = false,
+    List<String>? keyfilePaths,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockUsbContainer,
@@ -288,6 +321,8 @@ class VaultExplorerApi {
         'hashId': hashId ?? 255,
         if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
         'cacheDerivedKey': cacheDerivedKey,
+        if (keyfilePaths != null && keyfilePaths.isNotEmpty)
+          'keyfilePaths': keyfilePaths,
       },
     );
     if (raw == null) return null;

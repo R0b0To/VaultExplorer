@@ -29,6 +29,7 @@ class _VaultDashboardState extends State<VaultDashboard>
   Map<String, ContainerRecord> _records = {};
   AppSettings _appSettings = AppSettings();
   bool _actionInFlight = false;
+  int _currentIndex = 0; // 0: Vaults, 2: Settings (1 is modal trigger)
 
   final Map<int, Timer> _autoCloseTimers = {};
 
@@ -293,8 +294,8 @@ class _VaultDashboardState extends State<VaultDashboard>
       await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
-        useSafeArea: true, // Modern Android requirement for full-screen bottom sheets
-        showDragHandle: true, // Native MD3 handle
+        useSafeArea: true,
+        showDragHandle: true,
         builder: (_) => UnlockSheet(
           onMounted: _onContainerMounted,
           initialUri: uri,
@@ -357,15 +358,13 @@ class _VaultDashboardState extends State<VaultDashboard>
     });
   }
 
-  /// Modern MD3 Creation Bottom Sheet triggered by the Floating Action Button
   void _showAddContainerMenu() {
     HapticFeedback.lightImpact();
     showModalBottomSheet(
       context: context,
-      showDragHandle: true, // Standard OS-level grab handle
+      showDragHandle: true,
       useSafeArea: true,
       shape: const RoundedRectangleBorder(
-        // Much softer plush top corners standard in Android 15/16
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
       builder: (context) {
@@ -475,7 +474,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     );
   }
 
-  Future<void> _forgetContainer(String uri, String name) async {
+  Future<bool> _forgetContainer(String uri, String name) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -499,10 +498,45 @@ class _VaultDashboardState extends State<VaultDashboard>
         ],
       ),
     );
-    if (confirmed != true) return;
 
+    if (confirmed == true) {
+      await ContainerRepository.instance.remove(uri);
+      if (mounted) {
+        setState(() {
+          _records.remove(uri);
+        });
+      }
+      return true;
+    }
+    return false;
+  }
+
+  void _handleSwipeToRemove(String uri, ContainerRecord record) async {
+    setState(() {
+      _records.remove(uri);
+    });
     await ContainerRepository.instance.remove(uri);
-    if (mounted) setState(() => _records.remove(uri));
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 5),
+        content: Text('Removed "${record.label}" from dashboard'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await ContainerRepository.instance.save(record);
+            if (mounted) {
+              setState(() {
+                _records[uri] = record;
+              });
+            }
+          },
+        ),
+      ),
+    );
   }
 
   // ── Navigate to browser ───────────────────────────────────────────────────
@@ -530,6 +564,80 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (mounted) _refreshContainerSpace(container.volId);
   }
 
+  // ── Tab Builders ──────────────────────────────────────────────────────────
+
+  Widget _buildVaultsTab(List<dynamic> displayItems, ColorScheme cs, TextTheme textTheme) {
+    if (displayItems.isEmpty) {
+      return EmptyState(onAdd: () => _showUnlockSheet());
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 64, 16, 120),
+      itemCount: displayItems.length + 1,
+      separatorBuilder: (_, i) => i == 0 ? const SizedBox.shrink() : const SizedBox(height: 16),
+      itemBuilder: (_, i) {
+        if (i == 0) return _DashboardHeader(cs: cs, textTheme: textTheme);
+
+        final item = displayItems[i - 1];
+        final String uri;
+        final String label;
+        final bool isMounted;
+
+        if (item is MountedContainer) {
+          uri = item.uri;
+          label = item.displayName;
+          isMounted = true;
+        } else {
+          final record = item as ContainerRecord;
+          uri = record.uri;
+          label = record.label.isNotEmpty ? record.label : record.uri.split('/').last;
+          isMounted = false;
+        }
+
+        return Dismissible(
+          key: Key('dismiss_$uri'),
+          direction: DismissDirection.startToEnd,
+          confirmDismiss: (direction) async {
+            if (isMounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Lock the container before removing it.')),
+              );
+              return false;
+            }
+            return true;
+          },
+          onDismissed: (direction) {
+            _handleSwipeToRemove(uri, item as ContainerRecord);
+          },
+          background: Container(
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.only(left: 24),
+            decoration: BoxDecoration(
+              color: cs.errorContainer,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(Icons.delete_outline_rounded, color: cs.onErrorContainer),
+          ),
+          child: isMounted
+              ? ContainerCard(
+                  container: item,
+                  onLocked: _onContainerLocked,
+                  onBrowse: () => _openBrowser(item),
+                  onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+                )
+              : SavedContainerCard(
+                  name: label,
+                  uri: uri,
+                  onUnlock: () => (item as ContainerRecord).isUsbSource
+                      ? _showUsbUnlockSheet(existingRecord: item)
+                      : _showUnlockSheet(uri: uri, name: label),
+                  onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+                ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -547,118 +655,60 @@ class _VaultDashboardState extends State<VaultDashboard>
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _scheduleAutoLock(),
       child: Scaffold(
-        appBar: AppBar(
-          scrolledUnderElevation: 0, // Flat standard M3 interaction
-          title: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppRadius.lg),
-                  border: Border.all(color: cs.outlineVariant.withValues(alpha: 0)),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(AppRadius.lg - 1),
-                  child: Image.asset(
-                    'assets/images/app_icon.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Vault Explorer',
-                style: textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: -0.2, // Modern typography tweak
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.settings_outlined, size: AppIconSize.action),
-              tooltip: 'App Settings',
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
-                );
-                _loadAll();
-              },
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _currentIndex,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+          height: 64,
+          onDestinationSelected: (index) {
+            if (index == 1) {
+              _showAddContainerMenu();
+              return;
+            }
+            setState(() => _currentIndex = index);
+            if (index == 0 || index == 2) {
+              _loadAll(); // Refresh data/settings when switching tabs
+            }
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.grid_view_outlined),
+              selectedIcon: Icon(Icons.grid_view_rounded),
+              label: 'Vaults',
             ),
-            const SizedBox(width: 8),
+            NavigationDestination(
+              icon: Icon(Icons.add_circle_outline_rounded),
+              selectedIcon: Icon(Icons.add_circle_rounded),
+              label: 'Add',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings_rounded),
+              label: 'Settings',
+            ),
           ],
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _showAddContainerMenu,
-          elevation: 2, // Modern low-lift tonal standard
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Add Vault'),
-        ),
-
-        // ── Body: list + floating clipboard pill ────────────────────────────
         body: Stack(
           children: [
-            // 1. The main list
-            Positioned.fill(
-              child: displayItems.isEmpty
-                  ? EmptyState(onAdd: () => _showUnlockSheet())
-                  : ListView.separated(
-                      // Pushed top padding and side paddings to give large radii room
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 112),
-                      itemCount: displayItems.length,
-                      // Increased separator height to balance the plush new 24dp cards
-                      separatorBuilder: (_, __) => const SizedBox(height: 16),
-                      itemBuilder: (_, i) {
-                        final item = displayItems[i];
-                        if (item is MountedContainer) {
-                          return ContainerCard(
-                            container: item,
-                            onLocked: _onContainerLocked,
-                            onBrowse: () => _openBrowser(item),
-                            onLongPress: () => _showContainerConfig(
-                              uri: item.uri,
-                              currentLabel: item.displayName,
-                            ),
-                          );
-                        } else {
-                          final record = item as ContainerRecord;
-                          return SavedContainerCard(
-                            name: record.label.isNotEmpty
-                                ? record.label
-                                : record.uri.split('/').last,
-                            uri: record.uri,
-                            onUnlock: () => record.isUsbSource
-                                ? _showUsbUnlockSheet(existingRecord: record)
-                                : _showUnlockSheet(
-                                    uri: record.uri,
-                                    name: record.label,
-                                  ),
-                            onLongPress: () => _showContainerConfig(
-                              uri: record.uri,
-                              currentLabel: record.label,
-                            ),
-                          );
-                        }
-                      },
-                    ),
+            // Use IndexedStack to persist state across tabs while keeping the Nav Bar visible
+            IndexedStack(
+              index: _currentIndex,
+              children: [
+                _buildVaultsTab(displayItems, cs, textTheme),
+                const SizedBox.shrink(), // Index 1 is handled by bottom sheet
+                const AppSettingsScreen(), // Index 2
+              ],
             ),
 
-            // 2. The Floating Clipboard Pill
             Positioned(
               left: 0,
               right: 0,
-              bottom: 88,
+              bottom: 16,
               child: Center(
                 child: ListenableBuilder(
                   listenable: CrossContainerClipboard.instance,
                   builder: (context, _) {
                     final clipboard = CrossContainerClipboard.instance;
                     if (!clipboard.hasItems) return const SizedBox.shrink();
-
                     return _FloatingClipboardDashboardBanner(
                       clipboard: clipboard,
                       onClear: clipboard.clear,
@@ -674,7 +724,20 @@ class _VaultDashboardState extends State<VaultDashboard>
   }
 }
 
-// ── Internal Widget for Add Menu ──────────────────────────────────────────────
+// ── Internal Helper Widgets ──────────────────────────────────────────────────
+
+class _DashboardHeader extends StatelessWidget {
+  const _DashboardHeader({required this.cs, required this.textTheme});
+  final ColorScheme cs;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(bottom: 24, left: 8),
+    );
+  }
+}
 
 class _ModernListTile extends StatelessWidget {
   final IconData icon;
@@ -698,7 +761,7 @@ class _ModernListTile extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16), // Rounded ripples
+        borderRadius: BorderRadius.circular(16),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
@@ -715,8 +778,6 @@ class _ModernListTile extends StatelessWidget {
     );
   }
 }
-
-// ── Floating Clipboard Banner for Dashboard (MD3 Pill) ──────────────────────
 
 class _FloatingClipboardDashboardBanner extends StatelessWidget {
   final CrossContainerClipboard clipboard;
@@ -735,9 +796,8 @@ class _FloatingClipboardDashboardBanner extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Material(
-        // Replaced heavy shadow/elevation with flat inverse surface mapping
         color: cs.inverseSurface,
-        elevation: 0, 
+        elevation: 0,
         shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
         child: Padding(

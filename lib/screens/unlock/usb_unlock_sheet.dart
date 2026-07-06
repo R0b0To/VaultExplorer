@@ -75,6 +75,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
   bool _remember = false;
+  final List<KeyfileRef> _keyfiles = [];
+  bool _pickingKeyfiles = false;
 
   Future<void>? _loadDevicesFuture;
 
@@ -354,8 +356,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       return;
     }
     var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
-    if (effectivePassword.isEmpty && preservedKey == null) {
-      setState(() => _error = 'Password is required');
+    if (effectivePassword.isEmpty && preservedKey == null && _keyfiles.isEmpty) {
+      setState(() => _error = 'Password or keyfiles required');
       return;
     }
 
@@ -373,6 +375,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
 
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final displayName = widget.existingRecord?.label ?? device.productName;
+      final keyfilePaths = _keyfiles.map((k) => k.uri).toList();
 
       final appSettings = await AppSettingsService.loadSettings();
       final isReconnect = widget.existingRecord != null;
@@ -401,6 +404,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         hashId: _hashId,
         preservedKey: resolvedPreservedKey,
         cacheDerivedKey: shouldCacheDerivedKey,
+        keyfilePaths: keyfilePaths,
       );
 
       // FIX: same stale-key fallback as the file-based sheet — a bus path
@@ -412,7 +416,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
           effectivePassword =
               (await ContainerRepository.instance.getPassword(widget.existingRecord!.uri))?.trim() ?? '';
         }
-        if (effectivePassword.isNotEmpty) {
+        if (effectivePassword.isNotEmpty || keyfilePaths.isNotEmpty) {
           result = await vaultExplorerApi.unlockUsbContainer(
             device.deviceName,
             effectivePassword,
@@ -423,12 +427,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
             hashId: _hashId,
             preservedKey: null,
             cacheDerivedKey: shouldCacheDerivedKey,
+            keyfilePaths: keyfilePaths,
           );
         }
       }
 
       if (result == null) {
-        setState(() => _error = 'Incorrect password or unsupported drive');
+        setState(() => _error = 'Incorrect password/keyfiles or unsupported drive');
         return;
       }
 
@@ -544,6 +549,31 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
     } finally {
       if (mounted) setState(() => _unlocking = false);
     }
+  }
+
+  // ── Keyfiles ─────────────────────────────────────────────────────────────
+
+  Future<void> _pickKeyfiles() async {
+    setState(() => _pickingKeyfiles = true);
+    try {
+      final picked = await vaultExplorerApi.pickKeyfiles();
+      if (!mounted) return;
+      setState(() {
+        for (final k in picked) {
+          if (!_keyfiles.any((existing) => existing.uri == k.uri)) {
+            _keyfiles.add(k);
+          }
+        }
+      });
+    } on PlatformException catch (e) {
+      if (mounted) setState(() => _error = e.message ?? 'Could not pick keyfiles');
+    } finally {
+      if (mounted) setState(() => _pickingKeyfiles = false);
+    }
+  }
+
+  void _removeKeyfile(KeyfileRef keyfile) {
+    setState(() => _keyfiles.removeWhere((k) => k.uri == keyfile.uri));
   }
 
   @override
@@ -784,6 +814,53 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                         ),
                       ),
                       const SizedBox(height: 12),
+
+                      // Keyfiles (optional) — VeraCrypt lets you mix one or
+                      // more keyfiles into the password before derivation,
+                      // and even supports a keyfile-only unlock (password
+                      // left empty).
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Keyfiles (optional)',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: (busy || _pickingKeyfiles) ? null : _pickKeyfiles,
+                            icon: _pickingKeyfiles
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.attach_file_rounded, size: 18),
+                            label: const Text('Add'),
+                          ),
+                        ],
+                      ),
+                      if (_keyfiles.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: _keyfiles
+                                .map(
+                                  (k) => InputChip(
+                                    avatar: const Icon(Icons.description_outlined, size: 18),
+                                    label: Text(k.displayName, overflow: TextOverflow.ellipsis),
+                                    onDeleted: busy ? null : () => _removeKeyfile(k),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+
                       TextField(
                         controller: _pimCtrl,
                         enabled: !busy,

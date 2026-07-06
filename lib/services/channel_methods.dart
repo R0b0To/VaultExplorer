@@ -6,6 +6,7 @@
 abstract final class ChannelMethods {
   // ── Container lifecycle ──────────────────────────────────────────────────
   static const pickContainer = 'pickContainer';
+  static const pickKeyfiles = 'pickKeyfiles';
   static const createContainer = 'createContainer';
   static const unlockContainer = 'unlockContainer';
   static const lockContainer = 'lockContainer';
@@ -49,4 +50,3 @@ abstract final class ChannelMethods {
   static const unlockUsbContainer = 'unlockUsbContainer';
   static const documentExists = 'documentExists';
 }
-

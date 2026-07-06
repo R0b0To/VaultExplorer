@@ -158,7 +158,6 @@ struct VolumeState {
     std::mutex mutex;
     int        fd = -1;
     uint64_t   dataOffset = 0;
-    bool       relTweak = false;
 
     // FIX (hidden volumes): EncryptedAreaLength read directly out of the
     // header that unlocked this volume. Drives GET_SECTOR_COUNT so a
@@ -216,7 +215,6 @@ struct VolumeState {
         if (fd >= 0) close(fd);
         fd = -1;
         dataOffset = 0;
-        relTweak = false;
         dataAreaLengthBytes = 0;
         isHiddenVolume = false;
         fileSize = 0;
@@ -608,22 +606,14 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 
     VolumeState& v = volumes[pdrv];
     const uint64_t basePhysical = v.dataOffset / 512;
-    const bool relTweak = v.relTweak;
 
-    static constexpr UINT MAX_SECTORS_PER_BATCH = 8192; // 4 MB/batch — unchanged tuning, no longer a hard limit
+    static constexpr UINT MAX_SECTORS_PER_BATCH = 8192; // 4 MB/batch
     UINT remaining   = count;
     LBA_t curSector  = sector;
     BYTE* curBuf     = buff;
 
     alignas(16) unsigned char stackBuf[65536];
 
-    // FIX: previously this loop duplicated the pread+decrypt body once for
-    // the "fits on the stack" case and again (with an early `continue`) for
-    // the "needs the persistent volume buffer" case. Two copies of the same
-    // logic is exactly the trap the tryKeyCandidate() comment above warns
-    // about elsewhere in this file — easy to silently diverge on a future
-    // edit. disk_write() already uses the single-path form below; mirror it
-    // here so both hooks share one code path.
     while (remaining > 0) {
         const UINT batchCount = std::min(remaining, MAX_SECTORS_PER_BATCH);
         const uint64_t firstPhysical = basePhysical + curSector;
@@ -642,10 +632,10 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 
         if (!physRead(pdrv, firstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
-        for (UINT i = 0; i < batchCount; i++) {
+for (UINT i = 0; i < batchCount; i++) {
             const uint64_t physSector = firstPhysical + i;
-            const uint64_t sectorInPartition = physSector - v.partitionStartSector;
-            const uint64_t tweak = relTweak ? (physSector - basePhysical) : sectorInPartition;
+            // FIX: Tweak must be the absolute sector offset from the host start
+            const uint64_t tweak = physSector - v.partitionStartSector;
             cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512), curBuf + (i*512));
         }
 
@@ -665,7 +655,6 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
 
     VolumeState& v = volumes[pdrv];
     const uint64_t basePhysical = v.dataOffset / 512;
-    const bool     relTweak     = v.relTweak;
 
     static constexpr UINT MAX_SECTORS_PER_BATCH = 8192;
     UINT remaining        = count;
@@ -693,10 +682,10 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             encBuf = getVolIoBuf(v, totalBytes);
         }
 
-        for (UINT i = 0; i < batchCount; i++) {
+for (UINT i = 0; i < batchCount; i++) {
             const uint64_t physSector = firstPhysical + i;
-            const uint64_t sectorInPartition = physSector - v.partitionStartSector;
-            const uint64_t tweak = relTweak ? (physSector - basePhysical) : sectorInPartition;
+            // FIX: Tweak must be the absolute sector offset from the host start
+            const uint64_t tweak = physSector - v.partitionStartSector;
             cascadeEncryptSector(v.cascade, tweak,
                           curBuf + (i * 512), encBuf + (i * 512));
         }
@@ -716,7 +705,17 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
             return RES_OK;
 
         case GET_SECTOR_COUNT:
-            if (pdrv < MAX_VOLUMES && volumes[pdrv].fileSize > VC_DATA_AREA_OFFSET * 2) {
+            // FIX (hidden volumes): a hidden volume's filesystem must never
+            // see space belonging to the outer volume (writing past its
+            // real end would corrupt the outer volume's data), so prefer
+            // the header's own EncryptedAreaLength — authoritative for
+            // both normal and hidden volumes — over a fileSize-based
+            // guess. The fileSize fallback below still applies during
+            // createContainerNative()'s own format step, where
+            // dataAreaLengthBytes is legitimately still 0.
+            if (pdrv < MAX_VOLUMES && volumes[pdrv].dataAreaLengthBytes > 0) {
+                *(LBA_t*)buff = static_cast<LBA_t>(volumes[pdrv].dataAreaLengthBytes / 512);
+            } else if (pdrv < MAX_VOLUMES && volumes[pdrv].fileSize > VC_DATA_AREA_OFFSET * 2) {
                 *(LBA_t*)buff = static_cast<LBA_t>(
                     (volumes[pdrv].fileSize - VC_DATA_AREA_OFFSET * 2) / 512);
             } else {
@@ -774,16 +773,12 @@ static bool _derivationInit = [](){
     return true;
 }();
 
-// Result of trying one candidate key against the early sectors of the
-// container, searching for a valid FAT/exFAT boot-sector signature (0x55AA)
-// under either tweak convention (absolute physical sector vs. relative to
-// the data-area start). VeraCrypt volumes can use either depending on
-// version/format, so both must be tried per candidate key.
-struct FsScanResult {
-    bool found = false;
-    uint64_t dataOffset = 0;
-    bool relTweak = false;
-};
+// FsScanResult used to live here, backing a scan for a valid FAT/exFAT
+// boot-sector signature under two guessed tweak conventions. Removed along
+// with tryKeyCandidate()/tryKeyCandidateUsb() below — dataOffset and the
+// tweak convention are now read directly out of the validated header (see
+// ParsedHeaderFields), which is both correct for hidden volumes (whose
+// data area the old scan window could never reach) and strictly simpler.
 
 // ----------------------------------------------------------------====
 // FIX: previously the PBKDF2-derive + header-decrypt + magic-byte-check
@@ -820,7 +815,8 @@ static bool tryDecryptHeader(
     const unsigned char encH[VC_HEADER_BODY_SIZE],
     CascadeId cipherId,
     const unsigned char* derivedKeyMaterial,
-    unsigned char decH[VC_HEADER_BODY_SIZE]
+    unsigned char decH[VC_HEADER_BODY_SIZE],
+    ParsedHeaderFields* outFields = nullptr
 ) {
     CascadeContext tempCtx;
     CascadeSpec spec = cascadeSpecFor(cipherId);
@@ -850,23 +846,31 @@ static bool tryDecryptHeader(
         return false;
     }
 
-    auto readBE32 = [&decH](int off) -> uint32_t {
-        return (static_cast<uint32_t>(decH[off])     << 24) |
-               (static_cast<uint32_t>(decH[off + 1]) << 16) |
-               (static_cast<uint32_t>(decH[off + 2]) <<  8) |
-                static_cast<uint32_t>(decH[off + 3]);
-    };
-
     const uint32_t computedHdrCrc = crc32(decH, VC_HDR_CRC_COVERAGE_LEN);
-    const uint32_t storedHdrCrc   = readBE32(VC_HDR_OFF_HEADER_CRC);
+    const uint32_t storedHdrCrc   = readHeaderBE32Body(decH, VC_HDR_OFF_HEADER_CRC);
     if (computedHdrCrc != storedHdrCrc) {
         return false;
     }
 
     const uint32_t computedKeyCrc = crc32(&decH[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
-    const uint32_t storedKeyCrc = readBE32(VC_HDR_OFF_KEY_CRC);
+    const uint32_t storedKeyCrc = readHeaderBE32Body(decH, VC_HDR_OFF_KEY_CRC);
     if (computedKeyCrc != storedKeyCrc) {
         return false;
+    }
+
+    // FIX (hidden volumes): surface the fields real VeraCrypt uses to
+    // locate this header's data area, instead of leaving the caller to
+    // rediscover it by scanning the disk for a filesystem signature. A
+    // CRC-validated header is already strong proof the password/cipher/
+    // hash combination is correct (that's the whole security model), so
+    // there is nothing left to confirm by scanning — we can just trust
+    // these fields the same way upstream ReadVolumeHeaderWithAbort() does.
+    if (outFields) {
+        outFields->volumeSize          = readHeaderBE64(decH, VC_HDR_OFF_VOLUME_SIZE);
+        outFields->hiddenVolumeSize    = readHeaderBE64(decH, VC_HDR_OFF_HIDDEN_VOL_SIZE);
+        outFields->encryptedAreaStart  = readHeaderBE64(decH, VC_HDR_OFF_KEY_SCOPE_START);
+        outFields->encryptedAreaLength = readHeaderBE64(decH, VC_HDR_OFF_KEY_SCOPE_SIZE);
+        outFields->sectorSize          = readHeaderBE32Body(decH, VC_HDR_OFF_SECTOR_SIZE);
     }
 
     return true;
@@ -874,11 +878,13 @@ static bool tryDecryptHeader(
 std::mutex derivationMutexes[MAX_VOLUMES];
 static bool deriveAndValidateHeader(
     const unsigned char headerSector[VC_FULL_HEADER_SIZE],
-    const char* password, int pim,
+    const unsigned char* password, size_t passwordLen, int pim,
     int cipherIdParam, int hashIdParam,
     unsigned char outKeyMaterial[192],
+    unsigned char outDecryptedHeader[VC_HEADER_BODY_SIZE], // ADDED
     CascadeId& outMatchedCipher,
-    HashId& outMatchedHash
+    HashId& outMatchedHash,
+    ParsedHeaderFields& outFields
 ) {
     const auto timingStart = std::chrono::steady_clock::now();
     const unsigned char* salt = headerSector;
@@ -893,14 +899,15 @@ static bool deriveAndValidateHeader(
         // PBKDF2 with SHA-512 outputs 64 bytes per block. 
         // Requesting 64 bytes instead of 192 makes this EXACTLY 3x faster.
         unsigned char fastKey[64]; 
-        if (pbkdf2Hmac(HashId::kSha512,
-                        reinterpret_cast<const unsigned char*>(password), strlen(password),
+        if (pbkdf2Hmac(HashId::kSha512, password, passwordLen,
                         salt, VC_SALT_SIZE, fastIter, fastKey, 64)) {
             unsigned char decH[VC_HEADER_BODY_SIZE];
-            if (tryDecryptHeader(encH, CascadeId::kAes, fastKey, decH)) {
+            ParsedHeaderFields fastFields;
+            if (tryDecryptHeader(encH, CascadeId::kAes, fastKey, decH, &fastFields)) {
                 std::memcpy(outKeyMaterial, &decH[VC_KEY_OFFSET_MASTER], 64);
                 outMatchedCipher = CascadeId::kAes;
                 outMatchedHash   = HashId::kSha512;
+                outFields        = fastFields;
                 mbedtls_platform_zeroize(decH, sizeof(decH));
                 mbedtls_platform_zeroize(fastKey, sizeof(fastKey));
                 return true;
@@ -939,6 +946,7 @@ static bool deriveAndValidateHeader(
     unsigned char resultKeyMaterial[192] = {0};
     CascadeId resultCipher{};
     HashId resultHash{};
+    ParsedHeaderFields resultFields;
 
     int maxLayersToTry = 1;
     for (CascadeId c : ciphersToTry) {
@@ -954,7 +962,7 @@ static bool deriveAndValidateHeader(
         
         // FIX: Removed `&found` (9th argument) to resolve the undefined symbol linker error.
         // It now correctly passes 8 arguments matching your original crypto implementation.
-        if (!pbkdf2Hmac(h, reinterpret_cast<const unsigned char*>(password), strlen(password),
+        if (!pbkdf2Hmac(h, password, passwordLen,
                        salt, VC_SALT_SIZE, iter, derivedKeyMaterial, neededKeyBytes)) {
             return;
         }
@@ -967,15 +975,18 @@ static bool deriveAndValidateHeader(
         unsigned char decH[VC_HEADER_BODY_SIZE];
         for (CascadeId c : ciphersToTry) {
             if (found.load(std::memory_order_acquire)) break;
-            if (tryDecryptHeader(encH, c, derivedKeyMaterial, decH)) {
-                bool expected = false;
-                if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
-                    std::lock_guard<std::mutex> lock(resultMutex);
-                    CascadeSpec spec = cascadeSpecFor(c);
-                    std::memcpy(resultKeyMaterial, &decH[VC_KEY_OFFSET_MASTER], spec.layerCount * 64);
-                    resultCipher = c;
-                    resultHash = h;
-                }
+            ParsedHeaderFields candidateFields;
+            if (tryDecryptHeader(encH, c, derivedKeyMaterial, decH, &candidateFields)) {
+        bool expected = false;
+        if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+            std::lock_guard<std::mutex> lock(resultMutex);
+            // FIX: Store the PBKDF2 derived material, not the master key
+            std::memcpy(resultKeyMaterial, derivedKeyMaterial, 192); 
+            std::memcpy(outDecryptedHeader, decH, VC_HEADER_BODY_SIZE);
+            resultCipher = c;
+            resultHash = h;
+            resultFields = candidateFields;
+        }
                 mbedtls_platform_zeroize(decH, sizeof(decH));
                 mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
                 return;
@@ -1002,55 +1013,13 @@ static bool deriveAndValidateHeader(
     std::memcpy(outKeyMaterial, resultKeyMaterial, sizeof(resultKeyMaterial));
     outMatchedCipher = resultCipher;
     outMatchedHash = resultHash;
+    outFields = resultFields;
     mbedtls_platform_zeroize(resultKeyMaterial, sizeof(resultKeyMaterial));
-    LOGI("deriveAndValidateHeader: success in %lld ms (cipher=%d hash=%d)",
-         elapsedMs(timingStart), static_cast<int>(resultCipher), static_cast<int>(resultHash));
+    LOGI("deriveAndValidateHeader: success in %lld ms (cipher=%d hash=%d hidden=%d)",
+         elapsedMs(timingStart), static_cast<int>(resultCipher), static_cast<int>(resultHash),
+         resultFields.isHiddenVolume() ? 1 : 0);
     return true;
 }
-
-static FsScanResult tryKeyCandidate(
-    int fd,
-    const CascadeContext& candidateCascade
-) {
-    FsScanResult result;
-    std::unique_ptr<unsigned char[]> encBatch(new unsigned char[SCAN_BATCH * 512]);
-    unsigned char decS[512];
-
-    uint64_t s = 0;
-    while (s < SCAN_SECTORS) {
-        const uint64_t batchCount = std::min(SCAN_BATCH, SCAN_SECTORS - s);
-        const ssize_t  batchBytes = static_cast<ssize_t>(batchCount * 512);
-
-        if (pread(fd, encBatch.get(), batchBytes,
-                  static_cast<off_t>(s * 512)) != batchBytes) {
-            break;
-        }
-
-        for (uint64_t i = 0; i < batchCount; i++) {
-            const uint64_t sectorIdx = s + i;
-            const unsigned char* enc = encBatch.get() + (i * 512);
-
-            cascadeDecryptSector(candidateCascade, sectorIdx, enc, decS);
-            if (isValidBootSector(decS)) {
-                result.found      = true;
-                result.dataOffset = sectorIdx * 512;
-                result.relTweak   = false;
-                return result;
-            }
-
-            cascadeDecryptSector(candidateCascade, 0, enc, decS);
-            if (isValidBootSector(decS)) {
-                result.found      = true;
-                result.dataOffset = sectorIdx * 512;
-                result.relTweak   = true;
-                return result;
-            }
-        }
-        s += batchCount;
-    }
-    return result; // found == false
-}
-
 
 // ----------------------------------------------------------------====
 // LOCK DOMAIN CONTRACT (read before touching prepareSession/disk_read/disk_write)
@@ -1083,205 +1052,98 @@ static FsScanResult tryKeyCandidate(
 // invariants (call ordering vs. memory state), and the safety argument above
 // depends on both being present.
 // ----------------------------------------------------------------====
-bool prepareSession(int fd, const char* password, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0) {
+bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0) {
     const auto opStart = std::chrono::steady_clock::now();
-    const auto headerReadStart = std::chrono::steady_clock::now();
-    
-    if (volId < 0 || volId >= MAX_VOLUMES) {
-        if (fd >= 0) close(fd);
-        return false;
-    }
+    if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); return false; }
     VolumeState& v = volumes[volId];
 
-    // Fast path: session already established, no derivation needed.
     if (!forceDerive) {
         std::lock_guard<std::mutex> lock(v.mutex);
-        if (v.dataCtxInitialized && v.fd >= 0) {
-            if (fd >= 0) close(fd);
-            LOGI("prepareSession(vol=%d): reused existing session in %lld ms", volId, elapsedMs(opStart));
-            return true;
-        }
-        if (v.dataCtxInitialized) {
-            if (fd >= 0) {
-                struct stat st;
-                if (fstat(fd, &st) == 0)
-                    v.fileSize = static_cast<uint64_t>(st.st_size);
-                v.fd = fd;
-                return true;
-            }
-            return false;
-        }
+        if (v.dataCtxInitialized && v.fd >= 0) { if (fd >= 0) close(fd); return true; }
     }
+    if (fd < 0) return false;
 
-    if (fd < 0) {
-        LOGI("prepareSession(vol=%d): missing fd before derivation in %lld ms", volId, elapsedMs(opStart));
-        return false;
-    }
-
-    // --- FIX 2: Mutex Wait System instead of Spinlock ---
-    // If a double-tap hits, Thread B gracefully goes to sleep here 
-    // without wasting battery or blocking CPU cores until Thread A finishes.
     std::lock_guard<std::mutex> derivationLock(derivationMutexes[volId]);
-
-    // Re-check: Thread A may have successfully initialized the session while we slept.
-    if (!forceDerive) {
-        std::lock_guard<std::mutex> lock(v.mutex);
-        if (v.dataCtxInitialized) {
-            if (fd >= 0) close(fd);
-            LOGI("prepareSession(vol=%d): session prepared by another thread in %lld ms", volId, elapsedMs(opStart));
-            return true;
-        }
-    }
-
-    LOGI("Running PBKDF2 Key Derivation for Volume %d (mutex NOT held)...", volId);
-
-    // --- Read header WITHOUT holding the volume mutex ---
-    unsigned char headerBuf[VC_FULL_HEADER_SIZE];
-    if (pread(fd, headerBuf, VC_FULL_HEADER_SIZE, 0) != VC_FULL_HEADER_SIZE) {
-        close(fd);
-        LOGI("prepareSession(vol=%d): header read failed in %lld ms", volId, elapsedMs(opStart));
-        return false;
-    }
-
-    uint64_t fileSize = 0;
-    {
-        struct stat st;
-        if (fstat(fd, &st) == 0)
-            fileSize = static_cast<uint64_t>(st.st_size);
-    }
-
-    const auto headerReadMs = elapsedMs(headerReadStart);
-    unsigned char dKey[192];
-    CascadeId matchedCipher;
-    HashId matchedHash;
-    const auto deriveStart = std::chrono::steady_clock::now();
     
-    bool derivedSuccessfully = false;
-    if (preservedKey != nullptr && preservedKeyLen > 0) {
-        LOGI("prepareSession(vol=%d): using cached master-key material len=%zu (cipher=%d hash=%d)",
-             volId, preservedKeyLen, cipherId, hashId);
-        matchedCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
-        matchedHash = (hashId != 255) ? static_cast<HashId>(hashId) : HashId::kSha512;
-        const size_t bytesToCopy = std::min(preservedKeyLen, sizeof(dKey));
-        std::memcpy(dKey, preservedKey, bytesToCopy);
-        if (bytesToCopy < sizeof(dKey)) {
-            std::memset(dKey + bytesToCopy, 0, sizeof(dKey) - bytesToCopy);
+    uint64_t fileSize = 0;
+    struct stat st;
+    if (fstat(fd, &st) == 0) fileSize = static_cast<uint64_t>(st.st_size);
+
+    struct HeaderSlot { uint64_t fileOffset; };
+    static constexpr HeaderSlot kHeaderSlots[] = { { 0 }, { VC_HIDDEN_HEADER_OFFSET } };
+
+    unsigned char dKey[192];           // PBKDF2 result (Key to Header)
+    unsigned char decH[VC_HEADER_BODY_SIZE]; // Decrypted Header Body
+    CascadeId matchedCipher{};
+    HashId matchedHash{};
+    ParsedHeaderFields fields;
+    bool matched = false;
+
+    for (const auto& slot : kHeaderSlots) {
+        unsigned char headerSector[VC_FULL_HEADER_SIZE];
+        if (pread(fd, headerSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(slot.fileOffset)) != VC_FULL_HEADER_SIZE) continue;
+
+        if (preservedKey != nullptr && preservedKeyLen > 0) {
+            CascadeId candidateCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
+            unsigned char candidateKey[192];
+            memset(candidateKey, 0, 192);
+            memcpy(candidateKey, preservedKey, std::min(preservedKeyLen, (size_t)192));
+
+            if (tryDecryptHeader(headerSector + VC_SALT_SIZE, candidateCipher, candidateKey, decH, &fields)) {
+                memcpy(dKey, candidateKey, 192);
+                matchedCipher = candidateCipher;
+                matchedHash = (hashId != 255) ? static_cast<HashId>(hashId) : HashId::kSha512;
+                matched = true;
+                break;
+            }
+        } else {
+            if (deriveAndValidateHeader(headerSector, password, passwordLen, pim, cipherId, hashId, dKey, decH, matchedCipher, matchedHash, fields)) {
+                matched = true;
+                break;
+            }
         }
-        derivedSuccessfully = true;
-    } else {
-        LOGI("prepareSession(vol=%d): no preserved key available, falling back to PBKDF2", volId);
-        derivedSuccessfully = deriveAndValidateHeader(
-            headerBuf, password, pim, cipherId, hashId,
-            dKey, matchedCipher, matchedHash);
     }
 
-    if (!derivedSuccessfully) {
-        LOGI("prepareSession(vol=%d): preserved-key path failed, falling back to PBKDF2 result=false", volId);
-        close(fd);
-        LOGI("prepareSession(vol=%d): deriveAndValidateHeader failed in %lld ms (headerRead=%lld ms, derive=%lld ms)",
-             volId, elapsedMs(opStart), headerReadMs, elapsedMs(deriveStart));
-        return false;
-    }
+    if (!matched) { close(fd); return false; }
 
-    const auto deriveMs = elapsedMs(deriveStart);
-    LOGI("prepareSession(vol=%d): derived key branch succeeded in %lld ms", volId, deriveMs);
+    // FIX: Extract Master Key from Decrypted Header
     CascadeContext candidateCascade;
     CascadeSpec spec = cascadeSpecFor(matchedCipher);
-    if (!cascadeSetKeys(candidateCascade, matchedCipher, dKey, spec.layerCount * 64)) {
-        mbedtls_platform_zeroize(dKey, sizeof(dKey));
-        close(fd);
-        LOGI("prepareSession(vol=%d): cascade key setup failed in %lld ms (headerRead=%lld ms, derive=%lld ms)",
-             volId, elapsedMs(opStart), headerReadMs, deriveMs);
-        return false;
-    }
-    if (preservedKey == nullptr || preservedKeyLen == 0) {
-        std::lock_guard<std::mutex> lock(v.mutex);
-        if (v.preservedDerivedKey != nullptr) {
-            mbedtls_platform_zeroize(v.preservedDerivedKey, v.preservedDerivedKeyLen);
-            delete[] v.preservedDerivedKey;
-        }
-        v.preservedDerivedKey = new unsigned char[sizeof(dKey)];
-        std::memcpy(v.preservedDerivedKey, dKey, sizeof(dKey));
-        v.preservedDerivedKeyLen = sizeof(dKey);
-    }
-    mbedtls_platform_zeroize(dKey, sizeof(dKey));
+    const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER]; 
 
-    const auto scanStart = std::chrono::steady_clock::now();
-    FsScanResult scan = tryKeyCandidate(fd, candidateCascade);
-    const auto scanMs = elapsedMs(scanStart);
-    if (!scan.found) {
-        close(fd);
-        LOGI("prepareSession(vol=%d): scan failed in %lld ms (headerRead=%lld ms, derive=%lld ms, scan=%lld ms)",
-             volId, elapsedMs(opStart), headerReadMs, deriveMs, scanMs);
-        return false;
+    // DATA is encrypted with Master Key, not dKey!
+    if (!cascadeSetKeys(candidateCascade, matchedCipher, masterKeyPtr, spec.layerCount * 64)) {
+        close(fd); return false;
     }
 
-    // Derivation & validation strictly complete. 
-    // Now acquire the volume mutex ONLY for the brief assignment swap.
     {
         std::lock_guard<std::mutex> lock(v.mutex);
-        v.cascade            = candidateCascade;
-        v.dataCtxInitialized = true;
-        v.fd                 = fd;
-        v.dataOffset         = scan.dataOffset;
-        v.relTweak           = scan.relTweak;
-        v.fileSize           = fileSize;
-        v.matchedCipherId    = static_cast<int>(matchedCipher);
-        v.matchedHashId      = static_cast<int>(matchedHash);
-    }
+        if (v.preservedDerivedKey) delete[] v.preservedDerivedKey;
+        v.preservedDerivedKey = new unsigned char[192];
+        memcpy(v.preservedDerivedKey, dKey, 192); // Store PBKDF2 for future "preserved" unlocks
+        v.preservedDerivedKeyLen = 192;
 
-    LOGI("prepareSession(vol=%d): success in %lld ms (headerRead=%lld ms, derive=%lld ms, scan=%lld ms)",
-         volId, elapsedMs(opStart), headerReadMs, deriveMs, scanMs);
+        v.cascade = candidateCascade;
+        v.dataCtxInitialized = true;
+        v.fd = fd;
+        v.dataOffset = fields.encryptedAreaStart;
+        v.dataAreaLengthBytes = fields.encryptedAreaLength;
+        v.isHiddenVolume = fields.isHiddenVolume();
+        v.fileSize = fileSize;
+        v.matchedCipherId = (int)matchedCipher;
+        v.matchedHashId = (int)matchedHash;
+        v.partitionStartSector = 0; // For files, absolute tweak = physical sector
+    }
     return true;
 }
 
+// tryKeyCandidateUsb() used to live here — the USB-backed equivalent of
+// tryKeyCandidate(), removed for the same reason (see the note above
+// FsScanResult's old location): dataOffset now comes straight from the
+// validated header via ParsedHeaderFields, for both the file-backed and
+// USB-backed paths.
 
-// USB-backed equivalent of tryKeyCandidate(): scans via the USB upcall
-// instead of pread on a container fd. Kept as a separate function rather
-// than parameterizing the fd-based version above, since the two read paths
-// (pread vs JNI upcall) are different enough that folding them into one
-// function would make the already-delicate unlock flow harder to reason
-// about, not easier.
-static FsScanResult tryKeyCandidateUsb(int volId, uint64_t partitionStartSector, const CascadeContext& candidateCascade) {
-    const auto timingStart = std::chrono::steady_clock::now();
-    FsScanResult result;
-    std::unique_ptr<unsigned char[]> encBatch(new unsigned char[SCAN_BATCH * 512]);
-    unsigned char decS[512];
-
-    uint64_t s = 0;
-    while (s < SCAN_SECTORS) {
-        const uint64_t batchCount = std::min(SCAN_BATCH, SCAN_SECTORS - s);
-        if (!usbReadSectors(volId, partitionStartSector + s, static_cast<uint32_t>(batchCount), encBatch.get())) break;
-
-        for (uint64_t i = 0; i < batchCount; i++) {
-            const uint64_t sectorIdx = s + i;
-            const unsigned char* enc = encBatch.get() + (i * 512);
-
-            cascadeDecryptSector(candidateCascade, sectorIdx, enc, decS);
-            if (isValidBootSector(decS)) {
-                result.found = true; 
-                result.dataOffset = (partitionStartSector + sectorIdx) * 512;
-                result.relTweak = false;
-                LOGI("tryKeyCandidateUsb(vol=%d): found candidate in %lld ms", volId, elapsedMs(timingStart));
-                return result;
-            }
-
-            cascadeDecryptSector(candidateCascade, 0, enc, decS);
-            if (isValidBootSector(decS)) {
-                result.found = true; 
-                result.dataOffset = (partitionStartSector + sectorIdx) * 512;
-                result.relTweak = true;
-                LOGI("tryKeyCandidateUsb(vol=%d): found candidate in %lld ms", volId, elapsedMs(timingStart));
-                return result;
-            }
-        }
-        s += batchCount;
-    }
-    return result; // found == false
-}
-
-
-static bool prepareUsbSession(const char* password, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0, int64_t partitionOffsetHint = -1) {
+static bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0, int64_t partitionOffsetHint = -1) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
     VolumeState& v = volumes[volId];
     std::lock_guard<std::mutex> derivationLock(derivationMutexes[volId]);
@@ -1356,9 +1218,22 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
         }
     }
 
+    // FIX (hidden volumes): for EACH partition candidate, also try the
+    // hidden-volume header slot (VC_HIDDEN_HEADER_OFFSET past that
+    // partition's own start) if the primary slot (the partition's start
+    // itself) doesn't decrypt — same reasoning as prepareSession's
+    // file-backed path, just repeated per partition since we don't yet
+    // know which partition is even the right one.
+    struct HeaderSlot { uint64_t sectorOffset; };
+    static constexpr HeaderSlot kHeaderSlots[] = {
+        { 0 },
+        { VC_HIDDEN_HEADER_OFFSET / 512 },
+    };
+
     bool fsFound = false;
     uint64_t foundDataOffset = 0;
-    bool foundRelTweak = false;
+    uint64_t foundDataLength = 0;
+    bool foundIsHidden = false;
     CascadeContext candidateCascade;
     uint64_t matchedPartitionStart = 0;
     CascadeId matchedCipherFound{};
@@ -1366,52 +1241,57 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
     std::vector<unsigned char> derivedKeyBytes;
 
     for (const auto& part : partitions) {
-        unsigned char headerBuf[VC_FULL_HEADER_SIZE];
-        if (!usbReadSectors(volId, part.startSector, 1, headerBuf)) {
-            continue;
-        }
+        for (const auto& slot : kHeaderSlots) {
+            const uint64_t headerSector = part.startSector + slot.sectorOffset;
 
-        unsigned char dKey[192]{};
-        CascadeId matchedCipher;
-        HashId matchedHash;
-        bool derivedSuccessfully = false;
+            unsigned char dKey[192]{};
+            unsigned char decH[VC_HEADER_BODY_SIZE]; // <--- ADD THIS LINE
+            CascadeId matchedCipher{};
+            HashId matchedHash{};
+            ParsedHeaderFields fields;
+            bool derivedSuccessfully = false;
 
-        if (preservedKey != nullptr && preservedKeyLen > 0) {
-            LOGI("prepareUsbSession(vol=%d): using cached master-key material len=%zu", volId, preservedKeyLen);
-            matchedCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
-            matchedHash = (hashId != 255) ? static_cast<HashId>(hashId) : HashId::kSha512;
-            const size_t bytesToCopy = std::min(preservedKeyLen, sizeof(dKey));
-            std::memcpy(dKey, preservedKey, bytesToCopy);
-            if (bytesToCopy < sizeof(dKey)) {
-                std::memset(dKey + bytesToCopy, 0, sizeof(dKey) - bytesToCopy);
+            if (preservedKey != nullptr && preservedKeyLen > 0) {
+                unsigned char headerBuf[VC_FULL_HEADER_SIZE];
+                if (!usbReadSectors(volId, headerSector, 1, headerBuf)) continue;
+
+                CascadeId candidateCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
+                const size_t bytesToCopy = std::min(preservedKeyLen, (size_t)192);
+                memcpy(dKey, preservedKey, bytesToCopy);
+                
+                // PASS decH here
+                if (tryDecryptHeader(headerBuf + VC_SALT_SIZE, candidateCipher, dKey, decH, &fields)) {
+                    matchedCipher = candidateCipher;
+                    matchedHash = (hashId != 255) ? static_cast<HashId>(hashId) : HashId::kSha512;
+                    derivedSuccessfully = true;
+                }
+            } else {
+                unsigned char headerBuf[VC_FULL_HEADER_SIZE];
+                if (!usbReadSectors(volId, headerSector, 1, headerBuf)) continue;
+
+                // PASS decH here
+                derivedSuccessfully = deriveAndValidateHeader(headerBuf, password, passwordLen, pim, cipherId, hashId,
+                                         dKey, decH, matchedCipher, matchedHash, fields);
             }
-            derivedSuccessfully = true;
-        } else {
-            // --- OPTIMIZATION 2: Bypass USB Header Read ---
-            // Only pay the USB latency cost of reading the header if we actually need to PBKDF2 it.
-            unsigned char headerBuf[VC_FULL_HEADER_SIZE];
-            if (!usbReadSectors(volId, part.startSector, 1, headerBuf)) {
+
+            if (!derivedSuccessfully) {
+                mbedtls_platform_zeroize(dKey, sizeof(dKey));
                 continue;
             }
-            LOGI("prepareUsbSession(vol=%d): no preserved key available, falling back to PBKDF2", volId);
-            derivedSuccessfully = deriveAndValidateHeader(headerBuf, password, pim, cipherId, hashId, dKey, matchedCipher, matchedHash);
-        }
 
-        if (!derivedSuccessfully) {
-            continue;
-        }
+            // Extract Master Key from decH
+            CascadeSpec spec = cascadeSpecFor(matchedCipher);
+            const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER]; // This will now work
+            
+            if (!cascadeSetKeys(candidateCascade, matchedCipher, masterKeyPtr, spec.layerCount * 64)) {
+                mbedtls_platform_zeroize(dKey, sizeof(dKey));
+                continue;
+            }
 
-        CascadeSpec spec = cascadeSpecFor(matchedCipher);
-        if (!cascadeSetKeys(candidateCascade, matchedCipher, dKey, spec.layerCount * 64)) {
-            mbedtls_platform_zeroize(dKey, sizeof(dKey));
-            continue;
-        }
-
-        FsScanResult scan = tryKeyCandidateUsb(volId, part.startSector, candidateCascade);
-        if (scan.found) {
             fsFound = true;
-            foundDataOffset = scan.dataOffset;
-            foundRelTweak = scan.relTweak;
+            foundDataOffset = part.startSector * 512 + fields.encryptedAreaStart;
+            foundDataLength = fields.encryptedAreaLength;
+            foundIsHidden   = fields.isHiddenVolume();
             matchedPartitionStart = part.startSector;
             matchedCipherFound = matchedCipher;
             matchedHashFound = matchedHash;
@@ -1419,7 +1299,7 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
             mbedtls_platform_zeroize(dKey, sizeof(dKey));
             break;
         }
-        mbedtls_platform_zeroize(dKey, sizeof(dKey));
+        if (fsFound) break;
     }
 
     if (!fsFound) {
@@ -1442,7 +1322,8 @@ static bool prepareUsbSession(const char* password, int pim, int volId, int ciph
         v.dataCtxInitialized   = true;
         v.fd                   = -1;
         v.dataOffset           = foundDataOffset;
-        v.relTweak             = foundRelTweak;
+        v.dataAreaLengthBytes  = foundDataLength;
+        v.isHiddenVolume       = foundIsHidden;
         v.partitionStartSector = matchedPartitionStart;
         v.matchedCipherId      = static_cast<int>(matchedCipherFound);
         v.matchedHashId        = static_cast<int>(matchedHashFound);
@@ -1573,10 +1454,25 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
     }
 
     unsigned char dKey[192];
+    unsigned char dummyDecH[VC_HEADER_BODY_SIZE]; // Add this dummy buffer
     CascadeId matchedCipher{};
     HashId matchedHash{};
+    ParsedHeaderFields fields;
+
+    // Add dummyDecH as the 8th parameter
     const bool ok = deriveAndValidateHeader(
-        headerBuf, nativePass, pim, cipherId, hashId, dKey, matchedCipher, matchedHash);
+        headerBuf, 
+        reinterpret_cast<const unsigned char*>(nativePass), 
+        strlen(nativePass), 
+        pim, 
+        cipherId, 
+        hashId, 
+        dKey, 
+        dummyDecH, 
+        matchedCipher, 
+        matchedHash, 
+        fields
+    );
     env->ReleaseStringUTFChars(password, nativePass);
 
     if (!ok) return nullptr;
@@ -1599,7 +1495,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     }
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    if (!prepareSession(fd, nativePass, pim, volId, true, cipherId, hashId, preservedBytes, preservedLen)) {
+    
+    // FIX: Insert missing password length parameter and cast correctly
+    if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, true, cipherId, hashId, preservedBytes, preservedLen)) {
         if (preservedKey != nullptr) {
             env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
         }
@@ -1834,7 +1732,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             v.dataCtxInitialized = true;
             v.fd                 = fd;
             v.dataOffset         = VC_DATA_AREA_OFFSET;
-            v.relTweak           = false;
+            // FIX: Removed `v.relTweak = false;` as the struct member no longer exists
             v.fileSize           = VOLUME_SIZE;
 
             const bool useExFat = (strncasecmp(nativeFS, "exfat", 5) == 0);
@@ -1857,7 +1755,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             v.fsMounted          = false;
             v.fd                 = -1;
             v.dataOffset         = 0;
-            v.relTweak           = false;
+            // FIX: Removed `v.relTweak = false;` as the struct member no longer exists
             v.fileSize           = 0;
             v.cascade.initialized = false;
             v.dataCtxInitialized = false;
@@ -2352,11 +2250,11 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
     }
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
-    // FIX (perf, fix #2): pass the cached offset (-1 if this is the first
-    // unlock / device has never resolved one) so prepareUsbSession() can
-    // skip straight to it instead of re-walking every MBR/GPT candidate.
-    const bool ok = prepareUsbSession(nativePass, pim, volId, cipherId, hashId, preservedBytes, preservedLen,
+    
+    // FIX: Insert missing password length parameter and cast correctly
+    const bool ok = prepareUsbSession(reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, cipherId, hashId, preservedBytes, preservedLen,
                                        static_cast<int64_t>(partitionOffsetHint));
+    
     if (preservedKey != nullptr) {
         env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
     }

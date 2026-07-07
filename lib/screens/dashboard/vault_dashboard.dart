@@ -65,6 +65,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     VaultExplorerApi.addUsbContainerDetachedListener(_onUsbContainerDetached);
+    VaultExplorerApi.addScreenOffListener(_onScreenOff);
     _loadAll();
   }
 
@@ -75,6 +76,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     _autoCloseTimers.clear();
     _autoLockTimer?.cancel();
     VaultExplorerApi.removeUsbContainerDetachedListener(_onUsbContainerDetached);
+    VaultExplorerApi.removeScreenOffListener(_onScreenOff);
     super.dispose();
   }
 
@@ -93,20 +95,20 @@ class _VaultDashboardState extends State<VaultDashboard>
           mins > 0 &&
           DateTime.now().difference(pausedAt) >= Duration(minutes: mins);
 
-      final shouldLockOnScreenLock = pausedAt != null &&
-          _appSettings.lockContainersOnScreenLock &&
-          mins == 0;
-
-      if (wasAwayTooLong || shouldLockOnScreenLock) {
+      if (wasAwayTooLong) {
         _performAutoLock();
       } else {
         _scheduleAutoLock();
       }
     } else if (state == AppLifecycleState.paused) {
+
       _pausedAt = DateTime.now();
-      if (_appSettings.lockContainersOnScreenLock && _appSettings.autoLockMins == 0) {
-        _performAutoLock();
-      }
+    }
+  }
+
+  void _onScreenOff() {
+    if (_appSettings.lockContainersOnScreenLock && _appSettings.autoLockMins == 0) {
+      _performAutoLock();
     }
   }
 

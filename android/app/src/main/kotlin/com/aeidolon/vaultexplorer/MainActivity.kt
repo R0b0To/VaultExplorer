@@ -110,10 +110,13 @@ private var pendingUsbPermissionDeviceName: String? = null
 // instant the drive goes away, independent of any lock/unlock call.
 private var usbDetachReceiver: BroadcastReceiver? = null
 
+private var screenOffReceiver: BroadcastReceiver? = null
+
     override fun onDestroy() {
     chooserReceiver?.let { unregisterReceiver(it) }
     usbPermissionReceiver?.let { unregisterReceiver(it) }
     usbDetachReceiver?.let { unregisterReceiver(it) }
+    screenOffReceiver?.let { unregisterReceiver(it) }
     super.onDestroy()
 }
 
@@ -772,6 +775,24 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
 } else {
     @Suppress("UnspecifiedRegisterReceiverFlag")
     registerReceiver(usbDetachReceiver, detachFilter)
+}
+
+screenOffReceiver = object : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        if (intent?.action != Intent.ACTION_SCREEN_OFF) return
+        runOnUiThread {
+            methodChannel?.invokeMethod("onScreenOff", null)
+        }
+    }
+}
+val screenOffFilter = IntentFilter(Intent.ACTION_SCREEN_OFF)
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    // Protected system broadcast — only the OS can send ACTION_SCREEN_OFF —
+    // so it doesn't need to be exported, same as the USB detach receiver.
+    registerReceiver(screenOffReceiver, screenOffFilter, RECEIVER_NOT_EXPORTED)
+} else {
+    @Suppress("UnspecifiedRegisterReceiverFlag")
+    registerReceiver(screenOffReceiver, screenOffFilter)
 }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(chooserReceiver, filter, RECEIVER_EXPORTED)

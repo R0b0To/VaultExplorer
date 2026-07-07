@@ -386,8 +386,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
                           _settings.autoLockMins == 0
-                              ? 'Containers will lock immediately when you lock the screen or '
-                                  'minimize the app, but stay open while you are actively using it.'
+                              ? 'Containers will lock immediately when you lock the screen, but stay open while you are actively using it.'
                               : 'Switching away briefly and coming back is fine — this only '
                                   'fires after ${_settings.autoLockMins} minute'
                                   '${_settings.autoLockMins == 1 ? '' : 's'} of not using the '

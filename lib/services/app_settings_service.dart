@@ -27,7 +27,7 @@ class AppSettings {
   bool blockScreenshots;
   bool defaultDerivedKeyCacheEnabled;
   bool lockContainersOnScreenLock;
-   int autoLockMins;
+  int autoLockMins;
 
   /// App-wide default thumbnail cache mode, applied to every container whose
   /// [ContainerRecord.thumbnailCacheMode] is null.

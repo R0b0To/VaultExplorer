@@ -57,6 +57,17 @@ class VaultExplorerApi {
     _usbContainerDetachedListeners.remove(listener);
   }
 
+
+  static final List<void Function()> _screenOffListeners = [];
+
+  static void addScreenOffListener(void Function() listener) {
+    _screenOffListeners.add(listener);
+  }
+
+  static void removeScreenOffListener(void Function() listener) {
+    _screenOffListeners.remove(listener);
+  }
+
   // ── Unlock progress / cancellation ──────────────────────────────────────
   //
   // "onUnlockStarted" fires once, synchronously from the native method call
@@ -104,6 +115,10 @@ class VaultExplorerApi {
           for (final listener in List.of(_usbContainerDetachedListeners)) {
             listener(volId);
           }
+        }
+      } else if (call.method == 'onScreenOff') {
+        for (final listener in List.of(_screenOffListeners)) {
+          listener();
         }
       } else if (call.method == 'onUnlockStarted') {
         final volId = call.arguments['volId'] as int?;

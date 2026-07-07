@@ -49,6 +49,14 @@ VaultExplorer lets you mount, browse, and manage VeraCrypt volumes directly on y
 - Configurable **thumbnail caching**: OS app cache (encrypted, fast) or inside the container (fully at-rest encrypted), or disabled entirely
 - Screenshot blocking (`FLAG_SECURE`)
 
+### Screenshots
+
+<p align="center">
+  <img width="250" alt="Screenshot_1783428063" src="https://github.com/user-attachments/assets/2267accb-aae3-4ce6-8fae-bd09bfebd3c1" />
+  <img width="250" alt="Screenshot_1783428136" src="https://github.com/user-attachments/assets/a7ac12c5-6481-423d-a930-098ef5da3283" /> 
+   <img width="250" alt="Screenshot_1783428136" src="https://github.com/user-attachments/assets/154c1dcf-e448-46ab-ad9d-2d92ad10fbe3" />
+
+</p>
 ---
 
 ## Architecture
@@ -132,8 +140,6 @@ The C++ engine is built automatically by CMake during the Android build. mbedTLS
 ## Limitations
 
 - **Android only** (the native engine uses Android JNI / NDK APIs)
-- Hidden volumes are not currently supported
-- Keyfiles are not currently supported
 
 ---
 

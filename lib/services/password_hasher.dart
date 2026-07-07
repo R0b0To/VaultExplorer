@@ -19,7 +19,6 @@ class PasswordHasher {
 
   static const int _saltBytes = 16;
   static const int _iterations = 200000;
-  static const int _outputBytes = 64;
 
   /// Derives a PBKDF2-SHA512 hash from [plaintext].
   ///

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/thumbnail_cache_mode.dart';
+import '../models/thumbnail_quality.dart';
 import 'vaultexplorer_api.dart';
 
 // ── ContainerUnlockMethod ─────────────────────────────────────────────────────
@@ -200,6 +201,7 @@ class ContainerRecord {
   final int autoCloseMins;
   final bool documentProvider;
   final ThumbnailCacheMode? thumbnailCacheMode;
+  final ThumbnailQuality? thumbnailQuality;
   final bool cacheDerivedKey;
   final String? pendingPassword;
   final String? pendingPatternHash;
@@ -219,6 +221,7 @@ class ContainerRecord {
     this.autoCloseMins = 0,
     this.documentProvider = false,
     this.thumbnailCacheMode,
+    this.thumbnailQuality,
     this.cacheDerivedKey = false,
     this.pendingPassword,
     this.pendingPatternHash,
@@ -248,6 +251,7 @@ class ContainerRecord {
     int? autoCloseMins,
     bool? documentProvider,
     Object? thumbnailCacheMode = _keep,
+    Object? thumbnailQuality = _keep,
     bool? cacheDerivedKey,
     String? pendingPassword,
     String? pendingPatternHash,
@@ -264,6 +268,9 @@ class ContainerRecord {
       thumbnailCacheMode: thumbnailCacheMode == _keep
           ? this.thumbnailCacheMode
           : thumbnailCacheMode as ThumbnailCacheMode?,
+      thumbnailQuality: thumbnailQuality == _keep
+          ? this.thumbnailQuality
+          : thumbnailQuality as ThumbnailQuality?,
       cacheDerivedKey: cacheDerivedKey ?? this.cacheDerivedKey,
       pendingPassword: pendingPassword,
       pendingPatternHash: pendingPatternHash,
@@ -281,6 +288,8 @@ class ContainerRecord {
     'documentProvider': documentProvider,
     if (thumbnailCacheMode != null)
       'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
+    if (thumbnailQuality != null)
+      'thumbnailQuality': thumbnailQuality!.toJson(),
     'cacheDerivedKey': cacheDerivedKey,
     'cipherId': cipherId,
     'hashId': hashId,
@@ -298,6 +307,9 @@ class ContainerRecord {
       documentProvider: j['documentProvider'] as bool? ?? false,
       thumbnailCacheMode: j.containsKey('thumbnailCacheMode')
           ? ThumbnailCacheMode.fromJson(j['thumbnailCacheMode'] as String?)
+          : null,
+      thumbnailQuality: j.containsKey('thumbnailQuality')
+          ? ThumbnailQuality.fromJson(j['thumbnailQuality'] as String?)
           : null,
       cacheDerivedKey: j['cacheDerivedKey'] as bool? ?? false,
       cipherId: j['cipherId'] as int? ?? 255,

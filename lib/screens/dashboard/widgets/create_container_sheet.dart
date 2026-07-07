@@ -93,10 +93,128 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     }
   }
 
+  InputDecoration _getInputDecoration(
+    ColorScheme cs, {
+    required String labelText,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: labelText,
+      prefixIcon: Icon(prefixIcon, size: 22, color: cs.primary),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: cs.surfaceContainerLow,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: cs.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: cs.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: cs.primary, width: 2),
+      ),
+    );
+  }
+
+  Widget _buildAdvancedTile(BuildContext context, ColorScheme cs, TextTheme textTheme) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        title: Text(
+          'Advanced parameters',
+          style: textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: cs.onSurface,
+          ),
+        ),
+        leading: Icon(Icons.tune_rounded, color: cs.primary),
+        childrenPadding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        backgroundColor: cs.surfaceContainerLow,
+        collapsedBackgroundColor: cs.surfaceContainerLow,
+        children: [
+          // PIM
+          TextField(
+            controller: _pimCtrl,
+            keyboardType: TextInputType.number,
+            decoration: _getInputDecoration(
+              cs,
+              labelText: 'PIM  (leave blank for default)',
+              prefixIcon: Icons.password_outlined,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // File System selection
+          DropdownButtonFormField<String>(
+            initialValue: _fileSystem,
+            decoration: _getInputDecoration(
+              cs,
+              labelText: 'Format File System',
+              prefixIcon: Icons.dns_rounded,
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: 'FAT',
+                child: Text('FAT (FAT32)'),
+              ),
+              DropdownMenuItem(value: 'exFAT', child: Text('exFAT')),
+            ],
+            onChanged: (val) {
+              if (val != null) setState(() => _fileSystem = val);
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Encryption Algorithm selection
+          DropdownButtonFormField<int>(
+            initialValue: _cipherId,
+            decoration: _getInputDecoration(
+              cs,
+              labelText: 'Encryption Algorithm',
+              prefixIcon: Icons.security_rounded,
+            ),
+            items: CipherAlgo.dropdownItems(includeAuto: false),
+            onChanged: (val) {
+              if (val != null) setState(() => _cipherId = val);
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Hash Algorithm selection
+          DropdownButtonFormField<int>(
+            initialValue: _hashId,
+            decoration: _getInputDecoration(
+              cs,
+              labelText: 'Hash Algorithm',
+              prefixIcon: Icons.tag_rounded,
+            ),
+            items: HashAlgo.dropdownItems(includeAuto: false),
+            onChanged: (val) {
+              if (val != null) setState(() => _hashId = val);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return Scaffold(
       appBar: AppBar(
@@ -104,155 +222,222 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: AutofillGroup(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // File name
-                TextField(
-                  controller: _nameCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'File Name',
-                    prefixIcon: Icon(
-                      Icons.drive_file_rename_outline_rounded,
-                      size: AppIconSize.small,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
+            child: isLandscape
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Left column
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // File name
+                            TextField(
+                              controller: _nameCtrl,
+                              decoration: _getInputDecoration(
+                                cs,
+                                labelText: 'File Name',
+                                prefixIcon: Icons.drive_file_rename_outline_rounded,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
 
-                // Size and unit selection
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: TextField(
-                        controller: _sizeCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: 'Container Size',
-                          prefixIcon: Icon(Icons.sd_card_outlined, size: AppIconSize.small),
+                            // Size and unit selection
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 2,
+                                  child: TextField(
+                                    controller: _sizeCtrl,
+                                    keyboardType: const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                    decoration: _getInputDecoration(
+                                      cs,
+                                      labelText: 'Container Size',
+                                      prefixIcon: Icons.sd_card_outlined,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: DropdownButtonFormField<String>(
+                                    initialValue: _sizeUnit,
+                                    decoration: _getInputDecoration(
+                                      cs,
+                                      labelText: 'Unit',
+                                      prefixIcon: Icons.scale_rounded,
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(value: 'MB', child: Text('MB')),
+                                      DropdownMenuItem(value: 'GB', child: Text('GB')),
+                                    ],
+                                    onChanged: (val) {
+                                      if (val != null) {
+                                        setState(() => _sizeUnit = val);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Password
+                            TextField(
+                              controller: _passwordCtrl,
+                              obscureText: _obscure,
+                              autofillHints: const [AutofillHints.password],
+                              decoration: _getInputDecoration(
+                                cs,
+                                labelText: 'Password',
+                                prefixIcon: Icons.key_rounded,
+                                suffixIcon: PasswordVisibilityToggle(
+                                  obscured: _obscure,
+                                  onToggle: () => setState(() => _obscure = !_obscure),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _sizeUnit,
-                        decoration: const InputDecoration(labelText: 'Unit'),
-                        items: const [
-                          DropdownMenuItem(value: 'MB', child: Text('MB')),
-                          DropdownMenuItem(value: 'GB', child: Text('GB')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) {
-                            setState(() => _sizeUnit = val);
-                          }
-                        },
+                      const SizedBox(width: 24),
+                      // Right column
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildAdvancedTile(context, cs, textTheme),
+                            if (_error != null) ...[
+                              const SizedBox(height: 16),
+                              InlineErrorBanner(_error!),
+                            ],
+                            const SizedBox(height: 32),
+                            FilledButton(
+                              onPressed: _loading ? null : _create,
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(56),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                ),
+                              ),
+                              child: _loading
+                                  ? SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                                      ),
+                                    )
+                                  : const Text('Create Container'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // File name
+                      TextField(
+                        controller: _nameCtrl,
+                        decoration: _getInputDecoration(
+                          cs,
+                          labelText: 'File Name',
+                          prefixIcon: Icons.drive_file_rename_outline_rounded,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
 
-                // Password
-                TextField(
-                  controller: _passwordCtrl,
-                  obscureText: _obscure,
-                  autofillHints: const [AutofillHints.password],
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: Icon(Icons.key_rounded, size: AppIconSize.small),
-                    suffixIcon: PasswordVisibilityToggle(
-                      obscured: _obscure,
-                      onToggle: () => setState(() => _obscure = !_obscure),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // PIM
-                TextField(
-                  controller: _pimCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'PIM  (leave blank for default)',
-                    prefixIcon: Icon(Icons.tune_rounded, size: AppIconSize.small),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // File System selection
-                DropdownButtonFormField<String>(
-                  initialValue: _fileSystem,
-                  decoration: InputDecoration(
-                    labelText: 'Format File System',
-                    prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'FAT',
-                      child: Text('FAT (FAT32)'),
-                    ),
-                    DropdownMenuItem(value: 'exFAT', child: Text('exFAT')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _fileSystem = val);
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Encryption Algorithm selection
-                DropdownButtonFormField<int>(
-                  initialValue: _cipherId,
-                  decoration: InputDecoration(
-                    labelText: 'Encryption Algorithm',
-                    prefixIcon: Icon(Icons.lock_outline_rounded, size: AppIconSize.small),
-                  ),
-                  items: CipherAlgo.dropdownItems(includeAuto: false),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _cipherId = val);
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Hash Algorithm selection
-                DropdownButtonFormField<int>(
-                  initialValue: _hashId,
-                  decoration: InputDecoration(
-                    labelText: 'Hash Algorithm',
-                    prefixIcon: Icon(Icons.tag_rounded, size: AppIconSize.small),
-                  ),
-                  items: HashAlgo.dropdownItems(includeAuto: false),
-                  onChanged: (val) {
-                    if (val != null) setState(() => _hashId = val);
-                  },
-                ),
-
-                if (_error != null) ...[
-                  const SizedBox(height: 14),
-                  InlineErrorBanner(_error!),
-                ],
-
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _loading ? null : _create,
-                  child: _loading
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
-                            valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                      // Size and unit selection
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: TextField(
+                              controller: _sizeCtrl,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true,
+                              ),
+                              decoration: _getInputDecoration(
+                                cs,
+                                labelText: 'Container Size',
+                                prefixIcon: Icons.sd_card_outlined,
+                              ),
+                            ),
                           ),
-                        )
-                      : const Text('Create Container'),
-                ),
-              ],
-            ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _sizeUnit,
+                              decoration: _getInputDecoration(
+                                cs,
+                                labelText: 'Unit',
+                                prefixIcon: Icons.scale_rounded,
+                              ),
+                              items: const [
+                                DropdownMenuItem(value: 'MB', child: Text('MB')),
+                                DropdownMenuItem(value: 'GB', child: Text('GB')),
+                              ],
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _sizeUnit = val);
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Password
+                      TextField(
+                        controller: _passwordCtrl,
+                        obscureText: _obscure,
+                        autofillHints: const [AutofillHints.password],
+                        decoration: _getInputDecoration(
+                          cs,
+                          labelText: 'Password',
+                          prefixIcon: Icons.key_rounded,
+                          suffixIcon: PasswordVisibilityToggle(
+                            obscured: _obscure,
+                            onToggle: () => setState(() => _obscure = !_obscure),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      _buildAdvancedTile(context, cs, textTheme),
+                      if (_error != null) ...[
+                        const SizedBox(height: 16),
+                        InlineErrorBanner(_error!),
+                      ],
+                      const SizedBox(height: 32),
+                      FilledButton(
+                        onPressed: _loading ? null : _create,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                        ),
+                        child: _loading
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+                                ),
+                              )
+                            : const Text('Create Container'),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ),

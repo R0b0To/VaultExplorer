@@ -234,7 +234,7 @@ class FileListView extends StatelessWidget {
                             style: textTheme.titleMedium?.copyWith(
                               fontWeight: TileSelectionStyle.titleWeight(
                                 isSelected,
-                              ) ?? FontWeight.w500,
+                              ),
                               letterSpacing: 0,
                             ),
                           ),

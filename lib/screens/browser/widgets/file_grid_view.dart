@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../models/mounted_container.dart';
 import '../../../models/thumbnail_cache_mode.dart';
+import '../../../models/thumbnail_quality.dart';
 import '../../../services/thumbnail_cache_service.dart';
 import '../../../services/vaultexplorer_api.dart';
 import '../../../utils/file_type_utils.dart';
@@ -20,6 +21,7 @@ class FileGridView extends StatefulWidget {
   final Set<String> selectedItems;
   final String currentDirPath;
   final ThumbnailCacheMode thumbnailCacheMode;
+  final ThumbnailQuality thumbnailQuality;
   final ValueChanged<String> onDirTap;
   final ValueChanged<String> onFileTap;
   final ValueChanged<String> onItemLongPress;
@@ -34,6 +36,7 @@ class FileGridView extends StatefulWidget {
     required this.selectedItems,
     required this.currentDirPath,
     required this.thumbnailCacheMode,
+    required this.thumbnailQuality,
     required this.onDirTap,
     required this.onFileTap,
     required this.onItemLongPress,
@@ -45,8 +48,29 @@ class FileGridView extends StatefulWidget {
 }
 
 class _FileGridViewState extends State<FileGridView> {
-  int _crossAxisCount = 3;
+  Orientation? _lastOrientation;
+  late int _crossAxisCount;
   double _baselineScale = 1.0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final orientation = MediaQuery.of(context).orientation;
+    if (_lastOrientation != orientation) {
+      _lastOrientation = orientation;
+      _crossAxisCount = orientation == Orientation.landscape ? 5 : 3;
+    }
+  }
+
+  int get _minColumns {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    return isLandscape ? 3 : 1;
+  }
+
+  int get _maxColumns {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    return isLandscape ? 7 : 4;
+  }
 
   double _getAspectRatio(int columns) {
     switch (columns) {
@@ -55,8 +79,13 @@ class _FileGridViewState extends State<FileGridView> {
       case 2:
         return 0.95;
       case 3:
-      default:
+        return 0.8;
+      case 4:
+        return 0.76;
+      case 5:
         return 0.74;
+      default:
+        return 0.72;
     }
   }
 
@@ -69,14 +98,14 @@ class _FileGridViewState extends State<FileGridView> {
     final factor = scale / _baselineScale;
 
     if (factor > 1.35) {
-      if (_crossAxisCount > 1) {
+      if (_crossAxisCount > _minColumns) {
         setState(() {
           _crossAxisCount--;
           _baselineScale = scale;
         });
       }
     } else if (factor < 0.75) {
-      if (_crossAxisCount < 3) {
+      if (_crossAxisCount < _maxColumns) {
         setState(() {
           _crossAxisCount++;
           _baselineScale = scale;
@@ -182,12 +211,14 @@ class _FileGridViewState extends State<FileGridView> {
         container: widget.container,
         filePath: fullPath,
         cacheMode: widget.thumbnailCacheMode,
+        quality: widget.thumbnailQuality,
       );
     } else if (isVid) {
       previewWidget = _VideoThumb(
         container: widget.container,
         filePath: fullPath,
         cacheMode: widget.thumbnailCacheMode,
+        quality: widget.thumbnailQuality,
       );
     } else {
       previewWidget = Center(
@@ -220,7 +251,6 @@ class _FileGridViewState extends State<FileGridView> {
 class _GridCell extends StatelessWidget {
   final Widget preview;
   final String label;
-  final String? sublabel;
   final bool isSelected;
   final bool isSelectionMode;
   final VoidCallback onTap;
@@ -230,7 +260,6 @@ class _GridCell extends StatelessWidget {
   const _GridCell({
     required this.preview,
     required this.label,
-    this.sublabel,
     required this.isSelected,
     required this.isSelectionMode,
     required this.onTap,
@@ -304,15 +333,7 @@ class _GridCell extends StatelessWidget {
                       color: cs.onSurface,
                     ),
                   ),
-                  if (sublabel != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      sublabel!,
-                      style: textTheme.labelSmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+
                 ],
               ),
             ),
@@ -562,17 +583,20 @@ class _EncryptedImageGridThumb extends StatelessWidget {
   final MountedContainer container;
   final String filePath;
   final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
 
   const _EncryptedImageGridThumb({
     required this.container,
     required this.filePath,
     required this.cacheMode,
+    required this.quality,
   });
 
   static Future<Uint8List> _fetch(
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
+    ThumbnailQuality quality,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await ThumbnailCacheService.get(
@@ -587,6 +611,7 @@ class _EncryptedImageGridThumb extends StatelessWidget {
       container,
       path,
       targetSize: 180,
+      quality: quality.jpegQuality,
     );
 
     if (thumbBytes == null || thumbBytes.isEmpty) {
@@ -627,7 +652,7 @@ class _EncryptedImageGridThumb extends StatelessWidget {
     filePath: filePath,
     cache: _cache,
     limiter: _limiter,
-    fetchFn: (c, p) => _fetch(c, p, cacheMode),
+    fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
     debounce: const Duration(milliseconds: 100),
     syncLookup: () => ThumbnailCacheService.getFromMemory(container, filePath),
   );
@@ -644,17 +669,20 @@ class _VideoThumb extends StatelessWidget {
   final MountedContainer container;
   final String filePath;
   final ThumbnailCacheMode cacheMode;
+  final ThumbnailQuality quality;
 
   const _VideoThumb({
     required this.container,
     required this.filePath,
     required this.cacheMode,
+    required this.quality,
   });
 
   static Future<Uint8List> _fetch(
     MountedContainer container,
     String path,
     ThumbnailCacheMode mode,
+    ThumbnailQuality quality,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await ThumbnailCacheService.get(
@@ -665,7 +693,7 @@ class _VideoThumb extends StatelessWidget {
       if (cached != null && cached.isNotEmpty) return cached;
     }
 
-    final data = await vaultExplorerApi.getVideoThumbnail(container, path);
+    final data = await vaultExplorerApi.getVideoThumbnail(container, path, quality: quality.jpegQuality);
     if (data == null || data.isEmpty) return Uint8List(0);
 
     ThumbnailCacheService.putInMemory(container, path, data);
@@ -696,7 +724,7 @@ class _VideoThumb extends StatelessWidget {
           filePath: filePath,
           cache: _cache,
           limiter: _limiter,
-          fetchFn: (c, p) => _fetch(c, p, cacheMode),
+          fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () =>
               ThumbnailCacheService.getFromMemory(container, filePath),

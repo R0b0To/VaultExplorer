@@ -93,13 +93,20 @@ class _VaultDashboardState extends State<VaultDashboard>
           mins > 0 &&
           DateTime.now().difference(pausedAt) >= Duration(minutes: mins);
 
-      if (wasAwayTooLong) {
+      final shouldLockOnScreenLock = pausedAt != null &&
+          _appSettings.lockContainersOnScreenLock &&
+          mins == 0;
+
+      if (wasAwayTooLong || shouldLockOnScreenLock) {
         _performAutoLock();
       } else {
         _scheduleAutoLock();
       }
     } else if (state == AppLifecycleState.paused) {
       _pausedAt = DateTime.now();
+      if (_appSettings.lockContainersOnScreenLock && _appSettings.autoLockMins == 0) {
+        _performAutoLock();
+      }
     }
   }
 
@@ -391,8 +398,15 @@ class _VaultDashboardState extends State<VaultDashboard>
   void _showAddOptionsSheet() {
     HapticFeedback.lightImpact();
     final cs = Theme.of(context).colorScheme;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: isLandscape,
+      constraints: isLandscape
+          ? BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.5,
+            )
+          : null,
       builder: (sheetContext) => AppBottomSheet(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -510,15 +524,16 @@ class _VaultDashboardState extends State<VaultDashboard>
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    final controller = messenger.showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 5),
         content: Text('Removed "${record.label}" from dashboard'),
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () async {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            messenger.hideCurrentSnackBar();
             await ContainerRepository.instance.save(record);
             if (mounted) {
               setState(() {
@@ -530,6 +545,9 @@ class _VaultDashboardState extends State<VaultDashboard>
         ),
       ),
     );
+    Future.delayed(const Duration(seconds: 3), () {
+      controller.close();
+    });
   }
 
   // ── Navigate to browser ───────────────────────────────────────────────────
@@ -679,7 +697,7 @@ class _VaultDashboardState extends State<VaultDashboard>
                         maxCrossAxisExtent: 420, // Forces dynamic column calculation
                         mainAxisSpacing: 16,
                         crossAxisSpacing: 16,
-                        mainAxisExtent: 172, // Fixed optimal extent for the new dense cards
+                        mainAxisExtent: 140, // Reduced for landscape viewport
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (_, i) => _buildVaultListTile(displayItems[i], i, cs),
@@ -821,8 +839,8 @@ class _VaultDashboardState extends State<VaultDashboard>
       onPointerDown: (_) => _scheduleAutoLock(),
       child: Scaffold(
         extendBody: true,
-        // Remove standard FAB and Bottom Nav out of the way when the screen is wide
-        floatingActionButton: (!isWide && _currentIndex == 0)
+        // Show the FAB on the Vaults tab in both portrait and landscape
+        floatingActionButton: _currentIndex == 0
             ? FloatingActionButton.extended(
                 onPressed: _actionInFlight ? null : _showAddOptionsSheet,
                 icon: const Icon(Icons.add_rounded),
@@ -861,14 +879,7 @@ class _VaultDashboardState extends State<VaultDashboard>
                   _loadAll();
                 },
                 labelType: NavigationRailLabelType.all,
-                // FAB is relocated to the top of the Navigation Rail in landscape modes
-                leading: _currentIndex == 0
-                    ? FloatingActionButton(
-                        elevation: 0,
-                        onPressed: _actionInFlight ? null : _showAddOptionsSheet,
-                        child: const Icon(Icons.add_rounded),
-                      )
-                    : null,
+                leading: const SizedBox(height: 8),
                 destinations: const [
                   NavigationRailDestination(
                     icon: Icon(Icons.grid_view_outlined),

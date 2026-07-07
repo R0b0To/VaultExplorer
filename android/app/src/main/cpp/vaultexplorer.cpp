@@ -2260,14 +2260,25 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
                 if (inFile.is_open()) {
                     std::unique_ptr<char[]> buf(new char[IO_BUFFER_SIZE]);
                     UINT bw;
-                    while (inFile) {
+                    bool writeError = false;
+                    while (inFile && !writeError) {
                         inFile.read(buf.get(), IO_BUFFER_SIZE);
                         std::streamsize n = inFile.gcount();
-                        if (n > 0) f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
+                        if (n > 0) {
+                            FRESULT res = f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
+                            if (res != FR_OK || bw != static_cast<UINT>(n)) {
+                                writeError = true;
+                            }
+                        }
                     }
-                    success = true;
+                    if (!writeError) {
+                        success = true;
+                    }
                 }
                 f_close(&f);
+                if (!success) {
+                    f_unlink(fatPath.c_str());
+                }
             }
         }
     }

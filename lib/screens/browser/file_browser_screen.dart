@@ -5,6 +5,7 @@ import '../../models/clipboard_item.dart';
 import '../../models/file_operation.dart';
 import '../../models/mounted_container.dart';
 import '../../models/thumbnail_cache_mode.dart';
+import '../../models/thumbnail_quality.dart';
 import '../../models/vault_item.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
@@ -79,8 +80,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
   String? _currentFilter;
+  double _sidebarWidth = 200.0;
 
   ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
+  ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.medium;
 
   static const int _maxScanDepth = 20;
 
@@ -135,6 +138,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             _resolvedThumbnailCacheMode =
                 record?.thumbnailCacheMode ??
                 appSettings.defaultThumbnailCacheMode;
+            _resolvedThumbnailQuality =
+                record?.thumbnailQuality ??
+                appSettings.defaultThumbnailQuality;
           });
         }
       }
@@ -356,6 +362,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           mediaFiles: resolvedPaths.isNotEmpty ? resolvedPaths : [fullPath],
           initialIndex: index >= 0 ? index : 0,
           startingFolder: _currentDirPath,
+          thumbnailQuality: _resolvedThumbnailQuality,
         ),
       ),
     );
@@ -581,6 +588,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             mediaFiles: resolvedPaths,
             initialIndex: 0,
             startingFolder: _currentDirPath,
+            thumbnailQuality: _resolvedThumbnailQuality,
           ),
         ),
       );
@@ -605,6 +613,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               mediaFiles: recursiveMedia,
               initialIndex: 0,
               startingFolder: _currentDirPath,
+              thumbnailQuality: _resolvedThumbnailQuality,
             ),
           ),
         );
@@ -927,46 +936,66 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _importFilesFromDevice() async {
     _signalActivity();
-    setState(() => _isLoading = true);
-    try {
-      final count = await vaultExplorerApi.importFiles(
+    final op = _opSvc.enqueueImport(
+      dest: widget.container,
+      destDirPath: _currentDirPath,
+      isFolder: false,
+      performImport: () => vaultExplorerApi.importFiles(
         widget.container,
         _currentDirPath,
-      );
-      if (count > 0) await _loadDirectoryContents(_currentDirPath);
-      _setStatus(
-        count > 0
-            ? 'Imported $count file${count != 1 ? 's' : ''}'
-            : 'No files imported',
-        error: count == 0,
-      );
-    } catch (e) {
-      _setStatus('Import failed: ${e.runtimeType}', error: true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      ),
+    );
+
+    void listener() {
+      if (!mounted) {
+        op.removeListener(listener);
+        return;
+      }
+      final done =
+          op.status != FileOperationStatus.running &&
+          op.status != FileOperationStatus.pending;
+      if (done) {
+        op.removeListener(listener);
+        if (op.status == FileOperationStatus.completed &&
+            op.destDirPath == _currentDirPath) {
+          _loadDirectoryContents(_currentDirPath);
+        }
+      }
     }
+
+    op.addListener(listener);
   }
 
   Future<void> _importFolderFromDevice() async {
     _signalActivity();
-    setState(() => _isLoading = true);
-    try {
-      final count = await vaultExplorerApi.importFolder(
+    final op = _opSvc.enqueueImport(
+      dest: widget.container,
+      destDirPath: _currentDirPath,
+      isFolder: true,
+      performImport: () => vaultExplorerApi.importFolder(
         widget.container,
         _currentDirPath,
-      );
-      if (count > 0) await _loadDirectoryContents(_currentDirPath);
-      _setStatus(
-        count > 0
-            ? 'Imported $count item${count != 1 ? 's' : ''}'
-            : 'No files imported',
-        error: count == 0,
-      );
-    } catch (e) {
-      _setStatus('Folder import failed: ${e.runtimeType}', error: true);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      ),
+    );
+
+    void listener() {
+      if (!mounted) {
+        op.removeListener(listener);
+        return;
+      }
+      final done =
+          op.status != FileOperationStatus.running &&
+          op.status != FileOperationStatus.pending;
+      if (done) {
+        op.removeListener(listener);
+        if (op.status == FileOperationStatus.completed &&
+            op.destDirPath == _currentDirPath) {
+          _loadDirectoryContents(_currentDirPath);
+        }
+      }
     }
+
+    op.addListener(listener);
   }
 
   // ── Filter helpers ────────────────────────────────────────────────────────
@@ -1015,6 +1044,33 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 
+  Widget _buildFilterMenuButton(
+    String? value,
+    String label,
+    IconData icon,
+    ColorScheme cs,
+    TextTheme textTheme,
+  ) {
+    final isActive = _currentFilter == value;
+    return MenuItemButton(
+      onPressed: () => setState(() => _currentFilter = value),
+      leadingIcon: Icon(
+        icon,
+        size: 16,
+        color: isActive ? cs.primary : cs.onSurfaceVariant,
+      ),
+      trailingIcon: isActive
+          ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+          : null,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
+        ),
+      ),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
  @override
@@ -1045,6 +1101,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
       return _matchesFilter(name);
     }).toList();
+
+    final cs = Theme.of(context).colorScheme;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     return PopScope(
       canPop: false,
@@ -1078,31 +1137,89 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         // dashboard, so the two screens now feel like one coherent system.
         body: Stack(
           children: [
-            Column(
-              children: [
-                BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-                _StatsBar(
-                  dirCount: filteredDirs.length,
-                  fileCount: filteredFiles.length,
-                  freeSpaceBytes: _freeSpace,
-                  isFiltered: query.isNotEmpty || _currentFilter != null,
-                ),
-                _FilterChipsBar(
-                  currentFilter: _currentFilter,
-                  onFilterChanged: (filter) =>
-                      setState(() => _currentFilter = filter),
-                ),
-                const Divider(),
-                Expanded(child: _buildBody(filteredDirs, filteredFiles)),
-                if (_statusMessage != null)
-                  _StatusBar(
-                    message: _statusMessage!,
-                    isError: _statusIsError,
-                    onDismiss: _clearStatus,
+            isLandscape
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Sidebar on the left
+                      Container(
+                        width: _sidebarWidth,
+                        color: cs.surfaceContainerLow,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _StatsBar(
+                                dirCount: filteredDirs.length,
+                                fileCount: filteredFiles.length,
+                                freeSpaceBytes: _freeSpace,
+                                isFiltered: query.isNotEmpty || _currentFilter != null,
+                                isVertical: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onHorizontalDragUpdate: (details) {
+                          setState(() {
+                            _sidebarWidth = (_sidebarWidth + details.delta.dx)
+                                .clamp(160.0, 300.0);
+                          });
+                        },
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.resizeLeftRight,
+                          child: Container(
+                            width: 8,
+                            color: Colors.transparent,
+                            child: const Center(
+                              child: VerticalDivider(
+                                width: 1,
+                                thickness: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Main content area on the right
+                      Expanded(
+                        child: Column(
+                          children: [
+                            BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+                            const Divider(),
+                            Expanded(child: _buildBody(filteredDirs, filteredFiles)),
+                            if (_statusMessage != null)
+                              _StatusBar(
+                                message: _statusMessage!,
+                                isError: _statusIsError,
+                                onDismiss: _clearStatus,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+                      _StatsBar(
+                        dirCount: filteredDirs.length,
+                        fileCount: filteredFiles.length,
+                        freeSpaceBytes: _freeSpace,
+                        isFiltered: query.isNotEmpty || _currentFilter != null,
+                      ),
+                      const Divider(),
+                      Expanded(child: _buildBody(filteredDirs, filteredFiles)),
+                      if (_statusMessage != null)
+                        _StatusBar(
+                          message: _statusMessage!,
+                          isError: _statusIsError,
+                          onDismiss: _clearStatus,
+                        ),
+                    ],
                   ),
-              ],
-            ),
-Positioned(
+            Positioned(
               left: 0,
               right: 0,
               bottom: 16,
@@ -1235,8 +1352,8 @@ Positioned(
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
-        tooltip: _atRoot ? 'Back to dashboard' : 'Go up',
-        onPressed: _atRoot ? () => Navigator.of(context).pop() : _navigateUp,
+        tooltip: 'Back to dashboard',
+        onPressed: () => Navigator.of(context).pop(),
       ),
       title: Text(widget.container.displayName),
       actions: [
@@ -1397,6 +1514,17 @@ Positioned(
               ],
               child: const Text('Sort By'),
             ),
+            const PopupMenuDivider(),
+            SubmenuButton(
+              menuChildren: [
+                _buildFilterMenuButton(null, 'All Files', Icons.all_inclusive_rounded, cs, textTheme),
+                _buildFilterMenuButton('image', 'Images', Icons.image_outlined, cs, textTheme),
+                _buildFilterMenuButton('video', 'Videos', Icons.videocam_outlined, cs, textTheme),
+                _buildFilterMenuButton('audio', 'Audio', Icons.audiotrack_rounded, cs, textTheme),
+                _buildFilterMenuButton('document', 'Documents', Icons.description_outlined, cs, textTheme),
+              ],
+              child: const Text('Filter By'),
+            ),
           ],
         ),
       ],
@@ -1429,6 +1557,7 @@ Positioned(
         selectedItems: selectedItems,
         currentDirPath: _currentDirPath,
         thumbnailCacheMode: _resolvedThumbnailCacheMode,
+        thumbnailQuality: _resolvedThumbnailQuality,
         onDirTap: _handleDirTap,
         onFileTap: _handleFileTap,
         onItemLongPress: _handleItemLongPress,
@@ -1491,51 +1620,6 @@ class _TruncatedBanner extends StatelessWidget {
 
 // ── Filter chips bar ──────────────────────────────────────────────────────────
 
-class _FilterChipsBar extends StatelessWidget {
-  final String? currentFilter;
-  final ValueChanged<String?> onFilterChanged;
-  const _FilterChipsBar({
-    required this.currentFilter,
-    required this.onFilterChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      height: 48,
-      color: cs.surface,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        children: [
-          _chip(context, null, 'All Files', Icons.all_inclusive_rounded),
-          const SizedBox(width: 8),
-          _chip(context, 'image', 'Images', Icons.image_outlined),
-          const SizedBox(width: 8),
-          _chip(context, 'video', 'Videos', Icons.videocam_outlined),
-          const SizedBox(width: 8),
-          _chip(context, 'audio', 'Audio', Icons.audiotrack_rounded),
-          const SizedBox(width: 8),
-          _chip(context, 'document', 'Documents', Icons.description_outlined),
-        ],
-      ),
-    );
-  }
-
-  Widget _chip(BuildContext context, String? filter, String label, IconData icon) {
-    final cs = Theme.of(context).colorScheme;
-    final isSelected = currentFilter == filter;
-    return FilterChip(
-      showCheckmark: false,
-      avatar: Icon(icon, size: 16,
-          color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant),
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) => onFilterChanged(selected ? filter : null),
-    );
-  }
-}
 
 // ── Inline status bar ─────────────────────────────────────────────────────────
 
@@ -1596,17 +1680,65 @@ class _StatsBar extends StatelessWidget {
   final int fileCount;
   final int freeSpaceBytes;
   final bool isFiltered;
+  final bool isVertical;
   const _StatsBar({
     required this.dirCount,
     required this.fileCount,
     required this.freeSpaceBytes,
     this.isFiltered = false,
+    this.isVertical = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    if (isVertical) {
+      return Container(
+        color: cs.surfaceContainerLow,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'STORAGE',
+              style: textTheme.labelSmall?.copyWith(
+                color: cs.primary,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _stat(context, Icons.folder_rounded, '$dirCount folders'),
+            const SizedBox(height: 8),
+            _stat(context, Icons.description_rounded, '$fileCount files'),
+            const SizedBox(height: 8),
+            _stat(context, Icons.storage_rounded, '${formatBytes(freeSpaceBytes)} free'),
+            if (isFiltered) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  'filtered',
+                  style: textTheme.labelSmall?.copyWith(
+                    color: cs.onPrimaryContainer,
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Container(
       color: cs.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

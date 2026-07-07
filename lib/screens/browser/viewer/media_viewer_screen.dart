@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import '/../../models/mounted_container.dart';
+import '/../../models/thumbnail_quality.dart';
 import '/../../services/vaultexplorer_api.dart';
 import 'media_viewer_constants.dart';
 import 'playlist_controller.dart';
@@ -19,6 +20,7 @@ class MediaViewerScreen extends StatefulWidget {
   final List<String> mediaFiles;
   final int initialIndex;
   final String? startingFolder;
+  final ThumbnailQuality thumbnailQuality;
 
   const MediaViewerScreen({
     Key? key,
@@ -26,6 +28,7 @@ class MediaViewerScreen extends StatefulWidget {
     required this.mediaFiles,
     required this.initialIndex,
     this.startingFolder,
+    this.thumbnailQuality = ThumbnailQuality.medium,
   }) : super(key: key);
 
   @override
@@ -44,7 +47,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       ValueNotifier<VideoPlaybackProgress>(const VideoPlaybackProgress());
 
   bool _showUI = false;
-  bool _isLandscape = false;
   int _activeMenuCount = 0;
 
   Timer? _slideshowTimer;
@@ -180,6 +182,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         widget.container,
         fileName,
         targetSize: MediaViewerConstants.thumbnailTargetSize,
+        quality: widget.thumbnailQuality.jpegQuality,
       );
       if (thumbBytes != null && thumbBytes.isNotEmpty && mounted) {
         setState(() {
@@ -393,10 +396,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.4),
       isScrollControlled: true,
-      showDragHandle: false,
       builder: (context) {
         String sheetPage = 'main';
 
@@ -409,15 +409,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 : MediaQuery.of(context).size.height * 0.9;
 
             Widget buildHeader(String title, VoidCallback? onBack) {
+              final textTheme = Theme.of(context).textTheme;
               return Container(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
                     if (onBack != null)
                       IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_back_rounded,
-                          color: Colors.white70,
+                          color: cs.onSurfaceVariant,
                         ),
                         onPressed: onBack,
                       )
@@ -426,9 +427,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     Expanded(
                       child: Text(
                         title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
+                        style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                         textAlign: onBack != null
@@ -445,146 +444,108 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               );
             }
 
-            return ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(28),
-              ),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.75),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(28),
-                    ),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxSheetHeight),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 4,
+                    bottom: 24,
                   ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: maxSheetHeight),
-                    child: SafeArea(
-                      top: false,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(height: 12),
-                          Container(
-                            width: 36,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(2),
-                            ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (sheetPage == 'main') ...[
+                        buildHeader(
+                          isImage
+                              ? 'Image Settings'
+                              : 'Playback Settings',
+                          null,
+                        ),
+                        const SizedBox(height: 8),
+                        _buildMainPage(
+                          context,
+                          isImage,
+                          setSheetState,
+                          onGoToImageFit: () => setSheetState(
+                            () => sheetPage = 'imageFit',
                           ),
-                          const SizedBox(height: 8),
-                          Flexible(
-                            child: SingleChildScrollView(
-                              child: Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 20,
-                                  right: 20,
-                                  top: 4,
-                                  bottom: 24,
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (sheetPage == 'main') ...[
-                                      buildHeader(
-                                        isImage
-                                            ? 'Image Settings'
-                                            : 'Playback Settings',
-                                        null,
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _buildMainPage(
-                                        context,
-                                        isImage,
-                                        setSheetState,
-                                        onGoToImageFit: () => setSheetState(
-                                          () => sheetPage = 'imageFit',
-                                        ),
-                                        onGoToSlideshowDelay: () =>
-                                            setSheetState(
-                                              () =>
-                                                  sheetPage = 'slideshowDelay',
-                                            ),
-                                        onGoToPlaybackSpeed: () =>
-                                            setSheetState(
-                                              () => sheetPage = 'playbackSpeed',
-                                            ),
-                                        onGoToPlaybackMode: () => setSheetState(
-                                          () => sheetPage = 'playbackMode',
-                                        ),
-                                      ),
-                                    ] else if (sheetPage == 'imageFit') ...[
-                                      buildHeader(
-                                        'Image Fit Mode',
-                                        () => setSheetState(
-                                          () => sheetPage = 'main',
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _buildImageFitSubmenu(
-                                        cs,
-                                        () => setSheetState(
-                                          () => sheetPage = 'main',
-                                        ),
-                                      ),
-                                    ] else if (sheetPage ==
-                                        'slideshowDelay') ...[
-                                      buildHeader(
-                                        'Slideshow Delay',
-                                        () => setSheetState(
-                                          () => sheetPage = 'main',
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _buildSlideshowDelaySubmenu(
-                                        cs,
-                                        () => setSheetState(
-                                          () => sheetPage = 'main',
-                                        ),
-                                      ),
-                                    ] else if (sheetPage ==
-                                        'playbackSpeed') ...[
-                                      buildHeader(
-                                        'Playback Speed',
-                                        () => setSheetState(
-                                          () => sheetPage = 'main',
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _buildPlaybackSpeedSubmenu(
-                                        cs,
-                                        () => setSheetState(
-                                          () => sheetPage = 'main',
-                                        ),
-                                      ),
-                                    ] else if (sheetPage == 'playbackMode') ...[
-                                      buildHeader(
-                                        'Playback Mode',
-                                        () => setSheetState(
-                                          () => sheetPage = 'main',
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _buildPlaybackModeSubmenu(
-                                        cs,
-                                        () => setSheetState(
-                                          () => sheetPage = 'main',
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                          onGoToSlideshowDelay: () =>
+                              setSheetState(
+                                () =>
+                                    sheetPage = 'slideshowDelay',
                               ),
-                            ),
+                          onGoToPlaybackSpeed: () =>
+                              setSheetState(
+                                () => sheetPage = 'playbackSpeed',
+                              ),
+                          onGoToPlaybackMode: () => setSheetState(
+                            () => sheetPage = 'playbackMode',
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      ] else if (sheetPage == 'imageFit') ...[
+                        buildHeader(
+                          'Image Fit Mode',
+                          () => setSheetState(
+                            () => sheetPage = 'main',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildImageFitSubmenu(
+                          cs,
+                          () => setSheetState(
+                            () => sheetPage = 'main',
+                          ),
+                        ),
+                      ] else if (sheetPage ==
+                          'slideshowDelay') ...[
+                        buildHeader(
+                          'Slideshow Delay',
+                          () => setSheetState(
+                            () => sheetPage = 'main',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildSlideshowDelaySubmenu(
+                          cs,
+                          () => setSheetState(
+                            () => sheetPage = 'main',
+                          ),
+                        ),
+                      ] else if (sheetPage ==
+                          'playbackSpeed') ...[
+                        buildHeader(
+                          'Playback Speed',
+                          () => setSheetState(
+                            () => sheetPage = 'main',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildPlaybackSpeedSubmenu(
+                          cs,
+                          () => setSheetState(
+                            () => sheetPage = 'main',
+                          ),
+                        ),
+                      ] else if (sheetPage == 'playbackMode') ...[
+                        buildHeader(
+                          'Playback Mode',
+                          () => setSheetState(
+                            () => sheetPage = 'main',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildPlaybackModeSubmenu(
+                          cs,
+                          () => setSheetState(
+                            () => sheetPage = 'main',
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -615,11 +576,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(
               Icons.rotate_right_rounded,
-              color: Colors.white70,
             ),
             title: const Text(
               'Rotate 90°',
-              style: TextStyle(color: Colors.white, fontSize: 14),
             ),
             trailing: Text(
               '${(_rotations[currentName] ?? 0) * 90}°',
@@ -638,16 +597,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               setSheetState(() {});
             },
           ),
-          const Divider(color: Colors.white10),
+          const Divider(),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(
               Icons.aspect_ratio_rounded,
-              color: Colors.white70,
             ),
             title: const Text(
               'Image Fit Mode',
-              style: TextStyle(color: Colors.white, fontSize: 14),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -659,7 +616,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 const SizedBox(width: 4),
                 const Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white30,
                   size: 20,
                 ),
               ],
@@ -669,13 +625,12 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               onGoToImageFit();
             },
           ),
-          const Divider(color: Colors.white10),
+          const Divider(),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.timer_outlined, color: Colors.white70),
+            leading: const Icon(Icons.timer_outlined),
             title: const Text(
               'Slideshow Delay',
-              style: TextStyle(color: Colors.white, fontSize: 14),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -687,7 +642,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 const SizedBox(width: 4),
                 const Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white30,
                   size: 20,
                 ),
               ],
@@ -710,11 +664,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             contentPadding: EdgeInsets.zero,
             leading: const Icon(
               Icons.rotate_right_rounded,
-              color: Colors.white70,
             ),
             title: const Text(
               'Rotate 90°',
-              style: TextStyle(color: Colors.white, fontSize: 14),
             ),
             trailing: Text(
               '${(_rotations[currentName] ?? 0) * 90}°',
@@ -733,16 +685,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               setSheetState(() {});
             },
           ),
-          const Divider(color: Colors.white10),
+          const Divider(),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(
               Icons.slow_motion_video_rounded,
-              color: Colors.white70,
             ),
             title: const Text(
               'Playback Speed',
-              style: TextStyle(color: Colors.white, fontSize: 14),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -754,7 +704,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 const SizedBox(width: 4),
                 const Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white30,
                   size: 20,
                 ),
               ],
@@ -764,16 +713,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               onGoToPlaybackSpeed();
             },
           ),
-          const Divider(color: Colors.white10),
+          const Divider(),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(
               Icons.play_circle_outline_rounded,
-              color: Colors.white70,
             ),
             title: const Text(
               'Playback Mode',
-              style: TextStyle(color: Colors.white, fontSize: 14),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -785,7 +732,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 const SizedBox(width: 4),
                 const Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white30,
                   size: 20,
                 ),
               ],
@@ -796,16 +742,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             },
           ),
           if (hasSubtitles) ...[
-            const Divider(color: Colors.white10),
+            const Divider(),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               secondary: const Icon(
                 Icons.subtitles_rounded,
-                color: Colors.white70,
               ),
               title: const Text(
                 'Subtitles',
-                style: TextStyle(color: Colors.white, fontSize: 14),
               ),
               value: _subtitlesEnabled,
               activeColor: cs.primary,
@@ -832,8 +776,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           title: Text(
             _getImageFitLabel(fit),
             style: TextStyle(
-              color: isSelected ? cs.primary : Colors.white70,
-              fontSize: 14,
+              color: isSelected ? cs.primary : null,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
@@ -861,8 +804,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           title: Text(
             '${delay} seconds',
             style: TextStyle(
-              color: isSelected ? cs.primary : Colors.white70,
-              fontSize: 14,
+              color: isSelected ? cs.primary : null,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
@@ -894,8 +836,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           title: Text(
             '${speed}x${speed == 1.0 ? " (Normal)" : ""}',
             style: TextStyle(
-              color: isSelected ? cs.primary : Colors.white70,
-              fontSize: 14,
+              color: isSelected ? cs.primary : null,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
@@ -928,8 +869,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           title: Text(
             _getPlaybackModeLabel(mode),
             style: TextStyle(
-              color: isSelected ? cs.primary : Colors.white70,
-              fontSize: 14,
+              color: isSelected ? cs.primary : null,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),

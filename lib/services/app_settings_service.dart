@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/thumbnail_cache_mode.dart';
+import '../models/thumbnail_quality.dart';
 import 'container_repository.dart';
 
 export 'container_repository.dart'
@@ -32,6 +33,10 @@ class AppSettings {
   /// [ContainerRecord.thumbnailCacheMode] is null.
   ThumbnailCacheMode defaultThumbnailCacheMode;
 
+  /// App-wide default thumbnail quality settings, applied to every container whose
+  /// [ContainerRecord.thumbnailQuality] is null.
+  ThumbnailQuality defaultThumbnailQuality;
+
   Map<String, String> extensionPreferences;
 
   String? _masterPasswordHash;
@@ -47,6 +52,7 @@ class AppSettings {
     this.defaultDerivedKeyCacheEnabled = false,
     this.autoLockMins = 0,
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
+    this.defaultThumbnailQuality = ThumbnailQuality.medium,
     Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
     String? masterPasswordSalt,
@@ -86,6 +92,7 @@ class AppSettings {
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
     'autoLockMins': autoLockMins,
     'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
+    'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
     'extensionPreferences': extensionPreferences,
   };
 
@@ -105,6 +112,11 @@ class AppSettings {
           j['defaultThumbnailCacheMode'] as String?,
         ) ??
         ThumbnailCacheMode.appCache,
+    defaultThumbnailQuality:
+        ThumbnailQuality.fromJson(
+          j['defaultThumbnailQuality'] as String?,
+        ) ??
+        ThumbnailQuality.medium,
     extensionPreferences:
         (j['extensionPreferences'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v as String),

@@ -3,6 +3,7 @@ import 'package:local_auth/local_auth.dart';
 import 'about_screen.dart';
 
 import '../../models/thumbnail_cache_mode.dart';
+import '../../models/thumbnail_quality.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/password_hasher.dart';
 import '../../services/vaultexplorer_api.dart';
@@ -385,8 +386,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Text(
                           _settings.autoLockMins == 0
-                              ? 'Everything stays open until you lock it manually, no matter '
-                                  'how long you switch away or leave the screen off.'
+                              ? 'Containers will lock immediately when you lock the screen or '
+                                  'minimize the app, but stay open while you are actively using it.'
                               : 'Switching away briefly and coming back is fine — this only '
                                   'fires after ${_settings.autoLockMins} minute'
                                   '${_settings.autoLockMins == 1 ? '' : 's'} of not using the '
@@ -458,6 +459,26 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                           height: 1.4,
                         ),
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<ThumbnailQuality>(
+                      value: _settings.defaultThumbnailQuality,
+                      decoration: InputDecoration(
+                        labelText: 'Thumbnail Quality (default)',
+                        prefixIcon: Icon(Icons.high_quality_rounded, size: AppIconSize.small),
+                      ),
+                      items: ThumbnailQuality.values.map((q) {
+                        return DropdownMenuItem(
+                          value: q,
+                          child: Text(q.label),
+                        );
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          setState(() => _settings.defaultThumbnailQuality = v);
+                          _persist();
+                        }
+                      },
                     ),
                   ],
                 ),

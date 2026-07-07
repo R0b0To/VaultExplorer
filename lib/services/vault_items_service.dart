@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../models/mounted_container.dart';
 import '../models/vault_item.dart';
 import 'vaultexplorer_api.dart';
-import '../utils/filename_utils.dart';
 
 class VaultItemsService {
   VaultItemsService._();

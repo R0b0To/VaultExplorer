@@ -1285,9 +1285,10 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                         retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                                     }
 
-                                    if (frame != null) {
+                                     if (frame != null) {
+                                        val quality = call.argument<Int>("quality") ?: 60
                                         val stream = ByteArrayOutputStream()
-                                        frame.compress(Bitmap.CompressFormat.JPEG, 60, stream)
+                                        frame.compress(Bitmap.CompressFormat.JPEG, quality, stream)
                                         val bytes = stream.toByteArray()
                                         runOnUiThread { result.success(bytes) }
                                     } else {
@@ -1308,6 +1309,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                         val uriString  = call.argument<String>("filePath")
                         val fileName   = call.argument<String>("fileName")
                         val targetSize = call.argument<Int>("targetSize") ?: 180
+                        val quality = call.argument<Int>("quality") ?: 70
 
                         if (uriString == null || fileName == null) {
                             result.error("INVALID_ARGS", "filePath and fileName required", null)
@@ -1346,7 +1348,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                     if (scaledBitmap != rawBitmap) rawBitmap.recycle()
 
                                     val stream = ByteArrayOutputStream()
-                                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 75, stream)
+                                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
                                     val bytes = stream.toByteArray()
                                     scaledBitmap.recycle()
 
@@ -1365,6 +1367,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                         val fileName  = call.argument<String>("fileName")
                         val keyBytes  = call.argument<ByteArray>("keyBytes")
                         val targetSize = 180
+                        val quality = call.argument<Int>("quality") ?: 70
 
                         if (uriString == null || fileName == null || keyBytes == null) {
                             result.success(null)
@@ -1400,7 +1403,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                     }
 
                                     val stream = ByteArrayOutputStream()
-                                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, 70, stream)
+                                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
                                     val thumbData = stream.toByteArray()
                                     scaledBitmap.recycle()
 
@@ -1801,7 +1804,10 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
         srcDoc: DocumentFile, containerUri: String, targetFatPath: String, volId: Int
     ): Int {
         if (srcDoc.isDirectory) {
-            VeraCryptBridge.createDirectory(volId, targetFatPath)
+            val ok = VeraCryptBridge.createDirectory(volId, targetFatPath)
+            if (!ok) {
+                throw java.io.IOException("Failed to create directory: $targetFatPath. Storage might be full or write-protected.")
+            }
             var count = 0
             for (child in srcDoc.listFiles()) {
                 val childName = child.name ?: continue
@@ -1809,15 +1815,21 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
             }
             return count
         }
-        return try {
-            val tempFile = File(cacheDir, "import_${System.nanoTime()}")
-            contentResolver.openInputStream(srcDoc.uri)?.use { inp ->
+        val tempFile = File(cacheDir, "import_${System.nanoTime()}")
+        try {
+            val stream = contentResolver.openInputStream(srcDoc.uri)
+                ?: throw java.io.IOException("Failed to open input stream for: ${srcDoc.name}")
+            stream.use { inp ->
                 tempFile.outputStream().use { inp.copyTo(it) }
             }
             val ok = VeraCryptBridge.writeBackFile(volId, targetFatPath, tempFile.absolutePath)
+            if (!ok) {
+                throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
+            }
+            return 1
+        } finally {
             tempFile.delete()
-            if (ok) 1 else 0
-        } catch (_: Exception) { 0 }
+        }
     }
 }
 

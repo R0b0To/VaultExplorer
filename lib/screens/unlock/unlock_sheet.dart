@@ -574,14 +574,14 @@ Future<void> _pickFile() async {
                 child: Card(
                   elevation: 0,
                   color: _selectedUri != null
-                      ? cs.primaryContainer.withOpacity(0.12)
+                      ? cs.primaryContainer.withValues(alpha:0.12)
                       : cs.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
                       color: _selectedUri != null
                           ? cs.primary
-                          : cs.outlineVariant.withOpacity(0.5),
+                          : cs.outlineVariant.withValues(alpha:0.5),
                       width: _selectedUri != null ? 1.5 : 1,
                     ),
                   ),
@@ -662,7 +662,7 @@ Future<void> _pickFile() async {
                         ] else ...[
                           Icon(
                             Icons.chevron_right_rounded,
-                            color: cs.onSurfaceVariant.withOpacity(0.5),
+                            color: cs.onSurfaceVariant.withValues(alpha:0.5),
                           ),
                         ],
                       ],
@@ -684,10 +684,10 @@ Future<void> _pickFile() async {
               else if (_containerMissing) ...[
                 Card(
                   elevation: 0,
-                  color: cs.errorContainer.withOpacity(0.15),
+                  color: cs.errorContainer.withValues(alpha:0.15),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
-                    side: BorderSide(color: cs.error.withOpacity(0.25)),
+                    side: BorderSide(color: cs.error.withValues(alpha:0.25)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -724,7 +724,7 @@ Future<void> _pickFile() async {
                                   Text(
                                     'File path could not be resolved',
                                     style: textTheme.bodySmall?.copyWith(
-                                      color: cs.onErrorContainer.withOpacity(0.8),
+                                      color: cs.onErrorContainer.withValues(alpha:0.8),
                                     ),
                                   ),
                                 ],
@@ -788,7 +788,7 @@ Future<void> _pickFile() async {
                   color: cs.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
-                    side: BorderSide(color: cs.outlineVariant.withOpacity(0.3)),
+                    side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.3)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(32),
@@ -798,7 +798,7 @@ Future<void> _pickFile() async {
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: cs.primaryContainer.withOpacity(0.4),
+                            color: cs.primaryContainer.withValues(alpha:0.4),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -861,7 +861,7 @@ Future<void> _pickFile() async {
                   color: cs.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
-                    side: BorderSide(color: cs.outlineVariant.withOpacity(0.3)),
+                    side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.3)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -966,7 +966,7 @@ Future<void> _pickFile() async {
                         decoration: BoxDecoration(
                           color: cs.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+                          border: Border.all(color: cs.outlineVariant.withValues(alpha:0.5)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1034,7 +1034,7 @@ Future<void> _pickFile() async {
                               Text(
                                 'No keyfiles attached',
                                 style: textTheme.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant.withOpacity(0.6),
+                                  color: cs.onSurfaceVariant.withValues(alpha:0.6),
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
@@ -1059,11 +1059,11 @@ Future<void> _pickFile() async {
                           childrenPadding: const EdgeInsets.all(16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                            side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
                           ),
                           collapsedShape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                            side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
                           ),
                           backgroundColor: cs.surfaceContainerLow,
                           collapsedBackgroundColor: cs.surfaceContainerLow,
@@ -1120,7 +1120,7 @@ Future<void> _pickFile() async {
                           decoration: BoxDecoration(
                             color: cs.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
+                            border: Border.all(color: cs.outlineVariant.withValues(alpha:0.3)),
                           ),
                           child: SwitchListTile(
                             value: _remember,

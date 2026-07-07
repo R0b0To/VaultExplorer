@@ -538,10 +538,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                 if (isReconnect && _reconnectTargetMissing) ...[
                   Card(
                     elevation: 0,
-                    color: cs.tertiaryContainer.withOpacity(0.3),
+                    color: cs.tertiaryContainer.withValues(alpha:0.3),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: cs.tertiary.withOpacity(0.2)),
+                      side: BorderSide(color: cs.tertiary.withValues(alpha:0.2)),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -568,7 +568,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                           Text(
                             'Plug the drive back in and tap Retry, or select it below if it shows up under a different name.',
                             style: textTheme.bodySmall?.copyWith(
-                              color: cs.onTertiaryContainer.withOpacity(0.8),
+                              color: cs.onTertiaryContainer.withValues(alpha:0.8),
                               height: 1.3,
                             ),
                             textAlign: TextAlign.center,
@@ -596,7 +596,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                     color: cs.surfaceContainerLow,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
-                      side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                      side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(32),
@@ -664,18 +664,18 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                             child: Card(
                               elevation: 0,
                               color: isAlreadyMounted
-                                  ? cs.surfaceContainerLow.withOpacity(0.5)
+                                  ? cs.surfaceContainerLow.withValues(alpha:0.5)
                                   : isSelected
-                                      ? cs.primaryContainer.withOpacity(0.12)
+                                      ? cs.primaryContainer.withValues(alpha:0.12)
                                       : cs.surfaceContainerLow,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                                 side: BorderSide(
                                   color: isAlreadyMounted
-                                      ? cs.outlineVariant.withOpacity(0.2)
+                                      ? cs.outlineVariant.withValues(alpha:0.2)
                                       : isSelected
                                           ? cs.primary
-                                          : cs.outlineVariant.withOpacity(0.5),
+                                          : cs.outlineVariant.withValues(alpha:0.5),
                                   width: isSelected ? 1.5 : 1,
                                 ),
                               ),
@@ -699,7 +699,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                                             : Icons.usb_rounded,
                                         size: 22,
                                         color: isAlreadyMounted
-                                            ? cs.onSurfaceVariant.withOpacity(0.5)
+                                            ? cs.onSurfaceVariant.withValues(alpha:0.5)
                                             : isSelected
                                                 ? cs.onPrimaryContainer
                                                 : cs.primary,
@@ -715,7 +715,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                                             style: textTheme.bodyLarge?.copyWith(
                                               fontWeight: FontWeight.bold,
                                               color: isAlreadyMounted
-                                                  ? cs.onSurfaceVariant.withOpacity(0.5)
+                                                  ? cs.onSurfaceVariant.withValues(alpha:0.5)
                                                   : cs.onSurface,
                                             ),
                                           ),
@@ -750,7 +750,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                                         child: Text(
                                           'Active',
                                           style: textTheme.labelSmall?.copyWith(
-                                            color: cs.onSurfaceVariant.withOpacity(0.7),
+                                            color: cs.onSurfaceVariant.withValues(alpha:0.7),
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -790,7 +790,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                       color: cs.surfaceContainerLow,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
-                        side: BorderSide(color: cs.outlineVariant.withOpacity(0.3)),
+                        side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.3)),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(32),
@@ -800,7 +800,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                             Container(
                               padding: const EdgeInsets.all(24),
                               decoration: BoxDecoration(
-                                color: cs.primaryContainer.withOpacity(0.4),
+                                color: cs.primaryContainer.withValues(alpha:0.4),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
@@ -862,7 +862,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                       color: cs.surfaceContainerLow,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
-                        side: BorderSide(color: cs.outlineVariant.withOpacity(0.3)),
+                        side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.3)),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(24),
@@ -959,7 +959,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                       decoration: BoxDecoration(
                         color: cs.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+                        border: Border.all(color: cs.outlineVariant.withValues(alpha:0.5)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1027,7 +1027,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                             Text(
                               'No keyfiles attached',
                               style: textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant.withOpacity(0.6),
+                                color: cs.onSurfaceVariant.withValues(alpha:0.6),
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
@@ -1052,11 +1052,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                         childrenPadding: const EdgeInsets.all(16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                          side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
                         ),
                         collapsedShape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                          side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
                         ),
                         backgroundColor: cs.surfaceContainerLow,
                         collapsedBackgroundColor: cs.surfaceContainerLow,
@@ -1114,7 +1114,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                         decoration: BoxDecoration(
                           color: cs.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
+                          border: Border.all(color: cs.outlineVariant.withValues(alpha:0.3)),
                         ),
                         child: SwitchListTile(
                           value: _remember,

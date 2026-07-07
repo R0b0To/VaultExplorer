@@ -3,6 +3,7 @@ library file_operation;
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:vaultexplorer/utils/format_utils.dart';
 import '/models/clipboard_item.dart';
 import '/models/mounted_container.dart';
@@ -95,6 +96,7 @@ class FileOperation extends ChangeNotifier {
   final String destDisplayName;
   final String destDirPath;
   final List<ClipboardItem> items;
+  final bool isImport;
 
   // ── Mutable state (read-only externally) ──────────────────────────────────
 
@@ -142,19 +144,20 @@ class FileOperation extends ChangeNotifier {
   // ── Derived display helpers ───────────────────────────────────────────────
 
   double? get progressFraction {
-    if (_itemStatuses.isEmpty) return null;
+    if (_itemStatuses.isEmpty || isImport) return null;
     final done = _doneCount + _failCount + _skipCount;
     return done / _itemStatuses.length;
   }
 
-  bool get isCrossContainer => sourceVolId != destVolId;
-  String get verb => isCut ? 'Move' : 'Copy';
-  String get verbPast => isCut ? 'Moved' : 'Copied';
+  bool get isCrossContainer => !isImport && sourceVolId != destVolId;
+  String get verb => isImport ? 'Import' : (isCut ? 'Move' : 'Copy');
+  String get verbPast => isImport ? 'Imported' : (isCut ? 'Moved' : 'Copied');
+  String get verbIng => isImport ? 'Importing' : (isCut ? 'Moving' : 'Copying');
 
   String get shortSummary {
     final n = items.length;
     final label = n == 1 ? items.first.name : '$n items';
-    return '${verb}ing $label';
+    return '$verbIng $label';
   }
 
   String get completionSummary {
@@ -182,6 +185,7 @@ class FileOperation extends ChangeNotifier {
     required this.destDisplayName,
     required this.destDirPath,
     required this.items,
+    this.isImport = false,
   }) : _itemStatuses = items
            .map((i) => FileItemStatus(item: i))
            .toList(growable: false);
@@ -200,6 +204,11 @@ class FileOperation extends ChangeNotifier {
 
   void _setError(String summary) {
     _errorSummary = summary;
+    notifyListeners();
+  }
+
+  void _setDoneCount(int count) {
+    _doneCount = count;
     notifyListeners();
   }
 

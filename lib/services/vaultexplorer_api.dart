@@ -538,6 +538,7 @@ class VaultExplorerApi {
     MountedContainer container,
     String fileName, {
     int targetSize = 180,
+    int quality = 70,
   }) async {
     try {
       final Uint8List? bytes = await _channel.invokeMethod<Uint8List>(
@@ -546,6 +547,7 @@ class VaultExplorerApi {
           'filePath': container.uri,
           'fileName': fileName,
           'targetSize': targetSize,
+          'quality': quality,
         },
       );
       return bytes;
@@ -560,12 +562,14 @@ class VaultExplorerApi {
     required MountedContainer container,
     required String filePath,
     required List<int> keyBytes,
+    int quality = 70,
   }) async {
     try {
       await _channel.invokeMethod<void>('generateAndCacheThumbnail', {
         'filePath': container.uri,
         'fileName': filePath,
         'keyBytes': Uint8List.fromList(keyBytes),
+        'quality': quality,
       });
     } catch (e) {
       debugPrint('Background thumbnail build request failed: $e');
@@ -703,12 +707,17 @@ class VaultExplorerApi {
   /// Returns null on any error — callers should show a fallback icon.
   Future<Uint8List?> getVideoThumbnail(
     MountedContainer container,
-    String fileName,
-  ) async {
+    String fileName, {
+    int quality = 60,
+  }) async {
     try {
       final Uint8List? bytes = await _channel.invokeMethod<Uint8List>(
         ChannelMethods.getVideoThumbnail,
-        {'filePath': container.uri, 'fileName': fileName},
+        {
+          'filePath': container.uri,
+          'fileName': fileName,
+          'quality': quality,
+        },
       );
       return bytes;
     } catch (_) {

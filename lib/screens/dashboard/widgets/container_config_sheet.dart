@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../../models/thumbnail_cache_mode.dart';
+import '../../../models/thumbnail_quality.dart';
 import '../../../services/app_settings_service.dart';
 import '../../../services/vaultexplorer_api.dart';
 import '../../../theme.dart';
@@ -41,6 +42,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   late int  _autoCloseMins;
   late bool _documentProvider;
   ThumbnailCacheMode? _thumbnailCacheMode;
+  ThumbnailQuality? _thumbnailQuality;
   bool _cacheDerivedKey = false;
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
@@ -66,6 +68,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     _autoCloseMins    = rec?.autoCloseMins ?? 0;
     _documentProvider = rec?.documentProvider ?? false;
     _thumbnailCacheMode = rec?.thumbnailCacheMode;
+    _thumbnailQuality = rec?.thumbnailQuality;
     _cacheDerivedKey = rec?.cacheDerivedKey ?? widget.appSettings?.defaultDerivedKeyCacheEnabled ?? false;
     _cipherId         = rec?.cipherId ?? 255;
     _hashId           = rec?.hashId ?? 255;
@@ -85,6 +88,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
       if (mounted) {
         setState(() {
           _thumbnailCacheMode ??= settings.defaultThumbnailCacheMode;
+          _thumbnailQuality ??= settings.defaultThumbnailQuality;
           // If appSettings wasn't available synchronously in initState (so
           // _cacheDerivedKey fell back to `false`), apply the real default now
           // — but only for brand-new containers; an existing record's saved
@@ -157,6 +161,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
       autoCloseMins: _autoCloseMins,
       documentProvider: _documentProvider,
       thumbnailCacheMode: _thumbnailCacheMode,
+      thumbnailQuality: _thumbnailQuality,
       cacheDerivedKey: _cacheDerivedKey,
       pendingPassword: shouldSavePassword // Can safely hold an empty string for keyfile-only volumes
           ? _passwordCtrl.text
@@ -281,7 +286,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                 color: cs.surfaceContainerLow,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                  side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -314,7 +319,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                 color: cs.surfaceContainerLow,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                  side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -337,7 +342,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: cs.primaryContainer.withOpacity(0.4),
+                                    color: cs.primaryContainer.withValues(alpha:0.4),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(Icons.lock_outline_rounded, size: 32, color: cs.primary),
@@ -541,11 +546,11 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                             childrenPadding: const EdgeInsets.all(16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                              side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
                             ),
                             collapsedShape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                              side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
                             ),
                             backgroundColor: cs.surfaceContainerLow,
                             collapsedBackgroundColor: cs.surfaceContainerLow,
@@ -595,7 +600,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                 color: cs.surfaceContainerLow,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(color: cs.outlineVariant.withOpacity(0.5)),
+                  side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -675,6 +680,25 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                               ?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      if (!_loadingPassword)
+                        DropdownButtonFormField<ThumbnailQuality?>(
+                          initialValue: _thumbnailQuality,
+                          decoration: InputDecoration(
+                            labelText: 'Thumbnail Quality',
+                            prefixIcon: Icon(Icons.high_quality_rounded, size: 20, color: cs.primary),
+                            filled: true,
+                            fillColor: cs.surfaceContainer,
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          items: ThumbnailQuality.values
+                              .map((q) => DropdownMenuItem<ThumbnailQuality?>(
+                                    value: q,
+                                    child: Text(q.label),
+                                  ))
+                              .toList(),
+                          onChanged: (v) => setState(() => _thumbnailQuality = v),
+                        ),
                     ],
                   ),
                 ),
@@ -1111,7 +1135,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
               decoration: BoxDecoration(
                 color: cs.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+                border: Border.all(color: cs.outlineVariant.withValues(alpha:0.5)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1175,7 +1199,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
                     Text(
                       'No keyfiles attached',
                       style: textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant.withOpacity(0.6),
+                        color: cs.onSurfaceVariant.withValues(alpha:0.6),
                         fontStyle: FontStyle.italic,
                       ),
                     ),

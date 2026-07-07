@@ -103,6 +103,37 @@ class FileOperationService extends ChangeNotifier {
     return op;
   }
 
+  /// Enqueues and starts a background native import operation.
+  FileOperation enqueueImport({
+    required MountedContainer dest,
+    required String destDirPath,
+    required bool isFolder,
+    required Future<int> Function() performImport,
+  }) {
+    final op = FileOperation._internal(
+      id: _nextId++,
+      isCut: false,
+      sourceVolId: 0,
+      sourceDisplayName: 'Device',
+      destVolId: dest.volId,
+      destDisplayName: dest.displayName,
+      destDirPath: destDirPath,
+      items: [
+        ClipboardItem(
+          path: isFolder ? 'Folder' : 'Files',
+          isDir: isFolder,
+          sizeBytes: 0,
+        )
+      ],
+      isImport: true,
+    );
+    _operations.add(op);
+    notifyListeners();
+
+    _runImport(op, performImport);
+    return op;
+  }
+
   /// Standalone batch delete — no clipboard involved.
   /// Returns the number of items successfully deleted.
   Future<int> deleteItems({
@@ -179,6 +210,32 @@ class FileOperationService extends ChangeNotifier {
 
   // ── Operation runner ──────────────────────────────────────────────────────
 
+  Future<void> _runImport(
+    FileOperation op,
+    Future<int> Function() performImport,
+  ) async {
+    op._setStatus(FileOperationStatus.running);
+    op._setActivity('Importing…');
+
+    try {
+      final count = await performImport();
+      if (count > 0) {
+        op._recordItemResult(0, FileItemResult.success);
+        op._setDoneCount(count);
+        op._setStatus(FileOperationStatus.completed);
+      } else {
+        op._setStatus(FileOperationStatus.cancelled);
+      }
+    } catch (e) {
+      final msg =
+          e is PlatformException ? (e.message ?? e.toString()) : e.toString();
+      op._setError(msg);
+      op._setStatus(FileOperationStatus.failed);
+    } finally {
+      notifyListeners();
+    }
+  }
+
   Future<void> _run(
     FileOperation op,
     MountedContainer src,
@@ -196,9 +253,11 @@ class FileOperationService extends ChangeNotifier {
       op._setActivity('Checking available space…');
 
       int requiredBytes = 0;
-      for (final item in op.items) {
-        requiredBytes += await measureItemBytes(src, item);
-        if (op.cancelRequested) throw const _CancelledException();
+      if (!(op.isCut && src.volId == dest.volId)) {
+        for (final item in op.items) {
+          requiredBytes += await measureItemBytes(src, item);
+          if (op.cancelRequested) throw const _CancelledException();
+        }
       }
 
       final spaceInfo = await vaultExplorerApi.getSpaceInfo(dest);
@@ -304,27 +363,45 @@ class FileOperationService extends ChangeNotifier {
               '${op.isCut ? "Moving" : "Copying"} ${r.item.name}…',
             );
 
-            final ok = await _copyEntry(
-              src,
-              dest,
-              r.item.path,
-              r.destPath,
-              r.item.isDir,
-              createdDestPaths,
-              op,
-            );
-
-            if (!ok) {
-              op._recordItemResult(
-                idx,
-                FileItemResult.failed,
-                errorMessage: 'Copy failed',
+            bool ok = false;
+            if (op.isCut && src.volId == dest.volId) {
+              ok = await vaultExplorerApi.renameFile(
+                src,
+                r.item.path,
+                r.destPath,
               );
-            } else if (op.isCut) {
-              await _deleteEntryRecursive(src, r.item.path, r.item.isDir);
-              op._recordItemResult(idx, FileItemResult.success);
+              if (!ok) {
+                op._recordItemResult(
+                  idx,
+                  FileItemResult.failed,
+                  errorMessage: 'Move failed',
+                );
+              } else {
+                op._recordItemResult(idx, FileItemResult.success);
+              }
             } else {
-              op._recordItemResult(idx, FileItemResult.success);
+              ok = await _copyEntry(
+                src,
+                dest,
+                r.item.path,
+                r.destPath,
+                r.item.isDir,
+                createdDestPaths,
+                op,
+              );
+
+              if (!ok) {
+                op._recordItemResult(
+                  idx,
+                  FileItemResult.failed,
+                  errorMessage: 'Copy failed',
+                );
+              } else if (op.isCut) {
+                await _deleteEntryRecursive(src, r.item.path, r.item.isDir);
+                op._recordItemResult(idx, FileItemResult.success);
+              } else {
+                op._recordItemResult(idx, FileItemResult.success);
+              }
             }
           } on _DiskFullException {
             op._recordItemResult(

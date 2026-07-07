@@ -37,13 +37,19 @@ class BreadcrumbBar extends StatelessWidget {
                     horizontal: 8,
                     vertical: 4,
                   ),
-                  child: Text(
-                    stack[i].label,
-                    style: textTheme.labelLarge?.copyWith(
-                      color: cs.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: i == 0
+                      ? Icon(
+                          Icons.home_rounded,
+                          color: cs.onSurface,
+                          size: 20,
+                        )
+                      : Text(
+                          stack[i].label,
+                          style: textTheme.labelLarge?.copyWith(
+                            color: cs.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 )
               else
                 // Clickable historical directories
@@ -55,13 +61,19 @@ class BreadcrumbBar extends StatelessWidget {
                       horizontal: 8,
                       vertical: 4,
                     ),
-                    child: Text(
-                      stack[i].label,
-                      style: textTheme.labelLarge?.copyWith(
-                        color: cs.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                    child: i == 0
+                        ? Icon(
+                            Icons.home_outlined,
+                            color: cs.primary,
+                            size: 20,
+                          )
+                        : Text(
+                            stack[i].label,
+                            style: textTheme.labelLarge?.copyWith(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                   ),
                 ),
               if (!isLast)

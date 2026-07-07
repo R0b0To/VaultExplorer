@@ -194,7 +194,7 @@ class _OperationRow extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (isActive)
+                  if (isActive && !op.isImport)
                     IconButton(
                       icon: Icon(
                         Icons.close_rounded,

@@ -6,10 +6,12 @@
 abstract final class ChannelMethods {
   // ── Container lifecycle ──────────────────────────────────────────────────
   static const pickContainer = 'pickContainer';
+  static const pickKeyfiles = 'pickKeyfiles';
   static const createContainer = 'createContainer';
   static const unlockContainer = 'unlockContainer';
   static const lockContainer = 'lockContainer';
   static const updateContainerSettings = 'updateContainerSettings';
+  static const cancelUnlock = 'cancelUnlock';
 
   // ── File I/O ─────────────────────────────────────────────────────────────
   static const decryptFile = 'decryptFile';
@@ -47,4 +49,5 @@ abstract final class ChannelMethods {
   static const listUsbDevices = 'listUsbDevices';
   static const requestUsbPermission = 'requestUsbPermission';
   static const unlockUsbContainer = 'unlockUsbContainer';
+  static const documentExists = 'documentExists';
 }

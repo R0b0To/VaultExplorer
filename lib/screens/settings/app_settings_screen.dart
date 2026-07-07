@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:vaultexplorer/main.dart';
+import 'about_screen.dart';
+
 import '../../models/thumbnail_cache_mode.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/password_hasher.dart';
@@ -30,6 +30,18 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 
   bool _biometricAvailable = false;
   final _localAuth = LocalAuthentication();
+
+  Future<void> _persist() async {
+    try {
+      await AppSettingsService.saveSettings(_settings);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save settings')),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -61,17 +73,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     }
   }
 
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    await AppSettingsService.saveSettings(_settings);
-    if (mounted) {
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Settings saved')));
-    }
-  }
-
   void _toggleMasterPassword(bool enabled) {
     setState(() {
       _settings.useMasterPassword = enabled;
@@ -86,6 +87,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
         _showPwFields = true;
       }
     });
+    if (!enabled) _persist();
   }
 
   /// Derives PBKDF2-SHA512 via [PasswordHasher] and persists hash to Android Keystore.
@@ -146,40 +148,19 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('App Settings'),
-        actions: [
-          if (!_loading && !_showPwFields)
-            TextButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: cs.primary,
-                      ),
-                    )
-                  : Text(
-                      'Save',
-                      style: TextStyle(
-                        color: cs.primary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
-          : ListView(
-              // FIX: standardized to the same page-padding pattern used by
-              // vault_item_edit_screen.dart (bottom 32 clears Android
-              // gesture-nav on 16/17 edge-to-edge; top 12 gives breathing
-              // room under the AppBar). Previously this screen used a flat
-              // EdgeInsets.all(16).
-              padding: AppSpacing.pagePadding,
-              children: [
+          : Builder(
+        builder: (context) {
+          // Grab your actual navigation bar height (80, from your theme)
+          final navBarHeight =
+              Theme.of(context).navigationBarTheme.height ?? 80;
+          return ListView(
+            padding: AppSpacing.pagePadding.copyWith(
+              bottom: navBarHeight,
+            ),
+            children: [
                 const SectionLabel('Security'),
                 _Card(
                   cs: cs,
@@ -309,9 +290,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                           title: 'Biometric Unlock',
                           subtitle: 'Use fingerprint or face instead of typing',
                           value: _settings.masterPasswordIsFingerprint,
-                          onChanged: (v) => setState(
-                            () => _settings.masterPasswordIsFingerprint = v,
-                          ),
+                          onChanged: (v) {
+                            setState(() => _settings.masterPasswordIsFingerprint = v);
+                            _persist();
+                          },
                         ),
                       if (!_biometricAvailable)
                         Padding(
@@ -346,26 +328,73 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     SettingsToggleRow(
                       icon: Icons.security_rounded,
                       title: 'Block Screenshots',
-                      subtitle:
-                          'Prevent screenshots and hide content in recent apps preview.',
+                      subtitle: 'Prevent screenshots and hide content in recent apps preview.',
                       value: _settings.blockScreenshots,
                       onChanged: (v) async {
                         setState(() => _settings.blockScreenshots = v);
                         await vaultExplorerApi.setSecureScreen(v);
+                        await _persist();
                       },
                     ),
                     const Divider(height: 24),
                     SettingsToggleRow(
                       icon: Icons.lock_clock_rounded,
-                      title: 'Lock Containers on Screen Lock',
+                      title: 'Auto-Lock',
                       subtitle:
-                          'Automatically lock all open containers when the '
-                          'screen turns off or the app is backgrounded.',
+                          'Automatically lock all open containers — and return to the dashboard or master password screen — after a period of inactivity.',
                       value: _settings.lockContainersOnScreenLock,
-                      onChanged: (v) => setState(
-                        () => _settings.lockContainersOnScreenLock = v,
-                      ),
+                      onChanged: (v) {
+                        setState(() {
+                          _settings.lockContainersOnScreenLock = v;
+                          if (v && _settings.autoLockMins == 0) {
+                            _settings.autoLockMins = 5;
+                          } else if (!v) {
+                            _settings.autoLockMins = 0;
+                          }
+                        });
+                        _persist();
+                      },
                     ),
+                    if (_settings.lockContainersOnScreenLock) ...[
+                      const Divider(height: 24),
+                      DropdownButtonFormField<int>(
+                        value: _settings.autoLockMins,
+                        decoration: InputDecoration(
+                          labelText: 'Auto-Lock After Inactivity',
+                          prefixIcon: Icon(Icons.timer_rounded, size: AppIconSize.small),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 0, child: Text('Never')),
+                          DropdownMenuItem(value: 1, child: Text('1 minute')),
+                          DropdownMenuItem(value: 2, child: Text('2 minutes')),
+                          DropdownMenuItem(value: 5, child: Text('5 minutes')),
+                          DropdownMenuItem(value: 10, child: Text('10 minutes')),
+                          DropdownMenuItem(value: 15, child: Text('15 minutes')),
+                          DropdownMenuItem(value: 30, child: Text('30 minutes')),
+                          DropdownMenuItem(value: 60, child: Text('60 minutes')),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() => _settings.autoLockMins = v);
+                            _persist();
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          _settings.autoLockMins == 0
+                              ? 'Everything stays open until you lock it manually, no matter '
+                                  'how long you switch away or leave the screen off.'
+                              : 'Switching away briefly and coming back is fine — this only '
+                                  'fires after ${_settings.autoLockMins} minute'
+                                  '${_settings.autoLockMins == 1 ? '' : 's'} of not using the '
+                                  'app, whether the screen was off or you were elsewhere.',
+                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
+                        ),
+                      ),
+                    ],
                     const Divider(height: 24),
                     SettingsToggleRow(
                       icon: Icons.key_rounded,
@@ -373,9 +402,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       subtitle:
                           'Reuse the last derived key in Android Keystore for faster unlocks across supported methods.',
                       value: _settings.defaultDerivedKeyCacheEnabled,
-                      onChanged: (v) => setState(
-                        () => _settings.defaultDerivedKeyCacheEnabled = v,
-                      ),
+                      onChanged: (v) {
+                        setState(() => _settings.defaultDerivedKeyCacheEnabled = v);
+                        _persist();
+                      },
                     ),
                   ],
                 ),
@@ -393,12 +423,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                           'New containers will be exposed in Android\'s file '
                           'picker by default.',
                       value: _settings.defaultDocumentProvider,
-                      onChanged: (v) =>
-                          setState(() => _settings.defaultDocumentProvider = v),
+                      onChanged: (v) {
+                        setState(() => _settings.defaultDocumentProvider = v);
+                        _persist();
+                      },
                     ),
                     const Divider(height: 24),
                     DropdownButtonFormField<ThumbnailCacheMode>(
-                      initialValue: _settings.defaultThumbnailCacheMode,
+                      value: _settings.defaultThumbnailCacheMode,
                       decoration: InputDecoration(
                         labelText: 'Thumbnail Caching (default)',
                         prefixIcon: Icon(Icons.cached_rounded, size: AppIconSize.small),
@@ -411,9 +443,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       }).toList(),
                       onChanged: (v) {
                         if (v != null) {
-                          setState(
-                            () => _settings.defaultThumbnailCacheMode = v,
-                          );
+                          setState(() => _settings.defaultThumbnailCacheMode = v);
+                          _persist();
                         }
                       },
                     ),
@@ -508,12 +539,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                                 ),
                                 tooltip: 'Remove association',
                                 onPressed: () {
-                                  setState(() {
-                                    _settings.extensionPreferences.remove(
-                                      entry.key,
-                                    );
-                                  });
-                                  _save(); // Auto-save after removing
+                                  setState(() => _settings.extensionPreferences.remove(entry.key));
+                                  _persist();
                                 },
                               ),
                             ],
@@ -527,43 +554,42 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 const SizedBox(height: 24),
 
                 const SectionLabel('About'),
-                _Card(
-                  cs: cs,
-                  children: [
-                    _InfoRow('Version', appVersion, cs),
-                    const Divider(),
-                    _InfoRow('Encryption', 'AES-256-XTS (VeraCrypt)', cs),
-                    const Divider(),
-                    _InfoRow('Key derivation', 'PBKDF2-SHA512', cs),
-                    const Divider(),
-                    _InfoRow('Filesystem', 'FAT32 / exFAT via FatFs', cs),
-                    const Divider(),
-                    GestureDetector(
-                      onTap: () => launchUrl(
-                        Uri.parse('https://github.com/R0b0To/VaultExplorer'),
-                      ),
-                      child: _InfoRow(
-                        'GitHub',
-                        'https://github.com/R0b0To/VaultExplorer',
-                        cs,
+                Card(
+                  color: cs.surfaceContainerLow,
+                  elevation: 0,
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AboutScreen()),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info_outline_rounded, color: cs.primary),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text('About VaultExplorer', style: textTheme.bodyLarge),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-
+          
                 const SizedBox(height: 32),
               ],
-            ),
+            );})
     );
   }
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
-//
-// _SectionLabel and _ToggleRow were removed from this file — they are now
-// the shared SectionLabel / SettingsToggleRow widgets in
-// lib/widgets/common_widgets.dart, previously duplicated verbatim here and
-// in container_config_sheet.dart.
 
 class _Card extends StatelessWidget {
   final List<Widget> children;
@@ -583,32 +609,4 @@ class _Card extends StatelessWidget {
       ),
     ),
   );
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final ColorScheme cs;
-  const _InfoRow(this.label, this.value, this.cs);
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Text(
-            label,
-            style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
-    );
-  }
 }

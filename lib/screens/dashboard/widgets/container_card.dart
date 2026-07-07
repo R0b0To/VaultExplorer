@@ -5,8 +5,9 @@ import '../../../services/vaultexplorer_api.dart';
 import '../../../utils/format_utils.dart';
 
 // ── Base Container Card (Internal) ──────────────────────────────────────────
-
 class _BaseContainerCard extends StatelessWidget {
+  static const double _bottomAreaHeight = 14.0;
+
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   final IconData icon;
@@ -14,8 +15,9 @@ class _BaseContainerCard extends StatelessWidget {
   final Color iconBackgroundColor;
   final String title;
   final Widget subtitle;
-  final Widget trailingAction;
-  final Widget? bottomContent;
+  final Widget? trailingAction;
+  final Widget? bottomContent; // optional progress bar row
+  final bool isElevated;
 
   const _BaseContainerCard({
     required this.onTap,
@@ -25,44 +27,59 @@ class _BaseContainerCard extends StatelessWidget {
     required this.iconBackgroundColor,
     required this.title,
     required this.subtitle,
-    required this.trailingAction,
+    this.trailingAction,
     this.bottomContent,
+    this.isElevated = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
     return Card(
+      elevation: 0,
+      color: isElevated ? cs.surfaceContainer : Colors.transparent,
       clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: isElevated
+            ? BorderSide.none
+            : BorderSide(color: cs.outlineVariant, width: 1),
+      ),
       child: InkWell(
         onTap: onTap,
         onLongPress: onLongPress,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Main content row: icon + text + action button
               Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
                       color: iconBackgroundColor,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Icon(icon, size: 24, color: iconColor),
+                    child: Icon(icon, size: 28, color: iconColor),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           title,
-                          style: textTheme.titleMedium,
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.1,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
@@ -70,14 +87,17 @@ class _BaseContainerCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  trailingAction,
+                  if (trailingAction != null) ...[
+                    const SizedBox(width: 8),
+                    trailingAction!,
+                  ],
                 ],
               ),
-              if (bottomContent != null) ...[
-                const SizedBox(height: 16),
-                bottomContent!,
-              ],
+              // Fixed-height bottom area – same size in locked & unlocked cards
+              SizedBox(
+                height: _bottomAreaHeight,
+                child: bottomContent ?? const SizedBox.shrink(),
+              ),
             ],
           ),
         ),
@@ -86,8 +106,7 @@ class _BaseContainerCard extends StatelessWidget {
   }
 }
 
-// ── Mounted container card ────────────────────────────────────────────────────
-
+// ── Mounted (unlocked) container card ──────────────────────────────────────
 class ContainerCard extends StatelessWidget {
   final MountedContainer container;
   final ValueChanged<int> onLocked;
@@ -104,7 +123,7 @@ class ContainerCard extends StatelessWidget {
 
   Color _barColor(double fraction, ColorScheme cs) {
     if (fraction > 0.90) return cs.error;
-    if (fraction > 0.70) return cs.secondary;
+    if (fraction > 0.70) return cs.tertiary;
     return cs.primary;
   }
 
@@ -119,50 +138,159 @@ class ContainerCard extends StatelessWidget {
     final hasSpace = container.totalSpace > 0;
     final isUsb = container.uri.startsWith('usb:');
 
+    // Subtitle without the bar – bar goes in the bottom area
+    Widget subtitleWidget;
+    if (hasSpace) {
+      subtitleWidget = Text(
+        '${formatBytes(container.freeSpace)} free · ${formatBytes(container.totalSpace)} total',
+        style: textTheme.bodyMedium?.copyWith(
+          color: cs.onSurfaceVariant,
+        ),
+        overflow: TextOverflow.ellipsis,
+      );
+    } else {
+      subtitleWidget = Text(
+        'Vol ${container.volId} · Mounted',
+        style: textTheme.bodyMedium?.copyWith(
+          color: cs.onSurfaceVariant,
+        ),
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    // Bottom content: mini progress bar row (only if space info is available)
+    Widget? bottomContent;
+    if (hasSpace) {
+      bottomContent = Padding(
+        padding: const EdgeInsets.only(top: 8.0), // space above the bar
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(100),
+          child: LinearProgressIndicator(
+            value: usedFraction,
+            minHeight: 6,
+            backgroundColor: cs.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              _barColor(usedFraction, cs),
+            ),
+          ),
+        ),
+      );
+    }
+
     return _BaseContainerCard(
       onTap: onBrowse,
       onLongPress: onLongPress,
-      icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_outlined,
+      icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_rounded,
       iconColor: cs.onPrimaryContainer,
       iconBackgroundColor: cs.primaryContainer,
       title: container.displayName,
-      subtitle: Row(
-        children: [
-          // STATUS: Currently Unlocked/Mounted
-          Icon(Icons.lock_open, size: 14, color: cs.primary),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              hasSpace
-                  ? '${formatBytes(container.freeSpace)} free of ${formatBytes(container.totalSpace)}'
-                  : 'Vol ${container.volId} · Mounted',
-              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              overflow: TextOverflow.ellipsis,
+      subtitle: subtitleWidget,
+      trailingAction: _LockButton(container: container, onLocked: onLocked),
+      bottomContent: bottomContent,
+    );
+  }
+}
+
+// ── Saved (locked) container card ───────────────────────────────────────────
+class SavedContainerCard extends StatelessWidget {
+  final String name;
+  final String uri;
+  final VoidCallback onUnlock;
+  final VoidCallback? onLongPress;
+
+  const SavedContainerCard({
+    super.key,
+    required this.name,
+    required this.uri,
+    required this.onUnlock,
+    this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isUsb = uri.startsWith('usb:');
+
+    return _BaseContainerCard(
+      onTap: onUnlock,
+      onLongPress: onLongPress,
+      icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_rounded,
+      iconColor: cs.onSurfaceVariant,
+      iconBackgroundColor: cs.surfaceContainerHighest,
+      title: name,
+      subtitle: Text(
+        isUsb ? 'USB drive' : 'Locked container',
+        style: textTheme.bodyMedium?.copyWith(
+          color: cs.onSurfaceVariant,
+        ),
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailingAction: _UnlockButton(
+        onUnlock: onUnlock,
+        isUsb: isUsb,
+      ),
+      isElevated: false,
+      // bottomContent is omitted → the fixed 28dp area remains empty
+    );
+  }
+}
+
+// ── Compact Icon‑Only Action Button (Android 16+ pill shape) ──────────────
+class _CompactIconButton extends StatelessWidget {
+  final IconData icon;
+  final bool isLoading;
+  final VoidCallback? onPressed;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final String? tooltip;
+
+  const _CompactIconButton({
+    required this.icon,
+    this.isLoading = false,
+    this.onPressed,
+    required this.backgroundColor,
+    required this.foregroundColor,
+    this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip ?? '',
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: FilledButton(
+          onPressed: isLoading ? null : onPressed,
+          style: FilledButton.styleFrom(
+            backgroundColor: backgroundColor,
+            foregroundColor: foregroundColor,
+            disabledBackgroundColor: backgroundColor.withValues(alpha: 0.6),
+            disabledForegroundColor: foregroundColor.withValues(alpha: 0.6),
+            padding: EdgeInsets.zero,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(100),
             ),
           ),
-        ],
+          child: isLoading
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: foregroundColor.withValues(alpha: 0.8),
+                  ),
+                )
+              : Icon(icon, size: 22),
+        ),
       ),
-      // ACTION: Tap to Lock
-      trailingAction: _LockButton(container: container, onLocked: onLocked),
-      bottomContent: hasSpace
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(100),
-              child: LinearProgressIndicator(
-                value: usedFraction,
-                minHeight: 4,
-                backgroundColor: cs.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  _barColor(usedFraction, cs),
-                ),
-              ),
-            )
-          : null,
     );
   }
 }
 
 // ── Lock button ───────────────────────────────────────────────────────────────
-
 class _LockButton extends StatefulWidget {
   final MountedContainer container;
   final ValueChanged<int> onLocked;
@@ -180,11 +308,7 @@ class _LockButtonState extends State<_LockButton> {
     if (!vaultExplorerApi.acquireLockGuard(widget.container.volId)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'An operation is in progress. Please wait before locking.',
-            ),
-          ),
+          const SnackBar(content: Text('An operation is in progress. Please wait before locking.')),
         );
       }
       return;
@@ -209,80 +333,39 @@ class _LockButtonState extends State<_LockButton> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return IconButton(
-      onPressed: _loading ? null : _lock,
+    return _CompactIconButton(
+      icon: Icons.lock_outline_rounded,
+      isLoading: _loading,
+      onPressed: _lock,
+      backgroundColor: cs.secondaryContainer,
+      foregroundColor: cs.onSecondaryContainer,
       tooltip: 'Lock container',
-      icon: _loading
-          ? SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                color: cs.error,
-              ),
-            )
-          // ACTION ICON: Represents what happens when tapped (it locks)
-          : Icon(Icons.lock_outline, size: 24, color: cs.error),
     );
   }
 }
 
-// ── Saved (locked) container card ─────────────────────────────────────────────
-
-class SavedContainerCard extends StatelessWidget {
-  final String name;
-  final String uri;
+// ── Unlock button ────────────────────────────────────────────────────────────
+class _UnlockButton extends StatelessWidget {
   final VoidCallback onUnlock;
-  final VoidCallback? onLongPress;
+  final bool isUsb;
 
-  const SavedContainerCard({
-    super.key,
-    required this.name,
-    required this.uri,
+  const _UnlockButton({
     required this.onUnlock,
-    this.onLongPress,
+    required this.isUsb,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    final isUsb = uri.startsWith('usb:');
-
-    return _BaseContainerCard(
-      onTap: onUnlock,
-      onLongPress: onLongPress,
-      icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_outlined,
-      iconColor: cs.onSurfaceVariant,
-      iconBackgroundColor: cs.surfaceContainerHighest,
-      title: name,
-      subtitle: Row(
-        children: [
-          // STATUS: Currently Locked
-          Icon(
-            isUsb ? Icons.usb_off_rounded : Icons.lock,
-            size: 14,
-            color: cs.onSurfaceVariant,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            isUsb ? 'USB · reconnect to unlock' : 'Locked',
-            style: textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-      // ACTION ICON: Represents what happens when tapped (it unlocks)
-      trailingAction: IconButton(
-        icon: Icon(
-          isUsb ? Icons.usb_rounded : Icons.lock_open_outlined,
-          color: cs.primary,
-        ),
-        tooltip: isUsb ? 'Reconnect USB drive' : 'Unlock container',
-        onPressed: onUnlock,
-      ),
+    return _CompactIconButton(
+      icon: isUsb ? Icons.usb_rounded : Icons.lock_open_rounded,
+      onPressed: () {
+        HapticFeedback.lightImpact();
+        onUnlock();
+      },
+      backgroundColor: cs.primaryContainer,
+      foregroundColor: cs.onPrimaryContainer,
+      tooltip: isUsb ? 'Reconnect USB' : 'Unlock container',
     );
   }
 }

@@ -5,7 +5,7 @@ import '../../models/mounted_container.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
 import '../../services/vaultexplorer_api.dart';
-import '../../theme.dart';
+import '../../widgets/common_widgets.dart';
 import '../settings/app_settings_screen.dart';
 import '../unlock/unlock_sheet.dart';
 import 'widgets/container_card.dart';
@@ -14,6 +14,27 @@ import 'widgets/create_container_sheet.dart';
 import 'widgets/empty_state.dart';
 import '../browser/file_browser_screen.dart';
 import '../unlock/usb_unlock_sheet.dart';
+import '../lock/lock_gate_screen.dart';
+
+enum VaultSortField { name, date, size, status }
+
+class SlideRightRoute<T> extends PageRouteBuilder<T> {
+  final Widget page;
+  SlideRightRoute({required this.page})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = Offset(1.0, 0.0);
+            const end = Offset.zero;
+            const curve = Curves.easeInOut;
+            final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+            return SlideTransition(
+              position: animation.drive(tween),
+              child: child,
+            );
+          },
+        );
+}
 
 class VaultDashboard extends StatefulWidget {
   const VaultDashboard({Key? key}) : super(key: key);
@@ -26,25 +47,34 @@ class _VaultDashboardState extends State<VaultDashboard>
     with WidgetsBindingObserver {
   final List<MountedContainer> _mounted = [];
   Map<String, ContainerRecord> _records = {};
+  final List<String> _recordsOrder = [];
   AppSettings _appSettings = AppSettings();
   bool _actionInFlight = false;
+  int _currentIndex = 0; // 0: Vaults, 1: Settings
+
+  VaultSortField _sortField = VaultSortField.name;
+  bool _sortAscending = true;
 
   final Map<int, Timer> _autoCloseTimers = {};
+
+  DateTime? _pausedAt;
+  Timer? _autoLockTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    VaultExplorerApi.addUsbContainerDetachedListener(_onUsbContainerDetached);
     _loadAll();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    for (final t in _autoCloseTimers.values) {
-      t.cancel();
-    }
+    for (final t in _autoCloseTimers.values) t.cancel();
     _autoCloseTimers.clear();
+    _autoLockTimer?.cancel();
+    VaultExplorerApi.removeUsbContainerDetachedListener(_onUsbContainerDetached);
     super.dispose();
   }
 
@@ -54,35 +84,69 @@ class _VaultDashboardState extends State<VaultDashboard>
       for (final c in List<MountedContainer>.from(_mounted)) {
         _refreshContainerSpace(c.volId);
       }
-    } else if (state == AppLifecycleState.paused) {
-      // FIX: "paused" fires both when the app is backgrounded and when the
-      // screen is turned off while this app is foreground — the closest
-      // proxy Flutter exposes to a screen-lock event. Locking here honours
-      // AppSettings.lockContainersOnScreenLock (default: enabled).
-      if (_appSettings.lockContainersOnScreenLock) {
-        _lockAllContainersOnScreenOff();
+
+      final pausedAt = _pausedAt;
+      _pausedAt = null;
+
+      final mins = _appSettings.autoLockMins;
+      final wasAwayTooLong = pausedAt != null &&
+          mins > 0 &&
+          DateTime.now().difference(pausedAt) >= Duration(minutes: mins);
+
+      if (wasAwayTooLong) {
+        _performAutoLock();
+      } else {
+        _scheduleAutoLock();
       }
+    } else if (state == AppLifecycleState.paused) {
+      _pausedAt = DateTime.now();
     }
   }
 
-  /// Locks every currently-mounted container in response to the screen
-  /// turning off / the app being backgrounded, when
-  /// [AppSettings.lockContainersOnScreenLock] is enabled.
-  ///
-  /// Containers with an in-flight file operation are skipped (the lock
-  /// guard fails to acquire) rather than interrupting a copy/move — they'll
-  /// remain unlocked until the operation finishes and the user locks
-  /// manually, same as the existing auto-close behavior.
-  Future<void> _lockAllContainersOnScreenOff() async {
+  void _scheduleAutoLock() {
+    _autoLockTimer?.cancel();
+    final mins = _appSettings.autoLockMins;
+    final hasMasterPassword =
+        _appSettings.useMasterPassword && _appSettings.masterPasswordHash != null;
+    if (mins <= 0 || (!hasMasterPassword && !_appSettings.lockContainersOnScreenLock)) {
+      return;
+    }
+    _autoLockTimer = Timer(Duration(minutes: mins), _performAutoLock);
+  }
+
+  Future<void> _performAutoLock() async {
+    _autoLockTimer?.cancel();
+    if (_appSettings.lockContainersOnScreenLock) {
+      await _lockAllMountedContainers();
+    }
+    if (!mounted) return;
+    final hasMasterPassword =
+        _appSettings.useMasterPassword && _appSettings.masterPasswordHash != null;
+    if (_appSettings.lockContainersOnScreenLock || hasMasterPassword) {
+      await _enforceAppLock();
+    }
+  }
+
+  Future<void> _enforceAppLock() async {
+    if (!mounted) return;
+    final navigator = Navigator.of(context);
+    navigator.popUntil((route) => route.isFirst);
+    if (_appSettings.useMasterPassword && _appSettings.masterPasswordHash != null) {
+      navigator.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LockGateScreen()),
+        (route) => false,
+      );
+    }
+  }
+
+  Future<void> _lockAllMountedContainers() async {
     for (final c in List<MountedContainer>.from(_mounted)) {
       if (!vaultExplorerApi.acquireLockGuard(c.volId)) continue;
       try {
         await vaultExplorerApi.lockContainer(c.uri);
         _onContainerLocked(c.volId);
       } catch (e) {
-        debugPrint(
-          'Lock-on-screen-off failed for volId=${c.volId}: $e',
-        );
+        debugPrint('Auto-lock failed for volId=${c.volId}: $e');
       } finally {
         vaultExplorerApi.releaseLockGuard(c.volId);
       }
@@ -96,8 +160,18 @@ class _VaultDashboardState extends State<VaultDashboard>
       setState(() {
         _appSettings = settings;
         _records = Map.from(records);
+        _recordsOrder.clear();
+        _recordsOrder.addAll(records.keys);
       });
+      _scheduleAutoLock();
     }
+  }
+
+  Future<void> _handleRefresh() async {
+    await _loadAll();
+    await Future.wait(
+      List<MountedContainer>.from(_mounted).map((c) => _refreshContainerSpace(c.volId)),
+    );
   }
 
   // ── Auto-close ────────────────────────────────────────────────────────────
@@ -149,6 +223,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     if ((record?.autoCloseMins ?? 0) > 0) {
       _scheduleAutoClose(container);
     }
+    _scheduleAutoLock();
   }
 
   void _cancelAutoClose(int volId) {
@@ -158,40 +233,43 @@ class _VaultDashboardState extends State<VaultDashboard>
 
   // ── Container lifecycle ───────────────────────────────────────────────────
 
-  void _onContainerMounted(MountedContainer container) {
-    setState(() => _mounted.add(container));
-    _scheduleAutoClose(container);
+  void _onContainerMounted(MountedContainer container, {ContainerRecord? record}) {
+    if (_mounted.any((c) => c.uri == container.uri)) return;
 
-    if (!_records.containsKey(container.uri)) {
-      final record = ContainerRecord(
-        uri: container.uri,
-        label: container.displayName,
-        documentProvider: _appSettings.defaultDocumentProvider,
-      );
-      _records[container.uri] = record;
-      ContainerRepository.instance.save(record);
-    }
+    setState(() {
+      _mounted.add(container);
+      if (record != null && !_records.containsKey(container.uri)) {
+        _records[container.uri] = record;
+        _recordsOrder.add(container.uri);
+      }
+    });
+    _scheduleAutoClose(container);
   }
 
-  /// Used instead of [_onContainerMounted] when [UsbUnlockSheet] detects
-  /// that a saved USB entry's device path changed since it was last mounted
-  /// (see [ContainerRecord.isUsbSource] doc comment for why that happens)
-  /// and has already migrated the persisted record onto the new uri.
-  ///
-  /// This just reconciles our own in-memory [_records]/[_mounted] state to
-  /// match what's now on disk — it must NOT re-run [_onContainerMounted]'s
-  /// "create a default record if one doesn't exist" logic, since that would
-  /// immediately clobber the just-migrated record (carrying the original
-  /// label/unlock method/remembered password) with a fresh default one.
+  void _onUsbContainerDetached(int volId) {
+    if (!mounted) return;
+    if (!_mounted.any((c) => c.volId == volId)) return;
+    _onContainerLocked(volId);
+    showAppSnackBar(
+      context,
+      message: 'USB drive disconnected — container locked',
+      tone: AppBannerTone.warning,
+    );
+  }
+
   void _onUsbContainerReconnected(
     MountedContainer container,
     ContainerRecord migratedRecord,
     String oldUri,
   ) {
+    if (_mounted.any((c) => c.uri == container.uri)) return;
+
     setState(() {
       _mounted.add(container);
       _records.remove(oldUri);
+      _recordsOrder.remove(oldUri);
       _records[container.uri] = migratedRecord;
+      _recordsOrder.add(container.uri);
     });
     _scheduleAutoClose(container);
   }
@@ -232,6 +310,11 @@ class _VaultDashboardState extends State<VaultDashboard>
   // ── Unlock & Create Actions ───────────────────────────────────────────────
 
   Future<void> _showUnlockSheet({String? uri, String? name}) async {
+    if (uri != null && _mounted.any((c) => c.uri == uri)) {
+      showAppSnackBar(context, message: 'This container is already mounted.');
+      return;
+    }
+
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
 
@@ -239,26 +322,25 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (uri != null) {
       final record = _records[uri];
       if (record?.unlockMethod == ContainerUnlockMethod.rememberPassword) {
-        rememberedPassword = await ContainerRepository.instance.getPassword(
-          uri,
-        );
+        rememberedPassword = await ContainerRepository.instance.getPassword(uri);
       }
     }
 
     final record = uri != null ? _records[uri] : null;
-    final docProvider =
-        record?.documentProvider ?? _appSettings.defaultDocumentProvider;
+    final docProvider = record?.documentProvider ?? _appSettings.defaultDocumentProvider;
 
     try {
-      await showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        builder: (_) => UnlockSheet(
-          onMounted: _onContainerMounted,
-          initialUri: uri,
-          initialName: name,
-          prefillPassword: rememberedPassword,
-          documentProvider: docProvider,
+      await Navigator.push(
+        context,
+        SlideRightRoute(
+          page: UnlockSheet(
+            onMounted: _onContainerMounted,
+            initialUri: uri,
+            initialName: name,
+            prefillPassword: rememberedPassword,
+            documentProvider: docProvider,
+            mountedUris: _mounted.map((c) => c.uri).toList(),
+          ),
         ),
       );
       await _loadAll();
@@ -267,40 +349,26 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
   }
 
-  /// FIX: previously always opened a fresh "pick any connected USB drive"
-  /// sheet with no way to target a specific saved drive, and the dashboard's
-  /// saved-container tile always routed to [_showUnlockSheet] (the
-  /// file-based sheet) regardless of uri scheme — which handed a `usb:...`
-  /// string to `contentResolver.openFileDescriptor()` and failed with "no
-  /// content provider for usb:...". Now accepts an optional [existingRecord]
-  /// to drive [UsbUnlockSheet]'s reconnect flow: auto-selecting the
-  /// previously used device, prefilling a remembered password, and
-  /// reconciling the saved record if the device's bus path has changed
-  /// since it was last mounted.
   Future<void> _showUsbUnlockSheet({ContainerRecord? existingRecord}) async {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
 
     String? rememberedPassword;
-    if (existingRecord != null &&
-        existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
-      rememberedPassword = await ContainerRepository.instance.getPassword(
-        existingRecord.uri,
-      );
+    if (existingRecord != null && existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
+      rememberedPassword = await ContainerRepository.instance.getPassword(existingRecord.uri);
     }
 
     try {
-      await showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        builder: (_) => UsbUnlockSheet(
-          onMounted: _onContainerMounted,
-          onReconnected: _onUsbContainerReconnected,
-          documentProvider:
-              existingRecord?.documentProvider ??
-              _appSettings.defaultDocumentProvider,
-          existingRecord: existingRecord,
-          prefillPassword: rememberedPassword,
+      await Navigator.push(
+        context,
+        SlideRightRoute(
+          page: UsbUnlockSheet(
+            onMounted: _onContainerMounted,
+            onReconnected: _onUsbContainerReconnected,
+            documentProvider: existingRecord?.documentProvider ?? _appSettings.defaultDocumentProvider,
+            existingRecord: existingRecord,
+            prefillPassword: rememberedPassword,
+          ),
         ),
       );
       await _loadAll();
@@ -312,181 +380,156 @@ class _VaultDashboardState extends State<VaultDashboard>
   void _showCreateSheet() {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => const CreateContainerSheet(),
+    Navigator.push(
+      context,
+      SlideRightRoute(page: const CreateContainerSheet()),
     ).whenComplete(() {
       if (mounted) setState(() => _actionInFlight = false);
     });
   }
 
-  /// Modern MD3 Creation Bottom Sheet triggered by the Floating Action Button
-  void _showAddContainerMenu() {
+  void _showAddOptionsSheet() {
     HapticFeedback.lightImpact();
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
-      builder: (context) {
-        final cs = Theme.of(context).colorScheme;
-        final textTheme = Theme.of(context).textTheme;
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 8,
-                  ),
-                  child: Text(
-                    'Add Container',
-                    style: textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ListTile(
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(
-                      Icons.lock_open_rounded,
-                      color: cs.onPrimaryContainer,
-                    ),
-                  ),
-                  title: const Text('Mount Existing Container'),
-                  subtitle: const Text('Unlock an encrypted vault from storage'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showUnlockSheet();
-                  },
-                ),
-                ListTile(
-  leading: Container(
-    width: 40,
-    height: 40,
-    decoration: BoxDecoration(
-      color: cs.tertiaryContainer,
-      borderRadius: BorderRadius.circular(AppRadius.md),
-    ),
-    child: Icon(
-      Icons.usb_rounded,
-      color: cs.onTertiaryContainer,
-    ),
-  ),
-  title: const Text('Mount USB Drive'),
-  subtitle: const Text('Unlock a fully-encrypted external drive'),
-  onTap: () {
-    Navigator.pop(context);
-    _showUsbUnlockSheet();
-  },
-),
-                ListTile(
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: cs.secondaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                    ),
-                    child: Icon(
-                      Icons.add_box_rounded,
-                      color: cs.onSecondaryContainer,
-                    ),
-                  ),
-                  title: const Text('Create New Container'),
-                  subtitle: const Text('Generate a new encrypted volume'),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _showCreateSheet();
-                  },
-                ),
-              ],
+      builder: (sheetContext) => AppBottomSheet(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 4),
+              child: Text(
+                'Add a vault',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
             ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showContainerConfig({
-    required String uri,
-    required String currentLabel,
-  }) {
-    HapticFeedback.mediumImpact();
-    final existing = _records[uri];
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => ContainerConfigSheet(
-        uri: uri,
-        currentLabel: currentLabel,
-        existingRecord: existing,
-        appSettings: _appSettings,
-        onSaved: (record) async {
-          if (mounted) setState(() => _records[uri] = record);
-          final idx = _mounted.indexWhere((m) => m.uri == uri);
-          if (idx != -1) {
-            final oldContainer = _mounted[idx];
-            final newName = record.label.isNotEmpty
-                ? record.label
-                : record.uri.split('/').last;
-
-            final newContainer = oldContainer.copyWith(displayName: newName);
-            if (mounted) setState(() => _mounted[idx] = newContainer);
-
-            await vaultExplorerApi.updateContainerSettings(
-              uri,
-              newName,
-              record.documentProvider,
-            );
-
-            _scheduleAutoClose(newContainer);
-          }
-        },
-        onForget: _mounted.any((m) => m.uri == uri)
-            ? null
-            : () => _forgetContainer(uri, currentLabel),
+            const SizedBox(height: 4),
+            SheetOptionTile(
+              icon: Icons.lock_open_rounded,
+              iconColor: cs.primary,
+              title: 'Mount existing container',
+              subtitle: 'Unlock a VeraCrypt file you already have',
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showUnlockSheet();
+              },
+            ),
+            SheetOptionTile(
+              icon: Icons.usb_rounded,
+              iconColor: cs.tertiary,
+              title: 'Mount USB drive',
+              subtitle: 'Unlock a container on an OTG flash drive',
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showUsbUnlockSheet();
+              },
+            ),
+            SheetOptionTile(
+              icon: Icons.add_box_rounded,
+              iconColor: cs.secondary,
+              title: 'Create new container',
+              subtitle: 'Format a brand-new encrypted vault',
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showCreateSheet();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Future<void> _forgetContainer(String uri, String name) async {
+  void _showContainerConfig({required String uri, required String currentLabel}) {
+    HapticFeedback.mediumImpact();
+    final existing = _records[uri];
+    Navigator.push(
+      context,
+      SlideLeftRoute(
+        page: ContainerConfigScreen(
+          uri: uri,
+          currentLabel: currentLabel,
+          existingRecord: existing,
+          appSettings: _appSettings,
+          onSaved: (record) async {
+            if (mounted) setState(() => _records[uri] = record);
+            final idx = _mounted.indexWhere((m) => m.uri == uri);
+            if (idx != -1) {
+              final oldContainer = _mounted[idx];
+              final newName = record.label.isNotEmpty ? record.label : record.uri.split('/').last;
+              final newContainer = oldContainer.copyWith(displayName: newName);
+              if (mounted) setState(() => _mounted[idx] = newContainer);
+
+              await vaultExplorerApi.updateContainerSettings(uri, newName, record.documentProvider);
+              _scheduleAutoClose(newContainer);
+            }
+          },
+          onForget: _mounted.any((m) => m.uri == uri) ? null : () => _forgetContainer(uri, currentLabel),
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _forgetContainer(String uri, String name) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Remove container?'),
-        content: Text(
-          'Remove "$name" from the dashboard? '
-          'The container file is not deleted.',
-        ),
+        content: Text('Remove "$name" from the dashboard? The container file is not deleted.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Remove',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
+            child: Text('Remove', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
     );
-    if (confirmed != true) return;
 
+    if (confirmed == true) {
+      await ContainerRepository.instance.remove(uri);
+      if (mounted) {
+        setState(() {
+          _records.remove(uri);
+          _recordsOrder.remove(uri);
+        });
+      }
+      return true;
+    }
+    return false;
+  }
+
+  void _handleSwipeToRemove(String uri, ContainerRecord record) async {
+    setState(() {
+      _records.remove(uri);
+      _recordsOrder.remove(uri);
+    });
     await ContainerRepository.instance.remove(uri);
-    if (mounted) setState(() => _records.remove(uri));
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 5),
+        content: Text('Removed "${record.label}" from dashboard'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            await ContainerRepository.instance.save(record);
+            if (mounted) {
+              setState(() {
+                _records[uri] = record;
+                _recordsOrder.add(uri);
+              });
+            }
+          },
+        ),
+      ),
+    );
   }
 
   // ── Navigate to browser ───────────────────────────────────────────────────
@@ -514,10 +557,237 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (mounted) _refreshContainerSpace(container.volId);
   }
 
+  // ── Sort Helpers ─────────────────────────────────────────────────────────
+
+  String _getItemName(dynamic item) {
+    if (item is MountedContainer) return item.displayName;
+    if (item is ContainerRecord) return item.label.isNotEmpty ? item.label : item.uri.split('/').last;
+    return '';
+  }
+
+  DateTime _getItemDate(dynamic item) {
+    try {
+      final dynamic d = item;
+      if (d.createdAt != null) return d.createdAt as DateTime;
+    } catch (_) {}
+    try {
+      final dynamic d = item;
+      if (d.dateAdded != null) return d.dateAdded as DateTime;
+    } catch (_) {}
+
+    final String? uri = item is MountedContainer ? item.uri : (item is ContainerRecord ? item.uri : null);
+    if (uri != null) {
+      final idx = _recordsOrder.indexOf(uri);
+      if (idx != -1) return DateTime.fromMillisecondsSinceEpoch(idx * 1000);
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  int _getItemSize(dynamic item) => item is MountedContainer ? item.totalSpace : 0;
+  int _getItemStatus(dynamic item) => item is MountedContainer ? 1 : 0;
+
+  // ── Tab Builders ──────────────────────────────────────────────────────────
+
+  List<PopupMenuEntry<VaultSortField>> _sortMenuItems() => const [
+        PopupMenuItem(
+          value: VaultSortField.name,
+          child: Row(
+            children: [
+              Icon(Icons.sort_by_alpha_rounded),
+              SizedBox(width: 10),
+              Text('Sort by Name'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: VaultSortField.date,
+          child: Row(
+            children: [
+              Icon(Icons.calendar_today_rounded),
+              SizedBox(width: 10),
+              Text('Sort by Date Added'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: VaultSortField.size,
+          child: Row(
+            children: [
+              Icon(Icons.sd_card_outlined),
+              SizedBox(width: 10),
+              Text('Sort by Size'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: VaultSortField.status,
+          child: Row(
+            children: [
+              Icon(Icons.toggle_on_rounded),
+              SizedBox(width: 10),
+              Text('Sort by Mount Status'),
+            ],
+          ),
+        ),
+      ];
+
+  List<Widget> _buildAppBarActions() {
+    return [
+      PopupMenuButton<VaultSortField>(
+        icon: const Icon(Icons.sort_rounded),
+        tooltip: 'Sort options',
+        initialValue: _sortField,
+        onSelected: (field) => setState(() => _sortField = field),
+        itemBuilder: (_) => _sortMenuItems(),
+      ),
+      IconButton(
+        icon: Icon(_sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded),
+        tooltip: 'Invert sorting order',
+        onPressed: () => setState(() => _sortAscending = !_sortAscending),
+      ),
+      const SizedBox(width: 4),
+    ];
+  }
+
+  Widget _buildVaultsTab(List<dynamic> displayItems, ColorScheme cs, TextTheme textTheme, bool isWide) {
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      child: CustomScrollView(
+        slivers: [
+          // Use standard fixed App Bar in landscape to conserve vertical space.
+          isWide
+              ? SliverAppBar(
+                  pinned: true,
+                  floating: true,
+                  actions: _buildAppBarActions(),
+                )
+              : SliverAppBar(
+
+                  actions: _buildAppBarActions(),
+                ),
+          if (displayItems.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: EmptyState(onAdd: _showAddOptionsSheet),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+              sliver: isWide
+                  ? SliverGrid(
+                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 420, // Forces dynamic column calculation
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        mainAxisExtent: 172, // Fixed optimal extent for the new dense cards
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => _buildVaultListTile(displayItems[i], i, cs),
+                        childCount: displayItems.length,
+                      ),
+                    )
+                  : SliverList.separated(
+                      itemCount: displayItems.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 16),
+                      itemBuilder: (_, i) => _buildVaultListTile(displayItems[i], i, cs),
+                    ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVaultListTile(dynamic item, int index, ColorScheme cs) {
+    final String uri;
+    final String label;
+    final bool isMounted;
+
+    if (item is MountedContainer) {
+      uri = item.uri;
+      label = item.displayName;
+      isMounted = true;
+    } else {
+      final record = item as ContainerRecord;
+      uri = record.uri;
+      label = record.label.isNotEmpty ? record.label : record.uri.split('/').last;
+      isMounted = false;
+    }
+
+    return StaggeredEntrance(
+      index: index,
+      child: Dismissible(
+        key: Key('dismiss_$uri'),
+        direction: DismissDirection.startToEnd,
+        confirmDismiss: (direction) async {
+          if (isMounted) {
+            showAppSnackBar(
+              context,
+              message: 'Lock the container before removing it.',
+              tone: AppBannerTone.warning,
+            );
+            return false;
+          }
+          return true;
+        },
+        onDismissed: (direction) {
+          _handleSwipeToRemove(uri, item as ContainerRecord);
+        },
+        background: Container(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 24),
+          decoration: BoxDecoration(
+            color: cs.errorContainer,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Icon(Icons.delete_outline_rounded, color: cs.onErrorContainer),
+        ),
+        // AnimatedSize handles smoothly expanding/collapsing the card's vertical height
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOutCubic,
+          alignment: Alignment.topCenter,
+          // AnimatedSwitcher coordinates the fading transition between state-specific keys
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: child,
+              );
+            },
+            // Unique keys tell AnimatedSwitcher that a structural layout change took place
+            child: isMounted
+                ? ContainerCard(
+                    key: ValueKey('mounted_$uri'),
+                    container: item as MountedContainer,
+                    onLocked: _onContainerLocked,
+                    onBrowse: () => _openBrowser(item),
+                    onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+                  )
+                : SavedContainerCard(
+                    key: ValueKey('locked_$uri'),
+                    name: label,
+                    uri: uri,
+                    onUnlock: () => (item as ContainerRecord).isUsbSource
+                        ? _showUsbUnlockSheet(existingRecord: item)
+                        : _showUnlockSheet(uri: uri, name: label),
+                    onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
+    // Use a >= 600 dp breakpoint (standard Android class boundary for foldables/tablets in landscape)
+    final isWide = MediaQuery.sizeOf(context).width >= 600;
 
     final displayItems = <dynamic>[];
     displayItems.addAll(_mounted);
@@ -527,138 +797,134 @@ class _VaultDashboardState extends State<VaultDashboard>
       }
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
+    displayItems.sort((a, b) {
+      int result = 0;
+      switch (_sortField) {
+        case VaultSortField.name:
+          result = _getItemName(a).toLowerCase().compareTo(_getItemName(b).toLowerCase());
+          break;
+        case VaultSortField.date:
+          result = _getItemDate(a).compareTo(_getItemDate(b));
+          break;
+        case VaultSortField.size:
+          result = _getItemSize(a).compareTo(_getItemSize(b));
+          break;
+        case VaultSortField.status:
+          result = _getItemStatus(a).compareTo(_getItemStatus(b));
+          break;
+      }
+      return _sortAscending ? result : -result;
+    });
+
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _scheduleAutoLock(),
+      child: Scaffold(
+        extendBody: true,
+        // Remove standard FAB and Bottom Nav out of the way when the screen is wide
+        floatingActionButton: (!isWide && _currentIndex == 0)
+            ? FloatingActionButton.extended(
+                onPressed: _actionInFlight ? null : _showAddOptionsSheet,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add vault'),
+              )
+            : null,
+        bottomNavigationBar: isWide
+            ? null
+            : NavigationBar(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: (index) {
+                  setState(() => _currentIndex = index);
+                  _loadAll();
+                },
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.grid_view_outlined),
+                    selectedIcon: Icon(Icons.grid_view_rounded),
+                    label: 'Vaults',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings_rounded),
+                    label: 'Settings',
+                  ),
+                ],
+              ),
+        body: Row(
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0)),
+            if (isWide)
+              NavigationRail(
+                backgroundColor: cs.surface,
+                selectedIndex: _currentIndex,
+                onDestinationSelected: (index) {
+                  setState(() => _currentIndex = index);
+                  _loadAll();
+                },
+                labelType: NavigationRailLabelType.all,
+                // FAB is relocated to the top of the Navigation Rail in landscape modes
+                leading: _currentIndex == 0
+                    ? FloatingActionButton(
+                        elevation: 0,
+                        onPressed: _actionInFlight ? null : _showAddOptionsSheet,
+                        child: const Icon(Icons.add_rounded),
+                      )
+                    : null,
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.grid_view_outlined),
+                    selectedIcon: Icon(Icons.grid_view_rounded),
+                    label: Text('Vaults'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings_rounded),
+                    label: Text('Settings'),
+                  ),
+                ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.lg - 1),
-                child: Image.asset(
-                  'assets/images/app_icon.png',
-                  fit: BoxFit.contain,
-                ),
+            if (isWide)
+              VerticalDivider(
+                thickness: 1,
+                width: 1,
+                color: cs.outlineVariant.withValues(alpha: 0.3),
               ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'Vault Explorer',
-              style: textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w400,
+            Expanded(
+              child: Stack(
+                children: [
+                  IndexedStack(
+                    index: _currentIndex,
+                    children: [
+                      _buildVaultsTab(displayItems, cs, textTheme, isWide),
+                      const AppSettingsScreen(),
+                    ],
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 16,
+                    child: Center(
+                      child: ListenableBuilder(
+                        listenable: CrossContainerClipboard.instance,
+                        builder: (context, _) {
+                          final clipboard = CrossContainerClipboard.instance;
+                          if (!clipboard.hasItems) return const SizedBox.shrink();
+                          return _FloatingClipboardDashboardBanner(
+                            clipboard: clipboard,
+                            onClear: clipboard.clear,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings_outlined, size: AppIconSize.action),
-            tooltip: 'App Settings',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
-              );
-              _loadAll();
-            },
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddContainerMenu,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Vault'),
-      ),
-
-      // ── Body: list + floating clipboard pill ────────────────────────────
-      body: Stack(
-        children: [
-          // 1. The main list (fills the background)
-          Positioned.fill(
-            child: displayItems.isEmpty
-                ? EmptyState(onAdd: () => _showUnlockSheet())
-                : ListView.separated(
-                    // Bottom padding is taller than AppSpacing.pagePadding's
-                    // default (32) to clear the extended FAB, which itself
-                    // sits above Android 16/17 gesture-nav; horizontal/top
-                    // insets still match the rest of the app.
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-                    itemCount: displayItems.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) {
-                      final item = displayItems[i];
-                      if (item is MountedContainer) {
-                        return ContainerCard(
-                          container: item,
-                          onLocked: _onContainerLocked,
-                          onBrowse: () => _openBrowser(item),
-                          onLongPress: () => _showContainerConfig(
-                            uri: item.uri,
-                            currentLabel: item.displayName,
-                          ),
-                        );
-                      } else {
-                        final record = item as ContainerRecord;
-                        return SavedContainerCard(
-                          name: record.label.isNotEmpty
-                              ? record.label
-                              : record.uri.split('/').last,
-                          uri: record.uri,
-                          // FIX: was always _showUnlockSheet (file-based),
-                          // which sent usb:... uris to
-                          // contentResolver.openFileDescriptor() and failed
-                          // with "no content provider for usb:...". Route by
-                          // scheme instead.
-                          onUnlock: () => record.isUsbSource
-                              ? _showUsbUnlockSheet(existingRecord: record)
-                              : _showUnlockSheet(
-                                  uri: record.uri,
-                                  name: record.label,
-                                ),
-                          onLongPress: () => _showContainerConfig(
-                            uri: record.uri,
-                            currentLabel: record.label,
-                          ),
-                        );
-                      }
-                    },
-                  ),
-          ),
-
-          // 2. The Floating Clipboard Pill
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 88, // Sits cleanly above the Floating Action Button
-            child: Center(
-              child: ListenableBuilder(
-                listenable: CrossContainerClipboard.instance,
-                builder: (context, _) {
-                  final clipboard = CrossContainerClipboard.instance;
-                  if (!clipboard.hasItems) return const SizedBox.shrink();
-
-                  return _FloatingClipboardDashboardBanner(
-                    clipboard: clipboard,
-                    onClear: clipboard.clear,
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
 }
-
-// ── Floating Clipboard Banner for Dashboard (MD3 Pill) ──────────────────────
 
 class _FloatingClipboardDashboardBanner extends StatelessWidget {
   final CrossContainerClipboard clipboard;
@@ -677,22 +943,21 @@ class _FloatingClipboardDashboardBanner extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Material(
-        color: cs.tertiaryContainer,
-        elevation: 6,
-        shadowColor: cs.shadow.withValues(alpha: 0.4),
+        color: cs.inverseSurface,
+        elevation: 0,
         shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
-            mainAxisSize: MainAxisSize.min, // Shrink-wrap to content width
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 clipboard.isCutOperation ? Icons.cut_rounded : Icons.copy_rounded,
-                size: AppIconSize.standard,
-                color: cs.onTertiaryContainer,
+                size: 22,
+                color: cs.onInverseSurface,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Flexible(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -701,7 +966,7 @@ class _FloatingClipboardDashboardBanner extends StatelessWidget {
                     Text(
                       clipboard.summary,
                       style: textTheme.labelLarge?.copyWith(
-                        color: cs.onTertiaryContainer,
+                        color: cs.onInverseSurface,
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 1,
@@ -710,7 +975,7 @@ class _FloatingClipboardDashboardBanner extends StatelessWidget {
                     Text(
                       'Open a container to paste',
                       style: textTheme.labelSmall?.copyWith(
-                        color: cs.onTertiaryContainer.withValues(alpha: 0.8),
+                        color: cs.onInverseSurface.withValues(alpha: 0.8),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -718,18 +983,18 @@ class _FloatingClipboardDashboardBanner extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Container(
                 width: 1,
-                height: 24,
-                color: cs.onTertiaryContainer.withValues(alpha: 0.2),
+                height: 28,
+                color: cs.onInverseSurface.withValues(alpha: 0.2),
               ),
               const SizedBox(width: 4),
               IconButton(
                 icon: Icon(
                   Icons.close_rounded,
-                  size: AppIconSize.standard,
-                  color: cs.onTertiaryContainer,
+                  size: 22,
+                  color: cs.onInverseSurface,
                 ),
                 tooltip: 'Cancel',
                 onPressed: onClear,
@@ -743,4 +1008,22 @@ class _FloatingClipboardDashboardBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+class SlideLeftRoute<T> extends PageRouteBuilder<T> {
+  final Widget page;
+  SlideLeftRoute({required this.page})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = Offset(-1.0, 0.0);
+            const end = Offset.zero;
+            const curve = Curves.easeInOut;
+            final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+            return SlideTransition(
+              position: animation.drive(tween),
+              child: child,
+            );
+          },
+        );
 }

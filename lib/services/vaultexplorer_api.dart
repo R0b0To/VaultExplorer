@@ -6,6 +6,33 @@ import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/models/usb_device_info.dart';
 import '../models/mounted_container.dart';
 import 'channel_methods.dart';
+import '../models/crypto_algorithms.dart';
+
+/// A single keyfile picked via [VaultExplorerApi.pickKeyfiles]: [uri] is
+/// what gets sent back to native (and round-tripped through
+/// [VaultExplorerApi.unlockContainer]/[unlockUsbContainer]/[deriveDerivedKey]
+/// as a `keyfilePaths` entry); [displayName] is purely for showing a chip
+/// or list entry in the unlock UI.
+typedef KeyfileRef = ({String uri, String displayName});
+
+/// One "onUnlockProgress" push from native during cipher/hash auto-detect.
+/// [attempted]/[total] count hash-algorithm rounds tried so far (auto-detect
+/// runs up to 5 in parallel, each then tries up to 8 ciphers against it very
+/// quickly) — suitable for a "trying combination 2 of 5" style indicator.
+/// [hashId]/[cipherId] are whichever combination was just attempted (-1 for
+/// cipherId if that hash's PBKDF2 itself hadn't finished yet); see
+/// [hashAlgorithmName]/[cipherAlgorithmName] to render them.
+typedef UnlockProgress = ({
+  int volId,
+  int attempted,
+  int total,
+  int hashId,
+  int cipherId,
+});
+
+String hashAlgorithmName(int hashId) => HashAlgo.nameFor(hashId);
+String cipherAlgorithmName(int cipherId) => CipherAlgo.nameFor(cipherId);
+
 
 class VaultExplorerApi {
   const VaultExplorerApi();
@@ -14,6 +41,55 @@ class VaultExplorerApi {
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;
 
+
+  static final List<void Function(int volId)> _usbContainerDetachedListeners =
+      [];
+
+  static void addUsbContainerDetachedListener(
+    void Function(int volId) listener,
+  ) {
+    _usbContainerDetachedListeners.add(listener);
+  }
+
+  static void removeUsbContainerDetachedListener(
+    void Function(int volId) listener,
+  ) {
+    _usbContainerDetachedListeners.remove(listener);
+  }
+
+  // ── Unlock progress / cancellation ──────────────────────────────────────
+  //
+  // "onUnlockStarted" fires once, synchronously from the native method call
+  // handler, as soon as a volId has been allocated for this attempt — before
+  // the (potentially several-second) auto-detect search actually begins.
+  // "onUnlockProgress" then fires repeatedly during that search. Listeners
+  // should filter on volId themselves if more than one unlock could be in
+  // flight (in practice: at most one per UnlockSheet/UsbUnlockSheet instance).
+
+  static final List<void Function(int volId)> _unlockStartedListeners = [];
+  static final List<void Function(UnlockProgress progress)>
+      _unlockProgressListeners = [];
+
+  static void addUnlockStartedListener(void Function(int volId) listener) {
+    _unlockStartedListeners.add(listener);
+  }
+
+  static void removeUnlockStartedListener(void Function(int volId) listener) {
+    _unlockStartedListeners.remove(listener);
+  }
+
+  static void addUnlockProgressListener(
+    void Function(UnlockProgress progress) listener,
+  ) {
+    _unlockProgressListeners.add(listener);
+  }
+
+  static void removeUnlockProgressListener(
+    void Function(UnlockProgress progress) listener,
+  ) {
+    _unlockProgressListeners.remove(listener);
+  }
+
   static void initMethodCallHandler() {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onAppSelected') {
@@ -21,6 +97,37 @@ class VaultExplorerApi {
         final pkg = call.arguments['package'] as String?;
         if (ext != null && pkg != null) {
           onAppSelectedCallback?.call(ext, pkg);
+        }
+      } else if (call.method == 'onUsbContainerDetached') {
+        final volId = call.arguments['volId'] as int?;
+        if (volId != null) {
+          for (final listener in List.of(_usbContainerDetachedListeners)) {
+            listener(volId);
+          }
+        }
+      } else if (call.method == 'onUnlockStarted') {
+        final volId = call.arguments['volId'] as int?;
+        if (volId != null) {
+          for (final listener in List.of(_unlockStartedListeners)) {
+            listener(volId);
+          }
+        }
+      } else if (call.method == 'onUnlockProgress') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final volId = args['volId'] as int?;
+        final attempted = args['attempted'] as int?;
+        final total = args['total'] as int?;
+        if (volId != null && attempted != null && total != null) {
+          final progress = (
+            volId: volId,
+            attempted: attempted,
+            total: total,
+            hashId: args['hashId'] as int? ?? 255,
+            cipherId: args['cipherId'] as int? ?? 255,
+          );
+          for (final listener in List.of(_unlockProgressListeners)) {
+            listener(progress);
+          }
         }
       }
     });
@@ -85,6 +192,7 @@ class VaultExplorerApi {
     required int pim,
     int? cipherId,
     int? hashId,
+    List<String>? keyfilePaths,
   }) async {
     final result = await _channel.invokeMethod<String>(
       ChannelMethods.deriveDerivedKey,
@@ -94,6 +202,8 @@ class VaultExplorerApi {
         'pim': pim,
         'cipherId': cipherId ?? 255,
         'hashId': hashId ?? 255,
+        if (keyfilePaths != null && keyfilePaths.isNotEmpty)
+          'keyfilePaths': keyfilePaths,
       },
     );
     if (result == null || result.isEmpty) return null;
@@ -160,6 +270,42 @@ class VaultExplorerApi {
     );
   }
 
+  /// Opens a multi-select document picker for keyfiles. Returns an empty
+  /// list if the user cancels. Any file type is a valid keyfile (VeraCrypt
+  /// keyfile mixing just hashes the raw bytes — a photo, an mp3, a random
+  /// binary blob are all equally valid), so this doesn't filter by
+  /// extension or mime type.
+  Future<List<KeyfileRef>> pickKeyfiles() async {
+    final raw = await _channel.invokeMethod<List<Object?>>(
+      ChannelMethods.pickKeyfiles,
+    );
+    if (raw == null) return [];
+    return raw
+        .cast<Map<Object?, Object?>>()
+        .map((m) => (
+              uri: m['uri'] as String,
+              displayName: m['displayName'] as String,
+            ))
+        .toList();
+  }
+
+  /// Asks native to abort the in-flight unlock for [volId] (see
+  /// [addUnlockStartedListener] for how the caller learns [volId] before the
+  /// original [unlockContainer]/[unlockUsbContainer] call has resolved).
+  ///
+  /// Fire-and-forget and best-effort: this doesn't itself throw or resolve
+  /// the pending unlock — that call will still complete on its own shortly
+  /// after, but with a `PlatformException(code: 'CANCELLED')` instead of a
+  /// result, once native notices the request. Safe to call more than once,
+  /// or after the unlock has already finished.
+  Future<void> cancelUnlock(int volId) async {
+    try {
+      await _channel.invokeMethod(ChannelMethods.cancelUnlock, {'volId': volId});
+    } catch (_) {
+      // Best-effort — the pending unlock call resolves on its own regardless.
+    }
+  }
+
  Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId})?> unlockContainer(
     String filePath,
     String password,
@@ -170,6 +316,7 @@ class VaultExplorerApi {
     int? hashId,
     Uint8List? preservedKey,
     bool cacheDerivedKey = false,
+    List<String>? keyfilePaths,
   }) async {
     final raw = await _channel
         .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockContainer, {
@@ -182,6 +329,8 @@ class VaultExplorerApi {
           'hashId': hashId ?? 255,
           if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
           'cacheDerivedKey': cacheDerivedKey,
+          if (keyfilePaths != null && keyfilePaths.isNotEmpty)
+            'keyfilePaths': keyfilePaths,
         });
     if (raw == null) return null;
     final volId = raw['volId'] as int;
@@ -192,6 +341,28 @@ class VaultExplorerApi {
       matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
       matchedHashId: raw['matchedHashId'] as int? ?? 255,
     );
+  }
+
+  /// Checks whether the document/file at [filePath] (a content:// SAF uri
+  /// or a plain file:// path) can currently be resolved — without
+  /// attempting to unlock it. Returns false for a container living on
+  /// removable storage that's been disconnected or a file that was moved
+  /// or deleted, and also false if a previously-granted content:// SAF
+  /// permission was revoked (e.g. after removing and re-inserting an SD
+  /// card resets the grant).
+  Future<bool> documentExists(String filePath) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.documentExists,
+        {'filePath': filePath},
+      );
+      return result ?? false;
+    } catch (_) {
+      // Treat a failed check as "unknown", not "missing" — let the normal
+      // unlock attempt surface the real error rather than blocking access
+      // to a container that might actually be fine.
+      return true;
+    }
   }
   Future<List<UsbDeviceInfo>> listUsbDevices() async {
     final raw = await _channel.invokeMethod<List<Object?>>(
@@ -230,6 +401,7 @@ class VaultExplorerApi {
     int? hashId,
     Uint8List? preservedKey,
     bool cacheDerivedKey = false,
+    List<String>? keyfilePaths,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockUsbContainer,
@@ -243,6 +415,8 @@ class VaultExplorerApi {
         'hashId': hashId ?? 255,
         if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
         'cacheDerivedKey': cacheDerivedKey,
+        if (keyfilePaths != null && keyfilePaths.isNotEmpty)
+          'keyfilePaths': keyfilePaths,
       },
     );
     if (raw == null) return null;

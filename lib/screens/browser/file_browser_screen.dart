@@ -101,15 +101,23 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     super.initState();
     _freeSpace = widget.container.freeSpace;
     _initSettingsAndContents();
+    VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
   }
 
   @override
   void dispose() {
+    VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
     _searchController.dispose();
     super.dispose();
   }
 
   void _signalActivity() => widget.onUserActivity?.call();
+
+
+  void _onContainerDetached(int volId) {
+    if (!mounted || volId != widget.container.volId) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -324,8 +332,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   void _openMediaViewer(String fileName, String fullPath) {
-    final mediaEntries = _currentItems
+
+    final sortedItems = _currentItems
         .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
+        .toList()
+      ..sort(compareItems);
+
+    final mediaEntries = sortedItems
         .map((f) => RawEntry.parse(f).name)
         .where(_isSupportedMedia)
         .toList();
@@ -547,8 +560,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
-    final localMedia = _currentItems
+    final sortedItems = _currentItems
         .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
+        .toList()
+      ..sort(compareItems);
+    final localMedia = sortedItems
         .map((f) => RawEntry.parse(f).name)
         .where(_isSupportedMedia)
         .toList();

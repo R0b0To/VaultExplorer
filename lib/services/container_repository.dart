@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/thumbnail_cache_mode.dart';
+import 'vaultexplorer_api.dart';
 
 // ── ContainerUnlockMethod ─────────────────────────────────────────────────────
 
@@ -118,14 +119,14 @@ class ContainerRepository {
     await _persist();
   }
 
-  /// Completely removes a container — JSON entry, config, and Keystore entry.
-  Future<void> remove(String uri) async {
+Future<void> remove(String uri) async {
     await _ensureLoaded();
     _cache!.remove(uri);
-    // Always attempt Keystore deletion — even if rememberPassword was false,
-    // a stale entry might exist from a previous state.
     await _secure.delete(key: _keystoreKey(uri));
     await _secure.delete(key: _patternHashKey(uri));
+    try {
+      await vaultExplorerApi.clearDerivedKey(uri);
+    } catch (_) {}
     await _persist();
   }
 
@@ -286,14 +287,7 @@ class ContainerRecord {
   };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
-    final ContainerUnlockMethod method;
-    if (j.containsKey('unlockMethod')) {
-      method = ContainerUnlockMethod.fromJson(j['unlockMethod'] as String?);
-    } else {
-      method = (j['rememberPassword'] as bool? ?? false)
-          ? ContainerUnlockMethod.rememberPassword
-          : ContainerUnlockMethod.password;
-    }
+    final method = ContainerUnlockMethod.fromJson(j['unlockMethod'] as String?);
 
     return ContainerRecord(
       uri: j['uri'] as String,
@@ -301,10 +295,7 @@ class ContainerRecord {
       rememberPassword: method != ContainerUnlockMethod.password,
       unlockMethod: method,
       autoCloseMins: j['autoCloseMins'] as int? ?? 0,
-      documentProvider:
-          j['documentProvider'] as bool? ??
-          j['mountAsDocumentProvider'] as bool? ??
-          false,
+      documentProvider: j['documentProvider'] as bool? ?? false,
       thumbnailCacheMode: j.containsKey('thumbnailCacheMode')
           ? ThumbnailCacheMode.fromJson(j['thumbnailCacheMode'] as String?)
           : null,

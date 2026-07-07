@@ -72,6 +72,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     // Enable sensor-based auto-rotation by default when entering the viewer
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
 
+    VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
+
     _playlistController = PlaylistController(
       container: widget.container,
       initialMediaFiles: widget.mediaFiles,
@@ -91,6 +93,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _startSlideshowTimerIfNeeded();
       _prefetchSurroundingItems();
     });
+  }
+
+  void _onContainerDetached(int volId) {
+    if (!mounted || volId != widget.container.volId) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _onPlaylistUpdate() {
@@ -332,6 +339,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   @override
   void dispose() {
+    VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
     _playlistController.removeListener(_onPlaylistUpdate);
     if (_lastListenedController != null) {
       try {

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../utils/file_type_utils.dart';
 import '../../../utils/format_utils.dart';
 import '../../../utils/raw_entry.dart';
+import '../../../theme.dart'; // Design tokens for AppRadius, AppIconSize, AppSpacing
 import 'tile_selection_style.dart';
 
-/// Stateless renderer for a flat columned list of directory entries.
+/// Stateless renderer for a modern inset list of directory entries.
 class FileListView extends StatelessWidget {
   final List<String> dirs;
   final List<String> files;
@@ -31,8 +32,8 @@ class FileListView extends StatelessWidget {
   });
 
   static const _months = [
-    'Jan','Feb','Mar','Apr','May','Jun',
-    'Jul','Aug','Sep','Oct','Nov','Dec',
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
   String _formatDateColumn(int secs) {
@@ -55,6 +56,72 @@ class FileListView extends StatelessWidget {
         : '$monthAbbr ${dt.day}, ${dt.year}';
   }
 
+  /// Builds the modern trailing layout containing either the selection indicator,
+  /// the file size, or the "More" (⋯) actions menu.
+  Widget _buildTrailingColumn({
+    required BuildContext context,
+    required bool isDir,
+    required String sizeStr,
+    required bool isSelected,
+    required String rawItem,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final sizeWidget = Text(
+      sizeStr,
+      textAlign: TextAlign.right,
+      style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
+    if (isSelectionMode) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: isSelected
+            ? TileSelectionIndicator(selected: true)
+            : (isDir ? const SizedBox.shrink() : sizeWidget),
+      );
+    }
+
+    if (isDir) {
+      return const SizedBox.shrink();
+    }
+
+    // Fulfills the missing onFileLongMenu requirement natively
+    if (onFileLongMenu != null) {
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: sizeWidget,
+            ),
+          ),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              iconSize: 20,
+              color: cs.onSurfaceVariant,
+              icon: const Icon(Icons.more_horiz_rounded), // Standard MD3 Kebab
+              onPressed: () => onFileLongMenu!(rawItem),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: sizeWidget,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = dirs.length + files.length;
@@ -63,10 +130,15 @@ class FileListView extends StatelessWidget {
 
     return Column(
       children: [
-        const Divider(height: 1),
+        // Modern MD3 drops full-width dividers in favor of whitespace padding
+        const SizedBox(height: 8),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+            // Increased safe padding for bottom sheets & floating clipboards
+            padding: EdgeInsets.only(
+              top: 0,
+              bottom: 112 + MediaQuery.paddingOf(context).bottom,
+            ),
             itemCount: total,
             itemBuilder: (_, index) {
               final isDir = index < dirs.length;
@@ -81,11 +153,9 @@ class FileListView extends StatelessWidget {
 
               if (!isDir) {
                 final ext = displayName.split('.').last;
-                // Use the shared vault-type helpers from file_type_utils.dart.
                 vaultIcon = vaultIconForExt(ext);
                 vaultColor = vaultColorForExt(ext);
 
-                // Strip the vault extension from the display name.
                 if (vaultIcon != null) {
                   final parts = displayName.split('.');
                   if (parts.length > 1) {
@@ -96,7 +166,6 @@ class FileListView extends StatelessWidget {
               }
 
               final dateStr = _formatDateColumn(entry.modifiedSecs);
-              // Hide sizes for vault items and directories
               final sizeStr = isDir || vaultIcon != null
                   ? ''
                   : formatBytes(entry.sizeBytes);
@@ -109,87 +178,95 @@ class FileListView extends StatelessWidget {
                   ? cs.secondary
                   : (vaultColor ?? colorForFile(entry.name));
 
-              return InkWell(
-                onTap: () => isDir ? onDirTap(rawItem) : onFileTap(rawItem),
-                onLongPress: () => onItemLongPress(rawItem),
-                child: Container(
-                  color: isSelected
-                      ? TileSelectionStyle.selectedBackground(cs)
-                      : Colors.transparent,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        displayIcon,
-                        size: 22,
-                        color: TileSelectionStyle.leadingIconColor(
-                          cs,
-                          selected: isSelected,
-                          unselectedColor: iconColor,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
+              // Tonal mapping for the icon's background "squircle"
+              final squircleBackground = isSelected
+                  ? cs.primaryContainer
+                  : (isDir
+                      ? cs.secondaryContainer.withValues(alpha: 0.4)
+                      : cs.surfaceContainerHighest);
 
-                      Expanded(
-                        flex: 5,
-                        child: Text(
-                          displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontWeight: TileSelectionStyle.titleWeight(
-                              isSelected,
+              // ── Modern Inset List Item ──
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16), // Rounded Ripples
+                  onTap: () => isDir ? onDirTap(rawItem) : onFileTap(rawItem),
+                  onLongPress: () => onItemLongPress(rawItem),
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? TileSelectionStyle.selectedBackground(cs)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10, // Plush interior targets
+                    ),
+                    child: Row(
+                      children: [
+                        // 1. The plush "Squircle" Leading Icon
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: squircleBackground,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            displayIcon,
+                            size: AppIconSize.action,
+                            color: TileSelectionStyle.leadingIconColor(
+                              cs,
+                              selected: isSelected,
+                              unselectedColor: iconColor,
                             ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 16),
 
-                      SizedBox(
-                        width: 90,
-                        child: Text(
-                          dateStr,
-                          textAlign: TextAlign.right,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-
-                      if (isSelectionMode) ...[
-                        if (isSelected) ...[
-                          const SizedBox(width: 60),
-                          TileSelectionIndicator(selected: isSelected),
-                        ] else ...[
-                          SizedBox(
-                            width: 80,
-                            child: Text(
-                              sizeStr,
-                              textAlign: TextAlign.right,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ] else if (isDir) ...[
-                        const SizedBox(width: 80),
-                      ] else ...[
-                        SizedBox(
-                          width: 80,
+                        // 2. File Name (Upgraded to titleMedium for better legibility)
+                        Expanded(
                           child: Text(
-                            sizeStr,
+                            displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleMedium?.copyWith(
+                              fontWeight: TileSelectionStyle.titleWeight(
+                                isSelected,
+                              ) ?? FontWeight.w500,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+
+                        // 3. Date Column
+                        SizedBox(
+                          width: 90,
+                          child: Text(
+                            dateStr,
                             textAlign: TextAlign.right,
                             style: textTheme.bodySmall?.copyWith(
                               color: cs.onSurfaceVariant,
                             ),
                           ),
                         ),
+                        const SizedBox(width: 12),
+
+                        // 4. Trailing Column (Size & Actions)
+                        SizedBox(
+                          width: 96,
+                          child: _buildTrailingColumn(
+                            context: context,
+                            isDir: isDir,
+                            sizeStr: sizeStr,
+                            isSelected: isSelected,
+                            rawItem: rawItem,
+                          ),
+                        ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
               );

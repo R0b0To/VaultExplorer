@@ -7,6 +7,7 @@ import '../../models/vault_item.dart';
 import '../../services/vault_items_service.dart';
 import '../../theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../utils/filename_utils.dart';
 
 class VaultItemEditScreen extends StatefulWidget {
   final MountedContainer container;
@@ -83,7 +84,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
     };
 
     final newTitle = _titleCtrl.text.trim();
-    final safeTitle = newTitle.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    final safeTitle = sanitizeFatFileName(newTitle);
     
     String finalPath = widget.filePath ?? '';
 

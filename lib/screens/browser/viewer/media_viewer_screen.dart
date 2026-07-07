@@ -61,6 +61,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   int _doubleTapSkipSeconds = 5;
   BoxFit _imageFit = BoxFit.contain;
   bool _isMuted = false;
+  bool _isSwiping = false;
 
   final Map<String, Uint8List> _prefetchedImages = {};
   final Set<String> _prefetchingActive = {};
@@ -71,7 +72,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   @override
   void initState() {
     super.initState();
-    // Enable sensor-based auto-rotation by default when entering the viewer
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
 
     VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
@@ -238,6 +238,29 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
+  void _onScrollStart() {
+    if (!_isSwiping) {
+      _isSwiping = true;
+      _playbackManager.activeController?.pause();
+      _cancelSlideshowTimer();
+    }
+  }
+
+  void _onScrollEnd() {
+    _isSwiping = false;
+    final index = _playlistController.currentIndex;
+    _playbackManager.handlePageChange(index);
+
+    final currentFile = _playlistController.currentFile;
+    if (MediaViewerConstants.isImage(currentFile)) {
+      _startSlideshowTimerIfNeeded();
+    } else {
+      if (_autoPlay) {
+        _playbackManager.activeController?.play();
+      }
+    }
+  }
+
   Future<void> _deleteCurrentFile() async {
     final cs = Theme.of(context).colorScheme;
     final confirm = await showDialog<bool>(
@@ -282,6 +305,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
       _pageController.jumpToPage(_playlistController.currentIndex);
       _prefetchSurroundingItems();
+      _onScrollEnd();
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('File deleted successfully')),
@@ -913,90 +937,105 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           ValueListenableBuilder<ScrollPhysics>(
             valueListenable: _swipePhysicsNotifier,
             builder: (context, physics, child) {
-              return PageView.builder(
-                controller: _pageController,
-                physics: physics,
-                itemCount: total,
-                onPageChanged: (index) {
-                  _playlistController.updateIndex(index);
-                  _startSlideshowTimerIfNeeded();
-                  _prefetchSurroundingItems();
-                  _playbackManager.handlePageChange(index);
+              return NotificationListener<ScrollNotification>(
+                onNotification: (ScrollNotification notification) {
+                  if (notification.depth == 0) {
+                    if (notification is ScrollStartNotification) {
+                      _onScrollStart();
+                    } else if (notification is ScrollEndNotification) {
+                      _onScrollEnd();
+                    }
+                  }
+                  return false;
                 },
-                itemBuilder: (context, index) {
-                  final volId = widget.container.volId;
-                  final escapedPath = Uri.encodeComponent(
-                    _playlistController.playlist[index],
-                  );
-                  final contentUriString =
-                      'content://com.aeidolon.vaultexplorer.documents/document/$volId%3Afile%3A$escapedPath';
-                  final fileName = _playlistController.playlist[index];
-                  final prefetchedBytes = _prefetchedImages[fileName];
+                child: PageView.builder(
+                  controller: _pageController,
+                  physics: physics,
+                  itemCount: total,
+                  onPageChanged: (index) {
+                    _playlistController.updateIndex(index);
+                    _prefetchSurroundingItems();
+                  },
+                  itemBuilder: (context, index) {
+                    final volId = widget.container.volId;
+                    final escapedPath = Uri.encodeComponent(
+                      _playlistController.playlist[index],
+                    );
+                    final contentUriString =
+                        'content://com.aeidolon.vaultexplorer.documents/document/$volId%3Afile%3A$escapedPath';
+                    final fileName = _playlistController.playlist[index];
+                    final prefetchedBytes = _prefetchedImages[fileName];
 
-                  final ext = fileName.split('.').last.toLowerCase();
-                  final isImg = MediaViewerConstants.imageExtensions.contains(
-                    ext,
-                  );
-                  final isAudio = MediaViewerConstants.audioExtensions.contains(
-                    ext,
-                  );
+                    final ext = fileName.split('.').last.toLowerCase();
+                    final isImg = MediaViewerConstants.imageExtensions.contains(
+                      ext,
+                    );
+                    final isAudio = MediaViewerConstants.audioExtensions.contains(
+                      ext,
+                    );
 
-                  return Container(
-                    color: Colors.black,
-                    child: isImg
-                        ? _ImagePageItem(
-                            key: ValueKey(fileName),
-                            fileName: fileName,
-                            prefetchedBytes: prefetchedBytes,
-                            container: widget.container,
-                            imageFit: _imageFit,
-                            rotationQuarterTurns: _rotations[fileName] ?? 0,
-                            showUI: _showUI,
-                            onToggleUI: _setUIVisibility,
-                            onZoomChanged: (allowSwipe) {
-                              _swipePhysicsNotifier.value = allowSwipe
-                                  ? const BouncingScrollPhysics()
-                                  : const NeverScrollableScrollPhysics();
-                            },
-                          )
-                        : MediaPlayerWidget(
-                            key: ValueKey(fileName),
-                            container: widget.container,
-                            fileName: fileName,
-                            contentUriString: contentUriString,
-                            showUI: _showUI,
-                            onToggleUI: _setUIVisibility,
-                            skipSeconds: _doubleTapSkipSeconds,
-                            autoPlay: _autoPlay,
-                            isAudio: isAudio,
-                            subtitlesEnabled: _subtitlesEnabled,
-                            rotationQuarterTurns: _rotations[fileName] ?? 0,
-                            progressNotifier: _videoProgressNotifier,
-                            onSubtitlesAvailableChanged: (val) {
-                              _playbackManager.updateSubtitleStatus(index, val);
-                              if (index == _playlistController.currentIndex) {
-                                setState(() {});
-                              }
-                            },
-                            onZoomChanged: (allowSwipe) {
-                              _swipePhysicsNotifier.value = allowSwipe
-                                  ? const BouncingScrollPhysics()
-                                  : const NeverScrollableScrollPhysics();
-                            },
-                            onVideoControllerInitialized: (controller) {
-                              _playbackManager.registerController(
-                                index: index,
-                                controller: controller,
-                                currentFocus:
-                                    index == _playlistController.currentIndex,
-                              );
-                            },
-                            onVideoControllerDisposed: () {
-                              _playbackManager.handleDisposed(index);
-                            },
-                          ),
-                  );
-                },
+                    return Container(
+                      color: Colors.black,
+                      child: isImg
+                          ? _ImagePageItem(
+                              key: ValueKey(fileName),
+                              fileName: fileName,
+                              prefetchedBytes: prefetchedBytes,
+                              container: widget.container,
+                              imageFit: _imageFit,
+                              rotationQuarterTurns: _rotations[fileName] ?? 0,
+                              showUI: _showUI,
+                              onToggleUI: _setUIVisibility,
+                              onZoomChanged: (allowSwipe) {
+                                _swipePhysicsNotifier.value = allowSwipe
+                                    ? const BouncingScrollPhysics()
+                                    : const NeverScrollableScrollPhysics();
+                              },
+                            )
+                          : MediaPlayerWidget(
+                              key: ValueKey(fileName),
+                              container: widget.container,
+                              fileName: fileName,
+                              contentUriString: contentUriString,
+                              showUI: _showUI,
+                              onToggleUI: _setUIVisibility,
+                              skipSeconds: _doubleTapSkipSeconds,
+                              autoPlay: false,
+                              isAudio: isAudio,
+                              subtitlesEnabled: _subtitlesEnabled,
+                              rotationQuarterTurns: _rotations[fileName] ?? 0,
+                              progressNotifier: _videoProgressNotifier,
+                              onSubtitlesAvailableChanged: (val) {
+                                _playbackManager.updateSubtitleStatus(index, val);
+                                if (index == _playlistController.currentIndex) {
+                                  setState(() {});
+                                }
+                              },
+                              onZoomChanged: (allowSwipe) {
+                                _swipePhysicsNotifier.value = allowSwipe
+                                    ? const BouncingScrollPhysics()
+                                    : const NeverScrollableScrollPhysics();
+                              },
+                              onVideoControllerInitialized: (controller) {
+                                _playbackManager.registerController(
+                                  index: index,
+                                  controller: controller,
+                                  currentFocus:
+                                      index == _playlistController.currentIndex,
+                                );
+                                if (index == _playlistController.currentIndex &&
+                                    !_isSwiping &&
+                                    _autoPlay) {
+                                  controller.play();
+                                }
+                              },
+                              onVideoControllerDisposed: () {
+                                _playbackManager.handleDisposed(index);
+                              },
+                            ),
+                    );
+                  },
+                ),
               );
             },
           ),
@@ -1300,6 +1339,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             _playlistController.toggleShuffle();
             if (_pageController.hasClients) {
               _pageController.jumpToPage(_playlistController.currentIndex);
+              _onScrollEnd();
             }
           },
           leadingIcon: Icon(
@@ -1339,6 +1379,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 await _playlistController.filterByFolder('Current Folder Only');
                 if (_pageController.hasClients) {
                   _pageController.jumpToPage(_playlistController.currentIndex);
+                  _onScrollEnd();
                 }
               },
               leadingIcon:
@@ -1357,6 +1398,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 await _playlistController.filterByFolder('All');
                 if (_pageController.hasClients) {
                   _pageController.jumpToPage(_playlistController.currentIndex);
+                  _onScrollEnd();
                 }
               },
               leadingIcon: _playlistController.selectedFolder == 'All'

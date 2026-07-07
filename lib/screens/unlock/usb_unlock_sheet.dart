@@ -1,17 +1,15 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../services/vaultexplorer_api.dart';
-import '../../services/container_repository.dart';
 import '../../services/app_settings_service.dart';
 import '../../models/mounted_container.dart';
 import '../../models/usb_device_info.dart';
 import '../../utils/validation_utils.dart';
-import '../../theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../lock/pattern_lock_view.dart';
+import '../../../models/crypto_algorithms.dart';
 
 class UsbUnlockSheet extends StatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
@@ -1085,20 +1083,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            items: const [
-                              DropdownMenuItem(value: 255, child: Text('Auto-detect')),
-                              DropdownMenuItem(value: 0, child: Text('AES')),
-                              DropdownMenuItem(value: 1, child: Text('Serpent')),
-                              DropdownMenuItem(value: 2, child: Text('Twofish')),
-                              DropdownMenuItem(value: 3, child: Text('AES-Twofish')),
-                              DropdownMenuItem(value: 4, child: Text('Serpent-AES')),
-                              DropdownMenuItem(value: 5, child: Text('Twofish-Serpent')),
-                              DropdownMenuItem(value: 6, child: Text('AES-Twofish-Serpent')),
-                              DropdownMenuItem(value: 7, child: Text('Serpent-Twofish-AES')),
-                            ],
-                            onChanged: busy ? null : (val) {
-                              if (val != null) setState(() => _cipherId = val);
-                            },
+                             items: CipherAlgo.dropdownItems(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _cipherId = val);
+                              },
                           ),
                           const SizedBox(height: 16),
                           DropdownButtonFormField<int>(
@@ -1110,17 +1098,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            items: const [
-                              DropdownMenuItem(value: 255, child: Text('Auto-detect')),
-                              DropdownMenuItem(value: 0, child: Text('SHA-512')),
-                              DropdownMenuItem(value: 1, child: Text('SHA-256')),
-                              DropdownMenuItem(value: 2, child: Text('Whirlpool')),
-                              DropdownMenuItem(value: 3, child: Text('Streebog')),
-                              DropdownMenuItem(value: 4, child: Text('BLAKE2s-256')),
-                            ],
-                            onChanged: busy ? null : (val) {
-                              if (val != null) setState(() => _hashId = val);
-                            },
+                            items: HashAlgo.dropdownItems(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _hashId = val);
+                              },
                           ),
                         ],
                       ),

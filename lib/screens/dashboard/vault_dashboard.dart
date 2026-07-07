@@ -5,6 +5,7 @@ import '../../models/mounted_container.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
 import '../../services/vaultexplorer_api.dart';
+import '../../widgets/common_widgets.dart';
 import '../settings/app_settings_screen.dart';
 import '../unlock/unlock_sheet.dart';
 import 'widgets/container_card.dart';
@@ -166,6 +167,13 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
   }
 
+  Future<void> _handleRefresh() async {
+    await _loadAll();
+    await Future.wait(
+      List<MountedContainer>.from(_mounted).map((c) => _refreshContainerSpace(c.volId)),
+    );
+  }
+
   // ── Auto-close ────────────────────────────────────────────────────────────
 
   void _scheduleAutoClose(MountedContainer container) {
@@ -253,8 +261,10 @@ void _onContainerMounted(MountedContainer container, {ContainerRecord? record}) 
     if (!mounted) return;
     if (!_mounted.any((c) => c.volId == volId)) return;
     _onContainerLocked(volId);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('USB drive disconnected — container locked')),
+    showAppSnackBar(
+      context,
+      message: 'USB drive disconnected — container locked',
+      tone: AppBannerTone.warning,
     );
   }
   void _onUsbContainerReconnected(
@@ -315,9 +325,7 @@ void _onContainerMounted(MountedContainer container, {ContainerRecord? record}) 
 Future<void> _showUnlockSheet({String? uri, String? name}) async {
     // If the card is clicked but already mounted, do not navigate
     if (uri != null && _mounted.any((c) => c.uri == uri)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This container is already mounted.')),
-      );
+      showAppSnackBar(context, message: 'This container is already mounted.');
       return;
     }
 
@@ -400,6 +408,64 @@ Future<void> _showUnlockSheet({String? uri, String? name}) async {
     ).whenComplete(() {
       if (mounted) setState(() => _actionInFlight = false);
     });
+  }
+
+
+  void _showAddOptionsSheet() {
+    HapticFeedback.lightImpact();
+    final cs = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => AppBottomSheet(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 4, bottom: 4),
+              child: Text(
+                'Add a vault',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(height: 4),
+            SheetOptionTile(
+              icon: Icons.lock_open_rounded,
+              iconColor: cs.primary,
+              title: 'Mount existing container',
+              subtitle: 'Unlock a VeraCrypt file you already have',
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showUnlockSheet();
+              },
+            ),
+            SheetOptionTile(
+              icon: Icons.usb_rounded,
+              iconColor: cs.tertiary,
+              title: 'Mount USB drive',
+              subtitle: 'Unlock a container on an OTG flash drive',
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showUsbUnlockSheet();
+              },
+            ),
+            SheetOptionTile(
+              icon: Icons.add_box_rounded,
+              iconColor: cs.secondary,
+              title: 'Create new container',
+              subtitle: 'Format a brand-new encrypted vault',
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showCreateSheet();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   
@@ -594,13 +660,52 @@ void _showContainerConfig({
 
   // ── Tab Builders ──────────────────────────────────────────────────────────
 
-  Widget _buildVaultsTab(List<dynamic> displayItems, ColorScheme cs, TextTheme textTheme) {
-    if (displayItems.isEmpty) {
-      return EmptyState(onAdd: () => _showUnlockSheet());
-    }
+  List<PopupMenuEntry<VaultSortField>> _sortMenuItems() => const [
+        PopupMenuItem(
+          value: VaultSortField.name,
+          child: Row(
+            children: [
+              Icon(Icons.sort_by_alpha_rounded),
+              SizedBox(width: 10),
+              Text('Sort by Name'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: VaultSortField.date,
+          child: Row(
+            children: [
+              Icon(Icons.calendar_today_rounded),
+              SizedBox(width: 10),
+              Text('Sort by Date Added'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: VaultSortField.size,
+          child: Row(
+            children: [
+              Icon(Icons.sd_card_outlined),
+              SizedBox(width: 10),
+              Text('Sort by Size'),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: VaultSortField.status,
+          child: Row(
+            children: [
+              Icon(Icons.toggle_on_rounded),
+              SizedBox(width: 10),
+              Text('Sort by Mount Status'),
+            ],
+          ),
+        ),
+      ];
 
+  Widget _buildVaultsList(List<dynamic> displayItems, ColorScheme cs) {
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
       itemCount: displayItems.length,
       separatorBuilder: (_, i) => const SizedBox(height: 16),
       itemBuilder: (_, i) {
@@ -620,47 +725,174 @@ void _showContainerConfig({
           isMounted = false;
         }
 
-        return Dismissible(
-          key: Key('dismiss_$uri'),
-          direction: DismissDirection.startToEnd,
-          confirmDismiss: (direction) async {
-            if (isMounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Lock the container before removing it.')),
-              );
-              return false;
-            }
-            return true;
-          },
-          onDismissed: (direction) {
-            _handleSwipeToRemove(uri, item as ContainerRecord);
-          },
-          background: Container(
-            alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.only(left: 24),
-            decoration: BoxDecoration(
-              color: cs.errorContainer,
-              borderRadius: BorderRadius.circular(24),
+        return StaggeredEntrance(
+          index: i,
+          child: Dismissible(
+            key: Key('dismiss_$uri'),
+            direction: DismissDirection.startToEnd,
+            confirmDismiss: (direction) async {
+              if (isMounted) {
+                showAppSnackBar(
+                  context,
+                  message: 'Lock the container before removing it.',
+                  tone: AppBannerTone.warning,
+                );
+                return false;
+              }
+              return true;
+            },
+            onDismissed: (direction) {
+              _handleSwipeToRemove(uri, item as ContainerRecord);
+            },
+            background: Container(
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.only(left: 24),
+              decoration: BoxDecoration(
+                color: cs.errorContainer,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Icon(Icons.delete_outline_rounded, color: cs.onErrorContainer),
             ),
-            child: Icon(Icons.delete_outline_rounded, color: cs.onErrorContainer),
+            child: isMounted
+                ? ContainerCard(
+                    container: item,
+                    onLocked: _onContainerLocked,
+                    onBrowse: () => _openBrowser(item),
+                    onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+                  )
+                : SavedContainerCard(
+                    name: label,
+                    uri: uri,
+                    onUnlock: () => (item as ContainerRecord).isUsbSource
+                        ? _showUsbUnlockSheet(existingRecord: item)
+                        : _showUnlockSheet(uri: uri, name: label),
+                    onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+                  ),
           ),
-          child: isMounted
-              ? ContainerCard(
-                  container: item,
-                  onLocked: _onContainerLocked,
-                  onBrowse: () => _openBrowser(item),
-                  onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
-                )
-              : SavedContainerCard(
-                  name: label,
-                  uri: uri,
-                  onUnlock: () => (item as ContainerRecord).isUsbSource
-                      ? _showUsbUnlockSheet(existingRecord: item)
-                      : _showUnlockSheet(uri: uri, name: label),
-                  onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
-                ),
         );
       },
+    );
+  }
+
+  /// Vaults tab: a single scroll view carrying its own large, collapsing
+  /// M3 app bar (title shrinks into the standard app-bar row as the list is
+  /// scrolled — the modern Android replacement for a fixed-height AppBar),
+  /// wrapped in [RefreshIndicator] for pull-to-refresh.
+  Widget _buildVaultsTab(List<dynamic> displayItems, ColorScheme cs, TextTheme textTheme) {
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      child: CustomScrollView(
+        slivers: [
+          SliverAppBar.large(
+            title: const Text('Vaults'),
+            actions: [
+              PopupMenuButton<VaultSortField>(
+                icon: const Icon(Icons.sort_rounded),
+                tooltip: 'Sort options',
+                initialValue: _sortField,
+                onSelected: (field) => setState(() => _sortField = field),
+                itemBuilder: (_) => _sortMenuItems(),
+              ),
+              IconButton(
+                icon: Icon(
+                  _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                ),
+                tooltip: 'Invert sorting order',
+                onPressed: () => setState(() => _sortAscending = !_sortAscending),
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
+          if (displayItems.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: EmptyState(onAdd: _showAddOptionsSheet),
+            )
+          else
+            SliverToBoxAdapter(
+              child: SizedBox(
+                // Generous height budget; ListView.separated below manages
+                // its own internal scrolling via NeverScrollableScrollPhysics
+                // is avoided in favor of just letting the outer sliver scroll
+                // — simplest is a fixed-height box sized to content isn't
+                // ideal, so instead we build the rows directly as slivers.
+                height: 0,
+              ),
+            ),
+          if (displayItems.isNotEmpty)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+              sliver: SliverList.separated(
+                itemCount: displayItems.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 16),
+                itemBuilder: (_, i) => _buildVaultListTile(displayItems[i], i, cs),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVaultListTile(dynamic item, int index, ColorScheme cs) {
+    final String uri;
+    final String label;
+    final bool isMounted;
+
+    if (item is MountedContainer) {
+      uri = item.uri;
+      label = item.displayName;
+      isMounted = true;
+    } else {
+      final record = item as ContainerRecord;
+      uri = record.uri;
+      label = record.label.isNotEmpty ? record.label : record.uri.split('/').last;
+      isMounted = false;
+    }
+
+    return StaggeredEntrance(
+      index: index,
+      child: Dismissible(
+        key: Key('dismiss_$uri'),
+        direction: DismissDirection.startToEnd,
+        confirmDismiss: (direction) async {
+          if (isMounted) {
+            showAppSnackBar(
+              context,
+              message: 'Lock the container before removing it.',
+              tone: AppBannerTone.warning,
+            );
+            return false;
+          }
+          return true;
+        },
+        onDismissed: (direction) {
+          _handleSwipeToRemove(uri, item as ContainerRecord);
+        },
+        background: Container(
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.only(left: 24),
+          decoration: BoxDecoration(
+            color: cs.errorContainer,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Icon(Icons.delete_outline_rounded, color: cs.onErrorContainer),
+        ),
+        child: isMounted
+            ? ContainerCard(
+                container: item,
+                onLocked: _onContainerLocked,
+                onBrowse: () => _openBrowser(item),
+                onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+              )
+            : SavedContainerCard(
+                name: label,
+                uri: uri,
+                onUnlock: () => (item as ContainerRecord).isUsbSource
+                    ? _showUsbUnlockSheet(existingRecord: item)
+                    : _showUnlockSheet(uri: uri, name: label),
+                onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+              ),
+      ),
     );
   }
 
@@ -701,133 +933,20 @@ void _showContainerConfig({
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _scheduleAutoLock(),
       child: Scaffold(
-        appBar: _currentIndex == 0
-            ? AppBar(
-                title: const Text(
-                  'Vaults',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                actions: [
-                  // Sort Field Selector
-                  PopupMenuButton<VaultSortField>(
-                    icon: const Icon(Icons.sort_rounded),
-                    tooltip: 'Sort Options',
-                    initialValue: _sortField,
-                    onSelected: (VaultSortField selectedField) {
-                      setState(() {
-                        _sortField = selectedField;
-                      });
-                    },
-                    itemBuilder: (BuildContext context) => <PopupMenuEntry<VaultSortField>>[
-                      const PopupMenuItem<VaultSortField>(
-                        value: VaultSortField.name,
-                        child: Row(
-                          children: [
-                            Icon(Icons.sort_by_alpha_rounded),
-                            SizedBox(width: 10),
-                            Text('Sort by Name'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem<VaultSortField>(
-                        value: VaultSortField.date,
-                        child: Row(
-                          children: [
-                            Icon(Icons.calendar_today_rounded),
-                            SizedBox(width: 10),
-                            Text('Sort by Date Added'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem<VaultSortField>(
-                        value: VaultSortField.size,
-                        child: Row(
-                          children: [
-                            Icon(Icons.sd_card_outlined),
-                            SizedBox(width: 10),
-                            Text('Sort by Size'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem<VaultSortField>(
-                        value: VaultSortField.status,
-                        child: Row(
-                          children: [
-                            Icon(Icons.toggle_on_rounded),
-                            SizedBox(width: 10),
-                            Text('Sort by Mount Status'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Sort Order Inverse Toggle
-                  IconButton(
-                    icon: Icon(_sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded),
-                    tooltip: 'Invert Sorting Order',
-                    onPressed: () {
-                      setState(() => _sortAscending = !_sortAscending);
-                    },
-                  ),
-                  // Floating Add Menu anchored right below the AppBar action
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.add_circle_outline_rounded),
-                    tooltip: 'Add Container',
-                    offset: const Offset(0, 48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    onSelected: (value) {
-                      if (value == 'mount_file') {
-                        _showUnlockSheet();
-                      } else if (value == 'mount_usb') {
-                        _showUsbUnlockSheet();
-                      } else if (value == 'create_new') {
-                        _showCreateSheet();
-                      }
-                    },
-                    itemBuilder: (context) {
-                      return [
-                        PopupMenuItem(
-                          value: 'mount_file',
-                          child: Row(
-                            children: [
-                              Icon(Icons.lock_open_rounded, color: cs.primary),
-                              const SizedBox(width: 12),
-                              const Text('Mount Existing Container'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'mount_usb',
-                          child: Row(
-                            children: [
-                              Icon(Icons.usb_rounded, color: cs.tertiary),
-                              const SizedBox(width: 12),
-                              const Text('Mount USB Drive'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'create_new',
-                          child: Row(
-                            children: [
-                              Icon(Icons.add_box_rounded, color: cs.secondary),
-                              const SizedBox(width: 12),
-                              const Text('Create New Container'),
-                            ],
-                          ),
-                        ),
-                      ];
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                ],
+        // The Vaults tab supplies its own large collapsing app bar inside
+        // its CustomScrollView; Settings supplies its own via
+        // AppSettingsScreen's Scaffold. The outer Scaffold stays chrome-free
+        // so bottom nav + FAB are the only persistent outer surfaces.
+        extendBody: true,
+        floatingActionButton: _currentIndex == 0
+            ? FloatingActionButton.extended(
+                onPressed: _actionInFlight ? null : _showAddOptionsSheet,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add vault'),
               )
             : null,
         bottomNavigationBar: NavigationBar(
           selectedIndex: _currentIndex,
-          height: 64,
           onDestinationSelected: (index) {
             setState(() => _currentIndex = index);
             _loadAll();

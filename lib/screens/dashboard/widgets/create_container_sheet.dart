@@ -4,6 +4,7 @@ import '../../../services/vaultexplorer_api.dart';
 import '../../../utils/validation_utils.dart';
 import '../../../theme.dart';
 import '../../../widgets/common_widgets.dart';
+import '../../../models/crypto_algorithms.dart';
 
 class CreateContainerSheet extends StatefulWidget {
   const CreateContainerSheet({Key? key}) : super(key: key);
@@ -211,16 +212,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                     labelText: 'Encryption Algorithm',
                     prefixIcon: Icon(Icons.lock_outline_rounded, size: AppIconSize.small),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 0, child: Text('AES')),
-                    DropdownMenuItem(value: 1, child: Text('Serpent')),
-                    DropdownMenuItem(value: 2, child: Text('Twofish')),
-                    DropdownMenuItem(value: 3, child: Text('AES-Twofish')),
-                    DropdownMenuItem(value: 4, child: Text('Serpent-AES')),
-                    DropdownMenuItem(value: 5, child: Text('Twofish-Serpent')),
-                    DropdownMenuItem(value: 6, child: Text('AES-Twofish-Serpent')),
-                    DropdownMenuItem(value: 7, child: Text('Serpent-Twofish-AES')),
-                  ],
+                  items: CipherAlgo.dropdownItems(includeAuto: false),
                   onChanged: (val) {
                     if (val != null) setState(() => _cipherId = val);
                   },
@@ -234,13 +226,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                     labelText: 'Hash Algorithm',
                     prefixIcon: Icon(Icons.tag_rounded, size: AppIconSize.small),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 0, child: Text('SHA-512')),
-                    DropdownMenuItem(value: 1, child: Text('SHA-256')),
-                    DropdownMenuItem(value: 2, child: Text('Whirlpool')),
-                    DropdownMenuItem(value: 3, child: Text('Streebog')),
-                    DropdownMenuItem(value: 4, child: Text('BLAKE2s-256')),
-                  ],
+                  items: HashAlgo.dropdownItems(includeAuto: false),
                   onChanged: (val) {
                     if (val != null) setState(() => _hashId = val);
                   },

@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/models/usb_device_info.dart';
 import '../models/mounted_container.dart';
 import 'channel_methods.dart';
+import '../models/crypto_algorithms.dart';
 
 /// A single keyfile picked via [VaultExplorerApi.pickKeyfiles]: [uri] is
 /// what gets sent back to native (and round-tripped through
@@ -29,29 +30,9 @@ typedef UnlockProgress = ({
   int cipherId,
 });
 
-/// Mirrors the hash-algorithm dropdown in unlock_sheet.dart/
-/// usb_unlock_sheet.dart — keep in sync with the HashId order
-/// deriveAndValidateHeader() in vaultexplorer.cpp searches.
-String hashAlgorithmName(int hashId) {
-  const names = ['SHA-512', 'SHA-256', 'Whirlpool', 'Streebog', 'BLAKE2s-256'];
-  return (hashId >= 0 && hashId < names.length) ? names[hashId] : 'Unknown';
-}
+String hashAlgorithmName(int hashId) => HashAlgo.nameFor(hashId);
+String cipherAlgorithmName(int cipherId) => CipherAlgo.nameFor(cipherId);
 
-/// Mirrors the cipher dropdown in unlock_sheet.dart/usb_unlock_sheet.dart —
-/// keep in sync with the CascadeId order in crypto/cascade.h.
-String cipherAlgorithmName(int cipherId) {
-  const names = [
-    'AES',
-    'Serpent',
-    'Twofish',
-    'AES-Twofish',
-    'Serpent-AES',
-    'Twofish-Serpent',
-    'AES-Twofish-Serpent',
-    'Serpent-Twofish-AES',
-  ];
-  return (cipherId >= 0 && cipherId < names.length) ? names[cipherId] : 'Unknown';
-}
 
 class VaultExplorerApi {
   const VaultExplorerApi();

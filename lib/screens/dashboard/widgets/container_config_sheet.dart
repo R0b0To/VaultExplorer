@@ -9,6 +9,7 @@ import '../../../widgets/common_widgets.dart';
 import '../../lock/pattern_setup_sheet.dart';
 import '../../lock/pattern_lock_view.dart';
 import '../../../utils/validation_utils.dart';
+import '../../../models/crypto_algorithms.dart';
 
 class ContainerConfigScreen extends StatefulWidget {
   final String uri;
@@ -558,20 +559,10 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                items: const [
-                                  DropdownMenuItem(value: 255, child: Text('Auto-detect')),
-                                  DropdownMenuItem(value: 0, child: Text('AES')),
-                                  DropdownMenuItem(value: 1, child: Text('Serpent')),
-                                  DropdownMenuItem(value: 2, child: Text('Twofish')),
-                                  DropdownMenuItem(value: 3, child: Text('AES-Twofish')),
-                                  DropdownMenuItem(value: 4, child: Text('Serpent-AES')),
-                                  DropdownMenuItem(value: 5, child: Text('Twofish-Serpent')),
-                                  DropdownMenuItem(value: 6, child: Text('AES-Twofish-Serpent')),
-                                  DropdownMenuItem(value: 7, child: Text('Serpent-Twofish-AES')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setState(() => _cipherId = val);
-                                },
+                                 items: CipherAlgo.dropdownItems(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _cipherId = val);
+                              },
                               ),
                               const SizedBox(height: 16),
                               DropdownButtonFormField<int>(
@@ -583,17 +574,10 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                items: const [
-                                  DropdownMenuItem(value: 255, child: Text('Auto-detect')),
-                                  DropdownMenuItem(value: 0, child: Text('SHA-512')),
-                                  DropdownMenuItem(value: 1, child: Text('SHA-256')),
-                                  DropdownMenuItem(value: 2, child: Text('Whirlpool')),
-                                  DropdownMenuItem(value: 3, child: Text('Streebog')),
-                                  DropdownMenuItem(value: 4, child: Text('BLAKE2s-256')),
-                                ],
-                                onChanged: (val) {
-                                  if (val != null) setState(() => _hashId = val);
-                                },
+                                items: HashAlgo.dropdownItems(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _hashId = val);
+                              },
                               ),
                             ],
                           ),

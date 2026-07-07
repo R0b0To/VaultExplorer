@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fvp/fvp.dart' as fvp;
 import 'package:path_provider/path_provider.dart';
 import 'theme.dart';
@@ -14,6 +15,7 @@ void main() async {
   // Ensure bindings are initialised before calling path_provider.
   WidgetsFlutterBinding.ensureInitialized();
   VaultExplorerApi.initMethodCallHandler();
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   try {
     final settings = await AppSettingsService.loadSettings();
@@ -83,7 +85,9 @@ class VaultExplorerApp extends StatelessWidget {
     return MaterialApp(
       title: 'VaultExplorer',
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
+      theme: buildLightTheme(),
+      darkTheme: buildDarkTheme(),
+      themeMode: ThemeMode.system,
       home: const LockGateScreen(),
     );
   }

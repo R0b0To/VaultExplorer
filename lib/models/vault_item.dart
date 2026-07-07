@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 // ── Item type enum ─────────────────────────────────────────────────────────────
 
 enum VaultItemType {
@@ -246,29 +244,4 @@ class VaultItem {
       );
 }
 
-// ── VaultItemStore ─────────────────────────────────────────────────────────────
-//
-// Serialises / deserialises the full items list to / from a single JSON string.
-// The caller is responsible for reading/writing the string to/from the container.
 
-class VaultItemStore {
-  static const version = 1;
-  static const storeFileName = '.vault_items.json';
-
-  static String encode(List<VaultItem> items) => jsonEncode({
-        'version': version,
-        'items': items.map((i) => i.toJson()).toList(),
-      });
-
-  static List<VaultItem> decode(String raw) {
-    try {
-      final j = jsonDecode(raw) as Map<String, dynamic>;
-      final list = j['items'] as List<dynamic>? ?? [];
-      return list
-          .map((e) => VaultItem.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return [];
-    }
-  }
-}

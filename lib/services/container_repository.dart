@@ -287,14 +287,7 @@ class ContainerRecord {
   };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
-    final ContainerUnlockMethod method;
-    if (j.containsKey('unlockMethod')) {
-      method = ContainerUnlockMethod.fromJson(j['unlockMethod'] as String?);
-    } else {
-      method = (j['rememberPassword'] as bool? ?? false)
-          ? ContainerUnlockMethod.rememberPassword
-          : ContainerUnlockMethod.password;
-    }
+    final method = ContainerUnlockMethod.fromJson(j['unlockMethod'] as String?);
 
     return ContainerRecord(
       uri: j['uri'] as String,
@@ -302,10 +295,7 @@ class ContainerRecord {
       rememberPassword: method != ContainerUnlockMethod.password,
       unlockMethod: method,
       autoCloseMins: j['autoCloseMins'] as int? ?? 0,
-      documentProvider:
-          j['documentProvider'] as bool? ??
-          j['mountAsDocumentProvider'] as bool? ??
-          false,
+      documentProvider: j['documentProvider'] as bool? ?? false,
       thumbnailCacheMode: j.containsKey('thumbnailCacheMode')
           ? ThumbnailCacheMode.fromJson(j['thumbnailCacheMode'] as String?)
           : null,

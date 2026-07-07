@@ -233,21 +233,11 @@ class _VaultDashboardState extends State<VaultDashboard>
 
   // ── Container lifecycle ───────────────────────────────────────────────────
 
-void _onContainerMounted(MountedContainer container, {ContainerRecord? record}) {
-    // Safeguard: do not add if already present in state
-    if (_mounted.any((c) => c.uri == container.uri)) {
-      return;
-    }
+  void _onContainerMounted(MountedContainer container, {ContainerRecord? record}) {
+    if (_mounted.any((c) => c.uri == container.uri)) return;
 
     setState(() {
       _mounted.add(container);
-      // The caller (UnlockSheet / UsbUnlockSheet) already persisted the record
-      // (or deliberately didn't, if the user chose not to remember it) — it
-      // knows the full picture: cipher/hash, cacheDerivedKey, unlock method,
-      // etc. We only mirror it into our in-memory view so the dashboard
-      // reflects it immediately. We must NOT fabricate a bare-bones record
-      // here: doing so used to (a) ignore the "remember" toggle entirely and
-      // (b) clobber the caller's fuller record with a stripped-down one.
       if (record != null && !_records.containsKey(container.uri)) {
         _records[container.uri] = record;
         _recordsOrder.add(container.uri);
@@ -255,7 +245,6 @@ void _onContainerMounted(MountedContainer container, {ContainerRecord? record}) 
     });
     _scheduleAutoClose(container);
   }
-
 
   void _onUsbContainerDetached(int volId) {
     if (!mounted) return;
@@ -267,15 +256,13 @@ void _onContainerMounted(MountedContainer container, {ContainerRecord? record}) 
       tone: AppBannerTone.warning,
     );
   }
+
   void _onUsbContainerReconnected(
     MountedContainer container,
     ContainerRecord migratedRecord,
     String oldUri,
   ) {
-    // Safeguard: do not add if already present in state
-    if (_mounted.any((c) => c.uri == container.uri)) {
-      return;
-    }
+    if (_mounted.any((c) => c.uri == container.uri)) return;
 
     setState(() {
       _mounted.add(container);
@@ -322,8 +309,7 @@ void _onContainerMounted(MountedContainer container, {ContainerRecord? record}) 
 
   // ── Unlock & Create Actions ───────────────────────────────────────────────
 
-Future<void> _showUnlockSheet({String? uri, String? name}) async {
-    // If the card is clicked but already mounted, do not navigate
+  Future<void> _showUnlockSheet({String? uri, String? name}) async {
     if (uri != null && _mounted.any((c) => c.uri == uri)) {
       showAppSnackBar(context, message: 'This container is already mounted.');
       return;
@@ -336,15 +322,12 @@ Future<void> _showUnlockSheet({String? uri, String? name}) async {
     if (uri != null) {
       final record = _records[uri];
       if (record?.unlockMethod == ContainerUnlockMethod.rememberPassword) {
-        rememberedPassword = await ContainerRepository.instance.getPassword(
-          uri,
-        );
+        rememberedPassword = await ContainerRepository.instance.getPassword(uri);
       }
     }
 
     final record = uri != null ? _records[uri] : null;
-    final docProvider =
-        record?.documentProvider ?? _appSettings.defaultDocumentProvider;
+    final docProvider = record?.documentProvider ?? _appSettings.defaultDocumentProvider;
 
     try {
       await Navigator.push(
@@ -356,7 +339,7 @@ Future<void> _showUnlockSheet({String? uri, String? name}) async {
             initialName: name,
             prefillPassword: rememberedPassword,
             documentProvider: docProvider,
-            mountedUris: _mounted.map((c) => c.uri).toList(), // <--- Pass the URIs here
+            mountedUris: _mounted.map((c) => c.uri).toList(),
           ),
         ),
       );
@@ -371,11 +354,8 @@ Future<void> _showUnlockSheet({String? uri, String? name}) async {
     setState(() => _actionInFlight = true);
 
     String? rememberedPassword;
-    if (existingRecord != null &&
-        existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
-      rememberedPassword = await ContainerRepository.instance.getPassword(
-        existingRecord.uri,
-      );
+    if (existingRecord != null && existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
+      rememberedPassword = await ContainerRepository.instance.getPassword(existingRecord.uri);
     }
 
     try {
@@ -385,9 +365,7 @@ Future<void> _showUnlockSheet({String? uri, String? name}) async {
           page: UsbUnlockSheet(
             onMounted: _onContainerMounted,
             onReconnected: _onUsbContainerReconnected,
-            documentProvider:
-                existingRecord?.documentProvider ??
-                _appSettings.defaultDocumentProvider,
+            documentProvider: existingRecord?.documentProvider ?? _appSettings.defaultDocumentProvider,
             existingRecord: existingRecord,
             prefillPassword: rememberedPassword,
           ),
@@ -410,7 +388,6 @@ Future<void> _showUnlockSheet({String? uri, String? name}) async {
     });
   }
 
-
   void _showAddOptionsSheet() {
     HapticFeedback.lightImpact();
     final cs = Theme.of(context).colorScheme;
@@ -425,10 +402,7 @@ Future<void> _showUnlockSheet({String? uri, String? name}) async {
               padding: const EdgeInsets.only(left: 4, bottom: 4),
               child: Text(
                 'Add a vault',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(height: 4),
@@ -468,71 +442,47 @@ Future<void> _showUnlockSheet({String? uri, String? name}) async {
     );
   }
 
-  
+  void _showContainerConfig({required String uri, required String currentLabel}) {
+    HapticFeedback.mediumImpact();
+    final existing = _records[uri];
+    Navigator.push(
+      context,
+      SlideLeftRoute(
+        page: ContainerConfigScreen(
+          uri: uri,
+          currentLabel: currentLabel,
+          existingRecord: existing,
+          appSettings: _appSettings,
+          onSaved: (record) async {
+            if (mounted) setState(() => _records[uri] = record);
+            final idx = _mounted.indexWhere((m) => m.uri == uri);
+            if (idx != -1) {
+              final oldContainer = _mounted[idx];
+              final newName = record.label.isNotEmpty ? record.label : record.uri.split('/').last;
+              final newContainer = oldContainer.copyWith(displayName: newName);
+              if (mounted) setState(() => _mounted[idx] = newContainer);
 
-void _showContainerConfig({
-  required String uri,
-  required String currentLabel,
-}) {
-  HapticFeedback.mediumImpact();
-  final existing = _records[uri];
-  Navigator.push(
-    context,
-    SlideLeftRoute(
-      page: ContainerConfigScreen(
-        uri: uri,
-        currentLabel: currentLabel,
-        existingRecord: existing,
-        appSettings: _appSettings,
-        onSaved: (record) async {
-          if (mounted) setState(() => _records[uri] = record);
-          final idx = _mounted.indexWhere((m) => m.uri == uri);
-          if (idx != -1) {
-            final oldContainer = _mounted[idx];
-            final newName = record.label.isNotEmpty
-                ? record.label
-                : record.uri.split('/').last;
-
-            final newContainer = oldContainer.copyWith(displayName: newName);
-            if (mounted) setState(() => _mounted[idx] = newContainer);
-
-            await vaultExplorerApi.updateContainerSettings(
-              uri,
-              newName,
-              record.documentProvider,
-            );
-
-            _scheduleAutoClose(newContainer);
-          }
-        },
-        onForget: _mounted.any((m) => m.uri == uri)
-            ? null
-            : () => _forgetContainer(uri, currentLabel),
+              await vaultExplorerApi.updateContainerSettings(uri, newName, record.documentProvider);
+              _scheduleAutoClose(newContainer);
+            }
+          },
+          onForget: _mounted.any((m) => m.uri == uri) ? null : () => _forgetContainer(uri, currentLabel),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Future<bool> _forgetContainer(String uri, String name) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Remove container?'),
-        content: Text(
-          'Remove "$name" from the dashboard? '
-          'The container file is not deleted.',
-        ),
+        content: Text('Remove "$name" from the dashboard? The container file is not deleted.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              'Remove',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
+            child: Text('Remove', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -568,9 +518,6 @@ void _showContainerConfig({
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () async {
-            // Tapping the action doesn't auto-hide a SnackBar in Flutter — without
-            // this call the banner just sits there, visible, until its full
-            // duration elapses even though the undo already completed.
             ScaffoldMessenger.of(context).hideCurrentSnackBar();
             await ContainerRepository.instance.save(record);
             if (mounted) {
@@ -613,11 +560,8 @@ void _showContainerConfig({
   // ── Sort Helpers ─────────────────────────────────────────────────────────
 
   String _getItemName(dynamic item) {
-    if (item is MountedContainer) {
-      return item.displayName;
-    } else if (item is ContainerRecord) {
-      return item.label.isNotEmpty ? item.label : item.uri.split('/').last;
-    }
+    if (item is MountedContainer) return item.displayName;
+    if (item is ContainerRecord) return item.label.isNotEmpty ? item.label : item.uri.split('/').last;
     return '';
   }
 
@@ -631,32 +575,16 @@ void _showContainerConfig({
       if (d.dateAdded != null) return d.dateAdded as DateTime;
     } catch (_) {}
 
-    final String? uri = item is MountedContainer
-        ? item.uri
-        : (item is ContainerRecord ? item.uri : null);
-
+    final String? uri = item is MountedContainer ? item.uri : (item is ContainerRecord ? item.uri : null);
     if (uri != null) {
       final idx = _recordsOrder.indexOf(uri);
-      if (idx != -1) {
-        return DateTime.fromMillisecondsSinceEpoch(idx * 1000);
-      }
+      if (idx != -1) return DateTime.fromMillisecondsSinceEpoch(idx * 1000);
     }
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
-  int _getItemSize(dynamic item) {
-    if (item is MountedContainer) {
-      return item.totalSpace;
-    }
-    return 0; // Saved/Locked records do not have sizes loaded
-  }
-
-  int _getItemStatus(dynamic item) {
-    if (item is MountedContainer) {
-      return 1; // Mounted is higher
-    }
-    return 0; // Saved is lower
-  }
+  int _getItemSize(dynamic item) => item is MountedContainer ? item.totalSpace : 0;
+  int _getItemStatus(dynamic item) => item is MountedContainer ? 1 : 0;
 
   // ── Tab Builders ──────────────────────────────────────────────────────────
 
@@ -703,130 +631,66 @@ void _showContainerConfig({
         ),
       ];
 
-  Widget _buildVaultsList(List<dynamic> displayItems, ColorScheme cs) {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-      itemCount: displayItems.length,
-      separatorBuilder: (_, i) => const SizedBox(height: 16),
-      itemBuilder: (_, i) {
-        final item = displayItems[i];
-        final String uri;
-        final String label;
-        final bool isMounted;
-
-        if (item is MountedContainer) {
-          uri = item.uri;
-          label = item.displayName;
-          isMounted = true;
-        } else {
-          final record = item as ContainerRecord;
-          uri = record.uri;
-          label = record.label.isNotEmpty ? record.label : record.uri.split('/').last;
-          isMounted = false;
-        }
-
-        return StaggeredEntrance(
-          index: i,
-          child: Dismissible(
-            key: Key('dismiss_$uri'),
-            direction: DismissDirection.startToEnd,
-            confirmDismiss: (direction) async {
-              if (isMounted) {
-                showAppSnackBar(
-                  context,
-                  message: 'Lock the container before removing it.',
-                  tone: AppBannerTone.warning,
-                );
-                return false;
-              }
-              return true;
-            },
-            onDismissed: (direction) {
-              _handleSwipeToRemove(uri, item as ContainerRecord);
-            },
-            background: Container(
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.only(left: 24),
-              decoration: BoxDecoration(
-                color: cs.errorContainer,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Icon(Icons.delete_outline_rounded, color: cs.onErrorContainer),
-            ),
-            child: isMounted
-                ? ContainerCard(
-                    container: item,
-                    onLocked: _onContainerLocked,
-                    onBrowse: () => _openBrowser(item),
-                    onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
-                  )
-                : SavedContainerCard(
-                    name: label,
-                    uri: uri,
-                    onUnlock: () => (item as ContainerRecord).isUsbSource
-                        ? _showUsbUnlockSheet(existingRecord: item)
-                        : _showUnlockSheet(uri: uri, name: label),
-                    onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
-                  ),
-          ),
-        );
-      },
-    );
+  List<Widget> _buildAppBarActions() {
+    return [
+      PopupMenuButton<VaultSortField>(
+        icon: const Icon(Icons.sort_rounded),
+        tooltip: 'Sort options',
+        initialValue: _sortField,
+        onSelected: (field) => setState(() => _sortField = field),
+        itemBuilder: (_) => _sortMenuItems(),
+      ),
+      IconButton(
+        icon: Icon(_sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded),
+        tooltip: 'Invert sorting order',
+        onPressed: () => setState(() => _sortAscending = !_sortAscending),
+      ),
+      const SizedBox(width: 4),
+    ];
   }
 
-  /// Vaults tab: a single scroll view carrying its own large, collapsing
-  /// M3 app bar (title shrinks into the standard app-bar row as the list is
-  /// scrolled — the modern Android replacement for a fixed-height AppBar),
-  /// wrapped in [RefreshIndicator] for pull-to-refresh.
-  Widget _buildVaultsTab(List<dynamic> displayItems, ColorScheme cs, TextTheme textTheme) {
+  Widget _buildVaultsTab(List<dynamic> displayItems, ColorScheme cs, TextTheme textTheme, bool isWide) {
     return RefreshIndicator(
       onRefresh: _handleRefresh,
       child: CustomScrollView(
         slivers: [
-          SliverAppBar.large(
-            title: const Text('Vaults'),
-            actions: [
-              PopupMenuButton<VaultSortField>(
-                icon: const Icon(Icons.sort_rounded),
-                tooltip: 'Sort options',
-                initialValue: _sortField,
-                onSelected: (field) => setState(() => _sortField = field),
-                itemBuilder: (_) => _sortMenuItems(),
-              ),
-              IconButton(
-                icon: Icon(
-                  _sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+          // Use standard fixed App Bar in landscape to conserve vertical space.
+          isWide
+              ? SliverAppBar(
+                  pinned: true,
+                  floating: true,
+                  actions: _buildAppBarActions(),
+                )
+              : SliverAppBar(
+
+                  actions: _buildAppBarActions(),
                 ),
-                tooltip: 'Invert sorting order',
-                onPressed: () => setState(() => _sortAscending = !_sortAscending),
-              ),
-              const SizedBox(width: 4),
-            ],
-          ),
           if (displayItems.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(onAdd: _showAddOptionsSheet),
             )
           else
-            SliverToBoxAdapter(
-              child: SizedBox(
-                // Generous height budget; ListView.separated below manages
-                // its own internal scrolling via NeverScrollableScrollPhysics
-                // is avoided in favor of just letting the outer sliver scroll
-                // — simplest is a fixed-height box sized to content isn't
-                // ideal, so instead we build the rows directly as slivers.
-                height: 0,
-              ),
-            ),
-          if (displayItems.isNotEmpty)
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-              sliver: SliverList.separated(
-                itemCount: displayItems.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 16),
-                itemBuilder: (_, i) => _buildVaultListTile(displayItems[i], i, cs),
-              ),
+              sliver: isWide
+                  ? SliverGrid(
+                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 420, // Forces dynamic column calculation
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        mainAxisExtent: 172, // Fixed optimal extent for the new dense cards
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => _buildVaultListTile(displayItems[i], i, cs),
+                        childCount: displayItems.length,
+                      ),
+                    )
+                  : SliverList.separated(
+                      itemCount: displayItems.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 16),
+                      itemBuilder: (_, i) => _buildVaultListTile(displayItems[i], i, cs),
+                    ),
             ),
         ],
       ),
@@ -877,21 +741,42 @@ void _showContainerConfig({
           ),
           child: Icon(Icons.delete_outline_rounded, color: cs.onErrorContainer),
         ),
-        child: isMounted
-            ? ContainerCard(
-                container: item,
-                onLocked: _onContainerLocked,
-                onBrowse: () => _openBrowser(item),
-                onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
-              )
-            : SavedContainerCard(
-                name: label,
-                uri: uri,
-                onUnlock: () => (item as ContainerRecord).isUsbSource
-                    ? _showUsbUnlockSheet(existingRecord: item)
-                    : _showUnlockSheet(uri: uri, name: label),
-                onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
-              ),
+        // AnimatedSize handles smoothly expanding/collapsing the card's vertical height
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOutCubic,
+          alignment: Alignment.topCenter,
+          // AnimatedSwitcher coordinates the fading transition between state-specific keys
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: child,
+              );
+            },
+            // Unique keys tell AnimatedSwitcher that a structural layout change took place
+            child: isMounted
+                ? ContainerCard(
+                    key: ValueKey('mounted_$uri'),
+                    container: item as MountedContainer,
+                    onLocked: _onContainerLocked,
+                    onBrowse: () => _openBrowser(item),
+                    onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+                  )
+                : SavedContainerCard(
+                    key: ValueKey('locked_$uri'),
+                    name: label,
+                    uri: uri,
+                    onUnlock: () => (item as ContainerRecord).isUsbSource
+                        ? _showUsbUnlockSheet(existingRecord: item)
+                        : _showUnlockSheet(uri: uri, name: label),
+                    onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+                  ),
+          ),
+        ),
       ),
     );
   }
@@ -901,6 +786,9 @@ void _showContainerConfig({
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    // Use a >= 600 dp breakpoint (standard Android class boundary for foldables/tablets in landscape)
+    final isWide = MediaQuery.sizeOf(context).width >= 600;
+
     final displayItems = <dynamic>[];
     displayItems.addAll(_mounted);
     for (final entry in _records.entries) {
@@ -909,7 +797,6 @@ void _showContainerConfig({
       }
     }
 
-    // Apply sorting selection with potential inverse logic
     displayItems.sort((a, b) {
       int result = 0;
       switch (_sortField) {
@@ -933,62 +820,103 @@ void _showContainerConfig({
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _scheduleAutoLock(),
       child: Scaffold(
-        // The Vaults tab supplies its own large collapsing app bar inside
-        // its CustomScrollView; Settings supplies its own via
-        // AppSettingsScreen's Scaffold. The outer Scaffold stays chrome-free
-        // so bottom nav + FAB are the only persistent outer surfaces.
         extendBody: true,
-        floatingActionButton: _currentIndex == 0
+        // Remove standard FAB and Bottom Nav out of the way when the screen is wide
+        floatingActionButton: (!isWide && _currentIndex == 0)
             ? FloatingActionButton.extended(
                 onPressed: _actionInFlight ? null : _showAddOptionsSheet,
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('Add vault'),
               )
             : null,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: (index) {
-            setState(() => _currentIndex = index);
-            _loadAll();
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.grid_view_outlined),
-              selectedIcon: Icon(Icons.grid_view_rounded),
-              label: 'Vaults',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings_rounded),
-              label: 'Settings',
-            ),
-          ],
-        ),
-        body: Stack(
+        bottomNavigationBar: isWide
+            ? null
+            : NavigationBar(
+                selectedIndex: _currentIndex,
+                onDestinationSelected: (index) {
+                  setState(() => _currentIndex = index);
+                  _loadAll();
+                },
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.grid_view_outlined),
+                    selectedIcon: Icon(Icons.grid_view_rounded),
+                    label: 'Vaults',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings_rounded),
+                    label: 'Settings',
+                  ),
+                ],
+              ),
+        body: Row(
           children: [
-            IndexedStack(
-              index: _currentIndex,
-              children: [
-                _buildVaultsTab(displayItems, cs, textTheme),
-                const AppSettingsScreen(),
-              ],
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 16,
-              child: Center(
-                child: ListenableBuilder(
-                  listenable: CrossContainerClipboard.instance,
-                  builder: (context, _) {
-                    final clipboard = CrossContainerClipboard.instance;
-                    if (!clipboard.hasItems) return const SizedBox.shrink();
-                    return _FloatingClipboardDashboardBanner(
-                      clipboard: clipboard,
-                      onClear: clipboard.clear,
-                    );
-                  },
-                ),
+            if (isWide)
+              NavigationRail(
+                backgroundColor: cs.surface,
+                selectedIndex: _currentIndex,
+                onDestinationSelected: (index) {
+                  setState(() => _currentIndex = index);
+                  _loadAll();
+                },
+                labelType: NavigationRailLabelType.all,
+                // FAB is relocated to the top of the Navigation Rail in landscape modes
+                leading: _currentIndex == 0
+                    ? FloatingActionButton(
+                        elevation: 0,
+                        onPressed: _actionInFlight ? null : _showAddOptionsSheet,
+                        child: const Icon(Icons.add_rounded),
+                      )
+                    : null,
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.grid_view_outlined),
+                    selectedIcon: Icon(Icons.grid_view_rounded),
+                    label: Text('Vaults'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.settings_outlined),
+                    selectedIcon: Icon(Icons.settings_rounded),
+                    label: Text('Settings'),
+                  ),
+                ],
+              ),
+            if (isWide)
+              VerticalDivider(
+                thickness: 1,
+                width: 1,
+                color: cs.outlineVariant.withValues(alpha: 0.3),
+              ),
+            Expanded(
+              child: Stack(
+                children: [
+                  IndexedStack(
+                    index: _currentIndex,
+                    children: [
+                      _buildVaultsTab(displayItems, cs, textTheme, isWide),
+                      const AppSettingsScreen(),
+                    ],
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 16,
+                    child: Center(
+                      child: ListenableBuilder(
+                        listenable: CrossContainerClipboard.instance,
+                        builder: (context, _) {
+                          final clipboard = CrossContainerClipboard.instance;
+                          if (!clipboard.hasItems) return const SizedBox.shrink();
+                          return _FloatingClipboardDashboardBanner(
+                            clipboard: clipboard,
+                            onClear: clipboard.clear,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1088,7 +1016,7 @@ class SlideLeftRoute<T> extends PageRouteBuilder<T> {
       : super(
           pageBuilder: (context, animation, secondaryAnimation) => page,
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            const begin = Offset(-1.0, 0.0); // Start offscreen left
+            const begin = Offset(-1.0, 0.0);
             const end = Offset.zero;
             const curve = Curves.easeInOut;
             final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/mounted_container.dart';
 import '../../services/vaultexplorer_api.dart';
+import '../../utils/filename_utils.dart';
 
 /// Static helpers that show the browser's confirmation / input dialogs.
 ///
@@ -32,7 +33,10 @@ abstract class BrowserDialogs {
           ),
           TextButton(
             onPressed: () async {
-              final name = ctrl.text.trim();
+              // FIX: sanitize before this name ever reaches the wire
+              // format — see filename_utils.dart for why `|` and a
+              // leading "[DIR] " are unsafe here.
+              final name = sanitizeFatFileName(ctrl.text.trim());
               if (name.isEmpty) return;
               Navigator.pop(context);
               final full = currentDirPath.isEmpty
@@ -72,7 +76,8 @@ abstract class BrowserDialogs {
           ),
           TextButton(
             onPressed: () async {
-              final name = ctrl.text.trim();
+              // FIX: same sanitization as showCreateFolder above.
+              final name = sanitizeFatFileName(ctrl.text.trim());
               if (name.isEmpty) return;
               Navigator.pop(context);
               final full = currentDirPath.isEmpty
@@ -109,7 +114,11 @@ abstract class BrowserDialogs {
           ),
           TextButton(
             onPressed: () async {
-              final newName = ctrl.text.trim();
+              // FIX: same sanitization as showCreateFolder/showCreateFile.
+              // Comparing against oldName AFTER sanitizing is deliberate —
+              // if the sanitized result happens to equal oldName, there's
+              // genuinely nothing to rename.
+              final newName = sanitizeFatFileName(ctrl.text.trim());
               if (newName.isEmpty || newName == oldName) return;
               Navigator.pop(context);
               final oldFull = currentDirPath.isEmpty

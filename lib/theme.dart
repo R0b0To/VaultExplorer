@@ -7,10 +7,12 @@ import 'package:flutter/services.dart';
 //
 // Single source of truth for spacing / radius / icon-size / motion values.
 
+
 abstract final class AppRadius {
   static const sm = 8.0; // chips, small controls
   static const md = 12.0; // cards, tiles, standard containers, dialogs' children
   static const lg = 20.0; // icon badges, prominent hero containers
+  static const xl = 24.0; // hero cards (dashboard container cards, etc.)
   static const sheet = 28.0; // bottom sheets, dialogs (MD3 large)
   static const full = 100.0; // pill shapes (buttons, progress bars, badges)
 }

@@ -1,58 +1,14 @@
 import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
-
 import '../models/mounted_container.dart';
 import '../models/vault_item.dart';
 import 'vaultexplorer_api.dart';
+import '../utils/filename_utils.dart';
 
 class VaultItemsService {
   VaultItemsService._();
   static final instance = VaultItemsService._();
 
-  /// Unpacks legacy single `.vault_items.json` into individual files 
-  /// natively stored in the container, then removes the legacy file.
-  Future<void> migrateIfNeeded(MountedContainer container) async {
-    try {
-      final size = await vaultExplorerApi.getFileSize(
-        container,
-        VaultItemStore.storeFileName,
-      );
-      if (size <= 0) return;
-
-      final bytes = await vaultExplorerApi.readFileChunk(
-        container,
-        VaultItemStore.storeFileName,
-        0,
-        size,
-      );
-      if (bytes == null || bytes.isEmpty) return;
-
-      final raw = utf8.decode(bytes);
-      final items = VaultItemStore.decode(raw);
-
-      for (final item in items) {
-        String baseName = item.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-        if (baseName.isEmpty) baseName = 'Untitled';
-        
-        String path = '$baseName.${item.type.name}';
-        
-        // Avoid naming collisions
-        int c = 1;
-        while (await vaultExplorerApi.getFileSize(container, path) > 0) {
-          path = '$baseName ($c).${item.type.name}';
-          c++;
-        }
-        
-        await saveItem(container, path, item);
-      }
-
-      await vaultExplorerApi.deleteFile(container, VaultItemStore.storeFileName);
-    } catch (e) {
-      debugPrint('VaultItemsService migration error: $e');
-    }
-  }
 
   Future<VaultItem?> loadItem(MountedContainer container, String path) async {
     try {

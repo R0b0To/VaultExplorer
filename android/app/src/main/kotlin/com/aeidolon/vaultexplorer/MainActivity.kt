@@ -520,11 +520,6 @@ private var usbDetachReceiver: BroadcastReceiver? = null
         return if (trimmed.length > 180) trimmed.substring(0, 180) else trimmed
     }
 
-    private fun legacyDerivedKeyAlias(filePath: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(filePath.toByteArray(Charsets.UTF_8))
-        val encoded = android.util.Base64.encodeToString(digest, android.util.Base64.NO_WRAP)
-        return "vc2_derived_${encoded}"
-    }
 
     private fun containerFingerprint(filePath: String): String? {
         return try {
@@ -570,9 +565,12 @@ private var usbDetachReceiver: BroadcastReceiver? = null
         }
     }
 
-    private fun derivedKeyAlias(filePath: String): String {
-        val fingerprint = containerFingerprint(filePath)
-        val root = fingerprint ?: legacyDerivedKeyAlias(filePath)
+   private fun derivedKeyAlias(filePath: String): String {
+        val root = containerFingerprint(filePath)
+            ?: android.util.Base64.encodeToString(
+                MessageDigest.getInstance("SHA-256").digest(filePath.toByteArray(Charsets.UTF_8)),
+                android.util.Base64.NO_WRAP,
+            )
         return "vc2_derived_${root}"
     }
 
@@ -625,39 +623,31 @@ private var usbDetachReceiver: BroadcastReceiver? = null
 
     private fun storeDerivedKeyBytes(filePath: String, derivedKey: ByteArray): Boolean {
         val alias = derivedKeyAlias(filePath)
-        val legacyAlias = legacyDerivedKeyAlias(filePath)
         Log.i("VaultExplorer_C++", "Storing derived key for ${filePath} (${derivedKey.size} bytes)")
         val encrypted = encryptDerivedKey(derivedKey, alias) ?: return false
         val encoded = android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP)
         return getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
             .edit()
             .putString(alias, encoded)
-            .putString(legacyAlias, encoded)
             .commit()
     }
-
-    private fun loadDerivedKeyBytes(filePath: String): ByteArray? {
-        val aliases = listOf(derivedKeyAlias(filePath), legacyDerivedKeyAlias(filePath))
-        for (alias in aliases) {
-            val encoded = getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
-                .getString(alias, null) ?: continue
-            val encrypted = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
-            val decrypted = decryptDerivedKey(encrypted, alias)
-            if (decrypted != null) {
-                Log.i("VaultExplorer_C++", "Loaded derived key for ${filePath} from Keystore-backed storage (${decrypted.size} bytes)")
-                return decrypted
-            }
+   private fun loadDerivedKeyBytes(filePath: String): ByteArray? {
+        val alias = derivedKeyAlias(filePath)
+        val encoded = getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
+            .getString(alias, null) ?: return null
+        val encrypted = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
+        val decrypted = decryptDerivedKey(encrypted, alias)
+        if (decrypted != null) {
+            Log.i("VaultExplorer_C++", "Loaded derived key for ${filePath} from Keystore-backed storage (${decrypted.size} bytes)")
         }
-        return null
+        return decrypted
     }
 
-    private fun clearDerivedKeyBytes(filePath: String): Boolean {
-        val aliases = listOf(derivedKeyAlias(filePath), legacyDerivedKeyAlias(filePath))
-        val editor = getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE).edit()
-        for (alias in aliases) {
-            editor.remove(alias)
-        }
-        return editor.commit()
+   private fun clearDerivedKeyBytes(filePath: String): Boolean {
+        return getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
+            .edit()
+            .remove(derivedKeyAlias(filePath))
+            .commit()
     }
 
     /**

@@ -91,12 +91,8 @@ class AppSettings {
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
     useMasterPassword: j['useMasterPassword'] as bool? ?? false,
-    masterPasswordIsFingerprint:
-        j['masterPasswordIsFingerprint'] as bool? ?? false,
-    defaultDocumentProvider:
-        j['defaultDocumentProvider'] as bool? ??
-        j['mountAsDocumentProvider'] as bool? ??
-        false,
+    masterPasswordIsFingerprint:j['masterPasswordIsFingerprint'] as bool? ?? false,
+    defaultDocumentProvider: j['defaultDocumentProvider'] as bool? ?? false,
     videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
     defaultDerivedKeyCacheEnabled:j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,

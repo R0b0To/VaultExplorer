@@ -533,10 +533,6 @@ Future<void> _pickFile() async {
         _unlockMethod == ContainerUnlockMethod.rememberPassword;
   }
 
-  /// Live label for the unlock button while [_loading] — "Decrypting..."
-  /// until the first progress event arrives (most re-unlocks of a known
-  /// container skip auto-detect entirely and never get one), then "Trying
-  /// <hash> (i of N)…" for as long as the cipher/hash search is running.
   String get _unlockProgressLabel {
     final p = _progress;
     if (p == null || p.total <= 0) return 'Decrypting...';
@@ -1190,7 +1186,7 @@ Future<void> _pickFile() async {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                color: cs.onPrimary,
+                                color: cs.primary,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1199,7 +1195,7 @@ Future<void> _pickFile() async {
                                 _unlockProgressLabel,
                                 overflow: TextOverflow.ellipsis,
                                 style: textTheme.titleMedium?.copyWith(
-                                  color: cs.onPrimary,
+                                  color: cs.primary,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

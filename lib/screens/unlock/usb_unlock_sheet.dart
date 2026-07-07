@@ -52,6 +52,12 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
 
+  // ── Cancel / progress state ──────────────────────────────────────────────
+  int? _activeVolId;
+  UnlockProgress? _progress;
+  late final void Function(int) _onUnlockStarted;
+  late final void Function(UnlockProgress) _onUnlockProgress;
+
   Future<void>? _loadDevicesFuture;
 
   ContainerUnlockMethod _unlockMethod = ContainerUnlockMethod.password;
@@ -72,6 +78,16 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       widget.prefillPassword?.isNotEmpty == true &&
       _passwordCtrl.text == widget.prefillPassword;
 
+  /// See UnlockSheet._unlockProgressLabel — identical logic, USB wording.
+  String get _unlockProgressLabel {
+    final p = _progress;
+    if (p == null || p.total <= 0) return 'Decrypting drive...';
+    final hashName = hashAlgorithmName(p.hashId);
+    return p.total > 1
+        ? 'Trying $hashName (${p.attempted} of ${p.total})…'
+        : 'Trying $hashName…';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +100,17 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
     }
     _loadDevicesFuture = _loadDevices();
     _initUnlockMethod();
+
+    _onUnlockStarted = (volId) {
+      if (mounted) setState(() => _activeVolId = volId);
+    };
+    _onUnlockProgress = (progress) {
+      if (mounted && progress.volId == _activeVolId) {
+        setState(() => _progress = progress);
+      }
+    };
+    VaultExplorerApi.addUnlockStartedListener(_onUnlockStarted);
+    VaultExplorerApi.addUnlockProgressListener(_onUnlockProgress);
   }
 
   Future<void> _initUnlockMethod() async {
@@ -215,6 +242,12 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
 
   @override
   void dispose() {
+    // See the matching comment in unlock_sheet.dart's dispose().
+    if (_unlocking && _activeVolId != null) {
+      vaultExplorerApi.cancelUnlock(_activeVolId!);
+    }
+    VaultExplorerApi.removeUnlockStartedListener(_onUnlockStarted);
+    VaultExplorerApi.removeUnlockProgressListener(_onUnlockProgress);
     _passwordCtrl.dispose();
     _pimCtrl.dispose();
     super.dispose();
@@ -288,7 +321,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       return;
     }
 
-    setState(() { _unlocking = true; _error = null; });
+    setState(() { _unlocking = true; _error = null; _activeVolId = null; _progress = null; });
 
     try {
       if (!device.hasPermission) {
@@ -431,9 +464,16 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       HapticFeedback.lightImpact();
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      setState(() => _error = e is PlatformException ? (e.message ?? e.toString()) : e.toString());
+      // A cancellation the user asked for isn't an error — just quietly
+      // drop back to the form instead of showing an error banner.
+      final isCancelled = e is PlatformException && e.code == 'CANCELLED';
+      if (!isCancelled) {
+        setState(() => _error = e is PlatformException ? (e.message ?? e.toString()) : e.toString());
+      }
     } finally {
-      if (mounted) setState(() => _unlocking = false);
+      if (mounted) {
+        setState(() { _unlocking = false; _activeVolId = null; _progress = null; });
+      }
     }
   }
 
@@ -1162,11 +1202,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                Text(
-                                  'Decrypting drive...',
-                                  style: textTheme.titleMedium?.copyWith(
-                                    color: cs.onPrimary,
-                                    fontWeight: FontWeight.bold,
+                                Flexible(
+                                  child: Text(
+                                    _unlocking ? _unlockProgressLabel : 'Requesting permission...',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: textTheme.titleMedium?.copyWith(
+                                      color: cs.onPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1179,6 +1222,15 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                               ),
                             ),
                     ),
+                    if (_unlocking && _activeVolId != null) ...[
+                      const SizedBox(height: 8),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ],

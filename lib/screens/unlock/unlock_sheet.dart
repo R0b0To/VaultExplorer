@@ -47,6 +47,12 @@ class _UnlockSheetState extends State<UnlockSheet> {
   final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
 
+  // ── Cancel / progress state ──────────────────────────────────────────────
+  int? _activeVolId;
+  UnlockProgress? _progress;
+  late final void Function(int) _onUnlockStarted;
+  late final void Function(UnlockProgress) _onUnlockProgress;
+
   // ── Unlock method state ──────────────────────────────────────────────────
   ContainerUnlockMethod _unlockMethod = ContainerUnlockMethod.password;
   bool _showPasswordFallback = false;
@@ -70,10 +76,32 @@ class _UnlockSheetState extends State<UnlockSheet> {
       _remember = true;
     }
     _initUnlockMethod();
+
+    _onUnlockStarted = (volId) {
+      if (mounted) setState(() => _activeVolId = volId);
+    };
+    _onUnlockProgress = (progress) {
+      if (mounted && progress.volId == _activeVolId) {
+        setState(() => _progress = progress);
+      }
+    };
+    VaultExplorerApi.addUnlockStartedListener(_onUnlockStarted);
+    VaultExplorerApi.addUnlockProgressListener(_onUnlockProgress);
   }
 
   @override
   void dispose() {
+    // If the user backs out while an unlock is still running (there's no
+    // PopScope blocking that — see vault_dashboard.dart's plain
+    // Navigator.push), the native derivation would otherwise keep running
+    // in the background, invisible, and block a subsequent attempt at the
+    // same volId for however long it takes to finish. Cancel it here
+    // instead of leaving it orphaned.
+    if (_loading && _activeVolId != null) {
+      vaultExplorerApi.cancelUnlock(_activeVolId!);
+    }
+    VaultExplorerApi.removeUnlockStartedListener(_onUnlockStarted);
+    VaultExplorerApi.removeUnlockProgressListener(_onUnlockProgress);
     _passwordCtrl.dispose();
     _pimCtrl.dispose();
     super.dispose();
@@ -332,7 +360,7 @@ Future<void> _pickFile() async {
       setState(() => _error = 'Password or keyfiles required');
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    setState(() { _loading = true; _error = null; _activeVolId = null; _progress = null; });
 
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
@@ -465,9 +493,15 @@ Future<void> _pickFile() async {
         setState(() => _error = 'Incorrect password or invalid container');
       }
     } on PlatformException catch (e) {
-      setState(() => _error = e.message ?? 'Unknown error');
+      // A cancellation the user asked for isn't an error — just quietly
+      // drop back to the form instead of showing an error banner.
+      if (e.code != 'CANCELLED') {
+        setState(() => _error = e.message ?? 'Unknown error');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() { _loading = false; _activeVolId = null; _progress = null; });
+      }
     }
   }
 
@@ -499,6 +533,19 @@ Future<void> _pickFile() async {
     if (widget.initialUri == null) return true;
     return _unlockMethod == ContainerUnlockMethod.password ||
         _unlockMethod == ContainerUnlockMethod.rememberPassword;
+  }
+
+  /// Live label for the unlock button while [_loading] — "Decrypting..."
+  /// until the first progress event arrives (most re-unlocks of a known
+  /// container skip auto-detect entirely and never get one), then "Trying
+  /// <hash> (i of N)…" for as long as the cipher/hash search is running.
+  String get _unlockProgressLabel {
+    final p = _progress;
+    if (p == null || p.total <= 0) return 'Decrypting...';
+    final hashName = hashAlgorithmName(p.hashId);
+    return p.total > 1
+        ? 'Trying $hashName (${p.attempted} of ${p.total})…'
+        : 'Trying $hashName…';
   }
 
   @override
@@ -1166,11 +1213,14 @@ Future<void> _pickFile() async {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Text(
-                              'Decrypting...',
-                              style: textTheme.titleMedium?.copyWith(
-                                color: cs.onPrimary,
-                                fontWeight: FontWeight.bold,
+                            Flexible(
+                              child: Text(
+                                _unlockProgressLabel,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.titleMedium?.copyWith(
+                                  color: cs.onPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
@@ -1183,6 +1233,15 @@ Future<void> _pickFile() async {
                           ),
                         ),
                 ),
+                if (_loading && _activeVolId != null) ...[
+                  const SizedBox(height: 8),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                ],
               ] else if (_error != null) ...[
                 const SizedBox(height: 16),
                 InlineErrorBanner(_error!),

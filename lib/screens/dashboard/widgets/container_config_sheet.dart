@@ -967,8 +967,28 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
   bool get _isUsb => widget.uri.startsWith('usb:');
   String get _usbDeviceName => widget.uri.substring(4);
 
+  // Same rationale as UnlockSheet/UsbUnlockSheet: this dialog's own Cancel
+  // button (and dismissing it any other way) doesn't stop the native call
+  // in flight, so it's tracked here too — see dispose() and the Cancel
+  // button below.
+  int? _activeVolId;
+  late final void Function(int) _onUnlockStarted;
+
+  @override
+  void initState() {
+    super.initState();
+    _onUnlockStarted = (volId) {
+      if (mounted) setState(() => _activeVolId = volId);
+    };
+    VaultExplorerApi.addUnlockStartedListener(_onUnlockStarted);
+  }
+
   @override
   void dispose() {
+    if (_loading && _activeVolId != null) {
+      vaultExplorerApi.cancelUnlock(_activeVolId!);
+    }
+    VaultExplorerApi.removeUnlockStartedListener(_onUnlockStarted);
     _pwCtrl.dispose();
     _pimCtrl.dispose();
     super.dispose();
@@ -1048,7 +1068,10 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
         ));
       }
     } catch (e) {
-      if (mounted) setState(() { _loading = false; _error = 'Verification failed'; });
+      final isCancelled = e is PlatformException && e.code == 'CANCELLED';
+      if (mounted && !isCancelled) {
+        setState(() { _loading = false; _error = 'Verification failed'; });
+      }
     }
   }
 
@@ -1203,7 +1226,15 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () {
+            if (_loading && _activeVolId != null) {
+              vaultExplorerApi.cancelUnlock(_activeVolId!);
+            }
+            Navigator.pop(context);
+          },
+          child: const Text('Cancel'),
+        ),
         FilledButton(
           onPressed: _loading ? null : _verify,
           style: FilledButton.styleFrom(

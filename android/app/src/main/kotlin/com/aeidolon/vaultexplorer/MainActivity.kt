@@ -77,6 +77,7 @@ private object ChannelMethods {
     const val REQUEST_USB_PERMISSION = "requestUsbPermission"
     const val UNLOCK_USB_CONTAINER = "unlockUsbContainer"
     const val DOCUMENT_EXISTS = "documentExists"
+    const val CANCEL_UNLOCK = "cancelUnlock"
 }
 
 private const val MAX_CHUNK_BYTES = 64 * 1024 * 1024  // 64 MB
@@ -413,7 +414,9 @@ private var usbDetachReceiver: BroadcastReceiver? = null
      * (launchers, runNativeOp, and several channel handlers below).
      */
     private fun dispatchNativeError(e: Exception, result: MethodChannel.Result) {
-        if (isNotUnlockedException(e)) {
+        if (e is UnlockCancelledException) {
+            result.error("CANCELLED", e.message, null)
+        } else if (isNotUnlockedException(e)) {
             result.error("NOT_UNLOCKED", e.message, null)
         } else {
             result.error("C++_ERROR", e.message, null)
@@ -707,6 +710,7 @@ private var usbDetachReceiver: BroadcastReceiver? = null
 
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel
+        UnlockProgressBridge.channel = channel
 
         val filter = IntentFilter(ACTION_CHOOSER)
         chooserReceiver = object : BroadcastReceiver() {
@@ -881,6 +885,11 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
         result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
         return@setMethodCallHandler
     }
+    // Tell Dart the volId as soon as it's known — the unlock call below can
+    // run for several seconds during cipher/hash auto-detect, and Dart needs
+    // this to let the user cancel it (VeraCryptEngine.requestCancelUnlockNative)
+    // before the call itself returns.
+    methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
 
     Thread {
         var msd: UsbMassStorageDevice? = null
@@ -902,10 +911,19 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                 Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
             }
 
-            val files = VeraCryptEngine.unlockUsbAndListNative(
-                password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
-                keyfileFds = keyfileFds
-            )
+            // FIX: previously the only unlock path NOT wrapped in this lock
+            // (the file-based path below always was) — meaning two rapid USB
+            // unlock attempts for the same volId (e.g. retry after a typo)
+            // could both enter native concurrently instead of the second one
+            // waiting for the first to actually exit. Serializing entry here
+            // is also what makes requestCancelUnlockNative's "reset the flag
+            // at the top of the next attempt" safe (see vaultexplorer.cpp).
+            val files = synchronized(VeraCryptSession.locks[targetVolId]) {
+                VeraCryptEngine.unlockUsbAndListNative(
+                    password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
+                    keyfileFds = keyfileFds
+                )
+            }
 
             runOnUiThread {
                 if (files != null) {
@@ -1028,6 +1046,10 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
                             return@setMethodCallHandler
                         }
+                        // See the matching comment in UNLOCK_USB_CONTAINER —
+                        // lets Dart send requestCancelUnlockNative(volId) for
+                        // this attempt before it returns.
+                        methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
 
                         Thread {
                             var pfd: ParcelFileDescriptor? = null
@@ -1096,6 +1118,20 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                 runOnUiThread { dispatchNativeError(e, result) }
                             }
                         }.start()
+                    }
+
+                    ChannelMethods.CANCEL_UNLOCK -> {
+                        val volId = call.argument<Number>("volId")?.toInt()
+                        if (volId == null) {
+                            result.error("INVALID_ARGS", "volId required", null)
+                            return@setMethodCallHandler
+                        }
+                        // Fire-and-forget — the pending unlockContainer/
+                        // unlockUsbContainer call for this volId will resolve
+                        // on its own (with a CANCELLED error) once the native
+                        // side notices the flag; there's nothing to await here.
+                        VeraCryptEngine.requestCancelUnlockNative(volId)
+                        result.success(true)
                     }
 
                     ChannelMethods.DERIVE_DERIVED_KEY -> {

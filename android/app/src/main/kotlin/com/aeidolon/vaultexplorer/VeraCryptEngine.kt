@@ -68,6 +68,13 @@ object VeraCryptEngine {
     @JvmStatic
     external fun lockNative(volId: Int)
 
+    /** Best-effort: asks an in-flight unlockAndListNative/unlockUsbAndListNative
+     *  call for [volId] to abort at its next hash/cipher combination boundary
+     *  (not instant — bounded by roughly one PBKDF2 round). Safe to call even
+     *  if nothing is currently unlocking for [volId]. See UnlockCancelledException. */
+    @JvmStatic
+    external fun requestCancelUnlockNative(volId: Int)
+
     // ── Tier 2: stateless file operations (volId-only) ─────────────────────
 
     // ── Matched cipher/hash lookup (perf: skip auto-detect next unlock) ────

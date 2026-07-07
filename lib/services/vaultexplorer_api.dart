@@ -14,6 +14,45 @@ import 'channel_methods.dart';
 /// or list entry in the unlock UI.
 typedef KeyfileRef = ({String uri, String displayName});
 
+/// One "onUnlockProgress" push from native during cipher/hash auto-detect.
+/// [attempted]/[total] count hash-algorithm rounds tried so far (auto-detect
+/// runs up to 5 in parallel, each then tries up to 8 ciphers against it very
+/// quickly) — suitable for a "trying combination 2 of 5" style indicator.
+/// [hashId]/[cipherId] are whichever combination was just attempted (-1 for
+/// cipherId if that hash's PBKDF2 itself hadn't finished yet); see
+/// [hashAlgorithmName]/[cipherAlgorithmName] to render them.
+typedef UnlockProgress = ({
+  int volId,
+  int attempted,
+  int total,
+  int hashId,
+  int cipherId,
+});
+
+/// Mirrors the hash-algorithm dropdown in unlock_sheet.dart/
+/// usb_unlock_sheet.dart — keep in sync with the HashId order
+/// deriveAndValidateHeader() in vaultexplorer.cpp searches.
+String hashAlgorithmName(int hashId) {
+  const names = ['SHA-512', 'SHA-256', 'Whirlpool', 'Streebog', 'BLAKE2s-256'];
+  return (hashId >= 0 && hashId < names.length) ? names[hashId] : 'Unknown';
+}
+
+/// Mirrors the cipher dropdown in unlock_sheet.dart/usb_unlock_sheet.dart —
+/// keep in sync with the CascadeId order in crypto/cascade.h.
+String cipherAlgorithmName(int cipherId) {
+  const names = [
+    'AES',
+    'Serpent',
+    'Twofish',
+    'AES-Twofish',
+    'Serpent-AES',
+    'Twofish-Serpent',
+    'AES-Twofish-Serpent',
+    'Serpent-Twofish-AES',
+  ];
+  return (cipherId >= 0 && cipherId < names.length) ? names[cipherId] : 'Unknown';
+}
+
 class VaultExplorerApi {
   const VaultExplorerApi();
 
@@ -37,6 +76,39 @@ class VaultExplorerApi {
     _usbContainerDetachedListeners.remove(listener);
   }
 
+  // ── Unlock progress / cancellation ──────────────────────────────────────
+  //
+  // "onUnlockStarted" fires once, synchronously from the native method call
+  // handler, as soon as a volId has been allocated for this attempt — before
+  // the (potentially several-second) auto-detect search actually begins.
+  // "onUnlockProgress" then fires repeatedly during that search. Listeners
+  // should filter on volId themselves if more than one unlock could be in
+  // flight (in practice: at most one per UnlockSheet/UsbUnlockSheet instance).
+
+  static final List<void Function(int volId)> _unlockStartedListeners = [];
+  static final List<void Function(UnlockProgress progress)>
+      _unlockProgressListeners = [];
+
+  static void addUnlockStartedListener(void Function(int volId) listener) {
+    _unlockStartedListeners.add(listener);
+  }
+
+  static void removeUnlockStartedListener(void Function(int volId) listener) {
+    _unlockStartedListeners.remove(listener);
+  }
+
+  static void addUnlockProgressListener(
+    void Function(UnlockProgress progress) listener,
+  ) {
+    _unlockProgressListeners.add(listener);
+  }
+
+  static void removeUnlockProgressListener(
+    void Function(UnlockProgress progress) listener,
+  ) {
+    _unlockProgressListeners.remove(listener);
+  }
+
   static void initMethodCallHandler() {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onAppSelected') {
@@ -50,6 +122,30 @@ class VaultExplorerApi {
         if (volId != null) {
           for (final listener in List.of(_usbContainerDetachedListeners)) {
             listener(volId);
+          }
+        }
+      } else if (call.method == 'onUnlockStarted') {
+        final volId = call.arguments['volId'] as int?;
+        if (volId != null) {
+          for (final listener in List.of(_unlockStartedListeners)) {
+            listener(volId);
+          }
+        }
+      } else if (call.method == 'onUnlockProgress') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final volId = args['volId'] as int?;
+        final attempted = args['attempted'] as int?;
+        final total = args['total'] as int?;
+        if (volId != null && attempted != null && total != null) {
+          final progress = (
+            volId: volId,
+            attempted: attempted,
+            total: total,
+            hashId: args['hashId'] as int? ?? 255,
+            cipherId: args['cipherId'] as int? ?? 255,
+          );
+          for (final listener in List.of(_unlockProgressListeners)) {
+            listener(progress);
           }
         }
       }
@@ -210,6 +306,23 @@ class VaultExplorerApi {
               displayName: m['displayName'] as String,
             ))
         .toList();
+  }
+
+  /// Asks native to abort the in-flight unlock for [volId] (see
+  /// [addUnlockStartedListener] for how the caller learns [volId] before the
+  /// original [unlockContainer]/[unlockUsbContainer] call has resolved).
+  ///
+  /// Fire-and-forget and best-effort: this doesn't itself throw or resolve
+  /// the pending unlock — that call will still complete on its own shortly
+  /// after, but with a `PlatformException(code: 'CANCELLED')` instead of a
+  /// result, once native notices the request. Safe to call more than once,
+  /// or after the unlock has already finished.
+  Future<void> cancelUnlock(int volId) async {
+    try {
+      await _channel.invokeMethod(ChannelMethods.cancelUnlock, {'volId': volId});
+    } catch (_) {
+      // Best-effort — the pending unlock call resolves on its own regardless.
+    }
   }
 
  Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId})?> unlockContainer(

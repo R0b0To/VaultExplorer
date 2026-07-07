@@ -279,6 +279,12 @@ static JavaVM*   g_vm             = nullptr;
 static jclass    g_usbBridgeClass = nullptr;
 static jmethodID g_usbReadMethod  = nullptr;  // static byte[]  readSectors(int, long, int)
 static jmethodID g_usbWriteMethod = nullptr;  // static boolean writeSectors(int, long, int, byte[])
+
+// Upcall target for unlock progress ("trying combination i of N"), pushed
+// from whichever worker thread inside deriveAndValidateHeader() just
+// finished a hash/cipher attempt. See UnlockProgressBridge.kt.
+static jclass    g_progressBridgeClass  = nullptr;
+static jmethodID g_progressReportMethod = nullptr; // static void reportProgress(int,int,int,int,int)
 static bool isValidBootSector(const unsigned char* decS) {
     // End of sector signature must be 0x55AA
     if (decS[510] != 0x55 || decS[511] != 0xAA) {
@@ -360,6 +366,21 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         LOGI("JNI_OnLoad: UsbBlockBridge methods not found");
         return JNI_ERR;
     }
+
+    jclass progressLocal = env->FindClass("com/aeidolon/vaultexplorer/UnlockProgressBridge");
+    if (!progressLocal) {
+        LOGI("JNI_OnLoad: UnlockProgressBridge class not found");
+        return JNI_ERR;
+    }
+    g_progressBridgeClass = reinterpret_cast<jclass>(env->NewGlobalRef(progressLocal));
+    env->DeleteLocalRef(progressLocal);
+
+    g_progressReportMethod = env->GetStaticMethodID(
+        g_progressBridgeClass, "reportProgress", "(IIIII)V");
+    if (!g_progressReportMethod) {
+        LOGI("JNI_OnLoad: UnlockProgressBridge.reportProgress not found");
+        return JNI_ERR;
+    }
     return JNI_VERSION_1_6;
 }
 
@@ -377,6 +398,23 @@ struct ScopedJniEnv {
     }
     ~ScopedJniEnv() { if (attached) g_vm->DetachCurrentThread(); }
 };
+
+// Pushes an "i of N combinations tried" update to Kotlin. Safe to call from
+// any worker thread spawned inside deriveAndValidateHeader() (attaches on
+// demand via ScopedJniEnv, same as usbReadSectors/usbWriteSectors below).
+// volId < 0 (used by deriveKeyMaterialNative, which has no session/volId of
+// its own) silently no-ops — there's no Dart-side listener keyed on a
+// negative volId to receive it anyway.
+static void reportUnlockProgress(int volId, int attempted, int total, int hashId, int cipherId) {
+    if (volId < 0) return;
+    ScopedJniEnv scope;
+    if (!scope.env) return;
+    scope.env->CallStaticVoidMethod(
+        g_progressBridgeClass, g_progressReportMethod,
+        static_cast<jint>(volId), static_cast<jint>(attempted), static_cast<jint>(total),
+        static_cast<jint>(hashId), static_cast<jint>(cipherId));
+    if (scope.env->ExceptionCheck()) scope.env->ExceptionClear();
+}
 
 static bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount, unsigned char* outBuf) {
     ScopedJniEnv scope;
@@ -801,6 +839,38 @@ static bool _derivationInit = [](){
     return true;
 }();
 
+// ----------------------------------------------------------------====
+// UNLOCK CANCELLATION
+//
+// Lets a user abort an in-flight unlock (e.g. mistyped password, or they
+// want to try a different container without waiting for this volId's full
+// 5-hash x 8-cipher auto-detect search to finish). Checked at combination
+// boundaries inside deriveAndValidateHeader() below — NOT mid-PBKDF2 — so
+// worst-case cancel latency is roughly one PBKDF2 round (the iteration
+// count for whichever hash is currently running), not instant, but bounded
+// and small compared to the multi-combination search it interrupts.
+//
+// requestCancelUnlockNative() (JNI export) sets this; unlockAndListNative /
+// unlockUsbAndListNative clear it for their volId before starting a fresh
+// attempt. Kotlin's `synchronized(VeraCryptSession.locks[volId])` wrapper
+// around BOTH unlock call sites guarantees the clear-at-entry can never
+// race a still-running older attempt for the same volId — see the LOCK
+// DOMAIN CONTRACT comment further down for why that Kotlin-side lock
+// matters independently of derivationMutexes[volId].
+// ----------------------------------------------------------------====
+static std::atomic<bool> cancelRequested[MAX_VOLUMES];
+
+static bool _cancelInit = [](){
+    for (int i = 0; i < MAX_VOLUMES; i++)
+        cancelRequested[i].store(false);
+    return true;
+}();
+
+static inline bool isUnlockCancelled(int volId) {
+    return volId >= 0 && volId < MAX_VOLUMES &&
+           cancelRequested[volId].load(std::memory_order_acquire);
+}
+
 // FsScanResult used to live here, backing a scan for a valid FAT/exFAT
 // boot-sector signature under two guessed tweak conventions. Removed along
 // with tryKeyCandidate()/tryKeyCandidateUsb() below — dataOffset and the
@@ -912,15 +982,50 @@ static bool deriveAndValidateHeader(
     unsigned char outDecryptedHeader[VC_HEADER_BODY_SIZE], // ADDED
     CascadeId& outMatchedCipher,
     HashId& outMatchedHash,
-    ParsedHeaderFields& outFields
+    ParsedHeaderFields& outFields,
+    int volId = -1 // NEW: for cancellation checks + "i of N" progress upcalls.
+                    // -1 (deriveKeyMaterialNative's caller has no session
+                    // yet) just disables both, silently.
 ) {
     const auto timingStart = std::chrono::steady_clock::now();
     const unsigned char* salt = headerSector;
     const unsigned char* encH = headerSector + VC_SALT_SIZE;
     const int safePim = clampPim(pim);
 
+    // Hoisted above the fast path (previously built further down, after the
+    // fast path either returned or fell through) purely so the total step
+    // count is known before the first progress report — the search logic
+    // itself is unchanged.
+    std::vector<HashId> hashesToTry;
+    if (hashIdParam != 255) {
+        hashesToTry.push_back(static_cast<HashId>(hashIdParam));
+    } else {
+        hashesToTry = { HashId::kSha512, HashId::kSha256, HashId::kWhirlpool, HashId::kStreebog, HashId::kBlake2s256 };
+    }
+
+    std::vector<CascadeId> ciphersToTry;
+    if (cipherIdParam != 255) {
+        ciphersToTry.push_back(static_cast<CascadeId>(cipherIdParam));
+    } else {
+        ciphersToTry = {
+            CascadeId::kAes,
+            CascadeId::kSerpent,
+            CascadeId::kTwofish,
+            CascadeId::kAesTwofish,
+            CascadeId::kSerpentAes,
+            CascadeId::kTwofishSerpent,
+            CascadeId::kAesTwofishSerpent,
+            CascadeId::kSerpentTwofishAes
+        };
+    }
+    const int totalHashSteps = static_cast<int>(hashesToTry.size());
+
+    if (isUnlockCancelled(volId)) return false;
+
     // --- FIX 1: The 64-byte Fast Path ---
     if (cipherIdParam == 255 && hashIdParam == 255) {
+        reportUnlockProgress(volId, 0, totalHashSteps,
+                              static_cast<int>(HashId::kSha512), static_cast<int>(CascadeId::kAes));
         const int fastIter = iterationsForHash(HashId::kSha512, safePim);
         
         // PBKDF2 with SHA-512 outputs 64 bytes per block. 
@@ -946,30 +1051,10 @@ static bool deriveAndValidateHeader(
         // Not AES/SHA-512 — fall through to the full parallel search below.
     }
 
-    std::vector<HashId> hashesToTry;
-    if (hashIdParam != 255) {
-        hashesToTry.push_back(static_cast<HashId>(hashIdParam));
-    } else {
-        hashesToTry = { HashId::kSha512, HashId::kSha256, HashId::kWhirlpool, HashId::kStreebog, HashId::kBlake2s256 };
-    }
-
-    std::vector<CascadeId> ciphersToTry;
-    if (cipherIdParam != 255) {
-        ciphersToTry.push_back(static_cast<CascadeId>(cipherIdParam));
-    } else {
-        ciphersToTry = {
-            CascadeId::kAes,
-            CascadeId::kSerpent,
-            CascadeId::kTwofish,
-            CascadeId::kAesTwofish,
-            CascadeId::kSerpentAes,
-            CascadeId::kTwofishSerpent,
-            CascadeId::kAesTwofishSerpent,
-            CascadeId::kSerpentTwofishAes
-        };
-    }
+    if (isUnlockCancelled(volId)) return false;
 
     std::atomic<bool> found{false};
+    std::atomic<int> combinationsAttempted{0};
     std::mutex resultMutex;
     unsigned char resultKeyMaterial[192] = {0};
     CascadeId resultCipher{};
@@ -983,24 +1068,28 @@ static bool deriveAndValidateHeader(
     const size_t neededKeyBytes = static_cast<size_t>(maxLayersToTry) * 64;
 
     auto worker = [&](HashId h) {
-        if (found.load(std::memory_order_acquire)) return;
+        if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId)) return;
 
         int iter = iterationsForHash(h, safePim);
         unsigned char derivedKeyMaterial[192] = {0};
         
         if (!pbkdf2Hmac(h, password, passwordLen,
                        salt, VC_SALT_SIZE, iter, derivedKeyMaterial, neededKeyBytes)) {
+            reportUnlockProgress(volId, combinationsAttempted.fetch_add(1) + 1, totalHashSteps,
+                                 static_cast<int>(h), -1);
             return;
         }
 
-        if (found.load(std::memory_order_acquire)) {
+        if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId)) {
             mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
             return;
         }
 
         unsigned char decH[VC_HEADER_BODY_SIZE];
+        int lastCipherTried = -1;
         for (CascadeId c : ciphersToTry) {
-            if (found.load(std::memory_order_acquire)) break;
+            if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId)) break;
+            lastCipherTried = static_cast<int>(c);
             ParsedHeaderFields candidateFields;
             if (tryDecryptHeader(encH, c, derivedKeyMaterial, decH, &candidateFields)) {
                 bool expected = false;
@@ -1014,10 +1103,14 @@ static bool deriveAndValidateHeader(
         }
                 mbedtls_platform_zeroize(decH, sizeof(decH));
                 mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
+                reportUnlockProgress(volId, combinationsAttempted.fetch_add(1) + 1, totalHashSteps,
+                                     static_cast<int>(h), lastCipherTried);
                 return;
             }
         }
         mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
+        reportUnlockProgress(volId, combinationsAttempted.fetch_add(1) + 1, totalHashSteps,
+                             static_cast<int>(h), lastCipherTried);
     };
 
     if (hashesToTry.size() <= 1) {
@@ -1030,8 +1123,12 @@ static bool deriveAndValidateHeader(
     }
 
     if (!found.load(std::memory_order_acquire)) {
-        LOGI("deriveAndValidateHeader: failed after %lld ms (cipher=%d hash=%d)",
-             elapsedMs(timingStart), cipherIdParam, hashIdParam);
+        if (isUnlockCancelled(volId)) {
+            LOGI("deriveAndValidateHeader: cancelled after %lld ms (vol=%d)", elapsedMs(timingStart), volId);
+        } else {
+            LOGI("deriveAndValidateHeader: failed after %lld ms (cipher=%d hash=%d)",
+                 elapsedMs(timingStart), cipherIdParam, hashIdParam);
+        }
         return false;
     }
 
@@ -1146,7 +1243,7 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
                 break;
             }
         } else {
-            if (deriveAndValidateHeader(headerSector, mixedPassword, mixedPasswordLen, pim, cipherId, hashId, dKey, decH, matchedCipher, matchedHash, fields)) {
+            if (deriveAndValidateHeader(headerSector, mixedPassword, mixedPasswordLen, pim, cipherId, hashId, dKey, decH, matchedCipher, matchedHash, fields, volId)) {
                 matched = true;
                 break;
             }
@@ -1340,7 +1437,7 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
 
                 // PASS decH here
                 derivedSuccessfully = deriveAndValidateHeader(headerBuf, mixedPassword, mixedPasswordLen, pim, cipherId, hashId,
-                                         dKey, decH, matchedCipher, matchedHash, fields);
+                                         dKey, decH, matchedCipher, matchedHash, fields, volId);
             }
 
             if (!derivedSuccessfully) {
@@ -1502,6 +1599,18 @@ static std::vector<int> extractKeyfileFds(JNIEnv* env, jintArray arr) {
     return fds;
 }
 
+// Distinguishes "user cancelled" from "wrong password" across the JNI
+// boundary: both prepareSession()/prepareUsbSession() just return false for
+// either case (deriveAndValidateHeader doesn't thread a reason code back),
+// so the *_Native functions below re-check isUnlockCancelled(volId) after a
+// false return and throw this instead of returning null when that's why it
+// failed. Kotlin's dispatchNativeError() maps it to a "CANCELLED" result.error
+// (see MainActivity.kt) instead of AUTH_FAIL.
+static void throwUnlockCancelledException(JNIEnv* env) {
+    jclass excClass = env->FindClass("com/aeidolon/vaultexplorer/UnlockCancelledException");
+    if (excClass) env->ThrowNew(excClass, "CANCELLED");
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMaxVolumesNative(JNIEnv*, jobject) {
     // FIX: previously MAX_VOLUMES had to be manually kept in sync across
@@ -1592,6 +1701,15 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
         JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds) {
 
+    // Clear any stale cancellation from a *previous* attempt at this volId.
+    // Kotlin's synchronized(VeraCryptSession.locks[volId]) around this call
+    // guarantees a prior attempt for the same volId has already fully
+    // returned by the time we get here, so this can't race a still-running
+    // derivation into an un-cancelled state.
+    if (volId >= 0 && volId < MAX_VOLUMES) {
+        cancelRequested[volId].store(false, std::memory_order_release);
+    }
+
     const unsigned char* preservedBytes = nullptr;
     size_t preservedLen = 0;
     if (preservedKey != nullptr) {
@@ -1609,6 +1727,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
             env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
         }
         env->ReleaseStringUTFChars(password, nativePass);
+        if (isUnlockCancelled(volId)) throwUnlockCancelledException(env);
         return nullptr;
     }
 
@@ -1627,6 +1746,20 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     }
     env->ReleaseStringUTFChars(password, nativePass);
     return result;
+}
+
+// Signals cancellation for whatever unlock is currently in flight for
+// [volId] (or a not-yet-started one about to check the flag). Fire-and-
+// forget: does not wait for the derivation to actually stop, and is safe to
+// call even if nothing is running for this volId (no-op — the flag is
+// cleared again at the top of the next unlockAndListNative/
+// unlockUsbAndListNative call for this volId regardless).
+extern "C" JNIEXPORT void JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_requestCancelUnlockNative(
+        JNIEnv*, jobject, jint volId) {
+    if (volId >= 0 && volId < MAX_VOLUMES) {
+        cancelRequested[volId].store(true, std::memory_order_release);
+    }
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -2349,6 +2482,14 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
         jlong partitionOffsetHint, jintArray keyfileFds) {
 
+    // See the matching comment in unlockAndListNative — this is only race
+    // free because Kotlin now wraps this native call in
+    // synchronized(VeraCryptSession.locks[volId]) too (see MainActivity.kt's
+    // UNLOCK_USB_CONTAINER handler).
+    if (volId >= 0 && volId < MAX_VOLUMES) {
+        cancelRequested[volId].store(false, std::memory_order_release);
+    }
+
     const unsigned char* preservedBytes = nullptr;
     size_t preservedLen = 0;
     if (preservedKey != nullptr) {
@@ -2368,7 +2509,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
         env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
     }
     env->ReleaseStringUTFChars(password, nativePass);
-    if (!ok) return nullptr;
+    if (!ok) {
+        if (isUnlockCancelled(volId)) throwUnlockCancelledException(env);
+        return nullptr;
+    }
 
     {
         std::lock_guard<std::mutex> lock(volumes[volId].mutex);

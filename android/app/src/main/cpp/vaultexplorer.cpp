@@ -26,6 +26,26 @@
 #include "crypto/keyfile_mixing.h"
 #include <thread>
 
+#include <fcntl.h>
+
+extern "C" {
+#include "device.h"
+#include "volume.h"
+#include "inode.h"
+#include "dir.h"
+#include "attrib.h"
+#include "layout.h"
+}
+
+// Undefine conflicting macros defined by NTFS-3G support.h
+#undef min
+#undef max
+
+struct NtfsStream {
+    ntfs_inode* inode = nullptr;
+    ntfs_attr*  attr = nullptr;
+};
+
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 static inline long long elapsedMs(const std::chrono::steady_clock::time_point& start) {
@@ -114,6 +134,17 @@ struct VolumeState {
     CascadeContext cascade;
     FATFS fatfs{};
 
+    // --- NTFS Support Properties ---
+    ntfs_volume* ntfsVol = nullptr;
+    enum FsType {
+        FS_UNKNOWN,
+        FS_FATFS,
+        FS_NTFS
+    } fsType = FS_UNKNOWN;
+    
+    std::vector<NtfsStream*> openNtfsStreams;
+    // -------------------------------
+
     std::unique_ptr<unsigned char[]> ioBuf;
     size_t     ioBufSize = 0;
     std::mutex ioBufMutex;
@@ -138,6 +169,8 @@ struct VolumeState {
         cascade.initialized = false;
         matchedCipherId = -1;
         matchedHashId = -1;
+        fsType = FS_UNKNOWN;
+        ntfsVol = nullptr;
         if (preservedDerivedKey != nullptr) {
             mbedtls_platform_zeroize(preservedDerivedKey, preservedDerivedKeyLen);
             delete[] preservedDerivedKey;
@@ -155,6 +188,7 @@ static jmethodID g_usbReadMethod  = nullptr;
 static jmethodID g_usbWriteMethod = nullptr;  
 static jclass    g_progressBridgeClass  = nullptr;
 static jmethodID g_progressReportMethod = nullptr; 
+
 static bool isValidBootSector(const unsigned char* decS) {
 
     if (decS[510] != 0x55 || decS[511] != 0xAA) {
@@ -198,43 +232,6 @@ static uint32_t readHeaderBE32Body(const unsigned char* body, int bodyOffset) {
            (static_cast<uint32_t>(body[bodyOffset + 1]) << 16) |
            (static_cast<uint32_t>(body[bodyOffset + 2]) <<  8) |
             static_cast<uint32_t>(body[bodyOffset + 3]);
-}
-
-extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
-    g_vm = vm;
-    JNIEnv* env = nullptr;
-    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
-
-    jclass localClass = env->FindClass("com/aeidolon/vaultexplorer/UsbBlockBridge");
-    if (!localClass) {
-        LOGI("JNI_OnLoad: UsbBlockBridge class not found");
-        return JNI_ERR;
-    }
-    g_usbBridgeClass = reinterpret_cast<jclass>(env->NewGlobalRef(localClass));
-    env->DeleteLocalRef(localClass);
-
-    g_usbReadMethod  = env->GetStaticMethodID(g_usbBridgeClass, "readSectors",  "(IJI)[B");
-    g_usbWriteMethod = env->GetStaticMethodID(g_usbBridgeClass, "writeSectors", "(IJI[B)Z");
-    if (!g_usbReadMethod || !g_usbWriteMethod) {
-        LOGI("JNI_OnLoad: UsbBlockBridge methods not found");
-        return JNI_ERR;
-    }
-
-    jclass progressLocal = env->FindClass("com/aeidolon/vaultexplorer/UnlockProgressBridge");
-    if (!progressLocal) {
-        LOGI("JNI_OnLoad: UnlockProgressBridge class not found");
-        return JNI_ERR;
-    }
-    g_progressBridgeClass = reinterpret_cast<jclass>(env->NewGlobalRef(progressLocal));
-    env->DeleteLocalRef(progressLocal);
-
-    g_progressReportMethod = env->GetStaticMethodID(
-        g_progressBridgeClass, "reportProgress", "(IIIII)V");
-    if (!g_progressReportMethod) {
-        LOGI("JNI_OnLoad: UnlockProgressBridge.reportProgress not found");
-        return JNI_ERR;
-    }
-    return JNI_VERSION_1_6;
 }
 
 struct ScopedJniEnv {
@@ -323,6 +320,333 @@ static const char* drivePaths[MAX_VOLUMES] = {
     "0:", "1:", "2:", "3:", "4:", "5:", "6:", "7:"
 };
 
+// ----------------------------------------------------------------====
+// NTFS SUPPORT STRUCTURES & OPERATIONS
+// ----------------------------------------------------------------====
+
+struct NtfsFilldirContext {
+    std::vector<std::string>* results;
+    ntfs_volume* vol;
+};
+
+static int vExplorer_ntfs_filldir(void *dirent, const ntfschar *name, const int name_len, const int name_type, const s64 pos, const MFT_REF mft_reference, const unsigned dt_type) {
+    NtfsFilldirContext* ctx = static_cast<NtfsFilldirContext*>(dirent);
+
+    if (name_type == FILE_NAME_DOS) {
+        return 0; // Skip 8.3 namespace to avoid duplicates in directory listings
+    }
+
+    char* utf8Name = nullptr;
+    int utf8NameLen = ntfs_ucstombs(name, name_len, &utf8Name, 0);
+    if (utf8NameLen < 0 || !utf8Name) {
+        if (utf8Name) free(utf8Name);
+        return 0;
+    }
+
+    std::string nameStr(utf8Name, utf8NameLen);
+    free(utf8Name);
+
+    if (nameStr == "." || nameStr == "..") {
+        return 0;
+    }
+
+    ntfs_inode* ni = ntfs_inode_open(ctx->vol, mft_reference);
+    if (!ni) return 0;
+
+    uint64_t size = 0;
+    uint64_t ts = 0;
+    bool isDir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+
+    if (!isDir) {
+        size = ni->data_size;
+    }
+
+    uint64_t ntfsTime = ni->last_data_change_time;
+    if (ntfsTime > 116444736000000000ULL) {
+        ts = (ntfsTime - 116444736000000000ULL) / 10000000ULL;
+    }
+
+    ntfs_inode_close(ni);
+
+    if (isDir) {
+        ctx->results->push_back("[DIR] " + nameStr + "|0|" + std::to_string(ts));
+    } else {
+        ctx->results->push_back(nameStr + "|" + std::to_string(size) + "|" + std::to_string(ts));
+    }
+    return 0;
+}
+
+struct NtfsSizeContext {
+    uint64_t totalSize = 0;
+    ntfs_volume* vol;
+};
+
+static int recursiveNtfsSizeFilldir(void *dirent, const ntfschar *name, const int name_len, const int name_type, const s64 pos, const MFT_REF mft_reference, const unsigned dt_type) {
+    NtfsSizeContext* ctx = static_cast<NtfsSizeContext*>(dirent);
+    if (name_type == FILE_NAME_DOS) return 0;
+
+    char* utf8Name = nullptr;
+    int utf8NameLen = ntfs_ucstombs(name, name_len, &utf8Name, 0);
+    if (utf8NameLen < 0 || !utf8Name) {
+        if (utf8Name) free(utf8Name);
+        return 0;
+    }
+    std::string nameStr(utf8Name, utf8NameLen);
+    free(utf8Name);
+
+    if (nameStr == "." || nameStr == "..") return 0;
+
+    ntfs_inode* ni = ntfs_inode_open(ctx->vol, mft_reference);
+    if (ni) {
+        bool isDir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+        if (isDir) {
+            s64 subPos = 0;
+            ntfs_readdir(ni, &subPos, ctx, recursiveNtfsSizeFilldir);
+        } else {
+            ctx->totalSize += ni->data_size;
+        }
+        ntfs_inode_close(ni);
+    }
+    return 0;
+}
+
+static uint64_t recursiveFolderSizeNtfs(int volId, const std::string& path) {
+    auto& v = volumes[volId];
+    ntfs_inode* dir_ni = nullptr;
+    if (path.empty() || path == "/") {
+        dir_ni = ntfs_inode_open(v.ntfsVol, FILE_root);
+    } else {
+        std::string fullNtfsPath = "/" + path;
+        dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullNtfsPath.c_str());
+    }
+
+    uint64_t total = 0;
+    if (dir_ni) {
+        s64 pos = 0;
+        NtfsSizeContext sizeCtx = { 0, v.ntfsVol };
+        ntfs_readdir(dir_ni, &pos, &sizeCtx, recursiveNtfsSizeFilldir);
+        total = sizeCtx.totalSize;
+        ntfs_inode_close(dir_ni);
+    }
+    return total;
+}
+
+static int vExplorer_ntfs_open(struct ntfs_device *dev, int flags) {
+    return 0; // Handled programmatically
+}
+
+static int vExplorer_ntfs_close(struct ntfs_device *dev) {
+    return 0;
+}
+
+static s64 vExplorer_ntfs_seek(struct ntfs_device *dev, s64 offset, int whence) {
+    return offset;
+}
+
+static s64 vExplorer_ntfs_pread(struct ntfs_device *dev, void *b, s64 count, s64 offset) {
+    if (count <= 0) return 0;
+    int volId = *static_cast<int*>(dev->d_private);
+    VolumeState& v = volumes[volId];
+
+    s64 bytesRead = 0;
+    s64 currOffset = offset;
+    s64 remaining = count;
+    unsigned char* outBuf = static_cast<unsigned char*>(b);
+    alignas(16) unsigned char sectorBuf[512];
+
+    while (remaining > 0) {
+        uint64_t sectorIndex = currOffset / 512;
+        uint32_t sectorOffset = currOffset % 512;
+        uint32_t bytesToCopy = 512 - sectorOffset;
+        if (bytesToCopy > remaining) {
+            bytesToCopy = remaining;
+        }
+
+        const uint64_t basePhysical = v.dataOffset / 512;
+        const uint64_t physSector = basePhysical + sectorIndex;
+        const uint64_t tweak = physSector - v.partitionStartSector;
+
+        alignas(16) unsigned char encBuf[512];
+        if (!physRead(volId, physSector * 512, encBuf, 512)) {
+            return bytesRead > 0 ? bytesRead : -1;
+        }
+
+        cascadeDecryptSector(v.cascade, tweak, encBuf, sectorBuf);
+        std::memcpy(outBuf + bytesRead, sectorBuf + sectorOffset, bytesToCopy);
+
+        bytesRead += bytesToCopy;
+        currOffset += bytesToCopy;
+        remaining -= bytesToCopy;
+    }
+    return bytesRead;
+}
+
+static s64 vExplorer_ntfs_pwrite(struct ntfs_device *dev, const void *b, s64 count, s64 offset) {
+    if (count <= 0) return 0;
+    int volId = *static_cast<int*>(dev->d_private);
+    VolumeState& v = volumes[volId];
+
+    s64 bytesWritten = 0;
+    s64 currOffset = offset;
+    s64 remaining = count;
+    const unsigned char* inBuf = static_cast<const unsigned char*>(b);
+    alignas(16) unsigned char sectorBuf[512];
+
+    while (remaining > 0) {
+        uint64_t sectorIndex = currOffset / 512;
+        uint32_t sectorOffset = currOffset % 512;
+        uint32_t bytesToCopy = 512 - sectorOffset;
+        if (bytesToCopy > remaining) {
+            bytesToCopy = remaining;
+        }
+
+        const uint64_t basePhysical = v.dataOffset / 512;
+        const uint64_t physSector = basePhysical + sectorIndex;
+        const uint64_t tweak = physSector - v.partitionStartSector;
+
+        if (sectorOffset > 0 || bytesToCopy < 512) {
+            alignas(16) unsigned char encBuf[512];
+            if (!physRead(volId, physSector * 512, encBuf, 512)) {
+                return bytesWritten > 0 ? bytesWritten : -1;
+            }
+            cascadeDecryptSector(v.cascade, tweak, encBuf, sectorBuf);
+        }
+
+        std::memcpy(sectorBuf + sectorOffset, inBuf + bytesWritten, bytesToCopy);
+
+        alignas(16) unsigned char encBufOut[512];
+        cascadeEncryptSector(v.cascade, tweak, sectorBuf, encBufOut);
+
+        if (!physWrite(volId, physSector * 512, encBufOut, 512)) {
+            return bytesWritten > 0 ? bytesWritten : -1;
+        }
+
+        bytesWritten += bytesToCopy;
+        currOffset += bytesToCopy;
+        remaining -= bytesToCopy;
+    }
+    return bytesWritten;
+}
+
+static int vExplorer_ntfs_sync(struct ntfs_device *dev) {
+    int volId = *static_cast<int*>(dev->d_private);
+    if (volumes[volId].fd >= 0) {
+        fsync(volumes[volId].fd);
+    }
+    return 0;
+}
+
+static int vExplorer_ntfs_stat(struct ntfs_device *dev, struct stat *buf) {
+    int volId = *static_cast<int*>(dev->d_private);
+    if (volumes[volId].fd >= 0) {
+        return fstat(volumes[volId].fd, buf);
+    }
+    std::memset(buf, 0, sizeof(struct stat));
+    buf->st_size = volumes[volId].fileSize;
+    buf->st_mode = S_IFBLK | 0660;
+    return 0;
+}
+
+static int vExplorer_ntfs_ioctl(struct ntfs_device *dev, unsigned long request, void *argp) {
+    int volId = *static_cast<int*>(dev->d_private);
+    switch (request) {
+        case 0x1268: // BLKSSZGET
+            *static_cast<int*>(argp) = 512;
+            return 0;
+        case 0x1260: // BLKGETSIZE
+            *static_cast<unsigned long*>(argp) = volumes[volId].dataAreaLengthBytes / 512;
+            return 0;
+        case 0x80041272: // BLKGETSIZE64
+            *static_cast<uint64_t*>(argp) = volumes[volId].dataAreaLengthBytes;
+            return 0;
+        default:
+            errno = EOPNOTSUPP;
+            return -1;
+    }
+}
+
+// Compile-time static sequential initialization of virtual device operations
+static ntfs_device_operations vExplorer_ntfs_ops = {
+    vExplorer_ntfs_open,
+    vExplorer_ntfs_close,
+    vExplorer_ntfs_seek,
+    nullptr, // read
+    nullptr, // write
+    vExplorer_ntfs_pread,
+    vExplorer_ntfs_pwrite,
+    vExplorer_ntfs_sync,
+    vExplorer_ntfs_stat,
+    vExplorer_ntfs_ioctl
+};
+
+// ── NTFS File Allocation Helper ──────────────────────────────────────────────
+
+static ntfs_inode* createNtfsFile(ntfs_volume* vol, const std::string& fullPath) {
+    size_t slashPos = fullPath.find_last_of('/');
+    std::string parentPath = fullPath.substr(0, slashPos);
+    std::string childName = fullPath.substr(slashPos + 1);
+    if (parentPath.empty()) parentPath = "/";
+
+    ntfs_inode* parentNi = ntfs_pathname_to_inode(vol, NULL, parentPath.c_str());
+    if (!parentNi) return nullptr;
+
+    ntfschar* uChild = nullptr;
+    int uChildLen = ntfs_mbstoucs(childName.c_str(), &uChild);
+    ntfs_inode* ni = nullptr;
+
+    if (uChildLen >= 0) {
+        // S_IFREG automatically initializes the MFT record and $DATA stream
+        ni = ntfs_create(parentNi, 0, uChild, uChildLen, S_IFREG | 0644);
+        free(uChild);
+    }
+    ntfs_inode_close(parentNi);
+    return ni;
+}
+
+// ----------------------------------------------------------------====
+// JNI ONLOAD & INITIALIZATION
+// ----------------------------------------------------------------====
+
+extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
+    g_vm = vm;
+    JNIEnv* env = nullptr;
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
+
+    jclass localClass = env->FindClass("com/aeidolon/vaultexplorer/UsbBlockBridge");
+    if (!localClass) {
+        LOGI("JNI_OnLoad: UsbBlockBridge class not found");
+        return JNI_ERR;
+    }
+    g_usbBridgeClass = reinterpret_cast<jclass>(env->NewGlobalRef(localClass));
+    env->DeleteLocalRef(localClass);
+
+    g_usbReadMethod  = env->GetStaticMethodID(g_usbBridgeClass, "readSectors",  "(IJI)[B");
+    g_usbWriteMethod = env->GetStaticMethodID(g_usbBridgeClass, "writeSectors", "(IJI[B)Z");
+    if (!g_usbReadMethod || !g_usbWriteMethod) {
+        LOGI("JNI_OnLoad: UsbBlockBridge methods not found");
+        return JNI_ERR;
+    }
+
+    jclass progressLocal = env->FindClass("com/aeidolon/vaultexplorer/UnlockProgressBridge");
+    if (!progressLocal) {
+        LOGI("JNI_OnLoad: UnlockProgressBridge class not found");
+        return JNI_ERR;
+    }
+    g_progressBridgeClass = reinterpret_cast<jclass>(env->NewGlobalRef(progressLocal));
+    env->DeleteLocalRef(progressLocal);
+
+    g_progressReportMethod = env->GetStaticMethodID(
+        g_progressBridgeClass, "reportProgress", "(IIIII)V");
+    if (!g_progressReportMethod) {
+        LOGI("JNI_OnLoad: UnlockProgressBridge.reportProgress not found");
+        return JNI_ERR;
+    }
+    return JNI_VERSION_1_6;
+}
+
+// ----------------------------------------------------------------====
+// MOUNT CACHE HELPERS
+// ----------------------------------------------------------------====
 
 static inline bool requireActiveSession(int volId, const char* callerName) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
@@ -345,32 +669,75 @@ static void throwNotUnlocked(JNIEnv* env, int volId, const char* callerName) {
     env->ThrowNew(exClass, msg);
 }
 
-// ----------------------------------------------------------------====
-// MOUNT CACHE HELPERS
-// ----------------------------------------------------------------====
-
 static bool ensureMounted(int volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
     auto& v = volumes[volId];
     if (v.fsMounted) return true;
 
-    FRESULT fr = f_mount(&v.fatfs, drivePaths[volId], 1);
-    if (fr == FR_OK) {
+    alignas(16) unsigned char decS[512];
+    DRESULT dr = disk_read(static_cast<BYTE>(volId), decS, 0, 1);
+    if (dr != RES_OK) {
+        LOGI("ensureMounted: failed to read boot sector for volume %d", volId);
+        return false;
+    }
+
+    if (decS[510] != 0x55 || decS[511] != 0xAA) {
+        LOGI("ensureMounted: invalid signature in boot sector for volume %d", volId);
+        return false;
+    }
+
+    // Inspect Boot Sector for NTFS Oem ID
+    if (std::memcmp(&decS[3], "NTFS    ", 8) == 0) {
+        v.fsType = VolumeState::FS_NTFS;
+        LOGI("ensureMounted: detected NTFS on volume %d", volId);
+
+        int* privVolId = new int(volId);
+        struct ntfs_device* dev = ntfs_device_alloc("vaultexplorer", 0, &vExplorer_ntfs_ops, privVolId);
+        if (!dev) {
+            delete privVolId;
+            return false;
+        }
+
+        v.ntfsVol = ntfs_device_mount(dev, 0);
+        if (!v.ntfsVol) {
+            // Unclean logs fallback
+            v.ntfsVol = ntfs_device_mount(dev, NTFS_MNT_RECOVER);
+        }
+
+        if (!v.ntfsVol) {
+            LOGI("ensureMounted: ntfs_device_mount failed");
+            ntfs_device_free(dev);
+            delete privVolId;
+            return false;
+        }
         v.fsMounted = true;
         return true;
+    } else {
+        v.fsType = VolumeState::FS_FATFS;
+        FRESULT fr = f_mount(&v.fatfs, drivePaths[volId], 1);
+        if (fr == FR_OK) {
+            v.fsMounted = true;
+            return true;
+        }
+        return false;
     }
-    LOGI("ensureMounted: f_mount failed for volume %d, code=%d", volId, (int)fr);
-    return false;
 }
 
 static void unmountVolume(int volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return;
     auto& v = volumes[volId];
     if (v.fsMounted) {
-        f_mount(nullptr, drivePaths[volId], 0);
+        if (v.fsType == VolumeState::FS_FATFS) {
+            f_mount(nullptr, drivePaths[volId], 0);
+        } else if (v.fsType == VolumeState::FS_NTFS && v.ntfsVol) {
+            void* priv = v.ntfsVol->dev->d_private;
+            ntfs_umount(v.ntfsVol, FALSE);
+            if (priv) delete static_cast<int*>(priv);
+            v.ntfsVol = nullptr;
+        }
         v.fsMounted = false;
+        v.fsType = VolumeState::FS_UNKNOWN;
     }
-    // Release persistent IO buffer when volume is locked.
     std::lock_guard<std::mutex> bufLock(v.ioBufMutex);
     v.ioBuf.reset();
     v.ioBufSize = 0;
@@ -503,7 +870,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 
         if (!physRead(pdrv, firstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
-for (UINT i = 0; i < batch.count; i++) {
+        for (UINT i = 0; i < batch.count; i++) {
             const uint64_t physSector = firstPhysical + i;
             const uint64_t tweak = physSector - v.partitionStartSector;
             cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512), curBuf + (i*512));
@@ -806,14 +1173,14 @@ static bool deriveAndValidateHeader(
             ParsedHeaderFields candidateFields;
             if (tryDecryptHeader(encH, c, derivedKeyMaterial, decH, &candidateFields)) {
                 bool expected = false;
-        if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
-            std::lock_guard<std::mutex> lock(resultMutex);
-            std::memcpy(resultKeyMaterial, derivedKeyMaterial, 192); 
-            std::memcpy(outDecryptedHeader, decH, VC_HEADER_BODY_SIZE);
-            resultCipher = c;
-            resultHash = h;
-            resultFields = candidateFields;
-        }
+                if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+                    std::lock_guard<std::mutex> lock(resultMutex);
+                    std::memcpy(resultKeyMaterial, derivedKeyMaterial, 192); 
+                    std::memcpy(outDecryptedHeader, decH, VC_HEADER_BODY_SIZE);
+                    resultCipher = c;
+                    resultHash = h;
+                    resultFields = candidateFields;
+                }
                 mbedtls_platform_zeroize(decH, sizeof(decH));
                 mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
                 reportUnlockProgress(volId, combinationsAttempted.fetch_add(1) + 1, totalHashSteps,
@@ -1155,6 +1522,7 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
     }
     return true;
 }
+
 // ----------------------------------------------------------------====
 // SHARED: Directory listing
 // ----------------------------------------------------------------====
@@ -1183,47 +1551,53 @@ static uint64_t recursiveFolderSize(int volId, const std::string& fatPath) {
 
 static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pathSuffix) {
     std::vector<std::string> results;
-    std::string fullPath = drivePaths[volId];
-    if (pathSuffix && pathSuffix[0] != '\0') {
-        fullPath += '/';
-        fullPath += pathSuffix;
-    }
+    auto& v = volumes[volId];
 
-    DIR dir;
-    FILINFO fno;
-    if (f_opendir(&dir, fullPath.c_str()) == FR_OK) {
-        while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
-            if (results.size() >= MAX_DIR_ENTRIES) {
-                results.push_back("System:TRUNCATED");
-                LOGI("buildDirectoryListing: truncated at %zu entries", MAX_DIR_ENTRIES);
-                break;
-            }
-            const char* name = fno.fname;
-            if (strcmp(name, "SYSTEM~1") == 0 || strcmp(name, "$RECYCLE.BIN") == 0)
-                continue;
-
-            const uint64_t ts = fatToUnixTimestamp(fno.fdate, fno.ftime);
-            if (fno.fattrib & AM_DIR) {
-                std::string entry = "[DIR] ";
-                entry += name;
-                entry += "|0|";
-                entry += std::to_string(ts);
-                results.push_back(std::move(entry));
-            } else {
-                std::string entry = name;
-                entry += '|';
-                entry += std::to_string(fno.fsize);
-                entry += '|';
-                entry += std::to_string(ts);
-                results.push_back(std::move(entry));
-            }
+    if (v.fsType == VolumeState::FS_FATFS) {
+        std::string fullPath = drivePaths[volId];
+        if (pathSuffix && pathSuffix[0] != '\0') {
+            fullPath += '/';
+            fullPath += pathSuffix;
         }
-        f_closedir(&dir);
+        DIR dir;
+        FILINFO fno;
+        if (f_opendir(&dir, fullPath.c_str()) == FR_OK) {
+            while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
+                if (results.size() >= MAX_DIR_ENTRIES) {
+                    results.push_back("System:TRUNCATED");
+                    break;
+                }
+                const char* name = fno.fname;
+                if (strcmp(name, "SYSTEM~1") == 0 || strcmp(name, "$RECYCLE.BIN") == 0) continue;
+
+                const uint64_t ts = fatToUnixTimestamp(fno.fdate, fno.ftime);
+                if (fno.fattrib & AM_DIR) {
+                    results.push_back("[DIR] " + std::string(name) + "|0|" + std::to_string(ts));
+                } else {
+                    results.push_back(std::string(name) + "|" + std::to_string(fno.fsize) + "|" + std::to_string(ts));
+                }
+            }
+            f_closedir(&dir);
+        }
+    } else if (v.fsType == VolumeState::FS_NTFS) {
+        ntfs_inode* dir_ni = nullptr;
+        if (!pathSuffix || pathSuffix[0] == '\0' || std::strcmp(pathSuffix, "/") == 0) {
+            dir_ni = ntfs_inode_open(v.ntfsVol, FILE_root);
+        } else {
+            std::string fullPath = "/" + std::string(pathSuffix);
+            dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+        }
+
+        if (dir_ni) {
+            s64 pos = 0;
+            NtfsFilldirContext fillCtx = { &results, v.ntfsVol };
+            ntfs_readdir(dir_ni, &pos, &fillCtx, vExplorer_ntfs_filldir);
+            ntfs_inode_close(dir_ni);
+        }
     }
 
     jclass strClass = env->FindClass("java/lang/String");
-    jobjectArray retArr = env->NewObjectArray(
-        static_cast<jsize>(results.size()), strClass, nullptr);
+    jobjectArray retArr = env->NewObjectArray(static_cast<jsize>(results.size()), strClass, nullptr);
     for (size_t i = 0; i < results.size(); i++) {
         sanitizeString(results[i]);
         jstring js = env->NewStringUTF(results[i].c_str());
@@ -1361,7 +1735,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
         if (ensureMounted(volId)) {
             result = buildDirectoryListing(env, volId, nullptr);
         } else {
-            LOGI("FATFS Mount failed on volume %d", volId);
+            LOGI("FATFS/NTFS Mount failed on volume %d", volId);
         }
     }
 
@@ -1387,11 +1761,20 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
     VolumeState& v = volumes[volId];
     std::lock_guard<std::mutex> lock(v.mutex);
 
+    // Close FAT streams
     for (FIL* f : v.openStreams) {
         f_close(f);
         delete f;
     }
     v.openStreams.clear();
+
+    // Close NTFS streams
+    for (NtfsStream* ns : v.openNtfsStreams) {
+        ntfs_attr_close(ns->attr);
+        ntfs_inode_close(ns->inode);
+        delete ns;
+    }
+    v.openNtfsStreams.clear();
 
     v.reset();
 
@@ -1723,14 +2106,24 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSize(
     }
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jlong size = 0;
+    auto& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::lock_guard<std::mutex> fsLock(v.mutex);
         if (ensureMounted(volId)) {
-            FIL f;
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-                size = static_cast<jlong>(f_size(&f));
-                f_close(&f);
+            if (v.fsType == VolumeState::FS_FATFS) {
+                FIL f;
+                std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+                if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+                    size = static_cast<jlong>(f_size(&f));
+                    f_close(&f);
+                }
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                std::string fullPath = "/" + std::string(targetName);
+                ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+                if (ni) {
+                    size = static_cast<jlong>(ni->data_size);
+                    ntfs_inode_close(ni);
+                }
             }
         }
     }
@@ -1746,10 +2139,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSize(
     }
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     jlong total = 0;
+    auto& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-        if (ensureMounted(volId))
-            total = static_cast<jlong>(recursiveFolderSize(volId, nativePath));
+        std::lock_guard<std::mutex> fsLock(v.mutex);
+        if (ensureMounted(volId)) {
+            if (v.fsType == VolumeState::FS_FATFS) {
+                total = static_cast<jlong>(recursiveFolderSize(volId, nativePath));
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                total = static_cast<jlong>(recursiveFolderSizeNtfs(volId, nativePath));
+            }
+        }
     }
     env->ReleaseStringUTFChars(dirPath, nativePath);
     return total;
@@ -1765,21 +2164,41 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunk(
     }
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jbyteArray retArray = nullptr;
+    auto& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::lock_guard<std::mutex> fsLock(v.mutex);
         if (ensureMounted(volId)) {
-            FIL f;
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-                f_lseek(&f, static_cast<FSIZE_t>(offset));
-                std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
-                UINT br = 0;
-                if (f_read(&f, buffer.get(), static_cast<UINT>(length), &br) == FR_OK && br > 0) {
-                    retArray = env->NewByteArray(static_cast<jsize>(br));
-                    env->SetByteArrayRegion(retArray, 0, static_cast<jsize>(br),
-                                            reinterpret_cast<jbyte*>(buffer.get()));
+            if (v.fsType == VolumeState::FS_FATFS) {
+                FIL f;
+                std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+                if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+                    f_lseek(&f, static_cast<FSIZE_t>(offset));
+                    std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
+                    UINT br = 0;
+                    if (f_read(&f, buffer.get(), static_cast<UINT>(length), &br) == FR_OK && br > 0) {
+                        retArray = env->NewByteArray(static_cast<jsize>(br));
+                        env->SetByteArrayRegion(retArray, 0, static_cast<jsize>(br),
+                                                reinterpret_cast<jbyte*>(buffer.get()));
+                    }
+                    f_close(&f);
                 }
-                f_close(&f);
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                std::string fullPath = "/" + std::string(targetName);
+                ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+                if (ni) {
+                    ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+                    if (na) {
+                        std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
+                        s64 br = ntfs_attr_pread(na, offset, length, buffer.get());
+                        if (br > 0) {
+                            retArray = env->NewByteArray(static_cast<jsize>(br));
+                            env->SetByteArrayRegion(retArray, 0, static_cast<jsize>(br),
+                                                    reinterpret_cast<jbyte*>(buffer.get()));
+                        }
+                        ntfs_attr_close(na);
+                    }
+                    ntfs_inode_close(ni);
+                }
             }
         }
     }
@@ -1799,25 +2218,45 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jbyte* body = env->GetByteArrayElements(data, nullptr);
     bool success = false;
-    {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-        if (ensureMounted(volId)) {
+
+    auto& v = volumes[volId];
+    std::lock_guard<std::mutex> fsLock(v.mutex);
+    if (ensureMounted(volId)) {
+        if (v.fsType == VolumeState::FS_FATFS) {
             FIL f;
             std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            BYTE openMode = (offset == 0)
-                ? (FA_WRITE | FA_CREATE_ALWAYS)
-                : (FA_WRITE | FA_OPEN_ALWAYS);
+            BYTE openMode = (offset == 0) ? (FA_WRITE | FA_CREATE_ALWAYS) : (FA_WRITE | FA_OPEN_ALWAYS);
             if (f_open(&f, fatPath.c_str(), openMode) == FR_OK) {
                 if (f_lseek(&f, static_cast<FSIZE_t>(offset)) == FR_OK) {
                     UINT bw = 0;
-                    if (f_write(&f, body, static_cast<UINT>(len), &bw) == FR_OK &&
-                        bw == static_cast<UINT>(len))
+                    if (f_write(&f, body, static_cast<UINT>(len), &bw) == FR_OK && bw == static_cast<UINT>(len))
                         success = true;
                 }
                 f_close(&f);
             }
+        } else if (v.fsType == VolumeState::FS_NTFS) {
+            std::string fullPath = "/" + std::string(targetName);
+            ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+
+            if (!ni) { // Create file
+                ni = createNtfsFile(v.ntfsVol, fullPath);
+            }
+
+            if (ni) {
+                ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+                if (na) {
+                    if (offset == 0) {
+                        ntfs_attr_truncate(na, 0);
+                    }
+                    s64 bw = ntfs_attr_pwrite(na, offset, len, body);
+                    if (bw == static_cast<s64>(len)) success = true;
+                    ntfs_attr_close(na);
+                }
+                ntfs_inode_close(ni);
+            }
         }
     }
+
     env->ReleaseByteArrayElements(data, body, JNI_ABORT);
     env->ReleaseStringUTFChars(fileName, targetName);
     return success ? JNI_TRUE : JNI_FALSE;
@@ -1833,34 +2272,73 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     const char* source     = env->GetStringUTFChars(sourcePath, nullptr);
     bool success = false;
+    auto& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::lock_guard<std::mutex> fsLock(v.mutex);
         if (ensureMounted(volId)) {
-            FIL f;
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
-                std::ifstream inFile(source, std::ios::binary);
-                if (inFile.is_open()) {
-                    std::unique_ptr<char[]> buf(new char[IO_BUFFER_SIZE]);
-                    UINT bw;
-                    bool writeError = false;
-                    while (inFile && !writeError) {
-                        inFile.read(buf.get(), IO_BUFFER_SIZE);
-                        std::streamsize n = inFile.gcount();
-                        if (n > 0) {
-                            FRESULT res = f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
-                            if (res != FR_OK || bw != static_cast<UINT>(n)) {
-                                writeError = true;
+            if (v.fsType == VolumeState::FS_FATFS) {
+                FIL f;
+                std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+                if (f_open(&f, fatPath.c_str(), FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+                    std::ifstream inFile(source, std::ios::binary);
+                    if (inFile.is_open()) {
+                        std::unique_ptr<char[]> buf(new char[IO_BUFFER_SIZE]);
+                        UINT bw;
+                        bool writeError = false;
+                        while (inFile && !writeError) {
+                            inFile.read(buf.get(), IO_BUFFER_SIZE);
+                            std::streamsize n = inFile.gcount();
+                            if (n > 0) {
+                                FRESULT res = f_write(&f, buf.get(), static_cast<UINT>(n), &bw);
+                                if (res != FR_OK || bw != static_cast<UINT>(n)) {
+                                    writeError = true;
+                                }
                             }
                         }
+                        if (!writeError) {
+                            success = true;
+                        }
                     }
-                    if (!writeError) {
-                        success = true;
+                    f_close(&f);
+                    if (!success) {
+                        f_unlink(fatPath.c_str());
                     }
                 }
-                f_close(&f);
-                if (!success) {
-                    f_unlink(fatPath.c_str());
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                std::string fullPath = "/" + std::string(targetName);
+                ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+                if (!ni) {
+                    ni = createNtfsFile(v.ntfsVol, fullPath);
+                }
+
+                if (ni) {
+                    ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+                    if (na) {
+                        ntfs_attr_truncate(na, 0);
+                        std::ifstream inFile(source, std::ios::binary);
+                        if (inFile.is_open()) {
+                            std::unique_ptr<char[]> buf(new char[IO_BUFFER_SIZE]);
+                            s64 offset = 0;
+                            bool writeError = false;
+                            while (inFile && !writeError) {
+                                inFile.read(buf.get(), IO_BUFFER_SIZE);
+                                std::streamsize n = inFile.gcount();
+                                if (n > 0) {
+                                    s64 bw = ntfs_attr_pwrite(na, offset, n, buf.get());
+                                    if (bw != n) {
+                                        writeError = true;
+                                    } else {
+                                        offset += bw;
+                                    }
+                                }
+                            }
+                            if (!writeError) {
+                                success = true;
+                            }
+                        }
+                        ntfs_attr_close(na);
+                    }
+                    ntfs_inode_close(ni);
                 }
             }
         }
@@ -1880,21 +2358,46 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_extractFile(
     const char* targetName  = env->GetStringUTFChars(targetFileName, nullptr);
     const char* destination = env->GetStringUTFChars(destPath, nullptr);
     bool success = false;
+    auto& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::lock_guard<std::mutex> fsLock(v.mutex);
         if (ensureMounted(volId)) {
-            FIL f;
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
-                std::ofstream outFile(destination, std::ios::binary);
-                if (outFile.is_open()) {
-                    std::unique_ptr<unsigned char[]> buf(new unsigned char[IO_BUFFER_SIZE]);
-                    UINT br;
-                    while (f_read(&f, buf.get(), IO_BUFFER_SIZE, &br) == FR_OK && br > 0)
-                        outFile.write(reinterpret_cast<char*>(buf.get()), br);
-                    success = true;
+            if (v.fsType == VolumeState::FS_FATFS) {
+                FIL f;
+                std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+                if (f_open(&f, fatPath.c_str(), FA_READ) == FR_OK) {
+                    std::ofstream outFile(destination, std::ios::binary);
+                    if (outFile.is_open()) {
+                        std::unique_ptr<unsigned char[]> buf(new unsigned char[IO_BUFFER_SIZE]);
+                        UINT br;
+                        while (f_read(&f, buf.get(), IO_BUFFER_SIZE, &br) == FR_OK && br > 0)
+                            outFile.write(reinterpret_cast<char*>(buf.get()), br);
+                        success = true;
+                    }
+                    f_close(&f);
                 }
-                f_close(&f);
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                std::string fullPath = "/" + std::string(targetName);
+                ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+                if (ni) {
+                    ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+                    if (na) {
+                        std::ofstream outFile(destination, std::ios::binary);
+                        if (outFile.is_open()) {
+                            std::unique_ptr<unsigned char[]> buf(new unsigned char[IO_BUFFER_SIZE]);
+                            s64 offset = 0;
+                            while (true) {
+                                s64 br = ntfs_attr_pread(na, offset, IO_BUFFER_SIZE, buf.get());
+                                if (br <= 0) break;
+                                outFile.write(reinterpret_cast<char*>(buf.get()), br);
+                                offset += br;
+                            }
+                            success = true;
+                        }
+                        ntfs_attr_close(na);
+                    }
+                    ntfs_inode_close(ni);
+                }
             }
         }
     }
@@ -1911,11 +2414,35 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
     }
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     bool success = false;
+    auto& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::lock_guard<std::mutex> fsLock(v.mutex);
         if (ensureMounted(volId)) {
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            success = (f_unlink(fatPath.c_str()) == FR_OK);
+            if (v.fsType == VolumeState::FS_FATFS) {
+                std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+                success = (f_unlink(fatPath.c_str()) == FR_OK);
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                std::string fullPath = "/" + std::string(targetName);
+                ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+                size_t slashPos = fullPath.find_last_of('/');
+                std::string parentPath = fullPath.substr(0, slashPos);
+                std::string childName = fullPath.substr(slashPos + 1);
+                if (parentPath.empty()) parentPath = "/";
+
+                ntfs_inode* dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentPath.c_str());
+                if (dir_ni && ni) {
+                    ntfschar* uname = nullptr;
+                    int uname_len = ntfs_mbstoucs(childName.c_str(), &uname);
+                    if (uname_len >= 0) {
+                        if (ntfs_delete(v.ntfsVol, fullPath.c_str(), ni, dir_ni, uname, static_cast<u8>(uname_len)) == 0) {
+                            success = true;
+                        }
+                        free(uname);
+                    }
+                    ntfs_inode_close(dir_ni);
+                }
+                if (ni) ntfs_inode_close(ni);
+            }
         }
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);
@@ -1930,11 +2457,35 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
     }
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     bool success = false;
+    auto& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::lock_guard<std::mutex> fsLock(v.mutex);
         if (ensureMounted(volId)) {
-            std::string fullPath = std::string(drivePaths[volId]) + "/" + nativePath;
-            success = (f_mkdir(fullPath.c_str()) == FR_OK);
+            if (v.fsType == VolumeState::FS_FATFS) {
+                std::string fullPath = std::string(drivePaths[volId]) + "/" + nativePath;
+                success = (f_mkdir(fullPath.c_str()) == FR_OK);
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                std::string fullPath = "/" + std::string(nativePath);
+                size_t slashPos = fullPath.find_last_of('/');
+                std::string parentPath = fullPath.substr(0, slashPos);
+                std::string childName = fullPath.substr(slashPos + 1);
+                if (parentPath.empty()) parentPath = "/";
+
+                ntfs_inode* parentNi = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentPath.c_str());
+                if (parentNi) {
+                    ntfschar* uChild = nullptr;
+                    int uChildLen = ntfs_mbstoucs(childName.c_str(), &uChild);
+                    if (uChildLen >= 0) {
+                        ntfs_inode* ni = ntfs_create(parentNi, 0, uChild, uChildLen, S_IFDIR | 0755);
+                        if (ni) {
+                            success = true;
+                            ntfs_inode_close(ni);
+                        }
+                        free(uChild);
+                    }
+                    ntfs_inode_close(parentNi);
+                }
+            }
         }
     }
     env->ReleaseStringUTFChars(dirPath, nativePath);
@@ -1951,12 +2502,63 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
     const char* nativeOld = env->GetStringUTFChars(oldPath, nullptr);
     const char* nativeNew = env->GetStringUTFChars(newPath, nullptr);
     bool success = false;
+    auto& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::lock_guard<std::mutex> fsLock(v.mutex);
         if (ensureMounted(volId)) {
-            std::string fullOld = std::string(drivePaths[volId]) + "/" + nativeOld;
-            std::string fullNew = std::string(drivePaths[volId]) + "/" + nativeNew;
-            success = (f_rename(fullOld.c_str(), fullNew.c_str()) == FR_OK);
+            if (v.fsType == VolumeState::FS_FATFS) {
+                std::string fullOld = std::string(drivePaths[volId]) + "/" + nativeOld;
+                std::string fullNew = std::string(drivePaths[volId]) + "/" + nativeNew;
+                success = (f_rename(fullOld.c_str(), fullNew.c_str()) == FR_OK);
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                std::string oldFullPath = "/" + std::string(nativeOld);
+                std::string newFullPath = "/" + std::string(nativeNew);
+                
+                size_t slashPosOld = oldFullPath.find_last_of('/');
+                std::string parentOldPath = oldFullPath.substr(0, slashPosOld);
+                std::string oldChildName = oldFullPath.substr(slashPosOld + 1);
+                if (parentOldPath.empty()) parentOldPath = "/";
+
+                size_t slashPosNew = newFullPath.find_last_of('/');
+                std::string parentNewPath = newFullPath.substr(0, slashPosNew);
+                std::string newChildName = newFullPath.substr(slashPosNew + 1);
+                if (parentNewPath.empty()) parentNewPath = "/";
+
+                ntfs_inode* old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, oldFullPath.c_str());
+                ntfs_inode* dir_old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentOldPath.c_str());
+                
+                // Avoid opening the parent directory inode twice if renaming within the same directory.
+                ntfs_inode* dir_new_ni = (parentOldPath == parentNewPath) ? dir_old_ni : ntfs_pathname_to_inode(v.ntfsVol, NULL, parentNewPath.c_str());
+
+                if (old_ni && dir_old_ni && dir_new_ni) {
+                    ntfschar* uOld = nullptr;
+                    int uOldLen = ntfs_mbstoucs(oldChildName.c_str(), &uOld);
+                    ntfschar* uNew = nullptr;
+                    int uNewLen = ntfs_mbstoucs(newChildName.c_str(), &uNew);
+
+                    if (uOldLen >= 0 && uNewLen >= 0) {
+                        // Check if a file already exists at the target path and delete it to simulate overwrite
+                        ntfs_inode* dest_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, newFullPath.c_str());
+                        if (dest_ni) {
+                            ntfs_delete(v.ntfsVol, newFullPath.c_str(), dest_ni, dir_new_ni, uNew, uNewLen);
+                            ntfs_inode_close(dest_ni);
+                        }
+
+                        // Create the link at the new destination, then delete the old source link
+                        if (ntfs_link(old_ni, dir_new_ni, uNew, uNewLen) == 0) {
+                            if (ntfs_delete(v.ntfsVol, oldFullPath.c_str(), old_ni, dir_old_ni, uOld, uOldLen) == 0) {
+                                success = true;
+                            }
+                        }
+                    }
+                    if (uOld) free(uOld);
+                    if (uNew) free(uNew);
+                }
+                
+                if (old_ni) ntfs_inode_close(old_ni);
+                if (dir_old_ni) ntfs_inode_close(dir_old_ni);
+                if (dir_new_ni && dir_new_ni != dir_old_ni) ntfs_inode_close(dir_new_ni);
+            }
         }
     }
     env->ReleaseStringUTFChars(oldPath, nativeOld);
@@ -1968,24 +2570,31 @@ extern "C" JNIEXPORT jlongArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
         JNIEnv* env, jobject, jint volId) {
     if (!requireActiveSession(volId, "getSpaceInfo")) {
-        throwNotUnlocked(env, volId, "getSpaceInfo");
-        return nullptr;
+        throwNotUnlocked(env, volId, "getSpaceInfo"); return nullptr;
     }
     jlong totalBytes = 0, freeBytes = 0;
+    auto& v = volumes[volId];
     {
-        std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
+        std::lock_guard<std::mutex> fsLock(v.mutex);
         if (ensureMounted(volId)) {
-            FATFS* fs;
-            DWORD fre_clust;
-            if (f_getfree(drivePaths[volId], &fre_clust, &fs) == FR_OK) {
-                totalBytes = static_cast<jlong>(fs->n_fatent - 2) * fs->csize * 512;
-                freeBytes  = static_cast<jlong>(fre_clust)        * fs->csize * 512;
+            if (v.fsType == VolumeState::FS_FATFS) {
+                FATFS* fs;
+                DWORD fre_clust;
+                if (f_getfree(drivePaths[volId], &fre_clust, &fs) == FR_OK) {
+                    totalBytes = static_cast<jlong>(fs->n_fatent - 2) * fs->csize * 512;
+                    freeBytes  = static_cast<jlong>(fre_clust) * fs->csize * 512;
+                }
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                ntfs_volume* vol = v.ntfsVol;
+                s64 total_clusters = vol->nr_clusters;
+                s64 free_cl = ntfs_attr_get_free_bits(vol->lcnbmp_na);
+                totalBytes = total_clusters * vol->cluster_size;
+                freeBytes  = free_cl * vol->cluster_size;
             }
         }
     }
     jlongArray ret = env->NewLongArray(2);
-    if (!ret) return nullptr; // Guard against allocation failures
-    
+    if (!ret) return nullptr;
     const jlong tmp[2] = {totalBytes, freeBytes};
     env->SetLongArrayRegion(ret, 0, 2, tmp);
     return ret;
@@ -2002,13 +2611,31 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_openStream(
     {
         std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
-            FIL* f = new FIL();
-            std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
-            if (f_open(f, fatPath.c_str(), FA_READ) == FR_OK) {
-                streamPtr = reinterpret_cast<jlong>(f);
-                volumes[volId].openStreams.push_back(f);
-            } else {
-                delete f;
+            auto& v = volumes[volId];
+            if (v.fsType == VolumeState::FS_FATFS) {
+                FIL* f = new FIL();
+                std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
+                if (f_open(f, fatPath.c_str(), FA_READ) == FR_OK) {
+                    streamPtr = reinterpret_cast<jlong>(f);
+                    v.openStreams.push_back(f);
+                } else {
+                    delete f;
+                }
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                std::string fullPath = "/" + std::string(targetName);
+                ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+                if (ni) {
+                    ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+                    if (na) {
+                        NtfsStream* ns = new NtfsStream();
+                        ns->inode = ni;
+                        ns->attr = na;
+                        streamPtr = reinterpret_cast<jlong>(ns);
+                        v.openNtfsStreams.push_back(ns);
+                    } else {
+                        ntfs_inode_close(ni);
+                    }
+                }
             }
         }
     }
@@ -2022,23 +2649,34 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStream(
         jlong streamPtr, jlong offset, jbyteArray outBuffer, jint length, jint volId) {
     if (streamPtr == 0 || length <= 0) return -1;
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
-    FIL* f = reinterpret_cast<FIL*>(streamPtr);
     jint bytesRead = -1;
 
     std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-    auto& streams = volumes[volId].openStreams;
-    if (std::find(streams.begin(), streams.end(), f) == streams.end()) {
-        LOGI("readStream: stale/unknown stream pointer for volume %d", volId);
-        return -1;
-    }
+    auto& v = volumes[volId];
+    if (v.fsType == VolumeState::FS_FATFS) {
+        FIL* f = reinterpret_cast<FIL*>(streamPtr);
+        auto& streams = v.openStreams;
+        if (std::find(streams.begin(), streams.end(), f) == streams.end()) return -1;
 
-    f_lseek(f, static_cast<FSIZE_t>(offset));
-    jbyte* destBuf = env->GetByteArrayElements(outBuffer, nullptr);
-    if (destBuf != nullptr) {
-        UINT br = 0;
-        if (f_read(f, destBuf, static_cast<UINT>(length), &br) == FR_OK)
-            bytesRead = static_cast<jint>(br);
-        env->ReleaseByteArrayElements(outBuffer, destBuf, 0);
+        f_lseek(f, static_cast<FSIZE_t>(offset));
+        jbyte* destBuf = env->GetByteArrayElements(outBuffer, nullptr);
+        if (destBuf != nullptr) {
+            UINT br = 0;
+            if (f_read(f, destBuf, static_cast<UINT>(length), &br) == FR_OK)
+                bytesRead = static_cast<jint>(br);
+            env->ReleaseByteArrayElements(outBuffer, destBuf, 0);
+        }
+    } else if (v.fsType == VolumeState::FS_NTFS) {
+        NtfsStream* ns = reinterpret_cast<NtfsStream*>(streamPtr);
+        auto& streams = v.openNtfsStreams;
+        if (std::find(streams.begin(), streams.end(), ns) == streams.end()) return -1;
+
+        jbyte* destBuf = env->GetByteArrayElements(outBuffer, nullptr);
+        if (destBuf != nullptr) {
+            s64 br = ntfs_attr_pread(ns->attr, offset, length, destBuf);
+            if (br >= 0) bytesRead = static_cast<jint>(br);
+            env->ReleaseByteArrayElements(outBuffer, destBuf, 0);
+        }
     }
     return bytesRead;
 }
@@ -2048,18 +2686,27 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
         JNIEnv* env, jobject, jlong streamPtr, jint volId) {
     if (streamPtr == 0) return;
     if (volId < 0 || volId >= MAX_VOLUMES) return;
-    FIL* f = reinterpret_cast<FIL*>(streamPtr);
 
     std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-    auto& streams = volumes[volId].openStreams;
-    auto it = std::find(streams.begin(), streams.end(), f);
-    if (it == streams.end()) {
-        LOGI("closeStream: stale/unknown stream pointer for volume %d, ignoring", volId);
-        return;
+    auto& v = volumes[volId];
+    if (v.fsType == VolumeState::FS_FATFS) {
+        FIL* f = reinterpret_cast<FIL*>(streamPtr);
+        auto& streams = v.openStreams;
+        auto it = std::find(streams.begin(), streams.end(), f);
+        if (it == streams.end()) return;
+        streams.erase(it);
+        f_close(f);
+        delete f;
+    } else if (v.fsType == VolumeState::FS_NTFS) {
+        NtfsStream* ns = reinterpret_cast<NtfsStream*>(streamPtr);
+        auto& streams = v.openNtfsStreams;
+        auto it = std::find(streams.begin(), streams.end(), ns);
+        if (it == streams.end()) return;
+        streams.erase(it);
+        ntfs_attr_close(ns->attr);
+        ntfs_inode_close(ns->inode);
+        delete ns;
     }
-    streams.erase(it);
-    f_close(f);
-    delete f;
 }
 
 // ── Startup self-check ────────────────────────────────────────────────
@@ -2131,8 +2778,14 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
         if (ensureMounted(volId)) {
             result = buildDirectoryListing(env, volId, nullptr);
         } else {
-            LOGI("FATFS Mount failed on USB volume %d", volId);
+            LOGI("FATFS/NTFS Mount failed on USB volume %d", volId);
         }
     }
     return result;
+}
+
+extern "C" jint JNI_OnLoad(JavaVM* vm, void* reserved);
+
+extern "C" const char *ntfs_libntfs_version(void) {
+    return "vaultexplorer-ntfs3g-edge";
 }

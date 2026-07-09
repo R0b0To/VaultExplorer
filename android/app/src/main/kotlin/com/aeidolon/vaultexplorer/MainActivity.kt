@@ -35,6 +35,7 @@ import android.util.Log
 import android.security.keystore.KeyProperties
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.util.concurrent.Executors
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -95,27 +96,30 @@ class MainActivity : FlutterFragmentActivity() {
     private val ACTION_CHOOSER = "com.aeidolon.vaultexplorer.ACTION_CHOOSER"
     private var chooserReceiver: BroadcastReceiver? = null
     private val usbManager: UsbManager by lazy {
-    getSystemService(Context.USB_SERVICE) as UsbManager
-}
+        getSystemService(Context.USB_SERVICE) as UsbManager
+    }
 
-private val ACTION_USB_PERMISSION = "com.aeidolon.vaultexplorer.USB_PERMISSION"
-private var usbPermissionReceiver: BroadcastReceiver? = null
-private var pendingUsbPermissionResult: MethodChannel.Result? = null
-private var pendingUsbPermissionDeviceName: String? = null
+    private val ACTION_USB_PERMISSION = "com.aeidolon.vaultexplorer.USB_PERMISSION"
+    private var usbPermissionReceiver: BroadcastReceiver? = null
+    private var pendingUsbPermissionResult: MethodChannel.Result? = null
+    private var pendingUsbPermissionDeviceName: String? = null
 
-// BroadcastReceiver for physically detached USB mass storage devices.
-// Fired by the OS (protected system broadcast) when a drive goes away.
-// This notifies the Dart layer to update the active session mount list.
-private var usbDetachReceiver: BroadcastReceiver? = null
-private var screenOffReceiver: BroadcastReceiver? = null
+    // Warm Thread Pool to process I/O tasks dynamically without thread-spawning latency
+    private val ioExecutor = Executors.newFixedThreadPool(4)
+
+    // BroadcastReceiver for physically detached USB mass storage devices.
+    // Fired by the OS (protected system broadcast) when a drive goes away.
+    // This notifies the Dart layer to update the active session mount list.
+    private var usbDetachReceiver: BroadcastReceiver? = null
+    private var screenOffReceiver: BroadcastReceiver? = null
 
     override fun onDestroy() {
-    chooserReceiver?.let { unregisterReceiver(it) }
-    usbPermissionReceiver?.let { unregisterReceiver(it) }
-    usbDetachReceiver?.let { unregisterReceiver(it) }
-    screenOffReceiver?.let { unregisterReceiver(it) }
-    super.onDestroy()
-}
+        chooserReceiver?.let { unregisterReceiver(it) }
+        usbPermissionReceiver?.let { unregisterReceiver(it) }
+        usbDetachReceiver?.let { unregisterReceiver(it) }
+        screenOffReceiver?.let { unregisterReceiver(it) }
+        super.onDestroy()
+    }
 
     // ── Activity Result Launchers ──────────────────────────────────────────
 
@@ -192,7 +196,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
         val data = activityResult.data
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null && create != null) {
             val destUri = data.data!!
-            Thread {
+            ioExecutor.execute {
                 try {
                     val pfd = contentResolver.openFileDescriptor(destUri, "rw")
                         ?: throw Exception("Could not open file descriptor")
@@ -206,7 +210,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
                 } catch (e: Exception) {
                     runOnUiThread { dispatchNativeError(e, res) }
                 }
-            }.start()
+            }
         } else {
             res.success(false)
         }
@@ -230,7 +234,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
             data.clipData?.let { clip -> for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri) }
                 ?: data.data?.let { uris.add(it) }
             if (uris.isNotEmpty()) {
-                Thread {
+                ioExecutor.execute {
                     try {
                         var successCount = 0
                         for (pickedUri in uris) {
@@ -243,7 +247,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
                     } catch (e: Exception) {
                         runOnUiThread { dispatchNativeError(e, res) }
                     }
-                }.start()
+                }
             } else {
                 res.success(0)
             }
@@ -271,7 +275,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
                 treeUri,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
-            Thread {
+            ioExecutor.execute {
                 try {
                     var successCount = 0
                     val destTree = DocumentFile.fromTreeUri(this, treeUri)
@@ -286,7 +290,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
                 } catch (e: Exception) {
                     runOnUiThread { dispatchNativeError(e, res) }
                 }
-            }.start()
+            }
         } else {
             res.success(0)
         }
@@ -315,14 +319,14 @@ private var screenOffReceiver: BroadcastReceiver? = null
             if (srcRoot != null) {
                 val folderName = srcRoot.name ?: "imported_folder"
                 val targetFatPath = if (pending.targetDir.isEmpty()) folderName else "${pending.targetDir}/$folderName"
-                Thread {
+                ioExecutor.execute {
                     try {
                         val count = importEntryRecursive(srcRoot, pending.containerUri, targetFatPath, pending.volId)
                         runOnUiThread { res.success(count) }
                     } catch (e: Exception) {
                         runOnUiThread { dispatchNativeError(e, res) }
                     }
-                }.start()
+                }
             } else {
                 res.success(0)
             }
@@ -346,7 +350,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
 
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null && pending != null) {
             val destUri = data.data!!
-            Thread {
+            ioExecutor.execute {
                 try {
                     val tempFile = File(cacheDir, "export_temp")
                     val success = VeraCryptBridge.extractToFile(pending.volId, pending.sourcePath, tempFile.absolutePath)
@@ -364,7 +368,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
                 } catch (e: Exception) {
                     runOnUiThread { dispatchNativeError(e, res) }
                 }
-            }.start()
+            }
         } else {
             res.success(false)
         }
@@ -384,14 +388,14 @@ private var screenOffReceiver: BroadcastReceiver? = null
             result.error("NOT_MOUNTED", "Container not mounted", null)
             return
         }
-        Thread {
+        ioExecutor.execute {
             try {
                 val value = synchronized(VeraCryptSession.locks[volId]) { block(volId) }
                 runOnUiThread { result.success(value) }
             } catch (e: Exception) {
                 runOnUiThread { dispatchNativeError(e, result) }
             }
-        }.start()
+        }
     }
 
     private fun isNotUnlockedException(e: Throwable): Boolean =
@@ -529,7 +533,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
         }
     }
 
-   private fun derivedKeyAlias(filePath: String): String {
+    private fun derivedKeyAlias(filePath: String): String {
         val root = containerFingerprint(filePath)
             ?: android.util.Base64.encodeToString(
                 MessageDigest.getInstance("SHA-256").digest(filePath.toByteArray(Charsets.UTF_8)),
@@ -595,7 +599,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
             .putString(alias, encoded)
             .commit()
     }
-   private fun loadDerivedKeyBytes(filePath: String): ByteArray? {
+    private fun loadDerivedKeyBytes(filePath: String): ByteArray? {
         val alias = derivedKeyAlias(filePath)
         val encoded = getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
             .getString(alias, null) ?: return null
@@ -607,7 +611,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
         return decrypted
     }
 
-   private fun clearDerivedKeyBytes(filePath: String): Boolean {
+    private fun clearDerivedKeyBytes(filePath: String): Boolean {
         return getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
             .edit()
             .remove(derivedKeyAlias(filePath))
@@ -621,7 +625,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
         val session = VeraCryptSession.activeSessions[volId]
         if (session?.isUsbSource != true) return
 
-        Thread {
+        ioExecutor.execute {
             UsbBlockBridge.unregister(volId)
             try {
                 synchronized(VeraCryptSession.locks[volId]) {
@@ -638,7 +642,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
                 methodChannel?.invokeMethod(
                     "onUsbContainerDetached", mapOf("volId" to volId))
             }
-        }.start()
+        }
     }
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
@@ -670,73 +674,68 @@ private var screenOffReceiver: BroadcastReceiver? = null
         }
 
         val usbFilter = IntentFilter(ACTION_USB_PERMISSION)
-usbPermissionReceiver = object : BroadcastReceiver() {
-    override fun onReceive(context: Context?, intent: Intent?) {
-        if (intent?.action != ACTION_USB_PERMISSION) return
-        synchronized(this) {
-            val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
-            }
-            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-            val res = pendingUsbPermissionResult
-            pendingUsbPermissionResult = null
-            pendingUsbPermissionDeviceName = null
-            if (device != null && res != null) {
-                runOnUiThread { res.success(granted) }
+        usbPermissionReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action != ACTION_USB_PERMISSION) return
+                synchronized(this) {
+                    val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
+                    }
+                    val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                    val res = pendingUsbPermissionResult
+                    pendingUsbPermissionResult = null
+                    pendingUsbPermissionDeviceName = null
+                    if (device != null && res != null) {
+                        runOnUiThread { res.success(granted) }
+                    }
+                }
             }
         }
-    }
-}
-if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-    registerReceiver(usbPermissionReceiver, usbFilter, RECEIVER_EXPORTED)
-} else {
-    @Suppress("UnspecifiedRegisterReceiverFlag")
-    registerReceiver(usbPermissionReceiver, usbFilter)
-}
-
-usbDetachReceiver = object : BroadcastReceiver() {
-    override fun onReceive(context: Context?, intent: Intent?) {
-        if (intent?.action != UsbManager.ACTION_USB_DEVICE_DETACHED) return
-        val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbPermissionReceiver, usbFilter, RECEIVER_EXPORTED)
         } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
-        } ?: return
-        handleUsbDeviceDetached(device)
-    }
-}
-val detachFilter = IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED)
-if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-    // Unlike usbFilter/filter above (custom actions we fire ourselves via
-    // PendingIntent/broadcast), this is a protected system broadcast that
-    // only the OS can send, so it doesn't need to be exported.
-    registerReceiver(usbDetachReceiver, detachFilter, RECEIVER_NOT_EXPORTED)
-} else {
-    @Suppress("UnspecifiedRegisterReceiverFlag")
-    registerReceiver(usbDetachReceiver, detachFilter)
-}
-
-screenOffReceiver = object : BroadcastReceiver() {
-    override fun onReceive(context: Context?, intent: Intent?) {
-        if (intent?.action != Intent.ACTION_SCREEN_OFF) return
-        runOnUiThread {
-            methodChannel?.invokeMethod("onScreenOff", null)
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(usbPermissionReceiver, usbFilter)
         }
-    }
-}
-val screenOffFilter = IntentFilter(Intent.ACTION_SCREEN_OFF)
-if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-    // Protected system broadcast — only the OS can send ACTION_SCREEN_OFF —
-    // so it doesn't need to be exported, same as the USB detach receiver.
-    registerReceiver(screenOffReceiver, screenOffFilter, RECEIVER_NOT_EXPORTED)
-} else {
-    @Suppress("UnspecifiedRegisterReceiverFlag")
-    registerReceiver(screenOffReceiver, screenOffFilter)
-}
+
+        usbDetachReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action != UsbManager.ACTION_USB_DEVICE_DETACHED) return
+                val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
+                } ?: return
+                handleUsbDeviceDetached(device)
+            }
+        }
+        val detachFilter = IntentFilter(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbDetachReceiver, detachFilter, RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(usbDetachReceiver, detachFilter)
+        }
+
+        screenOffReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action != Intent.ACTION_SCREEN_OFF) return
+                runOnUiThread {
+                    methodChannel?.invokeMethod("onScreenOff", null)
+                }
+            }
+        }
+        val screenOffFilter = IntentFilter(Intent.ACTION_SCREEN_OFF)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenOffReceiver, screenOffFilter, RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            registerReceiver(screenOffReceiver, screenOffFilter)
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(chooserReceiver, filter, RECEIVER_EXPORTED)
         } else {
@@ -757,162 +756,153 @@ if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     }
 
                     ChannelMethods.LIST_USB_DEVICES -> {
-    val list = usbManager.deviceList.values
-        .filter { device -> (0 until device.interfaceCount).any { i ->
-            val intf = device.getInterface(i)
-            intf.interfaceClass == 0x08 && intf.interfaceSubclass == 0x06 && intf.interfaceProtocol == 0x50
-        } }
-        .map { device ->
-            mapOf(
-                "deviceName" to device.deviceName,
-                "productName" to (device.productName ?: device.deviceName),
-                "hasPermission" to usbManager.hasPermission(device),
-            )
-        }
-    result.success(list)
-}
+                        val list = usbManager.deviceList.values
+                            .filter { device -> (0 until device.interfaceCount).any { i ->
+                                val intf = device.getInterface(i)
+                                intf.interfaceClass == 0x08 && intf.interfaceSubclass == 0x06 && intf.interfaceProtocol == 0x50
+                            } }
+                            .map { device ->
+                                mapOf(
+                                    "deviceName" to device.deviceName,
+                                    "productName" to (device.productName ?: device.deviceName),
+                                    "hasPermission" to usbManager.hasPermission(device),
+                                )
+                            }
+                        result.success(list)
+                    }
 
-ChannelMethods.REQUEST_USB_PERMISSION -> {
-    val deviceName = call.argument<String>("deviceName")
-    val device = deviceName?.let { usbManager.deviceList[it] }
-    if (device == null) {
-        result.error("USB_NOT_FOUND", "USB device not found: $deviceName", null)
-        return@setMethodCallHandler
-    }
-    if (usbManager.hasPermission(device)) {
-        result.success(true)
-        return@setMethodCallHandler
-    }
-    pendingUsbPermissionResult = result
-    pendingUsbPermissionDeviceName = deviceName
-    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-    } else {
-        PendingIntent.FLAG_UPDATE_CURRENT
-    }
-    val permissionIntent = PendingIntent.getBroadcast(
-        this, 0, Intent(ACTION_USB_PERMISSION), flags
-    )
-    usbManager.requestPermission(device, permissionIntent)
-}
+                    ChannelMethods.REQUEST_USB_PERMISSION -> {
+                        val deviceName = call.argument<String>("deviceName")
+                        val device = deviceName?.let { usbManager.deviceList[it] }
+                        if (device == null) {
+                            result.error("USB_NOT_FOUND", "USB device not found: $deviceName", null)
+                            return@setMethodCallHandler
+                        }
+                        if (usbManager.hasPermission(device)) {
+                            result.success(true)
+                            return@setMethodCallHandler
+                        }
+                        pendingUsbPermissionResult = result
+                        pendingUsbPermissionDeviceName = deviceName
+                        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                        } else {
+                            PendingIntent.FLAG_UPDATE_CURRENT
+                        }
+                        val permissionIntent = PendingIntent.getBroadcast(
+                            this, 0, Intent(ACTION_USB_PERMISSION), flags
+                        )
+                        usbManager.requestPermission(device, permissionIntent)
+                    }
 
-ChannelMethods.UNLOCK_USB_CONTAINER -> {
-    val deviceName    = call.argument<String>("deviceName")
-    val password      = call.argument<String>("password")
-    val pim           = call.argument<Number>("pim")?.toInt() ?: 0
-    val displayName   = call.argument<String>("displayName")
-    val docProvider   = call.argument<Boolean>("documentProvider") ?: false
-    val cipherId      = call.argument<Number>("cipherId")?.toInt() ?: 255
-    val hashId        = call.argument<Number>("hashId")?.toInt() ?: 255
-    val preservedKeyBase64 = call.argument<String>("preservedKey")
-    val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
-    if (preservedKey != null) {
-        Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
-    }
-    val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
-    val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+                    ChannelMethods.UNLOCK_USB_CONTAINER -> {
+                        val deviceName    = call.argument<String>("deviceName")
+                        val password      = call.argument<String>("password")
+                        val pim           = call.argument<Number>("pim")?.toInt() ?: 0
+                        val displayName   = call.argument<String>("displayName")
+                        val docProvider   = call.argument<Boolean>("documentProvider") ?: false
+                        val cipherId      = call.argument<Number>("cipherId")?.toInt() ?: 255
+                        val hashId        = call.argument<Number>("hashId")?.toInt() ?: 255
+                        val preservedKeyBase64 = call.argument<String>("preservedKey")
+                        val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+                        if (preservedKey != null) {
+                            Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
+                        }
+                        val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
+                        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
 
-    if (deviceName == null || password == null) {
-        result.error("INVALID_ARGS", "deviceName and password required", null)
-        return@setMethodCallHandler
-    }
-    // See UNLOCK_CONTAINER for why this only rejects when BOTH a password
-    // and keyfiles are absent — VeraCrypt supports keyfile-only unlock.
-    if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
-        result.error("INVALID_ARGS", "password or keyfiles required", null)
-        return@setMethodCallHandler
-    }
-    val device = usbManager.deviceList[deviceName]
-    if (device == null) {
-        result.error("USB_NOT_FOUND", "USB device not found: $deviceName", null)
-        return@setMethodCallHandler
-    }
-    if (!usbManager.hasPermission(device)) {
-        result.error("USB_NO_PERMISSION", "Permission not granted for device", null)
-        return@setMethodCallHandler
-    }
+                        if (deviceName == null || password == null) {
+                            result.error("INVALID_ARGS", "deviceName and password required", null)
+                            return@setMethodCallHandler
+                        }
+                        if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
+                            result.error("INVALID_ARGS", "password or keyfiles required", null)
+                            return@setMethodCallHandler
+                        }
+                        val device = usbManager.deviceList[deviceName]
+                        if (device == null) {
+                            result.error("USB_NOT_FOUND", "USB device not found: $deviceName", null)
+                            return@setMethodCallHandler
+                        }
+                        if (!usbManager.hasPermission(device)) {
+                            result.error("USB_NO_PERMISSION", "Permission not granted for device", null)
+                            return@setMethodCallHandler
+                        }
 
-    val containerUri = "usb:$deviceName"
-    val targetVolId = VeraCryptSession.getVolumeIdByUri(containerUri)
-        ?: VeraCryptSession.getFreeVolumeId()
-    if (targetVolId == null) {
-        result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
-        return@setMethodCallHandler
-    }
-    // Tell Dart the volId as soon as it's known — the unlock call below can
-    // run for several seconds during cipher/hash auto-detect, and Dart needs
-    // this to let the user cancel it (VeraCryptEngine.requestCancelUnlockNative)
-    // before the call itself returns.
-    methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
+                        val containerUri = "usb:$deviceName"
+                        val targetVolId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                            ?: VeraCryptSession.getFreeVolumeId()
+                        if (targetVolId == null) {
+                            result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
+                            return@setMethodCallHandler
+                        }
+                        methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
 
-    Thread {
-        var msd: UsbMassStorageDevice? = null
-        try {
-            msd = UsbMassStorageDevice.open(usbManager, device)
-                ?: throw Exception("Failed to open USB mass storage device")
+                        ioExecutor.execute {
+                            var msd: UsbMassStorageDevice? = null
+                            try {
+                                msd = UsbMassStorageDevice.open(usbManager, device)
+                                    ?: throw Exception("Failed to open USB mass storage device")
 
-            val sizeBytes = msd.sectorCount * msd.sectorSize
-            UsbBlockBridge.register(targetVolId, msd)
+                                val sizeBytes = msd.sectorCount * msd.sectorSize
+                                UsbBlockBridge.register(targetVolId, msd)
 
-            val keyfileFds = openKeyfileFds(keyfilePaths)
+                                val keyfileFds = openKeyfileFds(keyfilePaths)
 
-            if (preservedKey != null) {
-                Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${preservedKey.size})")
-            } else if (cacheDerivedKey) {
-                Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
-            }
-            if (keyfileFds != null && keyfileFds.isNotEmpty()) {
-                Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
-            }
+                                if (preservedKey != null) {
+                                    Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${preservedKey.size})")
+                                } else if (cacheDerivedKey) {
+                                    Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
+                                }
+                                if (keyfileFds != null && keyfileFds.isNotEmpty()) {
+                                    Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
+                                }
 
-            // Serialize USB unlock operations using the volume monitor lock.
-            // This prevents race conditions if multiple unlock requests occur concurrently for the same slot
-            // and ensures the cancellation flag in vaultexplorer.cpp is reset safely between sequential attempts.
-            val files = synchronized(VeraCryptSession.locks[targetVolId]) {
-                VeraCryptEngine.unlockUsbAndListNative(
-                    password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
-                    keyfileFds = keyfileFds
-                )
-            }
+                                val files = synchronized(VeraCryptSession.locks[targetVolId]) {
+                                    VeraCryptEngine.unlockUsbAndListNative(
+                                        password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
+                                        keyfileFds = keyfileFds
+                                    )
+                                }
 
-            runOnUiThread {
-                if (files != null) {
-                    if (cacheDerivedKey && preservedKey == null) {
-                        val derived = VeraCryptEngine.getLastDerivedKeyMaterialNative(targetVolId)
-                        if (derived != null) {
-                            storeDerivedKeyBytes(deviceName, derived)
+                                runOnUiThread {
+                                    if (files != null) {
+                                        if (cacheDerivedKey && preservedKey == null) {
+                                            val derived = VeraCryptEngine.getLastDerivedKeyMaterialNative(targetVolId)
+                                            if (derived != null) {
+                                                storeDerivedKeyBytes(deviceName, derived)
+                                            }
+                                        }
+                                        VeraCryptSession.activeSessions[targetVolId] = ContainerSession(
+                                            uri = containerUri,
+                                            volId = targetVolId,
+                                            cachedFilesList = files.toList(),
+                                            displayName = displayName ?: device.productName ?: deviceName,
+                                            documentProvider = docProvider,
+                                            isUsbSource = true,
+                                        )
+                                        if (docProvider) {
+                                            contentResolver.notifyChange(
+                                                DocumentsContract.buildRootsUri(
+                                                    "com.aeidolon.vaultexplorer.documents"), null)
+                                        }
+                                        result.success(mapOf(
+                                            "volId" to targetVolId,
+                                            "files" to files.toList(),
+                                            "matchedCipherId" to VeraCryptEngine.getMatchedCipherId(targetVolId),
+                                            "matchedHashId" to VeraCryptEngine.getMatchedHashId(targetVolId)
+                                        ))
+                                    } else {
+                                        UsbBlockBridge.unregister(targetVolId)
+                                        result.error("AUTH_FAIL", "Incorrect password/keyfiles or invalid drive", null)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                UsbBlockBridge.unregister(targetVolId)
+                                runOnUiThread { dispatchNativeError(e, result) }
+                            }
                         }
                     }
-                    VeraCryptSession.activeSessions[targetVolId] = ContainerSession(
-                        uri = containerUri,
-                        volId = targetVolId,
-                        cachedFilesList = files.toList(),
-                        displayName = displayName ?: device.productName ?: deviceName,
-                        documentProvider = docProvider,
-                        isUsbSource = true,
-                    )
-                    if (docProvider) {
-                        contentResolver.notifyChange(
-                            DocumentsContract.buildRootsUri(
-                                "com.aeidolon.vaultexplorer.documents"), null)
-                    }
-                    result.success(mapOf(
-                        "volId" to targetVolId,
-                        "files" to files.toList(),
-                        "matchedCipherId" to VeraCryptEngine.getMatchedCipherId(targetVolId),
-                        "matchedHashId" to VeraCryptEngine.getMatchedHashId(targetVolId)
-                    ))
-                } else {
-                    UsbBlockBridge.unregister(targetVolId)
-                    result.error("AUTH_FAIL", "Incorrect password/keyfiles or invalid drive", null)
-                }
-            }
-        } catch (e: Exception) {
-            UsbBlockBridge.unregister(targetVolId)
-            runOnUiThread { dispatchNativeError(e, result) }
-        }
-    }.start()
-}
 
                     ChannelMethods.PICK_CONTAINER -> {
                         pendingResultCheck(result)
@@ -981,10 +971,6 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             result.error("INVALID_ARGS", "filePath and password required", null)
                             return@setMethodCallHandler
                         }
-                        // VeraCrypt allows a keyfile-only unlock (empty password + at
-                        // least one keyfile) — only reject when BOTH are absent, and
-                        // only when we're not just reusing a preserved derived key
-                        // (which needs neither).
                         if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
                             result.error("INVALID_ARGS", "password or keyfiles required", null)
                             return@setMethodCallHandler
@@ -996,22 +982,15 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
                             return@setMethodCallHandler
                         }
-                        // See the matching comment in UNLOCK_USB_CONTAINER —
-                        // lets Dart send requestCancelUnlockNative(volId) for
-                        // this attempt before it returns.
                         methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
 
-                        Thread {
+                        ioExecutor.execute {
                             var pfd: ParcelFileDescriptor? = null
                             try {
                                 val uri = Uri.parse(uriString)
                                 pfd = contentResolver.openFileDescriptor(uri, "rw")
                                     ?: throw Exception("Could not open file descriptor")
 
-                                // Resolve keyfiles BEFORE detaching the container fd: if a
-                                // keyfile path is bad, `pfd` is still an intact
-                                // ParcelFileDescriptor here and the catch block below can
-                                // close it normally — nothing has been handed to native yet.
                                 val keyfileFds = openKeyfileFds(keyfilePaths)
                                 val fd = pfd.detachFd()
 
@@ -1060,14 +1039,10 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                     }
                                 }
                             } catch (e: Exception) {
-                                // No-op if `fd` was already detached and handed to native
-                                // above (detachFd() makes close() on this object a no-op);
-                                // actually closes it if we threw before ever reaching that
-                                // point (e.g. a bad keyfile path).
                                 try { pfd?.close() } catch (_: Exception) {}
                                 runOnUiThread { dispatchNativeError(e, result) }
                             }
-                        }.start()
+                        }
                     }
 
                     ChannelMethods.CANCEL_UNLOCK -> {
@@ -1076,10 +1051,6 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             result.error("INVALID_ARGS", "volId required", null)
                             return@setMethodCallHandler
                         }
-                        // Fire-and-forget — the pending unlockContainer/
-                        // unlockUsbContainer call for this volId will resolve
-                        // on its own (with a CANCELLED error) once the native
-                        // side notices the flag; there's nothing to await here.
                         VeraCryptEngine.requestCancelUnlockNative(volId)
                         result.success(true)
                     }
@@ -1097,14 +1068,11 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             return@setMethodCallHandler
                         }
 
-                        Thread {
+                        ioExecutor.execute {
                             var pfd: ParcelFileDescriptor? = null
                             try {
                                 pfd = contentResolver.openFileDescriptor(Uri.parse(filePath), "r")
                                     ?: throw Exception("Could not open file descriptor")
-                                // Same ordering as UNLOCK_CONTAINER: resolve keyfiles
-                                // before detaching, so a bad keyfile path still leaves
-                                // `pfd` closable in the catch block below.
                                 val keyfileFds = openKeyfileFds(keyfilePaths)
                                 val fd = pfd.detachFd()
                                 val derived = VeraCryptEngine.deriveKeyMaterialNative(fd, password, pim, cipherId, hashId, keyfileFds)
@@ -1114,7 +1082,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                 try { pfd?.close() } catch (_: Exception) {}
                                 runOnUiThread { dispatchNativeError(e, result) }
                             }
-                        }.start()
+                        }
                     }
 
                     ChannelMethods.DOCUMENT_EXISTS -> {
@@ -1125,10 +1093,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             return@setMethodCallHandler
                         }
 
-                        Thread {
-                            // Check if a document is accessible on a background thread.
-                            // Any exception (e.g. revoked permissions, I/O errors) is swallowed and treated
-                            // as a simple false ("does not exist") to update the UI on the Dart side.
+                        ioExecutor.execute {
                             val exists = try {
                                 if (filePath.startsWith("content://")) {
                                     DocumentFile.fromSingleUri(this, Uri.parse(filePath))
@@ -1140,7 +1105,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                 false
                             }
                             runOnUiThread { result.success(exists) }
-                        }.start()
+                        }
                     }
 
                     ChannelMethods.STORE_DERIVED_KEY -> {
@@ -1183,7 +1148,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             return@setMethodCallHandler
                         }
 
-                        Thread {
+                        ioExecutor.execute {
                             try {
                                 val hash = VeraCryptEngine.hashPasswordNative(password, saltBytes, iterations)
                                 runOnUiThread {
@@ -1193,7 +1158,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             } catch (e: Exception) {
                                 runOnUiThread { dispatchNativeError(e, result) }
                             }
-                        }.start()
+                        }
                     }
 
                     ChannelMethods.GET_VIDEO_THUMBNAIL -> {
@@ -1205,7 +1170,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             return@setMethodCallHandler
                         }
 
-                        Thread {
+                        ioExecutor.execute {
                             var retriever: MediaMetadataRetriever? = null
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString)
@@ -1213,7 +1178,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                         runOnUiThread {
                                             result.error("NOT_MOUNTED", "Container not mounted", null)
                                         }
-                                        return@Thread
+                                        return@execute
                                     }
 
                                 retriever = MediaMetadataRetriever()
@@ -1256,7 +1221,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             } finally {
                                 runCatching { retriever?.release() }
                             }
-                        }.start()
+                        }
                     }
 
                     ChannelMethods.GET_IMAGE_THUMBNAIL -> {
@@ -1270,12 +1235,12 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             return@setMethodCallHandler
                         }
 
-                        Thread {
+                        ioExecutor.execute {
                             try {
                                 val volId = VeraCryptSession.getVolumeIdByUri(uriString)
                                     ?: run {
                                         runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@Thread
+                                        return@execute
                                     }
 
                                 val inputStream = VeraCryptInputStream(this, uriString, fileName, volId)
@@ -1313,7 +1278,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             } catch (e: Exception) {
                                 runOnUiThread { dispatchNativeError(e, result) }
                             }
-                        }.start()
+                        }
                     }
 
                     ChannelMethods.GENERATE_AND_CACHE_THUMBNAIL -> {
@@ -1328,9 +1293,9 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                             return@setMethodCallHandler
                         }
 
-                        Thread {
+                        ioExecutor.execute {
                             try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: return@Thread
+                                val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: return@execute
                                 val inputStream = VeraCryptInputStream(this, uriString, fileName, volId)
                                 
                                 val options = BitmapFactory.Options().apply {
@@ -1388,43 +1353,43 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                     tmpFile.renameTo(file)
                                 }
                             } catch (_: Exception) {}
-                        }.start()
+                        }
 
                         result.success(null)
                     }
 
                     ChannelMethods.LOCK_CONTAINER -> {
-    val uriString = call.argument<String>("filePath")
-    if (uriString == null) {
-        result.error("INVALID_ARGS", "filePath is required", null)
-        return@setMethodCallHandler
-    }
-    val volId = VeraCryptSession.getVolumeIdByUri(uriString)
-    if (volId != null) {
-        val session = VeraCryptSession.activeSessions[volId]   // NEW: grab before removal
-        Thread {
-            try {
-                synchronized(VeraCryptSession.locks[volId]) {
-                    VeraCryptEngine.lockNative(volId)
-                }
-                if (session?.isUsbSource == true) {              // NEW
-                    UsbBlockBridge.unregister(volId)
-                }
-                VeraCryptSession.removeSession(volId)
-                runOnUiThread {
-                    contentResolver.notifyChange(
-                        DocumentsContract.buildRootsUri(
-                            "com.aeidolon.vaultexplorer.documents"), null)
-                    result.success(true)
-                }
-            } catch (e: Exception) {
-                runOnUiThread { dispatchNativeError(e, result) }
-            }
-        }.start()
-    } else {
-        result.success(false)
-    }
-}
+                        val uriString = call.argument<String>("filePath")
+                        if (uriString == null) {
+                            result.error("INVALID_ARGS", "filePath is required", null)
+                            return@setMethodCallHandler
+                        }
+                        val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+                        if (volId != null) {
+                            val session = VeraCryptSession.activeSessions[volId]
+                            ioExecutor.execute {
+                                try {
+                                    synchronized(VeraCryptSession.locks[volId]) {
+                                        VeraCryptEngine.lockNative(volId)
+                                    }
+                                    if (session?.isUsbSource == true) {
+                                        UsbBlockBridge.unregister(volId)
+                                    }
+                                    VeraCryptSession.removeSession(volId)
+                                    runOnUiThread {
+                                        contentResolver.notifyChange(
+                                            DocumentsContract.buildRootsUri(
+                                                "com.aeidolon.vaultexplorer.documents"), null)
+                                        result.success(true)
+                                    }
+                                } catch (e: Exception) {
+                                    runOnUiThread { dispatchNativeError(e, result) }
+                                }
+                            }
+                        } else {
+                            result.success(false)
+                        }
+                    }
 
                     ChannelMethods.UPDATE_CONTAINER_SETTINGS -> {
                         val uriString = call.argument<String>("filePath")
@@ -1580,7 +1545,6 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                 try {
                                     startActivity(intent)
                                 } catch (e: Exception) {
-                                    // Fallback to chooser if specific package launch fails (e.g. app uninstalled)
                                     intent.setPackage(null)
                                     val receiverIntent = Intent(ACTION_CHOOSER).apply {
                                         val ext = fileName.substringAfterLast('.', "")
@@ -1609,7 +1573,7 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                                 }
                                 val pendingIntent = PendingIntent.getBroadcast(this, 0, receiverIntent, flags)
                                 val chooser = Intent.createChooser(intent, "Open file with…", pendingIntent.intentSender)
-                                startActivity(chooser)
+                                  startActivity(chooser)
                             }
                             result.success(true)
                         } catch (e: Exception) { result.error("OPEN_WITH_ERROR", e.message, null) }

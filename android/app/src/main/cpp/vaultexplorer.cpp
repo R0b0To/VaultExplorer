@@ -333,7 +333,7 @@ static int vExplorer_ntfs_filldir(void *dirent, const ntfschar *name, const int 
     NtfsFilldirContext* ctx = static_cast<NtfsFilldirContext*>(dirent);
 
     if (name_type == FILE_NAME_DOS) {
-        return 0; // Skip 8.3 namespace to avoid duplicates in directory listings
+        return 0;
     }
 
     char* utf8Name = nullptr;
@@ -349,6 +349,20 @@ static int vExplorer_ntfs_filldir(void *dirent, const ntfschar *name, const int 
     if (nameStr == "." || nameStr == "..") {
         return 0;
     }
+
+    //Hide ONLY specific NTFS metadata & Windows system folders ---
+    if (nameStr[0] == '$') {
+        if (nameStr == "$MFT" || nameStr == "$MFTMirr" || nameStr == "$LogFile" ||
+            nameStr == "$Volume" || nameStr == "$AttrDef" || nameStr == "$Bitmap" ||
+            nameStr == "$Boot" || nameStr == "$BadClus" || nameStr == "$Secure" ||
+            nameStr == "$UpCase" || nameStr == "$Extend" || nameStr == "$RECYCLE.BIN") {
+            return 0;
+        }
+    } else if (nameStr == "System Volume Information") {
+        return 0;
+    }
+    // -------------------------------------------------------------------------------
+
 
     ntfs_inode* ni = ntfs_inode_open(ctx->vol, mft_reference);
     if (!ni) return 0;
@@ -395,6 +409,18 @@ static int recursiveNtfsSizeFilldir(void *dirent, const ntfschar *name, const in
     free(utf8Name);
 
     if (nameStr == "." || nameStr == "..") return 0;
+
+    // Hide ONLY specific NTFS metadata & Windows system folders ---
+    if (nameStr[0] == '$') {
+        if (nameStr == "$MFT" || nameStr == "$MFTMirr" || nameStr == "$LogFile" ||
+            nameStr == "$Volume" || nameStr == "$AttrDef" || nameStr == "$Bitmap" ||
+            nameStr == "$Boot" || nameStr == "$BadClus" || nameStr == "$Secure" ||
+            nameStr == "$UpCase" || nameStr == "$Extend" || nameStr == "$RECYCLE.BIN") {
+            return 0;
+        }
+    } else if (nameStr == "System Volume Information") {
+        return 0;
+    }
 
     ntfs_inode* ni = ntfs_inode_open(ctx->vol, mft_reference);
     if (ni) {
@@ -448,84 +474,116 @@ static s64 vExplorer_ntfs_pread(struct ntfs_device *dev, void *b, s64 count, s64
     int volId = *static_cast<int*>(dev->d_private);
     VolumeState& v = volumes[volId];
 
-    s64 bytesRead = 0;
-    s64 currOffset = offset;
-    s64 remaining = count;
     unsigned char* outBuf = static_cast<unsigned char*>(b);
-    alignas(16) unsigned char sectorBuf[512];
 
-    while (remaining > 0) {
-        uint64_t sectorIndex = currOffset / 512;
-        uint32_t sectorOffset = currOffset % 512;
-        uint32_t bytesToCopy = 512 - sectorOffset;
-        if (bytesToCopy > remaining) {
-            bytesToCopy = remaining;
-        }
+    uint64_t startByte = offset;
+    uint64_t endByte = offset + count;
+    uint64_t startSector = startByte / 512;
+    uint64_t endSector = (endByte + 511) / 512;
+    uint32_t numSectors = endSector - startSector;
 
-        const uint64_t basePhysical = v.dataOffset / 512;
-        const uint64_t physSector = basePhysical + sectorIndex;
-        const uint64_t tweak = physSector - v.partitionStartSector;
+    const uint64_t basePhysical = v.dataOffset / 512;
+    const uint64_t physicalStartSector = basePhysical + startSector;
+    const size_t totalBytesToRead = numSectors * 512;
 
-        alignas(16) unsigned char encBuf[512];
-        if (!physRead(volId, physSector * 512, encBuf, 512)) {
-            return bytesRead > 0 ? bytesRead : -1;
-        }
-
-        cascadeDecryptSector(v.cascade, tweak, encBuf, sectorBuf);
-        std::memcpy(outBuf + bytesRead, sectorBuf + sectorOffset, bytesToCopy);
-
-        bytesRead += bytesToCopy;
-        currOffset += bytesToCopy;
-        remaining -= bytesToCopy;
+    // Use posix_memalign to align arrays to 16-byte boundaries (critical for AES hardware acceleration)
+    void* rawEncBuf = nullptr;
+    if (posix_memalign(&rawEncBuf, 16, totalBytesToRead) != 0) {
+        return -1;
     }
-    return bytesRead;
+    std::unique_ptr<unsigned char, void(*)(void*)> encBuf(static_cast<unsigned char*>(rawEncBuf), std::free);
+
+    // Read all requested sectors in one single contiguous block operation
+    if (!physRead(volId, physicalStartSector * 512, encBuf.get(), totalBytesToRead)) {
+        return -1;
+    }
+
+    void* rawDecBuf = nullptr;
+    if (posix_memalign(&rawDecBuf, 16, totalBytesToRead) != 0) {
+        return -1;
+    }
+    std::unique_ptr<unsigned char, void(*)(void*)> decBuf(static_cast<unsigned char*>(rawDecBuf), std::free);
+
+    // Decrypt loop (runs entirely in memory, blazing fast)
+    for (uint32_t i = 0; i < numSectors; i++) {
+        uint64_t physSector = physicalStartSector + i;
+        uint64_t tweak = physSector - v.partitionStartSector;
+        cascadeDecryptSector(v.cascade, tweak, encBuf.get() + (i * 512), decBuf.get() + (i * 512));
+    }
+
+    uint64_t internalOffset = startByte - (startSector * 512);
+    std::memcpy(outBuf, decBuf.get() + internalOffset, count);
+
+    return count;
 }
+
 
 static s64 vExplorer_ntfs_pwrite(struct ntfs_device *dev, const void *b, s64 count, s64 offset) {
     if (count <= 0) return 0;
     int volId = *static_cast<int*>(dev->d_private);
     VolumeState& v = volumes[volId];
 
-    s64 bytesWritten = 0;
-    s64 currOffset = offset;
-    s64 remaining = count;
     const unsigned char* inBuf = static_cast<const unsigned char*>(b);
-    alignas(16) unsigned char sectorBuf[512];
 
-    while (remaining > 0) {
-        uint64_t sectorIndex = currOffset / 512;
-        uint32_t sectorOffset = currOffset % 512;
-        uint32_t bytesToCopy = 512 - sectorOffset;
-        if (bytesToCopy > remaining) {
-            bytesToCopy = remaining;
-        }
+    uint64_t startByte = offset;
+    uint64_t endByte = offset + count;
+    uint64_t startSector = startByte / 512;
+    uint64_t endSector = (endByte + 511) / 512;
+    uint32_t numSectors = endSector - startSector;
 
-        const uint64_t basePhysical = v.dataOffset / 512;
-        const uint64_t physSector = basePhysical + sectorIndex;
-        const uint64_t tweak = physSector - v.partitionStartSector;
+    const uint64_t basePhysical = v.dataOffset / 512;
+    const uint64_t physicalStartSector = basePhysical + startSector;
+    const size_t totalBytes = numSectors * 512;
 
-        if (sectorOffset > 0 || bytesToCopy < 512) {
-            alignas(16) unsigned char encBuf[512];
-            if (!physRead(volId, physSector * 512, encBuf, 512)) {
-                return bytesWritten > 0 ? bytesWritten : -1;
-            }
-            cascadeDecryptSector(v.cascade, tweak, encBuf, sectorBuf);
-        }
-
-        std::memcpy(sectorBuf + sectorOffset, inBuf + bytesWritten, bytesToCopy);
-
-        alignas(16) unsigned char encBufOut[512];
-        cascadeEncryptSector(v.cascade, tweak, sectorBuf, encBufOut);
-
-        if (!physWrite(volId, physSector * 512, encBufOut, 512)) {
-            return bytesWritten > 0 ? bytesWritten : -1;
-        }
-
-        bytesWritten += bytesToCopy;
-        currOffset += bytesToCopy;
-        remaining -= bytesToCopy;
+    void* rawSectorBuf = nullptr;
+    if (posix_memalign(&rawSectorBuf, 16, totalBytes) != 0) {
+        return -1;
     }
-    return bytesWritten;
+    std::unique_ptr<unsigned char, void(*)(void*)> sectorBuf(static_cast<unsigned char*>(rawSectorBuf), std::free);
+
+    bool partialStart = (startByte % 512 != 0);
+    bool partialEnd = (endByte % 512 != 0);
+
+    // If the write boundaries do not align to clean 512 bytes, execute standard Read-Modify-Write
+    if (partialStart || partialEnd) {
+        void* rawEncBuf = nullptr;
+        if (posix_memalign(&rawEncBuf, 16, totalBytes) != 0) {
+            return -1;
+        }
+        std::unique_ptr<unsigned char, void(*)(void*)> encBuf(static_cast<unsigned char*>(rawEncBuf), std::free);
+
+        if (!physRead(volId, physicalStartSector * 512, encBuf.get(), totalBytes)) {
+            return -1;
+        }
+        for (uint32_t i = 0; i < numSectors; i++) {
+            uint64_t physSector = physicalStartSector + i;
+            uint64_t tweak = physSector - v.partitionStartSector;
+            cascadeDecryptSector(v.cascade, tweak, encBuf.get() + (i * 512), sectorBuf.get() + (i * 512));
+        }
+    }
+
+    uint64_t internalOffset = startByte - (startSector * 512);
+    std::memcpy(sectorBuf.get() + internalOffset, inBuf, count);
+
+    void* rawEncBufOut = nullptr;
+    if (posix_memalign(&rawEncBufOut, 16, totalBytes) != 0) {
+        return -1;
+    }
+    std::unique_ptr<unsigned char, void(*)(void*)> encBufOut(static_cast<unsigned char*>(rawEncBufOut), std::free);
+
+    // Encrypt loop
+    for (uint32_t i = 0; i < numSectors; i++) {
+        uint64_t physSector = physicalStartSector + i;
+        uint64_t tweak = physSector - v.partitionStartSector;
+        cascadeEncryptSector(v.cascade, tweak, sectorBuf.get() + (i * 512), encBufOut.get() + (i * 512));
+    }
+
+    // Write batched, encrypted sectors to physical storage in a single transaction
+    if (!physWrite(volId, physicalStartSector * 512, encBufOut.get(), totalBytes)) {
+        return -1;
+    }
+
+    return count;
 }
 
 static int vExplorer_ntfs_sync(struct ntfs_device *dev) {
@@ -595,8 +653,7 @@ static ntfs_inode* createNtfsFile(ntfs_volume* vol, const std::string& fullPath)
     ntfs_inode* ni = nullptr;
 
     if (uChildLen >= 0) {
-        // S_IFREG automatically initializes the MFT record and $DATA stream
-        ni = ntfs_create(parentNi, 0, uChild, uChildLen, S_IFREG | 0644);
+        ni = ntfs_create(parentNi, 0, uChild, uChildLen, S_IFREG);
         free(uChild);
     }
     ntfs_inode_close(parentNi);
@@ -700,7 +757,6 @@ static bool ensureMounted(int volId) {
 
         v.ntfsVol = ntfs_device_mount(dev, 0);
         if (!v.ntfsVol) {
-            // Unclean logs fallback
             v.ntfsVol = ntfs_device_mount(dev, NTFS_MNT_RECOVER);
         }
 
@@ -2243,17 +2299,21 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
             }
 
             if (ni) {
-                ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
-                if (na) {
-                    if (offset == 0) {
-                        ntfs_attr_truncate(na, 0);
+                    ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+                    if (!na) {
+                        ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL, 0);
+                        na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
                     }
-                    s64 bw = ntfs_attr_pwrite(na, offset, len, body);
-                    if (bw == static_cast<s64>(len)) success = true;
-                    ntfs_attr_close(na);
+                    if (na) {
+                        if (offset == 0) {
+                            ntfs_attr_truncate(na, 0);
+                        }
+                        s64 bw = ntfs_attr_pwrite(na, offset, len, body);
+                        if (bw == static_cast<s64>(len)) success = true;
+                        ntfs_attr_close(na);
+                    }
+                    ntfs_inode_close(ni);
                 }
-                ntfs_inode_close(ni);
-            }
         }
     }
 
@@ -2313,6 +2373,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
 
                 if (ni) {
                     ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+                    if (!na) {
+                        ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL, 0);
+                        na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+                    }
                     if (na) {
                         ntfs_attr_truncate(na, 0);
                         std::ifstream inFile(source, std::ios::binary);
@@ -2422,27 +2486,32 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
                 std::string fatPath = std::string(drivePaths[volId]) + "/" + targetName;
                 success = (f_unlink(fatPath.c_str()) == FR_OK);
             } else if (v.fsType == VolumeState::FS_NTFS) {
-                std::string fullPath = "/" + std::string(targetName);
-                ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
-                size_t slashPos = fullPath.find_last_of('/');
-                std::string parentPath = fullPath.substr(0, slashPos);
-                std::string childName = fullPath.substr(slashPos + 1);
-                if (parentPath.empty()) parentPath = "/";
+    std::string fullPath = "/" + std::string(targetName);
+    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    size_t slashPos = fullPath.find_last_of('/');
+    std::string parentPath = fullPath.substr(0, slashPos);
+    std::string childName = fullPath.substr(slashPos + 1);
+    if (parentPath.empty()) parentPath = "/";
 
-                ntfs_inode* dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentPath.c_str());
-                if (dir_ni && ni) {
-                    ntfschar* uname = nullptr;
-                    int uname_len = ntfs_mbstoucs(childName.c_str(), &uname);
-                    if (uname_len >= 0) {
-                        if (ntfs_delete(v.ntfsVol, fullPath.c_str(), ni, dir_ni, uname, static_cast<u8>(uname_len)) == 0) {
-                            success = true;
-                        }
-                        free(uname);
-                    }
-                    ntfs_inode_close(dir_ni);
-                }
-                if (ni) ntfs_inode_close(ni);
-            }
+    ntfs_inode* dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentPath.c_str());
+    if (dir_ni && ni) {
+        ntfschar* uname = nullptr;
+        int uname_len = ntfs_mbstoucs(childName.c_str(), &uname);
+        if (uname_len >= 0) {
+            // ntfs_delete() unconditionally closes BOTH ni and dir_ni before
+            // returning (success or failure) — closing them again below was
+            // a double-free of already-released MFT-record state, which is
+            // what corrupted the heap and crashed the app right after delete.
+            success = (ntfs_delete(v.ntfsVol, fullPath.c_str(), ni, dir_ni,
+                                    uname, static_cast<u8>(uname_len)) == 0);
+            free(uname);
+            ni = nullptr;
+            dir_ni = nullptr;
+        }
+    }
+    if (ni) ntfs_inode_close(ni);
+    if (dir_ni) ntfs_inode_close(dir_ni);
+}
         }
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);
@@ -2476,7 +2545,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
                     ntfschar* uChild = nullptr;
                     int uChildLen = ntfs_mbstoucs(childName.c_str(), &uChild);
                     if (uChildLen >= 0) {
-                        ntfs_inode* ni = ntfs_create(parentNi, 0, uChild, uChildLen, S_IFDIR | 0755);
+                        ntfs_inode* ni = ntfs_create(parentNi, 0, uChild, uChildLen, S_IFDIR);
                         if (ni) {
                             success = true;
                             ntfs_inode_close(ni);
@@ -2513,7 +2582,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
             } else if (v.fsType == VolumeState::FS_NTFS) {
                 std::string oldFullPath = "/" + std::string(nativeOld);
                 std::string newFullPath = "/" + std::string(nativeNew);
-                
+
                 size_t slashPosOld = oldFullPath.find_last_of('/');
                 std::string parentOldPath = oldFullPath.substr(0, slashPosOld);
                 std::string oldChildName = oldFullPath.substr(slashPosOld + 1);
@@ -2524,40 +2593,51 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
                 std::string newChildName = newFullPath.substr(slashPosNew + 1);
                 if (parentNewPath.empty()) parentNewPath = "/";
 
-                ntfs_inode* old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, oldFullPath.c_str());
-                ntfs_inode* dir_old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentOldPath.c_str());
-                
-                // Avoid opening the parent directory inode twice if renaming within the same directory.
-                ntfs_inode* dir_new_ni = (parentOldPath == parentNewPath) ? dir_old_ni : ntfs_pathname_to_inode(v.ntfsVol, NULL, parentNewPath.c_str());
+                ntfschar* uOld = nullptr;
+                int uOldLen = ntfs_mbstoucs(oldChildName.c_str(), &uOld);
+                ntfschar* uNew = nullptr;
+                int uNewLen = ntfs_mbstoucs(newChildName.c_str(), &uNew);
 
-                if (old_ni && dir_old_ni && dir_new_ni) {
-                    ntfschar* uOld = nullptr;
-                    int uOldLen = ntfs_mbstoucs(oldChildName.c_str(), &uOld);
-                    ntfschar* uNew = nullptr;
-                    int uNewLen = ntfs_mbstoucs(newChildName.c_str(), &uNew);
-
-                    if (uOldLen >= 0 && uNewLen >= 0) {
-                        // Check if a file already exists at the target path and delete it to simulate overwrite
-                        ntfs_inode* dest_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, newFullPath.c_str());
-                        if (dest_ni) {
-                            ntfs_delete(v.ntfsVol, newFullPath.c_str(), dest_ni, dir_new_ni, uNew, uNewLen);
+                if (uOldLen >= 0 && uNewLen >= 0) {
+                    // Step 1: if something already exists at the destination, overwrite it
+                    ntfs_inode* dest_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, newFullPath.c_str());
+                    if (dest_ni) {
+                        ntfs_inode* dest_dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentNewPath.c_str());
+                        if (dest_dir_ni) {
+                            ntfs_delete(v.ntfsVol, newFullPath.c_str(), dest_ni, dest_dir_ni,
+                                        uNew, static_cast<u8>(uNewLen));
+                        } else {
                             ntfs_inode_close(dest_ni);
                         }
-
-                        // Create the link at the new destination, then delete the old source link
-                        if (ntfs_link(old_ni, dir_new_ni, uNew, uNewLen) == 0) {
-                            if (ntfs_delete(v.ntfsVol, oldFullPath.c_str(), old_ni, dir_old_ni, uOld, uOldLen) == 0) {
-                                success = true;
-                            }
-                        }
                     }
-                    if (uOld) free(uOld);
-                    if (uNew) free(uNew);
+
+                    // Step 2: pre-open all necessary inodes
+                    ntfs_inode* old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, oldFullPath.c_str());
+                    ntfs_inode* dir_new_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentNewPath.c_str());
+                    ntfs_inode* dir_old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentOldPath.c_str());
+
+                    if (old_ni && dir_new_ni && dir_old_ni) {
+                        // Link source under the new name
+                        if (ntfs_link(old_ni, dir_new_ni, uNew, static_cast<u8>(uNewLen)) == 0) {
+                            // Unlink the old name
+                            success = (ntfs_delete(v.ntfsVol, oldFullPath.c_str(), old_ni, dir_old_ni,
+                                                    uOld, static_cast<u8>(uOldLen)) == 0);
+                            old_ni = nullptr; // pointer consumed by ntfs_delete
+                            dir_old_ni = nullptr; // pointer consumed by ntfs_delete
+                        }
+                        
+                        // Close whatever didn't get consumed
+                        if (old_ni) ntfs_inode_close(old_ni);
+                        if (dir_old_ni) ntfs_inode_close(dir_old_ni);
+                        ntfs_inode_close(dir_new_ni);
+                    } else {
+                        if (old_ni) ntfs_inode_close(old_ni);
+                        if (dir_new_ni) ntfs_inode_close(dir_new_ni);
+                        if (dir_old_ni) ntfs_inode_close(dir_old_ni);
+                    }
                 }
-                
-                if (old_ni) ntfs_inode_close(old_ni);
-                if (dir_old_ni) ntfs_inode_close(dir_old_ni);
-                if (dir_new_ni && dir_new_ni != dir_old_ni) ntfs_inode_close(dir_new_ni);
+                if (uOld) free(uOld);
+                if (uNew) free(uNew);
             }
         }
     }

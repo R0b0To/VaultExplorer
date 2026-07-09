@@ -1,17 +1,3 @@
-// crypto/vc_header_layout.h
-//
-// Named VeraCrypt volume-header field offsets/sizes, cross-checked against
-// upstream VeraCrypt (Common/Volumes.h / Common/Volumes.c). Header-only —
-// pure `constexpr` declarations, so including this needs no CMakeLists.txt
-// change.
-//
-// All TC_HEADER_OFFSET_* constants below are ABSOLUTE offsets from byte 0
-// of the 512-byte on-disk header sector (byte 0 == first byte of the
-// 64-byte PKCS5 salt). vaultexplorer.cpp works on the already-salt-stripped
-// decrypted BODY buffer instead (body[0] == header byte 64), so the
-// VC_HDR_OFF_* constants it actually indexes with are those ABSOLUTE
-// offsets minus PKCS5_SALT_SIZE, computed once here via VC_BODY_OFFSET so
-// there is exactly one source of truth for each field position.
 #pragma once
 #include <cstdint>
 #include <cstddef>
@@ -32,20 +18,7 @@ static constexpr int    TC_HEADER_OFFSET_HEADER_CRC            = 252;
 static constexpr size_t HEADER_MASTER_KEYDATA_OFFSET           = 256;
 static constexpr size_t MASTER_KEYDATA_SIZE                    = 256;
 
-// Container/device layout (Common/Volumes.h: TC_VOLUME_HEADER_SIZE,
-// TC_VOLUME_HEADER_GROUP_SIZE, TC_VOLUME_DATA_OFFSET,
-// TC_HIDDEN_VOLUME_HEADER_OFFSET). Layout of a container file:
-//
-//   [0,                      65536)   primary header slot   (header @ 0)
-//   [65536,                 131072)   hidden-volume header slot (header @ 65536)
-//   [131072,      size-131072)        data area (outer/normal volume)
-//   [size-131072, size-65536)         backup primary header
-//   [size-65536,  size)               backup hidden-volume header
-//
-// A hidden volume's OWN data area is NOT anchored to 131072 — its start is
-// wherever EncryptedAreaStart in ITS header says (VeraCrypt picks a spot
-// near the end of the outer volume's free space at format time). That
-// value is read out of the header directly; it is never guessed.
+
 static constexpr uint64_t TC_VOLUME_HEADER_SIZE          = 64ULL * 1024;              // 65536
 static constexpr uint64_t TC_VOLUME_HEADER_GROUP_SIZE    = 2 * TC_VOLUME_HEADER_SIZE; // 131072
 static constexpr uint64_t TC_VOLUME_DATA_OFFSET          = TC_VOLUME_HEADER_GROUP_SIZE;
@@ -76,8 +49,5 @@ static constexpr int VC_HDR_KEY_CRC_COVERAGE_LEN = static_cast<int>(MASTER_KEYDA
 
 #undef VC_BODY_OFFSET
 
-// FatFs in this project is fixed at FF_MIN_SS == FF_MAX_SS == 512 (see
-// ffconf.h) — a perfectly valid VeraCrypt volume with a different
-// SectorSize field simply can't be mounted by this app, and we should say
-// so cleanly rather than silently misinterpreting sector boundaries.
+
 static constexpr uint32_t VC_SUPPORTED_SECTOR_SIZE = 512;

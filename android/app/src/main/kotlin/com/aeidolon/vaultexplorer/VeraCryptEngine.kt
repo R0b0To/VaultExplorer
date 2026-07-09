@@ -107,5 +107,8 @@ object VeraCryptEngine {
     @JvmStatic external fun openStream(targetFileName: String, volId: Int): Long
     @JvmStatic external fun readStream(streamPtr: Long, offset: Long, outBuffer: ByteArray, length: Int, volId: Int): Int
     @JvmStatic external fun closeStream(streamPtr: Long, volId: Int)
+    @JvmStatic external fun getCascadeFingerprint(cascadeId: Int): Int
+    @JvmStatic external fun getCascadeIdCount(): Int
+    @JvmStatic external fun getHashIdCount(): Int
     
 }

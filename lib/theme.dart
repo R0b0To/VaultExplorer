@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Single source of truth for spacing / radius / icon-size / motion values.
-
+// New UI should always reference these instead of literal numbers so the
+// whole app can be re-tuned from one place.
 
 abstract final class AppRadius {
   static const sm = 8.0; // chips, small controls
@@ -58,7 +59,13 @@ abstract final class AppMotion {
 // ─────────────────────────────────────────────────────────────────────────────
 // SEMANTIC COLORS (ThemeExtension)
 // ─────────────────────────────────────────────────────────────────────────────
-
+//
+// ColorScheme has no "success" / "warning" roles. Screens previously reached
+// for raw Colors.green/Colors.amber for things like "saved" / "unsaved"
+// status (see text_editor_screen.dart). This extension gives them a themed,
+// dark/light-aware home instead, participating in ThemeData like any other
+// role: `Theme.of(context).extension<AppSemanticColors>()!` (or the
+// `context.semanticColors` shortcut below).
 
 @immutable
 class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
@@ -159,6 +166,11 @@ extension AppThemeX on BuildContext {
 /// Seed used when dynamic color (Material You) isn't available/enabled.
 const Color _seedColor = Color(0xFF0B57D0); // Google Blue
 
+/// Hand-tuned MD3 dark palette (kept from the original app design — this is
+/// the "vault" look-and-feel) expressed as a *complete* ColorScheme rather
+/// than letting `ColorScheme.dark()` synthesize the surface-container and
+/// tertiary roles. Being explicit here means every role has a deliberate,
+/// contrast-checked value instead of an algorithmic guess.
 ColorScheme _darkColorScheme() => const ColorScheme(
       brightness: Brightness.dark,
 
@@ -207,6 +219,22 @@ ColorScheme _darkColorScheme() => const ColorScheme(
 // ─────────────────────────────────────────────────────────────────────────────
 // THEME BUILDERS
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// buildDarkTheme()/buildLightTheme() both accept an optional pre-built
+// ColorScheme. Pass one through here if you wire up Material You dynamic
+// color (e.g. via the `dynamic_color` package's DynamicColorBuilder):
+//
+//   DynamicColorBuilder(builder: (lightDynamic, darkDynamic) {
+//     return MaterialApp(
+//       theme: buildLightTheme(lightDynamic),
+//       darkTheme: buildDarkTheme(darkDynamic),
+//       themeMode: ThemeMode.system,
+//       ...
+//     );
+//   });
+//
+// Without that package wired up, both simply fall back to the seeded /
+// hand-tuned palettes above — dynamic color is additive, never required.
 
 ThemeData buildDarkTheme([ColorScheme? dynamicScheme]) =>
     _buildTheme(dynamicScheme ?? _darkColorScheme(), Brightness.dark);
@@ -285,26 +313,27 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
     ),
 
     inputDecorationTheme: InputDecorationTheme(
-      filled: false,
+      filled: true,
+      fillColor: cs.surfaceContainerHigh,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(4), // MD3 standard input radius
-        borderSide: BorderSide(color: cs.outline),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(4),
-        borderSide: BorderSide(color: cs.outline),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: BorderSide(color: cs.primary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(4),
-        borderSide: BorderSide(color: cs.error),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderSide: BorderSide(color: cs.error, width: 1.5),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         borderSide: BorderSide(color: cs.error, width: 2),
       ),
       labelStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 16),

@@ -7,7 +7,6 @@ import '/../../models/mounted_container.dart';
 import '/../../services/vaultexplorer_api.dart';
 import '../media_viewer_constants.dart';
 
-// Highly optimized, fine-grained model updating isolated nodes
 class VideoPlaybackProgress {
   final Duration position;
   final Duration duration;
@@ -112,7 +111,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     _controller = VideoPlayerController.contentUri(
       Uri.parse(widget.contentUriString),
     );
-    
 
     _controller.addListener(_onControllerTick);
     try {
@@ -128,7 +126,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         await _controller.setLooping(false);
         if (widget.autoPlay) {
           _controller.play();
-          //widget.onToggleUI(false);
         }
       }
     } catch (e) {
@@ -140,8 +137,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   void _onControllerTick() {
     if (!mounted || !_initialized) return;
-
-    // Updates the progressNotifier instead of triggering a full widget setState() rebuild
     widget.progressNotifier.value = widget.progressNotifier.value.copyWith(
       position: _controller.value.position,
       duration: _controller.value.duration,
@@ -212,6 +207,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       if (_videoScale == 1.0) {
         _videoScale = 2.2;
         if (position != null) {
+          // Precisely calculate the correct coordinate matrix relative to tap position
           final x = -position.dx * (_videoScale - 1);
           final y = -position.dy * (_videoScale - 1);
           _videoTransformationController.value = Matrix4.identity()
@@ -297,8 +293,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     final double computedAspectRatio = widget.isAudio
         ? 0.8
         : (isRotated
-              ? 1.0 / _controller.value.aspectRatio
-              : _controller.value.aspectRatio);
+            ? 1.0 / _controller.value.aspectRatio
+            : _controller.value.aspectRatio);
 
     Widget corePlayerWidget = Center(
       child: AspectRatio(
@@ -338,43 +334,32 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                   },
                 ),
               ),
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () => widget.onToggleUI(!widget.showUI),
-                    onDoubleTap: () => _skip(backwards: true),
-                    onLongPressStart: _onSpeedHoldStart,
-                    onLongPressEnd: _onSpeedHoldEnd,
-                    child: Container(),
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: GestureDetector(
+            Positioned.fill(
+              // Using a LayoutBuilder ensures we can properly divide skip vs zoom zones
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return GestureDetector(
                     behavior: HitTestBehavior.translucent,
                     onTap: () => widget.onToggleUI(!widget.showUI),
                     onDoubleTapDown: (d) => _videoDoubleTapDetails = d,
-                    onDoubleTap: _handleVideoDoubleTap,
+                    onDoubleTap: () {
+                      if (widget.isAudio) return;
+                      final width = constraints.maxWidth;
+                      final dx = _videoDoubleTapDetails?.localPosition.dx ?? 0;
+                      // Edges to skip, middle to zoom
+                      if (dx < width * 0.3) {
+                        _skip(backwards: true);
+                      } else if (dx > width * 0.7) {
+                        _skip(backwards: false);
+                      } else {
+                        _handleVideoDoubleTap();
+                      }
+                    },
                     onLongPressStart: _onSpeedHoldStart,
                     onLongPressEnd: _onSpeedHoldEnd,
-                    child: Container(),
-                  ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () => widget.onToggleUI(!widget.showUI),
-                    onDoubleTap: () => _skip(backwards: false),
-                    onLongPressStart: _onSpeedHoldStart,
-                    onLongPressEnd: _onSpeedHoldEnd,
-                    child: Container(),
-                  ),
-                ),
-              ],
+                  );
+                },
+              ),
             ),
           ],
         ),

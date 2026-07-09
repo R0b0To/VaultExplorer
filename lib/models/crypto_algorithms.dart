@@ -1,5 +1,6 @@
 library;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Canonical cipher/hash algorithm catalogs.
 ///
@@ -69,6 +70,7 @@ class HashAlgo {
 }
 
 class CipherAlgo {
+  static const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
   final int id;
   final String label;
   const CipherAlgo(this.id, this.label);

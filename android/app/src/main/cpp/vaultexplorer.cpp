@@ -11,11 +11,10 @@
 #include <memory>
 #include <algorithm>
 #include <mutex>
-#include <atomic>  // std::atomic<bool> derivationInProgress[] below relies on this directly,
-                   // not on a transitive include from <mutex>/<memory>.
+#include <atomic>
 #include <chrono>
-#include <ctime>   // mktime, struct tm, time_t
-
+#include <ctime>   
+#include "sector_batching.h"
 #include "mbedtls/md.h"
 #include "mbedtls/pkcs5.h"
 #include "mbedtls/aes.h"
@@ -36,80 +35,15 @@ static inline long long elapsedMs(const std::chrono::steady_clock::time_point& s
 
 #define MAX_VOLUMES FF_VOLUMES
 
-// ── VeraCrypt on-disk format constants ───────────────────────────────────────
-//
-// All offsets refer to the primary volume header at byte 0 of the container
-// file. The backup header is a byte-for-byte copy stored at
-// (volume_size - 131072). Spec ref: VeraCrypt source, Common/Volumes.h and
-// Format/VolumeCreator.cpp.
-//
-//  VC_SALT_SIZE (64)
-//      PKCS#5 salt occupying bytes [0, 63] of the header sector. Fed directly
-//      to PBKDF2-SHA512 together with the user password.
-//
-//  VC_HEADER_BODY_SIZE (448)
-//      The encrypted portion of the header, bytes [64, 511]. Decrypted with
-//      AES-XTS using a key derived from PBKDF2 output at offset 0 of the key
-//      material (the "header key"). After decryption the first four bytes
-//      must equal ASCII "VERA" to confirm the correct password was used.
-//
-//  VC_FULL_HEADER_SIZE (512)
-//      One full 512-byte sector: salt (64) + encrypted body (448).
-//
-//  VC_DATA_AREA_OFFSET (131072 = 256 × 512)
-//      The data area begins 256 sectors into the file. The first 256 sectors
-//      hold the primary header (sector 0) plus reserved/hidden-volume space.
-//      The backup header occupies the last 256 sectors of the file.
-//
-//  VC_KEY_OFFSET_MASTER (192, body-relative == absolute header offset 256)
-//      Byte offset inside the *decrypted* header body where the master key
-//      material starts. Used directly as the AES-256-XTS key (32-byte data
-//      key + 32-byte tweak key, concatenated = 64 bytes) for encrypting and
-//      decrypting the actual volume contents.
-//
-//      This is the ONLY master-key position for a single-cipher (AES)
-//      VeraCrypt volume. It's confirmed independently by the key-data CRC
-//      field (VC_HDR_OFF_KEY_CRC): per spec that CRC covers absolute header
-//      bytes 256–511, i.e. body[192..447] — 256 bytes starting exactly here.
-//      (A previous revision of this code also tried a second candidate at
-//      body offset 252, on the theory that "primary" and "secondary" keys
-//      lived at different offsets. That offset isn't spec-defined — real
-//      cascade-cipher key slots start at 192/256/320, and 252 doesn't land
-//      on any of those boundaries. It was harmless only because unlock
-//      always fell through to try 192 as well, which is the real position.)
-//
-//  VC_KEY_MATERIAL_LEN (64)
-//      Length of the master key in bytes (512 bits, as required by
-//      mbedtls_aes_xts_setkey_*). Only single-cipher AES-256-XTS volumes are
-//      supported; cascaded ciphers (Serpent, Twofish, ...) would need
-//      additional 64-byte keys at body offsets 256 and 320.
-//
-// VC_SALT_SIZE, VC_HEADER_BODY_SIZE, VC_FULL_HEADER_SIZE, VC_DATA_AREA_OFFSET,
-// VC_KEY_OFFSET_MASTER, VC_HDR_OFF_*, VC_HDR_CRC_COVERAGE_LEN,
-// VC_HDR_KEY_CRC_COVERAGE_LEN, VC_HIDDEN_HEADER_OFFSET, and
-// VC_SUPPORTED_SECTOR_SIZE now live in crypto/vc_header_layout.h (named,
-// spec-cross-checked constants — see that file for the "why this number"
-// derivation from upstream Common/Volumes.h). KEYFILE_POOL_SIZE,
-// KEYFILE_POOL_LEGACY_SIZE, KEYFILE_MAX_READ_LEN, MAX_LEGACY_PASSWORD, and
-// MAX_PASSWORD_LEN live in crypto/keyfile_mixing.h alongside the mixing
-// function that uses them. What's left here is genuinely local to this file.
-static constexpr size_t IO_BUFFER_SIZE          = 262144;   // 256 KB
+
+static constexpr size_t IO_BUFFER_SIZE          = 262144;   
 static constexpr int    VC_KEY_MATERIAL_LEN     = 64;
 static constexpr size_t MAX_DIR_ENTRIES         = 50000;
 static constexpr int    MKFS_WORK_BUF_SIZE      = 4096;
-static constexpr size_t MAX_CHUNK_SIZE          = 64 * 1024 * 1024; // 64 MB safety cap
-static constexpr uint64_t FALLBACK_SECTOR_COUNT_UNINITIALIZED = 1000000; // see disk_ioctl GET_SECTOR_COUNT
-
-// FIX P14: Use a much larger batch for container creation to reduce pwrite()
-// syscall count. 4096 sectors = 2 MB per write vs 32 KB — 64× fewer syscalls
-// for a 1 GB container (512 writes vs 32,768).
+static constexpr size_t MAX_CHUNK_SIZE          = 64 * 1024 * 1024;
+static constexpr uint64_t FALLBACK_SECTOR_COUNT_UNINITIALIZED = 1000000; 
 static constexpr uint64_t CREATE_FILL_BATCH     = 4096;
-
-// FIX P12: Per-volume persistent IO buffer to avoid allocating a fresh heap
-// buffer on every large disk_read/disk_write call (which FatFs can issue up to
-// 4 MB at once during sequential file access). Now lives on VolumeState
-// (see below) instead of as a standalone parallel array.
-static constexpr size_t   IO_VOL_BUF_SECTORS    = 512;    // 256 KB per volume
+static constexpr size_t   IO_VOL_BUF_SECTORS    = 512;    
 static constexpr size_t   IO_VOL_BUF_SIZE       = IO_VOL_BUF_SECTORS * 512;
 
 // ----------------------------------------------------------------====
@@ -139,12 +73,7 @@ struct MdContextGuard {
     ~MdContextGuard() { mbedtls_md_free(&ctx); }
 };
 
-// Zeroizes [buf] on scope exit no matter which of a function's several
-// early-return paths is taken. Used for the mixed-password buffers built
-// in prepareSession()/prepareUsbSession()/deriveKeyMaterialNative() —
-// those functions have too many return points to safely rely on a manual
-// mbedtls_platform_zeroize() call before each one (a new return path added
-// later could easily forget it).
+
 struct ScopeZeroize {
     unsigned char* buf; size_t len;
     ScopeZeroize(unsigned char* b, size_t l) : buf(b), len(l) {}
@@ -153,13 +82,7 @@ struct ScopeZeroize {
     ScopeZeroize& operator=(const ScopeZeroize&) = delete;
 };
 
-// applyKeyfilesToPassword() (crypto/keyfile_mixing.h) takes ownership of
-// every fd in a keyfileFds[] array and closes it, whether mixing succeeds
-// or fails. Some call paths (a cache-hit early return, or the
-// preserved-derived-key path that skips password derivation entirely)
-// never reach that call, but Kotlin has already handed over ownership of
-// those fds regardless — this closes them on those paths so they don't
-// leak.
+
 static void closeUnusedKeyfileFds(const int* keyfileFds, int keyfileCount) {
     if (!keyfileFds) return;
     for (int i = 0; i < keyfileCount; i++) {
@@ -169,17 +92,6 @@ static void closeUnusedKeyfileFds(const int* keyfileFds, int keyfileCount) {
 
 // ----------------------------------------------------------------====
 // PER-VOLUME STATE
-//
-// FIX: previously this was ~9 separate parallel arrays (activeFd[],
-// activeDataOffset[], activeIsRelTweak[], isDataCtxInitialized[],
-// activeFileSize[], fsMounted[], isUsbSource[], activePartitionStartSector[],
-// plus the IO buffer and open-stream arrays), each indexed by volId. Every
-// teardown site (lockNative, every failure branch in createContainerNative)
-// had to manually reset 6–8 of them in the right order — a missed reset on
-// a new exit path silently corrupts that volume's session. Collapsing them
-// into one struct per volume makes "reset this volume" a single call and
-// makes it structurally impossible to update one field's array but not
-// another's.
 // ----------------------------------------------------------------====
 
 struct VolumeState {
@@ -187,41 +99,15 @@ struct VolumeState {
     int        fd = -1;
     uint64_t   dataOffset = 0;
 
-    // FIX (hidden volumes): EncryptedAreaLength read directly out of the
-    // header that unlocked this volume. Drives GET_SECTOR_COUNT so a
-    // hidden volume's filesystem never sees space belonging to the outer
-    // volume (which would corrupt the outer volume on write). 0 only
-    // between createContainerNative()'s format step and its post-format
-    // reset, where the file-size-based fallback in disk_ioctl is correct.
     uint64_t   dataAreaLengthBytes = 0;
-    // True iff the header that unlocked this volume had a nonzero
-    // HiddenVolumeSize field, i.e. this IS a hidden volume, not the outer
-    // one. Purely informational (UI badge) — nothing else branches on it.
     bool       isHiddenVolume = false;
-
-    // NOTE: there used to be a `relTweak` flag here, guessed by scanning
-    // sectors for a 0x55AA boot signature under two different tweak
-    // conventions. Removed: the VeraCrypt XTS tweak (data-unit number) is
-    // ALWAYS relative to this volume's own dataOffset — that's what lets a
-    // hidden volume carry a tweak schedule starting fresh at 0, identical
-    // to a standalone volume, entirely independent of where its data area
-    // physically sits inside the outer container. See disk_read/disk_write.
     bool       dataCtxInitialized = false;
     uint64_t   fileSize = 0;
     bool       fsMounted = false;
     bool       isUsbSource = false;
     uint64_t   partitionStartSector = 0;
-
-    // FIX (perf, fix #1): remembers which cipher/hash combo actually
-    // unlocked this volume, so Kotlin can persist it and pass it back
-    // as an explicit cipherId/hashId on the NEXT unlock of the same
-    // container — collapsing the 5x8 auto-detect search space to
-    // exactly one PBKDF2 run. -1 = unknown / not yet unlocked.
     int matchedCipherId = -1;
     int matchedHashId = -1;
-
-    // Optional preserved derived key material for one-time caching by Kotlin.
-    // This is only kept when an unlock request specifically asks for it.
     unsigned char* preservedDerivedKey = nullptr;
     size_t        preservedDerivedKeyLen = 0;
 
@@ -263,45 +149,26 @@ struct VolumeState {
 
 static VolumeState volumes[MAX_VOLUMES];
 static std::mutex  slotAllocMutex;
-
-// ── USB backing-store support ────────────────────────────────────────────
-//
-// A volume's physical bytes come from one of two places:
-//   - a container file's fd (existing path, pread/pwrite)
-//   - a USB mass-storage device, reached only through a Kotlin upcall
-//     (UsbBlockBridge.readSectors/writeSectors), since raw block-device
-//     access on unrooted Android only exists via the USB Host API.
-//
-// volumes[volId].isUsbSource selects which path physRead/physWrite below use.
-// volumes[volId].fd stays -1 for USB volumes; only isUsbSource matters.
-
 static JavaVM*   g_vm             = nullptr;
 static jclass    g_usbBridgeClass = nullptr;
-static jmethodID g_usbReadMethod  = nullptr;  // static byte[]  readSectors(int, long, int)
-static jmethodID g_usbWriteMethod = nullptr;  // static boolean writeSectors(int, long, int, byte[])
-
-// Upcall target for unlock progress ("trying combination i of N"), pushed
-// from whichever worker thread inside deriveAndValidateHeader() just
-// finished a hash/cipher attempt. See UnlockProgressBridge.kt.
+static jmethodID g_usbReadMethod  = nullptr;  
+static jmethodID g_usbWriteMethod = nullptr;  
 static jclass    g_progressBridgeClass  = nullptr;
-static jmethodID g_progressReportMethod = nullptr; // static void reportProgress(int,int,int,int,int)
+static jmethodID g_progressReportMethod = nullptr; 
 static bool isValidBootSector(const unsigned char* decS) {
-    // End of sector signature must be 0x55AA
+
     if (decS[510] != 0x55 || decS[511] != 0xAA) {
         return false;
     }
 
-    // Check for exFAT jump instruction (EB 76 90) and OEM name "EXFAT   "
     if (decS[0] == 0xEB && decS[1] == 0x76 && decS[2] == 0x90) {
         if (memcmp(&decS[3], "EXFAT   ", 8) == 0) {
             return true;
         }
     }
 
-    // Check for FAT12/FAT16/FAT32 jump instruction (EB xx 90 or E9 xx xx)
+
     if (decS[0] == 0xEB || decS[0] == 0xE9) {
-        // FAT/FAT32 volumes have a valid sector size of 512 bytes at offset 11
-        // Safely read the little-endian 16-bit value byte-by-byte to prevent unaligned crashes on ARM
         uint16_t bytesPerSector = static_cast<uint16_t>(decS[11]) | (static_cast<uint16_t>(decS[12]) << 8);
         if (bytesPerSector == 512) {
             return true;
@@ -311,26 +178,12 @@ static bool isValidBootSector(const unsigned char* decS) {
     return false;
 }
 
-// isValidBootSector() used to live here — it backed the boot-sector scan
-// that guessed a volume's data offset. That scan is gone (see prepareSession
-// / prepareUsbSession): dataOffset now comes straight from the CRC-validated
-// header's own EncryptedAreaStart field, exactly like upstream VeraCrypt's
-// ReadVolumeHeaderWithAbort() does, which is also what makes hidden volumes
-// (whose data area can start anywhere inside a multi-GB outer volume, far
-// past any small scan window) actually discoverable. See ParsedHeaderFields
-// and tryDecryptHeader() below. Keyfile pool mixing (the other half of this
-// change) lives in crypto/keyfile_mixing.h, included above.
 
-// Header fields this app needs beyond the master key material itself, all
-// read directly out of a CRC-validated header body — see
-// crypto/vc_header_layout.h for field offsets and upstream
-// Common/Volumes.c's ReadVolumeHeaderWithAbort() for the reference logic
-// this mirrors.
 struct ParsedHeaderFields {
-    uint64_t volumeSize          = 0; // total size of the volume this header describes
-    uint64_t hiddenVolumeSize    = 0; // 0 for a normal volume; nonzero => this header IS a hidden volume's
-    uint64_t encryptedAreaStart  = 0; // byte offset (from file/partition start) of THIS volume's data area
-    uint64_t encryptedAreaLength = 0; // byte length of that data area
+    uint64_t volumeSize          = 0; 
+    uint64_t hiddenVolumeSize    = 0; 
+    uint64_t encryptedAreaStart  = 0; 
+    uint64_t encryptedAreaLength = 0; 
     uint32_t sectorSize          = 0;
     bool isHiddenVolume() const { return hiddenVolumeSize != 0; }
 };
@@ -384,9 +237,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     return JNI_VERSION_1_6;
 }
 
-// disk_read/disk_write can run on any thread FatFs happens to be driven
-// from, not necessarily one already attached to the JVM. Attach on demand,
-// detach only if we were the ones who attached.
 struct ScopedJniEnv {
     JNIEnv* env = nullptr;
     bool attached = false;
@@ -399,12 +249,7 @@ struct ScopedJniEnv {
     ~ScopedJniEnv() { if (attached) g_vm->DetachCurrentThread(); }
 };
 
-// Pushes an "i of N combinations tried" update to Kotlin. Safe to call from
-// any worker thread spawned inside deriveAndValidateHeader() (attaches on
-// demand via ScopedJniEnv, same as usbReadSectors/usbWriteSectors below).
-// volId < 0 (used by deriveKeyMaterialNative, which has no session/volId of
-// its own) silently no-ops — there's no Dart-side listener keyed on a
-// negative volId to receive it anyway.
+
 static void reportUnlockProgress(int volId, int attempted, int total, int hashId, int cipherId) {
     if (volId < 0) return;
     ScopedJniEnv scope;
@@ -456,9 +301,6 @@ static bool usbWriteSectors(int volId, uint64_t startSector, uint32_t sectorCoun
     return ok == JNI_TRUE;
 }
 
-// Unified physical-IO dispatch used by disk_read/disk_write. [physByteOffset]
-// and [totalBytes] must both be multiples of 512 (true for every call site
-// in this file — sectors in, sectors out).
 static bool physRead(int pdrv, uint64_t physByteOffset, unsigned char* buf, size_t totalBytes) {
     if (volumes[pdrv].isUsbSource) {
         return usbReadSectors(pdrv, physByteOffset / 512,
@@ -481,16 +323,12 @@ static const char* drivePaths[MAX_VOLUMES] = {
     "0:", "1:", "2:", "3:", "4:", "5:", "6:", "7:"
 };
 
-// Returns true only if volId already has an active, unlocked session.
-// Stateless natives (list/read/write/size/etc.) call this FIRST and bail
-// with a clear log line instead of silently falling through into
-// prepareSession's derivation path with an empty password.
+
 static inline bool requireActiveSession(int volId, const char* callerName) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
     auto& v = volumes[volId];
     std::lock_guard<std::mutex> lock(v.mutex);
 
-    // Allow fd to be < 0 only if this is an active USB session
     if (!v.dataCtxInitialized || (v.fd < 0 && !v.isUsbSource)) {
         LOGI("%s: volume %d has no active session (not unlocked)", callerName, volId);
         return false;
@@ -498,10 +336,7 @@ static inline bool requireActiveSession(int volId, const char* callerName) {
     return true;
 }
 
-// Throws a Kotlin-catchable IllegalStateException with a machine-readable
-// reason code, then returns. Callers must `return` immediately after this —
-// JNI does not unwind the C++ stack, it just marks a pending exception that
-// fires when control returns to the JVM.
+
 static void throwNotUnlocked(JNIEnv* env, int volId, const char* callerName) {
     jclass exClass = env->FindClass("java/lang/IllegalStateException");
     char msg[160];
@@ -545,9 +380,6 @@ static void unmountVolume(int volId) {
 // INLINE HELPERS
 // ----------------------------------------------------------------====
 
-// FIX P13: Fast check before paying the full replace_if scan cost.
-// The vast majority of filenames from FAT filesystems are clean ASCII —
-// checking first avoids a full byte scan on every directory entry.
 static inline bool hasControlChar(const std::string& s) {
     for (unsigned char c : s) {
         if (c < 32 || c == 127) return true;
@@ -556,7 +388,7 @@ static inline bool hasControlChar(const std::string& s) {
 }
 
 static void sanitizeString(std::string& s) {
-    if (!hasControlChar(s)) return;   // FIX P13: skip replace_if when clean
+    if (!hasControlChar(s)) return;   // Optimize: skip replace_if scan when the string is clean of control characters.
     std::replace_if(s.begin(), s.end(),
         [](unsigned char c){ return c < 32 || c == 127; }, '?');
 }
@@ -598,13 +430,10 @@ static uint64_t readUint64LE(const unsigned char* p) {
 // ── FAT date/time → Unix timestamp ─────────────────────────────────────────
 
 static uint64_t fatToUnixTimestamp(WORD fdate, WORD ftime) {
-    // FatFs stores dates as FAT-epoch (1980-01-01).
-    // fdate: bits[15:9]=year-1980  bits[8:5]=month  bits[4:0]=day
-    // ftime: bits[15:11]=hour  bits[10:5]=minute  bits[4:0]=second/2
-    if (fdate == 0) return 0; // no RTC data (FF_FS_NORTC=1 new files)
+    if (fdate == 0) return 0; 
     struct tm t = {};
-    t.tm_year  = ((fdate >> 9) & 0x7F) + 80; // FAT epoch 1980, tm epoch 1900
-    t.tm_mon   = ((fdate >> 5) & 0x0F) - 1;  // FAT 1-12  →  tm 0-11
+    t.tm_year  = ((fdate >> 9) & 0x7F) + 80; 
+    t.tm_mon   = ((fdate >> 5) & 0x0F) - 1;  
     t.tm_mday  =  (fdate)       & 0x1F;
     t.tm_hour  = (ftime >> 11)  & 0x1F;
     t.tm_min   = (ftime >>  5)  & 0x3F;
@@ -614,17 +443,7 @@ static uint64_t fatToUnixTimestamp(WORD fdate, WORD ftime) {
     return (ts < 0) ? 0 : static_cast<uint64_t>(ts);
 }
 
-// ----------------------------------------------------------------====
-// CRC-32 (standard IEEE 802.3 polynomial, reflected).
-//
-// FIX: previously an unnamed lambda declared locally inside
-// createContainerNative(), used only when writing the header CRCs and
-// never called anywhere else — meaning the CRCs it wrote were never
-// actually verified at unlock time. Now a single named, file-scope
-// function shared by createContainerNative() (write path) and
-// deriveAndValidateHeader() (read/verify path), so there's exactly one
-// implementation for both directions.
-// ----------------------------------------------------------------====
+
 static uint32_t crc32(const unsigned char* data, size_t len) {
     uint32_t crc = 0xFFFFFFFFu;
     for (size_t i = 0; i < len; ++i) {
@@ -636,18 +455,6 @@ static uint32_t crc32(const unsigned char* data, size_t len) {
 }
 
 
-// ----------------------------------------------------------------====
-// FIX P12: Per-volume IO buffer accessor
-// Returns a pointer to a buffer of at least `neededBytes` for `v`.
-// The buffer is allocated once and grown if needed; never shrunk during an
-// active session (it IS released entirely on lock, via unmountVolume()).
-// This is bounded and intentional, not a leak: disk_read/disk_write cap a
-// single batch at MAX_SECTORS_PER_BATCH (8192 sectors = 4MB), so this
-// buffer never exceeds 4MB per volume regardless of how much I/O flows
-// through it — shrinking mid-session would just cause repeated realloc
-// churn on the next large read for no real memory benefit.
-// MUST be called with v.ioBufMutex held.
-// ----------------------------------------------------------------====
 static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
     if (v.ioBufSize < neededBytes) {
         v.ioBuf.reset(new unsigned char[neededBytes]);
@@ -672,18 +479,16 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 
     VolumeState& v = volumes[pdrv];
     const uint64_t basePhysical = v.dataOffset / 512;
-
-    static constexpr UINT MAX_SECTORS_PER_BATCH = 8192; // 4 MB/batch
-    UINT remaining   = count;
-    LBA_t curSector  = sector;
-    BYTE* curBuf     = buff;
-
+    static constexpr uint32_t MAX_SECTORS_PER_BATCH = 8192; // 4 MB/batch
     alignas(16) unsigned char stackBuf[65536];
 
-    while (remaining > 0) {
-        const UINT batchCount = std::min(remaining, MAX_SECTORS_PER_BATCH);
-        const uint64_t firstPhysical = basePhysical + curSector;
-        const size_t   totalBytes    = static_cast<size_t>(batchCount) * 512;
+
+    const auto batches = planSectorBatches(static_cast<uint32_t>(count), MAX_SECTORS_PER_BATCH);
+
+    for (const auto& batch : batches) {
+        const uint64_t firstPhysical = basePhysical + sector + batch.startSector;
+        const size_t   totalBytes    = static_cast<size_t>(batch.count) * 512;
+        BYTE* curBuf = buff + batch.startSector * 512;
 
         unsigned char* encBuf;
         bool usedPersistent = (totalBytes > sizeof(stackBuf));
@@ -698,16 +503,11 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
 
         if (!physRead(pdrv, firstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
-for (UINT i = 0; i < batchCount; i++) {
+for (UINT i = 0; i < batch.count; i++) {
             const uint64_t physSector = firstPhysical + i;
-            // FIX: Tweak must be the absolute sector offset from the host start
             const uint64_t tweak = physSector - v.partitionStartSector;
             cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512), curBuf + (i*512));
         }
-
-        remaining -= batchCount;
-        curSector += batchCount;
-        curBuf    += batchCount * 512;
     }
     return RES_OK;
 }
@@ -722,45 +522,35 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     VolumeState& v = volumes[pdrv];
     const uint64_t basePhysical = v.dataOffset / 512;
 
-    static constexpr UINT MAX_SECTORS_PER_BATCH = 8192;
-    UINT remaining        = count;
-    LBA_t curSector       = sector;
-    const BYTE* curBuf    = buff;
-
+    static constexpr uint32_t MAX_SECTORS_PER_BATCH = 8192;
     alignas(16) unsigned char stackBuf[65536];
 
-    while (remaining > 0) {
-        const UINT batchCount = std::min(remaining, MAX_SECTORS_PER_BATCH);
-        const uint64_t firstPhysical = basePhysical + curSector;
-        const size_t   totalBytes    = static_cast<size_t>(batchCount) * 512;
+    const auto batches = planSectorBatches(static_cast<uint32_t>(count), MAX_SECTORS_PER_BATCH);
+
+    for (const auto& batch : batches) {
+        const uint64_t firstPhysical = basePhysical + sector + batch.startSector;
+        const size_t   totalBytes    = static_cast<size_t>(batch.count) * 512;
+        const BYTE* curBuf = buff + batch.startSector * 512;
 
         unsigned char* encBuf;
-        bool usedPersistent = false;
-        if (totalBytes <= sizeof(stackBuf)) {
-            encBuf = stackBuf;
-        } else {
-            usedPersistent = true;
-        }
 
+        bool usedPersistent = (totalBytes > sizeof(stackBuf));
         std::unique_lock<std::mutex> bufLock;
         if (usedPersistent) {
             bufLock = std::unique_lock<std::mutex>(v.ioBufMutex);
             encBuf = getVolIoBuf(v, totalBytes);
+        } else {
+            encBuf = stackBuf;
         }
 
-for (UINT i = 0; i < batchCount; i++) {
+        for (UINT i = 0; i < batch.count; i++) {
             const uint64_t physSector = firstPhysical + i;
-            // FIX: Tweak must be the absolute sector offset from the host start
             const uint64_t tweak = physSector - v.partitionStartSector;
-            cascadeEncryptSector(v.cascade, tweak,
-                          curBuf + (i * 512), encBuf + (i * 512));
+            cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + (i * 512));
         }
 
         if (!physWrite(pdrv, firstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
-        remaining -= batchCount;
-        curSector += batchCount;
-        curBuf    += batchCount * 512;
     }
     return RES_OK;
 }
@@ -771,14 +561,6 @@ extern "C" DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void* buff) {
             return RES_OK;
 
         case GET_SECTOR_COUNT:
-            // FIX (hidden volumes): a hidden volume's filesystem must never
-            // see space belonging to the outer volume (writing past its
-            // real end would corrupt the outer volume's data), so prefer
-            // the header's own EncryptedAreaLength — authoritative for
-            // both normal and hidden volumes — over a fileSize-based
-            // guess. The fileSize fallback below still applies during
-            // createContainerNative()'s own format step, where
-            // dataAreaLengthBytes is legitimately still 0.
             if (pdrv < MAX_VOLUMES && volumes[pdrv].dataAreaLengthBytes > 0) {
                 *(LBA_t*)buff = static_cast<LBA_t>(volumes[pdrv].dataAreaLengthBytes / 512);
             } else if (pdrv < MAX_VOLUMES && volumes[pdrv].fileSize > VC_DATA_AREA_OFFSET * 2) {
@@ -818,19 +600,6 @@ extern "C" DWORD get_fattime() {
     return (static_cast<DWORD>(fdate) << 16) | ftime;
 }
 
-// ----------------------------------------------------------------====
-// CRYPTO SESSION BUILDER
-//
-// FIX P11: PBKDF2 runs for ~2 s (500k iterations). The original code held
-// volumeMutex for the entire derivation, blocking ALL reads/writes on that
-// volume slot while the key was being computed.
-//
-// The fix: derive the key with NO lock held, then acquire the mutex only for
-// the brief header-decrypt + context-swap phase (~microseconds). A secondary
-// "derivation in progress" atomic flag prevents two threads from deriving
-// simultaneously for the same volume without blocking readers.
-// ----------------------------------------------------------------====
-
 static std::atomic<bool> derivationInProgress[MAX_VOLUMES];
 
 static bool _derivationInit = [](){
@@ -839,25 +608,7 @@ static bool _derivationInit = [](){
     return true;
 }();
 
-// ----------------------------------------------------------------====
-// UNLOCK CANCELLATION
-//
-// Lets a user abort an in-flight unlock (e.g. mistyped password, or they
-// want to try a different container without waiting for this volId's full
-// 5-hash x 8-cipher auto-detect search to finish). Checked at combination
-// boundaries inside deriveAndValidateHeader() below — NOT mid-PBKDF2 — so
-// worst-case cancel latency is roughly one PBKDF2 round (the iteration
-// count for whichever hash is currently running), not instant, but bounded
-// and small compared to the multi-combination search it interrupts.
-//
-// requestCancelUnlockNative() (JNI export) sets this; unlockAndListNative /
-// unlockUsbAndListNative clear it for their volId before starting a fresh
-// attempt. Kotlin's `synchronized(VeraCryptSession.locks[volId])` wrapper
-// around BOTH unlock call sites guarantees the clear-at-entry can never
-// race a still-running older attempt for the same volId — see the LOCK
-// DOMAIN CONTRACT comment further down for why that Kotlin-side lock
-// matters independently of derivationMutexes[volId].
-// ----------------------------------------------------------------====
+
 static std::atomic<bool> cancelRequested[MAX_VOLUMES];
 
 static bool _cancelInit = [](){
@@ -871,32 +622,7 @@ static inline bool isUnlockCancelled(int volId) {
            cancelRequested[volId].load(std::memory_order_acquire);
 }
 
-// FsScanResult used to live here, backing a scan for a valid FAT/exFAT
-// boot-sector signature under two guessed tweak conventions. Removed along
-// with tryKeyCandidate()/tryKeyCandidateUsb() below — dataOffset and the
-// tweak convention are now read directly out of the validated header (see
-// ParsedHeaderFields), which is both correct for hidden volumes (whose
-// data area the old scan window could never reach) and strictly simpler.
 
-// ----------------------------------------------------------------====
-// FIX: previously the PBKDF2-derive + header-decrypt + magic-byte-check
-// block below was duplicated near-verbatim inside both prepareSession()
-// (container-file backed) and prepareUsbSession() (USB block-device
-// backed) — ~40 lines each, differing only in how the raw header sector
-// was obtained. A crypto fix applied to one path (e.g. adding the CRC
-// checks below) was trivially easy to forget in the other.
-//
-// This function is now the single implementation both call. It also adds
-// verification of both header CRCs, which the previous code computed and
-// wrote on create but never checked on unlock — password correctness was
-// previously inferred solely from the "VERA" magic bytes matching, which
-// works but is weaker than the validation VeraCrypt's own format provides
-// for free.
-//
-// Deliberately takes no volId/globals as input — a pure function of the
-// header bytes, password, and pim — so it has no dependency on JNI or any
-// of the VolumeState machinery.
-// ----------------------------------------------------------------====
 static void localMultiplyTweak(unsigned char T[16]) {
     unsigned char carry = 0;
     for (int i = 0; i < 16; i++) {
@@ -956,13 +682,7 @@ static bool tryDecryptHeader(
         return false;
     }
 
-    // FIX (hidden volumes): surface the fields real VeraCrypt uses to
-    // locate this header's data area, instead of leaving the caller to
-    // rediscover it by scanning the disk for a filesystem signature. A
-    // CRC-validated header is already strong proof the password/cipher/
-    // hash combination is correct (that's the whole security model), so
-    // there is nothing left to confirm by scanning — we can just trust
-    // these fields the same way upstream ReadVolumeHeaderWithAbort() does.
+
     if (outFields) {
         outFields->volumeSize          = readHeaderBE64(decH, VC_HDR_OFF_VOLUME_SIZE);
         outFields->hiddenVolumeSize    = readHeaderBE64(decH, VC_HDR_OFF_HIDDEN_VOL_SIZE);
@@ -979,23 +699,18 @@ static bool deriveAndValidateHeader(
     const unsigned char* password, size_t passwordLen, int pim,
     int cipherIdParam, int hashIdParam,
     unsigned char outKeyMaterial[192],
-    unsigned char outDecryptedHeader[VC_HEADER_BODY_SIZE], // ADDED
+    unsigned char outDecryptedHeader[VC_HEADER_BODY_SIZE], // Out parameter filled with the decrypted header body on success.
     CascadeId& outMatchedCipher,
     HashId& outMatchedHash,
     ParsedHeaderFields& outFields,
-    int volId = -1 // NEW: for cancellation checks + "i of N" progress upcalls.
-                    // -1 (deriveKeyMaterialNative's caller has no session
-                    // yet) just disables both, silently.
+    int volId = -1
+
 ) {
     const auto timingStart = std::chrono::steady_clock::now();
     const unsigned char* salt = headerSector;
     const unsigned char* encH = headerSector + VC_SALT_SIZE;
     const int safePim = clampPim(pim);
 
-    // Hoisted above the fast path (previously built further down, after the
-    // fast path either returned or fell through) purely so the total step
-    // count is known before the first progress report — the search logic
-    // itself is unchanged.
     std::vector<HashId> hashesToTry;
     if (hashIdParam != 255) {
         hashesToTry.push_back(static_cast<HashId>(hashIdParam));
@@ -1022,14 +737,12 @@ static bool deriveAndValidateHeader(
 
     if (isUnlockCancelled(volId)) return false;
 
-    // --- FIX 1: The 64-byte Fast Path ---
+    // Optimistic check: try a 64-byte Fast Path (AES + SHA-512) directly to avoid trying all combinations if default is used.
     if (cipherIdParam == 255 && hashIdParam == 255) {
         reportUnlockProgress(volId, 0, totalHashSteps,
                               static_cast<int>(HashId::kSha512), static_cast<int>(CascadeId::kAes));
         const int fastIter = iterationsForHash(HashId::kSha512, safePim);
         
-        // PBKDF2 with SHA-512 outputs 64 bytes per block. 
-        // Requesting 64 bytes instead of 192 makes this EXACTLY 3x faster.
         unsigned char fastKey[64]; 
         if (pbkdf2Hmac(HashId::kSha512, password, passwordLen,
                         salt, VC_SALT_SIZE, fastIter, fastKey, 64)) {
@@ -1048,7 +761,7 @@ static bool deriveAndValidateHeader(
             mbedtls_platform_zeroize(decH, sizeof(decH));
         }
         mbedtls_platform_zeroize(fastKey, sizeof(fastKey));
-        // Not AES/SHA-512 — fall through to the full parallel search below.
+        
     }
 
     if (isUnlockCancelled(volId)) return false;
@@ -1143,37 +856,6 @@ static bool deriveAndValidateHeader(
     return true;
 }
 
-// ----------------------------------------------------------------====
-// LOCK DOMAIN CONTRACT (read before touching prepareSession/disk_read/disk_write)
-//
-// There are TWO independent lock domains protecting volume state, and they
-// are NOT composable — neither one alone is sufficient:
-//
-//   1. Kotlin: `synchronized(VeraCryptSession.locks[volId])`
-//      Serializes JNI *call entry* per volume from the Kotlin side. Ensures
-//      two Kotlin threads never call into native for the same volId at once.
-//
-//   2. C++: `volumes[volId].mutex`
-//      Protects the per-volume state (fd, dataCtxDec/Enc, dataCtxInitialized,
-//      dataOffset, ...) directly.
-//
-// prepareSession() DELIBERATELY derives the PBKDF2 key (the slow ~2s step)
-// WITHOUT holding volumes[volId].mutex (see FIX P11) so that disk_read/disk_write
-// on an *already-unlocked* volume aren't blocked by a concurrent unlock of
-// that SAME volume. This is safe only because:
-//   - disk_read/disk_write require volumes[pdrv].dataCtxInitialized == true,
-//     which is set exclusively inside the mutex-guarded block at the
-//     end of prepareSession — so a reader either sees the fully-swapped
-//     context or the previous one, never a half-written one.
-//   - The Kotlin-side `locks[volId]` still prevents two *unlock* calls (the
-//     only callers that pass forceDerive=true) from racing each other for
-//     the same volId, via derivationInProgress[] as a secondary guard.
-//
-// DO NOT remove the Kotlin `synchronized(VeraCryptSession.locks[volId])`
-// wrapper believing the C++ mutex already covers it — they guard different
-// invariants (call ordering vs. memory state), and the safety argument above
-// depends on both being present.
-// ----------------------------------------------------------------====
 bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0, const int* keyfileFds = nullptr, int keyfileCount = 0) {
     const auto opStart = std::chrono::steady_clock::now();
     if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
@@ -1201,14 +883,6 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     ParsedHeaderFields fields;
     bool matched = false;
 
-    // Keyfile mixing happens ONCE here, before the header-slot loop, not
-    // per-slot — it's a transform of the password itself, independent of
-    // which header slot ends up matching. Only needed on the
-    // password-derivation path: the preservedKey path below never touches
-    // [password] at all, so mixing it would be wasted work — but the fds
-    // still arrived from Kotlin under the same "you own them now, close
-    // them" contract applyKeyfilesToPassword() documents, so they're
-    // closed either way via closeUnusedKeyfileFds().
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
     size_t mixedPasswordLen = 0;
@@ -1252,12 +926,12 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
 
     if (!matched) { close(fd); return false; }
 
-    // FIX: Extract Master Key from Decrypted Header
+
     CascadeContext candidateCascade;
     CascadeSpec spec = cascadeSpecFor(matchedCipher);
     const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER]; 
 
-    // DATA is encrypted with Master Key, not dKey!
+
     if (!cascadeSetKeys(candidateCascade, matchedCipher, masterKeyPtr, spec.layerCount * 64)) {
         close(fd); return false;
     }
@@ -1283,11 +957,6 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     return true;
 }
 
-// tryKeyCandidateUsb() used to live here — the USB-backed equivalent of
-// tryKeyCandidate(), removed for the same reason (see the note above
-// FsScanResult's old location): dataOffset now comes straight from the
-// validated header via ParsedHeaderFields, for both the file-backed and
-// USB-backed paths.
 
 static bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0, int64_t partitionOffsetHint = -1, const int* keyfileFds = nullptr, int keyfileCount = 0) {
     if (volId < 0 || volId >= MAX_VOLUMES) { closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
@@ -1302,10 +971,6 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
         }
     }
 
-    // Keyfile mixing happens ONCE here, before the partition/header-slot
-    // search below — see the matching comment in prepareSession() for why
-    // this isn't done per-candidate and why the preservedKey path still
-    // needs to close these fds even though it never reads mixedPassword.
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
     size_t mixedPasswordLen = 0;
@@ -1384,12 +1049,6 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
         }
     }
 
-    // FIX (hidden volumes): for EACH partition candidate, also try the
-    // hidden-volume header slot (VC_HIDDEN_HEADER_OFFSET past that
-    // partition's own start) if the primary slot (the partition's start
-    // itself) doesn't decrypt — same reasoning as prepareSession's
-    // file-backed path, just repeated per partition since we don't yet
-    // know which partition is even the right one.
     struct HeaderSlot { uint64_t sectorOffset; };
     static constexpr HeaderSlot kHeaderSlots[] = {
         { 0 },
@@ -1411,7 +1070,7 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
             const uint64_t headerSector = part.startSector + slot.sectorOffset;
 
             unsigned char dKey[192]{};
-            unsigned char decH[VC_HEADER_BODY_SIZE]; // <--- ADD THIS LINE
+            unsigned char decH[VC_HEADER_BODY_SIZE]; // Holds the decrypted header fields on successful decryption.
             CascadeId matchedCipher{};
             HashId matchedHash{};
             ParsedHeaderFields fields;
@@ -1425,7 +1084,7 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
                 const size_t bytesToCopy = std::min(preservedKeyLen, (size_t)192);
                 memcpy(dKey, preservedKey, bytesToCopy);
                 
-                // PASS decH here
+
                 if (tryDecryptHeader(headerBuf + VC_SALT_SIZE, candidateCipher, dKey, decH, &fields)) {
                     matchedCipher = candidateCipher;
                     matchedHash = (hashId != 255) ? static_cast<HashId>(hashId) : HashId::kSha512;
@@ -1435,7 +1094,7 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
                 unsigned char headerBuf[VC_FULL_HEADER_SIZE];
                 if (!usbReadSectors(volId, headerSector, 1, headerBuf)) continue;
 
-                // PASS decH here
+
                 derivedSuccessfully = deriveAndValidateHeader(headerBuf, mixedPassword, mixedPasswordLen, pim, cipherId, hashId,
                                          dKey, decH, matchedCipher, matchedHash, fields, volId);
             }
@@ -1447,7 +1106,7 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
 
             // Extract Master Key from decH
             CascadeSpec spec = cascadeSpecFor(matchedCipher);
-            const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER]; // This will now work
+            const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER]; // Point to the master key material inside the decrypted header body.
             
             if (!cascadeSetKeys(candidateCascade, matchedCipher, masterKeyPtr, spec.layerCount * 64)) {
                 mbedtls_platform_zeroize(dKey, sizeof(dKey));
@@ -1500,8 +1159,6 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
 // SHARED: Directory listing
 // ----------------------------------------------------------------====
 
-// Returns the total byte size of all files under [fatPath] (recursive).
-// Called from getFolderSizeNative; also usable for progress reporting later.
 static uint64_t recursiveFolderSize(int volId, const std::string& fatPath) {
     std::string fullPath = drivePaths[volId];
     if (!fatPath.empty()) { fullPath += '/'; fullPath += fatPath; }
@@ -1579,14 +1236,6 @@ static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pa
 // ----------------------------------------------------------------====
 // JNI API
 // ----------------------------------------------------------------====
-
-// Copies a Kotlin-side IntArray of raw fds (obtained via
-// ParcelFileDescriptor.detachFd(), same convention as every other fd
-// crossing this JNI boundary) into a std::vector<int> Claude can hand to
-// applyKeyfilesToPassword()/prepareSession()/prepareUsbSession(). [arr]
-// may legitimately be null (no keyfiles) or empty — both just yield an
-// empty vector, and every call site below already treats keyfileCount<=0
-// as "no keyfiles" (a no-op for applyKeyfilesToPassword).
 static std::vector<int> extractKeyfileFds(JNIEnv* env, jintArray arr) {
     std::vector<int> fds;
     if (!arr) return fds;
@@ -1599,13 +1248,6 @@ static std::vector<int> extractKeyfileFds(JNIEnv* env, jintArray arr) {
     return fds;
 }
 
-// Distinguishes "user cancelled" from "wrong password" across the JNI
-// boundary: both prepareSession()/prepareUsbSession() just return false for
-// either case (deriveAndValidateHeader doesn't thread a reason code back),
-// so the *_Native functions below re-check isUnlockCancelled(volId) after a
-// false return and throw this instead of returning null when that's why it
-// failed. Kotlin's dispatchNativeError() maps it to a "CANCELLED" result.error
-// (see MainActivity.kt) instead of AUTH_FAIL.
 static void throwUnlockCancelledException(JNIEnv* env) {
     jclass excClass = env->FindClass("com/aeidolon/vaultexplorer/UnlockCancelledException");
     if (excClass) env->ThrowNew(excClass, "CANCELLED");
@@ -1613,12 +1255,6 @@ static void throwUnlockCancelledException(JNIEnv* env) {
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMaxVolumesNative(JNIEnv*, jobject) {
-    // FIX: previously MAX_VOLUMES had to be manually kept in sync across
-    // THREE places — FF_VOLUMES in ffconf.h, the MAX_VOLUMES macro here
-    // (which does derive from FF_VOLUMES already), and a hardcoded literal
-    // in Kotlin's VeraCryptSession.MAX_VOLUMES. Exposing the real value via
-    // JNI and having Kotlin read it here removes the third, easy-to-forget
-    // copy — now there's exactly one place a human edits this (FF_VOLUMES).
     return static_cast<jint>(MAX_VOLUMES);
 }
 
@@ -1653,11 +1289,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
         return nullptr;
     }
 
-    // Same "mix keyfiles into a fixed-size password buffer before
-    // deriving" step as prepareSession()/prepareUsbSession() — see the
-    // comment there. This JNI export skips prepareSession() entirely (no
-    // volume/session gets created; it just returns raw key material), so
-    // the mixing has to happen here too rather than being inherited.
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
     size_t mixedPasswordLen = std::min(strlen(nativePass), sizeof(mixedPassword));
@@ -1669,12 +1300,11 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
     }
 
     unsigned char dKey[192];
-    unsigned char dummyDecH[VC_HEADER_BODY_SIZE]; // Add this dummy buffer
+    unsigned char dummyDecH[VC_HEADER_BODY_SIZE]; 
     CascadeId matchedCipher{};
     HashId matchedHash{};
     ParsedHeaderFields fields;
 
-    // Add dummyDecH as the 8th parameter
     const bool ok = deriveAndValidateHeader(
         headerBuf, 
         mixedPassword, 
@@ -1701,11 +1331,6 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
         JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds) {
 
-    // Clear any stale cancellation from a *previous* attempt at this volId.
-    // Kotlin's synchronized(VeraCryptSession.locks[volId]) around this call
-    // guarantees a prior attempt for the same volId has already fully
-    // returned by the time we get here, so this can't race a still-running
-    // derivation into an un-cancelled state.
     if (volId >= 0 && volId < MAX_VOLUMES) {
         cancelRequested[volId].store(false, std::memory_order_release);
     }
@@ -1720,7 +1345,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     
-    // FIX: Insert missing password length parameter and cast correctly
     if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, true, cipherId, hashId, preservedBytes, preservedLen,
                          kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()))) {
         if (preservedKey != nullptr) {
@@ -1748,12 +1372,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     return result;
 }
 
-// Signals cancellation for whatever unlock is currently in flight for
-// [volId] (or a not-yet-started one about to check the flag). Fire-and-
-// forget: does not wait for the derivation to actually stop, and is safe to
-// call even if nothing is running for this volId (no-op — the flag is
-// cleared again at the top of the next unlockAndListNative/
-// unlockUsbAndListNative call for this volId regardless).
 extern "C" JNIEXPORT void JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_requestCancelUnlockNative(
         JNIEnv*, jobject, jint volId) {
@@ -1769,10 +1387,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
     VolumeState& v = volumes[volId];
     std::lock_guard<std::mutex> lock(v.mutex);
 
-    // FIX: invalidate any FIL* streams handed out via openStream() before we
-    // tear down the fd/crypto context they read through. Without this, a
-    // stream left open across a lock() call becomes a dangling handle into
-    // freed/zeroized crypto state.
     for (FIL* f : v.openStreams) {
         f_close(f);
         delete f;
@@ -1781,7 +1395,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
 
     v.reset();
 
-    unmountVolume(volId);  // also clears the persistent IO buffer
+    unmountVolume(volId);  
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -1795,7 +1409,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 
     bool success = false;
 
-    // Resolve selected cipher and hash (255 = auto, default to AES + SHA-512 for creation)
     CascadeId createCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
     HashId    createHash   = (hashId   != 255) ? static_cast<HashId>(hashId)      : HashId::kSha512;
     CascadeSpec cSpec      = cascadeSpecFor(createCipher);
@@ -1866,11 +1479,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         body[VC_HDR_OFF_SECTOR_SIZE + 2] = 0x02;
         body[VC_HDR_OFF_SECTOR_SIZE + 3] = 0x00;
 
-        // FIX: was VC_KEY_OFFSET_SECONDARY (192) — same numeric value, now
-        // correctly named VC_KEY_OFFSET_MASTER since this is the ONLY
-        // master-key position for a single-cipher AES volume, not one of
-        // two candidates. See the constant's doc comment at the top of
-        // this file for the full explanation.
+
         memcpy(&body[VC_KEY_OFFSET_MASTER], combinedMasterKey, masterKeyLen);
 
         uint32_t keyCrc = crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
@@ -1885,7 +1494,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         body[VC_HDR_OFF_HEADER_CRC + 2] = (hdrCrc >>  8) & 0xFF;
         body[VC_HDR_OFF_HEADER_CRC + 3] = (hdrCrc      ) & 0xFF;
 
-        // Encrypt header body using the selected cascade cipher (XTS with zero tweak)
         unsigned char encBody[VC_HEADER_BODY_SIZE];
         {
             CascadeContext hdrCtx;
@@ -1972,7 +1580,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             v.dataCtxInitialized = true;
             v.fd                 = fd;
             v.dataOffset         = VC_DATA_AREA_OFFSET;
-            // FIX: Removed `v.relTweak = false;` as the struct member no longer exists
             v.fileSize           = VOLUME_SIZE;
 
             const bool useExFat = (strncasecmp(nativeFS, "exfat", 5) == 0);
@@ -1995,7 +1602,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             v.fsMounted          = false;
             v.fd                 = -1;
             v.dataOffset         = 0;
-            // FIX: Removed `v.relTweak = false;` as the struct member no longer exists
             v.fileSize           = 0;
             v.cascade.initialized = false;
             v.dataCtxInitialized = false;
@@ -2070,14 +1676,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_hashPasswordNative(
     return result;
 }
 
-// ----------------------------------------------------------------====
-// JNI API — Tier 2: stateless (volId-only)
-//
-// No fd, password, or pim. requireActiveSession() is the first thing
-// every function calls; it throws IllegalStateException("NOT_UNLOCKED:…")
-// so Kotlin catches it as a typed signal rather than a silent null/0/false.
-// ----------------------------------------------------------------====
-
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedCipherId(JNIEnv*, jobject, jint volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
@@ -2092,16 +1690,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedHashId(JNIEnv*, jobjec
     return volumes[volId].matchedHashId;
 }
 
-// FIX (perf, fix #2): USB counterpart to getMatchedCipherId/getMatchedHashId
-// above. Kotlin should read this after a successful unlockUsbContainer and
-// persist it (ContainerRecord-side) exactly the way it already persists
-// matchedCipherId/matchedHashId, then pass it back as `partitionOffsetHint`
-// on the next unlockUsbAndListNative call for the same device. Without this,
-// every USB unlock re-walks every MBR/GPT partition candidate from scratch
-// even when the cipher/hash are already known — see the comment on
-// prepareUsbSession() for why that's the real cost, not PBKDF2 output size.
-// Only meaningful for USB volumes (v.isUsbSource); returns -1 for anything
-// else, same "unknown" sentinel used by the other two getters.
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedPartitionOffset(JNIEnv*, jobject, jint volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
@@ -2119,11 +1707,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectory(
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     jobjectArray result = nullptr;
     {
-        // FIX: FF_FS_REENTRANT is 0, so concurrent FatFs calls on the same
-        // volume (e.g. this listDirectory racing a writeFileChunk or
-        // deleteFile on another thread) can corrupt FAT/directory state.
-        // volumes[volId].mutex is the only lock the codebase uses to protect
-        // this instance, so serialize FatFs access through it.
         std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId))
             result = buildDirectoryListing(env, volId, nativePath);
@@ -2386,7 +1969,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
         JNIEnv* env, jobject, jint volId) {
     if (!requireActiveSession(volId, "getSpaceInfo")) {
         throwNotUnlocked(env, volId, "getSpaceInfo");
-        return nullptr; // Return nullptr immediately; JNI will safely propagate the exception to Kotlin
+        return nullptr;
     }
     jlong totalBytes = 0, freeBytes = 0;
     {
@@ -2442,13 +2025,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStream(
     FIL* f = reinterpret_cast<FIL*>(streamPtr);
     jint bytesRead = -1;
 
-    // FIX: previously volId was unused here, so a stream pointer left over
-    // from a volume that has since been locked (fd closed, crypto context
-    // freed) would still be read through — UB / stale-context decryption.
-    // Take the volume mutex and confirm the pointer is still a stream we
-    // handed out for THIS volume before touching it. lockNative() removes
-    // entries from openStreams when it invalidates them, so this check
-    // fails safely once a lock has happened.
     std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
     auto& streams = volumes[volId].openStreams;
     if (std::find(streams.begin(), streams.end(), f) == streams.end()) {
@@ -2474,8 +2050,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
     if (volId < 0 || volId >= MAX_VOLUMES) return;
     FIL* f = reinterpret_cast<FIL*>(streamPtr);
 
-    // FIX: guard against double-close / closing a pointer lockNative() has
-    // already torn down (which would double-free / close an invalid fd).
     std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
     auto& streams = volumes[volId].openStreams;
     auto it = std::find(streams.begin(), streams.end(), f);
@@ -2488,15 +2062,36 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
     delete f;
 }
 
+// ── Startup self-check ────────────────────────────────────────────────
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeFingerprint(
+        JNIEnv*, jobject, jint cascadeId) {
+    if (cascadeId < 0 || cascadeId > 7) return -1;
+    CascadeSpec spec = cascadeSpecFor(static_cast<CascadeId>(cascadeId));
+    int packed = spec.layerCount * 1000;
+    for (int i = 0; i < 3; i++) {
+        int layerVal = (i < spec.layerCount) ? static_cast<int>(spec.layers[i]) : 9;
+        packed += layerVal * (i == 0 ? 100 : (i == 1 ? 10 : 1));
+    }
+    return packed;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeIdCount(JNIEnv*, jobject) {
+    return 8; // kAes .. kSerpentTwofishAes
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getHashIdCount(JNIEnv*, jobject) {
+    return 5; // kSha512, kSha256, kWhirlpool, kStreebog, kBlake2s256
+}
+
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
         jlong partitionOffsetHint, jintArray keyfileFds) {
 
-    // See the matching comment in unlockAndListNative — this is only race
-    // free because Kotlin now wraps this native call in
-    // synchronized(VeraCryptSession.locks[volId]) too (see MainActivity.kt's
-    // UNLOCK_USB_CONTAINER handler).
     if (volId >= 0 && volId < MAX_VOLUMES) {
         cancelRequested[volId].store(false, std::memory_order_release);
     }
@@ -2511,7 +2106,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     
-    // FIX: Insert missing password length parameter and cast correctly
+    // Prepare the USB session with the password and explicit length parameter.
     const bool ok = prepareUsbSession(reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, cipherId, hashId, preservedBytes, preservedLen,
                                        static_cast<int64_t>(partitionOffsetHint),
                                        kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()));

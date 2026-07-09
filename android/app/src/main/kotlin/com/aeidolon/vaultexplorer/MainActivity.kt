@@ -103,13 +103,10 @@ private var usbPermissionReceiver: BroadcastReceiver? = null
 private var pendingUsbPermissionResult: MethodChannel.Result? = null
 private var pendingUsbPermissionDeviceName: String? = null
 
-// FIX: nothing previously listened for a USB drive being physically
-// unplugged, so a container mounted from it stayed in Dart's _mounted
-// list (shown as unlocked) forever after a real disconnect. This is a
-// protected system broadcast — only the OS can send it — fired the
-// instant the drive goes away, independent of any lock/unlock call.
+// BroadcastReceiver for physically detached USB mass storage devices.
+// Fired by the OS (protected system broadcast) when a drive goes away.
+// This notifies the Dart layer to update the active session mount list.
 private var usbDetachReceiver: BroadcastReceiver? = null
-
 private var screenOffReceiver: BroadcastReceiver? = null
 
     override fun onDestroy() {
@@ -144,13 +141,6 @@ private var screenOffReceiver: BroadcastReceiver? = null
         }
     }
 
-    // 1b. Pick Keyfiles Launcher — multi-select, read-only. Unlike container
-    // picking, a keyfile is often something generic (a photo, a random
-    // binary blob) the user keeps elsewhere and reuses across containers,
-    // so we still take a persistable grant (read-only) to let Dart offer
-    // "remember these keyfiles for this container" without re-prompting
-    // every unlock — but nothing here requires that Dart actually persist
-    // the paths; it's free to treat them as one-shot.
     private val pickKeyfilesLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -171,10 +161,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
             try {
                 contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             } catch (_: SecurityException) {
-                // Some providers (e.g. some USB/SD document providers) don't
-                // support persistable grants at all — fine, the grant is
-                // still valid for this activity's lifetime, which covers
-                // the immediate unlock flow that's about to use it.
+
             }
             try {
                 mapOf(
@@ -410,12 +397,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
     private fun isNotUnlockedException(e: Throwable): Boolean =
         e is IllegalStateException && e.message?.startsWith("NOT_UNLOCKED") == true
 
-    /**
-     * Single dispatch point for the "was this a not-unlocked error or a
-     * generic native error" decision. Previously this exact if/else block
-     * was duplicated inline across every Thread{} catch clause in this file
-     * (launchers, runNativeOp, and several channel handlers below).
-     */
+
     private fun dispatchNativeError(e: Exception, result: MethodChannel.Result) {
         if (e is UnlockCancelledException) {
             result.error("CANCELLED", e.message, null)
@@ -426,24 +408,6 @@ private var screenOffReceiver: BroadcastReceiver? = null
         }
     }
 
-    /**
-     * Opens each keyfile uri string in [paths] read-only and detaches its
-     * fd, returning them as an IntArray ready to hand to
-     * VeraCryptEngine.{unlockAndListNative,unlockUsbAndListNative,
-     * deriveKeyMaterialNative} — those native calls take ownership of every
-     * fd in the array and close it themselves (see keyfile_mixing.h's
-     * applyKeyfilesToPassword contract), whether the unlock succeeds or
-     * fails, so callers must not touch or close them again afterward.
-     *
-     * Returns null for a null/empty [paths] (the "no keyfiles" case — pass
-     * that straight through as the keyfileFds argument, native treats a
-     * null/empty array as a no-op).
-     *
-     * On failure to open any one of them, every fd already opened for
-     * EARLIER entries in [paths] is closed here (native never gets to see
-     * them, so nothing else will), and the triggering exception propagates
-     * to the caller's existing catch block.
-     */
     private fun openKeyfileFds(paths: List<String>?): IntArray? {
         if (paths.isNullOrEmpty()) return null
         val opened = mutableListOf<ParcelFileDescriptor>()
@@ -462,10 +426,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
         }
     }
 
-    /**
-     * Shared square-target downsample calculation, previously duplicated
-     * identically in both GET_IMAGE_THUMBNAIL and GENERATE_AND_CACHE_THUMBNAIL.
-     */
+
     private fun calculateInSampleSize(width: Int, height: Int, targetSize: Int): Int {
         var inSampleSize = 1
         if (width > targetSize || height > targetSize) {
@@ -653,18 +614,7 @@ private var screenOffReceiver: BroadcastReceiver? = null
             .commit()
     }
 
-    /**
-     * Fires the instant a USB drive is physically unplugged — no polling,
-     * no waiting for the next file operation to fail. If the detached
-     * device backs a currently-mounted container, force-cleans-up native
-     * state exactly like a manual lock would, then pushes
-     * "onUsbContainerDetached" to Dart so the dashboard can immediately
-     * drop it from the mounted list.
-     *
-     * No-ops for any device that isn't the backing store of an active
-     * session (e.g. an unrelated USB peripheral, or a mass-storage drive
-     * that was never unlocked in this app).
-     */
+
     private fun handleUsbDeviceDetached(device: UsbDevice) {
         val containerUri = "usb:${device.deviceName}"
         val volId = VeraCryptSession.getVolumeIdByUri(containerUri) ?: return
@@ -672,19 +622,12 @@ private var screenOffReceiver: BroadcastReceiver? = null
         if (session?.isUsbSource != true) return
 
         Thread {
-            // Unregister first: the device is already gone, so this just
-            // guarantees the lockNative call below hits UsbBlockBridge's
-            // "not registered" null/false path instead of attempting real
-            // I/O against a dead USB connection.
             UsbBlockBridge.unregister(volId)
             try {
                 synchronized(VeraCryptSession.locks[volId]) {
                     VeraCryptEngine.lockNative(volId)
                 }
             } catch (e: Exception) {
-                // Best-effort — the device is gone either way, so a clean
-                // native unmount/flush isn't possible. Still fall through
-                // to free the session rather than leaving it stuck.
                 Log.w("VaultExplorer_C++", "lockNative on USB detach failed for volId=$volId: ${e.message}")
             }
             VeraCryptSession.removeSession(volId)
@@ -922,13 +865,9 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                 Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
             }
 
-            // FIX: previously the only unlock path NOT wrapped in this lock
-            // (the file-based path below always was) — meaning two rapid USB
-            // unlock attempts for the same volId (e.g. retry after a typo)
-            // could both enter native concurrently instead of the second one
-            // waiting for the first to actually exit. Serializing entry here
-            // is also what makes requestCancelUnlockNative's "reset the flag
-            // at the top of the next attempt" safe (see vaultexplorer.cpp).
+            // Serialize USB unlock operations using the volume monitor lock.
+            // This prevents race conditions if multiple unlock requests occur concurrently for the same slot
+            // and ensures the cancellation flag in vaultexplorer.cpp is reset safely between sequential attempts.
             val files = synchronized(VeraCryptSession.locks[targetVolId]) {
                 VeraCryptEngine.unlockUsbAndListNative(
                     password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
@@ -1187,15 +1126,9 @@ ChannelMethods.UNLOCK_USB_CONTAINER -> {
                         }
 
                         Thread {
-                            // FIX: an exception here (revoked SAF grant, IO error,
-                            // etc.) is treated as "doesn't exist" rather than a hard
-                            // failure via result.error — unlike the crypto calls
-                            // above, the Dart side only needs a yes/no to decide
-                            // whether to show "container not found", and a failed
-                            // check IS effectively "not currently reachable" for
-                            // that purpose. See VaultExplorerApi.documentExists's
-                            // own catch block for the corresponding Dart-side
-                            // fallback if the channel call itself throws.
+                            // Check if a document is accessible on a background thread.
+                            // Any exception (e.g. revoked permissions, I/O errors) is swallowed and treated
+                            // as a simple false ("does not exist") to update the UI on the Dart side.
                             val exists = try {
                                 if (filePath.startsWith("content://")) {
                                     DocumentFile.fromSingleUri(this, Uri.parse(filePath))

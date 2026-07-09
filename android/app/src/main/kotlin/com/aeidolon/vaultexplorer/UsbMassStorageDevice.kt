@@ -20,14 +20,10 @@ class UsbMassStorageDevice private constructor(
     var sectorSize: Int = 512; private set
     var sectorCount: Long = 0; private set
 
-    // FIX: set once by readCapacity() when the device reports a capacity
-    // that doesn't fit in the 32-bit LBA field of READ(10)/WRITE(10)/
-    // READ CAPACITY(10) (i.e. > 2TB at 512B sectors). Per SBC-3, a device
-    // that reports the READ CAPACITY(10) 0xFFFFFFFF sentinel is required to
-    // also support READ CAPACITY(16)/READ(16)/WRITE(16), so switching CDB
-    // format based on this flag is safe. Left false (10-byte commands) for
-    // every drive that doesn't need it, since some older/cheaper USB mass
-    // storage controllers only implement the 10-byte command set.
+    // Flags whether to use 16-byte Command Descriptor Blocks (CDBs). Set to true by readCapacity()
+    // if the drive's total sectors exceed the 32-bit limit of standard READ(10)/WRITE(10) (>2TB).
+    // Defaults to false (using 10-byte commands) to ensure compatibility with older or cheaper USB
+    // mass storage controllers that do not support 16-byte SCSI commands.
     private var use16ByteCdb: Boolean = false
 
     private var tag: Int = 1

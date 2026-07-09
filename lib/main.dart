@@ -9,12 +9,19 @@ import 'screens/lock/lock_gate_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vaultexplorer/services/app_settings_service.dart';
 import 'package:vaultexplorer/services/vaultexplorer_api.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:vaultexplorer/models/crypto_algorithms.dart';
 
 String appVersion = '0.0.0';
 void main() async {
   // Ensure bindings are initialised before calling path_provider.
   WidgetsFlutterBinding.ensureInitialized();
   VaultExplorerApi.initMethodCallHandler();
+  if (kDebugMode) {
+    // Fire-and-forget; asserts internally if the native CascadeId/HashId
+   // ordering has drifted from what crypto_algorithms.dart expects.
+    //CipherAlgo.verifyNativeCascadeOrdering();
+  }
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   try {

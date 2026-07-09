@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../../../models/mounted_container.dart';
 import '../../../services/vaultexplorer_api.dart';
 import '../../../utils/format_utils.dart';
+import '../../../theme.dart';
+import '../../../widgets/common_widgets.dart';
 
 // ── Base Container Card (Internal) ──────────────────────────────────────────
 class _BaseContainerCard extends StatelessWidget {
@@ -42,7 +44,7 @@ class _BaseContainerCard extends StatelessWidget {
       color: isElevated ? cs.surfaceContainer : Colors.transparent,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadius.xl),
         side: isElevated
             ? BorderSide.none
             : BorderSide(color: cs.outlineVariant, width: 1),
@@ -164,13 +166,18 @@ class ContainerCard extends StatelessWidget {
       bottomContent = Padding(
         padding: const EdgeInsets.only(top: 8.0), // space above the bar
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(100),
-          child: LinearProgressIndicator(
-            value: usedFraction,
-            minHeight: 6,
-            backgroundColor: cs.surfaceContainerHighest,
-            valueColor: AlwaysStoppedAnimation<Color>(
-              _barColor(usedFraction, cs),
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: usedFraction),
+            duration: AppMotion.long1,
+            curve: AppMotion.standard,
+            builder: (context, animatedFraction, _) => LinearProgressIndicator(
+              value: animatedFraction,
+              minHeight: 6,
+              backgroundColor: cs.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                _barColor(usedFraction, cs),
+              ),
             ),
           ),
         ),
@@ -256,8 +263,9 @@ class _CompactIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final message = isLoading && tooltip != null ? '$tooltip, in progress' : (tooltip ?? '');
     return Tooltip(
-      message: tooltip ?? '',
+      message: message,
       child: SizedBox(
         width: 44,
         height: 44,
@@ -271,7 +279,7 @@ class _CompactIconButton extends StatelessWidget {
             padding: EdgeInsets.zero,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(100),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
           ),
           child: isLoading
@@ -307,8 +315,10 @@ class _LockButtonState extends State<_LockButton> {
     HapticFeedback.mediumImpact();
     if (!vaultExplorerApi.acquireLockGuard(widget.container.volId)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('An operation is in progress. Please wait before locking.')),
+        showAppSnackBar(
+          context,
+          message: 'An operation is in progress. Please wait before locking.',
+          tone: AppBannerTone.warning,
         );
       }
       return;
@@ -320,8 +330,10 @@ class _LockButtonState extends State<_LockButton> {
       widget.onLocked(widget.container.volId);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lock failed: ${e.runtimeType}')),
+        showAppSnackBar(
+          context,
+          message: 'Lock failed: ${e.runtimeType}',
+          tone: AppBannerTone.error,
         );
       }
     } finally {

@@ -366,6 +366,13 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         private var fileSizeCached: Long = -1L
         private var streamPtr: Long = 0L
 
+        // Read-ahead cache parameters
+        private val isCacheEnabled = !isWrite
+        private val cacheCapacity = 128 * 1024 // 128 KB read-ahead buffer
+        private val cacheBuffer = if (isCacheEnabled) ByteArray(cacheCapacity) else null
+        private var cacheOffset: Long = -1L
+        private var cacheLength: Int = 0
+
         init {
             try {
                 VeraCryptBridge.withLock(volId) {
@@ -387,6 +394,38 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             if (offset >= fileSizeCached || streamPtr == 0L) return 0
             val readSize = minOf(size.toLong(), fileSizeCached - offset).toInt()
             if (readSize <= 0) return 0
+
+            if (isCacheEnabled && cacheBuffer != null) {
+                // Serve from cache if the request falls completely within our buffered chunk
+                if (offset >= cacheOffset && offset + readSize <= cacheOffset + cacheLength) {
+                    val relativeOffset = (offset - cacheOffset).toInt()
+                    System.arraycopy(cacheBuffer, relativeOffset, data, 0, readSize)
+                    return readSize
+                }
+
+                // If cache miss, but requested size is smaller than the cache buffer, refresh cache
+                if (readSize < cacheCapacity) {
+                    val fetchSize = minOf(cacheCapacity.toLong(), fileSizeCached - offset).toInt()
+                    val actualRead = VeraCryptBridge.withLock(volId) {
+                        VeraCryptEngine.readStream(streamPtr, offset, cacheBuffer, fetchSize, volId)
+                    }
+                    if (actualRead < 0) {
+                        cacheOffset = -1L
+                        cacheLength = 0
+                        throw ErrnoException("onRead", OsConstants.EIO)
+                    }
+                    cacheOffset = offset
+                    cacheLength = actualRead
+
+                    val copySize = minOf(readSize, cacheLength)
+                    if (copySize > 0) {
+                        System.arraycopy(cacheBuffer, 0, data, 0, copySize)
+                    }
+                    return copySize
+                }
+            }
+
+            // Direct fallback read for writes or very large reads
             val actualRead = VeraCryptBridge.withLock(volId) {
                 VeraCryptEngine.readStream(streamPtr, offset, data, readSize, volId)
             }

@@ -6,8 +6,8 @@ import '../../services/app_settings_service.dart';
 import '../../models/mounted_container.dart';
 import '../../utils/validation_utils.dart';
 import '../../widgets/common_widgets.dart';
+import '../../theme.dart';
 import '../lock/pattern_lock_view.dart';
-import '../../models/crypto_algorithms.dart';
 
 class UnlockSheet extends StatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
@@ -533,6 +533,10 @@ Future<void> _pickFile() async {
         _unlockMethod == ContainerUnlockMethod.rememberPassword;
   }
 
+  /// Live label for the unlock button while [_loading] — "Decrypting..."
+  /// until the first progress event arrives (most re-unlocks of a known
+  /// container skip auto-detect entirely and never get one), then "Trying
+  /// <hash> (i of N)…" for as long as the cipher/hash search is running.
   String get _unlockProgressLabel {
     final p = _progress;
     if (p == null || p.total <= 0) return 'Decrypting...';
@@ -574,14 +578,14 @@ Future<void> _pickFile() async {
                 child: Card(
                   elevation: 0,
                   color: _selectedUri != null
-                      ? cs.primaryContainer.withValues(alpha:0.12)
+                      ? cs.primaryContainer.withValues(alpha: 0.12)
                       : cs.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
                       color: _selectedUri != null
                           ? cs.primary
-                          : cs.outlineVariant.withValues(alpha:0.5),
+                          : cs.outlineVariant.withValues(alpha: 0.5),
                       width: _selectedUri != null ? 1.5 : 1,
                     ),
                   ),
@@ -662,7 +666,7 @@ Future<void> _pickFile() async {
                         ] else ...[
                           Icon(
                             Icons.chevron_right_rounded,
-                            color: cs.onSurfaceVariant.withValues(alpha:0.5),
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.5),
                           ),
                         ],
                       ],
@@ -684,10 +688,10 @@ Future<void> _pickFile() async {
               else if (_containerMissing) ...[
                 Card(
                   elevation: 0,
-                  color: cs.errorContainer.withValues(alpha:0.15),
+                  color: cs.errorContainer.withValues(alpha: 0.15),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    side: BorderSide(color: cs.error.withValues(alpha:0.25)),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    side: BorderSide(color: cs.error.withValues(alpha: 0.25)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -724,7 +728,7 @@ Future<void> _pickFile() async {
                                   Text(
                                     'File path could not be resolved',
                                     style: textTheme.bodySmall?.copyWith(
-                                      color: cs.onErrorContainer.withValues(alpha:0.8),
+                                      color: cs.onErrorContainer.withValues(alpha: 0.8),
                                     ),
                                   ),
                                 ],
@@ -787,8 +791,8 @@ Future<void> _pickFile() async {
                   elevation: 0,
                   color: cs.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.3)),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(32),
@@ -798,7 +802,7 @@ Future<void> _pickFile() async {
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: cs.primaryContainer.withValues(alpha:0.4),
+                            color: cs.primaryContainer.withValues(alpha: 0.4),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -860,8 +864,8 @@ Future<void> _pickFile() async {
                   elevation: 0,
                   color: cs.surfaceContainerLow,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.3)),
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -942,175 +946,27 @@ Future<void> _pickFile() async {
                               const SizedBox(width: 8),
                             ],
                           ),
-                          filled: true,
-                          fillColor: cs.surfaceContainerLow,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: cs.outlineVariant),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: cs.outlineVariant),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(color: cs.primary, width: 2),
-                          ),
                         ),
                       ),
                       const SizedBox(height: 16),
 
                       // 2. Keyfiles Selection Box
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: cs.outlineVariant.withValues(alpha:0.5)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.insert_drive_file_outlined, size: 20, color: cs.primary),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'Keyfiles (optional)',
-                                      style: textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: cs.onSurface,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                TextButton.icon(
-                                  onPressed: _pickingKeyfiles ? null : _pickKeyfiles,
-                                  style: TextButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  icon: _pickingKeyfiles
-                                      ? const SizedBox(
-                                          width: 14,
-                                          height: 14,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : const Icon(Icons.add_rounded, size: 18),
-                                  label: const Text('Add file'),
-                                ),
-                              ],
-                            ),
-                            if (_keyfiles.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: _keyfiles
-                                    .map(
-                                      (k) => InputChip(
-                                        avatar: Icon(Icons.description_outlined, size: 16, color: cs.onSurfaceVariant),
-                                        label: Text(
-                                          k.displayName,
-                                          style: textTheme.bodySmall,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        onDeleted: () => _removeKeyfile(k),
-                                        deleteIconColor: cs.error,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        backgroundColor: cs.surfaceContainerHigh,
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                            ] else ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                'No keyfiles attached',
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant.withValues(alpha:0.6),
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+                      KeyfilesPicker(
+                        keyfiles: _keyfiles,
+                        picking: _pickingKeyfiles,
+                        onPick: _pickKeyfiles,
+                        onRemove: _removeKeyfile,
                       ),
                       const SizedBox(height: 16),
 
                       // 3. Collapsible Advanced parameters (PIM, Cipher, Hash)
-                      Theme(
-                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          title: Text(
-                            'Advanced parameters',
-                            style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: cs.onSurface,
-                            ),
-                          ),
-                          leading: Icon(Icons.tune_rounded, color: cs.primary),
-                          childrenPadding: const EdgeInsets.all(16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
-                          ),
-                          collapsedShape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
-                          ),
-                          backgroundColor: cs.surfaceContainerLow,
-                          collapsedBackgroundColor: cs.surfaceContainerLow,
-                          children: [
-                            TextField(
-                              controller: _pimCtrl,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                labelText: 'PIM  (leave blank for default)',
-                                prefixIcon: Icon(Icons.password_outlined, size: 20),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            DropdownButtonFormField<int>(
-                              initialValue: _cipherId,
-                              decoration: InputDecoration(
-                                labelText: 'Encryption Algorithm',
-                                prefixIcon: Icon(Icons.security_rounded, size: 20),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              items: CipherAlgo.dropdownItems(),
-                              onChanged: (val) {
-                                if (val != null) setState(() => _cipherId = val);
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            DropdownButtonFormField<int>(
-                              initialValue: _hashId,
-                              decoration: InputDecoration(
-                                labelText: 'Hash Algorithm',
-                                prefixIcon: Icon(Icons.tag_rounded, size: 20),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              items: HashAlgo.dropdownItems(),
-                              onChanged: (val) {
-                                if (val != null) setState(() => _hashId = val);
-                              },
-                            ),
-                          ],
-                        ),
+                      AdvancedParamsPanel(
+                        pimController: _pimCtrl,
+                        cipherId: _cipherId,
+                        hashId: _hashId,
+                        enabled: !_loading,
+                        onCipherChanged: (val) => setState(() => _cipherId = val),
+                        onHashChanged: (val) => setState(() => _hashId = val),
                       ),
                       const SizedBox(height: 16),
 
@@ -1120,7 +976,7 @@ Future<void> _pickFile() async {
                           decoration: BoxDecoration(
                             color: cs.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: cs.outlineVariant.withValues(alpha:0.3)),
+                            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
                           ),
                           child: SwitchListTile(
                             value: _remember,
@@ -1144,27 +1000,7 @@ Future<void> _pickFile() async {
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cs.errorContainer,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.error_outline_rounded, color: cs.onErrorContainer),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _error!,
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: cs.onErrorContainer,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  InlineErrorBanner(_error!),
                 ],
                 const SizedBox(height: 32),
 
@@ -1173,9 +1009,7 @@ Future<void> _pickFile() async {
                   onPressed: _loading ? null : _unlock,
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(56),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
+                    shape: const StadiumBorder(),
                   ),
                   child: _loading
                       ? Row(
@@ -1186,7 +1020,7 @@ Future<void> _pickFile() async {
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                color: cs.primary,
+                                color: cs.onPrimary,
                               ),
                             ),
                             const SizedBox(width: 12),

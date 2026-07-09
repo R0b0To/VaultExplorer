@@ -1,4 +1,3 @@
-// crypto/cascade.cpp
 #include "cascade.h"
 #include <cstring>
 #include <algorithm>
@@ -61,10 +60,9 @@ bool cascadeSetKeys(CascadeContext& ctx, CascadeId id,
         if (!blockCipherSetKey(ctx.layers[i].dataKeyDec, cipher, layerKey)) return false;
         if (!blockCipherSetKey(ctx.layers[i].tweakKey, cipher, layerKey + 32)) return false;
     }
-    // FIX (perf): single-layer AES also gets a real mbedTLS XTS context.
-    // mbedtls_aes_crypt_xts wants a 512-bit key = 32-byte data key +
-    // 32-byte tweak key concatenated — exactly what keyMaterial[0..63]
-    // already is for layer 0, same bytes the generic path above just used.
+    // Initialize the hardware-accelerated mbedTLS XTS contexts for single-layer AES.
+    // mbedtls_aes_crypt_xts requires a concatenated 512-bit key (32-byte data key + 32-byte tweak key),
+    // which corresponds exactly to keyMaterial[0..63] of the first layer.
     ctx.aesXtsFastPathReady = false;
     if (ctx.layerCount == 1 && id == CascadeId::kAes) {
         mbedtls_aes_xts_init(&ctx.aesXtsEncCtx);

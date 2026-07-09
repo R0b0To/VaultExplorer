@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../models/crypto_algorithms.dart';
+import '../services/vaultexplorer_api.dart' show KeyfileRef;
 import '../theme.dart';
 
 /// Uppercased, letter-spaced section header used above grouped settings
@@ -511,6 +513,204 @@ class SheetOptionTile extends StatelessWidget {
             Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The "keyfiles" picker card — previously hand-duplicated (with minor
+/// visual drift) across `unlock_sheet.dart`, `usb_unlock_sheet.dart`,
+/// `container_config_sheet.dart`'s `_RealPasswordGateDialog`. One
+/// implementation now backs all of them.
+class KeyfilesPicker extends StatelessWidget {
+  final List<KeyfileRef> keyfiles;
+  final bool picking;
+  final VoidCallback onPick;
+  final ValueChanged<KeyfileRef> onRemove;
+  final bool enabled;
+
+  const KeyfilesPicker({
+    super.key,
+    required this.keyfiles,
+    required this.picking,
+    required this.onPick,
+    required this.onRemove,
+    this.enabled = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.insert_drive_file_outlined, size: AppIconSize.standard, color: cs.primary),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Keyfiles (optional)',
+                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface),
+                  ),
+                ],
+              ),
+              TextButton.icon(
+                onPressed: (enabled && !picking) ? onPick : null,
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                icon: picking
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Add file'),
+              ),
+            ],
+          ),
+          if (keyfiles.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: keyfiles
+                  .map(
+                    (k) => InputChip(
+                      avatar: Icon(Icons.description_outlined, size: 16, color: cs.onSurfaceVariant),
+                      label: Text(k.displayName, style: textTheme.bodySmall, overflow: TextOverflow.ellipsis),
+                      onDeleted: enabled ? () => onRemove(k) : null,
+                      deleteIconColor: cs.error,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
+                      backgroundColor: cs.surfaceContainerHigh,
+                    ),
+                  )
+                  .toList(),
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            Text(
+              'No keyfiles attached',
+              style: textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The collapsible "Advanced parameters" (PIM / cipher / hash) panel —
+/// previously hand-duplicated across the same three call sites as
+/// [KeyfilesPicker]. [subtitle] is optional since only
+/// `container_config_sheet.dart`'s top-level screen (not its dialogs) shows
+/// one.
+class AdvancedParamsPanel extends StatelessWidget {
+  final TextEditingController? pimController;
+  final int cipherId;
+  final int hashId;
+  final ValueChanged<int> onCipherChanged;
+  final ValueChanged<int> onHashChanged;
+  final bool enabled;
+  final String? subtitle;
+
+  const AdvancedParamsPanel({
+    super.key,
+    this.pimController,
+    required this.cipherId,
+    required this.hashId,
+    required this.onCipherChanged,
+    required this.onHashChanged,
+    this.enabled = true,
+    this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = context.colors;
+    final textTheme = context.typography;
+
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        title: Text(
+          'Advanced parameters',
+          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold, color: cs.onSurface),
+        ),
+        subtitle: subtitle != null
+            ? Text(subtitle!, style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant))
+            : null,
+        leading: Icon(Icons.tune_rounded, color: cs.primary),
+        childrenPadding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        backgroundColor: cs.surfaceContainerLow,
+        collapsedBackgroundColor: cs.surfaceContainerLow,
+        children: [
+          if (pimController != null) ...[
+            TextField(
+              controller: pimController,
+              enabled: enabled,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'PIM  (leave blank for default)',
+                prefixIcon: Icon(Icons.password_outlined, size: AppIconSize.small),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+          DropdownButtonFormField<int>(
+            initialValue: cipherId,
+            decoration: const InputDecoration(
+              labelText: 'Encryption Algorithm',
+              prefixIcon: Icon(Icons.security_rounded, size: AppIconSize.small),
+            ),
+            items: CipherAlgo.dropdownItems(),
+            onChanged: enabled
+                ? (val) {
+                    if (val != null) onCipherChanged(val);
+                  }
+                : null,
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<int>(
+            initialValue: hashId,
+            decoration: const InputDecoration(
+              labelText: 'Hash Algorithm',
+              prefixIcon: Icon(Icons.tag_rounded, size: AppIconSize.small),
+            ),
+            items: HashAlgo.dropdownItems(),
+            onChanged: enabled
+                ? (val) {
+                    if (val != null) onHashChanged(val);
+                  }
+                : null,
+          ),
+        ],
       ),
     );
   }

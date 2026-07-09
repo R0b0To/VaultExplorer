@@ -2,19 +2,7 @@ package com.aeidolon.vaultexplorer
 
 import java.io.FileNotFoundException
 
-/**
- * Typed wrapper for VeraCrypt document IDs used by [VeraCryptDocumentsProvider].
- *
- * Wire format:  "<volId>:<type>:<fatPath>"
- *   volId   — integer in [0, MAX_VOLUMES); directly indexes [VeraCryptSession.locks]
- *   type    — "dir" or "file"
- *   fatPath — FAT path relative to the volume root; empty string = volume root
- *
- * All construction must go through [parse], which validates the volId range and
- * throws [FileNotFoundException] on any malformed input. This is the single
- * guard against ArrayIndexOutOfBoundsException on VeraCryptSession.locks[volId]
- * that was previously re-implemented (incompletely) in every Provider override.
- */
+
 data class DocumentId(
     val volId: Int,
     val type: String,     // "dir" or "file"

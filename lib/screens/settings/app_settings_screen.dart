@@ -37,8 +37,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       await AppSettingsService.saveSettings(_settings);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to save settings')),
+        showAppSnackBar(
+          context,
+          message: 'Failed to save settings',
+          tone: AppBannerTone.error,
         );
       }
     }
@@ -127,9 +129,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(
+        showAppSnackBar(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Master password set')));
+          message: 'Master password set',
+          tone: AppBannerTone.success,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -163,8 +167,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
             ),
             children: [
                 const SectionLabel('Security'),
-                _Card(
-                  cs: cs,
+                AppCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   children: [
                     SettingsToggleRow(
                       icon: Icons.lock_person_rounded,
@@ -323,8 +327,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 const SizedBox(height: 24),
 
                 const SectionLabel('Privacy'),
-                _Card(
-                  cs: cs,
+                AppCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   children: [
                     SettingsToggleRow(
                       icon: Icons.security_rounded,
@@ -359,7 +363,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     if (_settings.lockContainersOnScreenLock) ...[
                       const Divider(height: 24),
                       DropdownButtonFormField<int>(
-                        value: _settings.autoLockMins,
+                        initialValue: _settings.autoLockMins,
                         decoration: InputDecoration(
                           labelText: 'Auto-Lock After Inactivity',
                           prefixIcon: Icon(Icons.timer_rounded, size: AppIconSize.small),
@@ -413,8 +417,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 const SizedBox(height: 24),
 
                 const SectionLabel('Integration'),
-                _Card(
-                  cs: cs,
+                AppCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   children: [
                     SettingsToggleRow(
                       icon: Icons.folder_shared_rounded,
@@ -430,7 +434,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     ),
                     const Divider(height: 24),
                     DropdownButtonFormField<ThumbnailCacheMode>(
-                      value: _settings.defaultThumbnailCacheMode,
+                      initialValue: _settings.defaultThumbnailCacheMode,
                       decoration: InputDecoration(
                         labelText: 'Thumbnail Caching (default)',
                         prefixIcon: Icon(Icons.cached_rounded, size: AppIconSize.small),
@@ -485,8 +489,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 const SizedBox(height: 24),
 
                 const SectionLabel('File Associations'),
-                _Card(
-                  cs: cs,
+                AppCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   children: [
                     if (_settings.extensionPreferences.isEmpty)
                       Padding(
@@ -610,23 +614,3 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
-
-class _Card extends StatelessWidget {
-  final List<Widget> children;
-  final ColorScheme cs;
-  const _Card({required this.children, required this.cs});
-
-  @override
-  Widget build(BuildContext context) => Card(
-    color: cs.surfaceContainerLow,
-    elevation: 0,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
-      ),
-    ),
-  );
-}

@@ -164,7 +164,7 @@ class AboutScreen extends StatelessWidget {
                 icon: Icons.new_releases_outlined,
                 title: 'Version',
                 subtitle:
-                    'AES-256-XTS (VeraCrypt) · PBKDF2-SHA512 · FAT32/exFAT',
+                    'AES · Serpent · Twofish (VeraCrypt) · PBKDF2 · FAT32/exFAT',
                 trailing: _VersionPill(version: appVersion),
                 onTap: () => _copyVersionInfo(context),
               ),

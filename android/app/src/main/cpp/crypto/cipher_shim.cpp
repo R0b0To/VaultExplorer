@@ -1,4 +1,3 @@
-// crypto/cipher_shim.cpp
 #include "cipher_shim.h"
 #include "mbedtls/aes.h"
 #include "mbedtls/md.h"
@@ -124,16 +123,10 @@ static size_t hashDigestSize(HashId hash) {
 }
 
 // ── Precomputed HMAC key state ──────────────────────────────────────────
-//
-// FIX (perf): hashHmac() previously recomputed the ipad/opad-primed hash
-// state from scratch on EVERY call — and pbkdf2HmacCustom() calls it up to
-// `iterations` times (typically 500,000) per PBKDF2 run. The HMAC key never
-// changes across those calls, only the message does. Prime the inner/outer
-// contexts once here; each per-call site just copies the primed HashCtx
-// (a cheap POD memcpy) instead of re-deriving it every time.
+
 struct HmacPrecomputed {
-    HashCtx innerCtx; // hashInit + hashUpdate(k_ipad) already applied
-    HashCtx outerCtx; // hashInit + hashUpdate(k_opad) already applied
+    HashCtx innerCtx;
+    HashCtx outerCtx; 
 };
 
 static void hmacPrecompute(HashId hash, const unsigned char* key, size_t keyLen,
@@ -171,17 +164,17 @@ static void hashHmacFast(HashId hash, const HmacPrecomputed& pre,
                           const unsigned char* data, size_t dataLen, unsigned char* out) {
     size_t digestSize = hashDigestSize(hash);
 
-    HashCtx innerCtx = pre.innerCtx; // cheap struct copy, no re-priming
+    HashCtx innerCtx = pre.innerCtx; 
     hashUpdate(hash, &innerCtx, data, dataLen);
     unsigned char innerDigest[64];
     hashFinal(hash, &innerCtx, innerDigest);
 
-    HashCtx outerCtx = pre.outerCtx; // cheap struct copy, no re-priming
+    HashCtx outerCtx = pre.outerCtx; 
     hashUpdate(hash, &outerCtx, innerDigest, digestSize);
     hashFinal(hash, &outerCtx, out);
 }
 
-// Kept for any one-shot HMAC caller — no longer on the PBKDF2 hot path.
+
 static void hashHmac(HashId hash, const unsigned char* key, size_t keyLen,
                      const unsigned char* data, size_t dataLen, unsigned char* out) {
     HmacPrecomputed pre;
@@ -197,8 +190,7 @@ static bool pbkdf2HmacCustom(HashId hash,
     size_t digestSize = hashDigestSize(hash);
     if (digestSize == 0) return false;
 
-    // Prime the HMAC key state exactly ONCE per PBKDF2 call, not once per
-    // iteration. This is the fix; everything below is otherwise unchanged.
+
     HmacPrecomputed pre;
     hmacPrecompute(hash, password, passwordLen, pre);
 

@@ -137,8 +137,10 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
 
   Future<void> _save() async {
     if (_needsPatternSetup) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Set up a pattern before saving.')),
+      showAppSnackBar(
+        context,
+        message: 'Set up a pattern before saving.',
+        tone: AppBannerTone.warning,
       );
       return;
     }
@@ -281,51 +283,25 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // SECTION 1: General Info Card
-              Card(
-                elevation: 0,
-                color: cs.surfaceContainerLow,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+              AppCard(
+                padding: const EdgeInsets.all(16),
+                children: [
                       _SectionHeader(title: 'General Settings', icon: Icons.badge_outlined),
                       TextField(
                         controller: _labelCtrl,
                         decoration: InputDecoration(
                           labelText: 'Display Name',
                           prefixIcon: Icon(Icons.label_outline_rounded, size: 20, color: cs.primary),
-                          filled: true,
-                          fillColor: cs.surfaceContainer,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: cs.outlineVariant),
-                          ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
+                ],
               ),
               const SizedBox(height: 16),
 
               // SECTION 2: Security settings Card
-              Card(
-                elevation: 0,
-                color: cs.surfaceContainerLow,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+              AppCard(
+                padding: const EdgeInsets.all(16),
+                children: [
                       _SectionHeader(title: 'Security Settings', icon: Icons.shield_outlined),
                       if (_settingsLocked) ...[
                         Card(
@@ -342,7 +318,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: cs.primaryContainer.withValues(alpha:0.4),
+                                    color: cs.primaryContainer.withValues(alpha: 0.4),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(Icons.lock_outline_rounded, size: 32, color: cs.primary),
@@ -383,11 +359,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           decoration: InputDecoration(
                             labelText: 'Unlock Credentials',
                             prefixIcon: Icon(Icons.vpn_key_outlined, size: 20, color: cs.primary),
-                            filled: true,
-                            fillColor: cs.surfaceContainer,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
                           ),
                           items: ContainerUnlockMethod.values
                               .where((m) =>
@@ -468,9 +439,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                                 onToggle: () =>
                                     setState(() => _showPassword = !_showPassword),
                               ),
-                              filled: true,
-                              fillColor: cs.surfaceContainer,
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               hintText: 'Enter container password',
                             ),
                           ),
@@ -528,94 +496,28 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        Theme(
-                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                          child: ExpansionTile(
-                            title: Text(
-                              'Advanced parameters',
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: cs.onSurface,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Pin the algorithm to skip auto-detection on unlock.',
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                            leading: Icon(Icons.tune_rounded, color: cs.primary),
-                            childrenPadding: const EdgeInsets.all(16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
-                            ),
-                            collapsedShape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
-                            ),
-                            backgroundColor: cs.surfaceContainerLow,
-                            collapsedBackgroundColor: cs.surfaceContainerLow,
-                            children: [
-                              DropdownButtonFormField<int>(
-                                initialValue: _cipherId,
-                                decoration: InputDecoration(
-                                  labelText: 'Encryption Algorithm',
-                                  prefixIcon: Icon(Icons.security_rounded, size: 20),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                 items: CipherAlgo.dropdownItems(),
-                              onChanged: (val) {
-                                if (val != null) setState(() => _cipherId = val);
-                              },
-                              ),
-                              const SizedBox(height: 16),
-                              DropdownButtonFormField<int>(
-                                initialValue: _hashId,
-                                decoration: InputDecoration(
-                                  labelText: 'Hash Algorithm',
-                                  prefixIcon: Icon(Icons.tag_rounded, size: 20),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                items: HashAlgo.dropdownItems(),
-                              onChanged: (val) {
-                                if (val != null) setState(() => _hashId = val);
-                              },
-                              ),
-                            ],
-                          ),
+                        AdvancedParamsPanel(
+                          cipherId: _cipherId,
+                          hashId: _hashId,
+                          subtitle: 'Pin the algorithm to skip auto-detection on unlock.',
+                          onCipherChanged: (val) => setState(() => _cipherId = val),
+                          onHashChanged: (val) => setState(() => _hashId = val),
                         ),
                       ],
                     ],
-                  ),
-                ),
               ),
               const SizedBox(height: 16),
 
               // SECTION 3: System Settings Card
-              Card(
-                elevation: 0,
-                color: cs.surfaceContainerLow,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+              AppCard(
+                padding: const EdgeInsets.all(16),
+                children: [
                       _SectionHeader(title: 'System Settings', icon: Icons.tune_rounded),
                       DropdownButtonFormField<int>(
                         initialValue: _autoCloseMins,
                         decoration: InputDecoration(
                           labelText: 'Auto-Lock duration',
                           prefixIcon: Icon(Icons.timer_rounded, size: 20, color: cs.primary),
-                          filled: true,
-                          fillColor: cs.surfaceContainer,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         items: _autoCloseOptions.map((mins) {
                           final label = mins == 0
@@ -658,9 +560,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           decoration: InputDecoration(
                             labelText: 'Cache Mode',
                             prefixIcon: Icon(Icons.cached_rounded, size: 20, color: cs.primary),
-                            filled: true,
-                            fillColor: cs.surfaceContainer,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           items: ThumbnailCacheMode.values
                               .map((mode) => DropdownMenuItem<ThumbnailCacheMode?>(
@@ -687,9 +586,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           decoration: InputDecoration(
                             labelText: 'Thumbnail Quality',
                             prefixIcon: Icon(Icons.high_quality_rounded, size: 20, color: cs.primary),
-                            filled: true,
-                            fillColor: cs.surfaceContainer,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           items: ThumbnailQuality.values
                               .map((q) => DropdownMenuItem<ThumbnailQuality?>(
@@ -700,8 +596,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           onChanged: (v) => setState(() => _thumbnailQuality = v),
                         ),
                     ],
-                  ),
-                ),
               ),
               const SizedBox(height: 24),
 
@@ -741,7 +635,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                 onPressed: (_saving || !_canSave) ? null : _save,
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(56),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                  shape: const StadiumBorder(),
                 ),
                 child: _saving
                     ? const SizedBox(
@@ -901,7 +795,6 @@ class _PasswordVerifyDialogState extends State<_PasswordVerifyDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text('Verify Password'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1089,8 +982,6 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
     final textTheme = Theme.of(context).textTheme;
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      backgroundColor: cs.surfaceContainerHigh,
       title: Row(
         children: [
           Icon(Icons.lock_person_outlined, color: cs.primary),
@@ -1130,82 +1021,11 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
             ),
             const SizedBox(height: 16),
 
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: cs.outlineVariant.withValues(alpha:0.5)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.insert_drive_file_outlined, size: 18, color: cs.primary),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Keyfiles (optional)',
-                            style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      TextButton.icon(
-                        onPressed: _pickingKeyfiles ? null : _pickKeyfiles,
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        icon: _pickingKeyfiles
-                            ? const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.add_rounded, size: 16),
-                        label: const Text('Add'),
-                      ),
-                    ],
-                  ),
-                  if (_keyfiles.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: _keyfiles
-                          .map(
-                            (k) => InputChip(
-                              avatar: Icon(Icons.description_outlined, size: 14, color: cs.onSurfaceVariant),
-                              label: Text(
-                                k.displayName,
-                                style: textTheme.bodySmall,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              onDeleted: () => _removeKeyfile(k),
-                              deleteIconColor: cs.error,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'No keyfiles attached',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant.withValues(alpha:0.6),
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+            KeyfilesPicker(
+              keyfiles: _keyfiles,
+              picking: _pickingKeyfiles,
+              onPick: _pickKeyfiles,
+              onRemove: _removeKeyfile,
             ),
             const SizedBox(height: 16),
 

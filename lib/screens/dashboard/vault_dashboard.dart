@@ -50,6 +50,7 @@ class _VaultDashboardState extends State<VaultDashboard>
   final List<String> _recordsOrder = [];
   AppSettings _appSettings = AppSettings();
   bool _actionInFlight = false;
+  bool _isLoading = true;
   int _currentIndex = 0; // 0: Vaults, 1: Settings
 
   VaultSortField _sortField = VaultSortField.name;
@@ -171,6 +172,7 @@ class _VaultDashboardState extends State<VaultDashboard>
         _records = Map.from(records);
         _recordsOrder.clear();
         _recordsOrder.addAll(records.keys);
+        _isLoading = false;
       });
       _scheduleAutoLock();
     }
@@ -685,7 +687,7 @@ class _VaultDashboardState extends State<VaultDashboard>
 
                   actions: _buildAppBarActions(),
                 ),
-          if (displayItems.isEmpty)
+          if (displayItems.isEmpty && !_isLoading)
             SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(onAdd: _showAddOptionsSheet),

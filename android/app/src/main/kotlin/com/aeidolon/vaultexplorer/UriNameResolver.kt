@@ -7,12 +7,10 @@ import android.provider.OpenableColumns
 /**
  * Shared logic for resolving a human-readable display name for a Uri.
  *
- * Previously duplicated (with minor variations) in both MainActivity
- * (SAF container/tree picker results) and VeraCryptDocumentsProvider
- * (DocumentsProvider root title fallback). Consolidated here since both
- * call sites want the same behavior: query OpenableColumns.DISPLAY_NAME
- * for content:// Uris, falling back to the last path segment, and
- * finally to "Container" if nothing else is available.
+ * Resolves display names for both MainActivity (SAF container/tree picker)
+ * and VeraCryptDocumentsProvider (DocumentsProvider roots). Querying
+ * OpenableColumns.DISPLAY_NAME for content:// URIs, falling back to the last
+ * path segment, or "Container" if unavailable.
  */
 object UriNameResolver {
     fun resolve(resolver: ContentResolver?, uri: Uri): String {

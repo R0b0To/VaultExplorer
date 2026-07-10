@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <sstream>
 #include <cstring>
+#include <cstdlib>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <memory>
@@ -35,6 +36,8 @@ extern "C" {
 #include "dir.h"
 #include "attrib.h"
 #include "layout.h"
+#include <ext2fs/ext2fs.h>
+#include <ext2fs/ext2_io.h>
 }
 
 // Undefine conflicting macros defined by NTFS-3G support.h
@@ -44,6 +47,10 @@ extern "C" {
 struct NtfsStream {
     ntfs_inode* inode = nullptr;
     ntfs_attr*  attr = nullptr;
+};
+
+struct ExtStream {
+    ext2_file_t file = nullptr;
 };
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
@@ -136,13 +143,16 @@ struct VolumeState {
 
     // --- NTFS Support Properties ---
     ntfs_volume* ntfsVol = nullptr;
+    ext2_filsys extFs = nullptr;
     enum FsType {
         FS_UNKNOWN,
         FS_FATFS,
-        FS_NTFS
+        FS_NTFS,
+        FS_EXT
     } fsType = FS_UNKNOWN;
     
     std::vector<NtfsStream*> openNtfsStreams;
+    std::vector<ExtStream*> openExtStreams;
     // -------------------------------
 
     std::unique_ptr<unsigned char[]> ioBuf;
@@ -171,6 +181,7 @@ struct VolumeState {
         matchedHashId = -1;
         fsType = FS_UNKNOWN;
         ntfsVol = nullptr;
+        extFs = nullptr;
         if (preservedDerivedKey != nullptr) {
             mbedtls_platform_zeroize(preservedDerivedKey, preservedDerivedKeyLen);
             delete[] preservedDerivedKey;
@@ -726,6 +737,109 @@ static void throwNotUnlocked(JNIEnv* env, int volId, const char* callerName) {
     env->ThrowNew(exClass, msg);
 }
 
+// libext2fs sees a normal byte-addressable device.  This adapter translates
+// its block requests into the already encrypted FatFs disk I/O layer, so the
+// filesystem library never sees the container file or USB device directly.
+static bool extTransfer(int volId, uint64_t offset, void* data, size_t bytes,
+                        bool write) {
+    if (volId < 0 || volId >= MAX_VOLUMES || bytes == 0) return bytes == 0;
+    const auto& v = volumes[volId];
+    if (offset > v.dataAreaLengthBytes || bytes > v.dataAreaLengthBytes - offset)
+        return false;
+    const uint64_t firstSector = offset / 512;
+    const uint64_t lastSector = (offset + bytes + 511) / 512;
+    const size_t sectorBytes = static_cast<size_t>(lastSector - firstSector) * 512;
+    std::vector<unsigned char> sectors(sectorBytes);
+    const size_t inSector = static_cast<size_t>(offset % 512);
+    const bool wholeSectors = inSector == 0 && (bytes % 512) == 0;
+
+    if (!write || !wholeSectors) {
+        if (disk_read(static_cast<BYTE>(volId), sectors.data(), firstSector,
+                      static_cast<UINT>(lastSector - firstSector)) != RES_OK)
+            return false;
+    }
+    if (write) {
+        std::memcpy(sectors.data() + inSector, data, bytes);
+        return disk_write(static_cast<BYTE>(volId), sectors.data(), firstSector,
+                          static_cast<UINT>(lastSector - firstSector)) == RES_OK;
+    }
+    std::memcpy(data, sectors.data() + inSector, bytes);
+    return true;
+}
+
+static errcode_t extIoOpenBound(const char* name, int flags, io_channel* out);
+
+static errcode_t extIoOpen(const char* name, int, io_channel* out) {
+    if (!name || !out) return EXT2_ET_INVALID_ARGUMENT;
+    char* end = nullptr;
+    const long volId = std::strtol(name, &end, 10);
+    if (!end || *end || volId < 0 || volId >= MAX_VOLUMES) return EXT2_ET_BAD_DEVICE_NAME;
+    auto* channel = static_cast<io_channel>(std::calloc(1, sizeof(struct struct_io_channel)));
+    auto* privateId = new int(static_cast<int>(volId));
+    if (!channel || !privateId) { std::free(channel); delete privateId; return EXT2_ET_NO_MEMORY; }
+    channel->magic = EXT2_ET_MAGIC_IO_CHANNEL;
+    channel->manager = nullptr; // set by the manager's open wrapper below
+    channel->name = strdup(name);
+    channel->block_size = 1024;
+    channel->refcount = 1;
+    channel->private_data = privateId;
+    *out = channel;
+    return 0;
+}
+
+static errcode_t extIoClose(io_channel channel) {
+    if (!channel) return EXT2_ET_INVALID_ARGUMENT;
+    delete static_cast<int*>(channel->private_data);
+    std::free(channel->name);
+    std::free(channel);
+    return 0;
+}
+
+static errcode_t extIoSetBlockSize(io_channel channel, int size) {
+    if (!channel || size < 512 || (size % 512) != 0) return EXT2_ET_INVALID_ARGUMENT;
+    channel->block_size = size;
+    return 0;
+}
+
+static errcode_t extIoTransfer(io_channel channel, unsigned long long block,
+                               int count, void* data, bool write) {
+    if (!channel || !channel->private_data || !data || count == 0) return EXT2_ET_INVALID_ARGUMENT;
+    const uint64_t bytes = count < 0 ? static_cast<uint64_t>(-static_cast<long long>(count))
+        : static_cast<uint64_t>(count) * static_cast<uint64_t>(channel->block_size);
+    const uint64_t offset = block * static_cast<uint64_t>(channel->block_size);
+    const int volId = *static_cast<int*>(channel->private_data);
+    if (!extTransfer(volId, offset, data, static_cast<size_t>(bytes), write))
+        return write ? EXT2_ET_SHORT_WRITE : EXT2_ET_SHORT_READ;
+    return 0;
+}
+
+static errcode_t extIoRead(io_channel c, unsigned long b, int n, void* d) { return extIoTransfer(c, b, n, d, false); }
+static errcode_t extIoWrite(io_channel c, unsigned long b, int n, const void* d) { return extIoTransfer(c, b, n, const_cast<void*>(d), true); }
+static errcode_t extIoRead64(io_channel c, unsigned long long b, int n, void* d) { return extIoTransfer(c, b, n, d, false); }
+static errcode_t extIoWrite64(io_channel c, unsigned long long b, int n, const void* d) { return extIoTransfer(c, b, n, const_cast<void*>(d), true); }
+static errcode_t extIoWriteByte(io_channel c, unsigned long offset, int n, const void* d) {
+    if (!c || !c->private_data || n < 0) return EXT2_ET_INVALID_ARGUMENT;
+    return extTransfer(*static_cast<int*>(c->private_data), offset, const_cast<void*>(d), static_cast<size_t>(n), true)
+        ? 0 : EXT2_ET_SHORT_WRITE;
+}
+static errcode_t extIoFlush(io_channel c) {
+    if (!c || !c->private_data) return EXT2_ET_INVALID_ARGUMENT;
+    const auto& v = volumes[*static_cast<int*>(c->private_data)];
+    return (!v.isUsbSource && v.fd >= 0 && fsync(v.fd) != 0) ? EXT2_ET_SHORT_WRITE : 0;
+}
+
+static struct_io_manager g_extIoManager = {
+    EXT2_ET_MAGIC_IO_MANAGER, "vaultexplorer-encrypted", extIoOpenBound, extIoClose,
+    extIoSetBlockSize, extIoRead, extIoWrite, extIoFlush, extIoWriteByte,
+    nullptr, nullptr, extIoRead64, extIoWrite64, nullptr, nullptr, nullptr, {0}
+};
+
+static errcode_t extIoOpenBound(const char* name, int flags, io_channel* out) {
+    const errcode_t result = extIoOpen(name, flags, out);
+    if (!result) (*out)->manager = &g_extIoManager;
+    return result;
+}
+
 static bool ensureMounted(int volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
     auto& v = volumes[volId];
@@ -735,6 +849,26 @@ static bool ensureMounted(int volId) {
     DRESULT dr = disk_read(static_cast<BYTE>(volId), decS, 0, 1);
     if (dr != RES_OK) {
         LOGI("ensureMounted: failed to read boot sector for volume %d", volId);
+        return false;
+    }
+
+    // ext2/3/4 has no DOS boot signature. Its superblock starts at byte 1024
+    // and carries the little-endian 0xEF53 magic at offset 0x38.
+    alignas(16) unsigned char extSuperSector[512];
+    if (disk_read(static_cast<BYTE>(volId), extSuperSector, 2, 1) == RES_OK &&
+        extSuperSector[0x38] == 0x53 && extSuperSector[0x39] == 0xEF) {
+        const std::string deviceName = std::to_string(volId);
+        v.fsType = VolumeState::FS_EXT;
+        if (ext2fs_open(deviceName.c_str(), EXT2_FLAG_RW, 0, 0,
+                        &g_extIoManager, &v.extFs) == 0 &&
+            ext2fs_read_bitmaps(v.extFs) == 0) {
+            v.fsMounted = true;
+            LOGI("ensureMounted: detected ext filesystem on volume %d", volId);
+            return true;
+        }
+        if (v.extFs) { ext2fs_close(v.extFs); v.extFs = nullptr; }
+        v.fsType = VolumeState::FS_UNKNOWN;
+        LOGI("ensureMounted: unable to open ext filesystem on volume %d", volId);
         return false;
     }
 
@@ -790,6 +924,15 @@ static void unmountVolume(int volId) {
             ntfs_umount(v.ntfsVol, FALSE);
             if (priv) delete static_cast<int*>(priv);
             v.ntfsVol = nullptr;
+        } else if (v.fsType == VolumeState::FS_EXT && v.extFs) {
+            for (ExtStream* stream : v.openExtStreams) {
+                ext2fs_file_close(stream->file);
+                delete stream;
+            }
+            v.openExtStreams.clear();
+            ext2fs_flush(v.extFs);
+            ext2fs_close(v.extFs);
+            v.extFs = nullptr;
         }
         v.fsMounted = false;
         v.fsType = VolumeState::FS_UNKNOWN;
@@ -1636,6 +1779,94 @@ static uint64_t recursiveFolderSize(int volId, const std::string& fatPath) {
     return total;
 }
 
+static bool extResolvePath(ext2_filsys fs, const std::string& path, ext2_ino_t* ino) {
+    std::string relative = path;
+    while (!relative.empty() && relative.front() == '/') relative.erase(relative.begin());
+    if (relative.empty()) { *ino = EXT2_ROOT_INO; return true; }
+    return ext2fs_namei_follow(fs, EXT2_ROOT_INO, EXT2_ROOT_INO,
+                               relative.c_str(), ino) == 0;
+}
+
+struct ExtDirContext {
+    ext2_filsys fs;
+    std::vector<std::string>* results;
+};
+
+static int extDirectoryEntry(ext2_ino_t, int, struct ext2_dir_entry* entry,
+                             int, int, char*, void* data) {
+    auto* ctx = static_cast<ExtDirContext*>(data);
+    if (!entry->inode || ctx->results->size() >= MAX_DIR_ENTRIES) return 0;
+    const int nameLen = ext2fs_dirent_name_len(entry);
+    std::string name(entry->name, nameLen);
+    if (name == "." || name == "..") return 0;
+    struct ext2_inode inode{};
+    if (ext2fs_read_inode(ctx->fs, entry->inode, &inode) != 0) return 0;
+    if (LINUX_S_ISDIR(inode.i_mode))
+        ctx->results->push_back("[DIR] " + name + "|0|" + std::to_string(inode.i_mtime));
+    else {
+        const uint64_t size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
+        ctx->results->push_back(name + "|" + std::to_string(size) + "|" + std::to_string(inode.i_mtime));
+    }
+    return 0;
+}
+
+static bool extOpenFile(ext2_filsys fs, const std::string& path, bool write,
+                        bool create, ext2_file_t* out) {
+    ext2_ino_t ino = 0;
+    if (!extResolvePath(fs, path, &ino)) {
+        if (!create) return false;
+        const size_t slash = path.find_last_of('/');
+        const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
+        const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+        ext2_ino_t parent = 0;
+        if (name.empty() || !extResolvePath(fs, parentPath, &parent)) return false;
+        struct ext2_inode inode{};
+        if (ext2fs_new_inode(fs, parent, LINUX_S_IFREG | 0644, nullptr, &ino) != 0) return false;
+        inode.i_mode = LINUX_S_IFREG | 0644;
+        inode.i_links_count = 1;
+        if (ext2fs_write_new_inode(fs, ino, &inode) != 0 ||
+            ext2fs_link(fs, parent, name.c_str(), ino, EXT2_FT_REG_FILE) != 0) return false;
+        ext2fs_inode_alloc_stats2(fs, ino, +1, 0);
+    }
+    return ext2fs_file_open(fs, ino, write ? EXT2_FILE_WRITE : 0, out) == 0;
+}
+
+static bool extWriteFromHostFile(ext2_filsys fs, const std::string& path, const char* source) {
+    ext2_file_t file = nullptr;
+    if (!extOpenFile(fs, path, true, true, &file)) return false;
+    bool ok = ext2fs_file_set_size2(file, 0) == 0;
+    std::ifstream input(source, std::ios::binary);
+    std::unique_ptr<unsigned char[]> buffer(new unsigned char[IO_BUFFER_SIZE]);
+    while (ok && input) {
+        input.read(reinterpret_cast<char*>(buffer.get()), IO_BUFFER_SIZE);
+        const std::streamsize count = input.gcount();
+        if (count <= 0) break;
+        unsigned int written = 0;
+        ok = ext2fs_file_write(file, buffer.get(), static_cast<unsigned int>(count), &written) == 0 &&
+             written == static_cast<unsigned int>(count);
+    }
+    ok = ok && input.eof() && ext2fs_file_flush(file) == 0;
+    ext2fs_file_close(file);
+    return ok;
+}
+
+static bool extExtractToHostFile(ext2_filsys fs, const std::string& path, const char* destination) {
+    ext2_file_t file = nullptr;
+    if (!extOpenFile(fs, path, false, false, &file)) return false;
+    std::ofstream output(destination, std::ios::binary | std::ios::trunc);
+    std::unique_ptr<unsigned char[]> buffer(new unsigned char[IO_BUFFER_SIZE]);
+    bool ok = output.is_open();
+    while (ok) {
+        unsigned int got = 0;
+        if (ext2fs_file_read(file, buffer.get(), IO_BUFFER_SIZE, &got) != 0) { ok = false; break; }
+        if (!got) break;
+        output.write(reinterpret_cast<const char*>(buffer.get()), got);
+        ok = output.good();
+    }
+    ext2fs_file_close(file);
+    return ok;
+}
+
 static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pathSuffix) {
     std::vector<std::string> results;
     auto& v = volumes[volId];
@@ -1680,6 +1911,13 @@ static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pa
             NtfsFilldirContext fillCtx = { &results, v.ntfsVol };
             ntfs_readdir(dir_ni, &pos, &fillCtx, vExplorer_ntfs_filldir);
             ntfs_inode_close(dir_ni);
+        }
+    } else if (v.fsType == VolumeState::FS_EXT) {
+        ext2_ino_t dirInode = 0;
+        if (extResolvePath(v.extFs, pathSuffix ? pathSuffix : "", &dirInode)) {
+            ExtDirContext context{v.extFs, &results};
+            ext2fs_dir_iterate2(v.extFs, dirInode, 0, nullptr, extDirectoryEntry, &context);
+            if (results.size() >= MAX_DIR_ENTRIES) results.push_back("System:TRUNCATED");
         }
     }
 
@@ -2210,6 +2448,12 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSize(
                     size = static_cast<jlong>(ni->data_size);
                     ntfs_inode_close(ni);
                 }
+            } else if (v.fsType == VolumeState::FS_EXT) {
+                ext2_ino_t ino = 0;
+                struct ext2_inode inode{};
+                if (extResolvePath(v.extFs, targetName, &ino) &&
+                    ext2fs_read_inode(v.extFs, ino, &inode) == 0)
+                    size = static_cast<jlong>((static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size);
             }
         }
     }
@@ -2285,6 +2529,20 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunk(
                     }
                     ntfs_inode_close(ni);
                 }
+            } else if (v.fsType == VolumeState::FS_EXT) {
+                ext2_file_t file = nullptr;
+                if (extOpenFile(v.extFs, targetName, false, false, &file)) {
+                    __u64 position = 0;
+                    std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
+                    unsigned int got = 0;
+                    if (ext2fs_file_llseek(file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position) == 0 &&
+                        ext2fs_file_read(file, buffer.get(), static_cast<unsigned int>(length), &got) == 0 && got > 0) {
+                        retArray = env->NewByteArray(static_cast<jsize>(got));
+                        env->SetByteArrayRegion(retArray, 0, static_cast<jsize>(got),
+                                                reinterpret_cast<jbyte*>(buffer.get()));
+                    }
+                    ext2fs_file_close(file);
+                }
             }
         }
     }
@@ -2344,6 +2602,20 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
                     }
                     ntfs_inode_close(ni);
                 }
+        } else if (v.fsType == VolumeState::FS_EXT) {
+            ext2_file_t file = nullptr;
+            if (extOpenFile(v.extFs, targetName, true, true, &file)) {
+                __u64 position = 0;
+                if (offset == 0) ext2fs_file_set_size2(file, 0);
+                unsigned int written = 0;
+                if (ext2fs_file_llseek(file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position) == 0 &&
+                    ext2fs_file_write(file, body, static_cast<unsigned int>(len), &written) == 0 &&
+                    written == static_cast<unsigned int>(len) && ext2fs_file_flush(file) == 0) {
+                    ext2fs_flush(v.extFs);
+                    success = true;
+                }
+                ext2fs_file_close(file);
+            }
         }
     }
 
@@ -2434,6 +2706,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
                     }
                     ntfs_inode_close(ni);
                 }
+            } else if (v.fsType == VolumeState::FS_EXT) {
+                success = extWriteFromHostFile(v.extFs, targetName, source);
+                if (success) success = ext2fs_flush(v.extFs) == 0;
             }
         }
     }
@@ -2492,6 +2767,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_extractFile(
                     }
                     ntfs_inode_close(ni);
                 }
+            } else if (v.fsType == VolumeState::FS_EXT) {
+                success = extExtractToHostFile(v.extFs, targetName, destination);
             }
         }
     }
@@ -2542,6 +2819,24 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
     if (ni) ntfs_inode_close(ni);
     if (dir_ni) ntfs_inode_close(dir_ni);
 }
+            else if (v.fsType == VolumeState::FS_EXT) {
+                const std::string path(targetName);
+                const size_t slash = path.find_last_of('/');
+                const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
+                const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+                ext2_ino_t parent = 0, ino = 0;
+                if (!name.empty() && extResolvePath(v.extFs, parentPath, &parent) &&
+                    extResolvePath(v.extFs, path, &ino) &&
+                    ext2fs_unlink(v.extFs, parent, name.c_str(), ino, 0) == 0) {
+                    struct ext2_inode inode{};
+                    if (ext2fs_read_inode(v.extFs, ino, &inode) == 0 && inode.i_links_count) {
+                        --inode.i_links_count;
+                        ext2fs_write_inode(v.extFs, ino, &inode);
+                    }
+                    ext2fs_flush(v.extFs);
+                    success = true;
+                }
+            }
         }
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);
@@ -2583,6 +2878,17 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
                         free(uChild);
                     }
                     ntfs_inode_close(parentNi);
+                }
+            } else if (v.fsType == VolumeState::FS_EXT) {
+                const std::string path(nativePath);
+                const size_t slash = path.find_last_of('/');
+                const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
+                const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+                ext2_ino_t parent = 0;
+                if (!name.empty() && extResolvePath(v.extFs, parentPath, &parent) &&
+                    ext2fs_mkdir(v.extFs, parent, 0, name.c_str()) == 0) {
+                    ext2fs_flush(v.extFs);
+                    success = true;
                 }
             }
         }
@@ -2700,6 +3006,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
                 s64 free_cl = ntfs_attr_get_free_bits(vol->lcnbmp_na);
                 totalBytes = total_clusters * vol->cluster_size;
                 freeBytes  = free_cl * vol->cluster_size;
+            } else if (v.fsType == VolumeState::FS_EXT) {
+                totalBytes = static_cast<jlong>(ext2fs_blocks_count(v.extFs->super)) * v.extFs->blocksize;
+                freeBytes = static_cast<jlong>(ext2fs_free_blocks_count(v.extFs->super)) * v.extFs->blocksize;
             }
         }
     }
@@ -2746,6 +3055,13 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_openStream(
                         ntfs_inode_close(ni);
                     }
                 }
+            } else if (v.fsType == VolumeState::FS_EXT) {
+                ext2_file_t file = nullptr;
+                if (extOpenFile(v.extFs, targetName, false, false, &file)) {
+                    auto* stream = new ExtStream{file};
+                    streamPtr = reinterpret_cast<jlong>(stream);
+                    v.openExtStreams.push_back(stream);
+                }
             }
         }
     }
@@ -2787,6 +3103,18 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStream(
             if (br >= 0) bytesRead = static_cast<jint>(br);
             env->ReleaseByteArrayElements(outBuffer, destBuf, 0);
         }
+    } else if (v.fsType == VolumeState::FS_EXT) {
+        ExtStream* stream = reinterpret_cast<ExtStream*>(streamPtr);
+        if (std::find(v.openExtStreams.begin(), v.openExtStreams.end(), stream) == v.openExtStreams.end()) return -1;
+        jbyte* destBuf = env->GetByteArrayElements(outBuffer, nullptr);
+        if (destBuf != nullptr) {
+            __u64 position = 0;
+            unsigned int got = 0;
+            if (ext2fs_file_llseek(stream->file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position) == 0 &&
+                ext2fs_file_read(stream->file, destBuf, static_cast<unsigned int>(length), &got) == 0)
+                bytesRead = static_cast<jint>(got);
+            env->ReleaseByteArrayElements(outBuffer, destBuf, 0);
+        }
     }
     return bytesRead;
 }
@@ -2816,6 +3144,13 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
         ntfs_attr_close(ns->attr);
         ntfs_inode_close(ns->inode);
         delete ns;
+    } else if (v.fsType == VolumeState::FS_EXT) {
+        ExtStream* stream = reinterpret_cast<ExtStream*>(streamPtr);
+        auto it = std::find(v.openExtStreams.begin(), v.openExtStreams.end(), stream);
+        if (it == v.openExtStreams.end()) return;
+        v.openExtStreams.erase(it);
+        ext2fs_file_close(stream->file);
+        delete stream;
     }
 }
 

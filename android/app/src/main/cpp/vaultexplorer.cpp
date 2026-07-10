@@ -38,6 +38,7 @@ extern "C" {
 #include "layout.h"
 #include <ext2fs/ext2fs.h>
 #include <ext2fs/ext2_io.h>
+#include <et/com_err.h>
 }
 
 // Undefine conflicting macros defined by NTFS-3G support.h
@@ -337,6 +338,12 @@ static const char* drivePaths[MAX_VOLUMES] = {
 // NTFS SUPPORT STRUCTURES & OPERATIONS
 // ----------------------------------------------------------------====
 
+static std::atomic<int64_t> ntfsDevPos[MAX_VOLUMES];
+static bool _ntfsDevPosInit = [](){
+    for (int i = 0; i < MAX_VOLUMES; i++) ntfsDevPos[i].store(0);
+    return true;
+}();
+
 struct NtfsFilldirContext {
     std::vector<std::string>* results;
     ntfs_volume* vol;
@@ -470,10 +477,6 @@ static uint64_t recursiveFolderSizeNtfs(int volId, const std::string& path) {
     return total;
 }
 
-static int vExplorer_ntfs_open(struct ntfs_device *dev, int flags) {
-    return 0; // Handled programmatically
-}
-
 static int vExplorer_ntfs_volume_id(const struct ntfs_device* dev) {
     if (dev->d_private) return *static_cast<const int*>(dev->d_private);
     // mkntfs receives a synthetic "ve<N>" device name and uses these same
@@ -482,12 +485,65 @@ static int vExplorer_ntfs_volume_id(const struct ntfs_device* dev) {
         ? std::atoi(dev->d_name + 2) : -1;
 }
 
+
+static int vExplorer_ntfs_stat(struct ntfs_device *dev, struct stat *buf) {
+    int volId = vExplorer_ntfs_volume_id(dev);
+    if (!dev->d_private) {
+        std::memset(buf, 0, sizeof(*buf));
+        buf->st_size = volumes[volId].dataAreaLengthBytes;
+        buf->st_mode = S_IFBLK | 0660;
+        return 0;
+    }
+    if (volumes[volId].fd >= 0) {
+        return fstat(volumes[volId].fd, buf);
+    }
+    std::memset(buf, 0, sizeof(struct stat));
+    buf->st_size = volumes[volId].fileSize;
+    buf->st_mode = S_IFBLK | 0660;
+    return 0;
+}
+
+
+static int vExplorer_ntfs_open(struct ntfs_device *dev, int flags) {
+    int volId = vExplorer_ntfs_volume_id(dev);
+    if (volId >= 0 && volId < MAX_VOLUMES) {
+        ntfsDevPos[volId].store(0, std::memory_order_relaxed);
+    }
+    return 0; // Handled programmatically
+}
+
+
+
 static int vExplorer_ntfs_close(struct ntfs_device *dev) {
     return 0;
 }
 
 static s64 vExplorer_ntfs_seek(struct ntfs_device *dev, s64 offset, int whence) {
-    return offset;
+    int volId = vExplorer_ntfs_volume_id(dev);
+    if (volId < 0 || volId >= MAX_VOLUMES) return -1;
+
+    s64 base = 0;
+    switch (whence) {
+        case SEEK_SET:
+            base = 0;
+            break;
+        case SEEK_CUR:
+            base = ntfsDevPos[volId].load(std::memory_order_relaxed);
+            break;
+        case SEEK_END: {
+            struct stat st{};
+            if (vExplorer_ntfs_stat(dev, &st) != 0) return -1;
+            base = static_cast<s64>(st.st_size);
+            break;
+        }
+        default:
+            return -1;
+    }
+
+    const s64 newPos = base + offset;
+    if (newPos < 0) return -1;
+    ntfsDevPos[volId].store(newPos, std::memory_order_relaxed);
+    return newPos;
 }
 
 static s64 vExplorer_ntfs_pread(struct ntfs_device *dev, void *b, s64 count, s64 offset) {
@@ -607,6 +663,24 @@ static s64 vExplorer_ntfs_pwrite(struct ntfs_device *dev, const void *b, s64 cou
     return count;
 }
 
+static s64 vExplorer_ntfs_read(struct ntfs_device *dev, void *buf, s64 count) {
+    int volId = vExplorer_ntfs_volume_id(dev);
+    if (volId < 0 || volId >= MAX_VOLUMES || count <= 0) return 0;
+    const s64 pos = ntfsDevPos[volId].load(std::memory_order_relaxed);
+    const s64 got = vExplorer_ntfs_pread(dev, buf, count, pos);
+    if (got > 0) ntfsDevPos[volId].fetch_add(got, std::memory_order_relaxed);
+    return got;
+}
+
+static s64 vExplorer_ntfs_write(struct ntfs_device *dev, const void *buf, s64 count) {
+    int volId = vExplorer_ntfs_volume_id(dev);
+    if (volId < 0 || volId >= MAX_VOLUMES || count <= 0) return 0;
+    const s64 pos = ntfsDevPos[volId].load(std::memory_order_relaxed);
+    const s64 written = vExplorer_ntfs_pwrite(dev, buf, count, pos);
+    if (written > 0) ntfsDevPos[volId].fetch_add(written, std::memory_order_relaxed);
+    return written;
+}
+
 static int vExplorer_ntfs_sync(struct ntfs_device *dev) {
     int volId = vExplorer_ntfs_volume_id(dev);
     if (volumes[volId].fd >= 0) {
@@ -615,22 +689,7 @@ static int vExplorer_ntfs_sync(struct ntfs_device *dev) {
     return 0;
 }
 
-static int vExplorer_ntfs_stat(struct ntfs_device *dev, struct stat *buf) {
-    int volId = vExplorer_ntfs_volume_id(dev);
-    if (!dev->d_private) {
-        std::memset(buf, 0, sizeof(*buf));
-        buf->st_size = volumes[volId].dataAreaLengthBytes;
-        buf->st_mode = S_IFBLK | 0660;
-        return 0;
-    }
-    if (volumes[volId].fd >= 0) {
-        return fstat(volumes[volId].fd, buf);
-    }
-    std::memset(buf, 0, sizeof(struct stat));
-    buf->st_size = volumes[volId].fileSize;
-    buf->st_mode = S_IFBLK | 0660;
-    return 0;
-}
+
 
 static int vExplorer_ntfs_ioctl(struct ntfs_device *dev, unsigned long request, void *argp) {
     int volId = vExplorer_ntfs_volume_id(dev);
@@ -641,7 +700,8 @@ static int vExplorer_ntfs_ioctl(struct ntfs_device *dev, unsigned long request, 
         case 0x1260: // BLKGETSIZE
             *static_cast<unsigned long*>(argp) = volumes[volId].dataAreaLengthBytes / 512;
             return 0;
-        case 0x80041272: // BLKGETSIZE64
+        case 0x80041272: // BLKGETSIZE64 (32-bit size_t encoding)
+        case 0x80081272: // BLKGETSIZE64 (64-bit size_t encoding — the one arm64 actually uses)
             *static_cast<uint64_t*>(argp) = volumes[volId].dataAreaLengthBytes;
             return 0;
         default:
@@ -655,8 +715,8 @@ extern "C" ntfs_device_operations vExplorer_ntfs_ops = {
     vExplorer_ntfs_open,
     vExplorer_ntfs_close,
     vExplorer_ntfs_seek,
-    nullptr, // read
-    nullptr, // write
+    vExplorer_ntfs_read,
+    vExplorer_ntfs_write,
     vExplorer_ntfs_pread,
     vExplorer_ntfs_pwrite,
     vExplorer_ntfs_sync,
@@ -877,27 +937,47 @@ static bool formatExtVolume(int volId, const char* variant) {
     params.s_feature_incompat = EXT2_FEATURE_INCOMPAT_FILETYPE;
     params.s_feature_ro_compat = EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER;
     params.s_feature_compat = EXT2_FEATURE_COMPAT_EXT_ATTR | EXT2_FEATURE_COMPAT_DIR_INDEX;
+    
     if (ext3 || ext4) params.s_feature_compat |= EXT3_FEATURE_COMPAT_HAS_JOURNAL;
     if (ext4) {
         params.s_feature_incompat |= EXT3_FEATURE_INCOMPAT_EXTENTS | EXT4_FEATURE_INCOMPAT_64BIT;
         params.s_feature_ro_compat |= EXT4_FEATURE_RO_COMPAT_METADATA_CSUM;
         params.s_checksum_type = EXT2_CRC32C_CHKSUM;
+        params.s_desc_size = 64; 
     }
 
     char deviceName[16];
     std::snprintf(deviceName, sizeof(deviceName), "%d", volId);
     ext2_filsys fs = nullptr;
     if (ext2fs_initialize(deviceName, EXT2_FLAG_64BITS, &params, &g_extIoManager, &fs) != 0) return false;
+
+    FILE* urnd = fopen("/dev/urandom", "rb");
+    if (urnd) {
+        if (fread(fs->super->s_uuid, 1, 16, urnd) == 16) {
+            fs->super->s_uuid[6] = (fs->super->s_uuid[6] & 0x0F) | 0x40; // RFC 4122 Version 4
+            fs->super->s_uuid[8] = (fs->super->s_uuid[8] & 0x3F) | 0x80; // RFC 4122 Variant 1
+        }
+        fclose(urnd);
+    }
+
+    if (ext4) {
+        fs->super->s_checksum_type = EXT2_CRC32C_CHKSUM;
+        ext2fs_init_csum_seed(fs);
+    }
+
     bool ok = ext2fs_allocate_tables(fs) == 0 &&
               ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, nullptr) == 0 &&
               ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found") == 0;
+              
     if (ok && (ext3 || ext4)) {
         struct ext2fs_journal_params journal{};
         journal.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, std::max<uint64_t>(1024, blocks / 32)));
         ok = ext2fs_add_journal_inode3(fs, &journal, 0, 0) == 0;
     }
+    
     if (ok) ok = ext2fs_flush(fs) == 0;
     ext2fs_close(fs);
+    
     return ok;
 }
 
@@ -917,21 +997,28 @@ static bool ensureMounted(int volId) {
     // and carries the little-endian 0xEF53 magic at offset 0x38.
     alignas(16) unsigned char extSuperSector[512];
     if (disk_read(static_cast<BYTE>(volId), extSuperSector, 2, 1) == RES_OK &&
-        extSuperSector[0x38] == 0x53 && extSuperSector[0x39] == 0xEF) {
-        const std::string deviceName = std::to_string(volId);
-        v.fsType = VolumeState::FS_EXT;
-        if (ext2fs_open(deviceName.c_str(), EXT2_FLAG_RW, 0, 0,
-                        &g_extIoManager, &v.extFs) == 0 &&
-            ext2fs_read_bitmaps(v.extFs) == 0) {
-            v.fsMounted = true;
-            LOGI("ensureMounted: detected ext filesystem on volume %d", volId);
-            return true;
-        }
-        if (v.extFs) { ext2fs_close(v.extFs); v.extFs = nullptr; }
-        v.fsType = VolumeState::FS_UNKNOWN;
-        LOGI("ensureMounted: unable to open ext filesystem on volume %d", volId);
-        return false;
+    extSuperSector[0x38] == 0x53 && extSuperSector[0x39] == 0xEF) {
+    const std::string deviceName = std::to_string(volId);
+    v.fsType = VolumeState::FS_EXT;
+    const errcode_t openErr = ext2fs_open(deviceName.c_str(), EXT2_FLAG_RW | EXT2_FLAG_64BITS,
+                                      0, 0, &g_extIoManager, &v.extFs);
+if (openErr == 0) {
+    const errcode_t bmErr = ext2fs_read_bitmaps(v.extFs);
+    if (bmErr == 0) {
+        v.fsMounted = true;
+        LOGI("ensureMounted: detected ext filesystem on volume %d", volId);
+        return true;
     }
+    LOGI("ensureMounted: ext2fs_read_bitmaps failed on volume %d: %s (err=%lu)",
+         volId, error_message(bmErr), (unsigned long)bmErr);
+} else {
+    LOGI("ensureMounted: ext2fs_open failed on volume %d: %s (err=%lu)",
+         volId, error_message(openErr), (unsigned long)openErr);
+}
+if (v.extFs) { ext2fs_close(v.extFs); v.extFs = nullptr; }
+v.fsType = VolumeState::FS_UNKNOWN;
+return false;
+}
 
     if (decS[510] != 0x55 || decS[511] != 0xAA) {
         LOGI("ensureMounted: invalid signature in boot sector for volume %d", volId);
@@ -1228,6 +1315,11 @@ extern "C" DWORD get_fattime() {
 }
 
 static std::atomic<bool> derivationInProgress[MAX_VOLUMES];
+
+static bool _ext2ErrorTableInit = [](){
+    initialize_ext2_error_table();   
+    return true;
+}();
 
 static bool _derivationInit = [](){
     for (int i = 0; i < MAX_VOLUMES; i++)

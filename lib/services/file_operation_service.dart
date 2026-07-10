@@ -388,6 +388,7 @@ class FileOperationService extends ChangeNotifier {
                 r.item.isDir,
                 createdDestPaths,
                 op,
+                r.item.modifiedSecs,
               );
 
               if (!ok) {
@@ -477,16 +478,20 @@ class FileOperationService extends ChangeNotifier {
     bool isDir,
     List<String> createdDestPaths,
     FileOperation op,
+    int modifiedSecs,
   ) async {
     if (op.cancelRequested) throw const _CancelledException();
 
     if (!isDir) {
-      return _copyFile(src, dest, srcPath, destPath, createdDestPaths, op);
+      return _copyFile(src, dest, srcPath, destPath, createdDestPaths, op, modifiedSecs);
     }
 
     final children = await vaultExplorerApi.listDirectory(src, srcPath) ?? [];
     await vaultExplorerApi.createDirectory(dest, destPath);
     createdDestPaths.add(destPath);
+    if (modifiedSecs > 0) {
+      await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);
+    }
 
     bool allOk = true;
     for (final entry in children) {
@@ -501,6 +506,7 @@ class FileOperationService extends ChangeNotifier {
         e.isDir,
         createdDestPaths,
         op,
+        e.modifiedSecs,
       );
       if (!ok) allOk = false;
     }
@@ -514,6 +520,7 @@ class FileOperationService extends ChangeNotifier {
     String destPath,
     List<String> createdDestPaths,
     FileOperation op,
+    int modifiedSecs,
   ) async {
     try {
       final size = await vaultExplorerApi.getFileSize(src, srcPath);
@@ -523,7 +530,12 @@ class FileOperationService extends ChangeNotifier {
 
       if (size == 0) {
         final ok = await vaultExplorerApi.createEmptyFile(dest, destPath);
-        if (ok) createdDestPaths.add(destPath);
+        if (ok) {
+          createdDestPaths.add(destPath);
+          if (modifiedSecs > 0) {
+            await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);
+          }
+        }
         return ok;
       }
 
@@ -548,6 +560,9 @@ class FileOperationService extends ChangeNotifier {
         offset += chunk.length;
       }
       createdDestPaths.add(destPath);
+      if (modifiedSecs > 0) {
+        await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);
+      }
       return true;
     } catch (e) {
       if (e is _DiskFullException || e is _CancelledException) rethrow;

@@ -44,6 +44,9 @@ object VeraCryptBridge {
     fun renameFile(volId: Int, oldPath: String, newPath: String): Boolean =
         withLock(volId) { VeraCryptEngine.renameFile(oldPath, newPath, volId) }
 
+    fun setLastModifiedTime(volId: Int, fatPath: String, epochSeconds: Long): Boolean =
+        withLock(volId) { VeraCryptEngine.setLastModifiedTime(fatPath, epochSeconds, volId) }
+
     fun deleteFile(volId: Int, fatPath: String): Boolean =
         withLock(volId) { VeraCryptEngine.deleteFile(fatPath, volId) }
 

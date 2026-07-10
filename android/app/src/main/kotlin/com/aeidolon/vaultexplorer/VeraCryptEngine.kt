@@ -90,6 +90,7 @@ object VeraCryptEngine {
     @JvmStatic external fun deleteFile(targetFileName: String, volId: Int): Boolean
     @JvmStatic external fun createDirectory(dirPath: String, volId: Int): Boolean
     @JvmStatic external fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean
+    @JvmStatic external fun setLastModifiedTime(path: String, epochSeconds: Long, volId: Int): Boolean
     @JvmStatic external fun getSpaceInfo(volId: Int): LongArray?
     /** USB unlock + list. cipherId/hashId: 255 = auto-detect.
      *  keyfileFds: see [deriveKeyMaterialNative] — same detach/ownership contract. */

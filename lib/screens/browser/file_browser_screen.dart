@@ -741,6 +741,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         path: path,
         isDir: entry.isDir,
         sizeBytes: entry.isDir ? 0 : entry.sizeBytes,
+        modifiedSecs: entry.modifiedSecs,
       );
     }).toList();
 

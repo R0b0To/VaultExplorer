@@ -1208,6 +1208,29 @@ static uint64_t fatToUnixTimestamp(WORD fdate, WORD ftime) {
     return (ts < 0) ? 0 : static_cast<uint64_t>(ts);
 }
 
+static void unixToFatTimestamp(uint64_t unixTime, WORD& fdate, WORD& ftime) {
+    time_t t_secs = static_cast<time_t>(unixTime);
+    struct tm t = {};
+    localtime_r(&t_secs, &t);
+
+    int year = t.tm_year + 1900;
+    if (year < 1980) {
+        fdate = 0;
+        ftime = 0;
+        return;
+    }
+
+    fdate = static_cast<WORD>(
+        (((year - 1980) & 0x7F) << 9) |
+        (((t.tm_mon + 1) & 0x0F) << 5) |
+        (t.tm_mday & 0x1F));
+
+    ftime = static_cast<WORD>(
+        ((t.tm_hour & 0x1F) << 11) |
+        ((t.tm_min & 0x3F) << 5) |
+        ((t.tm_sec / 2) & 0x1F));
+}
+
 
 static uint32_t crc32(const unsigned char* data, size_t len) {
     uint32_t crc = 0xFFFFFFFFu;
@@ -3292,6 +3315,59 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
     }
     env->ReleaseStringUTFChars(oldPath, nativeOld);
     env->ReleaseStringUTFChars(newPath, nativeNew);
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_setLastModifiedTime(
+        JNIEnv* env, jobject,
+        jstring path, jlong epochSeconds, jint volId) {
+    if (!requireActiveSession(volId, "setLastModifiedTime")) {
+        throwNotUnlocked(env, volId, "setLastModifiedTime"); return JNI_FALSE;
+    }
+    const char* nativePath = env->GetStringUTFChars(path, nullptr);
+    bool success = false;
+    auto& v = volumes[volId];
+    {
+        std::lock_guard<std::mutex> fsLock(v.mutex);
+        if (ensureMounted(volId)) {
+            if (v.fsType == VolumeState::FS_FATFS) {
+                WORD fdate = 0, ftime = 0;
+                unixToFatTimestamp(static_cast<uint64_t>(epochSeconds), fdate, ftime);
+                std::string fatPath = std::string(drivePaths[volId]) + "/" + nativePath;
+                FILINFO fno = {};
+                fno.fdate = fdate;
+                fno.ftime = ftime;
+                success = (f_utime(fatPath.c_str(), &fno) == FR_OK);
+            } else if (v.fsType == VolumeState::FS_NTFS) {
+                std::string fullPath = "/" + std::string(nativePath);
+                ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+                if (ni) {
+                    uint64_t ntfsTime = (static_cast<uint64_t>(epochSeconds) * 10000000ULL) + 116444736000000000ULL;
+                    ni->last_data_change_time = ntfsTime;
+                    ni->last_access_time = ntfsTime;
+                    ni->last_mft_change_time = ntfsTime;
+                    NInoSetDirty(ni);
+                    success = (ntfs_inode_close(ni) == 0);
+                }
+            } else if (v.fsType == VolumeState::FS_EXT) {
+                ext2_ino_t ino = 0;
+                if (extResolvePath(v.extFs, nativePath, &ino)) {
+                    struct ext2_inode inode = {};
+                    if (ext2fs_read_inode(v.extFs, ino, &inode) == 0) {
+                        inode.i_mtime = static_cast<__u32>(epochSeconds);
+                        inode.i_atime = static_cast<__u32>(epochSeconds);
+                        inode.i_ctime = static_cast<__u32>(epochSeconds);
+                        if (ext2fs_write_inode(v.extFs, ino, &inode) == 0) {
+                            ext2fs_flush(v.extFs);
+                            success = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    env->ReleaseStringUTFChars(path, nativePath);
     return success ? JNI_TRUE : JNI_FALSE;
 }
 

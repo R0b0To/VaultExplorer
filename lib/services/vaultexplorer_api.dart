@@ -648,6 +648,22 @@ class VaultExplorerApi {
     return result ?? false;
   }
 
+  Future<bool> setLastModifiedTime(
+    MountedContainer container,
+    String fileName,
+    int epochSeconds,
+  ) async {
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.setLastModifiedTime,
+      {
+        'filePath': container.uri,
+        'fileName': fileName,
+        'epochSeconds': epochSeconds,
+      },
+    );
+    return result ?? false;
+  }
+
   Future<bool> writeBackFile(
     MountedContainer container,
     String fileName,

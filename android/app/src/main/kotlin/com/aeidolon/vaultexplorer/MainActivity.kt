@@ -79,6 +79,7 @@ private object ChannelMethods {
     const val UNLOCK_USB_CONTAINER = "unlockUsbContainer"
     const val DOCUMENT_EXISTS = "documentExists"
     const val CANCEL_UNLOCK = "cancelUnlock"
+    const val SET_LAST_MODIFIED_TIME = "setLastModifiedTime"
 }
 
 private const val MAX_CHUNK_BYTES = 64 * 1024 * 1024  // 64 MB
@@ -1501,6 +1502,17 @@ class MainActivity : FlutterFragmentActivity() {
                         }
                     }
 
+                    ChannelMethods.SET_LAST_MODIFIED_TIME -> {
+                        val fileName = call.argument<String>("fileName")
+                        val epochSecs = call.argument<Number>("epochSeconds")?.toLong()
+                        if (fileName == null || epochSecs == null) {
+                            result.error("INVALID_ARGS", "fileName and epochSeconds required", null); return@setMethodCallHandler
+                        }
+                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                            VeraCryptEngine.setLastModifiedTime(fileName, epochSecs, volId)
+                        }
+                    }
+
                     ChannelMethods.GET_SPACE_INFO -> {
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
                             VeraCryptEngine.getSpaceInfo(volId)?.toList()
@@ -1726,6 +1738,10 @@ class MainActivity : FlutterFragmentActivity() {
             if (!ok) {
                 throw java.io.IOException("Failed to create directory: $targetFatPath. Storage might be full or write-protected.")
             }
+            val lastModified = srcDoc.lastModified() / 1000L
+            if (lastModified > 0) {
+                VeraCryptBridge.setLastModifiedTime(volId, targetFatPath, lastModified)
+            }
             var count = 0
             for (child in srcDoc.listFiles()) {
                 val childName = child.name ?: continue
@@ -1743,6 +1759,10 @@ class MainActivity : FlutterFragmentActivity() {
             val ok = VeraCryptBridge.writeBackFile(volId, targetFatPath, tempFile.absolutePath)
             if (!ok) {
                 throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
+            }
+            val lastModified = srcDoc.lastModified() / 1000L
+            if (lastModified > 0) {
+                VeraCryptBridge.setLastModifiedTime(volId, targetFatPath, lastModified)
             }
             return 1
         } finally {

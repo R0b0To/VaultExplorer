@@ -924,7 +924,7 @@ class MainActivity : FlutterFragmentActivity() {
                     }
 
                     ChannelMethods.CREATE_CONTAINER -> {
-                        val name = call.argument<String>("displayName") ?: "vault.tc"
+                        val name = call.argument<String>("displayName") ?: "vault.hc"
                         val password = call.argument<String>("password")
                         if (password == null) {
                             result.error("INVALID_ARGS", "password required", null)

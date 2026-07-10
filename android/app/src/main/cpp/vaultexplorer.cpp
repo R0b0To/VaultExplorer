@@ -49,6 +49,8 @@ struct NtfsStream {
     ntfs_attr*  attr = nullptr;
 };
 
+extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
+
 struct ExtStream {
     ext2_file_t file = nullptr;
 };
@@ -472,6 +474,14 @@ static int vExplorer_ntfs_open(struct ntfs_device *dev, int flags) {
     return 0; // Handled programmatically
 }
 
+static int vExplorer_ntfs_volume_id(const struct ntfs_device* dev) {
+    if (dev->d_private) return *static_cast<const int*>(dev->d_private);
+    // mkntfs receives a synthetic "ve<N>" device name and uses these same
+    // operations without a private context.
+    return (dev->d_name && std::strncmp(dev->d_name, "ve", 2) == 0)
+        ? std::atoi(dev->d_name + 2) : -1;
+}
+
 static int vExplorer_ntfs_close(struct ntfs_device *dev) {
     return 0;
 }
@@ -482,7 +492,7 @@ static s64 vExplorer_ntfs_seek(struct ntfs_device *dev, s64 offset, int whence) 
 
 static s64 vExplorer_ntfs_pread(struct ntfs_device *dev, void *b, s64 count, s64 offset) {
     if (count <= 0) return 0;
-    int volId = *static_cast<int*>(dev->d_private);
+    int volId = vExplorer_ntfs_volume_id(dev);
     VolumeState& v = volumes[volId];
 
     unsigned char* outBuf = static_cast<unsigned char*>(b);
@@ -531,7 +541,7 @@ static s64 vExplorer_ntfs_pread(struct ntfs_device *dev, void *b, s64 count, s64
 
 static s64 vExplorer_ntfs_pwrite(struct ntfs_device *dev, const void *b, s64 count, s64 offset) {
     if (count <= 0) return 0;
-    int volId = *static_cast<int*>(dev->d_private);
+    int volId = vExplorer_ntfs_volume_id(dev);
     VolumeState& v = volumes[volId];
 
     const unsigned char* inBuf = static_cast<const unsigned char*>(b);
@@ -598,7 +608,7 @@ static s64 vExplorer_ntfs_pwrite(struct ntfs_device *dev, const void *b, s64 cou
 }
 
 static int vExplorer_ntfs_sync(struct ntfs_device *dev) {
-    int volId = *static_cast<int*>(dev->d_private);
+    int volId = vExplorer_ntfs_volume_id(dev);
     if (volumes[volId].fd >= 0) {
         fsync(volumes[volId].fd);
     }
@@ -606,7 +616,13 @@ static int vExplorer_ntfs_sync(struct ntfs_device *dev) {
 }
 
 static int vExplorer_ntfs_stat(struct ntfs_device *dev, struct stat *buf) {
-    int volId = *static_cast<int*>(dev->d_private);
+    int volId = vExplorer_ntfs_volume_id(dev);
+    if (!dev->d_private) {
+        std::memset(buf, 0, sizeof(*buf));
+        buf->st_size = volumes[volId].dataAreaLengthBytes;
+        buf->st_mode = S_IFBLK | 0660;
+        return 0;
+    }
     if (volumes[volId].fd >= 0) {
         return fstat(volumes[volId].fd, buf);
     }
@@ -617,7 +633,7 @@ static int vExplorer_ntfs_stat(struct ntfs_device *dev, struct stat *buf) {
 }
 
 static int vExplorer_ntfs_ioctl(struct ntfs_device *dev, unsigned long request, void *argp) {
-    int volId = *static_cast<int*>(dev->d_private);
+    int volId = vExplorer_ntfs_volume_id(dev);
     switch (request) {
         case 0x1268: // BLKSSZGET
             *static_cast<int*>(argp) = 512;
@@ -635,7 +651,7 @@ static int vExplorer_ntfs_ioctl(struct ntfs_device *dev, unsigned long request, 
 }
 
 // Compile-time static sequential initialization of virtual device operations
-static ntfs_device_operations vExplorer_ntfs_ops = {
+extern "C" ntfs_device_operations vExplorer_ntfs_ops = {
     vExplorer_ntfs_open,
     vExplorer_ntfs_close,
     vExplorer_ntfs_seek,
@@ -838,6 +854,51 @@ static errcode_t extIoOpenBound(const char* name, int flags, io_channel* out) {
     const errcode_t result = extIoOpen(name, flags, out);
     if (!result) (*out)->manager = &g_extIoManager;
     return result;
+}
+
+static bool formatExtVolume(int volId, const char* variant) {
+    const bool ext3 = strncasecmp(variant, "ext3", 4) == 0;
+    const bool ext4 = strncasecmp(variant, "ext4", 4) == 0;
+    const uint64_t blocks = volumes[volId].dataAreaLengthBytes / 4096;
+    if (blocks < 2048) return false;
+
+    struct ext2_super_block params{};
+    params.s_rev_level = EXT2_DYNAMIC_REV;
+    params.s_inode_size = 256;
+    params.s_first_ino = EXT2_GOOD_OLD_FIRST_INO;
+    params.s_log_block_size = 2; // 4096-byte filesystem blocks
+    params.s_log_cluster_size = 2;
+    params.s_blocks_per_group = 32768;
+    params.s_clusters_per_group = 32768;
+    params.s_inodes_per_group = 2048;
+    params.s_inodes_count = static_cast<__u32>(
+        ((blocks + params.s_blocks_per_group - 1) / params.s_blocks_per_group) * params.s_inodes_per_group);
+    ext2fs_blocks_count_set(&params, blocks);
+    params.s_feature_incompat = EXT2_FEATURE_INCOMPAT_FILETYPE;
+    params.s_feature_ro_compat = EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER;
+    params.s_feature_compat = EXT2_FEATURE_COMPAT_EXT_ATTR | EXT2_FEATURE_COMPAT_DIR_INDEX;
+    if (ext3 || ext4) params.s_feature_compat |= EXT3_FEATURE_COMPAT_HAS_JOURNAL;
+    if (ext4) {
+        params.s_feature_incompat |= EXT3_FEATURE_INCOMPAT_EXTENTS | EXT4_FEATURE_INCOMPAT_64BIT;
+        params.s_feature_ro_compat |= EXT4_FEATURE_RO_COMPAT_METADATA_CSUM;
+        params.s_checksum_type = EXT2_CRC32C_CHKSUM;
+    }
+
+    char deviceName[16];
+    std::snprintf(deviceName, sizeof(deviceName), "%d", volId);
+    ext2_filsys fs = nullptr;
+    if (ext2fs_initialize(deviceName, EXT2_FLAG_64BITS, &params, &g_extIoManager, &fs) != 0) return false;
+    bool ok = ext2fs_allocate_tables(fs) == 0 &&
+              ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, nullptr) == 0 &&
+              ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found") == 0;
+    if (ok && (ext3 || ext4)) {
+        struct ext2fs_journal_params journal{};
+        journal.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, std::max<uint64_t>(1024, blocks / 32)));
+        ok = ext2fs_add_journal_inode3(fs, &journal, 0, 0) == 0;
+    }
+    if (ok) ok = ext2fs_flush(fs) == 0;
+    ext2fs_close(fs);
+    return ok;
 }
 
 static bool ensureMounted(int volId) {
@@ -2287,9 +2348,58 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             v.dataCtxInitialized = true;
             v.fd                 = fd;
             v.dataOffset         = VC_DATA_AREA_OFFSET;
+            v.dataAreaLengthBytes = DATA_SIZE;
             v.fileSize           = VOLUME_SIZE;
 
             const bool useExFat = (strncasecmp(nativeFS, "exfat", 5) == 0);
+            const bool useNtfs = (strncasecmp(nativeFS, "ntfs", 4) == 0);
+            const bool useExt = strncasecmp(nativeFS, "ext2", 4) == 0 ||
+                                strncasecmp(nativeFS, "ext3", 4) == 0 ||
+                                strncasecmp(nativeFS, "ext4", 4) == 0;
+
+            if (useExt) {
+                const bool formatted = formatExtVolume(volId, nativeFS);
+                v.fsMounted = false;
+                v.fsType = VolumeState::FS_UNKNOWN;
+                v.fd = -1;
+                v.dataOffset = 0;
+                v.dataAreaLengthBytes = 0;
+                v.fileSize = 0;
+                v.cascade.initialized = false;
+                v.dataCtxInitialized = false;
+                if (!formatted) {
+                    LOGI("createContainer: %s formatter failed", nativeFS);
+                    break;
+                }
+                success = true;
+                continue;
+            }
+
+            if (useNtfs) {
+                char deviceName[16];
+                std::snprintf(deviceName, sizeof(deviceName), "ve%d", volId);
+                char* args[] = {
+                    const_cast<char*>("mkntfs"), const_cast<char*>("-F"),
+                    const_cast<char*>("-Q"), const_cast<char*>("-s"),
+                    const_cast<char*>("512"), const_cast<char*>("-p"),
+                    const_cast<char*>("0"), deviceName, nullptr
+                };
+                const int result = vaultexplorer_mkntfs_main(8, args);
+                v.fsMounted = false;
+                v.fsType = VolumeState::FS_UNKNOWN;
+                v.fd = -1;
+                v.dataOffset = 0;
+                v.dataAreaLengthBytes = 0;
+                v.fileSize = 0;
+                v.cascade.initialized = false;
+                v.dataCtxInitialized = false;
+                if (result != 0) {
+                    LOGI("createContainer: mkntfs failed, code=%d", result);
+                    break;
+                }
+                success = true;
+                continue;
+            }
 
             MKFS_PARM mp;
             memset(&mp, 0, sizeof(mp));
@@ -2309,6 +2419,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             v.fsMounted          = false;
             v.fd                 = -1;
             v.dataOffset         = 0;
+            v.dataAreaLengthBytes = 0;
             v.fileSize           = 0;
             v.cascade.initialized = false;
             v.dataCtxInitialized = false;

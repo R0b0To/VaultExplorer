@@ -177,6 +177,7 @@ set(CONFIG_H_CONTENT "
 #define HAVE_STDLIB_H 1
 #define HAVE_STDIO_H 1
 #define HAVE_LIMITS_H 1
+#define HAVE_GETOPT_H 1
 #define HAVE_STDARG_H 1
 #define HAVE_WCHAR_H 1
 #define HAVE_WCTYPE_H 1
@@ -184,6 +185,7 @@ set(CONFIG_H_CONTENT "
 #define HAVE_UTIMENSAT 1
 #define HAVE_SYS_SYSMACROS_H 1
 #define HAVE_TIME_H 1
+#define HAVE_CTYPE_H 1
 #define HAVE_FFS 1
 
 // Include system macros so makedev, major, and minor are fully declared
@@ -276,7 +278,19 @@ set(NTFS_3G_SOURCES
     ${NTFS_3G_SRC_DIR}/volume.c
     ${NTFS_3G_SRC_DIR}/unix_io.c
     ${NTFS_3G_SRC_DIR}/xattrs.c         
+    # mkntfs formatter support (GPL-2.0-or-later, compatible with this GPLv3 app)
+    ${ntfs3g_SOURCE_DIR}/ntfsprogs/attrdef.c
+    ${ntfs3g_SOURCE_DIR}/ntfsprogs/boot.c
+    ${ntfs3g_SOURCE_DIR}/ntfsprogs/cluster.c
+    ${ntfs3g_SOURCE_DIR}/ntfsprogs/sd.c
+    ${ntfs3g_SOURCE_DIR}/ntfsprogs/utils.c
 )
+
+# Embed mkntfs with a renamed entry point and route its device I/O through the
+# encrypted virtual device exported by vaultexplorer.cpp.
+set(MKNTFS_EMBEDDED_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/mkntfs_embedded.c)
+file(WRITE ${MKNTFS_EMBEDDED_SOURCE}
+"#include <ntfs-3g/device.h>\nextern struct ntfs_device_operations vExplorer_ntfs_ops;\n#undef ntfs_device_default_io_ops\n#define ntfs_device_default_io_ops vExplorer_ntfs_ops\n#define VERSION \"embedded\"\n#define main vaultexplorer_mkntfs_main\n#include \"${ntfs3g_SOURCE_DIR}/ntfsprogs/mkntfs.c\"\n")
 
 # 4. Build target: FatFs + original code + VeraCrypt crypto primitives + NTFS-3G
 add_library(
@@ -306,6 +320,7 @@ add_library(
         ${VC_ARGON2_DIR}/src/blake2/blake2b.c
         # ── NTFS-3G Sources ──
         ${NTFS_3G_SOURCES}
+        ${MKNTFS_EMBEDDED_SOURCE}
 )
 
 target_compile_definitions(vaultexplorer PRIVATE
@@ -331,6 +346,7 @@ target_include_directories(
         ${fatfs_SOURCE_DIR}/src
         ${ntfs3g_SOURCE_DIR}/include
         ${ntfs3g_SOURCE_DIR}/include/ntfs-3g
+        ${ntfs3g_SOURCE_DIR}/ntfsprogs
         ${CMAKE_CURRENT_BINARY_DIR} # config.h location
         ${VC_CRYPTO_DIR}
         ${VC_SRC_DIR}

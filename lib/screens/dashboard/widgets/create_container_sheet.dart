@@ -14,13 +14,13 @@ class CreateContainerSheet extends StatefulWidget {
 }
 
 class _CreateContainerSheetState extends State<CreateContainerSheet> {
-  final _nameCtrl = TextEditingController(text: 'vault.tc');
+  final _nameCtrl = TextEditingController(text: 'vault.hc');
   final _sizeCtrl = TextEditingController(text: '10');
   final _passwordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
 
   String _sizeUnit = 'MB';
-  String _fileSystem = 'FAT'; // FAT (FAT32) or exFAT
+  String _fileSystem = 'FAT';
   int _cipherId = 0; // AES
   int _hashId = 0; // SHA-512
   bool _obscure = true;
@@ -138,6 +138,10 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
           items: const [
             DropdownMenuItem(value: 'FAT', child: Text('FAT (FAT32)')),
             DropdownMenuItem(value: 'exFAT', child: Text('exFAT')),
+            DropdownMenuItem(value: 'NTFS', child: Text('NTFS')),
+            DropdownMenuItem(value: 'ext2', child: Text('ext2')),
+            DropdownMenuItem(value: 'ext3', child: Text('ext3')),
+            DropdownMenuItem(value: 'ext4', child: Text('ext4')),
           ],
           onChanged: (val) {
             if (val != null) setState(() => _fileSystem = val);

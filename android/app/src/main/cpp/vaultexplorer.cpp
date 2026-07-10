@@ -919,66 +919,117 @@ static errcode_t extIoOpenBound(const char* name, int flags, io_channel* out) {
 static bool formatExtVolume(int volId, const char* variant) {
     const bool ext3 = strncasecmp(variant, "ext3", 4) == 0;
     const bool ext4 = strncasecmp(variant, "ext4", 4) == 0;
-    const uint64_t blocks = volumes[volId].dataAreaLengthBytes / 4096;
-    if (blocks < 2048) return false;
+    const uint64_t totalBlocks = volumes[volId].dataAreaLengthBytes / 4096;
+    if (totalBlocks < 1024) return false;
 
     struct ext2_super_block params{};
+    std::memset(&params, 0, sizeof(params));
+    
     params.s_rev_level = EXT2_DYNAMIC_REV;
     params.s_inode_size = 256;
     params.s_first_ino = EXT2_GOOD_OLD_FIRST_INO;
-    params.s_log_block_size = 2; // 4096-byte filesystem blocks
-    params.s_log_cluster_size = 2;
+    params.s_log_block_size = 2; // 4096 bytes
     params.s_blocks_per_group = 32768;
-    params.s_clusters_per_group = 32768;
-    params.s_inodes_per_group = 2048;
-    params.s_inodes_count = static_cast<__u32>(
-        ((blocks + params.s_blocks_per_group - 1) / params.s_blocks_per_group) * params.s_inodes_per_group);
-    ext2fs_blocks_count_set(&params, blocks);
-    params.s_feature_incompat = EXT2_FEATURE_INCOMPAT_FILETYPE;
-    params.s_feature_ro_compat = EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER;
-    params.s_feature_compat = EXT2_FEATURE_COMPAT_EXT_ATTR | EXT2_FEATURE_COMPAT_DIR_INDEX;
+    params.s_inodes_per_group = 2048; 
+    ext2fs_blocks_count_set(&params, totalBlocks);
+
+    // Feature set equivalent to: mkfs.ext4 -O ^has_journal,extent,filetype,sparse_super
+    params.s_feature_incompat = 0x0002; // FILETYPE
+    params.s_feature_ro_compat = 0x0001; // SPARSE_SUPER
+    params.s_feature_compat = 0x0020;    // DIR_INDEX
     
-    if (ext3 || ext4) params.s_feature_compat |= EXT3_FEATURE_COMPAT_HAS_JOURNAL;
     if (ext4) {
-        params.s_feature_incompat |= EXT3_FEATURE_INCOMPAT_EXTENTS | EXT4_FEATURE_INCOMPAT_64BIT;
-        params.s_feature_ro_compat |= EXT4_FEATURE_RO_COMPAT_METADATA_CSUM;
-        params.s_checksum_type = EXT2_CRC32C_CHKSUM;
-        params.s_desc_size = 64; 
+        params.s_feature_incompat |= 0x0040; // EXTENTS
     }
 
     char deviceName[16];
     std::snprintf(deviceName, sizeof(deviceName), "%d", volId);
     ext2_filsys fs = nullptr;
-    if (ext2fs_initialize(deviceName, EXT2_FLAG_64BITS, &params, &g_extIoManager, &fs) != 0) return false;
+    errcode_t ret;
 
+    // 1. Initialize handle
+    ret = ext2fs_initialize(deviceName, 0, &params, &g_extIoManager, &fs);
+    if (ret) return false;
+
+    fs->flags |= EXT2_FLAG_RW;
+
+    // 2. Setup Superblock metadata
+    fs->super->s_state = 1; // Clean
+    fs->super->s_max_mnt_count = 20;
+    fs->super->s_lastcheck = (uint32_t)time(nullptr);
+    fs->super->s_mtime = (uint32_t)time(nullptr);
+    fs->super->s_wtime = (uint32_t)time(nullptr);
+    
+    // Set UUID
+    unsigned char uuid[16];
     FILE* urnd = fopen("/dev/urandom", "rb");
     if (urnd) {
-        if (fread(fs->super->s_uuid, 1, 16, urnd) == 16) {
-            fs->super->s_uuid[6] = (fs->super->s_uuid[6] & 0x0F) | 0x40; // RFC 4122 Version 4
-            fs->super->s_uuid[8] = (fs->super->s_uuid[8] & 0x3F) | 0x80; // RFC 4122 Variant 1
-        }
+        fread(uuid, 1, 16, urnd);
+        uuid[6] = (uuid[6] & 0x0F) | 0x40; 
+        uuid[8] = (uuid[8] & 0x3F) | 0x80;
+        std::memcpy(fs->super->s_uuid, uuid, 16);
         fclose(urnd);
     }
-
-    if (ext4) {
-        fs->super->s_checksum_type = EXT2_CRC32C_CHKSUM;
-        ext2fs_init_csum_seed(fs);
-    }
-
-    bool ok = ext2fs_allocate_tables(fs) == 0 &&
-              ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, nullptr) == 0 &&
-              ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found") == 0;
-              
-    if (ok && (ext3 || ext4)) {
-        struct ext2fs_journal_params journal{};
-        journal.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, std::max<uint64_t>(1024, blocks / 32)));
-        ok = ext2fs_add_journal_inode3(fs, &journal, 0, 0) == 0;
-    }
     
-    if (ok) ok = ext2fs_flush(fs) == 0;
+    // Set last mounted path (helps Linux identify the drive)
+    std::strncpy(reinterpret_cast<char*>(fs->super->s_last_mounted), "/", sizeof(fs->super->s_last_mounted));
+
+    // 3. Set Reserved Blocks to 0
+    fs->super->s_r_blocks_count = 0;
+
+    // 4. Allocate tables and write bitmaps
+    ret = ext2fs_allocate_tables(fs);
+    if (ret) { ext2fs_close(fs); return false; }
+    
+    ext2fs_write_inode_bitmap(fs);
+    ext2fs_write_block_bitmap(fs);
+
+    // 5. Initialize Root directory Inode (2)
+    ret = ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, 0);
+
+    // 6. Set ROOT Permissions and Ownership
+    struct ext2_inode root_inode{};
+    if (ext2fs_read_inode(fs, EXT2_ROOT_INO, &root_inode) == 0) {
+        root_inode.i_mode = LINUX_S_IFDIR | 0777; // Everyone can write
+        root_inode.i_uid = 0;
+        root_inode.i_gid = 0;
+        root_inode.i_links_count = 2; 
+        root_inode.i_atime = root_inode.i_mtime = root_inode.i_ctime = (uint32_t)time(nullptr);
+        ext2fs_write_inode(fs, EXT2_ROOT_INO, &root_inode);
+    }
+
+    // 7. Create lost+found
+    ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found");
+
+    // 8. Add Journal
+    if ((ext3 || ext4) && totalBlocks > 2048) {
+        struct ext2fs_journal_params jparams{};
+        jparams.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, totalBlocks / 32));
+        if (jparams.num_journal_blocks < 1024) jparams.num_journal_blocks = 1024;
+        
+        ext2fs_add_journal_inode3(fs, &jparams, 0, 0);
+    }
+
+    // 8a. Reserve the remaining metadata inodes (bad-blocks, quota, boot
+    // loader, undelete dir, resize inode, exclude, replica -- i.e. every
+    // inode number below s_first_ino that isn't already spoken for by root
+    // or the journal). Real mke2fs does this via its reserve_inodes() step;
+    // skipping it leaves these bits marked "free" in the on-disk inode
+    // bitmap, and the Linux kernel refuses the first ext4_new_inode() that
+    // lands on one of them ("reserved inode found cleared - inode=N"),
+    // which is exactly the corruption you're seeing on write.
+    for (ext2_ino_t resIno = EXT2_BAD_INO; resIno < fs->super->s_first_ino; ++resIno) {
+        if (!ext2fs_test_inode_bitmap2(fs->inode_map, resIno)) {
+            ext2fs_inode_alloc_stats2(fs, resIno, +1, 0);
+        }
+    }
+    ext2fs_mark_ib_dirty(fs);
+
+    // 9. Flush and Close
+    ext2fs_mark_super_dirty(fs);
+    ext2fs_flush(fs);
     ext2fs_close(fs);
-    
-    return ok;
+    return true; 
 }
 
 static bool ensureMounted(int volId) {
@@ -2317,8 +2368,35 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             break;
         }
 
-        const uint64_t VOLUME_SIZE = static_cast<uint64_t>(sizeBytes);
-        const uint64_t DATA_SIZE   = VOLUME_SIZE - (2 * VC_DATA_AREA_OFFSET);
+
+        // Align to 4096 bytes
+        const uint64_t VOLUME_SIZE = (static_cast<uint64_t>(sizeBytes) / 4096) * 4096;
+
+        // Truncate file to exact aligned size
+        if (static_cast<uint64_t>(sizeBytes) != VOLUME_SIZE) {
+            if (ftruncate(fd, VOLUME_SIZE) != 0) {
+                LOGI("DEBUG-Ext: ftruncate failed! errno=%d (%s)", errno, strerror(errno));
+            } else {
+                LOGI("DEBUG-Ext: Successfully truncated file to %llu", (unsigned long long)VOLUME_SIZE);
+            }
+        }
+
+        // Verify physical file size matches using fstat
+        struct stat st;
+        if (fstat(fd, &st) == 0) {
+            LOGI("DEBUG-Ext: Physical file size on disk: %lld", (long long)st.st_size);
+            if (static_cast<uint64_t>(st.st_size) != VOLUME_SIZE) {
+                LOGI("DEBUG-Ext: WARNING: Physical size does NOT match VOLUME_SIZE! Android SAF issue?");
+            }
+        } else {
+            LOGI("DEBUG-Ext: fstat failed!");
+        }
+
+        const uint64_t DATA_SIZE = VOLUME_SIZE - (2 * VC_DATA_AREA_OFFSET);
+        
+        if (DATA_SIZE % 4096 != 0 || DATA_SIZE % 512 != 0) {
+            LOGI("DEBUG-Ext: WARNING: DATA_SIZE is NOT aligned correctly!");
+        }
 
         unsigned char body[VC_HEADER_BODY_SIZE];
         memset(body, 0, sizeof(body));
@@ -2327,10 +2405,15 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         body[4] = 0x00; body[5] = 0x02;
         body[6] = 0x01; body[7] = 0x0b;
 
+        // Note: For standard (non-hidden) volumes, the official VeraCrypt spec 
+        // dictates that VC_HDR_OFF_VOLUME_SIZE holds the size of the decrypted 
+        // payload area (DATA_SIZE), NOT the total physical container file size.
         for (int i = 7; i >= 0; --i)
-            body[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (VOLUME_SIZE >> (i * 8)) & 0xFF;
+            body[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
+            
         for (int i = 7; i >= 0; --i)
             body[VC_HDR_OFF_KEY_SCOPE_START + (7 - i)] = (VC_DATA_AREA_OFFSET >> (i * 8)) & 0xFF;
+            
         for (int i = 7; i >= 0; --i)
             body[VC_HDR_OFF_KEY_SCOPE_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
 
@@ -2393,6 +2476,23 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
                    static_cast<off_t>(VOLUME_SIZE - VC_DATA_AREA_OFFSET)) != VC_FULL_HEADER_SIZE) {
             LOGI("createContainer: backup header write failed"); break;
         }
+        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE,
+                   static_cast<off_t>(VOLUME_SIZE - VC_DATA_AREA_OFFSET)) != VC_FULL_HEADER_SIZE) {
+            LOGI("createContainer: backup header write failed"); break;
+        }
+
+        // --- NEW FIX START ---
+        // Android SAF ignores ftruncate(). Because the backup header is only 512 bytes, 
+        // there is a 130,560 byte gap at the end of the file that never gets written to.
+        // We MUST force the OS to expand the file to the exact requested VOLUME_SIZE 
+        // by writing a single byte at the very end of the file (VOLUME_SIZE - 1).
+        unsigned char eofByte = 0;
+        if (pwrite(fd, &eofByte, 1, static_cast<off_t>(VOLUME_SIZE - 1)) != 1) {
+            LOGI("createContainer: failed to expand file to full VOLUME_SIZE");
+        } else {
+            LOGI("DEBUG-Ext: Successfully forced physical file size to %llu", (unsigned long long)VOLUME_SIZE);
+        }
+        // --- NEW FIX END ---
 
         {
             CascadeContext dataCtx;
@@ -2448,17 +2548,23 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
             const bool useExt = strncasecmp(nativeFS, "ext2", 4) == 0 ||
                                 strncasecmp(nativeFS, "ext3", 4) == 0 ||
                                 strncasecmp(nativeFS, "ext4", 4) == 0;
-
             if (useExt) {
+                // Prepare encryption context state
+                v.partitionStartSector = 0;
+                v.dataOffset = VC_DATA_AREA_OFFSET;
+                v.dataAreaLengthBytes = DATA_SIZE;
+                v.isUsbSource = false;
+                
+                // The keys were already set via cascadeSetKeys(v.cascade...) 
+                // in the previous block.
+                
                 const bool formatted = formatExtVolume(volId, nativeFS);
+                
+                // Post-format cleanup
                 v.fsMounted = false;
-                v.fsType = VolumeState::FS_UNKNOWN;
                 v.fd = -1;
-                v.dataOffset = 0;
-                v.dataAreaLengthBytes = 0;
-                v.fileSize = 0;
-                v.cascade.initialized = false;
                 v.dataCtxInitialized = false;
+
                 if (!formatted) {
                     LOGI("createContainer: %s formatter failed", nativeFS);
                     break;
@@ -2533,6 +2639,10 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 
     env->ReleaseStringUTFChars(password, nativePass);
     env->ReleaseStringUTFChars(fileSystem, nativeFS);
+    if (success) {
+        fsync(fd); // Final physical sync
+        LOGI("createContainer: SUCCESS.");
+    }
     close(fd);
 
     return success ? JNI_TRUE : JNI_FALSE;

@@ -153,6 +153,17 @@ foreach(E2FS_TARGET e2fs_com_err e2fs_uuid e2fs_ext2fs)
 endforeach()
 target_link_libraries(e2fs_ext2fs PRIVATE e2fs_com_err e2fs_uuid)
 
+# 3e. cJSON (lightweight JSON parser for LUKS2 metadata)
+FetchContent_Declare(
+        cjson
+        GIT_REPOSITORY https://github.com/DaveGamble/cJSON.git
+        GIT_TAG        v1.7.18
+)
+set(ENABLE_CJSON_TEST OFF CACHE BOOL "Disable cJSON tests")
+set(BUILD_SHARED_AND_STATIC_LIBS OFF CACHE BOOL "Build only static cJSON")
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Disable shared cJSON")
+FetchContent_MakeAvailable(cjson)
+
 # 3b. Generate a robust config.h to compile ntfs-3g natively on Android NDK
 set(CONFIG_H_CONTENT "
 #ifndef CONFIG_H
@@ -300,6 +311,7 @@ add_library(
         crypto/cipher_shim.cpp     # adapter
         crypto/cascade.cpp         # cipher-agnostic XTS + cascade chaining
         crypto/kdf_table.cpp       # per-hash iteration-count table + hash dispatch
+        crypto/luks_header.cpp     # LUKS header parsing & key recovery
         ${fatfs_SOURCE_DIR}/src/ff.c
         ${fatfs_SOURCE_DIR}/src/ffunicode.c
         # ── VeraCrypt primitives (pinned FetchContent source) ──
@@ -355,6 +367,7 @@ target_include_directories(
         ${E2FS_GENERATED_DIR}
         ${E2FS_SRC_DIR}/lib
         ${E2FS_EXT2FS_DIR}
+        ${cjson_SOURCE_DIR}
 )
 
 find_library(log-lib log)
@@ -365,7 +378,8 @@ target_link_libraries(
         mbedcrypto
         e2fs_ext2fs
         e2fs_com_err
-        e2fs_uuid)
+        e2fs_uuid
+        cjson)
 
 if(NOT ANDROID)
     add_executable(sector_batching_test test/sector_batching_test.cpp)

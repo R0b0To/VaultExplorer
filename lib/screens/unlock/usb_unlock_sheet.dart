@@ -50,6 +50,12 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
 
+  String _containerFormat = 'veracrypt';
+
+  /// True when the existing record indicates a LUKS container — hides PIM,
+  /// keyfiles, and cipher/hash pickers which don't apply to LUKS.
+  bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
+
   // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
   UnlockProgress? _progress;
@@ -76,10 +82,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       widget.prefillPassword?.isNotEmpty == true &&
       _passwordCtrl.text == widget.prefillPassword;
 
-  /// See UnlockSheet._unlockProgressLabel — identical logic, USB wording.
   String get _unlockProgressLabel {
     final p = _progress;
     if (p == null || p.total <= 0) return 'Decrypting drive...';
+    if (_isLuks) {
+      return p.total > 1
+          ? 'Trying keyslot ${p.attempted} of ${p.total}…'
+          : 'Trying keyslot…';
+    }
     final hashName = hashAlgorithmName(p.hashId);
     return p.total > 1
         ? 'Trying $hashName (${p.attempted} of ${p.total})…'
@@ -95,6 +105,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
     if (widget.existingRecord != null) {
       _cipherId = widget.existingRecord!.cipherId;
       _hashId = widget.existingRecord!.hashId;
+      _containerFormat = widget.existingRecord!.containerFormat;
     }
     _loadDevicesFuture = _loadDevices();
     _initUnlockMethod();
@@ -104,7 +115,12 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
     };
     _onUnlockProgress = (progress) {
       if (mounted && progress.volId == _activeVolId) {
-        setState(() => _progress = progress);
+        setState(() {
+          _progress = progress;
+          if (progress.containerFormat != 'veracrypt') {
+            _containerFormat = progress.containerFormat;
+          }
+        });
       }
     };
     VaultExplorerApi.addUnlockStartedListener(_onUnlockStarted);
@@ -427,6 +443,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
           pendingPatternHash: savedPatternHash,
           cipherId: result.matchedCipherId,
           hashId: result.matchedHashId,
+          containerFormat: result.containerFormat,
         );
         await ContainerRepository.instance.save(migrated);
 
@@ -434,11 +451,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       } else if (existing != null) {
         var effectiveExisting = existing;
         if (existing.cipherId != result.matchedCipherId ||
-            existing.hashId != result.matchedHashId) {
+            existing.hashId != result.matchedHashId ||
+            existing.containerFormat != result.containerFormat) {
           effectiveExisting = existing.copyWith(
             cacheDerivedKey: shouldCacheDerivedKey,
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
+            containerFormat: result.containerFormat,
           );
           await ContainerRepository.instance.save(effectiveExisting);
         }
@@ -453,6 +472,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
             cacheDerivedKey: shouldCacheDerivedKey,
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
+            containerFormat: result.containerFormat,
           );
           await ContainerRepository.instance.save(savedRecord);
         }
@@ -939,25 +959,29 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Keyfiles Card Component
-                    KeyfilesPicker(
-                      keyfiles: _keyfiles,
-                      picking: _pickingKeyfiles,
-                      onPick: _pickKeyfiles,
-                      onRemove: _removeKeyfile,
-                      enabled: !busy,
-                    ),
-                    const SizedBox(height: 16),
+                    // Keyfiles Card Component (not applicable for LUKS)
+                    if (!_isLuks) ...[
+                      KeyfilesPicker(
+                        keyfiles: _keyfiles,
+                        picking: _pickingKeyfiles,
+                        onPick: _pickKeyfiles,
+                        onRemove: _removeKeyfile,
+                        enabled: !busy,
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Collapsible Advanced settings panel
-                    AdvancedParamsPanel(
-                      pimController: _pimCtrl,
-                      cipherId: _cipherId,
-                      hashId: _hashId,
-                      enabled: !busy,
-                      onCipherChanged: (val) => setState(() => _cipherId = val),
-                      onHashChanged: (val) => setState(() => _hashId = val),
-                    ),
+                    //    LUKS doesn't use PIM or VeraCrypt cipher/hash selection.
+                    if (!_isLuks)
+                      AdvancedParamsPanel(
+                        pimController: _pimCtrl,
+                        cipherId: _cipherId,
+                        hashId: _hashId,
+                        enabled: !busy,
+                        onCipherChanged: (val) => setState(() => _cipherId = val),
+                        onHashChanged: (val) => setState(() => _hashId = val),
+                      ),
                     const SizedBox(height: 16),
 
                     // Remember Drive Toggle

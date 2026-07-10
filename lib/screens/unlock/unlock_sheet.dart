@@ -42,8 +42,14 @@ class _UnlockSheetState extends State<UnlockSheet> {
   String? _error;
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
+  String _containerFormat = 'veracrypt';
   final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
+
+  /// True when the saved record (or post-unlock result) indicates a LUKS
+  /// container — hides PIM, keyfiles, and cipher/hash pickers which don't
+  /// apply to LUKS.
+  bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
 
   // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
@@ -80,7 +86,12 @@ class _UnlockSheetState extends State<UnlockSheet> {
     };
     _onUnlockProgress = (progress) {
       if (mounted && progress.volId == _activeVolId) {
-        setState(() => _progress = progress);
+        setState(() {
+          _progress = progress;
+          if (progress.containerFormat != 'veracrypt') {
+            _containerFormat = progress.containerFormat;
+          }
+        });
       }
     };
     VaultExplorerApi.addUnlockStartedListener(_onUnlockStarted);
@@ -138,6 +149,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
       _unlockMethod = record.unlockMethod;
       _cipherId = record.cipherId;
       _hashId = record.hashId;
+      _containerFormat = record.containerFormat;
 
       if (_unlockMethod == ContainerUnlockMethod.pattern) {
         _storedPatternHash = await ContainerRepository.instance.getPatternHash(
@@ -193,6 +205,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
         pendingPatternHash: savedPatternHash,
         cipherId: existing.cipherId,
         hashId: existing.hashId,
+        containerFormat: existing.containerFormat,
       );
       await ContainerRepository.instance.save(migrated);
       if (!mounted) return;
@@ -203,6 +216,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
         _unlockMethod = migrated.unlockMethod;
         _cipherId = migrated.cipherId;
         _hashId = migrated.hashId;
+        _containerFormat = migrated.containerFormat;
         _storedPatternHash = savedPatternHash;
         _containerMissing = false;
         _loadingAuth = false;
@@ -435,6 +449,7 @@ Future<void> _pickFile() async {
             cacheDerivedKey: shouldCacheDerivedKey,
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
+            containerFormat: result.containerFormat,
           );
           await ContainerRepository.instance.save(newRecord);
           savedRecord = newRecord;
@@ -443,11 +458,13 @@ Future<void> _pickFile() async {
           final existing = records[widget.initialUri];
           if (existing != null &&
               (existing.cipherId != result.matchedCipherId ||
-                  existing.hashId != result.matchedHashId)) {
+                  existing.hashId != result.matchedHashId ||
+                  existing.containerFormat != result.containerFormat)) {
             final updated = existing.copyWith(
               cacheDerivedKey: shouldCacheDerivedKey,
               cipherId: result.matchedCipherId,
               hashId: result.matchedHashId,
+              containerFormat: result.containerFormat,
             );
             await ContainerRepository.instance.save(updated);
             savedRecord = updated;
@@ -540,6 +557,11 @@ Future<void> _pickFile() async {
   String get _unlockProgressLabel {
     final p = _progress;
     if (p == null || p.total <= 0) return 'Decrypting...';
+    if (_isLuks) {
+      return p.total > 1
+          ? 'Trying keyslot ${p.attempted} of ${p.total}…'
+          : 'Trying keyslot…';
+    }
     final hashName = hashAlgorithmName(p.hashId);
     return p.total > 1
         ? 'Trying $hashName (${p.attempted} of ${p.total})…'
@@ -618,8 +640,10 @@ Future<void> _pickFile() async {
                             children: [
                               Text(
                                 _selectedUri != null
-                                    ? 'Selected Container'
-                                    : 'VeraCrypt Container',
+                                    ? (_isLuks
+                                        ? 'LUKS Container'
+                                        : 'Selected Container')
+                                    : 'Encrypted Container',
                                 style: textTheme.labelLarge?.copyWith(
                                   color: _selectedUri != null
                                       ? cs.primary
@@ -950,24 +974,28 @@ Future<void> _pickFile() async {
                       ),
                       const SizedBox(height: 16),
 
-                      // 2. Keyfiles Selection Box
-                      KeyfilesPicker(
-                        keyfiles: _keyfiles,
-                        picking: _pickingKeyfiles,
-                        onPick: _pickKeyfiles,
-                        onRemove: _removeKeyfile,
-                      ),
-                      const SizedBox(height: 16),
+                      // 2. Keyfiles Selection Box (not applicable for LUKS)
+                      if (!_isLuks) ...[
+                        KeyfilesPicker(
+                          keyfiles: _keyfiles,
+                          picking: _pickingKeyfiles,
+                          onPick: _pickKeyfiles,
+                          onRemove: _removeKeyfile,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
 
                       // 3. Collapsible Advanced parameters (PIM, Cipher, Hash)
-                      AdvancedParamsPanel(
-                        pimController: _pimCtrl,
-                        cipherId: _cipherId,
-                        hashId: _hashId,
-                        enabled: !_loading,
-                        onCipherChanged: (val) => setState(() => _cipherId = val),
-                        onHashChanged: (val) => setState(() => _hashId = val),
-                      ),
+                      //    LUKS doesn't use PIM or VeraCrypt cipher/hash selection.
+                      if (!_isLuks)
+                        AdvancedParamsPanel(
+                          pimController: _pimCtrl,
+                          cipherId: _cipherId,
+                          hashId: _hashId,
+                          enabled: !_loading,
+                          onCipherChanged: (val) => setState(() => _cipherId = val),
+                          onHashChanged: (val) => setState(() => _hashId = val),
+                        ),
                       const SizedBox(height: 16),
 
                       // 4. Remember container Toggle

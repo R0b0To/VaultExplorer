@@ -212,6 +212,7 @@ class ContainerRecord {
   // down to exactly one KDF run on every subsequent unlock.
   final int cipherId;
   final int hashId;
+  final String containerFormat;
 
   const ContainerRecord({
     required this.uri,
@@ -227,6 +228,7 @@ class ContainerRecord {
     this.pendingPatternHash,
     this.cipherId = 255,
     this.hashId = 255,
+    this.containerFormat = 'veracrypt',
   });
 
   /// True for containers mounted from a USB mass-storage device (uri format
@@ -257,6 +259,7 @@ class ContainerRecord {
     String? pendingPatternHash,
     int? cipherId,
     int? hashId,
+    String? containerFormat,
   }) {
     return ContainerRecord(
       uri: uri,
@@ -276,6 +279,7 @@ class ContainerRecord {
       pendingPatternHash: pendingPatternHash,
       cipherId: cipherId ?? this.cipherId,
       hashId: hashId ?? this.hashId,
+      containerFormat: containerFormat ?? this.containerFormat,
     );
   }
 
@@ -293,6 +297,7 @@ class ContainerRecord {
     'cacheDerivedKey': cacheDerivedKey,
     'cipherId': cipherId,
     'hashId': hashId,
+    'containerFormat': containerFormat,
   };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
@@ -314,6 +319,7 @@ class ContainerRecord {
       cacheDerivedKey: j['cacheDerivedKey'] as bool? ?? false,
       cipherId: j['cipherId'] as int? ?? 255,
       hashId: j['hashId'] as int? ?? 255,
+      containerFormat: j['containerFormat'] as String? ?? 'veracrypt',
     );
   }
 }

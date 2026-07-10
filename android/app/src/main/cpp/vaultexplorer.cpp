@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <cstdio>
 #include <string>
 #include <fstream>
 #include <vector>
@@ -25,6 +26,7 @@
 #include "crypto/cascade.h"
 #include "crypto/vc_header_layout.h"
 #include "crypto/keyfile_mixing.h"
+#include "crypto/luks_header.h"
 #include <thread>
 
 #include <fcntl.h>
@@ -141,6 +143,19 @@ struct VolumeState {
     unsigned char* preservedDerivedKey = nullptr;
     size_t        preservedDerivedKeyLen = 0;
 
+    // ── Container format ──
+    enum ContainerFormat { FMT_VERACRYPT, FMT_LUKS1, FMT_LUKS2 } containerFormat = FMT_VERACRYPT;
+
+    // ── LUKS AES-XTS context (used instead of cascade for LUKS volumes) ──
+    XtsContextPair luksXts;
+    // LUKS2 segment "sector_size" (bytes). This is the AES-XTS data-unit
+    // width: every luksSectorSize-byte block shares exactly one XTS tweak.
+    // LUKS1 and most LUKS2 containers use 512, but LUKS2 allows larger
+    // values (commonly 4096) — disk_read/disk_write must decrypt/encrypt
+    // in units of this size, not a hardcoded 512, or the tweak sequence
+    // (and thus every byte after the first 16) comes out wrong.
+    uint32_t luksSectorSize = 512;
+
     CascadeContext cascade;
     FATFS fatfs{};
 
@@ -185,6 +200,15 @@ struct VolumeState {
         fsType = FS_UNKNOWN;
         ntfsVol = nullptr;
         extFs = nullptr;
+        containerFormat = FMT_VERACRYPT;
+        luksSectorSize = 512;
+        if (luksXts.initialized) {
+            mbedtls_aes_xts_free(&luksXts.dec);
+            mbedtls_aes_xts_free(&luksXts.enc);
+            mbedtls_aes_xts_init(&luksXts.dec);
+            mbedtls_aes_xts_init(&luksXts.enc);
+            luksXts.initialized = false;
+        }
         if (preservedDerivedKey != nullptr) {
             mbedtls_platform_zeroize(preservedDerivedKey, preservedDerivedKeyLen);
             delete[] preservedDerivedKey;
@@ -261,14 +285,14 @@ struct ScopedJniEnv {
 };
 
 
-static void reportUnlockProgress(int volId, int attempted, int total, int hashId, int cipherId) {
+static void reportUnlockProgress(int volId, int attempted, int total, int hashId, int cipherId, int format = 0) {
     if (volId < 0) return;
     ScopedJniEnv scope;
     if (!scope.env) return;
     scope.env->CallStaticVoidMethod(
         g_progressBridgeClass, g_progressReportMethod,
         static_cast<jint>(volId), static_cast<jint>(attempted), static_cast<jint>(total),
-        static_cast<jint>(hashId), static_cast<jint>(cipherId));
+        static_cast<jint>(hashId), static_cast<jint>(cipherId), static_cast<jint>(format));
     if (scope.env->ExceptionCheck()) scope.env->ExceptionClear();
 }
 
@@ -780,7 +804,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     env->DeleteLocalRef(progressLocal);
 
     g_progressReportMethod = env->GetStaticMethodID(
-        g_progressBridgeClass, "reportProgress", "(IIIII)V");
+        g_progressBridgeClass, "reportProgress", "(IIIIII)V");
     if (!g_progressReportMethod) {
         LOGI("JNI_OnLoad: UnlockProgressBridge.reportProgress not found");
         return JNI_ERR;
@@ -1057,7 +1081,65 @@ if (openErr == 0) {
     const errcode_t bmErr = ext2fs_read_bitmaps(v.extFs);
     if (bmErr == 0) {
         v.fsMounted = true;
-        LOGI("ensureMounted: detected ext filesystem on volume %d", volId);
+        struct ext2_super_block* sb = v.extFs->super;
+        // libext2fs (unlike a kernel mount) never replays the ext3/4 journal on
+        // open, so if the container was closed with a dirty journal, entries
+        // that were only checkpointed to the journal — not yet to the main
+        // block/inode trees — will be invisible here even though the mount
+        // itself "succeeds". Surface that state explicitly instead of staying
+        // silent, since an empty-looking volume with needsRecovery=1 points
+        // straight at the cause.
+        const bool needsRecovery = EXT2_HAS_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
+        const bool hasJournal = EXT2_HAS_COMPAT_FEATURE(sb, EXT3_FEATURE_COMPAT_HAS_JOURNAL);
+        LOGI("ensureMounted: detected ext filesystem on volume %d (blockSize=%d, blocksCount=%llu, "
+             "freeBlocks=%llu, inodesCount=%u, freeInodes=%u, hasJournal=%d, needsRecovery=%d, state=%u)",
+             volId, EXT2_BLOCK_SIZE(sb),
+             (unsigned long long)ext2fs_blocks_count(sb),
+             (unsigned long long)ext2fs_free_blocks_count(sb),
+             sb->s_inodes_count, sb->s_free_inodes_count,
+             hasJournal ? 1 : 0, needsRecovery ? 1 : 0, sb->s_state);
+        if (needsRecovery) {
+            LOGI("ensureMounted: WARNING volume %d has an unreplayed journal (needsRecovery=1) - "
+                 "any writes still sitting in the journal at close time will not appear in the "
+                 "listing until the journal is replayed", volId);
+        }
+
+        // ── Temporary forensic dump: is the group descriptor table (the
+        // block right after the superblock) actually decrypting correctly?
+        // ext2fs_read_bitmaps() never validates bg_*_loc against the block
+        // count, so it "succeeding" only proves the physical read worked,
+        // not that block 1's plaintext is sane. Dump both the raw decrypted
+        // bytes and what e2fsprogs parsed out of them.
+        {
+            const uint32_t blockSize = EXT2_BLOCK_SIZE(sb);
+            const uint64_t gdtByteOffset = blockSize; // block 1, whatever blockSize is
+            const uint64_t gdtSector = gdtByteOffset / 512;
+            const uint32_t gdtSectorCount = blockSize / 512;
+            std::vector<unsigned char> gdtBuf(blockSize);
+            DRESULT gdtDr = disk_read(static_cast<BYTE>(volId), gdtBuf.data(),
+                                       static_cast<LBA_t>(gdtSector), gdtSectorCount);
+            if (gdtDr == RES_OK) {
+                char hex[16 * 3 + 1] = {0};
+                for (int i = 0; i < 16; i++) snprintf(hex + i * 3, 4, "%02x ", gdtBuf[i]);
+                LOGI("ensureMounted: block1 (GDT) first 16 bytes raw: %s", hex);
+            } else {
+                LOGI("ensureMounted: block1 (GDT) disk_read failed dr=%d", gdtDr);
+            }
+            const dgrp_t groupCount = v.extFs->group_desc_count;
+            LOGI("ensureMounted: groupDescCount=%u descSize=%u blocksCount=%llu",
+                 groupCount, v.extFs->super->s_desc_size,
+                 (unsigned long long)ext2fs_blocks_count(sb));
+            for (dgrp_t g = 0; g < groupCount && g < 4; g++) {
+                LOGI("ensureMounted: group %u -> blockBitmapLoc=%llu inodeBitmapLoc=%llu "
+                     "inodeTableLoc=%llu freeBlocks=%u freeInodes=%u",
+                     g,
+                     (unsigned long long)ext2fs_block_bitmap_loc(v.extFs, g),
+                     (unsigned long long)ext2fs_inode_bitmap_loc(v.extFs, g),
+                     (unsigned long long)ext2fs_inode_table_loc(v.extFs, g),
+                     ext2fs_bg_free_blocks_count(v.extFs, g),
+                     ext2fs_bg_free_inodes_count(v.extFs, g));
+            }
+        }
         return true;
     }
     LOGI("ensureMounted: ext2fs_read_bitmaps failed on volume %d: %s (err=%lu)",
@@ -1270,13 +1352,34 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     static constexpr uint32_t MAX_SECTORS_PER_BATCH = 8192; // 4 MB/batch
     alignas(16) unsigned char stackBuf[65536];
 
+    // LUKS AES-XTS "sector_size" (default 512) is the data-unit width: every
+    // luksSectorSize-byte block shares exactly one XTS tweak. sectorsPerUnit
+    // expresses that width in 512-byte FatFs/ext2/ntfs sectors. When it's >1
+    // we must always decrypt whole aligned units, even if the caller only
+    // asked for a sub-range of one — XTS can't be decrypted starting mid-unit.
+    const bool isLuks = (v.containerFormat != VolumeState::FMT_VERACRYPT);
+    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+    const uint32_t sectorsPerUnit = luksUnit / 512;
 
     const auto batches = planSectorBatches(static_cast<uint32_t>(count), MAX_SECTORS_PER_BATCH);
 
     for (const auto& batch : batches) {
         const uint64_t firstPhysical = basePhysical + sector + batch.startSector;
-        const size_t   totalBytes    = static_cast<size_t>(batch.count) * 512;
         BYTE* curBuf = buff + batch.startSector * 512;
+
+        // Expand the requested sector range out to full sectorsPerUnit-aligned
+        // units, relative to the same base the tweak counter uses
+        // (partitionStartSector). For VeraCrypt / LUKS1 / default-sector-size
+        // LUKS2, sectorsPerUnit==1 so this is a no-op.
+        const uint64_t relStart = firstPhysical - v.partitionStartSector;
+        const uint64_t relEnd   = relStart + batch.count;
+        const uint64_t alignedRelStart = (relStart / sectorsPerUnit) * sectorsPerUnit;
+        const uint64_t alignedRelEnd   = ((relEnd + sectorsPerUnit - 1) / sectorsPerUnit) * sectorsPerUnit;
+        const uint64_t alignedFirstPhysical = alignedRelStart + v.partitionStartSector;
+        const uint64_t alignedCount    = alignedRelEnd - alignedRelStart;
+        const size_t   totalBytes      = static_cast<size_t>(alignedCount) * 512;
+        const size_t   copyOffset      = static_cast<size_t>(relStart - alignedRelStart) * 512;
+        const size_t   copyBytes       = static_cast<size_t>(batch.count) * 512;
 
         unsigned char* encBuf;
         bool usedPersistent = (totalBytes > sizeof(stackBuf));
@@ -1289,12 +1392,34 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             encBuf = stackBuf;
         }
 
-        if (!physRead(pdrv, firstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
+        if (!physRead(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
-        for (UINT i = 0; i < batch.count; i++) {
-            const uint64_t physSector = firstPhysical + i;
-            const uint64_t tweak = physSector - v.partitionStartSector;
-            cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512), curBuf + (i*512));
+        if (v.containerFormat == VolumeState::FMT_VERACRYPT) {
+            for (UINT i = 0; i < batch.count; i++) {
+                const uint64_t physSector = firstPhysical + i;
+                const uint64_t tweak = physSector - v.partitionStartSector;
+                cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512), curBuf + (i*512));
+            }
+        } else if (sectorsPerUnit <= 1) {
+            for (UINT i = 0; i < batch.count; i++) {
+                const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
+                unsigned char tweakBuf[16] = {0};
+                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
+                mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, 512, tweakBuf,
+                                       encBuf + (i * 512), curBuf + (i * 512));
+            }
+        } else {
+            // Decrypt every full aligned unit, then copy out only the sectors
+            // that were actually requested.
+            std::vector<unsigned char> decBuf(totalBytes);
+            for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
+                const uint64_t sectorTweak = alignedRelStart + u;
+unsigned char tweakBuf[16] = {0};
+for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
+                mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
+                                       encBuf + (u * 512), decBuf.data() + (u * 512));
+            }
+            std::memcpy(curBuf, decBuf.data() + copyOffset, copyBytes);
         }
     }
     return RES_OK;
@@ -1313,12 +1438,29 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     static constexpr uint32_t MAX_SECTORS_PER_BATCH = 8192;
     alignas(16) unsigned char stackBuf[65536];
 
+    // See disk_read for why sectorsPerUnit matters. On the write side, a
+    // sub-unit write (batch doesn't cover a whole aligned unit) requires a
+    // read-modify-write: pull the existing ciphertext, decrypt the untouched
+    // parts of each partially-covered unit, splice in the new plaintext,
+    // then re-encrypt whole units before writing back.
+    const bool isLuks = (v.containerFormat != VolumeState::FMT_VERACRYPT);
+    const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
+    const uint32_t sectorsPerUnit = luksUnit / 512;
+
     const auto batches = planSectorBatches(static_cast<uint32_t>(count), MAX_SECTORS_PER_BATCH);
 
     for (const auto& batch : batches) {
         const uint64_t firstPhysical = basePhysical + sector + batch.startSector;
-        const size_t   totalBytes    = static_cast<size_t>(batch.count) * 512;
         const BYTE* curBuf = buff + batch.startSector * 512;
+
+        const uint64_t relStart = firstPhysical - v.partitionStartSector;
+        const uint64_t relEnd   = relStart + batch.count;
+        const uint64_t alignedRelStart = (relStart / sectorsPerUnit) * sectorsPerUnit;
+        const uint64_t alignedRelEnd   = ((relEnd + sectorsPerUnit - 1) / sectorsPerUnit) * sectorsPerUnit;
+        const uint64_t alignedFirstPhysical = alignedRelStart + v.partitionStartSector;
+        const uint64_t alignedCount    = alignedRelEnd - alignedRelStart;
+        const size_t   totalBytes      = static_cast<size_t>(alignedCount) * 512;
+        const bool     needsSplice     = (alignedCount != batch.count);
 
         unsigned char* encBuf;
 
@@ -1331,13 +1473,47 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             encBuf = stackBuf;
         }
 
-        for (UINT i = 0; i < batch.count; i++) {
-            const uint64_t physSector = firstPhysical + i;
-            const uint64_t tweak = physSector - v.partitionStartSector;
-            cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + (i * 512));
+        if (v.containerFormat == VolumeState::FMT_VERACRYPT) {
+            for (UINT i = 0; i < batch.count; i++) {
+                const uint64_t physSector = firstPhysical + i;
+                const uint64_t tweak = physSector - v.partitionStartSector;
+                cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + (i * 512));
+            }
+        } else if (sectorsPerUnit <= 1) {
+            for (UINT i = 0; i < batch.count; i++) {
+                const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
+                unsigned char tweakBuf[16] = {0};
+                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
+                mbedtls_aes_crypt_xts(&v.luksXts.enc, MBEDTLS_AES_ENCRYPT, 512, tweakBuf,
+                                       curBuf + (i * 512), encBuf + (i * 512));
+            }
+        } else {
+            std::vector<unsigned char> plain(totalBytes);
+            if (needsSplice) {
+                std::vector<unsigned char> existingEnc(totalBytes);
+                if (!physRead(pdrv, alignedFirstPhysical * 512, existingEnc.data(), totalBytes))
+                    return RES_ERROR;
+                for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
+                    const uint64_t sectorTweak = alignedRelStart + u;
+unsigned char tweakBuf[16] = {0};
+for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
+                    mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
+                                           existingEnc.data() + (u * 512), plain.data() + (u * 512));
+                }
+            }
+            const size_t copyOffset = static_cast<size_t>(relStart - alignedRelStart) * 512;
+            std::memcpy(plain.data() + copyOffset, curBuf, static_cast<size_t>(batch.count) * 512);
+
+            for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
+                const uint64_t sectorTweak = alignedRelStart + u;
+unsigned char tweakBuf[16] = {0};
+for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;;
+                mbedtls_aes_crypt_xts(&v.luksXts.enc, MBEDTLS_AES_ENCRYPT, luksUnit, tweakBuf,
+                                       plain.data() + (u * 512), encBuf + (u * 512));
+            }
         }
 
-        if (!physWrite(pdrv, firstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
+        if (!physWrite(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
     }
     return RES_OK;
@@ -1680,6 +1856,90 @@ static bool deriveAndValidateHeader(
     return true;
 }
 
+static bool prepareLuksSession(int fd, const unsigned char* password, size_t passwordLen, int volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); return false; }
+    if (fd < 0) return false;
+
+    VolumeState& v = volumes[volId];
+
+    uint64_t fileSize = 0;
+    struct stat st;
+    if (fstat(fd, &st) == 0) fileSize = static_cast<uint64_t>(st.st_size);
+
+    LuksVolumeInfo luksInfo;
+
+    auto cancelCheck = [volId](int) -> bool {
+        return isUnlockCancelled(volId);
+    };
+    auto progressCb = [volId](int step, int total, int hashId, int cipherId) {
+        int format = (cipherId == 1) ? 2 : 1; // 1 = FMT_LUKS1, 2 = FMT_LUKS2
+        reportUnlockProgress(volId, step, total, hashId, 0, format);
+    };
+
+    if (!luksRecoverMasterKey(fd, password, passwordLen, luksInfo,
+                              volId, cancelCheck, progressCb)) {
+        close(fd);
+        return false;
+    }
+
+    const size_t xtsKeyBits = luksInfo.keyBytes * 8;
+    if (mbedtls_aes_xts_setkey_dec(&v.luksXts.dec, luksInfo.masterKey.data(), xtsKeyBits) != 0 ||
+        mbedtls_aes_xts_setkey_enc(&v.luksXts.enc, luksInfo.masterKey.data(), xtsKeyBits) != 0) {
+        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        close(fd);
+        return false;
+    }
+
+    int mappedCipher = 0; // kAes
+    if (luksInfo.cipherName == "serpent") mappedCipher = 1;
+    else if (luksInfo.cipherName == "twofish") mappedCipher = 2;
+
+    int mappedHash = 0; // kSha512
+
+    {
+        std::lock_guard<std::mutex> lock(v.mutex);
+        v.fd = fd;
+        v.dataOffset = luksInfo.dataOffsetBytes;
+        v.dataAreaLengthBytes = fileSize - luksInfo.dataOffsetBytes;
+        v.isHiddenVolume = false;
+        v.fileSize = fileSize;
+        v.matchedCipherId = mappedCipher;
+        v.matchedHashId = mappedHash;
+        v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
+        if (luksInfo.version == 1) {
+            // LUKS1: cryptsetup sets dm-crypt's iv_offset = payload_offset, so
+            // the XTS tweak counter is the ABSOLUTE physical sector from the
+            // start of the container (there's no segment/iv_tweak concept).
+            v.partitionStartSector = 0;
+        } else {
+            // LUKS2: the segment's "iv_tweak" (default 0) is added to a
+            // counter that starts at 0 at the FIRST sector of the segment
+            // itself (segment-relative), not the start of the file. Folding
+            // both the segment offset and iv_tweak into partitionStartSector
+            // lets disk_read/disk_write's existing
+            // "physSector - partitionStartSector" arithmetic land on the
+            // correct dm-crypt sector value:
+            //   (physSector - segmentStartSector) / sectorsPerUnit + ivTweak
+            const uint64_t segmentStartSector = luksInfo.dataOffsetBytes / 512;
+            const uint64_t sectorsPerUnit = v.luksSectorSize / 512;
+            v.partitionStartSector = segmentStartSector - (luksInfo.ivTweak * sectorsPerUnit);
+        }
+        v.containerFormat = luksInfo.version == 1
+            ? VolumeState::FMT_LUKS1 : VolumeState::FMT_LUKS2;
+        v.luksXts.initialized = true;
+        v.dataCtxInitialized = true;
+    }
+
+    mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+
+    LOGI("prepareLuksSession(vol=%d): LUKS%d unlocked, dataOffset=%llu, keyBytes=%u, "
+         "sectorSize=%u, ivTweak=%llu, partitionStartSector=%llu",
+         volId, luksInfo.version, (unsigned long long)luksInfo.dataOffsetBytes, luksInfo.keyBytes,
+         v.luksSectorSize, (unsigned long long)luksInfo.ivTweak,
+         (unsigned long long)v.partitionStartSector);
+    return true;
+}
+
 bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0, const int* keyfileFds = nullptr, int keyfileCount = 0) {
     const auto opStart = std::chrono::steady_clock::now();
     if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
@@ -1696,6 +1956,15 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     uint64_t fileSize = 0;
     struct stat st;
     if (fstat(fd, &st) == 0) fileSize = static_cast<uint64_t>(st.st_size);
+
+    // ── LUKS detection ────────────────────────────────────────────────────
+    {
+        unsigned char magicBuf[6];
+        if (pread(fd, magicBuf, 6, 0) == 6 && isLuksContainer(magicBuf, 6)) {
+            closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+            return prepareLuksSession(fd, password, passwordLen, volId);
+        }
+    }
 
     struct HeaderSlot { uint64_t fileOffset; };
     static constexpr HeaderSlot kHeaderSlots[] = { { 0 }, { VC_HIDDEN_HEADER_OFFSET } };
@@ -2142,8 +2411,15 @@ static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pa
     } else if (v.fsType == VolumeState::FS_EXT) {
         ext2_ino_t dirInode = 0;
         if (extResolvePath(v.extFs, pathSuffix ? pathSuffix : "", &dirInode)) {
+            struct ext2_inode dirNodeInfo{};
+            const errcode_t readInodeErr = ext2fs_read_inode(v.extFs, dirInode, &dirNodeInfo);
+            LOGI("buildDirectoryListing: ext dir inode=%u readInodeErr=%lu i_size=%u i_blocks=%u i_links_count=%u",
+                 dirInode, (unsigned long)readInodeErr, dirNodeInfo.i_size,
+                 dirNodeInfo.i_blocks, dirNodeInfo.i_links_count);
             ExtDirContext context{v.extFs, &results};
-            ext2fs_dir_iterate2(v.extFs, dirInode, 0, nullptr, extDirectoryEntry, &context);
+            const errcode_t iterErr = ext2fs_dir_iterate2(v.extFs, dirInode, 0, nullptr, extDirectoryEntry, &context);
+            LOGI("buildDirectoryListing: ext2fs_dir_iterate2 return=%lu (%s) entries=%zu",
+                 (unsigned long)iterErr, iterErr ? error_message(iterErr) : "OK", results.size());
             if (results.size() >= MAX_DIR_ENTRIES) results.push_back("System:TRUNCATED");
         }
     }
@@ -2731,6 +3007,13 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedHashId(JNIEnv*, jobjec
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
     std::lock_guard<std::mutex> lock(volumes[volId].mutex);
     return volumes[volId].matchedHashId;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getContainerFormat(JNIEnv*, jobject, jint volId) {
+    if (volId < 0 || volId >= MAX_VOLUMES) return 0;
+    std::lock_guard<std::mutex> lock(volumes[volId].mutex);
+    return static_cast<jint>(volumes[volId].containerFormat);
 }
 
 extern "C" JNIEXPORT jlong JNICALL

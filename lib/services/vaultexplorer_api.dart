@@ -28,6 +28,7 @@ typedef UnlockProgress = ({
   int total,
   int hashId,
   int cipherId,
+  String containerFormat,
 });
 
 String hashAlgorithmName(int hashId) => HashAlgo.nameFor(hashId);
@@ -139,6 +140,7 @@ class VaultExplorerApi {
             total: total,
             hashId: args['hashId'] as int? ?? 255,
             cipherId: args['cipherId'] as int? ?? 255,
+            containerFormat: args['containerFormat'] as String? ?? 'veracrypt',
           );
           for (final listener in List.of(_unlockProgressListeners)) {
             listener(progress);
@@ -321,7 +323,7 @@ class VaultExplorerApi {
     }
   }
 
- Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId})?> unlockContainer(
+ Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockContainer(
     String filePath,
     String password,
     int pim, {
@@ -355,6 +357,7 @@ class VaultExplorerApi {
       files: files,
       matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
       matchedHashId: raw['matchedHashId'] as int? ?? 255,
+      containerFormat: raw['containerFormat'] as String? ?? 'veracrypt',
     );
   }
 
@@ -406,7 +409,7 @@ class VaultExplorerApi {
     }
   }
 
- Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId})?> unlockUsbContainer(
+ Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockUsbContainer(
     String deviceName,
     String password,
     int pim, {
@@ -442,6 +445,7 @@ class VaultExplorerApi {
       files: files,
       matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
       matchedHashId: raw['matchedHashId'] as int? ?? 255,
+      containerFormat: raw['containerFormat'] as String? ?? 'veracrypt',
     );
   }
 

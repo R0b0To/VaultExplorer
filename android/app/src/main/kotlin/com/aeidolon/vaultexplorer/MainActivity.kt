@@ -887,11 +887,17 @@ class MainActivity : FlutterFragmentActivity() {
                                                 DocumentsContract.buildRootsUri(
                                                     "com.aeidolon.vaultexplorer.documents"), null)
                                         }
+                                        val fmt = when (VeraCryptEngine.getContainerFormat(targetVolId)) {
+                                            1 -> "luks1"
+                                            2 -> "luks2"
+                                            else -> "veracrypt"
+                                        }
                                         result.success(mapOf(
                                             "volId" to targetVolId,
                                             "files" to files.toList(),
                                             "matchedCipherId" to VeraCryptEngine.getMatchedCipherId(targetVolId),
-                                            "matchedHashId" to VeraCryptEngine.getMatchedHashId(targetVolId)
+                                            "matchedHashId" to VeraCryptEngine.getMatchedHashId(targetVolId),
+                                            "containerFormat" to fmt
                                         ))
                                     } else {
                                         UsbBlockBridge.unregister(targetVolId)
@@ -1028,11 +1034,17 @@ class MainActivity : FlutterFragmentActivity() {
                                                 DocumentsContract.buildRootsUri(
                                                     "com.aeidolon.vaultexplorer.documents"), null)
                                         }
+                                        val fmt = when (VeraCryptEngine.getContainerFormat(targetVolId)) {
+                                            1 -> "luks1"
+                                            2 -> "luks2"
+                                            else -> "veracrypt"
+                                        }
                                         result.success(mapOf(
                                             "volId" to targetVolId,
                                             "files" to files.toList(),
                                             "matchedCipherId" to VeraCryptEngine.getMatchedCipherId(targetVolId),
-                                            "matchedHashId" to VeraCryptEngine.getMatchedHashId(targetVolId)
+                                            "matchedHashId" to VeraCryptEngine.getMatchedHashId(targetVolId),
+                                            "containerFormat" to fmt
                                         ))
                                     } else {
                                         result.error("AUTH_FAIL",

@@ -80,6 +80,7 @@ object VeraCryptEngine {
     // ── Matched cipher/hash lookup (perf: skip auto-detect next unlock) ────
     @JvmStatic external fun getMatchedCipherId(volId: Int): Int
     @JvmStatic external fun getMatchedHashId(volId: Int): Int
+    @JvmStatic external fun getContainerFormat(volId: Int): Int
     @JvmStatic external fun listDirectory(dirPath: String, volId: Int): Array<String>?
     @JvmStatic external fun getFileSize(fileName: String, volId: Int): Long
     @JvmStatic external fun getFolderSize(dirPath: String, volId: Int): Long

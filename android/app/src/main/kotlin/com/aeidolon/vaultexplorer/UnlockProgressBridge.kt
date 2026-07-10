@@ -31,8 +31,13 @@ object UnlockProgressBridge {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     @JvmStatic
-    fun reportProgress(volId: Int, attempted: Int, total: Int, hashId: Int, cipherId: Int) {
+    fun reportProgress(volId: Int, attempted: Int, total: Int, hashId: Int, cipherId: Int, format: Int) {
         val ch = channel ?: return
+        val formatStr = when (format) {
+            1 -> "luks1"
+            2 -> "luks2"
+            else -> "veracrypt"
+        }
         mainHandler.post {
             ch.invokeMethod(
                 "onUnlockProgress",
@@ -42,6 +47,7 @@ object UnlockProgressBridge {
                     "total" to total,
                     "hashId" to hashId,
                     "cipherId" to cipherId,
+                    "containerFormat" to formatStr,
                 ),
             )
         }

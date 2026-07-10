@@ -6,6 +6,7 @@ class MountedContainer {
   final DateTime mountedAt;
   final int totalSpace;
   final int freeSpace;
+  final String containerFormat;
 
   const MountedContainer({
     required this.uri,
@@ -15,6 +16,7 @@ class MountedContainer {
     required this.mountedAt,
     required this.totalSpace,
     required this.freeSpace,
+    this.containerFormat = 'veracrypt',
   });
 
   MountedContainer copyWith({
@@ -22,6 +24,7 @@ class MountedContainer {
     List<String>? rootFiles,
     int? totalSpace,
     int? freeSpace,
+    String? containerFormat,
   }) {
     return MountedContainer(
       uri: uri,
@@ -31,6 +34,7 @@ class MountedContainer {
       mountedAt: mountedAt,
       totalSpace: totalSpace ?? this.totalSpace,
       freeSpace: freeSpace ?? this.freeSpace,
+      containerFormat: containerFormat ?? this.containerFormat,
     );
   }
 }

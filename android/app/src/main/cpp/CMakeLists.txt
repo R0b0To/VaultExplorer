@@ -94,10 +94,30 @@ struct hd_geometry {
 ")
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h "${CONFIG_H_CONTENT}")
 
-# 3c. Local VeraCrypt Directory Configuration
-set(VC_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/veracrypt)
+# 3c. VeraCrypt crypto primitives
+#
+# Keep this source outside the application tree and pin it to a reviewed
+# release.  The app only compiles the small C subset listed below; it does not
+# build VeraCrypt itself.
+FetchContent_Declare(
+        veracrypt
+        GIT_REPOSITORY https://github.com/veracrypt/VeraCrypt.git
+        GIT_TAG        d26216c294fdfb090ee856f6195c294176defa1d # VeraCrypt_1.26.29
+)
+FetchContent_GetProperties(veracrypt)
+if(NOT veracrypt_POPULATED)
+    FetchContent_Populate(veracrypt)
+endif()
+
+set(VC_SRC_DIR ${veracrypt_SOURCE_DIR}/src)
 set(VC_CRYPTO_DIR ${VC_SRC_DIR}/Crypto)
 set(VC_COMMON_DIR ${VC_SRC_DIR}/Common)
+set(VC_ARGON2_DIR ${VC_CRYPTO_DIR}/Argon2)
+# VeraCrypt 1.26.29 declares the Android ARM feature probes as plain `inline`
+# C functions. Clang's modern C inline semantics otherwise omit their emitted
+# definitions, leaving cpu.c with unresolved references at link time.
+set_source_files_properties(${VC_CRYPTO_DIR}/cpu.c PROPERTIES
+        COMPILE_OPTIONS "-fgnu89-inline")
 
 # 3d. Complete NTFS-3G Source Files list
 set(NTFS_3G_SRC_DIR ${ntfs3g_SOURCE_DIR}/libntfs-3g)
@@ -134,7 +154,7 @@ set(NTFS_3G_SOURCES
     ${NTFS_3G_SRC_DIR}/xattrs.c         
 )
 
-# 4. Build target: FatFs + original code + vendored crypto primitives + NTFS-3G
+# 4. Build target: FatFs + original code + VeraCrypt crypto primitives + NTFS-3G
 add_library(
         vaultexplorer
         SHARED
@@ -144,14 +164,22 @@ add_library(
         crypto/kdf_table.cpp       # per-hash iteration-count table + hash dispatch
         ${fatfs_SOURCE_DIR}/src/ff.c
         ${fatfs_SOURCE_DIR}/src/ffunicode.c
-        # ── Locally Vendored primitives ──
+        # ── VeraCrypt primitives (pinned FetchContent source) ──
         ${VC_CRYPTO_DIR}/Twofish.c
         ${VC_CRYPTO_DIR}/Serpent.c
+        ${VC_CRYPTO_DIR}/Camellia.c
+        ${VC_CRYPTO_DIR}/kuznyechik.c
         ${VC_CRYPTO_DIR}/Whirlpool.c
         ${VC_CRYPTO_DIR}/Streebog.c
         ${VC_CRYPTO_DIR}/blake2s.c
-        ${VC_CRYPTO_DIR}/cpu.c 
-        ${VC_COMMON_DIR}/Endian.c 
+        ${VC_CRYPTO_DIR}/cpu.c
+        ${VC_COMMON_DIR}/Endian.c
+        ${VC_ARGON2_DIR}/src/argon2.c
+        ${VC_ARGON2_DIR}/src/core.c
+        ${VC_ARGON2_DIR}/src/ref.c
+        ${VC_ARGON2_DIR}/src/opt_sse2.c
+        ${VC_ARGON2_DIR}/src/opt_avx2.c
+        ${VC_ARGON2_DIR}/src/blake2/blake2b.c
         # ── NTFS-3G Sources ──
         ${NTFS_3G_SOURCES}
 )
@@ -160,6 +188,11 @@ target_compile_definitions(vaultexplorer PRIVATE
         CRYPTOPP_DISABLE_ASM
         CRYPTOPP_DISABLE_SSE2
         CRYPTOPP_DISABLE_SSSE3
+        # We use mbedTLS for SHA-2. This also prevents VeraCrypt cpu.c from
+        # referencing its SHA-NI self-test, which is not compiled when ASM is
+        # disabled (notably on Android x86_64).
+        CRYPTOPP_DISABLE_SHANI
+        ARGON2_NO_THREADS # VeraCrypt uses one Argon2id lane for volume headers.
         HAVE_CONFIG_H  # Forces NTFS-3G files to look up our generated config.h
         _GNU_SOURCE
         _FILE_OFFSET_BITS=64
@@ -177,6 +210,8 @@ target_include_directories(
         ${CMAKE_CURRENT_BINARY_DIR} # config.h location
         ${VC_CRYPTO_DIR}
         ${VC_SRC_DIR}
+        ${VC_ARGON2_DIR}/include
+        ${VC_ARGON2_DIR}/src
 )
 
 find_library(log-lib log)
@@ -190,7 +225,12 @@ if(NOT ANDROID)
     add_executable(sector_batching_test test/sector_batching_test.cpp)
     add_executable(fs_scan_test test/fs_scan_test.cpp)
     add_executable(cascade_test test/cascade_test.cpp crypto/cascade.cpp crypto/cipher_shim.cpp
-                    ${VC_CRYPTO_DIR}/Twofish.c ${VC_CRYPTO_DIR}/Serpent.c)
+                    ${VC_CRYPTO_DIR}/Twofish.c ${VC_CRYPTO_DIR}/Serpent.c
+                    ${VC_CRYPTO_DIR}/Camellia.c ${VC_CRYPTO_DIR}/kuznyechik.c
+                    ${VC_CRYPTO_DIR}/cpu.c ${VC_COMMON_DIR}/Endian.c
+                    ${VC_ARGON2_DIR}/src/argon2.c ${VC_ARGON2_DIR}/src/core.c
+                    ${VC_ARGON2_DIR}/src/ref.c ${VC_ARGON2_DIR}/src/opt_sse2.c
+                    ${VC_ARGON2_DIR}/src/opt_avx2.c ${VC_ARGON2_DIR}/src/blake2/blake2b.c)
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)

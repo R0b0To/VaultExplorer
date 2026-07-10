@@ -1,4 +1,5 @@
 #include "cipher_shim.h"
+#include <algorithm>
 
 struct KdfParams {
     HashId hash;
@@ -24,4 +25,15 @@ int iterationsForHash(HashId hash, int clampedPim) {
         }
     }
     return 500000; // conservative fallback, should be unreachable
+}
+
+void argon2ParamsForPim(int clampedPim, uint32_t& memoryKiB,
+                        uint32_t& timeCost, uint32_t& parallelism) {
+    // VeraCrypt 1.26.29's get_argon2_params(): PIM 0 means its default 12.
+    int pim = clampedPim > 0 ? clampedPim : 12;
+    const int memoryMiB = std::min(64 + (pim - 1) * 32, 1024);
+    memoryKiB = static_cast<uint32_t>(memoryMiB) * 1024;
+    timeCost = static_cast<uint32_t>(pim <= 31 ? 3 + (pim - 1) / 3
+                                               : 13 + (pim - 31));
+    parallelism = 1;
 }

@@ -632,6 +632,17 @@ class AdvancedParamsPanel extends StatelessWidget {
   final bool enabled;
   final String? subtitle;
 
+  /// Whether "Auto-detect" (id 255) is a valid choice in the cipher/hash
+  /// dropdowns. True for unlock flows (native can search); must be false
+  /// for creation flows, where a concrete algorithm has to be picked up
+  /// front — see create_container_sheet.dart.
+  final bool includeAuto;
+
+  /// Extra fields rendered between the PIM field and the cipher dropdown.
+  /// Exists so create_container_sheet.dart's file-system selector can live
+  /// inside this same panel instead of needing its own separate one.
+  final List<Widget> extraFields;
+
   const AdvancedParamsPanel({
     super.key,
     this.pimController,
@@ -641,6 +652,8 @@ class AdvancedParamsPanel extends StatelessWidget {
     required this.onHashChanged,
     this.enabled = true,
     this.subtitle,
+    this.includeAuto = true,
+    this.extraFields = const [],
   });
 
   @override
@@ -683,13 +696,17 @@ class AdvancedParamsPanel extends StatelessWidget {
             ),
             const SizedBox(height: 16),
           ],
+          for (final field in extraFields) ...[
+            field,
+            const SizedBox(height: 16),
+          ],
           DropdownButtonFormField<int>(
             initialValue: cipherId,
             decoration: const InputDecoration(
               labelText: 'Encryption Algorithm',
               prefixIcon: Icon(Icons.security_rounded, size: AppIconSize.small),
             ),
-            items: CipherAlgo.dropdownItems(),
+            items: CipherAlgo.dropdownItems(includeAuto: includeAuto),
             onChanged: enabled
                 ? (val) {
                     if (val != null) onCipherChanged(val);
@@ -703,7 +720,7 @@ class AdvancedParamsPanel extends StatelessWidget {
               labelText: 'Hash Algorithm',
               prefixIcon: Icon(Icons.tag_rounded, size: AppIconSize.small),
             ),
-            items: HashAlgo.dropdownItems(),
+            items: HashAlgo.dropdownItems(includeAuto: includeAuto),
             onChanged: enabled
                 ? (val) {
                     if (val != null) onHashChanged(val);

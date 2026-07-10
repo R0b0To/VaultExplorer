@@ -120,93 +120,30 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     );
   }
 
-  Widget _buildAdvancedTile(BuildContext context, ColorScheme cs, TextTheme textTheme) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        title: Text(
-          'Advanced parameters',
-          style: textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: cs.onSurface,
+  Widget _buildAdvancedTile(BuildContext context) {
+    return AdvancedParamsPanel(
+      pimController: _pimCtrl,
+      cipherId: _cipherId,
+      hashId: _hashId,
+      includeAuto: false,
+      onCipherChanged: (val) => setState(() => _cipherId = val),
+      onHashChanged: (val) => setState(() => _hashId = val),
+      extraFields: [
+        DropdownButtonFormField<String>(
+          initialValue: _fileSystem,
+          decoration: const InputDecoration(
+            labelText: 'Format File System',
+            prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
           ),
+          items: const [
+            DropdownMenuItem(value: 'FAT', child: Text('FAT (FAT32)')),
+            DropdownMenuItem(value: 'exFAT', child: Text('exFAT')),
+          ],
+          onChanged: (val) {
+            if (val != null) setState(() => _fileSystem = val);
+          },
         ),
-        leading: Icon(Icons.tune_rounded, color: cs.primary),
-        childrenPadding: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-        ),
-        collapsedShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-        ),
-        backgroundColor: cs.surfaceContainerLow,
-        collapsedBackgroundColor: cs.surfaceContainerLow,
-        children: [
-          // PIM
-          TextField(
-            controller: _pimCtrl,
-            keyboardType: TextInputType.number,
-            decoration: _getInputDecoration(
-              cs,
-              labelText: 'PIM  (leave blank for default)',
-              prefixIcon: Icons.password_outlined,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // File System selection
-          DropdownButtonFormField<String>(
-            initialValue: _fileSystem,
-            decoration: _getInputDecoration(
-              cs,
-              labelText: 'Format File System',
-              prefixIcon: Icons.dns_rounded,
-            ),
-            items: const [
-              DropdownMenuItem(
-                value: 'FAT',
-                child: Text('FAT (FAT32)'),
-              ),
-              DropdownMenuItem(value: 'exFAT', child: Text('exFAT')),
-            ],
-            onChanged: (val) {
-              if (val != null) setState(() => _fileSystem = val);
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Encryption Algorithm selection
-          DropdownButtonFormField<int>(
-            initialValue: _cipherId,
-            decoration: _getInputDecoration(
-              cs,
-              labelText: 'Encryption Algorithm',
-              prefixIcon: Icons.security_rounded,
-            ),
-            items: CipherAlgo.dropdownItems(includeAuto: false),
-            onChanged: (val) {
-              if (val != null) setState(() => _cipherId = val);
-            },
-          ),
-          const SizedBox(height: 16),
-
-          // Hash Algorithm selection
-          DropdownButtonFormField<int>(
-            initialValue: _hashId,
-            decoration: _getInputDecoration(
-              cs,
-              labelText: 'Hash Algorithm',
-              prefixIcon: Icons.tag_rounded,
-            ),
-            items: HashAlgo.dropdownItems(includeAuto: false),
-            onChanged: (val) {
-              if (val != null) setState(() => _hashId = val);
-            },
-          ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -309,7 +246,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            _buildAdvancedTile(context, cs, textTheme),
+                            _buildAdvancedTile(context),
                             if (_error != null) ...[
                               const SizedBox(height: 16),
                               InlineErrorBanner(_error!),
@@ -411,7 +348,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                       ),
                       const SizedBox(height: 16),
 
-                      _buildAdvancedTile(context, cs, textTheme),
+                      _buildAdvancedTile(context),
                       if (_error != null) ...[
                         const SizedBox(height: 16),
                         InlineErrorBanner(_error!),

@@ -4,9 +4,12 @@
 #include "mbedtls/pkcs5.h"
 #include "Serpent.h"
 #include "Twofish.h"
+#include "Camellia.h"
+#include "kuznyechik.h"
 #include "Whirlpool.h"
 #include "Streebog.h"
 #include "blake2s.h"
+#include "argon2.h"
 #include <cstring>
 #include <algorithm>
 
@@ -33,6 +36,12 @@ bool blockCipherSetKey(BlockCipherContext& ctx, CipherId id,
         TwofishInstance* inst = reinterpret_cast<TwofishInstance*>(ctx.scheduleStorage);
         twofish_set_key(inst, reinterpret_cast<const u4byte*>(key));
         return true;
+    } else if (id == CipherId::kCamellia) {
+        camellia_set_key(key, ctx.scheduleStorage);
+        return true;
+    } else if (id == CipherId::kKuznyechik) {
+        kuznyechik_set_key(key, reinterpret_cast<kuznyechik_kds*>(ctx.scheduleStorage));
+        return true;
     }
     return false;
 }
@@ -54,6 +63,12 @@ void blockCipherEncryptBlock(const BlockCipherContext& ctx,
         std::memcpy(blockIn, in, 16);
         twofish_encrypt(inst, blockIn, blockOut);
         std::memcpy(out, blockOut, 16);
+    } else if (ctx.id == CipherId::kCamellia) {
+        unsigned char* ks = const_cast<unsigned char*>(ctx.scheduleStorage);
+        camellia_encrypt(in, out, ks);
+    } else if (ctx.id == CipherId::kKuznyechik) {
+        auto* kds = const_cast<kuznyechik_kds*>(reinterpret_cast<const kuznyechik_kds*>(ctx.scheduleStorage));
+        kuznyechik_encrypt_block(out, in, kds);
     }
 }
 
@@ -74,6 +89,12 @@ void blockCipherDecryptBlock(const BlockCipherContext& ctx,
         std::memcpy(blockIn, in, 16);
         twofish_decrypt(inst, blockIn, blockOut);
         std::memcpy(out, blockOut, 16);
+    } else if (ctx.id == CipherId::kCamellia) {
+        unsigned char* ks = const_cast<unsigned char*>(ctx.scheduleStorage);
+        camellia_decrypt(in, out, ks);
+    } else if (ctx.id == CipherId::kKuznyechik) {
+        auto* kds = const_cast<kuznyechik_kds*>(reinterpret_cast<const kuznyechik_kds*>(ctx.scheduleStorage));
+        kuznyechik_decrypt_block(out, in, kds);
     }
 }
 
@@ -246,4 +267,14 @@ bool pbkdf2Hmac(HashId hash,
     }
 
     return pbkdf2HmacCustom(hash, password, passwordLen, salt, saltLen, iterations, out, outLen);
+}
+
+bool argon2idDeriveKey(const unsigned char* password, size_t passwordLen,
+                       const unsigned char* salt, size_t saltLen,
+                       uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
+                       unsigned char* out, size_t outLen) {
+    if (!password || !salt || !out || parallelism == 0) return false;
+    return argon2id_hash_raw(timeCost, memoryKiB, parallelism,
+                             password, passwordLen, salt, saltLen,
+                             out, outLen, nullptr) == ARGON2_OK;
 }

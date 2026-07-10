@@ -1,4 +1,5 @@
 library;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -26,7 +27,6 @@ import 'package:flutter/services.dart';
 /// *creating* a container — a concrete algorithm must be picked up front —
 /// so every dropdown-builder here takes `includeAuto` to control that.
 
-
 class HashAlgo {
   final int id;
   final String label;
@@ -40,6 +40,7 @@ class HashAlgo {
   static const whirlpool = HashAlgo(2, 'Whirlpool');
   static const streebog = HashAlgo(3, 'Streebog');
   static const blake2s256 = HashAlgo(4, 'BLAKE2s-256');
+  static const argon2id = HashAlgo(5, 'Argon2id');
 
   /// Canonical id order — must mirror `HashId` in crypto/cipher_shim.h.
   static const List<HashAlgo> concrete = [
@@ -48,6 +49,7 @@ class HashAlgo {
     whirlpool,
     streebog,
     blake2s256,
+    argon2id,
   ];
 
   static const List<HashAlgo> withAuto = [auto, ...concrete];
@@ -85,6 +87,17 @@ class CipherAlgo {
   static const twofishSerpent = CipherAlgo(5, 'Twofish-Serpent');
   static const aesTwofishSerpent = CipherAlgo(6, 'AES-Twofish-Serpent');
   static const serpentTwofishAes = CipherAlgo(7, 'Serpent-Twofish-AES');
+  // These IDs are appended to retain compatibility with stored IDs 0..7.
+  static const camellia = CipherAlgo(8, 'Camellia');
+  static const kuznyechik = CipherAlgo(9, 'Kuznyechik');
+  static const camelliaKuznyechik = CipherAlgo(10, 'Camellia-Kuznyechik');
+  static const camelliaSerpent = CipherAlgo(11, 'Camellia-Serpent');
+  static const kuznyechikAes = CipherAlgo(12, 'Kuznyechik-AES');
+  static const kuznyechikSerpentCamellia = CipherAlgo(
+    13,
+    'Kuznyechik-Serpent-Camellia',
+  );
+  static const kuznyechikTwofish = CipherAlgo(14, 'Kuznyechik-Twofish');
 
   /// Canonical id order — must mirror `CascadeId` in crypto/cascade.h.
   static const List<CipherAlgo> concrete = [
@@ -96,6 +109,13 @@ class CipherAlgo {
     twofishSerpent,
     aesTwofishSerpent,
     serpentTwofishAes,
+    camellia,
+    kuznyechik,
+    camelliaKuznyechik,
+    camelliaSerpent,
+    kuznyechikAes,
+    kuznyechikSerpentCamellia,
+    kuznyechikTwofish,
   ];
 
   static const List<CipherAlgo> withAuto = [auto, ...concrete];

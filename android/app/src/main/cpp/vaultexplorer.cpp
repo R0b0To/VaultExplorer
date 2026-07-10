@@ -1116,6 +1116,27 @@ static bool tryDecryptHeader(
 
     return true;
 }
+
+// VeraCrypt's Argon2id header KDF always emits 192 bytes.  Argon2 output is
+// length-sensitive, so deriving only a cascade's first 64/128 bytes would not
+// match an official VeraCrypt volume.
+static bool deriveHeaderKey(HashId hash,
+                            const unsigned char* password, size_t passwordLen,
+                            const unsigned char* salt, int clampedPim,
+                            unsigned char* out, size_t outLen) {
+    if (hash == HashId::kArgon2id) {
+        if (outLen != 192) return false;
+        uint32_t memoryKiB = 0;
+        uint32_t timeCost = 0;
+        uint32_t parallelism = 0;
+        argon2ParamsForPim(clampedPim, memoryKiB, timeCost, parallelism);
+        return argon2idDeriveKey(password, passwordLen, salt, VC_SALT_SIZE,
+                                 memoryKiB, timeCost, parallelism, out, outLen);
+    }
+    return pbkdf2Hmac(hash, password, passwordLen, salt, VC_SALT_SIZE,
+                       iterationsForHash(hash, clampedPim), out, outLen);
+}
+
 std::mutex derivationMutexes[MAX_VOLUMES];
 static bool deriveAndValidateHeader(
     const unsigned char headerSector[VC_FULL_HEADER_SIZE],
@@ -1138,7 +1159,8 @@ static bool deriveAndValidateHeader(
     if (hashIdParam != 255) {
         hashesToTry.push_back(static_cast<HashId>(hashIdParam));
     } else {
-        hashesToTry = { HashId::kSha512, HashId::kSha256, HashId::kWhirlpool, HashId::kStreebog, HashId::kBlake2s256 };
+        hashesToTry = { HashId::kSha512, HashId::kSha256, HashId::kWhirlpool,
+                        HashId::kStreebog, HashId::kBlake2s256, HashId::kArgon2id };
     }
 
     std::vector<CascadeId> ciphersToTry;
@@ -1153,7 +1175,14 @@ static bool deriveAndValidateHeader(
             CascadeId::kSerpentAes,
             CascadeId::kTwofishSerpent,
             CascadeId::kAesTwofishSerpent,
-            CascadeId::kSerpentTwofishAes
+            CascadeId::kSerpentTwofishAes,
+            CascadeId::kCamellia,
+            CascadeId::kKuznyechik,
+            CascadeId::kCamelliaKuznyechik,
+            CascadeId::kCamelliaSerpent,
+            CascadeId::kKuznyechikAes,
+            CascadeId::kKuznyechikSerpentCamellia,
+            CascadeId::kKuznyechikTwofish,
         };
     }
     const int totalHashSteps = static_cast<int>(hashesToTry.size());
@@ -1206,11 +1235,13 @@ static bool deriveAndValidateHeader(
     auto worker = [&](HashId h) {
         if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId)) return;
 
-        int iter = iterationsForHash(h, safePim);
         unsigned char derivedKeyMaterial[192] = {0};
-        
-        if (!pbkdf2Hmac(h, password, passwordLen,
-                       salt, VC_SALT_SIZE, iter, derivedKeyMaterial, neededKeyBytes)) {
+
+        // Argon2id's 192-byte header key is intentionally derived in full;
+        // PBKDF2 only needs the longest selected cascade's key material.
+        const size_t outputBytes = h == HashId::kArgon2id ? 192 : neededKeyBytes;
+        if (!deriveHeaderKey(h, password, passwordLen, salt, safePim,
+                             derivedKeyMaterial, outputBytes)) {
             reportUnlockProgress(volId, combinationsAttempted.fetch_add(1) + 1, totalHashSteps,
                                  static_cast<int>(h), -1);
             return;
@@ -1885,14 +1916,13 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         }
 
         const int safePim = clampPim(pim);
-        const int iter = iterationsForHash(createHash, safePim);
-
-        // Derive 192 bytes of header key material (enough for any cascade)
+        // Derive the complete 192-byte header key. This is mandatory for
+        // Argon2id compatibility and harmless for PBKDF2-based headers.
         unsigned char headerKey[192] = {0};
-        if (!pbkdf2Hmac(createHash,
-                        reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass),
-                        salt, VC_SALT_SIZE, iter, headerKey, 192)) {
-            LOGI("createContainer: PBKDF2 failed");
+        if (!deriveHeaderKey(createHash,
+                             reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass),
+                             salt, safePim, headerKey, sizeof(headerKey))) {
+            LOGI("createContainer: header key derivation failed");
             break;
         }
 
@@ -2794,7 +2824,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeFingerprint(
         JNIEnv*, jobject, jint cascadeId) {
-    if (cascadeId < 0 || cascadeId > 7) return -1;
+    if (cascadeId < 0 || cascadeId >= 15) return -1;
     CascadeSpec spec = cascadeSpecFor(static_cast<CascadeId>(cascadeId));
     int packed = spec.layerCount * 1000;
     for (int i = 0; i < 3; i++) {
@@ -2806,12 +2836,12 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeFingerprint(
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeIdCount(JNIEnv*, jobject) {
-    return 8; // kAes .. kSerpentTwofishAes
+    return 15; // the eight legacy IDs plus the seven VeraCrypt 1.26.29 additions
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getHashIdCount(JNIEnv*, jobject) {
-    return 5; // kSha512, kSha256, kWhirlpool, kStreebog, kBlake2s256
+    return 6; // kSha512, kSha256, kWhirlpool, kStreebog, kBlake2s256, kArgon2id
 }
 
 extern "C" JNIEXPORT jobjectArray JNICALL

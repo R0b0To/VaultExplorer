@@ -38,6 +38,33 @@ CascadeSpec cascadeSpecFor(CascadeId id) {
         spec.layers[0] = CipherId::kSerpent;
         spec.layers[1] = CipherId::kTwofish;
         spec.layers[2] = CipherId::kAes;
+    } else if (id == CascadeId::kCamellia) {
+        spec.layerCount = 1;
+        spec.layers[0] = CipherId::kCamellia;
+    } else if (id == CascadeId::kKuznyechik) {
+        spec.layerCount = 1;
+        spec.layers[0] = CipherId::kKuznyechik;
+    } else if (id == CascadeId::kCamelliaKuznyechik) {
+        spec.layerCount = 2;
+        spec.layers[0] = CipherId::kCamellia;
+        spec.layers[1] = CipherId::kKuznyechik;
+    } else if (id == CascadeId::kCamelliaSerpent) {
+        spec.layerCount = 2;
+        spec.layers[0] = CipherId::kCamellia;
+        spec.layers[1] = CipherId::kSerpent;
+    } else if (id == CascadeId::kKuznyechikAes) {
+        spec.layerCount = 2;
+        spec.layers[0] = CipherId::kKuznyechik;
+        spec.layers[1] = CipherId::kAes;
+    } else if (id == CascadeId::kKuznyechikSerpentCamellia) {
+        spec.layerCount = 3;
+        spec.layers[0] = CipherId::kKuznyechik;
+        spec.layers[1] = CipherId::kSerpent;
+        spec.layers[2] = CipherId::kCamellia;
+    } else if (id == CascadeId::kKuznyechikTwofish) {
+        spec.layerCount = 2;
+        spec.layers[0] = CipherId::kKuznyechik;
+        spec.layers[1] = CipherId::kTwofish;
     }
     return spec;
 }

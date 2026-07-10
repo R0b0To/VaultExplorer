@@ -151,7 +151,7 @@ The C++ engine is built automatically by CMake during the Android build. mbedTLS
 | `mbedTLS 3.6.0` | AES-256-XTS, PBKDF2-HMAC-SHA512/256 (C++) |
 | `ChaN FatFs` | FAT32 / exFAT filesystem (C++) |
 
-Serpent, Twofish, Whirlpool, Streebog, and BLAKE2s-256 are vendored directly from VeraCrypt's own reference sources (see `android/app/src/main/cpp/veracrypt/Crypto`) rather than pulled in as external packages.
+VeraCrypt crypto primitives are fetched by CMake from the pinned VeraCrypt 1.26.29 source release. This includes Serpent, Twofish, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, and Argon2id, without carrying a local fork of those sources.
 
 ---
 

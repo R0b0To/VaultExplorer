@@ -15,6 +15,7 @@ class PlaylistController extends ChangeNotifier {
   bool _isShuffled = false;
   bool _allFilesScanned = false;
   bool _isScanningSubfolders = false;
+  bool _isPlaylistMode;
   String _selectedFolder = 'Current Folder Only';
 
   PlaylistController({
@@ -24,14 +25,16 @@ class PlaylistController extends ChangeNotifier {
     this.startingFolder,
   }) : _originalList = List.from(initialMediaFiles),
        _currentPlaylist = List.from(initialMediaFiles),
-       _currentIndex = initialIndex {
-    _initializeFolderFilter();
+       _currentIndex = initialIndex,
+       _isPlaylistMode = initialMediaFiles.length > 1 {
+    if (_isPlaylistMode) _initializeFolderFilter();
   }
 
   List<String> get playlist => _currentPlaylist;
   int get currentIndex => _currentIndex;
   bool get isShuffled => _isShuffled;
   bool get isScanningSubfolders => _isScanningSubfolders;
+  bool get isPlaylistMode => _isPlaylistMode;
   String get selectedFolder => _selectedFolder;
   bool get allFilesScanned => _allFilesScanned;
   bool get isEmpty => _currentPlaylist.isEmpty;
@@ -67,7 +70,7 @@ class PlaylistController extends ChangeNotifier {
   }
 
   void toggleShuffle() {
-    if (isEmpty) return;
+    if (isEmpty || !_isPlaylistMode) return;
     final current = currentFile;
     if (!_isShuffled) {
       final shuffled = List<String>.from(_currentPlaylist)
@@ -84,29 +87,57 @@ class PlaylistController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> filterByFolder(String folder) async {
+  /// Turns on (or re-scopes) playlist mode for the given folder scope
+  /// ('Current Folder Only' or 'All'). If the viewer was opened as a single
+  /// file, `_originalList` only contains that one file, so the first call
+  /// for a given scope triggers a real directory scan to populate it.
+  Future<void> enablePlaylist(String folder) async {
+    final anchor = currentFile;
     _selectedFolder = folder;
-    _applyFolderFiltering(folder, currentFile);
 
-    if (folder == 'All' && !_allFilesScanned) {
-      _isScanningSubfolders = true;
+    final needsScan = !_isPlaylistMode || (folder == 'All' && !_allFilesScanned);
+
+    if (!needsScan) {
+      _isPlaylistMode = true;
+      _applyFolderFiltering(folder, anchor);
       notifyListeners();
-      try {
-        final recursiveFiles = await _scanDirectoryRecursively(getBaseDir());
-        if (recursiveFiles.isNotEmpty) {
-          _originalList = List.from(recursiveFiles);
-        }
-        _allFilesScanned = true;
-        if (_selectedFolder == 'All') {
-          _applyFolderFiltering('All', currentFile);
-        }
-      } finally {
-        _isScanningSubfolders = false;
-        notifyListeners();
+      return;
+    }
+
+    _isScanningSubfolders = true;
+    notifyListeners();
+    try {
+      final baseDir = getBaseDir();
+      final scanned = folder == 'All'
+          ? await _scanDirectoryRecursively(baseDir)
+          : await _scanDirectorySingleLevel(baseDir);
+
+      if (scanned.isNotEmpty) {
+        _originalList = scanned;
+        if (folder == 'All') _allFilesScanned = true;
+      } else if (!_originalList.contains(anchor)) {
+        _originalList = [anchor];
       }
-    } else {
+
+      _isPlaylistMode = true;
+      _applyFolderFiltering(folder, anchor);
+    } finally {
+      _isScanningSubfolders = false;
       notifyListeners();
     }
+  }
+
+  /// Leaves playlist mode and collapses back to viewing just the current file.
+  void disablePlaylist() {
+    if (!_isPlaylistMode) return;
+    final anchor = currentFile;
+    _isPlaylistMode = false;
+    _isShuffled = false;
+    _selectedFolder = 'Current Folder Only';
+    _originalList = [anchor];
+    _currentPlaylist = [anchor];
+    _currentIndex = 0;
+    notifyListeners();
   }
 
   void _applyFolderFiltering(String folder, String fileAnchor) {
@@ -130,6 +161,29 @@ class PlaylistController extends ChangeNotifier {
       _currentPlaylist = filteredList;
       _currentIndex = newIndex;
     }
+  }
+
+  Future<List<String>> _scanDirectorySingleLevel(String baseDir) async {
+    final foundFiles = <String>[];
+    try {
+      final items = await vaultExplorerApi.listDirectory(container, baseDir);
+      if (items != null) {
+        for (final item in items) {
+          if (item.startsWith('System:')) continue;
+          final entry = RawEntry.parse(item);
+          if (!entry.isDir && MediaViewerConstants.isSupported(entry.name)) {
+            final fullPath = baseDir.isEmpty
+                ? entry.name
+                : '$baseDir/${entry.name}';
+            foundFiles.add(fullPath);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error scanning current folder: $e');
+    }
+    foundFiles.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return foundFiles;
   }
 
   Future<List<String>> _scanDirectoryRecursively(

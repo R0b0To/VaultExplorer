@@ -338,29 +338,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   void _openMediaViewer(String fileName, String fullPath) {
-
-    final sortedItems = _currentItems
-        .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
-        .toList()
-      ..sort(compareItems);
-
-    final mediaEntries = sortedItems
-        .map((f) => RawEntry.parse(f).name)
-        .where(_isSupportedMedia)
-        .toList();
-    final resolvedPaths = mediaEntries
-        .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
-        .toList();
-
-    final index = mediaEntries.indexOf(fileName);
-
+    // Opens just the tapped file. The viewer's own "Playlist" menu lets the
+    // user opt into scanning this folder (or all subfolders) afterward.
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => MediaViewerScreen(
           container: widget.container,
-          mediaFiles: resolvedPaths.isNotEmpty ? resolvedPaths : [fullPath],
-          initialIndex: index >= 0 ? index : 0,
+          mediaFiles: [fullPath],
+          initialIndex: 0,
           startingFolder: _currentDirPath,
           thumbnailQuality: _resolvedThumbnailQuality,
         ),

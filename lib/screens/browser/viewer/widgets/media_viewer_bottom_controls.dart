@@ -12,6 +12,7 @@ class MediaViewerBottomControls extends StatelessWidget {
   final ValueNotifier<VideoPlaybackProgress> videoProgressNotifier;
   final bool isImage;
   final bool showUI;
+  final bool isPlaylistMode;
   final bool autoAdvance;
   final int slideshowDelaySeconds;
   final bool isMuted;
@@ -24,6 +25,8 @@ class MediaViewerBottomControls extends StatelessWidget {
   final VoidCallback onAdvancedSettingsPressed;
   final VoidCallback onStartHideTimer;
   final ValueChanged<bool> onShowUIChanged;
+  final bool isCarouselVisible;
+  final VoidCallback? onToggleCarousel;
 
   const MediaViewerBottomControls({
     Key? key,
@@ -32,6 +35,7 @@ class MediaViewerBottomControls extends StatelessWidget {
     required this.videoProgressNotifier,
     required this.isImage,
     required this.showUI,
+    required this.isPlaylistMode,
     required this.autoAdvance,
     required this.slideshowDelaySeconds,
     required this.isMuted,
@@ -44,6 +48,8 @@ class MediaViewerBottomControls extends StatelessWidget {
     required this.onAdvancedSettingsPressed,
     required this.onStartHideTimer,
     required this.onShowUIChanged,
+    this.isCarouselVisible = false,
+    this.onToggleCarousel,
   }) : super(key: key);
 
   String _formatDuration(Duration d) {
@@ -171,12 +177,7 @@ class MediaViewerBottomControls extends StatelessWidget {
                 flex: 1,
                 child: Align(
                   alignment: Alignment.centerRight,
-                  child: IconButton(
-                    iconSize: 24,
-                    icon: const Icon(Icons.tune_rounded, color: Colors.white),
-                    tooltip: 'Advanced Settings',
-                    onPressed: onAdvancedSettingsPressed,
-                  ),
+                  child: _buildRightControls(cs),
                 ),
               ),
             ],
@@ -186,8 +187,33 @@ class MediaViewerBottomControls extends StatelessWidget {
     );
   }
 
+  Widget _buildRightControls(ColorScheme cs) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isPlaylistMode && onToggleCarousel != null)
+          IconButton(
+            iconSize: 22,
+            icon: Icon(
+              Icons.view_carousel_rounded,
+              color: isCarouselVisible ? cs.primary : Colors.white,
+            ),
+            tooltip: 'Thumbnail Carousel',
+            onPressed: onToggleCarousel,
+          ),
+        IconButton(
+          iconSize: 24,
+          icon: const Icon(Icons.tune_rounded, color: Colors.white),
+          tooltip: 'Advanced Settings',
+          onPressed: onAdvancedSettingsPressed,
+        ),
+      ],
+    );
+  }
+
   Widget _buildLeftControls(ColorScheme cs) {
     if (isImage) {
+      if (!isPlaylistMode) return const SizedBox.shrink();
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -252,16 +278,23 @@ class MediaViewerBottomControls extends StatelessWidget {
             onPressed: () {
               HapticFeedback.lightImpact();
               VideoPlaybackMode nextMode;
-              switch (videoPlaybackMode) {
-                case VideoPlaybackMode.playOnce:
-                  nextMode = VideoPlaybackMode.loop;
-                  break;
-                case VideoPlaybackMode.loop:
-                  nextMode = VideoPlaybackMode.playAndAdvance;
-                  break;
-                case VideoPlaybackMode.playAndAdvance:
-                  nextMode = VideoPlaybackMode.playOnce;
-                  break;
+              if (!isPlaylistMode) {
+                // Nothing to advance to outside a playlist, so just toggle looping.
+                nextMode = videoPlaybackMode == VideoPlaybackMode.loop
+                    ? VideoPlaybackMode.playOnce
+                    : VideoPlaybackMode.loop;
+              } else {
+                switch (videoPlaybackMode) {
+                  case VideoPlaybackMode.playOnce:
+                    nextMode = VideoPlaybackMode.loop;
+                    break;
+                  case VideoPlaybackMode.loop:
+                    nextMode = VideoPlaybackMode.playAndAdvance;
+                    break;
+                  case VideoPlaybackMode.playAndAdvance:
+                    nextMode = VideoPlaybackMode.playOnce;
+                    break;
+                }
               }
               onPlaybackModeChanged(nextMode);
             },
@@ -272,6 +305,9 @@ class MediaViewerBottomControls extends StatelessWidget {
   }
 
   Widget _buildBottomTransportControls(ColorScheme cs) {
+    // A single static image has no play/pause or navigation to offer.
+    if (isImage && !isPlaylistMode) return const SizedBox.shrink();
+
     final bool isFirst = playlistController.currentIndex == 0;
     final bool isLast =
         playlistController.currentIndex == playlistController.playlist.length - 1;
@@ -290,15 +326,17 @@ class MediaViewerBottomControls extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
-              iconSize: 32,
-              icon: Icon(
-                Icons.skip_previous_rounded,
-                color: isFirst ? Colors.white30 : Colors.white,
+            if (isPlaylistMode) ...[
+              IconButton(
+                iconSize: 32,
+                icon: Icon(
+                  Icons.skip_previous_rounded,
+                  color: isFirst ? Colors.white30 : Colors.white,
+                ),
+                onPressed: isFirst ? null : onNavigateToPrev,
               ),
-              onPressed: isFirst ? null : onNavigateToPrev,
-            ),
-            const SizedBox(width: 8),
+              const SizedBox(width: 8),
+            ],
             IconButton(
               iconSize: 48,
               icon: Icon(
@@ -311,15 +349,17 @@ class MediaViewerBottomControls extends StatelessWidget {
                 onTogglePlayPause(isPlayingState);
               },
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              iconSize: 32,
-              icon: Icon(
-                Icons.skip_next_rounded,
-                color: isLast ? Colors.white30 : Colors.white,
+            if (isPlaylistMode) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                iconSize: 32,
+                icon: Icon(
+                  Icons.skip_next_rounded,
+                  color: isLast ? Colors.white30 : Colors.white,
+                ),
+                onPressed: isLast ? null : onNavigateToNext,
               ),
-              onPressed: isLast ? null : onNavigateToNext,
-            ),
+            ],
           ],
         ),
       ),

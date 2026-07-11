@@ -13,6 +13,7 @@ import 'widgets/media_player_widget.dart';
 import 'widgets/media_viewer_top_bar.dart';
 import 'widgets/media_viewer_bottom_controls.dart';
 import 'widgets/advanced_settings_sheet.dart';
+import 'widgets/playlist_carousel_overlay.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 enum VideoPlaybackMode { playOnce, loop, playAndAdvance }
@@ -40,7 +41,7 @@ class MediaViewerScreen extends StatefulWidget {
 class _MediaViewerScreenState extends State<MediaViewerScreen> {
   late final PlaylistController _playlistController;
   late final VideoPlaybackManager _playbackManager;
-  late final PageController _pageController;
+  late PageController _pageController;
 
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
@@ -50,6 +51,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   bool _showUI = false;
   int _activeMenuCount = 0;
+  bool _isCarouselVisible = false;
 
   Timer? _slideshowTimer;
   Timer? _hideTimer;
@@ -68,6 +70,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   final Map<String, Uint8List> _prefetchedImages = {};
   final Set<String> _prefetchingActive = {};
   final Map<String, int> _rotations = {};
+  
+  // Using a GlobalKey cache ensures that when indices radically shift 
+  // during a playlist mode change, the loaded image state is preserved 
+  // and simply moved to the new index without flashing to a placeholder.
+  final Map<String, GlobalKey> _mediaKeys = {};
 
   VideoPlayerController? _lastListenedController;
   bool _wakelockEnabled = false;
@@ -98,6 +105,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _startSlideshowTimerIfNeeded();
       _prefetchSurroundingItems();
     });
+  }
+
+  GlobalKey _getMediaKey(String fileName) {
+    if (!_mediaKeys.containsKey(fileName)) {
+      // Keep a modest cache to prevent memory leaks during long browsing sessions
+      if (_mediaKeys.length > MediaViewerConstants.maxPrefetchCacheSize * 2) {
+        _mediaKeys.remove(_mediaKeys.keys.first);
+      }
+      _mediaKeys[fileName] = GlobalKey(debugLabel: fileName);
+    }
+    return _mediaKeys[fileName]!;
   }
 
   void _onContainerDetached(int volId) {
@@ -311,6 +329,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
     if (success && mounted) {
       _prefetchedImages.remove(fileToDelete);
+      _mediaKeys.remove(fileToDelete);
       _playlistController.removeCurrent();
 
       if (_playlistController.isEmpty) {
@@ -379,6 +398,26 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _startHideTimer();
   }
 
+  void _toggleCarousel() {
+    HapticFeedback.lightImpact();
+    setState(() => _isCarouselVisible = !_isCarouselVisible);
+    if (_isCarouselVisible) {
+      _menuOpened();
+    } else {
+      _menuClosed();
+    }
+  }
+
+  void _selectFromCarousel(int index) {
+    HapticFeedback.selectionClick();
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(index);
+    } else {
+      _playlistController.updateIndex(index);
+    }
+    _onScrollEnd();
+  }
+
   void _updatePlaybackMode(VideoPlaybackMode mode) {
     _startHideTimer(); // Reset the hide timer on playback configuration changes
     setState(() {
@@ -400,6 +439,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       isScrollControlled: true,
       builder: (context) {
         return AdvancedSettingsSheet(
+          isPlaylistMode: _playlistController.isPlaylistMode,
           isImage: isImage,
           currentFileName: _playlistController.currentFile,
           initialRotation: _rotations[_playlistController.currentFile] ?? 0,
@@ -527,6 +567,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   return false;
                 },
                 child: PageView.builder(
+                  // A state-aware composite key ensures the entire scrollable structure 
+                  // is safely recreated when the playlist is configured, shuffled, or closed.
+                  key: ValueKey(
+                    '${_playlistController.isPlaylistMode}_'
+                    '${_playlistController.selectedFolder}_'
+                    '${_playlistController.isShuffled}',
+                  ),
                   controller: _pageController,
                   physics: physics,
                   itemCount: total,
@@ -551,7 +598,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                       color: Colors.black,
                       child: isImg
                           ? ImagePageItem(
-                              key: ValueKey(fileName),
+                              key: _getMediaKey(fileName),
                               fileName: fileName,
                               prefetchedBytes: prefetchedBytes,
                               container: widget.container,
@@ -566,7 +613,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                               },
                             )
                           : MediaPlayerWidget(
-                              key: ValueKey(fileName),
+                              key: _getMediaKey(fileName),
                               container: widget.container,
                               fileName: fileName,
                               contentUriString: contentUriString,
@@ -631,10 +678,30 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               onDeletePressed: _deleteCurrentFile,
               onPlaylistChanged: () {
                 _startHideTimer(); // Reset hide timer on playlist adjustments
-                if (_pageController.hasClients) {
-                  _pageController.jumpToPage(_playlistController.currentIndex);
-                  _onScrollEnd();
+                if (!_playlistController.isPlaylistMode) {
+                  if (_isCarouselVisible) _toggleCarousel();
+                  if (_autoAdvance) {
+                    _updatePlaybackMode(VideoPlaybackMode.playOnce);
+                  }
                 }
+
+                // By perfectly re-creating the PageController whenever the playlist
+                // radically changes its count, we bypass any possibility of scroll constraints
+                // clamping and triggering a sudden image flash/disappearance.
+                if (_pageController.hasClients) {
+                  final oldController = _pageController;
+                  _pageController = PageController(initialPage: _playlistController.currentIndex);
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    oldController.dispose();
+                  });
+                }
+
+                setState(() {});
+                
+                // Fire off the finalization logic the frame after state resolves
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _onScrollEnd();
+                });
               },
             ),
           ),
@@ -652,6 +719,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               videoProgressNotifier: _videoProgressNotifier,
               isImage: isCurrentAnImage,
               showUI: _showUI,
+              isPlaylistMode: _playlistController.isPlaylistMode,
               autoAdvance: _autoAdvance,
               slideshowDelaySeconds: _slideshowDelaySeconds,
               isMuted: _isMuted,
@@ -687,6 +755,27 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               onAdvancedSettingsPressed: () => _showAdvancedSettings(context, isCurrentAnImage),
               onStartHideTimer: _startHideTimer,
               onShowUIChanged: _setUIVisibility,
+              isCarouselVisible: _isCarouselVisible,
+              onToggleCarousel: _playlistController.isPlaylistMode ? _toggleCarousel : null,
+            ),
+          ),
+
+          // Thumbnail carousel overlay — quick scroll-and-pick navigation
+          AnimatedPositioned(
+            duration: MediaViewerConstants.animationDuration,
+            curve: Curves.easeOut,
+            left: 0,
+            right: 0,
+            bottom: (_isCarouselVisible && _showUI)
+                ? 0
+                : -PlaylistCarouselOverlay.height,
+            child: PlaylistCarouselOverlay(
+              container: widget.container,
+              playlist: _playlistController.playlist,
+              currentIndex: _playlistController.currentIndex,
+              thumbnailQuality: widget.thumbnailQuality,
+              onSelect: _selectFromCarousel,
+              onClose: _toggleCarousel,
             ),
           ),
         ],

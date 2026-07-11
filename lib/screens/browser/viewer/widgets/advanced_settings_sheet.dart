@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../media_viewer_constants.dart';
 
 class AdvancedSettingsSheet extends StatefulWidget {
+  final bool isPlaylistMode;
   final bool isImage;
   final String currentFileName;
   final int initialRotation;
@@ -20,6 +21,7 @@ class AdvancedSettingsSheet extends StatefulWidget {
 
   const AdvancedSettingsSheet({
     Key? key,
+    required this.isPlaylistMode,
     required this.isImage,
     required this.currentFileName,
     required this.initialRotation,
@@ -191,27 +193,30 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
               setState(() => _sheetPage = 'imageFit');
             },
           ),
-          const Divider(),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.timer_outlined),
-            title: const Text('Slideshow Delay'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${_currentSlideshowDelaySeconds}s',
-                  style: TextStyle(color: cs.primary, fontSize: 13),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded, size: 20),
-              ],
+          // Only show Slideshow Delay if we are in Playlist Mode
+          if (widget.isPlaylistMode) ...[
+            const Divider(),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.timer_outlined),
+              title: const Text('Slideshow Delay'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${_currentSlideshowDelaySeconds}s',
+                    style: TextStyle(color: cs.primary, fontSize: 13),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.chevron_right_rounded, size: 20),
+                ],
+              ),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                setState(() => _sheetPage = 'slideshowDelay');
+              },
             ),
-            onTap: () {
-              HapticFeedback.lightImpact();
-              setState(() => _sheetPage = 'slideshowDelay');
-            },
-          ),
+          ],
         ],
       );
     } else {

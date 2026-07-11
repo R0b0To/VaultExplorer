@@ -12,6 +12,7 @@ class MediaViewerConstants {
   static const int maxLiveVideoControllers = 3;
   static const int maxDirectorySearchDepth = 20;
   static const int thumbnailTargetSize = 360;
+  static const int carouselThumbnailTargetSize = 160;
 
   static const List<double> playbackSpeeds = [0.5, 1.0, 1.25, 1.5, 2.0];
 

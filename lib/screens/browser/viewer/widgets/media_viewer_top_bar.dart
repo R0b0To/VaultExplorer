@@ -68,16 +68,20 @@ class MediaViewerTopBar extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  '${playlistController.currentIndex + 1} of $totalCount${playlistController.isScanningSubfolders ? '  ·  scanning…' : ''}',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 12,
+                if (playlistController.isPlaylistMode || playlistController.isScanningSubfolders)
+                  Text(
+                    playlistController.isPlaylistMode
+                        ? '${playlistController.currentIndex + 1} of $totalCount${playlistController.isScanningSubfolders ? '  ·  scanning…' : ''}'
+                        : 'Scanning…',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 12,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
+          _buildPlaylistMenu(context, cs),
           IconButton(
             icon: Icon(Icons.delete_outline_rounded, color: cs.error),
             tooltip: 'Delete File',
@@ -90,20 +94,120 @@ class MediaViewerTopBar extends StatelessWidget {
     );
   }
 
+  Widget _buildPlaylistMenu(BuildContext context, ColorScheme cs) {
+    final isPlaylist = playlistController.isPlaylistMode;
+    final folderScope = playlistController.selectedFolder;
+
+    final isThisFolderSelected = isPlaylist && folderScope == 'Current Folder Only';
+    final isAllSelected = isPlaylist && folderScope == 'All';
+
+    return MenuAnchor(
+      builder: (ctx, controller, child) => IconButton(
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          controller.isOpen ? controller.close() : controller.open();
+        },
+        icon: Icon(
+          playlistController.isPlaylistMode
+              ? Icons.playlist_play_rounded
+              : Icons.playlist_add_rounded,
+          color: playlistController.isPlaylistMode ? cs.primary : Colors.white,
+        ),
+        tooltip: playlistController.isPlaylistMode ? 'Playlist Options' : 'Enable Playlist',
+      ),
+      menuChildren: [
+        MenuItemButton(
+          style: MenuItemButton.styleFrom(
+            foregroundColor: isThisFolderSelected ? cs.primary : null,
+          ),
+          onPressed: () async {
+            // 1. Capture the currently viewed file before altering the playlist
+            final targetFile = playlistController.currentFile;
+
+            if (isThisFolderSelected) {
+              playlistController.disablePlaylist();
+            } else {
+              await playlistController.enablePlaylist('Current Folder Only');
+            }
+
+            // 2. Find where the file ended up in the new playlist and update the index
+            final newIndex = playlistController.playlist.indexOf(targetFile);
+            if (newIndex != -1) {
+              playlistController.updateIndex(newIndex);
+            }
+
+            onPlaylistChanged();
+          },
+          leadingIcon: isThisFolderSelected
+              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+              : const SizedBox(width: 16),
+          child: const Text('This Folder'),
+        ),
+        MenuItemButton(
+          style: MenuItemButton.styleFrom(
+            foregroundColor: isAllSelected ? cs.primary : null,
+          ),
+          onPressed: () async {
+            // 1. Capture the currently viewed file before altering the playlist
+            final targetFile = playlistController.currentFile;
+
+            if (isAllSelected) {
+              playlistController.disablePlaylist();
+            } else {
+              await playlistController.enablePlaylist('All');
+            }
+
+            // 2. Find where the file ended up in the new playlist and update the index
+            final newIndex = playlistController.playlist.indexOf(targetFile);
+            if (newIndex != -1) {
+              playlistController.updateIndex(newIndex);
+            }
+
+            onPlaylistChanged();
+          },
+          leadingIcon: isAllSelected
+              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+              : const SizedBox(width: 16),
+          child: const Text('All (Incl. Subfolders)'),
+        ),
+        if (playlistController.isPlaylistMode) ...[
+          const PopupMenuDivider(),
+          MenuItemButton(
+            style: MenuItemButton.styleFrom(
+              foregroundColor: playlistController.isShuffled ? cs.primary : null,
+            ),
+            onPressed: () {
+              // 1. Capture current file
+              final targetFile = playlistController.currentFile;
+              
+              playlistController.toggleShuffle();
+
+              // 2. Restore index so we don't jump when shuffling/unshuffling
+              final newIndex = playlistController.playlist.indexOf(targetFile);
+              if (newIndex != -1) {
+                playlistController.updateIndex(newIndex);
+              }
+
+              onPlaylistChanged();
+            },
+            leadingIcon: Icon(
+              Icons.shuffle_rounded,
+              size: 16,
+              color: playlistController.isShuffled ? cs.primary : cs.onSurfaceVariant,
+            ),
+            child: Text(
+              playlistController.isShuffled
+                  ? 'Disable Shuffle'
+                  : 'Shuffle Playlist',
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildMoreMenu(BuildContext context, ColorScheme cs) {
     return MenuAnchor(
-      style: MenuStyle(
-        backgroundColor: WidgetStateProperty.all(
-          Colors.black.withValues(alpha: 0.9),
-        ),
-        elevation: WidgetStateProperty.all(12),
-        shape: WidgetStateProperty.all(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-            side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-          ),
-        ),
-      ),
       builder: (ctx, controller, child) => IconButton(
         onPressed: () {
           HapticFeedback.lightImpact();
@@ -114,7 +218,6 @@ class MediaViewerTopBar extends StatelessWidget {
       ),
       menuChildren: [
         MenuItemButton(
-          style: MenuItemButton.styleFrom(foregroundColor: Colors.white),
           onPressed: () async {
             try {
               await vaultExplorerApi.openWithApp(
@@ -132,34 +235,21 @@ class MediaViewerTopBar extends StatelessWidget {
               }
             }
           },
-          leadingIcon: const Icon(
+          leadingIcon: Icon(
             Icons.open_in_new_rounded,
             size: 18,
-            color: Colors.white70,
+            color: cs.onSurfaceVariant,
           ),
           child: const Text('Open with App'),
         ),
         SubmenuButton(
-          style: SubmenuButton.styleFrom(foregroundColor: Colors.white),
-          menuStyle: MenuStyle(
-            backgroundColor: WidgetStateProperty.all(
-              Colors.black.withValues(alpha: 0.9),
-            ),
-            shape: WidgetStateProperty.all(
-              RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-              ),
-            ),
-          ),
-          leadingIcon: const Icon(
+          leadingIcon: Icon(
             Icons.screen_rotation_rounded,
             size: 18,
-            color: Colors.white70,
+            color: cs.onSurfaceVariant,
           ),
           menuChildren: [
             MenuItemButton(
-              style: MenuItemButton.styleFrom(foregroundColor: Colors.white),
               onPressed: () {
                 HapticFeedback.lightImpact();
                 SystemChrome.setPreferredOrientations([
@@ -169,7 +259,6 @@ class MediaViewerTopBar extends StatelessWidget {
               child: const Text('Force Portrait'),
             ),
             MenuItemButton(
-              style: MenuItemButton.styleFrom(foregroundColor: Colors.white),
               onPressed: () {
                 HapticFeedback.lightImpact();
                 SystemChrome.setPreferredOrientations([
@@ -180,7 +269,6 @@ class MediaViewerTopBar extends StatelessWidget {
               child: const Text('Force Landscape'),
             ),
             MenuItemButton(
-              style: MenuItemButton.styleFrom(foregroundColor: Colors.white),
               onPressed: () {
                 HapticFeedback.lightImpact();
                 SystemChrome.setPreferredOrientations(DeviceOrientation.values);
@@ -189,73 +277,6 @@ class MediaViewerTopBar extends StatelessWidget {
             ),
           ],
           child: const Text('Screen Orientation'),
-        ),
-        MenuItemButton(
-          style: MenuItemButton.styleFrom(foregroundColor: Colors.white),
-          onPressed: () {
-            playlistController.toggleShuffle();
-            onPlaylistChanged();
-          },
-          leadingIcon: Icon(
-            Icons.shuffle_rounded,
-            size: 18,
-            color: playlistController.isShuffled ? cs.primary : Colors.white70,
-          ),
-          child: Text(
-            playlistController.isShuffled
-                ? 'Disable Shuffle'
-                : 'Shuffle Playlist',
-          ),
-        ),
-        const PopupMenuDivider(color: Colors.white10),
-        SubmenuButton(
-          style: SubmenuButton.styleFrom(foregroundColor: Colors.white),
-          menuStyle: MenuStyle(
-            backgroundColor: WidgetStateProperty.all(
-              Colors.black.withValues(alpha: 0.9),
-            ),
-            shape: WidgetStateProperty.all(
-              RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-              ),
-            ),
-          ),
-          menuChildren: [
-            MenuItemButton(
-              style: MenuItemButton.styleFrom(
-                foregroundColor:
-                    playlistController.selectedFolder == 'Current Folder Only'
-                        ? cs.primary
-                        : Colors.white,
-              ),
-              onPressed: () async {
-                await playlistController.filterByFolder('Current Folder Only');
-                onPlaylistChanged();
-              },
-              leadingIcon:
-                  playlistController.selectedFolder == 'Current Folder Only'
-                      ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-                      : const SizedBox(width: 16),
-              child: const Text('Current Folder Only'),
-            ),
-            MenuItemButton(
-              style: MenuItemButton.styleFrom(
-                foregroundColor: playlistController.selectedFolder == 'All'
-                    ? cs.primary
-                    : Colors.white,
-              ),
-              onPressed: () async {
-                await playlistController.filterByFolder('All');
-                onPlaylistChanged();
-              },
-              leadingIcon: playlistController.selectedFolder == 'All'
-                  ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-                  : const SizedBox(width: 16),
-              child: const Text('All (Incl. Subfolders)'),
-            ),
-          ],
-          child: const Text('Folder Filter'),
         ),
       ],
     );

@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/mounted_container.dart';
+import '../../models/vault_list_item.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
+import '../../services/session_lock_controller.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../widgets/common_widgets.dart';
 import '../settings/app_settings_screen.dart';
@@ -58,15 +60,23 @@ class _VaultDashboardState extends State<VaultDashboard>
 
   final Map<int, Timer> _autoCloseTimers = {};
 
-  DateTime? _pausedAt;
-  Timer? _autoLockTimer;
+  // All auto-lock/lifecycle/screen-off *policy* now lives in this
+  // controller — the dashboard just wires it to lifecycle callbacks and
+  // gives it a couple of hooks back into dashboard-specific behavior
+  // (locking every mounted container, showing the lock-gate screen).
+  late final SessionLockController _lockController;
 
   @override
   void initState() {
     super.initState();
+    _lockController = SessionLockController(
+      settings: () => _appSettings,
+      lockAllMountedContainers: _lockAllMountedContainers,
+      enforceAppLock: _enforceAppLock,
+    );
     WidgetsBinding.instance.addObserver(this);
     VaultExplorerApi.addUsbContainerDetachedListener(_onUsbContainerDetached);
-    VaultExplorerApi.addScreenOffListener(_onScreenOff);
+    VaultExplorerApi.addScreenOffListener(_lockController.handleScreenOff);
     _loadAll();
   }
 
@@ -75,9 +85,9 @@ class _VaultDashboardState extends State<VaultDashboard>
     WidgetsBinding.instance.removeObserver(this);
     for (final t in _autoCloseTimers.values) t.cancel();
     _autoCloseTimers.clear();
-    _autoLockTimer?.cancel();
+    _lockController.dispose();
     VaultExplorerApi.removeUsbContainerDetachedListener(_onUsbContainerDetached);
-    VaultExplorerApi.removeScreenOffListener(_onScreenOff);
+    VaultExplorerApi.removeScreenOffListener(_lockController.handleScreenOff);
     super.dispose();
   }
 
@@ -87,54 +97,8 @@ class _VaultDashboardState extends State<VaultDashboard>
       for (final c in List<MountedContainer>.from(_mounted)) {
         _refreshContainerSpace(c.volId);
       }
-
-      final pausedAt = _pausedAt;
-      _pausedAt = null;
-
-      final mins = _appSettings.autoLockMins;
-      final wasAwayTooLong = pausedAt != null &&
-          mins > 0 &&
-          DateTime.now().difference(pausedAt) >= Duration(minutes: mins);
-
-      if (wasAwayTooLong) {
-        _performAutoLock();
-      } else {
-        _scheduleAutoLock();
-      }
-    } else if (state == AppLifecycleState.paused) {
-
-      _pausedAt = DateTime.now();
     }
-  }
-
-  void _onScreenOff() {
-    if (_appSettings.lockContainersOnScreenLock && _appSettings.autoLockMins == 0) {
-      _performAutoLock();
-    }
-  }
-
-  void _scheduleAutoLock() {
-    _autoLockTimer?.cancel();
-    final mins = _appSettings.autoLockMins;
-    final hasMasterPassword =
-        _appSettings.useMasterPassword && _appSettings.masterPasswordHash != null;
-    if (mins <= 0 || (!hasMasterPassword && !_appSettings.lockContainersOnScreenLock)) {
-      return;
-    }
-    _autoLockTimer = Timer(Duration(minutes: mins), _performAutoLock);
-  }
-
-  Future<void> _performAutoLock() async {
-    _autoLockTimer?.cancel();
-    if (_appSettings.lockContainersOnScreenLock) {
-      await _lockAllMountedContainers();
-    }
-    if (!mounted) return;
-    final hasMasterPassword =
-        _appSettings.useMasterPassword && _appSettings.masterPasswordHash != null;
-    if (_appSettings.lockContainersOnScreenLock || hasMasterPassword) {
-      await _enforceAppLock();
-    }
+    _lockController.handleAppLifecycleState(state);
   }
 
   Future<void> _enforceAppLock() async {
@@ -174,7 +138,7 @@ class _VaultDashboardState extends State<VaultDashboard>
         _recordsOrder.addAll(records.keys);
         _isLoading = false;
       });
-      _scheduleAutoLock();
+      _lockController.scheduleAutoLock();
     }
   }
 
@@ -234,7 +198,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     if ((record?.autoCloseMins ?? 0) > 0) {
       _scheduleAutoClose(container);
     }
-    _scheduleAutoLock();
+    _lockController.scheduleAutoLock();
   }
 
   void _cancelAutoClose(int volId) {
@@ -579,34 +543,53 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (mounted) _refreshContainerSpace(container.volId);
   }
 
-  // ── Sort Helpers ─────────────────────────────────────────────────────────
+  // ── Display list ─────────────────────────────────────────────────────────
 
-  String _getItemName(dynamic item) {
-    if (item is MountedContainer) return item.displayName;
-    if (item is ContainerRecord) return item.label.isNotEmpty ? item.label : item.uri.split('/').last;
-    return '';
-  }
-
-  DateTime _getItemDate(dynamic item) {
-    try {
-      final dynamic d = item;
-      if (d.createdAt != null) return d.createdAt as DateTime;
-    } catch (_) {}
-    try {
-      final dynamic d = item;
-      if (d.dateAdded != null) return d.dateAdded as DateTime;
-    } catch (_) {}
-
-    final String? uri = item is MountedContainer ? item.uri : (item is ContainerRecord ? item.uri : null);
-    if (uri != null) {
-      final idx = _recordsOrder.indexOf(uri);
-      if (idx != -1) return DateTime.fromMillisecondsSinceEpoch(idx * 1000);
-    }
+  // "Sort by Date Added" proxy. Neither model has a real timestamp for this:
+  //   - MountedContainer only has `mountedAt`, which is a *last-unlocked*
+  //     time — using it would make the sort order jump around on every
+  //     re-unlock (see mounted_container.dart).
+  //   - ContainerRecord has no date field at all — nothing chronological is
+  //     even persisted to containers_v2.json (see container_repository.dart).
+  // So this stands in for "date added" using the order records come back
+  // from ContainerRepository.loadAll(). That's stable across app restarts:
+  // _persist() writes `_cache!.values` (a LinkedHashMap, so insertion order),
+  // and re-saving an existing record doesn't move its position — Map's `[]=`
+  // on an existing key keeps its original slot. So first-added stays first
+  // unless the record is removed and re-added.
+  //
+  // If you want a real "added" date shown/sorted, the fix is upstream: add
+  // `final DateTime createdAt` to ContainerRecord (stamped once, on first
+  // save — see ContainerRepository.save), default legacy JSON entries that
+  // predate the field to whatever this proxy already gives them so existing
+  // sort order doesn't jump on upgrade, then this function goes away.
+  DateTime _dateAddedProxy(String uri) {
+    final idx = _recordsOrder.indexOf(uri);
+    if (idx != -1) return DateTime.fromMillisecondsSinceEpoch(idx * 1000);
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
-  int _getItemSize(dynamic item) => item is MountedContainer ? item.totalSpace : 0;
-  int _getItemStatus(dynamic item) => item is MountedContainer ? 1 : 0;
+  List<VaultListItem> _buildDisplayItems() {
+    final items = <VaultListItem>[
+      for (final c in _mounted)
+        MountedVaultItem(c, sortDate: _dateAddedProxy(c.uri)),
+      for (final entry in _records.entries)
+        if (!_mounted.any((m) => m.uri == entry.key))
+          LockedVaultItem(entry.value, sortDate: _dateAddedProxy(entry.key)),
+    ];
+
+    items.sort((a, b) {
+      final result = switch (_sortField) {
+        VaultSortField.name => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        VaultSortField.date => a.sortDate.compareTo(b.sortDate),
+        VaultSortField.size => a.size.compareTo(b.size),
+        VaultSortField.status => (a.isMounted ? 1 : 0).compareTo(b.isMounted ? 1 : 0),
+      };
+      return _sortAscending ? result : -result;
+    });
+
+    return items;
+  }
 
   // ── Tab Builders ──────────────────────────────────────────────────────────
 
@@ -671,7 +654,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     ];
   }
 
-  Widget _buildVaultsTab(List<dynamic> displayItems, ColorScheme cs, TextTheme textTheme, bool isWide) {
+  Widget _buildVaultsTab(List<VaultListItem> displayItems, ColorScheme cs, TextTheme textTheme, bool isWide) {
     return RefreshIndicator(
       onRefresh: _handleRefresh,
       child: CustomScrollView(
@@ -719,21 +702,9 @@ class _VaultDashboardState extends State<VaultDashboard>
     );
   }
 
-  Widget _buildVaultListTile(dynamic item, int index, ColorScheme cs) {
-    final String uri;
-    final String label;
-    final bool isMounted;
-
-    if (item is MountedContainer) {
-      uri = item.uri;
-      label = item.displayName;
-      isMounted = true;
-    } else {
-      final record = item as ContainerRecord;
-      uri = record.uri;
-      label = record.label.isNotEmpty ? record.label : record.uri.split('/').last;
-      isMounted = false;
-    }
+  Widget _buildVaultListTile(VaultListItem item, int index, ColorScheme cs) {
+    final uri = item.uri;
+    final label = item.name;
 
     return StaggeredEntrance(
       index: index,
@@ -741,7 +712,7 @@ class _VaultDashboardState extends State<VaultDashboard>
         key: Key('dismiss_$uri'),
         direction: DismissDirection.startToEnd,
         confirmDismiss: (direction) async {
-          if (isMounted) {
+          if (item.isMounted) {
             showAppSnackBar(
               context,
               message: 'Lock the container before removing it.',
@@ -752,7 +723,7 @@ class _VaultDashboardState extends State<VaultDashboard>
           return true;
         },
         onDismissed: (direction) {
-          _handleSwipeToRemove(uri, item as ContainerRecord);
+          _handleSwipeToRemove(uri, (item as LockedVaultItem).record);
         },
         background: Container(
           alignment: Alignment.centerLeft,
@@ -779,24 +750,27 @@ class _VaultDashboardState extends State<VaultDashboard>
                 child: child,
               );
             },
-            // Unique keys tell AnimatedSwitcher that a structural layout change took place
-            child: isMounted
-                ? ContainerCard(
-                    key: ValueKey('mounted_$uri'),
-                    container: item as MountedContainer,
-                    onLocked: _onContainerLocked,
-                    onBrowse: () => _openBrowser(item),
-                    onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
-                  )
-                : SavedContainerCard(
-                    key: ValueKey('locked_$uri'),
-                    name: label,
-                    uri: uri,
-                    onUnlock: () => (item as ContainerRecord).isUsbSource
-                        ? _showUsbUnlockSheet(existingRecord: item)
-                        : _showUnlockSheet(uri: uri, name: label),
-                    onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
-                  ),
+            // The compiler checks this switch is exhaustive over the sealed
+            // VaultListItem hierarchy — add a third subtype later and this
+            // won't compile until you handle it here too.
+            child: switch (item) {
+              MountedVaultItem(:final container) => ContainerCard(
+                  key: ValueKey('mounted_$uri'),
+                  container: container,
+                  onLocked: _onContainerLocked,
+                  onBrowse: () => _openBrowser(container),
+                  onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+                ),
+              LockedVaultItem(:final record) => SavedContainerCard(
+                  key: ValueKey('locked_$uri'),
+                  name: label,
+                  uri: uri,
+                  onUnlock: () => record.isUsbSource
+                      ? _showUsbUnlockSheet(existingRecord: record)
+                      : _showUnlockSheet(uri: uri, name: label),
+                  onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
+                ),
+            },
           ),
         ),
       ),
@@ -811,36 +785,11 @@ class _VaultDashboardState extends State<VaultDashboard>
     // Use a >= 600 dp breakpoint (standard Android class boundary for foldables/tablets in landscape)
     final isWide = MediaQuery.sizeOf(context).width >= 600;
 
-    final displayItems = <dynamic>[];
-    displayItems.addAll(_mounted);
-    for (final entry in _records.entries) {
-      if (!_mounted.any((m) => m.uri == entry.key)) {
-        displayItems.add(entry.value);
-      }
-    }
-
-    displayItems.sort((a, b) {
-      int result = 0;
-      switch (_sortField) {
-        case VaultSortField.name:
-          result = _getItemName(a).toLowerCase().compareTo(_getItemName(b).toLowerCase());
-          break;
-        case VaultSortField.date:
-          result = _getItemDate(a).compareTo(_getItemDate(b));
-          break;
-        case VaultSortField.size:
-          result = _getItemSize(a).compareTo(_getItemSize(b));
-          break;
-        case VaultSortField.status:
-          result = _getItemStatus(a).compareTo(_getItemStatus(b));
-          break;
-      }
-      return _sortAscending ? result : -result;
-    });
+    final displayItems = _buildDisplayItems();
 
     return Listener(
       behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) => _scheduleAutoLock(),
+      onPointerDown: (_) => _lockController.scheduleAutoLock(),
       child: Scaffold(
         extendBody: true,
         // Show the FAB on the Vaults tab in both portrait and landscape

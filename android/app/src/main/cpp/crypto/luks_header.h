@@ -92,10 +92,18 @@ bool isLuksContainer(const uint8_t* header, size_t len);
 
 // Main master key recovery entry point for LUKS containers.
 // Handled callbacks for cancellation and progress reporting to keep JNI logic decoupled.
+// candidateMasterKey / candidateMasterKeyLen: optional quick-unlock fast
+// path. When supplied, password/passwordLen are ignored, every keyslot's
+// PBKDF2/Argon2 derivation is skipped entirely, and the candidate is
+// verified directly against the header (LUKS1) or matching digest (LUKS2).
+// Returns false without touching any keyslot if the candidate doesn't
+// verify — callers should fall back to password/keyfile in that case.
 bool luksRecoverMasterKey(int fd,
                           const uint8_t* password,
                           size_t passwordLen,
                           LuksVolumeInfo& outInfo,
                           int volId = -1,
                           std::function<bool(int)> cancelCheck = nullptr,
-                          std::function<void(int, int, int, int)> progressCallback = nullptr);
+                          std::function<void(int, int, int, int)> progressCallback = nullptr,
+                          const uint8_t* candidateMasterKey = nullptr,
+                          size_t candidateMasterKeyLen = 0);

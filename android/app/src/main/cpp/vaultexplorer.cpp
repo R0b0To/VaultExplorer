@@ -156,6 +156,15 @@ struct VolumeState {
     // (and thus every byte after the first 16) comes out wrong.
     uint32_t luksSectorSize = 512;
 
+    // ── LUKS: non-AES single cipher support (Serpent/Twofish over
+    // xts-plain64). Reuses the same single-layer CascadeContext machinery
+    // as VeraCrypt (CascadeId::kSerpent / CascadeId::kTwofish) rather than
+    // a second, parallel cipher abstraction — mbedTLS only provides XTS
+    // for AES, so non-AES LUKS ciphers go through cascadeSetKeys +
+    // blockCipherEncryptBlock/blockCipherDecryptBlock instead.
+    bool luksUsesGenericCipher = false;
+    CascadeContext luksGenericCascade;
+
     CascadeContext cascade;
     FATFS fatfs{};
 
@@ -202,6 +211,8 @@ struct VolumeState {
         extFs = nullptr;
         containerFormat = FMT_VERACRYPT;
         luksSectorSize = 512;
+        luksUsesGenericCipher = false;
+        luksGenericCascade.initialized = false;
         if (luksXts.initialized) {
             mbedtls_aes_xts_free(&luksXts.dec);
             mbedtls_aes_xts_free(&luksXts.enc);
@@ -1340,6 +1351,15 @@ static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
 extern "C" DSTATUS disk_initialize(BYTE pdrv) { return 0; }
 extern "C" DSTATUS disk_status(BYTE pdrv)     { return 0; }
 
+// Generic single-cipher XTS over a whole-block data unit (Serpent/Twofish —
+// ciphers mbedTLS doesn't provide XTS mode for). Defined below, alongside
+// localMultiplyTweak, which it reuses for the GF(2^128) tweak doubling;
+// forward-declared here so disk_read/disk_write can call it. LUKS never
+// needs ciphertext stealing, so dataLen is always a whole multiple of 16.
+static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t dataLen,
+                                 const unsigned char tweakSeed[16],
+                                 const unsigned char* in, unsigned char* out);
+
 extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     if (pdrv >= MAX_VOLUMES || !volumes[pdrv].dataCtxInitialized)
         return RES_NOTRDY;
@@ -1405,8 +1425,13 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                 const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-                mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, 512, tweakBuf,
-                                       encBuf + (i * 512), curBuf + (i * 512));
+                if (v.luksUsesGenericCipher) {
+                    genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, 512, tweakBuf,
+                                         encBuf + (i * 512), curBuf + (i * 512));
+                } else {
+                    mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, 512, tweakBuf,
+                                           encBuf + (i * 512), curBuf + (i * 512));
+                }
             }
         } else {
             // Decrypt every full aligned unit, then copy out only the sectors
@@ -1416,8 +1441,13 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                 const uint64_t sectorTweak = alignedRelStart + u;
 unsigned char tweakBuf[16] = {0};
 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
-                                       encBuf + (u * 512), decBuf.data() + (u * 512));
+                if (v.luksUsesGenericCipher) {
+                    genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
+                                         encBuf + (u * 512), decBuf.data() + (u * 512));
+                } else {
+                    mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
+                                           encBuf + (u * 512), decBuf.data() + (u * 512));
+                }
             }
             std::memcpy(curBuf, decBuf.data() + copyOffset, copyBytes);
         }
@@ -1484,8 +1514,13 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                 const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
-                mbedtls_aes_crypt_xts(&v.luksXts.enc, MBEDTLS_AES_ENCRYPT, 512, tweakBuf,
-                                       curBuf + (i * 512), encBuf + (i * 512));
+                if (v.luksUsesGenericCipher) {
+                    genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, 512, tweakBuf,
+                                         curBuf + (i * 512), encBuf + (i * 512));
+                } else {
+                    mbedtls_aes_crypt_xts(&v.luksXts.enc, MBEDTLS_AES_ENCRYPT, 512, tweakBuf,
+                                           curBuf + (i * 512), encBuf + (i * 512));
+                }
             }
         } else {
             std::vector<unsigned char> plain(totalBytes);
@@ -1497,8 +1532,13 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                     const uint64_t sectorTweak = alignedRelStart + u;
 unsigned char tweakBuf[16] = {0};
 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                    mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
-                                           existingEnc.data() + (u * 512), plain.data() + (u * 512));
+                    if (v.luksUsesGenericCipher) {
+                        genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
+                                             existingEnc.data() + (u * 512), plain.data() + (u * 512));
+                    } else {
+                        mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
+                                               existingEnc.data() + (u * 512), plain.data() + (u * 512));
+                    }
                 }
             }
             const size_t copyOffset = static_cast<size_t>(relStart - alignedRelStart) * 512;
@@ -1508,8 +1548,13 @@ for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
                 const uint64_t sectorTweak = alignedRelStart + u;
 unsigned char tweakBuf[16] = {0};
 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;;
-                mbedtls_aes_crypt_xts(&v.luksXts.enc, MBEDTLS_AES_ENCRYPT, luksUnit, tweakBuf,
-                                       plain.data() + (u * 512), encBuf + (u * 512));
+                if (v.luksUsesGenericCipher) {
+                    genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, luksUnit, tweakBuf,
+                                         plain.data() + (u * 512), encBuf + (u * 512));
+                } else {
+                    mbedtls_aes_crypt_xts(&v.luksXts.enc, MBEDTLS_AES_ENCRYPT, luksUnit, tweakBuf,
+                                           plain.data() + (u * 512), encBuf + (u * 512));
+                }
             }
         }
 
@@ -1601,6 +1646,25 @@ static void localMultiplyTweak(unsigned char T[16]) {
     }
     if (carry) {
         T[0] ^= 0x87;
+    }
+}
+
+// See forward declaration near disk_read for rationale. Mirrors
+// tryDecryptHeader's per-block tweak/encrypt/decrypt loop below, just
+// parameterized on an arbitrary starting tweak seed (the LE sector-number
+// buffer) instead of always starting from an all-zero seed.
+static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t dataLen,
+                                 const unsigned char tweakSeed[16],
+                                 const unsigned char* in, unsigned char* out) {
+    unsigned char T[16];
+    blockCipherEncryptBlock(layer.tweakKey, tweakSeed, T);
+    for (size_t b = 0; b < dataLen / 16; b++) {
+        unsigned char tmp[16];
+        for (int j = 0; j < 16; j++) tmp[j] = in[b * 16 + j] ^ T[j];
+        if (encrypt) blockCipherEncryptBlock(layer.dataKeyEnc, tmp, tmp);
+        else         blockCipherDecryptBlock(layer.dataKeyDec, tmp, tmp);
+        for (int j = 0; j < 16; j++) out[b * 16 + j] = tmp[j] ^ T[j];
+        localMultiplyTweak(T);
     }
 }
 
@@ -1856,11 +1920,45 @@ static bool deriveAndValidateHeader(
     return true;
 }
 
-static bool prepareLuksSession(int fd, const unsigned char* password, size_t passwordLen, int volId) {
-    if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); return false; }
-    if (fd < 0) return false;
+static bool prepareLuksSession(int fd, const unsigned char* password, size_t passwordLen, int volId,
+                                const unsigned char* preservedKey, size_t preservedKeyLen,
+                                const int* keyfileFds, int keyfileCount) {
+    if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
+    if (fd < 0) { closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
 
     VolumeState& v = volumes[volId];
+
+    // ── Passphrase resolution. Real LUKS (cryptsetup) treats a keyfile as a
+    // *replacement* for the typed passphrase, not an additive mix-in the way
+    // VeraCrypt's keyfile pool works here — a keyslot is unlocked by EITHER
+    // a password OR a keyfile, never both combined. If a keyfile is
+    // attached, its raw bytes become the passphrase and the typed password
+    // is ignored, matching `cryptsetup --key-file`. Only the first attached
+    // keyfile is used. ──
+    std::vector<unsigned char> keyfileBuf;
+    const unsigned char* effectivePassword = password;
+    size_t effectivePasswordLen = passwordLen;
+
+    if (keyfileCount > 0 && keyfileFds != nullptr && keyfileFds[0] >= 0) {
+        constexpr size_t kMaxKeyfileBytes = 1024 * 1024;
+        keyfileBuf.resize(kMaxKeyfileBytes);
+        ssize_t total = 0, n;
+        while (total < static_cast<ssize_t>(kMaxKeyfileBytes) &&
+               (n = read(keyfileFds[0], keyfileBuf.data() + total, kMaxKeyfileBytes - total)) > 0) {
+            total += n;
+        }
+        keyfileBuf.resize(total > 0 ? total : 0);
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        if (keyfileBuf.empty()) {
+            LOGI("prepareLuksSession(vol=%d): keyfile unreadable or empty", volId);
+            close(fd);
+            return false;
+        }
+        effectivePassword = keyfileBuf.data();
+        effectivePasswordLen = keyfileBuf.size();
+    } else {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+    }
 
     uint64_t fileSize = 0;
     struct stat st;
@@ -1876,25 +1974,76 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         reportUnlockProgress(volId, step, total, hashId, 0, format);
     };
 
-    if (!luksRecoverMasterKey(fd, password, passwordLen, luksInfo,
-                              volId, cancelCheck, progressCb)) {
+    const bool usingPreservedKey = (preservedKey != nullptr && preservedKeyLen > 0);
+    if (!luksRecoverMasterKey(fd,
+                              usingPreservedKey ? nullptr : effectivePassword,
+                              usingPreservedKey ? 0 : effectivePasswordLen,
+                              luksInfo, volId, cancelCheck, progressCb,
+                              usingPreservedKey ? preservedKey : nullptr,
+                              usingPreservedKey ? preservedKeyLen : 0)) {
         close(fd);
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
         return false;
     }
 
-    const size_t xtsKeyBits = luksInfo.keyBytes * 8;
-    if (mbedtls_aes_xts_setkey_dec(&v.luksXts.dec, luksInfo.masterKey.data(), xtsKeyBits) != 0 ||
-        mbedtls_aes_xts_setkey_enc(&v.luksXts.enc, luksInfo.masterKey.data(), xtsKeyBits) != 0) {
+    // Only xts-plain64 is implemented on the sector-crypto side below —
+    // refuse rather than silently mounting something we'd decrypt wrong.
+    if (luksInfo.cipherMode.rfind("xts-plain64", 0) != 0) {
+        LOGI("prepareLuksSession(vol=%d): unsupported cipher mode '%s'", volId, luksInfo.cipherMode.c_str());
         mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
         close(fd);
         return false;
     }
 
-    int mappedCipher = 0; // kAes
+    // mappedCipher stays the app's existing 0/1/2 (aes/serpent/twofish)
+    // convention for matchedCipherId — unrelated to CascadeId's ordinals,
+    // and kept exactly as before so any stored records / UI reading this
+    // field keep behaving the same.
+    int mappedCipher = 0; // aes
     if (luksInfo.cipherName == "serpent") mappedCipher = 1;
     else if (luksInfo.cipherName == "twofish") mappedCipher = 2;
+    else if (luksInfo.cipherName != "aes") {
+        LOGI("prepareLuksSession(vol=%d): unsupported cipher '%s'", volId, luksInfo.cipherName.c_str());
+        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+        close(fd);
+        return false;
+    }
+    int mappedHash = 0; // kSha512, display-only for LUKS
 
-    int mappedHash = 0; // kSha512
+    // Cipher dispatch: AES gets mbedTLS's accelerated XTS directly (as
+    // before); Serpent/Twofish — the other ciphers cryptsetup commonly
+    // pairs with xts-plain64 — go through the same single-layer
+    // CascadeContext machinery the VeraCrypt cascade path already uses,
+    // via cascadeSetKeys(..., CascadeId::kSerpent/kTwofish, ...).
+    const bool isGenericCipher = (mappedCipher != 0);
+    const CascadeId genericCascadeId = (mappedCipher == 1) ? CascadeId::kSerpent : CascadeId::kTwofish;
+    CascadeContext genericCascade;
+
+    bool keySetupOk;
+    if (!isGenericCipher) {
+        const size_t xtsKeyBits = luksInfo.keyBytes * 8;
+        keySetupOk = (mbedtls_aes_xts_setkey_dec(&v.luksXts.dec, luksInfo.masterKey.data(), xtsKeyBits) == 0 &&
+                      mbedtls_aes_xts_setkey_enc(&v.luksXts.enc, luksInfo.masterKey.data(), xtsKeyBits) == 0);
+    } else {
+        CascadeSpec spec = cascadeSpecFor(genericCascadeId);
+        if (spec.layerCount != 1 || luksInfo.masterKey.size() != static_cast<size_t>(spec.layerCount) * 64) {
+            LOGI("prepareLuksSession(vol=%d): unsupported key size for %s (need %zu bytes, got %zu)",
+                 volId, luksInfo.cipherName.c_str(), static_cast<size_t>(spec.layerCount) * 64,
+                 luksInfo.masterKey.size());
+            keySetupOk = false;
+        } else {
+            keySetupOk = cascadeSetKeys(genericCascade, genericCascadeId,
+                                         luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        }
+    }
+    if (!keySetupOk) {
+        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+        close(fd);
+        return false;
+    }
 
     {
         std::lock_guard<std::mutex> lock(v.mutex);
@@ -1906,6 +2055,7 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         v.matchedCipherId = mappedCipher;
         v.matchedHashId = mappedHash;
         v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
+        v.luksUsesGenericCipher = isGenericCipher;
         if (luksInfo.version == 1) {
             // LUKS1: cryptsetup sets dm-crypt's iv_offset = payload_offset, so
             // the XTS tweak counter is the ABSOLUTE physical sector from the
@@ -1926,17 +2076,34 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         }
         v.containerFormat = luksInfo.version == 1
             ? VolumeState::FMT_LUKS1 : VolumeState::FMT_LUKS2;
-        v.luksXts.initialized = true;
+        if (isGenericCipher) {
+            v.luksGenericCascade = genericCascade;
+            v.luksXts.initialized = false;
+        } else {
+            v.luksXts.initialized = true;
+            v.luksGenericCascade.initialized = false;
+        }
         v.dataCtxInitialized = true;
+
+        // Cache the recovered master key for quick-unlock — same
+        // preservedDerivedKey slot VeraCrypt uses, read by
+        // getLastDerivedKeyMaterialNative() and reused via
+        // luksRecoverMasterKey's candidateMasterKey fast path above.
+        if (v.preservedDerivedKey) delete[] v.preservedDerivedKey;
+        v.preservedDerivedKey = new unsigned char[luksInfo.masterKey.size()];
+        memcpy(v.preservedDerivedKey, luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        v.preservedDerivedKeyLen = luksInfo.masterKey.size();
     }
 
     mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+    if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
 
-    LOGI("prepareLuksSession(vol=%d): LUKS%d unlocked, dataOffset=%llu, keyBytes=%u, "
-         "sectorSize=%u, ivTweak=%llu, partitionStartSector=%llu",
-         volId, luksInfo.version, (unsigned long long)luksInfo.dataOffsetBytes, luksInfo.keyBytes,
+    LOGI("prepareLuksSession(vol=%d): LUKS%d unlocked, cipher=%s, dataOffset=%llu, keyBytes=%u, "
+         "sectorSize=%u, ivTweak=%llu, partitionStartSector=%llu, cachedKey=%d",
+         volId, luksInfo.version, luksInfo.cipherName.c_str(),
+         (unsigned long long)luksInfo.dataOffsetBytes, luksInfo.keyBytes,
          v.luksSectorSize, (unsigned long long)luksInfo.ivTweak,
-         (unsigned long long)v.partitionStartSector);
+         (unsigned long long)v.partitionStartSector, usingPreservedKey ? 1 : 0);
     return true;
 }
 
@@ -1961,8 +2128,9 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     {
         unsigned char magicBuf[6];
         if (pread(fd, magicBuf, 6, 0) == 6 && isLuksContainer(magicBuf, 6)) {
-            closeUnusedKeyfileFds(keyfileFds, keyfileCount);
-            return prepareLuksSession(fd, password, passwordLen, volId);
+            return prepareLuksSession(fd, password, passwordLen, volId,
+                                       preservedKey, preservedKeyLen,
+                                       keyfileFds, keyfileCount);
         }
     }
 

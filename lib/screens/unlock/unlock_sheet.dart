@@ -352,6 +352,18 @@ Future<void> _pickFile() async {
     }
   }
 
+  // Treats a stale-cached-key auth failure the same as a null result, so
+  // the caller's existing "clear cache and retry with the real password"
+  // logic actually runs instead of this exception bypassing it entirely.
+  Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T> Function() attempt) async {
+    try {
+      return await attempt();
+    } on PlatformException catch (e) {
+      if (e.code == 'AUTH_FAIL') return null;
+      rethrow;
+    }
+  }
+
   Future<void> _unlock({
     Uint8List? preservedKey,
     bool? shouldCacheDerivedKeyOverride,
@@ -401,18 +413,37 @@ Future<void> _pickFile() async {
               : null);
       debugPrint('unlock: method=$_unlockMethod shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
 
-      var result = await vaultExplorerApi.unlockContainer(
-        _selectedUri!,
-        effectivePassword,
-        pim,
-        displayName: name,
-        documentProvider: widget.documentProvider,
-        cipherId: _cipherId,
-        hashId: _hashId,
-        preservedKey: resolvedPreservedKey,
-        cacheDerivedKey: shouldCacheDerivedKey,
-        keyfilePaths: keyfilePaths,
-      );
+      // A stale cached derived key doesn't come back as a null result —
+      // native throws PlatformException(code: 'AUTH_FAIL') instead. Only
+      // swallow that when we're actually trying a cached key, so it falls
+      // into the same "clear cache and retry with the real password"
+      // branch below instead of surfacing as a user-facing error for a
+      // cache problem the user didn't cause and can't fix.
+      var result = resolvedPreservedKey == null
+          ? await vaultExplorerApi.unlockContainer(
+              _selectedUri!,
+              effectivePassword,
+              pim,
+              displayName: name,
+              documentProvider: widget.documentProvider,
+              cipherId: _cipherId,
+              hashId: _hashId,
+              preservedKey: resolvedPreservedKey,
+              cacheDerivedKey: shouldCacheDerivedKey,
+              keyfilePaths: keyfilePaths,
+            )
+          : await _unlockSwallowingStaleAuthFail(() => vaultExplorerApi.unlockContainer(
+              _selectedUri!,
+              effectivePassword,
+              pim,
+              displayName: name,
+              documentProvider: widget.documentProvider,
+              cipherId: _cipherId,
+              hashId: _hashId,
+              preservedKey: resolvedPreservedKey,
+              cacheDerivedKey: shouldCacheDerivedKey,
+              keyfilePaths: keyfilePaths,
+            ));
 
       if (result == null && resolvedPreservedKey != null) {
         await vaultExplorerApi.clearDerivedKey(_selectedUri!);
@@ -974,16 +1005,26 @@ Future<void> _pickFile() async {
                       ),
                       const SizedBox(height: 16),
 
-                      // 2. Keyfiles Selection Box (not applicable for LUKS)
-                      if (!_isLuks) ...[
-                        KeyfilesPicker(
-                          keyfiles: _keyfiles,
-                          picking: _pickingKeyfiles,
-                          onPick: _pickKeyfiles,
-                          onRemove: _removeKeyfile,
+                      // 2. Keyfiles Selection Box. LUKS keyfiles work too —
+                      // cryptsetup treats a keyfile as a *replacement* for
+                      // the typed password, not an additive mix-in.
+                      KeyfilesPicker(
+                        keyfiles: _keyfiles,
+                        picking: _pickingKeyfiles,
+                        onPick: _pickKeyfiles,
+                        onRemove: _removeKeyfile,
+                      ),
+                      if (_isLuks && _keyfiles.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 4),
+                          child: Text(
+                            'For LUKS containers the keyfile replaces the password.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
                         ),
-                        const SizedBox(height: 16),
-                      ],
+                      const SizedBox(height: 16),
 
                       // 3. Collapsible Advanced parameters (PIM, Cipher, Hash)
                       //    LUKS doesn't use PIM or VeraCrypt cipher/hash selection.

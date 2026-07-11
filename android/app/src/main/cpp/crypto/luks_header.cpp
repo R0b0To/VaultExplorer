@@ -188,7 +188,9 @@ static bool luks1Unlock(int fd,
                         LuksVolumeInfo& outInfo,
                         int volId,
                         std::function<bool(int)> cancelCheck,
-                        std::function<void(int, int, int, int)> progressCallback) {
+                        std::function<void(int, int, int, int)> progressCallback,
+                        const uint8_t* candidateMasterKey = nullptr,
+                        size_t candidateMasterKeyLen = 0) {
     Luks1Phdr phdr;
     if (pread(fd, &phdr, sizeof(Luks1Phdr), 0) != sizeof(Luks1Phdr)) {
         LOGI("LUKS1: Failed to read phdr");
@@ -208,6 +210,28 @@ static bool luks1Unlock(int fd,
     if (mdType == MBEDTLS_MD_NONE) {
         LOGI("LUKS1: Unsupported hashSpec: %s", hashSpec.c_str());
         return false;
+    }
+
+    // ── Fast path: verify a cached master key directly against the header
+    // digest. Skips every keyslot's PBKDF2-AF derivation entirely — this is
+    // the whole point of quick-unlock. ──
+    if (candidateMasterKey != nullptr) {
+        if (candidateMasterKeyLen == keyBytes &&
+            luksVerifyMasterKey(mdType, candidateMasterKey, keyBytes,
+                                 phdr.mkDigestSalt, 32, mkDigestIter,
+                                 phdr.mkDigest, 20)) {
+            outInfo.version = 1;
+            outInfo.cipherName = phdr.cipherName;
+            outInfo.cipherMode = phdr.cipherMode;
+            outInfo.keyBytes = keyBytes;
+            outInfo.dataOffsetBytes = (uint64_t)payloadOffset * 512;
+            outInfo.dataSectorSize = 512;
+            outInfo.masterKey.assign(candidateMasterKey, candidateMasterKey + candidateMasterKeyLen);
+            LOGI("LUKS1: quick-unlock candidate key verified");
+            return true;
+        }
+        LOGI("LUKS1: quick-unlock candidate key stale/invalid");
+        return false; // stale cached key — caller falls back to password/keyfile
     }
 
     // Count active keyslots
@@ -305,7 +329,9 @@ static bool luks2Unlock(int fd,
                         LuksVolumeInfo& outInfo,
                         int volId,
                         std::function<bool(int)> cancelCheck,
-                        std::function<void(int, int, int, int)> progressCallback) {
+                        std::function<void(int, int, int, int)> progressCallback,
+                        const uint8_t* candidateMasterKey = nullptr,
+                        size_t candidateMasterKeyLen = 0) {
     LOGI("LUKS2: Starting unlock...");
     // Read the binary header area (4096 bytes)
     uint8_t hdr[4096];
@@ -413,6 +439,41 @@ static bool luks2Unlock(int fd,
              digestItem->string, d.type.c_str(), d.hashName.c_str(), d.keyslots.size(), d.digest.size());
         digests.push_back(d);
         digestItem = digestItem->next;
+    }
+
+    // ── Fast path: verify a cached master key against whichever digest
+    // covers it. LUKS2 keys the master key to a digest, not a keyslot, so
+    // this can run before a single keyslot's KDF/AF area is even read. ──
+    if (candidateMasterKey != nullptr) {
+        bool verified = false;
+        for (const auto& d : digests) {
+            mbedtls_md_type_t digestMd = mapHashSpec(d.hashName);
+            if (digestMd == MBEDTLS_MD_NONE) continue;
+            if (luksVerifyMasterKey(digestMd, candidateMasterKey, candidateMasterKeyLen,
+                                     d.salt.data(), d.salt.size(), d.iterations,
+                                     d.digest.data(), d.digest.size())) {
+                outInfo.version = 2;
+                std::string segmentEnc = segment.encryption;
+                size_t firstDash = segmentEnc.find('-');
+                if (firstDash != std::string::npos) {
+                    outInfo.cipherName = segmentEnc.substr(0, firstDash);
+                    outInfo.cipherMode = segmentEnc.substr(firstDash + 1);
+                } else {
+                    outInfo.cipherName = "aes";
+                    outInfo.cipherMode = "xts-plain64";
+                }
+                outInfo.keyBytes = static_cast<uint32_t>(candidateMasterKeyLen);
+                outInfo.dataOffsetBytes = segment.offset;
+                outInfo.dataSectorSize = segment.sectorSize;
+                outInfo.ivTweak = segment.ivTweak;
+                outInfo.masterKey.assign(candidateMasterKey, candidateMasterKey + candidateMasterKeyLen);
+                verified = true;
+                break;
+            }
+        }
+        LOGI("LUKS2: quick-unlock candidate key verified=%d", verified);
+        cJSON_Delete(root);
+        return verified; // false → caller falls back to password/keyfile
     }
 
     // Parse Keyslots
@@ -647,8 +708,11 @@ bool luksRecoverMasterKey(int fd,
                           LuksVolumeInfo& outInfo,
                           int volId,
                           std::function<bool(int)> cancelCheck,
-                          std::function<void(int, int, int, int)> progressCallback) {
-    if (fd < 0 || !password) return false;
+                          std::function<void(int, int, int, int)> progressCallback,
+                          const uint8_t* candidateMasterKey,
+                          size_t candidateMasterKeyLen) {
+    if (fd < 0) return false;
+    if (!password && !candidateMasterKey) return false;
 
     // Read the version to determine path
     uint8_t verBuf[2];
@@ -657,10 +721,12 @@ bool luksRecoverMasterKey(int fd,
     uint16_t version = (uint16_t(verBuf[0]) << 8) | verBuf[1];
     if (version == 1) {
         LOGI("luksRecoverMasterKey: detected LUKS1 container");
-        return luks1Unlock(fd, password, passwordLen, outInfo, volId, cancelCheck, progressCallback);
+        return luks1Unlock(fd, password, passwordLen, outInfo, volId, cancelCheck, progressCallback,
+                            candidateMasterKey, candidateMasterKeyLen);
     } else if (version == 2) {
         LOGI("luksRecoverMasterKey: detected LUKS2 container");
-        return luks2Unlock(fd, password, passwordLen, outInfo, volId, cancelCheck, progressCallback);
+        return luks2Unlock(fd, password, passwordLen, outInfo, volId, cancelCheck, progressCallback,
+                            candidateMasterKey, candidateMasterKeyLen);
     }
 
     LOGI("luksRecoverMasterKey: unknown LUKS version %u", version);

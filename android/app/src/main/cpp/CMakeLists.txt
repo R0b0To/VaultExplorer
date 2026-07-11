@@ -309,6 +309,7 @@ add_library(
         SHARED
         vaultexplorer.cpp
         session_prepare.cpp        # VeraCrypt/LUKS session establishment (Tier-1 JNI calls)
+        container_create.cpp       # new-container header/format creation (createContainerNative)
         jni_runtime.cpp
         jni_callbacks.cpp
         block_io.cpp

@@ -284,10 +284,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   void _onScrollEnd() {
     _isSwiping = false;
-    final index = _playlistController.currentIndex;
-    _playbackManager.handlePageChange(index);
-
     final currentFile = _playlistController.currentFile;
+    _playbackManager.handlePageChange(currentFile);
+
     if (MediaViewerConstants.isImage(currentFile)) {
       _startSlideshowTimerIfNeeded();
     } else {
@@ -295,6 +294,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _playbackManager.activeController?.play();
       }
     }
+
+
+    if (mounted) setState(() {});
 
     if (_showUI) {
       _startHideTimer(); // Refresh hide timer when manual swiping completes
@@ -417,10 +419,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   void _selectFromCarousel(int index) {
     HapticFeedback.selectionClick();
+
+    _playlistController.updateIndex(index);
     if (_pageController.hasClients) {
       _pageController.jumpToPage(index);
-    } else {
-      _playlistController.updateIndex(index);
     }
     _onScrollEnd();
   }
@@ -453,7 +455,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           initialImageFit: _imageFit,
           initialSlideshowDelaySeconds: _slideshowDelaySeconds,
           initialPlaybackSpeed: _playbackSpeed,
-          hasSubtitles: _playbackManager.isSubtitleAvailable(_playlistController.currentIndex),
+          hasSubtitles: _playbackManager.isSubtitleAvailable(_playlistController.currentFile),
           initialSubtitlesEnabled: _subtitlesEnabled,
           onRotationChanged: (rot) {
             _startHideTimer();
@@ -632,9 +634,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                               subtitlesEnabled: _subtitlesEnabled,
                               rotationQuarterTurns: _rotations[fileName] ?? 0,
                               progressNotifier: _videoProgressNotifier,
+                              isCurrent: fileName == _playlistController.currentFile,
                               onSubtitlesAvailableChanged: (val) {
-                                _playbackManager.updateSubtitleStatus(index, val);
-                                if (index == _playlistController.currentIndex) {
+                                _playbackManager.updateSubtitleStatus(fileName, val);
+                                if (fileName == _playlistController.currentFile) {
                                   setState(() {});
                                 }
                               },
@@ -645,18 +648,20 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                               },
                               onVideoControllerInitialized: (controller) {
                                 _playbackManager.registerController(
-                                  index: index,
+                                  fileName: fileName,
                                   controller: controller,
-                                  currentFocus: index == _playlistController.currentIndex,
+                                  currentFocus: fileName == _playlistController.currentFile,
+                                  playlist: _playlistController.playlist,
+                                  currentIndex: _playlistController.currentIndex,
                                 );
-                                if (index == _playlistController.currentIndex &&
+                                if (fileName == _playlistController.currentFile &&
                                     !_isSwiping &&
                                     _autoPlay) {
                                   controller.play();
                                 }
                               },
                               onVideoControllerDisposed: () {
-                                _playbackManager.handleDisposed(index);
+                                _playbackManager.handleDisposed(fileName);
                               },
                             ),
                     );

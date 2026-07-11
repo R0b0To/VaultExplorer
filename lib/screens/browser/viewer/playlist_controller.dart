@@ -114,9 +114,10 @@ class PlaylistController extends ChangeNotifier {
 
       if (scanned.isNotEmpty) {
         _originalList = scanned;
-        if (folder == 'All') _allFilesScanned = true;
+        _allFilesScanned = folder == 'All';
       } else if (!_originalList.contains(anchor)) {
         _originalList = [anchor];
+        _allFilesScanned = false;
       }
 
       _isPlaylistMode = true;
@@ -133,6 +134,7 @@ class PlaylistController extends ChangeNotifier {
     final anchor = currentFile;
     _isPlaylistMode = false;
     _isShuffled = false;
+    _allFilesScanned = false;
     _selectedFolder = 'Current Folder Only';
     _originalList = [anchor];
     _currentPlaylist = [anchor];

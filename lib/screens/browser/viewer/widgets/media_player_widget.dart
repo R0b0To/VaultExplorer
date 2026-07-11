@@ -63,6 +63,7 @@ class MediaPlayerWidget extends StatefulWidget {
   final ValueChanged<VideoPlayerController> onVideoControllerInitialized;
   final VoidCallback onVideoControllerDisposed;
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
+  final bool isCurrent;
 
   const MediaPlayerWidget({
     Key? key,
@@ -81,6 +82,7 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.onVideoControllerInitialized,
     required this.onVideoControllerDisposed,
     required this.progressNotifier,
+    required this.isCurrent,
   }) : super(key: key);
 
   @override
@@ -136,7 +138,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   }
 
   void _onControllerTick() {
-    if (!mounted || !_initialized) return;
+    if (!mounted || !_initialized || !widget.isCurrent) return;
     widget.progressNotifier.value = widget.progressNotifier.value.copyWith(
       position: _controller.value.position,
       duration: _controller.value.duration,

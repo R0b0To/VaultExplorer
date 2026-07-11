@@ -249,6 +249,64 @@ int recursiveSizeEntry(void* directory, const ntfschar* name, const int nameLeng
     return 0;
 }
 
+// Non-recursive directory-listing counterpart to recursiveSizeEntry above:
+// same metadata-filtering rules, but reports the immediate children of one
+// directory as "name|size|mtime" strings instead of summing file sizes.
+// Backs listNtfsDirectory() below, which is buildDirectoryListing()'s only
+// NTFS entry point (moved out of vaultexplorer.cpp).
+struct NtfsFilldirContext {
+    std::vector<std::string>* results;
+    ntfs_volume* vol;
+};
+
+int ntfsFilldir(void* dirent, const ntfschar* name, const int nameLength,
+                const int nameType, const s64, const MFT_REF reference,
+                const unsigned) {
+    auto* context = static_cast<NtfsFilldirContext*>(dirent);
+    if (nameType == FILE_NAME_DOS) return 0;
+
+    char* utf8Name = nullptr;
+    const int utf8Length = ntfs_ucstombs(name, nameLength, &utf8Name, 0);
+    if (utf8Length < 0 || !utf8Name) { if (utf8Name) free(utf8Name); return 0; }
+    std::string nameStr(utf8Name, utf8Length);
+    free(utf8Name);
+
+    if (nameStr == "." || nameStr == "..") return 0;
+
+    if (nameStr[0] == '$') {
+        if (nameStr == "$MFT" || nameStr == "$MFTMirr" || nameStr == "$LogFile" ||
+            nameStr == "$Volume" || nameStr == "$AttrDef" || nameStr == "$Bitmap" ||
+            nameStr == "$Boot" || nameStr == "$BadClus" || nameStr == "$Secure" ||
+            nameStr == "$UpCase" || nameStr == "$Extend" || nameStr == "$RECYCLE.BIN") {
+            return 0;
+        }
+    } else if (nameStr == "System Volume Information") {
+        return 0;
+    }
+
+    ntfs_inode* ni = ntfs_inode_open(context->vol, reference);
+    if (!ni) return 0;
+
+    uint64_t size = 0;
+    uint64_t ts = 0;
+    const bool isDir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+    if (!isDir) size = ni->data_size;
+
+    const uint64_t ntfsTime = ni->last_data_change_time;
+    if (ntfsTime > 116444736000000000ULL) {
+        ts = (ntfsTime - 116444736000000000ULL) / 10000000ULL;
+    }
+
+    ntfs_inode_close(ni);
+
+    if (isDir) {
+        context->results->push_back("[DIR] " + nameStr + "|0|" + std::to_string(ts));
+    } else {
+        context->results->push_back(nameStr + "|" + std::to_string(size) + "|" + std::to_string(ts));
+    }
+    return 0;
+}
+
 } // namespace
 
 extern "C" ntfs_device_operations vExplorer_ntfs_ops = {
@@ -276,6 +334,24 @@ uint64_t recursiveNtfsFolderSize(int volumeId, const std::string& path) {
     ntfs_readdir(directory, &position, &context, recursiveSizeEntry);
     ntfs_inode_close(directory);
     return context.totalSize;
+}
+
+bool listNtfsDirectory(int volumeId, const std::string& pathSuffix,
+                       std::vector<std::string>& results) {
+    if (volumeId < 0 || volumeId >= kMaxVolumes) return false;
+    ntfs_volume* volume = volumes[volumeId].ntfsVol;
+    if (!volume) return false;
+
+    ntfs_inode* dirInode = (pathSuffix.empty() || pathSuffix == "/")
+        ? ntfs_inode_open(volume, FILE_root)
+        : ntfs_pathname_to_inode(volume, nullptr, ("/" + pathSuffix).c_str());
+    if (!dirInode) return false;
+
+    s64 position = 0;
+    NtfsFilldirContext context{&results, volume};
+    ntfs_readdir(dirInode, &position, &context, ntfsFilldir);
+    ntfs_inode_close(dirInode);
+    return true;
 }
 
 ntfs_inode* createNtfsFile(ntfs_volume* volume, const std::string& path) {

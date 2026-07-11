@@ -121,76 +121,6 @@ static void closeUnusedKeyfileFds(const int* keyfileFds, int keyfileCount) {
 // ----------------------------------------------------------------====
 
 // ----------------------------------------------------------------====
-// NTFS SUPPORT STRUCTURES & OPERATIONS
-// ----------------------------------------------------------------====
-
-struct NtfsFilldirContext {
-    std::vector<std::string>* results;
-    ntfs_volume* vol;
-};
-
-static int vExplorer_ntfs_filldir(void *dirent, const ntfschar *name, const int name_len, const int name_type, const s64 pos, const MFT_REF mft_reference, const unsigned dt_type) {
-    NtfsFilldirContext* ctx = static_cast<NtfsFilldirContext*>(dirent);
-
-    if (name_type == FILE_NAME_DOS) {
-        return 0;
-    }
-
-    char* utf8Name = nullptr;
-    int utf8NameLen = ntfs_ucstombs(name, name_len, &utf8Name, 0);
-    if (utf8NameLen < 0 || !utf8Name) {
-        if (utf8Name) free(utf8Name);
-        return 0;
-    }
-
-    std::string nameStr(utf8Name, utf8NameLen);
-    free(utf8Name);
-
-    if (nameStr == "." || nameStr == "..") {
-        return 0;
-    }
-
-    //Hide ONLY specific NTFS metadata & Windows system folders ---
-    if (nameStr[0] == '$') {
-        if (nameStr == "$MFT" || nameStr == "$MFTMirr" || nameStr == "$LogFile" ||
-            nameStr == "$Volume" || nameStr == "$AttrDef" || nameStr == "$Bitmap" ||
-            nameStr == "$Boot" || nameStr == "$BadClus" || nameStr == "$Secure" ||
-            nameStr == "$UpCase" || nameStr == "$Extend" || nameStr == "$RECYCLE.BIN") {
-            return 0;
-        }
-    } else if (nameStr == "System Volume Information") {
-        return 0;
-    }
-    // -------------------------------------------------------------------------------
-
-
-    ntfs_inode* ni = ntfs_inode_open(ctx->vol, mft_reference);
-    if (!ni) return 0;
-
-    uint64_t size = 0;
-    uint64_t ts = 0;
-    bool isDir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
-
-    if (!isDir) {
-        size = ni->data_size;
-    }
-
-    uint64_t ntfsTime = ni->last_data_change_time;
-    if (ntfsTime > 116444736000000000ULL) {
-        ts = (ntfsTime - 116444736000000000ULL) / 10000000ULL;
-    }
-
-    ntfs_inode_close(ni);
-
-    if (isDir) {
-        ctx->results->push_back("[DIR] " + nameStr + "|0|" + std::to_string(ts));
-    } else {
-        ctx->results->push_back(nameStr + "|" + std::to_string(size) + "|" + std::to_string(ts));
-    }
-    return 0;
-}
-
-// ----------------------------------------------------------------====
 // MOUNT CACHE HELPERS
 // ----------------------------------------------------------------====
 
@@ -1418,20 +1348,7 @@ static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pa
             f_closedir(&dir);
         }
     } else if (v.fsType == VolumeState::FS_NTFS) {
-        ntfs_inode* dir_ni = nullptr;
-        if (!pathSuffix || pathSuffix[0] == '\0' || std::strcmp(pathSuffix, "/") == 0) {
-            dir_ni = ntfs_inode_open(v.ntfsVol, FILE_root);
-        } else {
-            std::string fullPath = "/" + std::string(pathSuffix);
-            dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
-        }
-
-        if (dir_ni) {
-            s64 pos = 0;
-            NtfsFilldirContext fillCtx = { &results, v.ntfsVol };
-            ntfs_readdir(dir_ni, &pos, &fillCtx, vExplorer_ntfs_filldir);
-            ntfs_inode_close(dir_ni);
-        }
+        listNtfsDirectory(volId, pathSuffix ? pathSuffix : "", results);
     } else if (v.fsType == VolumeState::FS_EXT) {
         ext2_ino_t dirInode = 0;
         if (extResolvePath(v.extFs, pathSuffix ? pathSuffix : "", &dirInode)) {

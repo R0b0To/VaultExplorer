@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import '/../../models/mounted_container.dart';
+import '/../../models/thumbnail_cache_mode.dart';
 import '/../../models/thumbnail_quality.dart';
 import '/../../services/vaultexplorer_api.dart';
 import 'media_viewer_constants.dart';
@@ -24,6 +25,11 @@ class MediaViewerScreen extends StatefulWidget {
   final int initialIndex;
   final String? startingFolder;
   final ThumbnailQuality thumbnailQuality;
+  // NOTE: pass the same ThumbnailCacheMode here that you already pass to
+  // FileGridView, so the carousel reuses the grid's cached thumbnails
+  // instead of regenerating them. There's no safe default to guess here —
+  // wire it through from wherever this screen is pushed.
+  final ThumbnailCacheMode thumbnailCacheMode;
 
   const MediaViewerScreen({
     Key? key,
@@ -32,6 +38,7 @@ class MediaViewerScreen extends StatefulWidget {
     required this.initialIndex,
     this.startingFolder,
     this.thumbnailQuality = ThumbnailQuality.medium,
+    required this.thumbnailCacheMode,
   }) : super(key: key);
 
   @override
@@ -774,6 +781,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               playlist: _playlistController.playlist,
               currentIndex: _playlistController.currentIndex,
               thumbnailQuality: widget.thumbnailQuality,
+              thumbnailCacheMode: widget.thumbnailCacheMode,
               onSelect: _selectFromCarousel,
               onClose: _toggleCarousel,
             ),

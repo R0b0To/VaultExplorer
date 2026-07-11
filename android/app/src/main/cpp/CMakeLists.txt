@@ -308,6 +308,17 @@ add_library(
         vaultexplorer
         SHARED
         vaultexplorer.cpp
+        jni_runtime.cpp
+        jni_callbacks.cpp
+        block_io.cpp
+        volume_state.cpp
+        ext_backend.cpp
+        fat_backend.cpp
+        filesystem_paths.cpp
+        ntfs_backend.cpp
+        session_guard.cpp
+        container_header.cpp
+        container_utils.cpp
         crypto/cipher_shim.cpp     # adapter
         crypto/cascade.cpp         # cipher-agnostic XTS + cascade chaining
         crypto/kdf_table.cpp       # per-hash iteration-count table + hash dispatch

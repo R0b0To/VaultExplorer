@@ -40,7 +40,7 @@
 
         </activity>
         <provider
-            android:name="com.aeidolon.vaultexplorer.VeraCryptDocumentsProvider"
+            android:name="com.aeidolon.vaultexplorer.ContainerDocumentsProvider"
             android:authorities="com.aeidolon.vaultexplorer.documents"
             android:exported="true"
             android:grantUriPermissions="true"

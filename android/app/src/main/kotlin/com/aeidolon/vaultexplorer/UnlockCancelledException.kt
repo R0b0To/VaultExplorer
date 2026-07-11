@@ -3,7 +3,7 @@ package com.aeidolon.vaultexplorer
 /**
  * Thrown across the JNI boundary (see throwUnlockCancelledException() in
  * vaultexplorer.cpp) when an unlock attempt was aborted via
- * VeraCryptEngine.requestCancelUnlockNative(volId) rather than failing for
+ * ContainerEngine.requestUnlockCancellation(volId) rather than failing for
  * a real reason (wrong password/keyfiles, corrupt container, ...).
  *
  * Kept distinct from a generic native error so MainActivity's

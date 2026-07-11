@@ -22,7 +22,7 @@ import android.system.OsConstants
 import java.io.File
 import java.io.FileNotFoundException
 
-class VeraCryptDocumentsProvider : DocumentsProvider() {
+class ContainerDocumentsProvider : DocumentsProvider() {
 
     companion object {
         private const val AUTHORITY = "com.aeidolon.vaultexplorer.documents"
@@ -113,7 +113,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             ?.takeIf { it in 0 until VeraCryptSession.MAX_VOLUMES }
             ?: return
         val session = VeraCryptSession.activeSessions[volId]
-        VeraCryptEngine.lockNative(volId)
+        ContainerEngine.lock(volId)
         if (session?.isUsbSource == true) UsbBlockBridge.unregister(volId)
         VeraCryptSession.removeSession(volId)
         context?.contentResolver?.notifyChange(
@@ -473,10 +473,10 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
         init {
             try {
                 VeraCryptBridge.withLock(volId) {
-                    fileSizeCached = VeraCryptEngine.getFileSize(fatPath, volId)
+                    fileSizeCached = VeraCryptBridge.getFileSize(volId, fatPath)
                     if (fileSizeCached < 0) fileSizeCached = 0L
                     if (!isWrite) {
-                        streamPtr = VeraCryptEngine.openStream(fatPath, volId)
+                        streamPtr = VeraCryptBridge.openStream(volId, fatPath)
                     }
                 }
             } catch (e: Exception) {
@@ -489,7 +489,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             if (writeCache != null && writeCacheLength > 0) {
                 val chunk = if (writeCacheLength == writeCacheCapacity) writeCache else writeCache.copyOf(writeCacheLength)
                 VeraCryptBridge.withLock(volId) {
-                    VeraCryptEngine.writeFileChunk(fatPath, writeCacheOffset, chunk, volId)
+                    VeraCryptBridge.writeFileChunk(volId, fatPath, writeCacheOffset, chunk)
                 }
                 
                 val endOffset = writeCacheOffset + writeCacheLength
@@ -520,7 +520,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
                 if (readSize <= readCacheCapacity) {
                     val fetchSize = minOf(readCacheCapacity.toLong(), fileSizeCached - offset).toInt()
                     val actualRead = VeraCryptBridge.withLock(volId) {
-                        VeraCryptEngine.readStream(streamPtr, offset, readCache, fetchSize, volId)
+                        VeraCryptBridge.readStream(volId, streamPtr, offset, readCache, fetchSize)
                     }
                     if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
                     
@@ -536,7 +536,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             }
 
             val actualRead = VeraCryptBridge.withLock(volId) {
-                VeraCryptEngine.readStream(streamPtr, offset, data, readSize, volId)
+                VeraCryptBridge.readStream(volId, streamPtr, offset, data, readSize)
             }
             if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
             return actualRead
@@ -552,7 +552,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             if (size >= writeCacheCapacity) {
                 val chunkData = if (data.size == size) data else data.copyOf(size)
                 val success = VeraCryptBridge.withLock(volId) {
-                    VeraCryptEngine.writeFileChunk(fatPath, offset, chunkData, volId)
+                    VeraCryptBridge.writeFileChunk(volId, fatPath, offset, chunkData)
                 }
                 if (!success) throw ErrnoException("onWrite", OsConstants.EIO)
                 
@@ -577,7 +577,7 @@ class VeraCryptDocumentsProvider : DocumentsProvider() {
             
             VeraCryptBridge.withLock(volId) {
                 if (streamPtr != 0L) {
-                    VeraCryptEngine.closeStream(streamPtr, volId)
+                    VeraCryptBridge.closeStream(volId, streamPtr)
                     streamPtr = 0L
                 }
             }

@@ -202,7 +202,7 @@ class MainActivity : FlutterFragmentActivity() {
                     val pfd = contentResolver.openFileDescriptor(destUri, "rw")
                         ?: throw Exception("Could not open file descriptor")
                     val success = synchronized(createContainerLock) {
-                        VeraCryptEngine.createContainerNative(
+                        ContainerEngine.create(
                             pfd.detachFd(), create.password, create.pim, create.sizeBytes, create.fileSystem,
                             create.cipherId, create.hashId
                         )
@@ -630,7 +630,7 @@ class MainActivity : FlutterFragmentActivity() {
             UsbBlockBridge.unregister(volId)
             try {
                 synchronized(VeraCryptSession.locks[volId]) {
-                    VeraCryptEngine.lockNative(volId)
+                    ContainerEngine.lock(volId)
                 }
             } catch (e: Exception) {
                 Log.w("VaultExplorer_C++", "lockNative on USB detach failed for volId=$volId: ${e.message}")
@@ -860,7 +860,7 @@ class MainActivity : FlutterFragmentActivity() {
                                 }
 
                                 val files = synchronized(VeraCryptSession.locks[targetVolId]) {
-                                    VeraCryptEngine.unlockUsbAndListNative(
+                                    ContainerEngine.unlockUsb(
                                         password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
                                         keyfileFds = keyfileFds
                                     )
@@ -869,7 +869,7 @@ class MainActivity : FlutterFragmentActivity() {
                                 runOnUiThread {
                                     if (files != null) {
                                         if (cacheDerivedKey && preservedKey == null) {
-                                            val derived = VeraCryptEngine.getLastDerivedKeyMaterialNative(targetVolId)
+                                            val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
                                             if (derived != null) {
                                                 storeDerivedKeyBytes(deviceName, derived)
                                             }
@@ -887,16 +887,12 @@ class MainActivity : FlutterFragmentActivity() {
                                                 DocumentsContract.buildRootsUri(
                                                     "com.aeidolon.vaultexplorer.documents"), null)
                                         }
-                                        val fmt = when (VeraCryptEngine.getContainerFormat(targetVolId)) {
-                                            1 -> "luks1"
-                                            2 -> "luks2"
-                                            else -> "veracrypt"
-                                        }
+                                        val fmt = ContainerEngine.format(targetVolId).wireName
                                         result.success(mapOf(
                                             "volId" to targetVolId,
                                             "files" to files.toList(),
-                                            "matchedCipherId" to VeraCryptEngine.getMatchedCipherId(targetVolId),
-                                            "matchedHashId" to VeraCryptEngine.getMatchedHashId(targetVolId),
+                                            "matchedCipherId" to ContainerEngine.matchedCipherId(targetVolId),
+                                            "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
                                             "containerFormat" to fmt
                                         ))
                                     } else {
@@ -1011,13 +1007,13 @@ class MainActivity : FlutterFragmentActivity() {
                                 }
 
                                 val files = synchronized(VeraCryptSession.locks[targetVolId]) {
-                                    VeraCryptEngine.unlockAndListNative(fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds)
+                                    ContainerEngine.unlockFile(fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds)
                                 }
 
                                 runOnUiThread {
                                     if (files != null) {
                                         if (cacheDerivedKey && preservedKey == null) {
-                                            val derived = VeraCryptEngine.getLastDerivedKeyMaterialNative(targetVolId)
+                                            val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
                                             if (derived != null) {
                                                 storeDerivedKeyBytes(uriString, derived)
                                             }
@@ -1034,16 +1030,12 @@ class MainActivity : FlutterFragmentActivity() {
                                                 DocumentsContract.buildRootsUri(
                                                     "com.aeidolon.vaultexplorer.documents"), null)
                                         }
-                                        val fmt = when (VeraCryptEngine.getContainerFormat(targetVolId)) {
-                                            1 -> "luks1"
-                                            2 -> "luks2"
-                                            else -> "veracrypt"
-                                        }
+                                        val fmt = ContainerEngine.format(targetVolId).wireName
                                         result.success(mapOf(
                                             "volId" to targetVolId,
                                             "files" to files.toList(),
-                                            "matchedCipherId" to VeraCryptEngine.getMatchedCipherId(targetVolId),
-                                            "matchedHashId" to VeraCryptEngine.getMatchedHashId(targetVolId),
+                                            "matchedCipherId" to ContainerEngine.matchedCipherId(targetVolId),
+                                            "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
                                             "containerFormat" to fmt
                                         ))
                                     } else {
@@ -1064,7 +1056,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "volId required", null)
                             return@setMethodCallHandler
                         }
-                        VeraCryptEngine.requestCancelUnlockNative(volId)
+                        ContainerEngine.requestUnlockCancellation(volId)
                         result.success(true)
                     }
 
@@ -1088,7 +1080,7 @@ class MainActivity : FlutterFragmentActivity() {
                                     ?: throw Exception("Could not open file descriptor")
                                 val keyfileFds = openKeyfileFds(keyfilePaths)
                                 val fd = pfd.detachFd()
-                                val derived = VeraCryptEngine.deriveKeyMaterialNative(fd, password, pim, cipherId, hashId, keyfileFds)
+                                val derived = ContainerEngine.deriveKeyMaterial(fd, password, pim, cipherId, hashId, keyfileFds)
                                 val encoded = derived?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
                                 runOnUiThread { result.success(encoded) }
                             } catch (e: Exception) {
@@ -1163,7 +1155,7 @@ class MainActivity : FlutterFragmentActivity() {
 
                         ioExecutor.execute {
                             try {
-                                val hash = VeraCryptEngine.hashPasswordNative(password, saltBytes, iterations)
+                                val hash = ContainerEngine.hashPassword(password, saltBytes, iterations)
                                 runOnUiThread {
                                     if (hash != null) result.success(hash)
                                     else result.error("KDF_FAILED", "PBKDF2 derivation failed", null)
@@ -1383,7 +1375,7 @@ class MainActivity : FlutterFragmentActivity() {
                             ioExecutor.execute {
                                 try {
                                     synchronized(VeraCryptSession.locks[volId]) {
-                                        VeraCryptEngine.lockNative(volId)
+                                        ContainerEngine.lock(volId)
                                     }
                                     if (session?.isUsbSource == true) {
                                         UsbBlockBridge.unregister(volId)
@@ -1438,7 +1430,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName and destPath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.extractFile(fileName, destPath, volId)
+                            VeraCryptBridge.extractToFile(volId, fileName, destPath)
                         }
                     }
 
@@ -1448,14 +1440,14 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.getFileSize(fileName, volId)
+                            VeraCryptBridge.getFileSize(volId, fileName)
                         }
                     }
 
                     ChannelMethods.GET_FOLDER_SIZE -> {
                         val dirPath = call.argument<String>("dirPath") ?: ""
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.getFolderSize(dirPath, volId)
+                            VeraCryptBridge.getFolderSize(volId, dirPath)
                         }
                     }
 
@@ -1471,14 +1463,14 @@ class MainActivity : FlutterFragmentActivity() {
                             return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.readFileChunk(fileName, offset, length, volId)
+                            VeraCryptBridge.readFileChunk(volId, fileName, offset, length)
                         }
                     }
 
                     ChannelMethods.LIST_DIRECTORY -> {
                         val dirPath = call.argument<String>("dirPath") ?: ""
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.listDirectory(dirPath, volId)?.toList()
+                            VeraCryptBridge.listDirectory(volId, dirPath)?.toList()
                         }
                     }
 
@@ -1488,7 +1480,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "dirPath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.createDirectory(dirPath, volId)
+                            VeraCryptBridge.createDirectory(volId, dirPath)
                         }
                     }
 
@@ -1499,7 +1491,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "oldPath and newPath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.renameFile(oldPath, newPath, volId)
+                            VeraCryptBridge.renameFile(volId, oldPath, newPath)
                         }
                     }
 
@@ -1510,7 +1502,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName and sourcePath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.writeBackFile(fileName, sourcePath, volId)
+                            VeraCryptBridge.writeBackFile(volId, fileName, sourcePath)
                         }
                     }
 
@@ -1521,13 +1513,13 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName and epochSeconds required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.setLastModifiedTime(fileName, epochSecs, volId)
+                            VeraCryptBridge.setLastModifiedTime(volId, fileName, epochSecs)
                         }
                     }
 
                     ChannelMethods.GET_SPACE_INFO -> {
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.getSpaceInfo(volId)?.toList()
+                            VeraCryptBridge.getSpaceInfo(volId)?.toList()
                         }
                     }
 
@@ -1537,7 +1529,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.deleteFile(fileName, volId)
+                            VeraCryptBridge.deleteFile(volId, fileName)
                         }
                     }
 
@@ -1692,7 +1684,7 @@ class MainActivity : FlutterFragmentActivity() {
                             return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptEngine.writeFileChunk(fileName, offset, data, volId)
+                            VeraCryptBridge.writeFileChunk(volId, fileName, offset, data)
                         }
                     }
 

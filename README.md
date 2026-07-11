@@ -86,14 +86,18 @@ Flutter (Dart)
 
 Android (Kotlin)
   ├── MainActivity — MethodChannel handler, SAF file picker, import/export
-  ├── VeraCryptSession / VeraCryptBridge — per-volume session registry & locking
-  ├── VeraCryptEngine — JNI wrapper for the C++ engine
+  ├── ContainerSessionRegistry / ContainerFileSystem — session registry & locking
+  ├── ContainerEngine — format-neutral façade over the JNI implementation
   ├── UsbMassStorageDevice / UsbBlockBridge — USB Mass Storage (Bulk-Only Transport) client
   ├── UnlockProgressBridge — pushes cipher/hash auto-detect progress to Dart
-  └── VeraCryptDocumentsProvider — Android Documents Provider (ContentProvider)
+  └── ContainerDocumentsProvider — Android Documents Provider (ContentProvider)
 
 C++ (NDK)
-  ├── vaultexplorer.cpp — crypto session, header parsing (incl. hidden volumes), FatFs disk hooks, all JNI entry points
+  ├── vaultexplorer.cpp — native orchestration, crypto sessions, disk hooks, JNI exports
+  ├── volume_state / block_io — shared unlocked-volume lifecycle and file/USB backing-store transport
+  ├── jni_runtime / jni_callbacks — JNI lifetime, progress, and USB upcalls
+  ├── container_{format,header,utils} — format IDs, decrypted-header decoding, and common data utilities
+  ├── {fat,ntfs,ext}_backend — filesystem-specific helpers (expanding backend boundary)
   ├── crypto/cascade.{h,cpp} — cipher-agnostic AES-XTS + multi-layer cascade chaining
   ├── crypto/cipher_shim.{h,cpp} — uniform adapter over AES/Serpent/Twofish and SHA-512/256, Whirlpool, Streebog, BLAKE2s-256
   ├── crypto/kdf_table.cpp — per-hash PBKDF2 iteration-count table

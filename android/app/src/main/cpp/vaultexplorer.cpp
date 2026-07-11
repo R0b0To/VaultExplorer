@@ -27,6 +27,17 @@
 #include "crypto/vc_header_layout.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/luks_header.h"
+#include "container_format.h"
+#include "container_header.h"
+#include "container_utils.h"
+#include "block_io.h"
+#include "ext_backend.h"
+#include "fat_backend.h"
+#include "filesystem_paths.h"
+#include "jni_callbacks.h"
+#include "ntfs_backend.h"
+#include "session_guard.h"
+#include "volume_state.h"
 #include <thread>
 
 #include <fcntl.h>
@@ -82,23 +93,6 @@ static constexpr size_t   IO_VOL_BUF_SIZE       = IO_VOL_BUF_SECTORS * 512;
 // RAII WRAPPERS
 // ----------------------------------------------------------------====
 
-struct XtsContextPair {
-    mbedtls_aes_xts_context dec;
-    mbedtls_aes_xts_context enc;
-    bool initialized = false;
-
-    XtsContextPair() {
-        mbedtls_aes_xts_init(&dec);
-        mbedtls_aes_xts_init(&enc);
-    }
-    ~XtsContextPair() {
-        mbedtls_aes_xts_free(&dec);
-        mbedtls_aes_xts_free(&enc);
-    }
-    XtsContextPair(const XtsContextPair&) = delete;
-    XtsContextPair& operator=(const XtsContextPair&) = delete;
-};
-
 struct MdContextGuard {
     mbedtls_md_context_t ctx;
     MdContextGuard() { mbedtls_md_init(&ctx); }
@@ -126,258 +120,9 @@ static void closeUnusedKeyfileFds(const int* keyfileFds, int keyfileCount) {
 // PER-VOLUME STATE
 // ----------------------------------------------------------------====
 
-struct VolumeState {
-    std::mutex mutex;
-    int        fd = -1;
-    uint64_t   dataOffset = 0;
-
-    uint64_t   dataAreaLengthBytes = 0;
-    bool       isHiddenVolume = false;
-    bool       dataCtxInitialized = false;
-    uint64_t   fileSize = 0;
-    bool       fsMounted = false;
-    bool       isUsbSource = false;
-    uint64_t   partitionStartSector = 0;
-    int matchedCipherId = -1;
-    int matchedHashId = -1;
-    unsigned char* preservedDerivedKey = nullptr;
-    size_t        preservedDerivedKeyLen = 0;
-
-    // ── Container format ──
-    enum ContainerFormat { FMT_VERACRYPT, FMT_LUKS1, FMT_LUKS2 } containerFormat = FMT_VERACRYPT;
-
-    // ── LUKS AES-XTS context (used instead of cascade for LUKS volumes) ──
-    XtsContextPair luksXts;
-    // LUKS2 segment "sector_size" (bytes). This is the AES-XTS data-unit
-    // width: every luksSectorSize-byte block shares exactly one XTS tweak.
-    // LUKS1 and most LUKS2 containers use 512, but LUKS2 allows larger
-    // values (commonly 4096) — disk_read/disk_write must decrypt/encrypt
-    // in units of this size, not a hardcoded 512, or the tweak sequence
-    // (and thus every byte after the first 16) comes out wrong.
-    uint32_t luksSectorSize = 512;
-
-    // ── LUKS: non-AES single cipher support (Serpent/Twofish over
-    // xts-plain64). Reuses the same single-layer CascadeContext machinery
-    // as VeraCrypt (CascadeId::kSerpent / CascadeId::kTwofish) rather than
-    // a second, parallel cipher abstraction — mbedTLS only provides XTS
-    // for AES, so non-AES LUKS ciphers go through cascadeSetKeys +
-    // blockCipherEncryptBlock/blockCipherDecryptBlock instead.
-    bool luksUsesGenericCipher = false;
-    CascadeContext luksGenericCascade;
-
-    CascadeContext cascade;
-    FATFS fatfs{};
-
-    // --- NTFS Support Properties ---
-    ntfs_volume* ntfsVol = nullptr;
-    ext2_filsys extFs = nullptr;
-    enum FsType {
-        FS_UNKNOWN,
-        FS_FATFS,
-        FS_NTFS,
-        FS_EXT
-    } fsType = FS_UNKNOWN;
-    
-    std::vector<NtfsStream*> openNtfsStreams;
-    std::vector<ExtStream*> openExtStreams;
-    // -------------------------------
-
-    std::unique_ptr<unsigned char[]> ioBuf;
-    size_t     ioBufSize = 0;
-    std::mutex ioBufMutex;
-
-    std::vector<FIL*> openStreams;
-
-    VolumeState() {}
-    ~VolumeState() {}
-    VolumeState(const VolumeState&) = delete;
-    VolumeState& operator=(const VolumeState&) = delete;
-
-    void reset() {
-        if (fd >= 0) close(fd);
-        fd = -1;
-        dataOffset = 0;
-        dataAreaLengthBytes = 0;
-        isHiddenVolume = false;
-        fileSize = 0;
-        isUsbSource = false;
-        partitionStartSector = 0;
-        dataCtxInitialized = false;
-        cascade.initialized = false;
-        matchedCipherId = -1;
-        matchedHashId = -1;
-        fsType = FS_UNKNOWN;
-        ntfsVol = nullptr;
-        extFs = nullptr;
-        containerFormat = FMT_VERACRYPT;
-        luksSectorSize = 512;
-        luksUsesGenericCipher = false;
-        luksGenericCascade.initialized = false;
-        if (luksXts.initialized) {
-            mbedtls_aes_xts_free(&luksXts.dec);
-            mbedtls_aes_xts_free(&luksXts.enc);
-            mbedtls_aes_xts_init(&luksXts.dec);
-            mbedtls_aes_xts_init(&luksXts.enc);
-            luksXts.initialized = false;
-        }
-        if (preservedDerivedKey != nullptr) {
-            mbedtls_platform_zeroize(preservedDerivedKey, preservedDerivedKeyLen);
-            delete[] preservedDerivedKey;
-            preservedDerivedKey = nullptr;
-            preservedDerivedKeyLen = 0;
-        }
-    }
-};
-
-static VolumeState volumes[MAX_VOLUMES];
-static std::mutex  slotAllocMutex;
-static JavaVM*   g_vm             = nullptr;
-static jclass    g_usbBridgeClass = nullptr;
-static jmethodID g_usbReadMethod  = nullptr;  
-static jmethodID g_usbWriteMethod = nullptr;  
-static jclass    g_progressBridgeClass  = nullptr;
-static jmethodID g_progressReportMethod = nullptr; 
-
-static bool isValidBootSector(const unsigned char* decS) {
-
-    if (decS[510] != 0x55 || decS[511] != 0xAA) {
-        return false;
-    }
-
-    if (decS[0] == 0xEB && decS[1] == 0x76 && decS[2] == 0x90) {
-        if (memcmp(&decS[3], "EXFAT   ", 8) == 0) {
-            return true;
-        }
-    }
-
-
-    if (decS[0] == 0xEB || decS[0] == 0xE9) {
-        uint16_t bytesPerSector = static_cast<uint16_t>(decS[11]) | (static_cast<uint16_t>(decS[12]) << 8);
-        if (bytesPerSector == 512) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-
-struct ParsedHeaderFields {
-    uint64_t volumeSize          = 0; 
-    uint64_t hiddenVolumeSize    = 0; 
-    uint64_t encryptedAreaStart  = 0; 
-    uint64_t encryptedAreaLength = 0; 
-    uint32_t sectorSize          = 0;
-    bool isHiddenVolume() const { return hiddenVolumeSize != 0; }
-};
-
-static uint64_t readHeaderBE64(const unsigned char* body, int bodyOffset) {
-    uint64_t v = 0;
-    for (int i = 0; i < 8; i++) v = (v << 8) | body[bodyOffset + i];
-    return v;
-}
-static uint32_t readHeaderBE32Body(const unsigned char* body, int bodyOffset) {
-    return (static_cast<uint32_t>(body[bodyOffset])     << 24) |
-           (static_cast<uint32_t>(body[bodyOffset + 1]) << 16) |
-           (static_cast<uint32_t>(body[bodyOffset + 2]) <<  8) |
-            static_cast<uint32_t>(body[bodyOffset + 3]);
-}
-
-struct ScopedJniEnv {
-    JNIEnv* env = nullptr;
-    bool attached = false;
-    ScopedJniEnv() {
-        if (!g_vm) return;
-        if (g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) return;
-        if (g_vm->AttachCurrentThread(&env, nullptr) == JNI_OK) attached = true;
-        else env = nullptr;
-    }
-    ~ScopedJniEnv() { if (attached) g_vm->DetachCurrentThread(); }
-};
-
-
-static void reportUnlockProgress(int volId, int attempted, int total, int hashId, int cipherId, int format = 0) {
-    if (volId < 0) return;
-    ScopedJniEnv scope;
-    if (!scope.env) return;
-    scope.env->CallStaticVoidMethod(
-        g_progressBridgeClass, g_progressReportMethod,
-        static_cast<jint>(volId), static_cast<jint>(attempted), static_cast<jint>(total),
-        static_cast<jint>(hashId), static_cast<jint>(cipherId), static_cast<jint>(format));
-    if (scope.env->ExceptionCheck()) scope.env->ExceptionClear();
-}
-
-static bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount, unsigned char* outBuf) {
-    ScopedJniEnv scope;
-    if (!scope.env) return false;
-    JNIEnv* env = scope.env;
-
-    jbyteArray result = static_cast<jbyteArray>(env->CallStaticObjectMethod(
-        g_usbBridgeClass, g_usbReadMethod,
-        static_cast<jint>(volId), static_cast<jlong>(startSector), static_cast<jint>(sectorCount)));
-
-    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
-    if (!result) return false;
-
-    const jsize len = env->GetArrayLength(result);
-    const size_t expected = static_cast<size_t>(sectorCount) * 512;
-    if (static_cast<size_t>(len) != expected) { env->DeleteLocalRef(result); return false; }
-
-    env->GetByteArrayRegion(result, 0, len, reinterpret_cast<jbyte*>(outBuf));
-    env->DeleteLocalRef(result);
-    return true;
-}
-
-static bool usbWriteSectors(int volId, uint64_t startSector, uint32_t sectorCount, const unsigned char* inBuf) {
-    ScopedJniEnv scope;
-    if (!scope.env) return false;
-    JNIEnv* env = scope.env;
-
-    const jsize len = static_cast<jsize>(static_cast<size_t>(sectorCount) * 512);
-    jbyteArray data = env->NewByteArray(len);
-    if (!data) return false;
-    env->SetByteArrayRegion(data, 0, len, reinterpret_cast<const jbyte*>(inBuf));
-
-    const jboolean ok = env->CallStaticBooleanMethod(
-        g_usbBridgeClass, g_usbWriteMethod,
-        static_cast<jint>(volId), static_cast<jlong>(startSector), static_cast<jint>(sectorCount), data);
-
-    env->DeleteLocalRef(data);
-    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
-    return ok == JNI_TRUE;
-}
-
-static bool physRead(int pdrv, uint64_t physByteOffset, unsigned char* buf, size_t totalBytes) {
-    if (volumes[pdrv].isUsbSource) {
-        return usbReadSectors(pdrv, physByteOffset / 512,
-                               static_cast<uint32_t>(totalBytes / 512), buf);
-    }
-    const ssize_t got = pread(volumes[pdrv].fd, buf, totalBytes, static_cast<off_t>(physByteOffset));
-    return got == static_cast<ssize_t>(totalBytes);
-}
-
-static bool physWrite(int pdrv, uint64_t physByteOffset, const unsigned char* buf, size_t totalBytes) {
-    if (volumes[pdrv].isUsbSource) {
-        return usbWriteSectors(pdrv, physByteOffset / 512,
-                                static_cast<uint32_t>(totalBytes / 512), buf);
-    }
-    const ssize_t written = pwrite(volumes[pdrv].fd, buf, totalBytes, static_cast<off_t>(physByteOffset));
-    return written == static_cast<ssize_t>(totalBytes);
-}
-
-static const char* drivePaths[MAX_VOLUMES] = {
-    "0:", "1:", "2:", "3:", "4:", "5:", "6:", "7:"
-};
-
 // ----------------------------------------------------------------====
 // NTFS SUPPORT STRUCTURES & OPERATIONS
 // ----------------------------------------------------------------====
-
-static std::atomic<int64_t> ntfsDevPos[MAX_VOLUMES];
-static bool _ntfsDevPosInit = [](){
-    for (int i = 0; i < MAX_VOLUMES; i++) ntfsDevPos[i].store(0);
-    return true;
-}();
 
 struct NtfsFilldirContext {
     std::vector<std::string>* results;
@@ -445,627 +190,9 @@ static int vExplorer_ntfs_filldir(void *dirent, const ntfschar *name, const int 
     return 0;
 }
 
-struct NtfsSizeContext {
-    uint64_t totalSize = 0;
-    ntfs_volume* vol;
-};
-
-static int recursiveNtfsSizeFilldir(void *dirent, const ntfschar *name, const int name_len, const int name_type, const s64 pos, const MFT_REF mft_reference, const unsigned dt_type) {
-    NtfsSizeContext* ctx = static_cast<NtfsSizeContext*>(dirent);
-    if (name_type == FILE_NAME_DOS) return 0;
-
-    char* utf8Name = nullptr;
-    int utf8NameLen = ntfs_ucstombs(name, name_len, &utf8Name, 0);
-    if (utf8NameLen < 0 || !utf8Name) {
-        if (utf8Name) free(utf8Name);
-        return 0;
-    }
-    std::string nameStr(utf8Name, utf8NameLen);
-    free(utf8Name);
-
-    if (nameStr == "." || nameStr == "..") return 0;
-
-    // Hide ONLY specific NTFS metadata & Windows system folders ---
-    if (nameStr[0] == '$') {
-        if (nameStr == "$MFT" || nameStr == "$MFTMirr" || nameStr == "$LogFile" ||
-            nameStr == "$Volume" || nameStr == "$AttrDef" || nameStr == "$Bitmap" ||
-            nameStr == "$Boot" || nameStr == "$BadClus" || nameStr == "$Secure" ||
-            nameStr == "$UpCase" || nameStr == "$Extend" || nameStr == "$RECYCLE.BIN") {
-            return 0;
-        }
-    } else if (nameStr == "System Volume Information") {
-        return 0;
-    }
-
-    ntfs_inode* ni = ntfs_inode_open(ctx->vol, mft_reference);
-    if (ni) {
-        bool isDir = (ni->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
-        if (isDir) {
-            s64 subPos = 0;
-            ntfs_readdir(ni, &subPos, ctx, recursiveNtfsSizeFilldir);
-        } else {
-            ctx->totalSize += ni->data_size;
-        }
-        ntfs_inode_close(ni);
-    }
-    return 0;
-}
-
-static uint64_t recursiveFolderSizeNtfs(int volId, const std::string& path) {
-    auto& v = volumes[volId];
-    ntfs_inode* dir_ni = nullptr;
-    if (path.empty() || path == "/") {
-        dir_ni = ntfs_inode_open(v.ntfsVol, FILE_root);
-    } else {
-        std::string fullNtfsPath = "/" + path;
-        dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullNtfsPath.c_str());
-    }
-
-    uint64_t total = 0;
-    if (dir_ni) {
-        s64 pos = 0;
-        NtfsSizeContext sizeCtx = { 0, v.ntfsVol };
-        ntfs_readdir(dir_ni, &pos, &sizeCtx, recursiveNtfsSizeFilldir);
-        total = sizeCtx.totalSize;
-        ntfs_inode_close(dir_ni);
-    }
-    return total;
-}
-
-static int vExplorer_ntfs_volume_id(const struct ntfs_device* dev) {
-    if (dev->d_private) return *static_cast<const int*>(dev->d_private);
-    // mkntfs receives a synthetic "ve<N>" device name and uses these same
-    // operations without a private context.
-    return (dev->d_name && std::strncmp(dev->d_name, "ve", 2) == 0)
-        ? std::atoi(dev->d_name + 2) : -1;
-}
-
-
-static int vExplorer_ntfs_stat(struct ntfs_device *dev, struct stat *buf) {
-    int volId = vExplorer_ntfs_volume_id(dev);
-    if (!dev->d_private) {
-        std::memset(buf, 0, sizeof(*buf));
-        buf->st_size = volumes[volId].dataAreaLengthBytes;
-        buf->st_mode = S_IFBLK | 0660;
-        return 0;
-    }
-    if (volumes[volId].fd >= 0) {
-        return fstat(volumes[volId].fd, buf);
-    }
-    std::memset(buf, 0, sizeof(struct stat));
-    buf->st_size = volumes[volId].fileSize;
-    buf->st_mode = S_IFBLK | 0660;
-    return 0;
-}
-
-
-static int vExplorer_ntfs_open(struct ntfs_device *dev, int flags) {
-    int volId = vExplorer_ntfs_volume_id(dev);
-    if (volId >= 0 && volId < MAX_VOLUMES) {
-        ntfsDevPos[volId].store(0, std::memory_order_relaxed);
-    }
-    return 0; // Handled programmatically
-}
-
-
-
-static int vExplorer_ntfs_close(struct ntfs_device *dev) {
-    return 0;
-}
-
-static s64 vExplorer_ntfs_seek(struct ntfs_device *dev, s64 offset, int whence) {
-    int volId = vExplorer_ntfs_volume_id(dev);
-    if (volId < 0 || volId >= MAX_VOLUMES) return -1;
-
-    s64 base = 0;
-    switch (whence) {
-        case SEEK_SET:
-            base = 0;
-            break;
-        case SEEK_CUR:
-            base = ntfsDevPos[volId].load(std::memory_order_relaxed);
-            break;
-        case SEEK_END: {
-            struct stat st{};
-            if (vExplorer_ntfs_stat(dev, &st) != 0) return -1;
-            base = static_cast<s64>(st.st_size);
-            break;
-        }
-        default:
-            return -1;
-    }
-
-    const s64 newPos = base + offset;
-    if (newPos < 0) return -1;
-    ntfsDevPos[volId].store(newPos, std::memory_order_relaxed);
-    return newPos;
-}
-
-static s64 vExplorer_ntfs_pread(struct ntfs_device *dev, void *b, s64 count, s64 offset) {
-    if (count <= 0) return 0;
-    int volId = vExplorer_ntfs_volume_id(dev);
-    VolumeState& v = volumes[volId];
-
-    unsigned char* outBuf = static_cast<unsigned char*>(b);
-
-    uint64_t startByte = offset;
-    uint64_t endByte = offset + count;
-    uint64_t startSector = startByte / 512;
-    uint64_t endSector = (endByte + 511) / 512;
-    uint32_t numSectors = endSector - startSector;
-
-    const uint64_t basePhysical = v.dataOffset / 512;
-    const uint64_t physicalStartSector = basePhysical + startSector;
-    const size_t totalBytesToRead = numSectors * 512;
-
-    // Use posix_memalign to align arrays to 16-byte boundaries (critical for AES hardware acceleration)
-    void* rawEncBuf = nullptr;
-    if (posix_memalign(&rawEncBuf, 16, totalBytesToRead) != 0) {
-        return -1;
-    }
-    std::unique_ptr<unsigned char, void(*)(void*)> encBuf(static_cast<unsigned char*>(rawEncBuf), std::free);
-
-    // Read all requested sectors in one single contiguous block operation
-    if (!physRead(volId, physicalStartSector * 512, encBuf.get(), totalBytesToRead)) {
-        return -1;
-    }
-
-    void* rawDecBuf = nullptr;
-    if (posix_memalign(&rawDecBuf, 16, totalBytesToRead) != 0) {
-        return -1;
-    }
-    std::unique_ptr<unsigned char, void(*)(void*)> decBuf(static_cast<unsigned char*>(rawDecBuf), std::free);
-
-    // Decrypt loop (runs entirely in memory, blazing fast)
-    for (uint32_t i = 0; i < numSectors; i++) {
-        uint64_t physSector = physicalStartSector + i;
-        uint64_t tweak = physSector - v.partitionStartSector;
-        cascadeDecryptSector(v.cascade, tweak, encBuf.get() + (i * 512), decBuf.get() + (i * 512));
-    }
-
-    uint64_t internalOffset = startByte - (startSector * 512);
-    std::memcpy(outBuf, decBuf.get() + internalOffset, count);
-
-    return count;
-}
-
-
-static s64 vExplorer_ntfs_pwrite(struct ntfs_device *dev, const void *b, s64 count, s64 offset) {
-    if (count <= 0) return 0;
-    int volId = vExplorer_ntfs_volume_id(dev);
-    VolumeState& v = volumes[volId];
-
-    const unsigned char* inBuf = static_cast<const unsigned char*>(b);
-
-    uint64_t startByte = offset;
-    uint64_t endByte = offset + count;
-    uint64_t startSector = startByte / 512;
-    uint64_t endSector = (endByte + 511) / 512;
-    uint32_t numSectors = endSector - startSector;
-
-    const uint64_t basePhysical = v.dataOffset / 512;
-    const uint64_t physicalStartSector = basePhysical + startSector;
-    const size_t totalBytes = numSectors * 512;
-
-    void* rawSectorBuf = nullptr;
-    if (posix_memalign(&rawSectorBuf, 16, totalBytes) != 0) {
-        return -1;
-    }
-    std::unique_ptr<unsigned char, void(*)(void*)> sectorBuf(static_cast<unsigned char*>(rawSectorBuf), std::free);
-
-    bool partialStart = (startByte % 512 != 0);
-    bool partialEnd = (endByte % 512 != 0);
-
-    // If the write boundaries do not align to clean 512 bytes, execute standard Read-Modify-Write
-    if (partialStart || partialEnd) {
-        void* rawEncBuf = nullptr;
-        if (posix_memalign(&rawEncBuf, 16, totalBytes) != 0) {
-            return -1;
-        }
-        std::unique_ptr<unsigned char, void(*)(void*)> encBuf(static_cast<unsigned char*>(rawEncBuf), std::free);
-
-        if (!physRead(volId, physicalStartSector * 512, encBuf.get(), totalBytes)) {
-            return -1;
-        }
-        for (uint32_t i = 0; i < numSectors; i++) {
-            uint64_t physSector = physicalStartSector + i;
-            uint64_t tweak = physSector - v.partitionStartSector;
-            cascadeDecryptSector(v.cascade, tweak, encBuf.get() + (i * 512), sectorBuf.get() + (i * 512));
-        }
-    }
-
-    uint64_t internalOffset = startByte - (startSector * 512);
-    std::memcpy(sectorBuf.get() + internalOffset, inBuf, count);
-
-    void* rawEncBufOut = nullptr;
-    if (posix_memalign(&rawEncBufOut, 16, totalBytes) != 0) {
-        return -1;
-    }
-    std::unique_ptr<unsigned char, void(*)(void*)> encBufOut(static_cast<unsigned char*>(rawEncBufOut), std::free);
-
-    // Encrypt loop
-    for (uint32_t i = 0; i < numSectors; i++) {
-        uint64_t physSector = physicalStartSector + i;
-        uint64_t tweak = physSector - v.partitionStartSector;
-        cascadeEncryptSector(v.cascade, tweak, sectorBuf.get() + (i * 512), encBufOut.get() + (i * 512));
-    }
-
-    // Write batched, encrypted sectors to physical storage in a single transaction
-    if (!physWrite(volId, physicalStartSector * 512, encBufOut.get(), totalBytes)) {
-        return -1;
-    }
-
-    return count;
-}
-
-static s64 vExplorer_ntfs_read(struct ntfs_device *dev, void *buf, s64 count) {
-    int volId = vExplorer_ntfs_volume_id(dev);
-    if (volId < 0 || volId >= MAX_VOLUMES || count <= 0) return 0;
-    const s64 pos = ntfsDevPos[volId].load(std::memory_order_relaxed);
-    const s64 got = vExplorer_ntfs_pread(dev, buf, count, pos);
-    if (got > 0) ntfsDevPos[volId].fetch_add(got, std::memory_order_relaxed);
-    return got;
-}
-
-static s64 vExplorer_ntfs_write(struct ntfs_device *dev, const void *buf, s64 count) {
-    int volId = vExplorer_ntfs_volume_id(dev);
-    if (volId < 0 || volId >= MAX_VOLUMES || count <= 0) return 0;
-    const s64 pos = ntfsDevPos[volId].load(std::memory_order_relaxed);
-    const s64 written = vExplorer_ntfs_pwrite(dev, buf, count, pos);
-    if (written > 0) ntfsDevPos[volId].fetch_add(written, std::memory_order_relaxed);
-    return written;
-}
-
-static int vExplorer_ntfs_sync(struct ntfs_device *dev) {
-    int volId = vExplorer_ntfs_volume_id(dev);
-    if (volumes[volId].fd >= 0) {
-        fsync(volumes[volId].fd);
-    }
-    return 0;
-}
-
-
-
-static int vExplorer_ntfs_ioctl(struct ntfs_device *dev, unsigned long request, void *argp) {
-    int volId = vExplorer_ntfs_volume_id(dev);
-    switch (request) {
-        case 0x1268: // BLKSSZGET
-            *static_cast<int*>(argp) = 512;
-            return 0;
-        case 0x1260: // BLKGETSIZE
-            *static_cast<unsigned long*>(argp) = volumes[volId].dataAreaLengthBytes / 512;
-            return 0;
-        case 0x80041272: // BLKGETSIZE64 (32-bit size_t encoding)
-        case 0x80081272: // BLKGETSIZE64 (64-bit size_t encoding — the one arm64 actually uses)
-            *static_cast<uint64_t*>(argp) = volumes[volId].dataAreaLengthBytes;
-            return 0;
-        default:
-            errno = EOPNOTSUPP;
-            return -1;
-    }
-}
-
-// Compile-time static sequential initialization of virtual device operations
-extern "C" ntfs_device_operations vExplorer_ntfs_ops = {
-    vExplorer_ntfs_open,
-    vExplorer_ntfs_close,
-    vExplorer_ntfs_seek,
-    vExplorer_ntfs_read,
-    vExplorer_ntfs_write,
-    vExplorer_ntfs_pread,
-    vExplorer_ntfs_pwrite,
-    vExplorer_ntfs_sync,
-    vExplorer_ntfs_stat,
-    vExplorer_ntfs_ioctl
-};
-
-// ── NTFS File Allocation Helper ──────────────────────────────────────────────
-
-static ntfs_inode* createNtfsFile(ntfs_volume* vol, const std::string& fullPath) {
-    size_t slashPos = fullPath.find_last_of('/');
-    std::string parentPath = fullPath.substr(0, slashPos);
-    std::string childName = fullPath.substr(slashPos + 1);
-    if (parentPath.empty()) parentPath = "/";
-
-    ntfs_inode* parentNi = ntfs_pathname_to_inode(vol, NULL, parentPath.c_str());
-    if (!parentNi) return nullptr;
-
-    ntfschar* uChild = nullptr;
-    int uChildLen = ntfs_mbstoucs(childName.c_str(), &uChild);
-    ntfs_inode* ni = nullptr;
-
-    if (uChildLen >= 0) {
-        ni = ntfs_create(parentNi, 0, uChild, uChildLen, S_IFREG);
-        free(uChild);
-    }
-    ntfs_inode_close(parentNi);
-    return ni;
-}
-
-// ----------------------------------------------------------------====
-// JNI ONLOAD & INITIALIZATION
-// ----------------------------------------------------------------====
-
-extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
-    g_vm = vm;
-    JNIEnv* env = nullptr;
-    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) return JNI_ERR;
-
-    jclass localClass = env->FindClass("com/aeidolon/vaultexplorer/UsbBlockBridge");
-    if (!localClass) {
-        LOGI("JNI_OnLoad: UsbBlockBridge class not found");
-        return JNI_ERR;
-    }
-    g_usbBridgeClass = reinterpret_cast<jclass>(env->NewGlobalRef(localClass));
-    env->DeleteLocalRef(localClass);
-
-    g_usbReadMethod  = env->GetStaticMethodID(g_usbBridgeClass, "readSectors",  "(IJI)[B");
-    g_usbWriteMethod = env->GetStaticMethodID(g_usbBridgeClass, "writeSectors", "(IJI[B)Z");
-    if (!g_usbReadMethod || !g_usbWriteMethod) {
-        LOGI("JNI_OnLoad: UsbBlockBridge methods not found");
-        return JNI_ERR;
-    }
-
-    jclass progressLocal = env->FindClass("com/aeidolon/vaultexplorer/UnlockProgressBridge");
-    if (!progressLocal) {
-        LOGI("JNI_OnLoad: UnlockProgressBridge class not found");
-        return JNI_ERR;
-    }
-    g_progressBridgeClass = reinterpret_cast<jclass>(env->NewGlobalRef(progressLocal));
-    env->DeleteLocalRef(progressLocal);
-
-    g_progressReportMethod = env->GetStaticMethodID(
-        g_progressBridgeClass, "reportProgress", "(IIIIII)V");
-    if (!g_progressReportMethod) {
-        LOGI("JNI_OnLoad: UnlockProgressBridge.reportProgress not found");
-        return JNI_ERR;
-    }
-    return JNI_VERSION_1_6;
-}
-
 // ----------------------------------------------------------------====
 // MOUNT CACHE HELPERS
 // ----------------------------------------------------------------====
-
-static inline bool requireActiveSession(int volId, const char* callerName) {
-    if (volId < 0 || volId >= MAX_VOLUMES) return false;
-    auto& v = volumes[volId];
-    std::lock_guard<std::mutex> lock(v.mutex);
-
-    if (!v.dataCtxInitialized || (v.fd < 0 && !v.isUsbSource)) {
-        LOGI("%s: volume %d has no active session (not unlocked)", callerName, volId);
-        return false;
-    }
-    return true;
-}
-
-
-static void throwNotUnlocked(JNIEnv* env, int volId, const char* callerName) {
-    jclass exClass = env->FindClass("java/lang/IllegalStateException");
-    char msg[160];
-    snprintf(msg, sizeof(msg), "NOT_UNLOCKED: volume %d has no active session (%s)",
-             volId, callerName);
-    env->ThrowNew(exClass, msg);
-}
-
-// libext2fs sees a normal byte-addressable device.  This adapter translates
-// its block requests into the already encrypted FatFs disk I/O layer, so the
-// filesystem library never sees the container file or USB device directly.
-static bool extTransfer(int volId, uint64_t offset, void* data, size_t bytes,
-                        bool write) {
-    if (volId < 0 || volId >= MAX_VOLUMES || bytes == 0) return bytes == 0;
-    const auto& v = volumes[volId];
-    if (offset > v.dataAreaLengthBytes || bytes > v.dataAreaLengthBytes - offset)
-        return false;
-    const uint64_t firstSector = offset / 512;
-    const uint64_t lastSector = (offset + bytes + 511) / 512;
-    const size_t sectorBytes = static_cast<size_t>(lastSector - firstSector) * 512;
-    std::vector<unsigned char> sectors(sectorBytes);
-    const size_t inSector = static_cast<size_t>(offset % 512);
-    const bool wholeSectors = inSector == 0 && (bytes % 512) == 0;
-
-    if (!write || !wholeSectors) {
-        if (disk_read(static_cast<BYTE>(volId), sectors.data(), firstSector,
-                      static_cast<UINT>(lastSector - firstSector)) != RES_OK)
-            return false;
-    }
-    if (write) {
-        std::memcpy(sectors.data() + inSector, data, bytes);
-        return disk_write(static_cast<BYTE>(volId), sectors.data(), firstSector,
-                          static_cast<UINT>(lastSector - firstSector)) == RES_OK;
-    }
-    std::memcpy(data, sectors.data() + inSector, bytes);
-    return true;
-}
-
-static errcode_t extIoOpenBound(const char* name, int flags, io_channel* out);
-
-static errcode_t extIoOpen(const char* name, int, io_channel* out) {
-    if (!name || !out) return EXT2_ET_INVALID_ARGUMENT;
-    char* end = nullptr;
-    const long volId = std::strtol(name, &end, 10);
-    if (!end || *end || volId < 0 || volId >= MAX_VOLUMES) return EXT2_ET_BAD_DEVICE_NAME;
-    auto* channel = static_cast<io_channel>(std::calloc(1, sizeof(struct struct_io_channel)));
-    auto* privateId = new int(static_cast<int>(volId));
-    if (!channel || !privateId) { std::free(channel); delete privateId; return EXT2_ET_NO_MEMORY; }
-    channel->magic = EXT2_ET_MAGIC_IO_CHANNEL;
-    channel->manager = nullptr; // set by the manager's open wrapper below
-    channel->name = strdup(name);
-    channel->block_size = 1024;
-    channel->refcount = 1;
-    channel->private_data = privateId;
-    *out = channel;
-    return 0;
-}
-
-static errcode_t extIoClose(io_channel channel) {
-    if (!channel) return EXT2_ET_INVALID_ARGUMENT;
-    delete static_cast<int*>(channel->private_data);
-    std::free(channel->name);
-    std::free(channel);
-    return 0;
-}
-
-static errcode_t extIoSetBlockSize(io_channel channel, int size) {
-    if (!channel || size < 512 || (size % 512) != 0) return EXT2_ET_INVALID_ARGUMENT;
-    channel->block_size = size;
-    return 0;
-}
-
-static errcode_t extIoTransfer(io_channel channel, unsigned long long block,
-                               int count, void* data, bool write) {
-    if (!channel || !channel->private_data || !data || count == 0) return EXT2_ET_INVALID_ARGUMENT;
-    const uint64_t bytes = count < 0 ? static_cast<uint64_t>(-static_cast<long long>(count))
-        : static_cast<uint64_t>(count) * static_cast<uint64_t>(channel->block_size);
-    const uint64_t offset = block * static_cast<uint64_t>(channel->block_size);
-    const int volId = *static_cast<int*>(channel->private_data);
-    if (!extTransfer(volId, offset, data, static_cast<size_t>(bytes), write))
-        return write ? EXT2_ET_SHORT_WRITE : EXT2_ET_SHORT_READ;
-    return 0;
-}
-
-static errcode_t extIoRead(io_channel c, unsigned long b, int n, void* d) { return extIoTransfer(c, b, n, d, false); }
-static errcode_t extIoWrite(io_channel c, unsigned long b, int n, const void* d) { return extIoTransfer(c, b, n, const_cast<void*>(d), true); }
-static errcode_t extIoRead64(io_channel c, unsigned long long b, int n, void* d) { return extIoTransfer(c, b, n, d, false); }
-static errcode_t extIoWrite64(io_channel c, unsigned long long b, int n, const void* d) { return extIoTransfer(c, b, n, const_cast<void*>(d), true); }
-static errcode_t extIoWriteByte(io_channel c, unsigned long offset, int n, const void* d) {
-    if (!c || !c->private_data || n < 0) return EXT2_ET_INVALID_ARGUMENT;
-    return extTransfer(*static_cast<int*>(c->private_data), offset, const_cast<void*>(d), static_cast<size_t>(n), true)
-        ? 0 : EXT2_ET_SHORT_WRITE;
-}
-static errcode_t extIoFlush(io_channel c) {
-    if (!c || !c->private_data) return EXT2_ET_INVALID_ARGUMENT;
-    const auto& v = volumes[*static_cast<int*>(c->private_data)];
-    return (!v.isUsbSource && v.fd >= 0 && fsync(v.fd) != 0) ? EXT2_ET_SHORT_WRITE : 0;
-}
-
-static struct_io_manager g_extIoManager = {
-    EXT2_ET_MAGIC_IO_MANAGER, "vaultexplorer-encrypted", extIoOpenBound, extIoClose,
-    extIoSetBlockSize, extIoRead, extIoWrite, extIoFlush, extIoWriteByte,
-    nullptr, nullptr, extIoRead64, extIoWrite64, nullptr, nullptr, nullptr, {0}
-};
-
-static errcode_t extIoOpenBound(const char* name, int flags, io_channel* out) {
-    const errcode_t result = extIoOpen(name, flags, out);
-    if (!result) (*out)->manager = &g_extIoManager;
-    return result;
-}
-
-static bool formatExtVolume(int volId, const char* variant) {
-    const bool ext3 = strncasecmp(variant, "ext3", 4) == 0;
-    const bool ext4 = strncasecmp(variant, "ext4", 4) == 0;
-    const uint64_t totalBlocks = volumes[volId].dataAreaLengthBytes / 4096;
-    if (totalBlocks < 1024) return false;
-
-    struct ext2_super_block params{};
-    std::memset(&params, 0, sizeof(params));
-    
-    params.s_rev_level = EXT2_DYNAMIC_REV;
-    params.s_inode_size = 256;
-    params.s_first_ino = EXT2_GOOD_OLD_FIRST_INO;
-    params.s_log_block_size = 2; // 4096 bytes
-    params.s_blocks_per_group = 32768;
-    params.s_inodes_per_group = 2048; 
-    ext2fs_blocks_count_set(&params, totalBlocks);
-
-    // Feature set equivalent to: mkfs.ext4 -O ^has_journal,extent,filetype,sparse_super
-    params.s_feature_incompat = 0x0002; // FILETYPE
-    params.s_feature_ro_compat = 0x0001; // SPARSE_SUPER
-    params.s_feature_compat = 0x0020;    // DIR_INDEX
-    
-    if (ext4) {
-        params.s_feature_incompat |= 0x0040; // EXTENTS
-    }
-
-    char deviceName[16];
-    std::snprintf(deviceName, sizeof(deviceName), "%d", volId);
-    ext2_filsys fs = nullptr;
-    errcode_t ret;
-
-    // 1. Initialize handle
-    ret = ext2fs_initialize(deviceName, 0, &params, &g_extIoManager, &fs);
-    if (ret) return false;
-
-    fs->flags |= EXT2_FLAG_RW;
-
-    // 2. Setup Superblock metadata
-    fs->super->s_state = 1; // Clean
-    fs->super->s_max_mnt_count = 20;
-    fs->super->s_lastcheck = (uint32_t)time(nullptr);
-    fs->super->s_mtime = (uint32_t)time(nullptr);
-    fs->super->s_wtime = (uint32_t)time(nullptr);
-    
-    // Set UUID
-    unsigned char uuid[16];
-    FILE* urnd = fopen("/dev/urandom", "rb");
-    if (urnd) {
-        fread(uuid, 1, 16, urnd);
-        uuid[6] = (uuid[6] & 0x0F) | 0x40; 
-        uuid[8] = (uuid[8] & 0x3F) | 0x80;
-        std::memcpy(fs->super->s_uuid, uuid, 16);
-        fclose(urnd);
-    }
-    
-    // Set last mounted path (helps Linux identify the drive)
-    std::strncpy(reinterpret_cast<char*>(fs->super->s_last_mounted), "/", sizeof(fs->super->s_last_mounted));
-
-    // 3. Set Reserved Blocks to 0
-    fs->super->s_r_blocks_count = 0;
-
-    // 4. Allocate tables and write bitmaps
-    ret = ext2fs_allocate_tables(fs);
-    if (ret) { ext2fs_close(fs); return false; }
-    
-    ext2fs_write_inode_bitmap(fs);
-    ext2fs_write_block_bitmap(fs);
-
-    // 5. Initialize Root directory Inode (2)
-    ret = ext2fs_mkdir(fs, EXT2_ROOT_INO, EXT2_ROOT_INO, 0);
-
-    // 6. Set ROOT Permissions and Ownership
-    struct ext2_inode root_inode{};
-    if (ext2fs_read_inode(fs, EXT2_ROOT_INO, &root_inode) == 0) {
-        root_inode.i_mode = LINUX_S_IFDIR | 0777; // Everyone can write
-        root_inode.i_uid = 0;
-        root_inode.i_gid = 0;
-        root_inode.i_links_count = 2; 
-        root_inode.i_atime = root_inode.i_mtime = root_inode.i_ctime = (uint32_t)time(nullptr);
-        ext2fs_write_inode(fs, EXT2_ROOT_INO, &root_inode);
-    }
-
-    // 7. Create lost+found
-    ext2fs_mkdir(fs, EXT2_ROOT_INO, 0, "lost+found");
-
-    // 8. Add Journal
-    if ((ext3 || ext4) && totalBlocks > 2048) {
-        struct ext2fs_journal_params jparams{};
-        jparams.num_journal_blocks = static_cast<blk_t>(std::min<uint64_t>(8192, totalBlocks / 32));
-        if (jparams.num_journal_blocks < 1024) jparams.num_journal_blocks = 1024;
-        
-        ext2fs_add_journal_inode3(fs, &jparams, 0, 0);
-    }
-
-    // 8a. Reserve the remaining metadata inodes (bad-blocks, quota, boot
-    // loader, undelete dir, resize inode, exclude, replica -- i.e. every
-    // inode number below s_first_ino that isn't already spoken for by root
-    // or the journal). Real mke2fs does this via its reserve_inodes() step;
-    // skipping it leaves these bits marked "free" in the on-disk inode
-    // bitmap, and the Linux kernel refuses the first ext4_new_inode() that
-    // lands on one of them ("reserved inode found cleared - inode=N"),
-    // which is exactly the corruption you're seeing on write.
-    for (ext2_ino_t resIno = EXT2_BAD_INO; resIno < fs->super->s_first_ino; ++resIno) {
-        if (!ext2fs_test_inode_bitmap2(fs->inode_map, resIno)) {
-            ext2fs_inode_alloc_stats2(fs, resIno, +1, 0);
-        }
-    }
-    ext2fs_mark_ib_dirty(fs);
-
-    // 9. Flush and Close
-    ext2fs_mark_super_dirty(fs);
-    ext2fs_flush(fs);
-    ext2fs_close(fs);
-    return true; 
-}
 
 static bool ensureMounted(int volId) {
     if (volId < 0 || volId >= MAX_VOLUMES) return false;
@@ -1079,90 +206,11 @@ static bool ensureMounted(int volId) {
         return false;
     }
 
-    // ext2/3/4 has no DOS boot signature. Its superblock starts at byte 1024
-    // and carries the little-endian 0xEF53 magic at offset 0x38.
     alignas(16) unsigned char extSuperSector[512];
     if (disk_read(static_cast<BYTE>(volId), extSuperSector, 2, 1) == RES_OK &&
-    extSuperSector[0x38] == 0x53 && extSuperSector[0x39] == 0xEF) {
-    const std::string deviceName = std::to_string(volId);
-    v.fsType = VolumeState::FS_EXT;
-    const errcode_t openErr = ext2fs_open(deviceName.c_str(), EXT2_FLAG_RW | EXT2_FLAG_64BITS,
-                                      0, 0, &g_extIoManager, &v.extFs);
-if (openErr == 0) {
-    const errcode_t bmErr = ext2fs_read_bitmaps(v.extFs);
-    if (bmErr == 0) {
-        v.fsMounted = true;
-        struct ext2_super_block* sb = v.extFs->super;
-        // libext2fs (unlike a kernel mount) never replays the ext3/4 journal on
-        // open, so if the container was closed with a dirty journal, entries
-        // that were only checkpointed to the journal — not yet to the main
-        // block/inode trees — will be invisible here even though the mount
-        // itself "succeeds". Surface that state explicitly instead of staying
-        // silent, since an empty-looking volume with needsRecovery=1 points
-        // straight at the cause.
-        const bool needsRecovery = EXT2_HAS_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
-        const bool hasJournal = EXT2_HAS_COMPAT_FEATURE(sb, EXT3_FEATURE_COMPAT_HAS_JOURNAL);
-        LOGI("ensureMounted: detected ext filesystem on volume %d (blockSize=%d, blocksCount=%llu, "
-             "freeBlocks=%llu, inodesCount=%u, freeInodes=%u, hasJournal=%d, needsRecovery=%d, state=%u)",
-             volId, EXT2_BLOCK_SIZE(sb),
-             (unsigned long long)ext2fs_blocks_count(sb),
-             (unsigned long long)ext2fs_free_blocks_count(sb),
-             sb->s_inodes_count, sb->s_free_inodes_count,
-             hasJournal ? 1 : 0, needsRecovery ? 1 : 0, sb->s_state);
-        if (needsRecovery) {
-            LOGI("ensureMounted: WARNING volume %d has an unreplayed journal (needsRecovery=1) - "
-                 "any writes still sitting in the journal at close time will not appear in the "
-                 "listing until the journal is replayed", volId);
-        }
-
-        // ── Temporary forensic dump: is the group descriptor table (the
-        // block right after the superblock) actually decrypting correctly?
-        // ext2fs_read_bitmaps() never validates bg_*_loc against the block
-        // count, so it "succeeding" only proves the physical read worked,
-        // not that block 1's plaintext is sane. Dump both the raw decrypted
-        // bytes and what e2fsprogs parsed out of them.
-        {
-            const uint32_t blockSize = EXT2_BLOCK_SIZE(sb);
-            const uint64_t gdtByteOffset = blockSize; // block 1, whatever blockSize is
-            const uint64_t gdtSector = gdtByteOffset / 512;
-            const uint32_t gdtSectorCount = blockSize / 512;
-            std::vector<unsigned char> gdtBuf(blockSize);
-            DRESULT gdtDr = disk_read(static_cast<BYTE>(volId), gdtBuf.data(),
-                                       static_cast<LBA_t>(gdtSector), gdtSectorCount);
-            if (gdtDr == RES_OK) {
-                char hex[16 * 3 + 1] = {0};
-                for (int i = 0; i < 16; i++) snprintf(hex + i * 3, 4, "%02x ", gdtBuf[i]);
-                LOGI("ensureMounted: block1 (GDT) first 16 bytes raw: %s", hex);
-            } else {
-                LOGI("ensureMounted: block1 (GDT) disk_read failed dr=%d", gdtDr);
-            }
-            const dgrp_t groupCount = v.extFs->group_desc_count;
-            LOGI("ensureMounted: groupDescCount=%u descSize=%u blocksCount=%llu",
-                 groupCount, v.extFs->super->s_desc_size,
-                 (unsigned long long)ext2fs_blocks_count(sb));
-            for (dgrp_t g = 0; g < groupCount && g < 4; g++) {
-                LOGI("ensureMounted: group %u -> blockBitmapLoc=%llu inodeBitmapLoc=%llu "
-                     "inodeTableLoc=%llu freeBlocks=%u freeInodes=%u",
-                     g,
-                     (unsigned long long)ext2fs_block_bitmap_loc(v.extFs, g),
-                     (unsigned long long)ext2fs_inode_bitmap_loc(v.extFs, g),
-                     (unsigned long long)ext2fs_inode_table_loc(v.extFs, g),
-                     ext2fs_bg_free_blocks_count(v.extFs, g),
-                     ext2fs_bg_free_inodes_count(v.extFs, g));
-            }
-        }
-        return true;
+        extSuperSector[0x38] == 0x53 && extSuperSector[0x39] == 0xEF) {
+        return mountExtVolume(volId);
     }
-    LOGI("ensureMounted: ext2fs_read_bitmaps failed on volume %d: %s (err=%lu)",
-         volId, error_message(bmErr), (unsigned long)bmErr);
-} else {
-    LOGI("ensureMounted: ext2fs_open failed on volume %d: %s (err=%lu)",
-         volId, error_message(openErr), (unsigned long)openErr);
-}
-if (v.extFs) { ext2fs_close(v.extFs); v.extFs = nullptr; }
-v.fsType = VolumeState::FS_UNKNOWN;
-return false;
-}
 
     if (decS[510] != 0x55 || decS[511] != 0xAA) {
         LOGI("ensureMounted: invalid signature in boot sector for volume %d", volId);
@@ -1238,19 +286,6 @@ static void unmountVolume(int volId) {
 // INLINE HELPERS
 // ----------------------------------------------------------------====
 
-static inline bool hasControlChar(const std::string& s) {
-    for (unsigned char c : s) {
-        if (c < 32 || c == 127) return true;
-    }
-    return false;
-}
-
-static void sanitizeString(std::string& s) {
-    if (!hasControlChar(s)) return;   // Optimize: skip replace_if scan when the string is clean of control characters.
-    std::replace_if(s.begin(), s.end(),
-        [](unsigned char c){ return c < 32 || c == 127; }, '?');
-}
-
 static inline void setTweak(unsigned char* tweak, uint64_t sectorNum) {
     *reinterpret_cast<uint64_t*>(tweak)   = sectorNum;
     *reinterpret_cast<uint64_t*>(tweak+8) = 0ULL;
@@ -1266,75 +301,6 @@ struct PartitionCandidate {
     uint64_t startSector;
     uint64_t sectorCount;
 };
-
-static uint32_t readUint32LE(const unsigned char* p) {
-    return static_cast<uint32_t>(p[0]) |
-           (static_cast<uint32_t>(p[1]) << 8) |
-           (static_cast<uint32_t>(p[2]) << 16) |
-           (static_cast<uint32_t>(p[3]) << 24);
-}
-
-static uint64_t readUint64LE(const unsigned char* p) {
-    return static_cast<uint64_t>(p[0]) |
-           (static_cast<uint64_t>(p[1]) << 8) |
-           (static_cast<uint64_t>(p[2]) << 16) |
-           (static_cast<uint64_t>(p[3]) << 24) |
-           (static_cast<uint64_t>(p[4]) << 32) |
-           (static_cast<uint64_t>(p[5]) << 40) |
-           (static_cast<uint64_t>(p[6]) << 48) |
-           (static_cast<uint64_t>(p[7]) << 56);
-}
-
-// ── FAT date/time → Unix timestamp ─────────────────────────────────────────
-
-static uint64_t fatToUnixTimestamp(WORD fdate, WORD ftime) {
-    if (fdate == 0) return 0; 
-    struct tm t = {};
-    t.tm_year  = ((fdate >> 9) & 0x7F) + 80; 
-    t.tm_mon   = ((fdate >> 5) & 0x0F) - 1;  
-    t.tm_mday  =  (fdate)       & 0x1F;
-    t.tm_hour  = (ftime >> 11)  & 0x1F;
-    t.tm_min   = (ftime >>  5)  & 0x3F;
-    t.tm_sec   = (ftime  & 0x1F) * 2;
-    t.tm_isdst = -1;
-    const time_t ts = mktime(&t);
-    return (ts < 0) ? 0 : static_cast<uint64_t>(ts);
-}
-
-static void unixToFatTimestamp(uint64_t unixTime, WORD& fdate, WORD& ftime) {
-    time_t t_secs = static_cast<time_t>(unixTime);
-    struct tm t = {};
-    localtime_r(&t_secs, &t);
-
-    int year = t.tm_year + 1900;
-    if (year < 1980) {
-        fdate = 0;
-        ftime = 0;
-        return;
-    }
-
-    fdate = static_cast<WORD>(
-        (((year - 1980) & 0x7F) << 9) |
-        (((t.tm_mon + 1) & 0x0F) << 5) |
-        (t.tm_mday & 0x1F));
-
-    ftime = static_cast<WORD>(
-        ((t.tm_hour & 0x1F) << 11) |
-        ((t.tm_min & 0x3F) << 5) |
-        ((t.tm_sec / 2) & 0x1F));
-}
-
-
-static uint32_t crc32(const unsigned char* data, size_t len) {
-    uint32_t crc = 0xFFFFFFFFu;
-    for (size_t i = 0; i < len; ++i) {
-        crc ^= data[i];
-        for (int b = 0; b < 8; ++b)
-            crc = (crc >> 1) ^ (0xEDB88320u & ~((crc & 1) - 1));
-    }
-    return crc ^ 0xFFFFFFFFu;
-}
-
 
 static unsigned char* getVolIoBuf(VolumeState& v, size_t neededBytes) {
     if (v.ioBufSize < neededBytes) {
@@ -1377,7 +343,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     // expresses that width in 512-byte FatFs/ext2/ntfs sectors. When it's >1
     // we must always decrypt whole aligned units, even if the caller only
     // asked for a sub-range of one — XTS can't be decrypted starting mid-unit.
-    const bool isLuks = (v.containerFormat != VolumeState::FMT_VERACRYPT);
+    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
     const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
     const uint32_t sectorsPerUnit = luksUnit / 512;
 
@@ -1412,9 +378,9 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             encBuf = stackBuf;
         }
 
-        if (!physRead(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
+        if (!physicalRead(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
-        if (v.containerFormat == VolumeState::FMT_VERACRYPT) {
+        if (v.containerFormat == ContainerFormat::kVeraCrypt) {
             for (UINT i = 0; i < batch.count; i++) {
                 const uint64_t physSector = firstPhysical + i;
                 const uint64_t tweak = physSector - v.partitionStartSector;
@@ -1473,7 +439,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     // read-modify-write: pull the existing ciphertext, decrypt the untouched
     // parts of each partially-covered unit, splice in the new plaintext,
     // then re-encrypt whole units before writing back.
-    const bool isLuks = (v.containerFormat != VolumeState::FMT_VERACRYPT);
+    const bool isLuks = (v.containerFormat != ContainerFormat::kVeraCrypt);
     const uint32_t luksUnit = (isLuks && v.luksSectorSize >= 512) ? v.luksSectorSize : 512;
     const uint32_t sectorsPerUnit = luksUnit / 512;
 
@@ -1503,7 +469,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             encBuf = stackBuf;
         }
 
-        if (v.containerFormat == VolumeState::FMT_VERACRYPT) {
+        if (v.containerFormat == ContainerFormat::kVeraCrypt) {
             for (UINT i = 0; i < batch.count; i++) {
                 const uint64_t physSector = firstPhysical + i;
                 const uint64_t tweak = physSector - v.partitionStartSector;
@@ -1526,7 +492,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             std::vector<unsigned char> plain(totalBytes);
             if (needsSplice) {
                 std::vector<unsigned char> existingEnc(totalBytes);
-                if (!physRead(pdrv, alignedFirstPhysical * 512, existingEnc.data(), totalBytes))
+                if (!physicalRead(pdrv, alignedFirstPhysical * 512, existingEnc.data(), totalBytes))
                     return RES_ERROR;
                 for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
                     const uint64_t sectorTweak = alignedRelStart + u;
@@ -1558,7 +524,7 @@ for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;;
             }
         }
 
-        if (!physWrite(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
+        if (!physicalWrite(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
     }
     return RES_OK;
@@ -1704,13 +670,13 @@ static bool tryDecryptHeader(
     }
 
     const uint32_t computedHdrCrc = crc32(decH, VC_HDR_CRC_COVERAGE_LEN);
-    const uint32_t storedHdrCrc   = readHeaderBE32Body(decH, VC_HDR_OFF_HEADER_CRC);
+    const uint32_t storedHdrCrc   = readHeaderBE32(decH, VC_HDR_OFF_HEADER_CRC);
     if (computedHdrCrc != storedHdrCrc) {
         return false;
     }
 
     const uint32_t computedKeyCrc = crc32(&decH[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
-    const uint32_t storedKeyCrc = readHeaderBE32Body(decH, VC_HDR_OFF_KEY_CRC);
+    const uint32_t storedKeyCrc = readHeaderBE32(decH, VC_HDR_OFF_KEY_CRC);
     if (computedKeyCrc != storedKeyCrc) {
         return false;
     }
@@ -1721,7 +687,7 @@ static bool tryDecryptHeader(
         outFields->hiddenVolumeSize    = readHeaderBE64(decH, VC_HDR_OFF_HIDDEN_VOL_SIZE);
         outFields->encryptedAreaStart  = readHeaderBE64(decH, VC_HDR_OFF_KEY_SCOPE_START);
         outFields->encryptedAreaLength = readHeaderBE64(decH, VC_HDR_OFF_KEY_SCOPE_SIZE);
-        outFields->sectorSize          = readHeaderBE32Body(decH, VC_HDR_OFF_SECTOR_SIZE);
+        outFields->sectorSize          = readHeaderBE32(decH, VC_HDR_OFF_SECTOR_SIZE);
     }
 
     return true;
@@ -2075,7 +1041,7 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
             v.partitionStartSector = segmentStartSector - (luksInfo.ivTweak * sectorsPerUnit);
         }
         v.containerFormat = luksInfo.version == 1
-            ? VolumeState::FMT_LUKS1 : VolumeState::FMT_LUKS2;
+            ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
         if (isGenericCipher) {
             v.luksGenericCascade = genericCascade;
             v.luksXts.initialized = false;
@@ -2420,116 +1386,6 @@ static bool prepareUsbSession(const unsigned char* password, size_t passwordLen,
 // ----------------------------------------------------------------====
 // SHARED: Directory listing
 // ----------------------------------------------------------------====
-
-static uint64_t recursiveFolderSize(int volId, const std::string& fatPath) {
-    std::string fullPath = drivePaths[volId];
-    if (!fatPath.empty()) { fullPath += '/'; fullPath += fatPath; }
-
-    uint64_t total = 0;
-    DIR dir; FILINFO fno;
-    if (f_opendir(&dir, fullPath.c_str()) == FR_OK) {
-        while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
-            if (fno.fattrib & AM_DIR) {
-                const std::string child = fatPath.empty()
-                    ? std::string(fno.fname)
-                    : fatPath + '/' + fno.fname;
-                total += recursiveFolderSize(volId, child);
-            } else {
-                total += fno.fsize;
-            }
-        }
-        f_closedir(&dir);
-    }
-    return total;
-}
-
-static bool extResolvePath(ext2_filsys fs, const std::string& path, ext2_ino_t* ino) {
-    std::string relative = path;
-    while (!relative.empty() && relative.front() == '/') relative.erase(relative.begin());
-    if (relative.empty()) { *ino = EXT2_ROOT_INO; return true; }
-    return ext2fs_namei_follow(fs, EXT2_ROOT_INO, EXT2_ROOT_INO,
-                               relative.c_str(), ino) == 0;
-}
-
-struct ExtDirContext {
-    ext2_filsys fs;
-    std::vector<std::string>* results;
-};
-
-static int extDirectoryEntry(ext2_ino_t, int, struct ext2_dir_entry* entry,
-                             int, int, char*, void* data) {
-    auto* ctx = static_cast<ExtDirContext*>(data);
-    if (!entry->inode || ctx->results->size() >= MAX_DIR_ENTRIES) return 0;
-    const int nameLen = ext2fs_dirent_name_len(entry);
-    std::string name(entry->name, nameLen);
-    if (name == "." || name == "..") return 0;
-    struct ext2_inode inode{};
-    if (ext2fs_read_inode(ctx->fs, entry->inode, &inode) != 0) return 0;
-    if (LINUX_S_ISDIR(inode.i_mode))
-        ctx->results->push_back("[DIR] " + name + "|0|" + std::to_string(inode.i_mtime));
-    else {
-        const uint64_t size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
-        ctx->results->push_back(name + "|" + std::to_string(size) + "|" + std::to_string(inode.i_mtime));
-    }
-    return 0;
-}
-
-static bool extOpenFile(ext2_filsys fs, const std::string& path, bool write,
-                        bool create, ext2_file_t* out) {
-    ext2_ino_t ino = 0;
-    if (!extResolvePath(fs, path, &ino)) {
-        if (!create) return false;
-        const size_t slash = path.find_last_of('/');
-        const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
-        const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
-        ext2_ino_t parent = 0;
-        if (name.empty() || !extResolvePath(fs, parentPath, &parent)) return false;
-        struct ext2_inode inode{};
-        if (ext2fs_new_inode(fs, parent, LINUX_S_IFREG | 0644, nullptr, &ino) != 0) return false;
-        inode.i_mode = LINUX_S_IFREG | 0644;
-        inode.i_links_count = 1;
-        if (ext2fs_write_new_inode(fs, ino, &inode) != 0 ||
-            ext2fs_link(fs, parent, name.c_str(), ino, EXT2_FT_REG_FILE) != 0) return false;
-        ext2fs_inode_alloc_stats2(fs, ino, +1, 0);
-    }
-    return ext2fs_file_open(fs, ino, write ? EXT2_FILE_WRITE : 0, out) == 0;
-}
-
-static bool extWriteFromHostFile(ext2_filsys fs, const std::string& path, const char* source) {
-    ext2_file_t file = nullptr;
-    if (!extOpenFile(fs, path, true, true, &file)) return false;
-    bool ok = ext2fs_file_set_size2(file, 0) == 0;
-    std::ifstream input(source, std::ios::binary);
-    std::unique_ptr<unsigned char[]> buffer(new unsigned char[IO_BUFFER_SIZE]);
-    while (ok && input) {
-        input.read(reinterpret_cast<char*>(buffer.get()), IO_BUFFER_SIZE);
-        const std::streamsize count = input.gcount();
-        if (count <= 0) break;
-        unsigned int written = 0;
-        ok = ext2fs_file_write(file, buffer.get(), static_cast<unsigned int>(count), &written) == 0 &&
-             written == static_cast<unsigned int>(count);
-    }
-    ok = ok && input.eof() && ext2fs_file_flush(file) == 0;
-    ext2fs_file_close(file);
-    return ok;
-}
-
-static bool extExtractToHostFile(ext2_filsys fs, const std::string& path, const char* destination) {
-    ext2_file_t file = nullptr;
-    if (!extOpenFile(fs, path, false, false, &file)) return false;
-    std::ofstream output(destination, std::ios::binary | std::ios::trunc);
-    std::unique_ptr<unsigned char[]> buffer(new unsigned char[IO_BUFFER_SIZE]);
-    bool ok = output.is_open();
-    while (ok) {
-        unsigned int got = 0;
-        if (ext2fs_file_read(file, buffer.get(), IO_BUFFER_SIZE, &got) != 0) { ok = false; break; }
-        if (!got) break;
-        output.write(reinterpret_cast<const char*>(buffer.get()), got);
-        ok = output.good();
-    }
-    ext2fs_file_close(file);
-    return ok;
-}
 
 static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pathSuffix) {
     std::vector<std::string> results;
@@ -3261,9 +2117,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSize(
         std::lock_guard<std::mutex> fsLock(v.mutex);
         if (ensureMounted(volId)) {
             if (v.fsType == VolumeState::FS_FATFS) {
-                total = static_cast<jlong>(recursiveFolderSize(volId, nativePath));
+                total = static_cast<jlong>(recursiveFatFolderSize(volId, nativePath));
             } else if (v.fsType == VolumeState::FS_NTFS) {
-                total = static_cast<jlong>(recursiveFolderSizeNtfs(volId, nativePath));
+                total = static_cast<jlong>(recursiveNtfsFolderSize(volId, nativePath));
             }
         }
     }

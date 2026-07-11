@@ -8,7 +8,7 @@ import android.provider.OpenableColumns
  * Shared logic for resolving a human-readable display name for a Uri.
  *
  * Resolves display names for both MainActivity (SAF container/tree picker)
- * and VeraCryptDocumentsProvider (DocumentsProvider roots). Querying
+ * and ContainerDocumentsProvider (DocumentsProvider roots). Querying
  * OpenableColumns.DISPLAY_NAME for content:// URIs, falling back to the last
  * path segment, or "Container" if unavailable.
  */

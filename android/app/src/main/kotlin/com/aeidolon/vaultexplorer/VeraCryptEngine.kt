@@ -1,9 +1,13 @@
 package com.aeidolon.vaultexplorer
 
 /**
- * JNI bridge to vaultexplorer.cpp.
+ * ABI-compatibility JNI shim for the original native export names.
  *
- * API is split into two clear tiers:
+ * App code must use [ContainerEngine]. This object stays format-specific only
+ * because the C++ library still exports statically named JNI symbols; keeping
+ * that constraint isolated here lets the public API evolve independently.
+ *
+ * The native API is split into two clear tiers:
  *
  *   1. Session-establishment calls — take a real fd + password + pim because
  *      they are creating the crypto session from scratch.
@@ -13,7 +17,7 @@ package com.aeidolon.vaultexplorer
  *      IllegalStateException("NOT_UNLOCKED: ...") if it doesn't.
  *
  */
-object VeraCryptEngine {
+internal object VeraCryptEngine {
     init {
         System.loadLibrary("vaultexplorer")
     }

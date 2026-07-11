@@ -308,6 +308,7 @@ add_library(
         vaultexplorer
         SHARED
         vaultexplorer.cpp
+        session_prepare.cpp        # VeraCrypt/LUKS session establishment (Tier-1 JNI calls)
         jni_runtime.cpp
         jni_callbacks.cpp
         block_io.cpp
@@ -321,7 +322,7 @@ add_library(
         container_utils.cpp
         crypto/cipher_shim.cpp     # adapter
         crypto/cascade.cpp         # cipher-agnostic XTS + cascade chaining
-        crypto/kdf_table.cpp       # per-hash iteration-count table + hash dispatch
+        crypto/kdf_table.cpp       # per-hash iteration-count table + hash dispatch + PIM clamping
         crypto/luks_header.cpp     # LUKS header parsing & key recovery
         ${fatfs_SOURCE_DIR}/src/ff.c
         ${fatfs_SOURCE_DIR}/src/ffunicode.c

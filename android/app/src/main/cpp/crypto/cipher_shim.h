@@ -54,6 +54,16 @@ bool pbkdf2Hmac(HashId hash,
 
 int iterationsForHash(HashId hash, int clampedPim);
 
+// Clamps a user-supplied PIM into the range this codebase supports:
+// [0, 2000]. 0 means "use the format default" (baseline PBKDF2 iteration
+// count, or Argon2id's PIM-12 default — see argon2ParamsForPim below);
+// values above 2000 are capped rather than rejected, matching how the rest
+// of the unlock path treats an out-of-range PIM as "use the ceiling"
+// instead of failing outright. Shared by session establishment
+// (deriveAndValidateHeader) and container creation (createContainerNative),
+// which both need the same clamping before deriving a header key.
+int clampPim(int pim);
+
 // ── Argon2id (separate from the PBKDF2-HMAC family above) ────────────────
 //
 // Argon2 takes a memory cost and a parallelism (lane count) parameter that

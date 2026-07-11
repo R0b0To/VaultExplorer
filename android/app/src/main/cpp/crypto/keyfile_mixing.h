@@ -15,6 +15,32 @@ static constexpr size_t MAX_LEGACY_PASSWORD = 64;
 
 static constexpr size_t MAX_PASSWORD_LEN = 128;
 
+// RAII guard: zeroizes [buf, buf+len) when it goes out of scope, regardless
+// of how the enclosing function returns. Used to scrub stack-resident
+// password/key buffers after derivation. Shared by every caller that mixes
+// keyfiles into a password (session_prepare.cpp) and by the standalone
+// quick-unlock key export (deriveKeyMaterialNative in vaultexplorer.cpp).
+struct ScopeZeroize {
+    unsigned char* buf; size_t len;
+    ScopeZeroize(unsigned char* b, size_t l) : buf(b), len(l) {}
+    ~ScopeZeroize() { mbedtls_platform_zeroize(buf, len); }
+    ScopeZeroize(const ScopeZeroize&) = delete;
+    ScopeZeroize& operator=(const ScopeZeroize&) = delete;
+};
+
+// Closes every valid (>=0) fd in [keyfileFds]. applyKeyfilesToPassword()
+// below already closes each fd itself as part of mixing, so this is only
+// needed on early-exit paths that bail out *before* reaching that call —
+// keeps the "every keyfile fd is closed exactly once" ownership contract
+// (see VeraCryptEngine.kt's deriveKeyMaterialNative/unlockAndListNative
+// doc comments) intact regardless of which path a caller takes.
+static inline void closeUnusedKeyfileFds(const int* keyfileFds, int keyfileCount) {
+    if (!keyfileFds) return;
+    for (int i = 0; i < keyfileCount; i++) {
+        if (keyfileFds[i] >= 0) close(keyfileFds[i]);
+    }
+}
+
 
 static inline uint32_t vcKeyfileCrc32UpdateByte(uint32_t crc, unsigned char b) {
     crc ^= b;

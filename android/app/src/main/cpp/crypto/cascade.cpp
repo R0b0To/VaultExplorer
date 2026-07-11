@@ -1,4 +1,5 @@
 #include "cascade.h"
+#include "xts_tweak.h"
 #include <cstring>
 #include <algorithm>
 
@@ -109,18 +110,6 @@ static inline void setTweak(unsigned char* tweak, uint64_t sectorNum) {
     *reinterpret_cast<uint64_t*>(tweak+8) = 0ULL;
 }
 
-static void multiplyTweak(unsigned char T[16]) {
-    unsigned char carry = 0;
-    for (int i = 0; i < 16; i++) {
-        unsigned char nextCarry = (T[i] & 0x80) ? 1 : 0;
-        T[i] = (T[i] << 1) | carry;
-        carry = nextCarry;
-    }
-    if (carry) {
-        T[0] ^= 0x87;
-    }
-}
-
 void cascadeDecryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
                            const unsigned char in[512], unsigned char out[512]) {
     if (ctx.aesXtsFastPathReady) {
@@ -151,7 +140,7 @@ void cascadeDecryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
             blockCipherDecryptBlock(layer.dataKeyDec, tmp, tmp);
             for (int j = 0; j < 16; j++) blockOut[j] = tmp[j] ^ T[j];
             
-            multiplyTweak(T);
+            xtsMultiplyTweak(T);
         }
         if (i > 0) {
             std::memcpy(temp, out, 512);
@@ -189,7 +178,7 @@ void cascadeEncryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
             blockCipherEncryptBlock(layer.dataKeyEnc, tmp, tmp);
             for (int j = 0; j < 16; j++) blockOut[j] = tmp[j] ^ T[j];
             
-            multiplyTweak(T);
+            xtsMultiplyTweak(T);
         }
         if (i < ctx.layerCount - 1) {
             std::memcpy(temp, out, 512);

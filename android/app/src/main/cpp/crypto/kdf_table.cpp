@@ -27,6 +27,12 @@ int iterationsForHash(HashId hash, int clampedPim) {
     return 500000; // conservative fallback, should be unreachable
 }
 
+int clampPim(int pim) {
+    if (pim < 0) return 0;
+    if (pim > 2000) return 2000;
+    return pim;
+}
+
 void argon2ParamsForPim(int clampedPim, uint32_t& memoryKiB,
                         uint32_t& timeCost, uint32_t& parallelism) {
     // VeraCrypt 1.26.29's get_argon2_params(): PIM 0 means its default 12.

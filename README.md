@@ -1,29 +1,34 @@
 # VaultExplorer [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K2ND3Y8)
 
-**A native Android file manager for VeraCrypt encrypted containers — no PC required.**
+**A native Android file manager for encrypted containers — no PC required.**
 
-VaultExplorer lets you mount, browse, and manage VeraCrypt volumes directly on your Android device. Built with Flutter and a custom C++ crypto engine (mbedTLS + FatFs), it decrypts and re-encrypts data fully on-device with zero temporary plaintext files on device storage.
+VaultExplorer lets you mount, browse, and manage VeraCrypt and LUKS encrypted volumes directly on your Android device. Built with Flutter and a custom C++ crypto engine (mbedTLS + FatFs + NTFS-3G + libext2fs), it decrypts and re-encrypts data fully on-device with zero temporary plaintext files on device storage.
 
 ---
 
 ## Features
 
 ### Encryption & Compatibility
-- Full **AES-256-XTS** decryption and encryption matching the VeraCrypt standard
-- Additional ciphers and cascades: **Serpent**, **Twofish**, and the cascaded combinations VeraCrypt supports (AES-Twofish, Serpent-AES, Twofish-Serpent, AES-Twofish-Serpent, Serpent-Twofish-AES)
-- Multiple hash algorithms for key derivation: **SHA-512**, SHA-256, Whirlpool, Streebog, and BLAKE2s-256
+- Support for **VeraCrypt** containers (`.hc` files) **and native LUKS1 / LUKS2 containers** (as created by Linux `cryptsetup`) — container format is auto-detected at unlock time, no need to tell the app which kind of volume you're opening
+- Full **AES-256-XTS** decryption and encryption matching the VeraCrypt/LUKS standard
+- Additional ciphers and cascades: **Serpent**, **Twofish**, **Camellia**, and **Kuznyechik**, plus the cascaded combinations VeraCrypt supports — AES-Twofish, Serpent-AES, Twofish-Serpent, AES-Twofish-Serpent, Serpent-Twofish-AES, Camellia-Kuznyechik, Camellia-Serpent, Kuznyechik-AES, Kuznyechik-Serpent-Camellia, Kuznyechik-Twofish (15 cipher/cascade combinations in total)
+- Multiple key-derivation options: PBKDF2 with **SHA-512**, SHA-256, Whirlpool, Streebog, or BLAKE2s-256, plus the memory-hard **Argon2id** KDF used by newer VeraCrypt volumes
+- LUKS1 and LUKS2 volumes are supported with AES/Serpent/Twofish in `xts-plain64` mode, PBKDF2 or Argon2id/Argon2i keyslot KDFs, and standard AF-splitting keyslot recovery — including LUKS2's per-segment sector size and IV-tweak offset
 - **Auto-detect mode** tries every cipher/hash combination in parallel when the algorithm isn't known, with a live "trying combination X of Y" progress indicator and the ability to cancel mid-search
 - Once a container has been unlocked, its matched cipher/hash is remembered so the next unlock skips straight to the right combination
-- **Keyfile support** — mix one or more files into the password using VeraCrypt's own pool-mixing algorithm, including keyfile-only (passwordless) volumes
-- **Hidden volume** detection — a hidden volume nested inside an outer container is discovered automatically at unlock time, with no separate "mount hidden volume" step
+- **Keyfile support** — mix one or more files into the password using VeraCrypt's own pool-mixing algorithm for VeraCrypt volumes (including keyfile-only, passwordless volumes), or supply a keyfile as a direct passphrase replacement for LUKS volumes, matching `cryptsetup --key-file` semantics
+- **Hidden volume** detection — a hidden VeraCrypt volume nested inside an outer container is discovered automatically at unlock time, with no separate "mount hidden volume" step
 - **PBKDF2** key derivation with configurable PIM support
-- Compatible with containers created by the desktop VeraCrypt application
-- Supports both **FAT32** and **exFAT** formatted volumes
-- Create new VeraCrypt containers directly from the app
+- Compatible with containers created by the desktop VeraCrypt application and by Linux `cryptsetup`
 - Up to **8 containers** can be mounted simultaneously, from container files, `content://` documents, or USB mass-storage devices
 
+### Filesystem Support
+- Read and write **FAT32**, **exFAT**, **NTFS**, and **ext2 / ext3 / ext4** volumes inside a mounted container — the filesystem is detected automatically at mount time, independent of the container format (VeraCrypt or LUKS)
+- Create new containers formatted as FAT32, exFAT, NTFS, or ext2/ext3/ext4 directly from the app
+- Full read/write support for each filesystem: directory listing, file create/read/write/delete/rename, directory creation, and timestamp updates
+
 ### USB Drive Support
-- Mount VeraCrypt volumes living on a USB OTG flash drive or external SSD — no root, no PC
+- Mount VeraCrypt or LUKS volumes living on a USB OTG flash drive or external SSD — no root, no PC
 - Automatic MBR/GPT partition scanning to locate the right partition, with the previously-matched partition remembered for faster reconnects
 - Detects physical USB disconnects instantly and cleanly locks the affected container
 
@@ -56,7 +61,7 @@ VaultExplorer lets you mount, browse, and manage VeraCrypt volumes directly on y
 - Optional **master password** to lock the app on launch, with exponential backoff after repeated failures (lockout state survives a force-kill of the app)
 - **Biometric unlock** as an alternative to typing the master password
 - Per-container unlock methods: manual password, remembered password, biometrics, or a **drawn pattern**
-- Optional **derived-key caching** in the Android Keystore, so biometric/pattern unlock can skip the expensive PBKDF2 pass entirely on repeat unlocks
+- Optional **derived-key caching** in the Android Keystore, so biometric/pattern unlock can skip the expensive PBKDF2/Argon2id pass entirely on repeat unlocks
 - App-wide auto-lock after a period of inactivity or on screen lock, plus a separate per-container auto-close timer
 - Custom per-container display name and Documents Provider toggle
 - Configurable **thumbnail caching**: OS app cache (encrypted, fast) or inside the container (fully at-rest encrypted), or disabled entirely
@@ -97,13 +102,17 @@ C++ (NDK)
   ├── volume_state / block_io — shared unlocked-volume lifecycle and file/USB backing-store transport
   ├── jni_runtime / jni_callbacks — JNI lifetime, progress, and USB upcalls
   ├── container_{format,header,utils} — format IDs, decrypted-header decoding, and common data utilities
-  ├── {fat,ntfs,ext}_backend — filesystem-specific helpers (expanding backend boundary)
-  ├── crypto/cascade.{h,cpp} — cipher-agnostic AES-XTS + multi-layer cascade chaining
-  ├── crypto/cipher_shim.{h,cpp} — uniform adapter over AES/Serpent/Twofish and SHA-512/256, Whirlpool, Streebog, BLAKE2s-256
-  ├── crypto/kdf_table.cpp — per-hash PBKDF2 iteration-count table
+  ├── {fat,ntfs,ext}_backend — filesystem-specific helpers (FAT32/exFAT, NTFS, ext2/3/4)
+  ├── crypto/cascade.{h,cpp} — cipher-agnostic AES-XTS + multi-layer cascade chaining (AES, Serpent, Twofish, Camellia, Kuznyechik)
+  ├── crypto/cipher_shim.{h,cpp} — uniform adapter over the block ciphers and SHA-512/256, Whirlpool, Streebog, BLAKE2s-256, Argon2id
+  ├── crypto/kdf_table.cpp — per-hash PBKDF2 iteration-count table + Argon2id parameter derivation
   ├── crypto/keyfile_mixing.h — VeraCrypt-compatible keyfile pool mixing
-  ├── mbedTLS v3.6.0 — AES primitives, PBKDF2-HMAC-SHA512/256
-  └── ChaN FatFs — FAT32 / exFAT read/write with UTF-8 LFN support
+  ├── crypto/luks_header.{h,cpp} — LUKS1/LUKS2 header + JSON metadata parsing, keyslot AF-merge and master-key recovery
+  ├── mbedTLS v3.6.0 — AES primitives, PBKDF2-HMAC-SHA512/256, AES-XTS, LUKS AF-diffusion base64
+  ├── ChaN FatFs — FAT32 / exFAT read/write with UTF-8 LFN support
+  ├── NTFS-3G — NTFS read/write, routed through a custom encrypted device backend
+  ├── libext2fs (e2fsprogs) — ext2/ext3/ext4 read/write, routed through a custom encrypted I/O manager
+  └── cJSON — LUKS2 JSON metadata parsing
 ```
 
 ---
@@ -133,7 +142,7 @@ flutter pub get
 flutter build apk --release
 ```
 
-The C++ engine is built automatically by CMake during the Android build. mbedTLS and FatFs are fetched via `FetchContent` at build time — no manual dependency setup required.
+The C++ engine is built automatically by CMake during the Android build. mbedTLS, FatFs, NTFS-3G, libext2fs, cJSON, and the VeraCrypt crypto primitives are fetched via `FetchContent` at build time — no manual dependency setup required.
 
 ---
 
@@ -154,6 +163,9 @@ The C++ engine is built automatically by CMake during the Android build. mbedTLS
 | `package_info_plus` | App version display in Settings |
 | `mbedTLS 3.6.0` | AES-256-XTS, PBKDF2-HMAC-SHA512/256 (C++) |
 | `ChaN FatFs` | FAT32 / exFAT filesystem (C++) |
+| `NTFS-3G` | NTFS filesystem, including the embedded `mkntfs` formatter (C++) |
+| `e2fsprogs` (`libext2fs`) | ext2 / ext3 / ext4 filesystem (C++) |
+| `cJSON` | LUKS2 JSON metadata parsing (C++) |
 
 VeraCrypt crypto primitives are fetched by CMake from the pinned VeraCrypt 1.26.29 source release. This includes Serpent, Twofish, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, and Argon2id, without carrying a local fork of those sources.
 
@@ -161,9 +173,9 @@ VeraCrypt crypto primitives are fetched by CMake from the pinned VeraCrypt 1.26.
 
 ## How It Works
 
-1. **Unlock**: The app reads the 512-byte VeraCrypt header (and, if present, the hidden-volume header slot) from the container file or USB partition, derives the header key via PBKDF2 — optionally mixed with keyfiles — and decrypts the header with AES-XTS (or the selected cascade) to extract the master key. When the cipher/hash isn't specified, every supported combination is tried in parallel.
-2. **Mount**: FatFs is initialised with custom `disk_read`/`disk_write` hooks that transparently decrypt/encrypt 512-byte sectors on every I/O call using the master key, honoring whichever cipher cascade the header specified.
-3. **Browse**: All file and directory operations go through FatFs over the encrypted disk layer — plaintext data never touches device storage.
+1. **Unlock**: For VeraCrypt containers, the app reads the 512-byte header (and, if present, the hidden-volume header slot) from the container file or USB partition, derives the header key via PBKDF2 or Argon2id — optionally mixed with keyfiles — and decrypts the header with AES-XTS (or the selected cascade) to extract the master key. When the cipher/hash isn't specified, every supported combination is tried in parallel. For LUKS1/LUKS2 containers, the app is detected by magic bytes, parses the binary or JSON metadata, derives each active keyslot's key (PBKDF2 or Argon2id/Argon2i), decrypts and AF-merges the keyslot's key material, and verifies the resulting candidate master key against the stored digest.
+2. **Mount**: FatFs, NTFS-3G, or libext2fs is initialised with custom disk I/O hooks that transparently decrypt/encrypt sectors (or LUKS "sector-size" data units) on every I/O call using the recovered master key, honoring whichever cipher cascade or LUKS cipher mode was matched. The filesystem itself (FAT32/exFAT/NTFS/ext2/3/4) is auto-detected from the decrypted boot sector.
+3. **Browse**: All file and directory operations go through the matching filesystem driver over the encrypted disk layer — plaintext data never touches device storage.
 4. **Stream (Documents Provider)**: For external apps, a `ProxyFileDescriptor` serves read/write calls chunk-by-chunk directly through the JNI engine, enabling seamless integration with Android's system file picker.
 
 ---
@@ -177,5 +189,9 @@ VeraCrypt crypto primitives are fetched by CMake from the pinned VeraCrypt 1.26.
 ## Acknowledgements
 
 - [VeraCrypt](https://veracrypt.fr) — the open-source disk encryption standard this app is compatible with
+- [LUKS / cryptsetup](https://gitlab.com/cryptsetup/cryptsetup) — the Linux disk encryption standard this app is compatible with
 - [Mbed TLS](https://github.com/Mbed-TLS/mbedtls) — embedded TLS and crypto library
 - [ChaN FatFs](http://elm-chan.org/fsw/ff/) — lightweight FAT/exFAT filesystem module
+- [NTFS-3G](https://github.com/tuxera/ntfs-3g) — NTFS filesystem driver
+- [e2fsprogs / libext2fs](https://github.com/tytso/e2fsprogs) — ext2/ext3/ext4 filesystem library
+- [cJSON](https://github.com/DaveGamble/cJSON) — lightweight JSON parser used for LUKS2 metadata

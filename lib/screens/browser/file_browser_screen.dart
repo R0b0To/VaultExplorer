@@ -349,6 +349,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           initialIndex: 0,
           startingFolder: _currentDirPath,
           thumbnailQuality: _resolvedThumbnailQuality,
+          thumbnailCacheMode: _resolvedThumbnailCacheMode,
         ),
       ),
     );
@@ -575,6 +576,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             initialIndex: 0,
             startingFolder: _currentDirPath,
             thumbnailQuality: _resolvedThumbnailQuality,
+            thumbnailCacheMode: _resolvedThumbnailCacheMode,
           ),
         ),
       );
@@ -600,6 +602,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               initialIndex: 0,
               startingFolder: _currentDirPath,
               thumbnailQuality: _resolvedThumbnailQuality,
+              thumbnailCacheMode: _resolvedThumbnailCacheMode,
             ),
           ),
         );

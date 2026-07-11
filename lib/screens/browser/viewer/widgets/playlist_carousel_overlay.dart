@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '/../../models/mounted_container.dart';
+import '/../../models/thumbnail_cache_mode.dart';
 import '/../../models/thumbnail_quality.dart';
+import '/../../services/thumbnail_cache_service.dart';
 import '/../../services/vaultexplorer_api.dart';
 import '../media_viewer_constants.dart';
 
@@ -13,6 +16,7 @@ class PlaylistCarouselOverlay extends StatefulWidget {
   final List<String> playlist;
   final int currentIndex;
   final ThumbnailQuality thumbnailQuality;
+  final ThumbnailCacheMode thumbnailCacheMode;
   final ValueChanged<int> onSelect;
   final VoidCallback onClose;
 
@@ -22,6 +26,7 @@ class PlaylistCarouselOverlay extends StatefulWidget {
     required this.playlist,
     required this.currentIndex,
     required this.thumbnailQuality,
+    required this.thumbnailCacheMode,
     required this.onSelect,
     required this.onClose,
   }) : super(key: key);
@@ -160,6 +165,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                           container: widget.container,
                           fileName: fileName,
                           thumbnailQuality: widget.thumbnailQuality,
+                          thumbnailCacheMode: widget.thumbnailCacheMode,
                         ),
                       ),
                     ),
@@ -247,12 +253,14 @@ class _CarouselThumb extends StatefulWidget {
   final MountedContainer container;
   final String fileName;
   final ThumbnailQuality thumbnailQuality;
+  final ThumbnailCacheMode thumbnailCacheMode;
 
   const _CarouselThumb({
     Key? key,
     required this.container,
     required this.fileName,
     required this.thumbnailQuality,
+    required this.thumbnailCacheMode,
   }) : super(key: key);
 
   @override
@@ -266,7 +274,18 @@ class _CarouselThumbState extends State<_CarouselThumb> {
   @override
   void initState() {
     super.initState();
-    _load();
+    // Same in-memory cache the file grid populates — if the grid (or an
+    // earlier carousel pass) already fetched this thumbnail, show it
+    // immediately instead of kicking off a fresh fetch/generation.
+    final cached = ThumbnailCacheService.getFromMemory(
+      widget.container,
+      widget.fileName,
+    );
+    if (cached != null && cached.isNotEmpty) {
+      _bytes = cached;
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -275,20 +294,55 @@ class _CarouselThumbState extends State<_CarouselThumb> {
 
     try {
       Uint8List? data;
-      if (MediaViewerConstants.isImage(target)) {
-        data = await vaultExplorerApi.getImageThumbnail(
-          widget.container,
-          target,
-          targetSize: MediaViewerConstants.carouselThumbnailTargetSize,
-          quality: widget.thumbnailQuality.jpegQuality,
+
+      // Check the shared persistent/disk cache first — mirrors
+      // _EncryptedImageGridThumb / _VideoThumb in file_grid_view.dart so the
+      // carousel reuses whatever the grid already generated and stored,
+      // instead of regenerating thumbnails (which is especially expensive
+      // for video) every time the carousel is opened or scrolled.
+      if (widget.thumbnailCacheMode != ThumbnailCacheMode.disabled) {
+        final cached = await ThumbnailCacheService.get(
+          container: widget.container,
+          filePath: target,
+          mode: widget.thumbnailCacheMode,
         );
-      } else if (MediaViewerConstants.isVideo(target)) {
-        data = await vaultExplorerApi.getVideoThumbnail(
-          widget.container,
-          target,
-          quality: widget.thumbnailQuality.jpegQuality,
-        );
+        if (cached != null && cached.isNotEmpty) {
+          data = cached;
+        }
       }
+
+      // Only hit the generator if there was no cache hit.
+      if (data == null || data.isEmpty) {
+        if (MediaViewerConstants.isImage(target)) {
+          data = await vaultExplorerApi.getImageThumbnail(
+            widget.container,
+            target,
+            targetSize: MediaViewerConstants.carouselThumbnailTargetSize,
+            quality: widget.thumbnailQuality.jpegQuality,
+          );
+        } else if (MediaViewerConstants.isVideo(target)) {
+          data = await vaultExplorerApi.getVideoThumbnail(
+            widget.container,
+            target,
+            quality: widget.thumbnailQuality.jpegQuality,
+          );
+        }
+
+        if (data != null && data.isNotEmpty) {
+          ThumbnailCacheService.putInMemory(widget.container, target, data);
+          if (widget.thumbnailCacheMode != ThumbnailCacheMode.disabled) {
+            unawaited(
+              ThumbnailCacheService.put(
+                container: widget.container,
+                filePath: target,
+                data: data,
+                mode: widget.thumbnailCacheMode,
+              ),
+            );
+          }
+        }
+      }
+
       if (!mounted) return;
       if (data != null && data.isNotEmpty) {
         setState(() => _bytes = data);

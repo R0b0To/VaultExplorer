@@ -36,22 +36,32 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
   final Map<String, TextEditingController> _ctrls = {};
   final Map<String, bool> _revealed = {};
   bool _saving = false;
-  bool _dirty = false;
+  
+  // Track initial values to determine if actual text edits occurred
+  late final String _initialTitle;
+  late final Map<String, String> _initialFieldValues;
+  bool _wasDirty = false;
 
   @override
   void initState() {
     super.initState();
     final existing = widget.existing;
-    _titleCtrl = TextEditingController(text: existing?.title ?? '');
-    _titleCtrl.addListener(() => setState(() => _dirty = true));
+    
+    _initialTitle = existing?.title ?? '';
+    _titleCtrl = TextEditingController(text: _initialTitle);
+    _titleCtrl.addListener(_onTextChanged);
 
     _fields = VaultItemTemplate.fieldsFor(widget.type)
         .map((t) => VaultField.fromTemplate(t, existing?.fields ?? {}))
         .toList();
 
+    _initialFieldValues = {};
     for (final f in _fields) {
-      final ctrl = TextEditingController(text: f.value);
-      ctrl.addListener(() => setState(() => _dirty = true));
+      final val = f.value ?? '';
+      _initialFieldValues[f.key] = val;
+
+      final ctrl = TextEditingController(text: val);
+      ctrl.addListener(_onTextChanged);
       _ctrls[f.key] = ctrl;
       _revealed[f.key] = false;
     }
@@ -59,15 +69,39 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
   @override
   void dispose() {
+    _titleCtrl.removeListener(_onTextChanged);
     _titleCtrl.dispose();
-    for (final c in _ctrls.values) c.dispose();
+    for (final c in _ctrls.values) {
+      c.removeListener(_onTextChanged);
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  // Determines if the form's current values differ from the initial ones
+  bool get _isDirty {
+    if (_titleCtrl.text != _initialTitle) return true;
+    for (final f in _fields) {
+      final currentVal = _ctrls[f.key]?.text ?? '';
+      final initialVal = _initialFieldValues[f.key] ?? '';
+      if (currentVal != initialVal) return true;
+    }
+    return false;
+  }
+
+  // Only triggers setState when transitioning between dirty and clean states
+  void _onTextChanged() {
+    final currentlyDirty = _isDirty;
+    if (currentlyDirty != _wasDirty) {
+      setState(() {
+        _wasDirty = currentlyDirty;
+      });
+    }
   }
 
   bool get _isNew => widget.existing == null;
 
   bool _validate() {
-    // Only the title is required now
     if (_titleCtrl.text.trim().isEmpty) {
       _showSnack('Title is required');
       return false;
@@ -99,7 +133,6 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
          c++;
       }
     } else if (widget.existing!.title != newTitle) {
-      // Rename file on disk if title changed
       final oldPath = widget.filePath!;
       final dir = oldPath.contains('/') ? oldPath.substring(0, oldPath.lastIndexOf('/')) : '';
       
@@ -126,7 +159,6 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
     setState(() => _saving = false);
 
     if (ok) {
-      // Return finalPath so caller knows if it was renamed
       Navigator.pop(context, finalPath);
     } else {
       _showSnack('Failed to save — check container is still mounted');
@@ -134,7 +166,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
   }
 
   Future<bool> _confirmDiscard() async {
-    if (!_dirty) return true;
+    if (!_wasDirty) return true;
     final result = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -158,8 +190,8 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-return PopScope(
-      canPop: !_dirty, 
+    return PopScope(
+      canPop: !_wasDirty, 
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         final shouldDiscard = await _confirmDiscard();
@@ -184,9 +216,6 @@ return PopScope(
             const SizedBox(width: 8),
           ],
         ),
-        // FIX: was fromLTRB(16, 12, 16, 32) already — this screen was the
-        // correct reference for AppSpacing.pagePadding, now using the
-        // named constant instead of a repeated literal so it can't drift.
         body: ListView(
           padding: AppSpacing.pagePadding,
           children: [
@@ -270,11 +299,6 @@ class _FieldInput extends StatelessWidget {
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // FIX: previously a bespoke IconButton pair here — kept
-                  // functionally identical (this one already used the
-                  // outlined icons correctly), but routed through the
-                  // shared toggle so it can't diverge from the other
-                  // password/secret fields across the app.
                   PasswordVisibilityToggle(
                     obscured: !revealed,
                     onToggle: onToggleReveal,
@@ -317,10 +341,3 @@ class _FieldInput extends StatelessWidget {
     FieldType.text      => Icons.text_fields_rounded,
   };
 }
-
-// ── Section label ─────────────────────────────────────────────────────────────
-//
-// _SectionLabel was removed from this file — it is now the shared
-// SectionLabel widget in lib/widgets/common_widgets.dart, previously
-// duplicated verbatim here, in app_settings_screen.dart (as _SectionLabel),
-// and as _SectionHeader in container_config_sheet.dart.

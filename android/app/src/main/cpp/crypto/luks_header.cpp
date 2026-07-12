@@ -2,7 +2,10 @@
 #include "cipher_shim.h"
 #include <cstring>
 #include <algorithm>
+#include <atomic>
 #include <memory>
+#include <mutex>
+#include <thread>
 #include <unistd.h>
 #include <android/log.h>
 #include <cJSON.h>
@@ -234,26 +237,28 @@ static bool luks1Unlock(int fd,
         return false; // stale cached key — caller falls back to password/keyfile
     }
 
-    // Count active keyslots
-    int activeSlotsCount = 0;
+    // Collect active keyslot indices, then try them concurrently — one
+    // thread per active slot, first one to verify against mkDigest wins.
+    // Real containers overwhelmingly have exactly one active passphrase
+    // slot, so the single-slot case below skips thread-spawn overhead
+    // entirely; this only matters for multi-user LUKS1 volumes.
+    std::vector<int> activeSlotIndices;
     for (int i = 0; i < 8; i++) {
         uint32_t active = readBE32((const uint8_t*)&phdr.keySlots[i].active);
-        if (active == 0x00AC71F3) activeSlotsCount++;
+        if (active == 0x00AC71F3) activeSlotIndices.push_back(i);
     }
+    const int activeSlotsCount = static_cast<int>(activeSlotIndices.size());
 
-    int currentStep = 0;
-    for (int i = 0; i < 8; i++) {
-        if (cancelCheck && cancelCheck(volId)) {
-            LOGI("LUKS1: Unlock cancelled");
-            return false;
-        }
+    std::atomic<bool> found{false};
+    std::atomic<int> attemptedCount{0};
+    std::mutex resultMutex;
+    std::vector<uint8_t> resultMasterKey;
 
-        uint32_t active = readBE32((const uint8_t*)&phdr.keySlots[i].active);
-        if (active != 0x00AC71F3) continue;
+    auto tryOneSlot = [&](int i) {
+        if (found.load(std::memory_order_acquire) || (cancelCheck && cancelCheck(volId))) return;
 
-        currentStep++;
         if (progressCallback) {
-            progressCallback(currentStep, activeSlotsCount, static_cast<int>(mdType), 0);
+            progressCallback(attemptedCount.fetch_add(1) + 1, activeSlotsCount, static_cast<int>(mdType), 0);
         }
 
         uint32_t iterations = readBE32((const uint8_t*)&phdr.keySlots[i].iterations);
@@ -263,63 +268,96 @@ static bool luks1Unlock(int fd,
         // 1. Derive keyslot key
         std::vector<uint8_t> slotKey(keyBytes);
         if (!luksDeriveKeyslotKey(mdType, password, passwordLen, phdr.keySlots[i].salt, 32, iterations, slotKey.data(), slotKey.size())) {
-            continue;
+            return;
         }
 
-        // 2. Read AF key material
+        if (found.load(std::memory_order_acquire)) {
+            mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
+            return;
+        }
+
+        // 2. Read AF key material — pread is thread-safe across concurrent
+        // calls on the same fd (unlike read/write, it doesn't touch the
+        // shared file position), so no locking needed here.
         size_t afLen = keyBytes * stripes;
         std::vector<uint8_t> afMaterial(afLen);
         if (pread(fd, afMaterial.data(), afLen, (uint64_t)keyMaterialOffset * 512) != (ssize_t)afLen) {
-            continue;
+            mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
+            return;
         }
 
         // 3. Decrypt AF key material using AES-CBC with slotKey (LUKS1 is typically AES-CBC-ESSIV or plain)
         // Note: For LUKS1, keyslots are encrypted with AES-CBC, IV=0.
-        // We set up mbedtls aes cbc.
+        // We set up mbedtls aes cbc — a local context, safe per-thread.
         mbedtls_aes_context aesCtx;
         mbedtls_aes_init(&aesCtx);
         if (mbedtls_aes_setkey_dec(&aesCtx, slotKey.data(), keyBytes * 8) != 0) {
             mbedtls_aes_free(&aesCtx);
-            continue;
+            mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
+            mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+            return;
         }
         uint8_t iv[16] = {0};
         std::vector<uint8_t> afDecrypted(afLen);
         if (mbedtls_aes_crypt_cbc(&aesCtx, MBEDTLS_AES_DECRYPT, afLen, iv, afMaterial.data(), afDecrypted.data()) != 0) {
             mbedtls_aes_free(&aesCtx);
-            continue;
+            mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
+            mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+            return;
         }
         mbedtls_aes_free(&aesCtx);
 
         // 4. Merge AF stripes to candidate master key
         std::vector<uint8_t> candidateKey(keyBytes);
         if (afMerge(mdType, keyBytes, stripes, afDecrypted.data(), candidateKey.data()) != 0) {
-            continue;
-        }
-
-        // 5. Verify master key candidate
-        if (luksVerifyMasterKey(mdType, candidateKey.data(), keyBytes, phdr.mkDigestSalt, 32, mkDigestIter, phdr.mkDigest, 20)) {
-            // Success!
-            outInfo.version = 1;
-            outInfo.cipherName = phdr.cipherName;
-            outInfo.cipherMode = phdr.cipherMode;
-            outInfo.keyBytes = keyBytes;
-            outInfo.dataOffsetBytes = (uint64_t)payloadOffset * 512;
-            outInfo.dataSectorSize = 512;
-            outInfo.masterKey = candidateKey;
-
             mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
             mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
             mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
-            return true;
+            return;
+        }
+
+        // 5. Verify master key candidate
+        bool verified = luksVerifyMasterKey(mdType, candidateKey.data(), keyBytes, phdr.mkDigestSalt, 32, mkDigestIter, phdr.mkDigest, 20);
+        if (verified) {
+            bool expected = false;
+            if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+                std::lock_guard<std::mutex> lock(resultMutex);
+                resultMasterKey = candidateKey;
+            }
         }
 
         mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
         mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
         mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
-        mbedtls_platform_zeroize(candidateKey.data(), candidateKey.size());
+        if (!verified) {
+            mbedtls_platform_zeroize(candidateKey.data(), candidateKey.size());
+        }
+    };
+
+    if (activeSlotIndices.size() <= 1) {
+        if (!activeSlotIndices.empty()) tryOneSlot(activeSlotIndices[0]);
+    } else {
+        std::vector<std::thread> threads;
+        threads.reserve(activeSlotIndices.size());
+        for (int i : activeSlotIndices) threads.emplace_back(tryOneSlot, i);
+        for (auto& t : threads) t.join();
     }
 
-    return false;
+    if (!found.load(std::memory_order_acquire)) {
+        if (cancelCheck && cancelCheck(volId)) {
+            LOGI("LUKS1: Unlock cancelled");
+        }
+        return false;
+    }
+
+    outInfo.version = 1;
+    outInfo.cipherName = phdr.cipherName;
+    outInfo.cipherMode = phdr.cipherMode;
+    outInfo.keyBytes = keyBytes;
+    outInfo.dataOffsetBytes = (uint64_t)payloadOffset * 512;
+    outInfo.dataSectorSize = 512;
+    outInfo.masterKey = resultMasterKey;
+    return true;
 }
 
 // ── LUKS2 Unlocking ─────────────────────────────────────────────────────────
@@ -537,17 +575,21 @@ static bool luks2Unlock(int fd,
         keyslotItem = keyslotItem->next;
     }
 
-    int activeSlotsCount = keyslots.size();
-    int currentStep = 0;
-    bool unlocked = false;
+    const int activeSlotsCount = static_cast<int>(keyslots.size());
 
-    for (const auto& ks : keyslots) {
-        if (cancelCheck && cancelCheck(volId)) {
-            LOGI("LUKS2: Unlock cancelled");
-            break;
-        }
+    std::atomic<bool> found{false};
+    std::atomic<int> attemptedCount{0};
+    std::mutex resultMutex;
+    LuksVolumeInfo resultInfo;
 
-        // Find digest associated with this keyslot
+    // One thread per parsed keyslot, first one to verify against its digest
+    // wins. Keyslots with no matching digest bail immediately without
+    // counting toward attemptedCount/progressCallback, matching the
+    // original sequential scan's behavior.
+    auto tryOneKeyslot = [&](size_t idx) {
+        const Luks2KeyslotInfo& ks = keyslots[idx];
+        if (found.load(std::memory_order_acquire) || (cancelCheck && cancelCheck(volId))) return;
+
         const Luks2DigestInfo* matchDigest = nullptr;
         for (const auto& d : digests) {
             if (std::find(d.keyslots.begin(), d.keyslots.end(), ks.index) != d.keyslots.end()) {
@@ -555,15 +597,11 @@ static bool luks2Unlock(int fd,
                 break;
             }
         }
-        if (!matchDigest) {
-            LOGI("LUKS2: Keyslot %d has no matching digest", ks.index);
-            continue;
-        }
+        if (!matchDigest) return;
 
-        currentStep++;
         mbedtls_md_type_t mdType = mapHashSpec(ks.hashName);
         if (progressCallback) {
-            progressCallback(currentStep, activeSlotsCount, static_cast<int>(mdType), 1);
+            progressCallback(attemptedCount.fetch_add(1) + 1, activeSlotsCount, static_cast<int>(mdType), 1);
         }
 
         // 1. Derive keyslot key
@@ -572,46 +610,40 @@ static bool luks2Unlock(int fd,
         std::vector<uint8_t> derivedKey(derivedKeyLen);
 
         bool kdfSuccess = false;
-        LOGI("LUKS2: Keyslot %d KDF start: type=%s, hash=%s, iter=%u, memory=%u, cpus=%u, saltSize=%zu, outLen=%zu",
-             ks.index, ks.kdfType.c_str(), ks.hashName.c_str(), ks.iterations, ks.memory, ks.parallelism, ks.salt.size(), derivedKeyLen);
-        
         if (ks.kdfType == "pbkdf2") {
             kdfSuccess = luksDeriveKeyslotKey(mdType, password, passwordLen, ks.salt.data(), ks.salt.size(), ks.iterations, derivedKey.data(), derivedKeyLen);
         } else if (ks.kdfType == "argon2id" || ks.kdfType == "argon2i") {
             uint32_t memoryKiB = ks.memory;
-            if (memoryKiB > 1048576) {
-                LOGI("LUKS2: Capping memory cost from %u KiB to 1048576 KiB", memoryKiB);
-                memoryKiB = 1048576;
-            }
+            if (memoryKiB > 1048576) memoryKiB = 1048576;
             kdfSuccess = argon2idDeriveKey(password, passwordLen, ks.salt.data(), ks.salt.size(), memoryKiB, ks.iterations, ks.parallelism, derivedKey.data(), derivedKeyLen);
         }
 
-        LOGI("LUKS2: Keyslot %d KDF done: success=%d", ks.index, kdfSuccess);
         if (!kdfSuccess) {
             mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
-            continue;
+            return;
         }
 
-        // 2. Read AF key material
+        if (found.load(std::memory_order_acquire)) {
+            mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
+            return;
+        }
+
+        // 2. Read AF key material — pread is thread-safe across concurrent
+        // calls on the same fd, no locking needed here.
         std::vector<uint8_t> afMaterial(ks.areaSize);
         ssize_t afReadLen = pread(fd, afMaterial.data(), ks.areaSize, ks.areaOffset);
-        LOGI("LUKS2: Keyslot %d AF read: offset=%llu, expectedSize=%llu, readSize=%zd",
-             ks.index, (unsigned long long)ks.areaOffset, (unsigned long long)ks.areaSize, afReadLen);
         if (afReadLen != (ssize_t)ks.areaSize) {
-            LOGI("LUKS2: Keyslot %d AF read failed", ks.index);
             mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
-            continue;
+            return;
         }
 
-        // 3. Decrypt AF key material using AES-XTS.
+        // 3. Decrypt AF key material using AES-XTS — a local context, safe per-thread.
         mbedtls_aes_xts_context decCtx;
         mbedtls_aes_xts_init(&decCtx);
-        int setkeyRet = mbedtls_aes_xts_setkey_dec(&decCtx, derivedKey.data(), derivedKeyLen * 8);
-        LOGI("LUKS2: Keyslot %d setkey_dec return=%d", ks.index, setkeyRet);
-        if (setkeyRet != 0) {
+        if (mbedtls_aes_xts_setkey_dec(&decCtx, derivedKey.data(), derivedKeyLen * 8) != 0) {
             mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
             mbedtls_aes_xts_free(&decCtx);
-            continue;
+            return;
         }
 
         std::vector<uint8_t> afDecrypted(ks.areaSize);
@@ -629,7 +661,6 @@ static bool luks2Unlock(int fd,
                 break;
             }
         }
-        LOGI("LUKS2: Keyslot %d crypt_xts return=%d", ks.index, decRet);
 
         mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
         mbedtls_aes_xts_free(&decCtx);
@@ -637,62 +668,69 @@ static bool luks2Unlock(int fd,
         if (decRet != 0) {
             mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
             mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
-            continue;
+            return;
         }
 
         // 4. Merge AF stripes to get candidate master key
         size_t masterKeySize = ks.areaKeySize;
         std::vector<uint8_t> candidateKey(masterKeySize);
         mbedtls_md_type_t afMd = mapHashSpec(ks.afHash);
-        LOGI("LUKS2: Keyslot %d merging AF stripes: masterKeySize=%zu, stripes=%d, hash=%s",
-             ks.index, masterKeySize, ks.afStripes, ks.afHash.c_str());
-        
-        int afMergeRet = afMerge(afMd, masterKeySize, ks.afStripes, afDecrypted.data(), candidateKey.data());
-        LOGI("LUKS2: Keyslot %d afMerge return=%d", ks.index, afMergeRet);
-        if (afMergeRet != 0) {
+        if (afMerge(afMd, masterKeySize, ks.afStripes, afDecrypted.data(), candidateKey.data()) != 0) {
             mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
             mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
             mbedtls_platform_zeroize(candidateKey.data(), candidateKey.size());
-            continue;
+            return;
         }
 
         // 5. Verify candidate master key using Digest
         mbedtls_md_type_t digestMd = mapHashSpec(matchDigest->hashName);
-        LOGI("LUKS2: Keyslot %d verifying candidate key: digestHash=%s, digestIterations=%u, digestSaltSize=%zu, digestExpectedSize=%zu",
-             ks.index, matchDigest->hashName.c_str(), matchDigest->iterations, matchDigest->salt.size(), matchDigest->digest.size());
-        
         bool verified = luksVerifyMasterKey(digestMd, candidateKey.data(), masterKeySize, matchDigest->salt.data(), matchDigest->salt.size(), matchDigest->iterations, matchDigest->digest.data(), matchDigest->digest.size());
-        LOGI("LUKS2: Keyslot %d verifyMasterKey return=%d", ks.index, verified);
-        
+
         if (verified) {
-            // Found the master key!
-            outInfo.version = 2;
+            bool expected = false;
+            if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+                std::lock_guard<std::mutex> lock(resultMutex);
+                resultInfo.version = 2;
 
-            std::string segmentEnc = segment.encryption;
-            size_t firstDash = segmentEnc.find('-');
-            if (firstDash != std::string::npos) {
-                outInfo.cipherName = segmentEnc.substr(0, firstDash);
-                outInfo.cipherMode = segmentEnc.substr(firstDash + 1);
-            } else {
-                outInfo.cipherName = "aes";
-                outInfo.cipherMode = "xts-plain64";
+                std::string segmentEnc = segment.encryption;
+                size_t firstDash = segmentEnc.find('-');
+                if (firstDash != std::string::npos) {
+                    resultInfo.cipherName = segmentEnc.substr(0, firstDash);
+                    resultInfo.cipherMode = segmentEnc.substr(firstDash + 1);
+                } else {
+                    resultInfo.cipherName = "aes";
+                    resultInfo.cipherMode = "xts-plain64";
+                }
+
+                resultInfo.keyBytes = static_cast<uint32_t>(masterKeySize);
+                resultInfo.dataOffsetBytes = segment.offset;
+                resultInfo.dataSectorSize = segment.sectorSize;
+                resultInfo.ivTweak = segment.ivTweak;
+                resultInfo.masterKey = candidateKey;
             }
-
-            outInfo.keyBytes = masterKeySize;
-            outInfo.dataOffsetBytes = segment.offset;
-            outInfo.dataSectorSize = segment.sectorSize;
-            outInfo.ivTweak = segment.ivTweak;
-            outInfo.masterKey = candidateKey;
-
-            unlocked = true;
-            mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
-            mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
-            break;
         }
 
         mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
         mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
-        mbedtls_platform_zeroize(candidateKey.data(), candidateKey.size());
+        if (!verified) {
+            mbedtls_platform_zeroize(candidateKey.data(), candidateKey.size());
+        }
+    };
+
+    if (keyslots.size() <= 1) {
+        if (!keyslots.empty()) tryOneKeyslot(0);
+    } else {
+        std::vector<std::thread> threads;
+        threads.reserve(keyslots.size());
+        for (size_t idx = 0; idx < keyslots.size(); idx++) threads.emplace_back(tryOneKeyslot, idx);
+        for (auto& t : threads) t.join();
+    }
+
+    const bool unlocked = found.load(std::memory_order_acquire);
+    if (unlocked) {
+        outInfo = resultInfo;
+    } else if (cancelCheck && cancelCheck(volId)) {
+        LOGI("LUKS2: Unlock cancelled");
     }
 
     cJSON_Delete(root);

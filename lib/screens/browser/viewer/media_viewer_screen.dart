@@ -295,7 +295,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       }
     }
 
-
+    // The controller swap above (and the play() call) change what the
+    // play/pause icon, wakelock, and progress UI should show, but nothing
+    // else triggers a rebuild for that — without this, the play button can
+    // keep showing "paused" even though the new page's video is already
+    // playing, until some unrelated interaction happens to rebuild us.
     if (mounted) setState(() {});
 
     if (_showUI) {
@@ -419,7 +423,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   void _selectFromCarousel(int index) {
     HapticFeedback.selectionClick();
-
+    // Update the controller first so _onScrollEnd (called synchronously
+    // below) always reads the newly-selected file rather than depending on
+    // PageView's onPageChanged notification having already fired.
     _playlistController.updateIndex(index);
     if (_pageController.hasClients) {
       _pageController.jumpToPage(index);

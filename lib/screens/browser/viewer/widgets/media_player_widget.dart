@@ -63,6 +63,12 @@ class MediaPlayerWidget extends StatefulWidget {
   final ValueChanged<VideoPlayerController> onVideoControllerInitialized;
   final VoidCallback onVideoControllerDisposed;
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
+  // Whether this page is the one currently on-screen. Up to
+  // maxLiveVideoControllers pages can have an initialized controller at
+  // once (for smooth swiping), but they all share one progressNotifier —
+  // without this guard a neighboring page finishing initialization (or
+  // otherwise ticking) would overwrite the active page's position/duration
+  // and make the seekbar jump/glitch.
   final bool isCurrent;
 
   const MediaPlayerWidget({

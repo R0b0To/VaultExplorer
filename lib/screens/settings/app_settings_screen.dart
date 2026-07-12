@@ -156,16 +156,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
-          : Builder(
-        builder: (context) {
-          // Grab your actual navigation bar height (80, from your theme)
-          final navBarHeight =
-              Theme.of(context).navigationBarTheme.height ?? 80;
-          return ListView(
-            padding: AppSpacing.pagePadding.copyWith(
-              bottom: navBarHeight,
-            ),
-            children: [
+          : ListView(
+              padding: AppSpacing.pagePadding,
+              children: [
                 const SectionLabel('Security'),
                 AppCard(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -605,10 +598,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     ),
                   ),
                 ),
-          
+
                 const SizedBox(height: 32),
               ],
-            );})
+            ),
     );
   }
 }

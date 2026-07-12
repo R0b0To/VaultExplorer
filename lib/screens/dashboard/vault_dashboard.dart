@@ -10,15 +10,13 @@ import '../../services/vaultexplorer_api.dart';
 import '../../widgets/common_widgets.dart';
 import '../settings/app_settings_screen.dart';
 import '../unlock/unlock_sheet.dart';
-import 'widgets/container_card.dart';
 import 'widgets/container_config_sheet.dart';
 import 'widgets/create_container_sheet.dart';
 import 'widgets/empty_state.dart';
+import 'widgets/vault_card_row.dart';
 import '../browser/file_browser_screen.dart';
 import '../unlock/usb_unlock_sheet.dart';
 import '../lock/lock_gate_screen.dart';
-
-enum VaultSortField { name, date, size, status }
 
 class SlideRightRoute<T> extends PageRouteBuilder<T> {
   final Widget page;
@@ -49,22 +47,28 @@ class _VaultDashboardState extends State<VaultDashboard>
     with WidgetsBindingObserver {
   final List<MountedContainer> _mounted = [];
   Map<String, ContainerRecord> _records = {};
+
   final List<String> _recordsOrder = [];
+
   AppSettings _appSettings = AppSettings();
   bool _actionInFlight = false;
   bool _isLoading = true;
-  int _currentIndex = 0; // 0: Vaults, 1: Settings
-
-  VaultSortField _sortField = VaultSortField.name;
-  bool _sortAscending = true;
 
   final Map<int, Timer> _autoCloseTimers = {};
 
-  // All auto-lock/lifecycle/screen-off *policy* now lives in this
-  // controller — the dashboard just wires it to lifecycle callbacks and
-  // gives it a couple of hooks back into dashboard-specific behavior
-  // (locking every mounted container, showing the lock-gate screen).
   late final SessionLockController _lockController;
+  final SwipeRowGroupController _swipeGroup = SwipeRowGroupController();
+
+  // Undo action, animation, and layout state
+  ContainerRecord? _recentlyDeletedRecord;
+  String? _recentlyDeletedUri;
+  int? _recentlyDeletedIndex;
+  bool _showUndoBar = false;
+  Timer? _undoTimer;
+
+  // Track cards currently animating
+  final Set<String> _animatingOutUris = {};
+  final Set<String> _animatingInUris = {};
 
   @override
   void initState() {
@@ -88,6 +92,8 @@ class _VaultDashboardState extends State<VaultDashboard>
     _lockController.dispose();
     VaultExplorerApi.removeUsbContainerDetachedListener(_onUsbContainerDetached);
     VaultExplorerApi.removeScreenOffListener(_lockController.handleScreenOff);
+    _swipeGroup.dispose();
+    _undoTimer?.cancel();
     super.dispose();
   }
 
@@ -130,16 +136,19 @@ class _VaultDashboardState extends State<VaultDashboard>
   Future<void> _loadAll() async {
     final settings = await AppSettingsService.loadSettings();
     final records = await ContainerRepository.instance.loadAll();
-    if (mounted) {
-      setState(() {
-        _appSettings = settings;
-        _records = Map.from(records);
-        _recordsOrder.clear();
-        _recordsOrder.addAll(records.keys);
-        _isLoading = false;
-      });
-      _lockController.scheduleAutoLock();
-    }
+    if (!mounted) return;
+    setState(() {
+      _appSettings = settings;
+      _records = Map.from(records);
+      _recordsOrder.removeWhere(
+        (uri) => !_records.containsKey(uri) && !_mounted.any((c) => c.uri == uri),
+      );
+      for (final uri in records.keys) {
+        _ensureOrdered(uri);
+      }
+      _isLoading = false;
+    });
+    _lockController.scheduleAutoLock();
   }
 
   Future<void> _handleRefresh() async {
@@ -147,6 +156,10 @@ class _VaultDashboardState extends State<VaultDashboard>
     await Future.wait(
       List<MountedContainer>.from(_mounted).map((c) => _refreshContainerSpace(c.volId)),
     );
+  }
+
+  void _ensureOrdered(String uri) {
+    if (!_recordsOrder.contains(uri)) _recordsOrder.add(uri);
   }
 
   // ── Auto-close ────────────────────────────────────────────────────────────
@@ -215,19 +228,10 @@ class _VaultDashboardState extends State<VaultDashboard>
       _mounted.add(container);
       if (record != null && !_records.containsKey(container.uri)) {
         _records[container.uri] = record;
-        _recordsOrder.add(container.uri);
       }
+      _ensureOrdered(container.uri);
     });
     _scheduleAutoClose(container);
-
-    // Root directory listing is no longer part of the unlock round-trip —
-    // unlockAndListNative now only proves the password/keyfiles are
-    // correct and mounts the filesystem, so container.rootFiles arrives
-    // here empty. Fetch the real listing separately, after the container
-    // is already showing as unlocked, so the UI transition isn't gated on
-    // however long the root folder's directory walk takes (this matters
-    // most for NTFS/ext, which open an inode per entry).
-    _refreshContainerFiles(container.volId);
   }
 
   void _onUsbContainerDetached(int volId) {
@@ -250,16 +254,17 @@ class _VaultDashboardState extends State<VaultDashboard>
 
     setState(() {
       _mounted.add(container);
+      final oldIndex = _recordsOrder.indexOf(oldUri);
       _records.remove(oldUri);
       _recordsOrder.remove(oldUri);
       _records[container.uri] = migratedRecord;
-      _recordsOrder.add(container.uri);
+      if (oldIndex != -1 && oldIndex <= _recordsOrder.length) {
+        _recordsOrder.insert(oldIndex, container.uri);
+      } else {
+        _recordsOrder.add(container.uri);
+      }
     });
     _scheduleAutoClose(container);
-
-    // Same reasoning as _onContainerMounted above — container.rootFiles
-    // arrives empty from the reconnect unlock call too.
-    _refreshContainerFiles(container.volId);
   }
 
   void _onContainerLocked(int volId) {
@@ -289,33 +294,6 @@ class _VaultDashboardState extends State<VaultDashboard>
               totalSpace: space[0],
               freeSpace: space[1],
             );
-          }
-        });
-      }
-    } catch (_) {}
-  }
-
-  // Companion to _refreshContainerSpace above, for the root directory
-  // listing deferred out of unlockAndListNative/unlockUsbAndListNative
-  // (see vaultexplorer.cpp) — fired once, right after a container is
-  // added in _onContainerMounted.
-  //
-  // Reads _mounted[currentIdx] fresh (rather than reusing a container
-  // captured before the await, as _refreshContainerSpace above does) so
-  // that if this races with a concurrent _refreshContainerSpace call for
-  // the same volId, neither setState clobbers the other's field — each
-  // patches onto whatever the current state actually is at that moment.
-  Future<void> _refreshContainerFiles(int volId) async {
-    final idx = _mounted.indexWhere((c) => c.volId == volId);
-    if (idx == -1) return;
-    final container = _mounted[idx];
-    try {
-      final files = await vaultExplorerApi.listDirectory(container, '');
-      if (files != null && mounted) {
-        setState(() {
-          final currentIdx = _mounted.indexWhere((c) => c.volId == volId);
-          if (currentIdx != -1) {
-            _mounted[currentIdx] = _mounted[currentIdx].copyWith(rootFiles: files);
           }
         });
       }
@@ -469,7 +447,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     final existing = _records[uri];
     Navigator.push(
       context,
-      SlideLeftRoute(
+      SlideRightRoute(
         page: ContainerConfigScreen(
           uri: uri,
           currentLabel: currentLabel,
@@ -488,73 +466,92 @@ class _VaultDashboardState extends State<VaultDashboard>
               _scheduleAutoClose(newContainer);
             }
           },
-          onForget: _mounted.any((m) => m.uri == uri) ? null : () => _forgetContainer(uri, currentLabel),
         ),
       ),
     );
   }
 
-  Future<bool> _forgetContainer(String uri, String name) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Remove container?'),
-        content: Text('Remove "$name" from the dashboard? The container file is not deleted.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Remove', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ),
-        ],
-      ),
-    );
+  void _handleSwipeToRemove(String uri, ContainerRecord record) async {
+    final originalIndex = _recordsOrder.indexOf(uri);
 
-    if (confirmed == true) {
+    setState(() {
+      _animatingOutUris.add(uri);
+      _recentlyDeletedRecord = record;
+      _recentlyDeletedUri = uri;
+      _recentlyDeletedIndex = originalIndex;
+      _showUndoBar = true;
+    });
+
+    _undoTimer?.cancel();
+    _undoTimer = Timer(const Duration(seconds: 5), () {
+      _dismissUndo();
+    });
+
+    // We delay the final data deletion until the exit animation finishes
+    Future.delayed(const Duration(milliseconds: 300), () async {
       await ContainerRepository.instance.remove(uri);
       if (mounted) {
         setState(() {
+          _animatingOutUris.remove(uri);
           _records.remove(uri);
           _recordsOrder.remove(uri);
         });
       }
-      return true;
-    }
-    return false;
+    });
   }
 
-  void _handleSwipeToRemove(String uri, ContainerRecord record) async {
-    setState(() {
-      _records.remove(uri);
-      _recordsOrder.remove(uri);
-    });
-    await ContainerRepository.instance.remove(uri);
-
+  void _dismissUndo() {
+    _undoTimer?.cancel();
     if (!mounted) return;
+    setState(() {
+      _showUndoBar = false;
+    });
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _recentlyDeletedRecord = null;
+          _recentlyDeletedUri = null;
+          _recentlyDeletedIndex = null;
+        });
+      }
+    });
+  }
 
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.clearSnackBars();
-    final controller = messenger.showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 5),
-        content: Text('Removed "${record.label}" from dashboard'),
-        action: SnackBarAction(
-          label: 'Undo',
-          onPressed: () async {
-            messenger.hideCurrentSnackBar();
-            await ContainerRepository.instance.save(record);
-            if (mounted) {
-              setState(() {
-                _records[uri] = record;
-                _recordsOrder.add(uri);
-              });
-            }
-          },
-        ),
-      ),
-    );
-    Future.delayed(const Duration(seconds: 3), () {
-      controller.close();
+  void _handleUndo() async {
+    final record = _recentlyDeletedRecord;
+    final uri = _recentlyDeletedUri;
+    final index = _recentlyDeletedIndex;
+
+    if (record == null || uri == null) return;
+
+    _undoTimer?.cancel();
+    setState(() {
+      _showUndoBar = false;
+    });
+
+    await ContainerRepository.instance.save(record);
+
+    if (mounted) {
+      setState(() {
+        _records[uri] = record;
+        _animatingInUris.add(uri);
+        if (index != null && index >= 0 && index <= _recordsOrder.length) {
+          _recordsOrder.insert(index, uri);
+        } else {
+          _recordsOrder.add(uri);
+        }
+      });
+    }
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _animatingInUris.remove(uri);
+          _recentlyDeletedRecord = null;
+          _recentlyDeletedUri = null;
+          _recentlyDeletedIndex = null;
+        });
+      }
     });
   }
 
@@ -583,26 +580,37 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (mounted) _refreshContainerSpace(container.volId);
   }
 
-  // ── Display list ─────────────────────────────────────────────────────────
+  // ── Card actions (tap / swipe-edit / swipe-delete) ────────────────────────
 
-  // "Sort by Date Added" proxy. Neither model has a real timestamp for this:
-  //   - MountedContainer only has `mountedAt`, which is a *last-unlocked*
-  //     time — using it would make the sort order jump around on every
-  //     re-unlock (see mounted_container.dart).
-  //   - ContainerRecord has no date field at all — nothing chronological is
-  //     even persisted to containers_v2.json (see container_repository.dart).
-  // So this stands in for "date added" using the order records come back
-  // from ContainerRepository.loadAll(). That's stable across app restarts:
-  // _persist() writes `_cache!.values` (a LinkedHashMap, so insertion order),
-  // and re-saving an existing record doesn't move its position — Map's `[]=`
-  // on an existing key keeps its original slot. So first-added stays first
-  // unless the record is removed and re-added.
-  //
-  // If you want a real "added" date shown/sorted, the fix is upstream: add
-  // `final DateTime createdAt` to ContainerRecord (stamped once, on first
-  // save — see ContainerRepository.save), default legacy JSON entries that
-  // predate the field to whatever this proxy already gives them so existing
-  // sort order doesn't jump on upgrade, then this function goes away.
+  void _openItem(VaultListItem item) {
+    switch (item) {
+      case MountedVaultItem(:final container):
+        _openBrowser(container);
+      case LockedVaultItem(:final record):
+        record.isUsbSource
+            ? _showUsbUnlockSheet(existingRecord: record)
+            : _showUnlockSheet(uri: item.uri, name: item.name);
+    }
+  }
+
+  void _requestEdit(VaultListItem item) {
+    _showContainerConfig(uri: item.uri, currentLabel: item.name);
+  }
+
+  void _requestDelete(VaultListItem item) {
+    if (item.isMounted) {
+      showAppSnackBar(
+        context,
+        message: 'Lock the container before removing it.',
+        tone: AppBannerTone.warning,
+      );
+      return;
+    }
+    _handleSwipeToRemove(item.uri, (item as LockedVaultItem).record);
+  }
+
+  // ── Display list & reordering ─────────────────────────────────────────────
+
   DateTime _dateAddedProxy(String uri) {
     final idx = _recordsOrder.indexOf(uri);
     if (idx != -1) return DateTime.fromMillisecondsSinceEpoch(idx * 1000);
@@ -610,206 +618,65 @@ class _VaultDashboardState extends State<VaultDashboard>
   }
 
   List<VaultListItem> _buildDisplayItems() {
-    final items = <VaultListItem>[
-      for (final c in _mounted)
-        MountedVaultItem(c, sortDate: _dateAddedProxy(c.uri)),
+    final byUri = <String, VaultListItem>{
+      for (final c in _mounted) c.uri: MountedVaultItem(c, sortDate: _dateAddedProxy(c.uri)),
       for (final entry in _records.entries)
         if (!_mounted.any((m) => m.uri == entry.key))
-          LockedVaultItem(entry.value, sortDate: _dateAddedProxy(entry.key)),
-    ];
+          entry.key: LockedVaultItem(entry.value, sortDate: _dateAddedProxy(entry.key)),
+    };
 
-    items.sort((a, b) {
-      final result = switch (_sortField) {
-        VaultSortField.name => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-        VaultSortField.date => a.sortDate.compareTo(b.sortDate),
-        VaultSortField.size => a.size.compareTo(b.size),
-        VaultSortField.status => (a.isMounted ? 1 : 0).compareTo(b.isMounted ? 1 : 0),
-      };
-      return _sortAscending ? result : -result;
+    final ordered = <VaultListItem>[
+      for (final uri in _recordsOrder)
+        if (byUri[uri] != null) byUri[uri]!,
+    ];
+    for (final entry in byUri.entries) {
+      if (!_recordsOrder.contains(entry.key)) ordered.add(entry.value);
+    }
+    return ordered;
+  }
+
+  void _handleReorder(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    final items = _buildDisplayItems();
+    final movedUri = items[oldIndex].uri;
+
+    setState(() {
+      _recordsOrder.remove(movedUri);
+      _recordsOrder.insert(newIndex.clamp(0, _recordsOrder.length), movedUri);
     });
-
-    return items;
   }
 
-  // ── Tab Builders ──────────────────────────────────────────────────────────
+  // ── Body ───────────────────────────────────────────────────────────────────
 
-  List<PopupMenuEntry<VaultSortField>> _sortMenuItems() => const [
-        PopupMenuItem(
-          value: VaultSortField.name,
-          child: Row(
-            children: [
-              Icon(Icons.sort_by_alpha_rounded),
-              SizedBox(width: 10),
-              Text('Sort by Name'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: VaultSortField.date,
-          child: Row(
-            children: [
-              Icon(Icons.calendar_today_rounded),
-              SizedBox(width: 10),
-              Text('Sort by Date Added'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: VaultSortField.size,
-          child: Row(
-            children: [
-              Icon(Icons.sd_card_outlined),
-              SizedBox(width: 10),
-              Text('Sort by Size'),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: VaultSortField.status,
-          child: Row(
-            children: [
-              Icon(Icons.toggle_on_rounded),
-              SizedBox(width: 10),
-              Text('Sort by Mount Status'),
-            ],
-          ),
-        ),
-      ];
+  Widget _buildBody(List<VaultListItem> displayItems) {
+    if (displayItems.isEmpty && !_isLoading) {
+      return EmptyState(onAdd: _showAddOptionsSheet);
+    }
 
-  List<Widget> _buildAppBarActions() {
-    return [
-      PopupMenuButton<VaultSortField>(
-        icon: const Icon(Icons.sort_rounded),
-        tooltip: 'Sort options',
-        initialValue: _sortField,
-        onSelected: (field) => setState(() => _sortField = field),
-        itemBuilder: (_) => _sortMenuItems(),
-      ),
-      IconButton(
-        icon: Icon(_sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded),
-        tooltip: 'Invert sorting order',
-        onPressed: () => setState(() => _sortAscending = !_sortAscending),
-      ),
-      const SizedBox(width: 4),
-    ];
-  }
-
-  Widget _buildVaultsTab(List<VaultListItem> displayItems, ColorScheme cs, TextTheme textTheme, bool isWide) {
     return RefreshIndicator(
       onRefresh: _handleRefresh,
-      child: CustomScrollView(
-        slivers: [
-          // Use standard fixed App Bar in landscape to conserve vertical space.
-          isWide
-              ? SliverAppBar(
-                  pinned: true,
-                  floating: true,
-                  actions: _buildAppBarActions(),
-                )
-              : SliverAppBar(
-
-                  actions: _buildAppBarActions(),
-                ),
-          if (displayItems.isEmpty && !_isLoading)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: EmptyState(onAdd: _showAddOptionsSheet),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
-              sliver: isWide
-                  ? SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 420, // Forces dynamic column calculation
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        mainAxisExtent: 140, // Reduced for landscape viewport
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (_, i) => _buildVaultListTile(displayItems[i], i, cs),
-                        childCount: displayItems.length,
-                      ),
-                    )
-                  : SliverList.separated(
-                      itemCount: displayItems.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 16),
-                      itemBuilder: (_, i) => _buildVaultListTile(displayItems[i], i, cs),
-                    ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVaultListTile(VaultListItem item, int index, ColorScheme cs) {
-    final uri = item.uri;
-    final label = item.name;
-
-    return StaggeredEntrance(
-      index: index,
-      child: Dismissible(
-        key: Key('dismiss_$uri'),
-        direction: DismissDirection.startToEnd,
-        confirmDismiss: (direction) async {
-          if (item.isMounted) {
-            showAppSnackBar(
-              context,
-              message: 'Lock the container before removing it.',
-              tone: AppBannerTone.warning,
-            );
-            return false;
-          }
-          return true;
-        },
-        onDismissed: (direction) {
-          _handleSwipeToRemove(uri, (item as LockedVaultItem).record);
-        },
-        background: Container(
-          alignment: Alignment.centerLeft,
-          padding: const EdgeInsets.only(left: 24),
-          decoration: BoxDecoration(
-            color: cs.errorContainer,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Icon(Icons.delete_outline_rounded, color: cs.onErrorContainer),
-        ),
-        // AnimatedSize handles smoothly expanding/collapsing the card's vertical height
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOutCubic,
-          alignment: Alignment.topCenter,
-          // AnimatedSwitcher coordinates the fading transition between state-specific keys
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 250),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (Widget child, Animation<double> animation) {
-              return FadeTransition(
-                opacity: animation,
-                child: child,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: ReorderableListView.builder(
+            buildDefaultDragHandles: false,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+            itemCount: displayItems.length,
+            onReorder: _handleReorder,
+            itemBuilder: (context, i) {
+              final item = displayItems[i];
+              return VaultCardRow(
+                key: ValueKey(item.uri),
+                index: i,
+                item: item,
+                group: _swipeGroup,
+                onOpen: () => _openItem(item),
+                onEdit: () => _requestEdit(item),
+                onDelete: () => _requestDelete(item),
+                onLocked: _onContainerLocked,
+                isRemoving: _animatingOutUris.contains(item.uri),
+                isInserting: _animatingInUris.contains(item.uri),
               );
-            },
-            // The compiler checks this switch is exhaustive over the sealed
-            // VaultListItem hierarchy — add a third subtype later and this
-            // won't compile until you handle it here too.
-            child: switch (item) {
-              MountedVaultItem(:final container) => ContainerCard(
-                  key: ValueKey('mounted_$uri'),
-                  container: container,
-                  onLocked: _onContainerLocked,
-                  onBrowse: () => _openBrowser(container),
-                  onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
-                ),
-              LockedVaultItem(:final record) => SavedContainerCard(
-                  key: ValueKey('locked_$uri'),
-                  name: label,
-                  uri: uri,
-                  onUnlock: () => record.isUsbSource
-                      ? _showUsbUnlockSheet(existingRecord: record)
-                      : _showUnlockSheet(uri: uri, name: label),
-                  onLongPress: () => _showContainerConfig(uri: uri, currentLabel: label),
-                ),
             },
           ),
         ),
@@ -819,111 +686,83 @@ class _VaultDashboardState extends State<VaultDashboard>
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    // Use a >= 600 dp breakpoint (standard Android class boundary for foldables/tablets in landscape)
-    final isWide = MediaQuery.sizeOf(context).width >= 600;
-
     final displayItems = _buildDisplayItems();
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final double undoBarHeight = 64.0 + (bottomInset > 0 ? bottomInset : 16.0);
 
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _lockController.scheduleAutoLock(),
       child: Scaffold(
-        extendBody: true,
-        // Show the FAB on the Vaults tab in both portrait and landscape
-        floatingActionButton: _currentIndex == 0
-            ? FloatingActionButton.extended(
-                onPressed: _actionInFlight ? null : _showAddOptionsSheet,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add vault'),
-              )
-            : null,
-        bottomNavigationBar: isWide
-            ? null
-            : NavigationBar(
-                selectedIndex: _currentIndex,
-                onDestinationSelected: (index) {
-                  setState(() => _currentIndex = index);
-                  _loadAll();
-                },
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.grid_view_outlined),
-                    selectedIcon: Icon(Icons.grid_view_rounded),
-                    label: 'Vaults',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(Icons.settings_rounded),
-                    label: 'Settings',
-                  ),
-                ],
-              ),
-        body: Row(
+        appBar: AppBar(
+          title: const Text('vaultexplorer'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings_rounded),
+              tooltip: 'Settings',
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
+                );
+                if (mounted) _loadAll();
+              },
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _actionInFlight ? null : _showAddOptionsSheet,
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Add vault'),
+        ),
+        body: Stack(
           children: [
-            if (isWide)
-              NavigationRail(
-                backgroundColor: cs.surface,
-                selectedIndex: _currentIndex,
-                onDestinationSelected: (index) {
-                  setState(() => _currentIndex = index);
-                  _loadAll();
-                },
-                labelType: NavigationRailLabelType.all,
-                leading: const SizedBox(height: 8),
-                destinations: const [
-                  NavigationRailDestination(
-                    icon: Icon(Icons.grid_view_outlined),
-                    selectedIcon: Icon(Icons.grid_view_rounded),
-                    label: Text('Vaults'),
-                  ),
-                  NavigationRailDestination(
-                    icon: Icon(Icons.settings_outlined),
-                    selectedIcon: Icon(Icons.settings_rounded),
-                    label: Text('Settings'),
-                  ),
-                ],
-              ),
-            if (isWide)
-              VerticalDivider(
-                thickness: 1,
-                width: 1,
-                color: cs.outlineVariant.withValues(alpha: 0.3),
-              ),
-            Expanded(
-              child: Stack(
-                children: [
-                  IndexedStack(
-                    index: _currentIndex,
-                    children: [
-                      _buildVaultsTab(displayItems, cs, textTheme, isWide),
-                      const AppSettingsScreen(),
-                    ],
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 16,
-                    child: Center(
-                      child: ListenableBuilder(
-                        listenable: CrossContainerClipboard.instance,
-                        builder: (context, _) {
-                          final clipboard = CrossContainerClipboard.instance;
-                          if (!clipboard.hasItems) return const SizedBox.shrink();
-                          return _FloatingClipboardDashboardBanner(
-                            clipboard: clipboard,
-                            onClear: clipboard.clear,
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ],
+            _buildBody(displayItems),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 16,
+              child: Center(
+                child: ListenableBuilder(
+                  listenable: CrossContainerClipboard.instance,
+                  builder: (context, _) {
+                    final clipboard = CrossContainerClipboard.instance;
+                    if (!clipboard.hasItems) return const SizedBox.shrink();
+                    return _FloatingClipboardDashboardBanner(
+                      clipboard: clipboard,
+                      onClear: clipboard.clear,
+                    );
+                  },
+                ),
               ),
             ),
           ],
+        ),
+        bottomNavigationBar: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          height: _showUndoBar ? undoBarHeight : 0.0,
+          child: SingleChildScrollView(
+            physics: const NeverScrollableScrollPhysics(),
+            child: Container(
+              height: undoBarHeight,
+              padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset > 0 ? bottomInset : 16.0),
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                offset: _showUndoBar ? Offset.zero : const Offset(0, 1.5),
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 250),
+                  opacity: _showUndoBar ? 1.0 : 0.0,
+                  child: _FloatingUndoBar(
+                    label: _recentlyDeletedRecord?.label ?? '',
+                    onUndo: _handleUndo,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1008,6 +847,71 @@ class _FloatingClipboardDashboardBanner extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FloatingUndoBar extends StatelessWidget {
+  final String label;
+  final VoidCallback onUndo;
+
+  const _FloatingUndoBar({
+    required this.label,
+    required this.onUndo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Material(
+      color: cs.inverseSurface,
+      elevation: 4,
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(
+          children: [
+            Icon(
+              Icons.delete_outline_rounded,
+              size: 22,
+              color: cs.onInverseSurface,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Text(
+                  'Removed "$label"',
+                  key: ValueKey(label),
+                  style: textTheme.labelLarge?.copyWith(
+                    color: cs.onInverseSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onUndo,
+              style: TextButton.styleFrom(
+                foregroundColor: cs.inversePrimary,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Undo',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
         ),
       ),
     );

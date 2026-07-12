@@ -7,11 +7,11 @@ import '../../../theme.dart';
 import '../../../widgets/common_widgets.dart';
 
 // ── Base Container Card (Internal) ──────────────────────────────────────────
+
 class _BaseContainerCard extends StatelessWidget {
   static const double _bottomAreaHeight = 14.0;
 
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
   final IconData icon;
   final Color iconColor;
   final Color iconBackgroundColor;
@@ -19,11 +19,11 @@ class _BaseContainerCard extends StatelessWidget {
   final Widget subtitle;
   final Widget? trailingAction;
   final Widget? bottomContent; // optional progress bar row
-  final bool isElevated;
+  final Color? backgroundColor;
+  final BorderRadiusGeometry? borderRadius;
 
   const _BaseContainerCard({
     required this.onTap,
-    this.onLongPress,
     required this.icon,
     required this.iconColor,
     required this.iconBackgroundColor,
@@ -31,27 +31,27 @@ class _BaseContainerCard extends StatelessWidget {
     required this.subtitle,
     this.trailingAction,
     this.bottomContent,
-    this.isElevated = true,
+    this.backgroundColor,
+    this.borderRadius,
   });
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    
+    final effectiveRadius = borderRadius ?? BorderRadius.circular(AppRadius.xl);
 
     return Card(
       elevation: 0,
-      color: isElevated ? cs.surfaceContainer : Colors.transparent,
+      color: backgroundColor ?? cs.surfaceContainer,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        side: isElevated
-            ? BorderSide.none
-            : BorderSide(color: cs.outlineVariant, width: 1),
+        borderRadius: effectiveRadius,
+        side: BorderSide.none,
       ),
       child: InkWell(
         onTap: onTap,
-        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           child: Column(
@@ -112,15 +112,15 @@ class _BaseContainerCard extends StatelessWidget {
 class ContainerCard extends StatelessWidget {
   final MountedContainer container;
   final ValueChanged<int> onLocked;
-  final VoidCallback? onLongPress;
   final VoidCallback onBrowse;
+  final BorderRadiusGeometry? borderRadius;
 
   const ContainerCard({
     super.key,
     required this.container,
     required this.onLocked,
     required this.onBrowse,
-    this.onLongPress,
+    this.borderRadius,
   });
 
   Color _barColor(double fraction, ColorScheme cs) {
@@ -186,7 +186,6 @@ class ContainerCard extends StatelessWidget {
 
     return _BaseContainerCard(
       onTap: onBrowse,
-      onLongPress: onLongPress,
       icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_rounded,
       iconColor: cs.onPrimaryContainer,
       iconBackgroundColor: cs.primaryContainer,
@@ -194,6 +193,7 @@ class ContainerCard extends StatelessWidget {
       subtitle: subtitleWidget,
       trailingAction: _LockButton(container: container, onLocked: onLocked),
       bottomContent: bottomContent,
+      borderRadius: borderRadius,
     );
   }
 }
@@ -203,14 +203,14 @@ class SavedContainerCard extends StatelessWidget {
   final String name;
   final String uri;
   final VoidCallback onUnlock;
-  final VoidCallback? onLongPress;
+  final BorderRadiusGeometry? borderRadius;
 
   const SavedContainerCard({
     super.key,
     required this.name,
     required this.uri,
     required this.onUnlock,
-    this.onLongPress,
+    this.borderRadius,
   });
 
   @override
@@ -221,7 +221,6 @@ class SavedContainerCard extends StatelessWidget {
 
     return _BaseContainerCard(
       onTap: onUnlock,
-      onLongPress: onLongPress,
       icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_rounded,
       iconColor: cs.onSurfaceVariant,
       iconBackgroundColor: cs.surfaceContainerHighest,
@@ -237,7 +236,8 @@ class SavedContainerCard extends StatelessWidget {
         onUnlock: onUnlock,
         isUsb: isUsb,
       ),
-      isElevated: false,
+      backgroundColor: cs.surfaceContainerLow,
+      borderRadius: borderRadius,
       // bottomContent is omitted → the fixed 28dp area remains empty
     );
   }
@@ -346,11 +346,11 @@ class _LockButtonState extends State<_LockButton> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return _CompactIconButton(
-      icon: Icons.lock_outline_rounded,
+      icon: Icons.lock_open_rounded,
       isLoading: _loading,
       onPressed: _lock,
-      backgroundColor: cs.secondaryContainer,
-      foregroundColor: cs.onSecondaryContainer,
+      backgroundColor: cs.primaryContainer,
+      foregroundColor: cs.onPrimaryContainer,
       tooltip: 'Lock container',
     );
   }
@@ -370,13 +370,13 @@ class _UnlockButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return _CompactIconButton(
-      icon: isUsb ? Icons.usb_rounded : Icons.lock_open_rounded,
+      icon: isUsb ? Icons.usb_rounded : Icons.lock_outline_rounded,
       onPressed: () {
         HapticFeedback.lightImpact();
         onUnlock();
       },
-      backgroundColor: cs.primaryContainer,
-      foregroundColor: cs.onPrimaryContainer,
+      backgroundColor: cs.secondaryContainer,
+      foregroundColor: cs.onSecondaryContainer,
       tooltip: isUsb ? 'Reconnect USB' : 'Unlock container',
     );
   }

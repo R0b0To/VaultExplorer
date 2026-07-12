@@ -656,8 +656,8 @@ Future<void> _pickFile() async {
                           ),
                           child: Icon(
                             _selectedUri != null
-                                ? Icons.lock_open_outlined
-                                : Icons.folder_open_rounded,
+                                ? Icons.folder_zip_rounded
+                                : Icons.folder_zip_rounded,
                             size: 24,
                             color: _selectedUri != null
                                 ? cs.onPrimaryContainer
@@ -713,11 +713,6 @@ Future<void> _pickFile() async {
                             ),
                           ),
                         ] else if (_selectedUri != null && widget.initialUri != null) ...[
-                          Icon(
-                            Icons.lock_outline_rounded,
-                            size: 20,
-                            color: cs.primary,
-                          ),
                         ] else ...[
                           Icon(
                             Icons.chevron_right_rounded,

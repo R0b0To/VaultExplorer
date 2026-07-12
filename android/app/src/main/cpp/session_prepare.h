@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 
@@ -47,10 +48,14 @@ bool deriveAndValidateHeader(
 // (deriveAndValidateHeader, one hash at a time while auto-detecting) and
 // during container creation (which already knows its hash/cipher and skips
 // the auto-detect loop entirely).
+// abortFlag: forwarded to pbkdf2Hmac — see its doc comment in cipher_shim.h.
+// Container creation has no concurrent workers to abort against, so it
+// omits this and gets the default nullptr.
 bool deriveHeaderKey(HashId hash,
                      const unsigned char* password, size_t passwordLen,
                      const unsigned char* salt, int clampedPim,
-                     unsigned char* out, size_t outLen);
+                     unsigned char* out, size_t outLen,
+                     const std::atomic<bool>* abortFlag = nullptr);
 
 // Establishes a session for volume [volId] backed by open file descriptor
 // [fd] — a VeraCrypt container file or a LUKS1/LUKS2 image; format is

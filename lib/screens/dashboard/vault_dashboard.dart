@@ -219,6 +219,15 @@ class _VaultDashboardState extends State<VaultDashboard>
       }
     });
     _scheduleAutoClose(container);
+
+    // Root directory listing is no longer part of the unlock round-trip —
+    // unlockAndListNative now only proves the password/keyfiles are
+    // correct and mounts the filesystem, so container.rootFiles arrives
+    // here empty. Fetch the real listing separately, after the container
+    // is already showing as unlocked, so the UI transition isn't gated on
+    // however long the root folder's directory walk takes (this matters
+    // most for NTFS/ext, which open an inode per entry).
+    _refreshContainerFiles(container.volId);
   }
 
   void _onUsbContainerDetached(int volId) {
@@ -247,6 +256,10 @@ class _VaultDashboardState extends State<VaultDashboard>
       _recordsOrder.add(container.uri);
     });
     _scheduleAutoClose(container);
+
+    // Same reasoning as _onContainerMounted above — container.rootFiles
+    // arrives empty from the reconnect unlock call too.
+    _refreshContainerFiles(container.volId);
   }
 
   void _onContainerLocked(int volId) {
@@ -276,6 +289,33 @@ class _VaultDashboardState extends State<VaultDashboard>
               totalSpace: space[0],
               freeSpace: space[1],
             );
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  // Companion to _refreshContainerSpace above, for the root directory
+  // listing deferred out of unlockAndListNative/unlockUsbAndListNative
+  // (see vaultexplorer.cpp) — fired once, right after a container is
+  // added in _onContainerMounted.
+  //
+  // Reads _mounted[currentIdx] fresh (rather than reusing a container
+  // captured before the await, as _refreshContainerSpace above does) so
+  // that if this races with a concurrent _refreshContainerSpace call for
+  // the same volId, neither setState clobbers the other's field — each
+  // patches onto whatever the current state actually is at that moment.
+  Future<void> _refreshContainerFiles(int volId) async {
+    final idx = _mounted.indexWhere((c) => c.volId == volId);
+    if (idx == -1) return;
+    final container = _mounted[idx];
+    try {
+      final files = await vaultExplorerApi.listDirectory(container, '');
+      if (files != null && mounted) {
+        setState(() {
+          final currentIdx = _mounted.indexWhere((c) => c.volId == volId);
+          if (currentIdx != -1) {
+            _mounted[currentIdx] = _mounted[currentIdx].copyWith(rootFiles: files);
           }
         });
       }

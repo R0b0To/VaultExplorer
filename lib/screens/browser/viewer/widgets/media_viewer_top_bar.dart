@@ -82,12 +82,6 @@ class MediaViewerTopBar extends StatelessWidget {
             ),
           ),
           _buildPlaylistMenu(context, cs),
-          IconButton(
-            icon: Icon(Icons.delete_outline_rounded, color: cs.error),
-            tooltip: 'Delete File',
-            onPressed: onDeletePressed,
-            iconSize: 24,
-          ),
           _buildMoreMenu(context, cs),
         ],
       ),
@@ -277,6 +271,19 @@ class MediaViewerTopBar extends StatelessWidget {
             ),
           ],
           child: const Text('Screen Orientation'),
+        ),
+        const PopupMenuDivider(),
+        MenuItemButton(
+          style: MenuItemButton.styleFrom(
+            foregroundColor: cs.error,
+          ),
+          onPressed: onDeletePressed,
+          leadingIcon: Icon(
+            Icons.delete_outline_rounded,
+            size: 18,
+            color: cs.error,
+          ),
+          child: const Text('Delete File'),
         ),
       ],
     );

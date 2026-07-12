@@ -138,18 +138,23 @@ static bool tryDecryptHeader(
 bool deriveHeaderKey(HashId hash,
                             const unsigned char* password, size_t passwordLen,
                             const unsigned char* salt, int clampedPim,
-                            unsigned char* out, size_t outLen) {
+                            unsigned char* out, size_t outLen,
+                            const std::atomic<bool>* abortFlag) {
     if (hash == HashId::kArgon2id) {
         if (outLen != 192) return false;
         uint32_t memoryKiB = 0;
         uint32_t timeCost = 0;
         uint32_t parallelism = 0;
         argon2ParamsForPim(clampedPim, memoryKiB, timeCost, parallelism);
+        // No early-exit here — VeraCrypt's embedded argon2.c exposes no
+        // cancellation hook. Bounded instead by the isUnlockCancelled()
+        // check between combinations in deriveAndValidateHeader's worker,
+        // same as before this change.
         return argon2idDeriveKey(password, passwordLen, salt, VC_SALT_SIZE,
                                  memoryKiB, timeCost, parallelism, out, outLen);
     }
     return pbkdf2Hmac(hash, password, passwordLen, salt, VC_SALT_SIZE,
-                       iterationsForHash(hash, clampedPim), out, outLen);
+                       iterationsForHash(hash, clampedPim), out, outLen, abortFlag);
 }
 
 std::mutex derivationMutexes[MAX_VOLUMES];
@@ -256,7 +261,7 @@ bool deriveAndValidateHeader(
         // PBKDF2 only needs the longest selected cascade's key material.
         const size_t outputBytes = h == HashId::kArgon2id ? 192 : neededKeyBytes;
         if (!deriveHeaderKey(h, password, passwordLen, salt, safePim,
-                             derivedKeyMaterial, outputBytes)) {
+                             derivedKeyMaterial, outputBytes, &found)) {
             reportUnlockProgress(volId, combinationsAttempted.fetch_add(1) + 1, totalHashSteps,
                                  static_cast<int>(h), -1);
             return;

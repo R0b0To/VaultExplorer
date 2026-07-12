@@ -12,6 +12,7 @@
 #include "argon2.h"
 #include <cstring>
 #include <algorithm>
+#include <atomic>
 
 
 struct AesCtxPair {
@@ -253,8 +254,15 @@ bool pbkdf2Hmac(HashId hash,
                  const unsigned char* password, size_t passwordLen,
                  const unsigned char* salt, size_t saltLen,
                  unsigned int iterations,
-                 unsigned char* out, size_t outLen) {
+                 unsigned char* out, size_t outLen,
+                 const std::atomic<bool>* abortFlag) {
     if (hash == HashId::kSha512 || hash == HashId::kSha256) {
+        // mbedtls_pkcs5_pbkdf2_hmac runs to completion in a single call —
+        // no hook to check abortFlag mid-derivation without reimplementing
+        // it. Not a practical loss: these are the two fastest hashes here
+        // (hardware-accelerated), so they're rarely the straggler thread
+        // another hash's worker is waiting on. abortFlag is deliberately
+        // unused on this path.
         mbedtls_md_type_t mdType = (hash == HashId::kSha512) ? MBEDTLS_MD_SHA512 : MBEDTLS_MD_SHA256;
         const mbedtls_md_info_t* mdInfo = mbedtls_md_info_from_type(mdType);
         if (!mdInfo) return false;
@@ -269,7 +277,7 @@ bool pbkdf2Hmac(HashId hash,
         return ret == 0;
     }
 
-    return pbkdf2HmacCustom(hash, password, passwordLen, salt, saltLen, iterations, out, outLen);
+    return pbkdf2HmacCustom(hash, password, passwordLen, salt, saltLen, iterations, out, outLen, abortFlag);
 }
 
 bool argon2idDeriveKey(const unsigned char* password, size_t passwordLen,

@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <cstddef>
+#include <atomic>
 
 // ── Cipher identity ──────────────────────────────────────────────────────
 
@@ -46,11 +47,18 @@ enum class HashId : uint8_t {
 
 static constexpr size_t kMaxHashOutputBytes = 64; // SHA-512/Whirlpool/Streebog = 64B, others less
 
+// abortFlag: optional cooperative early-exit, checked periodically inside
+// the custom PBKDF2 loop (Whirlpool/Streebog/Blake2s256 only — see
+// pbkdf2Hmac's definition for why SHA-256/SHA-512 can't honor it). Used by
+// deriveAndValidateHeader's per-hash worker threads to stop as soon as
+// another thread has already found the matching hash, instead of running
+// a slow hash's KDF to completion for nothing after the answer is known.
 bool pbkdf2Hmac(HashId hash,
                  const unsigned char* password, size_t passwordLen,
                  const unsigned char* salt, size_t saltLen,
                  unsigned int iterations,
-                 unsigned char* out, size_t outLen);
+                 unsigned char* out, size_t outLen,
+                 const std::atomic<bool>* abortFlag = nullptr);
 
 int iterationsForHash(HashId hash, int clampedPim);
 

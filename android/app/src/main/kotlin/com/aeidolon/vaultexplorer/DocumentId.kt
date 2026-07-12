@@ -31,9 +31,9 @@ data class DocumentId(
             }
             val volIdInt = parts[0].toIntOrNull()
                 ?: throw FileNotFoundException("Non-integer volume ID in $label ID: $id")
-            if (volIdInt < 0 || volIdInt >= VeraCryptSession.MAX_VOLUMES) {
+            if (volIdInt < 0 || volIdInt >= ContainerSessionRegistry.MAX_VOLUMES) {
                 throw FileNotFoundException(
-                    "Volume ID $volIdInt is out of range [0, ${VeraCryptSession.MAX_VOLUMES}) in $label ID: $id"
+                    "Volume ID $volIdInt is out of range [0, ${ContainerSessionRegistry.MAX_VOLUMES}) in $label ID: $id"
                 )
             }
             return DocumentId(

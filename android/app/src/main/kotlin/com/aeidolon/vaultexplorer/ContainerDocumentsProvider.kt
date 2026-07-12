@@ -67,10 +67,10 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val cursor = MatrixCursor(resolvedProjection)
         cursor.setNotificationUri(context?.contentResolver, DocumentsContract.buildRootsUri(AUTHORITY))
         
-        for ((volId, session) in VeraCryptSession.activeSessions.filter { it.value.documentProvider }) {
+        for ((volId, session) in ContainerSessionRegistry.activeSessions.filter { it.value.documentProvider }) {
             val rootTitle = session.displayName
                 ?: UriNameResolver.resolve(context?.contentResolver, Uri.parse(session.uri))
-            val (totalBytes, freeBytes) = VeraCryptBridge.getSpacePair(volId)
+            val (totalBytes, freeBytes) = ContainerFileSystem.getSpacePair(volId)
             val rootSummary = if (totalBytes > 0)
                 "Volume — ${android.text.format.Formatter.formatFileSize(context, freeBytes)} free"
             else "Volume"
@@ -110,12 +110,12 @@ class ContainerDocumentsProvider : DocumentsProvider() {
 
     override fun ejectRoot(rootId: String?) {
         val volId = rootId?.toIntOrNull()
-            ?.takeIf { it in 0 until VeraCryptSession.MAX_VOLUMES }
+            ?.takeIf { it in 0 until ContainerSessionRegistry.MAX_VOLUMES }
             ?: return
-        val session = VeraCryptSession.activeSessions[volId]
+        val session = ContainerSessionRegistry.activeSessions[volId]
         ContainerEngine.lock(volId)
         if (session?.isUsbSource == true) UsbBlockBridge.unregister(volId)
-        VeraCryptSession.removeSession(volId)
+        ContainerSessionRegistry.removeSession(volId)
         context?.contentResolver?.notifyChange(
             DocumentsContract.buildRootsUri(AUTHORITY), null
         )
@@ -172,7 +172,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val volId   = doc.volId
         val fatPath = doc.fatPath
 
-        VeraCryptBridge.requireSession(volId)
+        ContainerFileSystem.requireSession(volId)
 
         var actualIsDir = doc.isDir
         var actualSize = 0L
@@ -181,7 +181,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
             val parentPath = if (fatPath.contains("/")) fatPath.substringBeforeLast("/") else ""
             val fileName = fatPath.substringAfterLast("/")
             
-            val siblings = VeraCryptBridge.listDirectory(volId, parentPath) 
+            val siblings = ContainerFileSystem.listDirectory(volId, parentPath) 
                 ?: throw FileNotFoundException("Parent directory missing")
                 
             var found = false
@@ -232,10 +232,10 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         }
         val volId         = parent.volId
         val parentFatPath = parent.fatPath
-        VeraCryptBridge.requireSession(volId)
+        ContainerFileSystem.requireSession(volId)
 
         try {
-            val files = VeraCryptBridge.listDirectory(volId, parentFatPath)
+            val files = ContainerFileSystem.listDirectory(volId, parentFatPath)
             
             files?.forEach { file ->
                 if (file.startsWith("System:")) return@forEach
@@ -270,7 +270,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val parent        = DocumentId.parse(parentDocumentId, "parent")
         val volId         = parent.volId
         val parentFatPath = parent.fatPath
-        VeraCryptBridge.requireSession(volId)
+        ContainerFileSystem.requireSession(volId)
         
         val fileName  = displayName?.replace("/", "_") ?: throw FileNotFoundException("No file name provided")
         val cleanPath = if (parentFatPath.isEmpty()) fileName else "$parentFatPath/$fileName"
@@ -278,13 +278,13 @@ class ContainerDocumentsProvider : DocumentsProvider() {
 
         val success = try {
             if (isDirectory) {
-                VeraCryptBridge.createDirectory(volId, cleanPath)
+                ContainerFileSystem.createDirectory(volId, cleanPath)
             } else {
                 val tempFile = File(context?.cacheDir, "vc_new_${volId}_${cleanPath.hashCode()}_$fileName")
                 try {
                     if (tempFile.exists()) tempFile.delete()
                     tempFile.createNewFile()
-                    VeraCryptBridge.writeBackFile(volId, cleanPath, tempFile.absolutePath)
+                    ContainerFileSystem.writeBackFile(volId, cleanPath, tempFile.absolutePath)
                 } finally {
                     tempFile.delete()
                 }
@@ -305,7 +305,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
     private fun deleteRecursive(volId: Int, path: String, isDir: Boolean): Boolean {
         if (isDir) {
             try {
-                val children = VeraCryptBridge.listDirectory(volId, path)
+                val children = ContainerFileSystem.listDirectory(volId, path)
                 children?.forEach { child ->
                     if (child.startsWith("System:")) return@forEach
                     val childIsDir = child.startsWith("[DIR] ")
@@ -318,7 +318,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
                 // Ignore directory listing failures and try to delete whatever we can
             }
         }
-        return VeraCryptBridge.deleteFile(volId, path)
+        return ContainerFileSystem.deleteFile(volId, path)
     }
 
     @Throws(FileNotFoundException::class)
@@ -326,7 +326,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val doc     = DocumentId.parse(documentId, "document")
         val volId   = doc.volId
         val fatPath = doc.fatPath
-        VeraCryptBridge.requireSession(volId)
+        ContainerFileSystem.requireSession(volId)
 
         val success = deleteRecursive(volId, fatPath, doc.isDir)
         if (!success) throw FileNotFoundException("Delete failed for $fatPath")
@@ -347,7 +347,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val parentPath = if (oldFatPath.contains("/")) oldFatPath.substringBeforeLast("/") else ""
         val newFatPath = if (parentPath.isEmpty()) newName else "$parentPath/$newName"
 
-        val success = VeraCryptBridge.renameFile(doc.volId, oldFatPath, newFatPath)
+        val success = ContainerFileSystem.renameFile(doc.volId, oldFatPath, newFatPath)
         if (!success) throw FileNotFoundException("Rename failed for $oldFatPath to $newFatPath")
 
         val parentDocId = DocumentId(doc.volId, "dir", parentPath).toString()
@@ -370,7 +370,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
     ): ParcelFileDescriptor {
         val doc     = DocumentId.parse(documentId, "document")
         val volId   = doc.volId
-        val session = VeraCryptBridge.requireSession(volId)
+        val session = ContainerFileSystem.requireSession(volId)
         val fatPath = doc.fatPath
         val isWrite = mode?.contains("w") == true || mode?.contains("r+") == true
 
@@ -405,7 +405,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         if (fatPath.isEmpty()) throw FileNotFoundException(
             "Cannot generate thumbnail for volume root"
         )
-        VeraCryptBridge.requireSession(volId)
+        ContainerFileSystem.requireSession(volId)
 
         val pipe     = ParcelFileDescriptor.createPipe()
         val readEnd  = pipe[0]
@@ -414,7 +414,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         Thread {
             val tempFile = File(context?.cacheDir, "thumb_${System.nanoTime()}")
             try {
-                val ok = VeraCryptBridge.extractToFile(volId, fatPath, tempFile.absolutePath)
+                val ok = ContainerFileSystem.extractToFile(volId, fatPath, tempFile.absolutePath)
 
                 if (ok && tempFile.exists()) {
                     val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -472,11 +472,11 @@ class ContainerDocumentsProvider : DocumentsProvider() {
 
         init {
             try {
-                VeraCryptBridge.withLock(volId) {
-                    fileSizeCached = VeraCryptBridge.getFileSize(volId, fatPath)
+                ContainerFileSystem.withLock(volId) {
+                    fileSizeCached = ContainerFileSystem.getFileSize(volId, fatPath)
                     if (fileSizeCached < 0) fileSizeCached = 0L
                     if (!isWrite) {
-                        streamPtr = VeraCryptBridge.openStream(volId, fatPath)
+                        streamPtr = ContainerFileSystem.openStream(volId, fatPath)
                     }
                 }
             } catch (e: Exception) {
@@ -488,8 +488,8 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         private fun flushWriteCache() {
             if (writeCache != null && writeCacheLength > 0) {
                 val chunk = if (writeCacheLength == writeCacheCapacity) writeCache else writeCache.copyOf(writeCacheLength)
-                VeraCryptBridge.withLock(volId) {
-                    VeraCryptBridge.writeFileChunk(volId, fatPath, writeCacheOffset, chunk)
+                ContainerFileSystem.withLock(volId) {
+                    ContainerFileSystem.writeFileChunk(volId, fatPath, writeCacheOffset, chunk)
                 }
                 
                 val endOffset = writeCacheOffset + writeCacheLength
@@ -519,8 +519,8 @@ class ContainerDocumentsProvider : DocumentsProvider() {
 
                 if (readSize <= readCacheCapacity) {
                     val fetchSize = minOf(readCacheCapacity.toLong(), fileSizeCached - offset).toInt()
-                    val actualRead = VeraCryptBridge.withLock(volId) {
-                        VeraCryptBridge.readStream(volId, streamPtr, offset, readCache, fetchSize)
+                    val actualRead = ContainerFileSystem.withLock(volId) {
+                        ContainerFileSystem.readStream(volId, streamPtr, offset, readCache, fetchSize)
                     }
                     if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
                     
@@ -535,8 +535,8 @@ class ContainerDocumentsProvider : DocumentsProvider() {
                 }
             }
 
-            val actualRead = VeraCryptBridge.withLock(volId) {
-                VeraCryptBridge.readStream(volId, streamPtr, offset, data, readSize)
+            val actualRead = ContainerFileSystem.withLock(volId) {
+                ContainerFileSystem.readStream(volId, streamPtr, offset, data, readSize)
             }
             if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
             return actualRead
@@ -551,8 +551,8 @@ class ContainerDocumentsProvider : DocumentsProvider() {
 
             if (size >= writeCacheCapacity) {
                 val chunkData = if (data.size == size) data else data.copyOf(size)
-                val success = VeraCryptBridge.withLock(volId) {
-                    VeraCryptBridge.writeFileChunk(volId, fatPath, offset, chunkData)
+                val success = ContainerFileSystem.withLock(volId) {
+                    ContainerFileSystem.writeFileChunk(volId, fatPath, offset, chunkData)
                 }
                 if (!success) throw ErrnoException("onWrite", OsConstants.EIO)
                 
@@ -575,9 +575,9 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         override fun onRelease() {
             flushWriteCache()
             
-            VeraCryptBridge.withLock(volId) {
+            ContainerFileSystem.withLock(volId) {
                 if (streamPtr != 0L) {
-                    VeraCryptBridge.closeStream(volId, streamPtr)
+                    ContainerFileSystem.closeStream(volId, streamPtr)
                     streamPtr = 0L
                 }
             }

@@ -354,7 +354,7 @@ class MainActivity : FlutterFragmentActivity() {
             ioExecutor.execute {
                 try {
                     val tempFile = File(cacheDir, "export_temp")
-                    val success = VeraCryptBridge.extractToFile(pending.volId, pending.sourcePath, tempFile.absolutePath)
+                    val success = ContainerFileSystem.extractToFile(pending.volId, pending.sourcePath, tempFile.absolutePath)
                     
                     if (success && tempFile.exists()) {
                         contentResolver.openOutputStream(destUri)?.use { out ->
@@ -384,14 +384,14 @@ class MainActivity : FlutterFragmentActivity() {
             result.error("INVALID_ARGS", "filePath is required", null)
             return
         }
-        val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
         if (volId == null) {
             result.error("NOT_MOUNTED", "Container not mounted", null)
             return
         }
         ioExecutor.execute {
             try {
-                val value = synchronized(VeraCryptSession.locks[volId]) { block(volId) }
+                val value = synchronized(ContainerSessionRegistry.locks[volId]) { block(volId) }
                 runOnUiThread { result.success(value) }
             } catch (e: Exception) {
                 runOnUiThread { dispatchNativeError(e, result) }
@@ -622,20 +622,20 @@ class MainActivity : FlutterFragmentActivity() {
 
     private fun handleUsbDeviceDetached(device: UsbDevice) {
         val containerUri = "usb:${device.deviceName}"
-        val volId = VeraCryptSession.getVolumeIdByUri(containerUri) ?: return
-        val session = VeraCryptSession.activeSessions[volId]
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri) ?: return
+        val session = ContainerSessionRegistry.activeSessions[volId]
         if (session?.isUsbSource != true) return
 
         ioExecutor.execute {
             UsbBlockBridge.unregister(volId)
             try {
-                synchronized(VeraCryptSession.locks[volId]) {
+                synchronized(ContainerSessionRegistry.locks[volId]) {
                     ContainerEngine.lock(volId)
                 }
             } catch (e: Exception) {
                 Log.w("VaultExplorer_C++", "lockNative on USB detach failed for volId=$volId: ${e.message}")
             }
-            VeraCryptSession.removeSession(volId)
+            ContainerSessionRegistry.removeSession(volId)
             runOnUiThread {
                 contentResolver.notifyChange(
                     DocumentsContract.buildRootsUri(
@@ -831,8 +831,8 @@ class MainActivity : FlutterFragmentActivity() {
                         }
 
                         val containerUri = "usb:$deviceName"
-                        val targetVolId = VeraCryptSession.getVolumeIdByUri(containerUri)
-                            ?: VeraCryptSession.getFreeVolumeId()
+                        val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
+                            ?: ContainerSessionRegistry.getFreeVolumeId()
                         if (targetVolId == null) {
                             result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
                             return@setMethodCallHandler
@@ -859,7 +859,7 @@ class MainActivity : FlutterFragmentActivity() {
                                     Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
                                 }
 
-                                val files = synchronized(VeraCryptSession.locks[targetVolId]) {
+                                val files = synchronized(ContainerSessionRegistry.locks[targetVolId]) {
                                     ContainerEngine.unlockUsb(
                                         password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
                                         keyfileFds = keyfileFds
@@ -874,7 +874,7 @@ class MainActivity : FlutterFragmentActivity() {
                                                 storeDerivedKeyBytes(deviceName, derived)
                                             }
                                         }
-                                        VeraCryptSession.activeSessions[targetVolId] = ContainerSession(
+                                        ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                                             uri = containerUri,
                                             volId = targetVolId,
                                             cachedFilesList = files.toList(),
@@ -979,8 +979,8 @@ class MainActivity : FlutterFragmentActivity() {
                             return@setMethodCallHandler
                         }
 
-                        val targetVolId = VeraCryptSession.getVolumeIdByUri(uriString)
-                            ?: VeraCryptSession.getFreeVolumeId()
+                        val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                            ?: ContainerSessionRegistry.getFreeVolumeId()
                         if (targetVolId == null) {
                             result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
                             return@setMethodCallHandler
@@ -1006,7 +1006,7 @@ class MainActivity : FlutterFragmentActivity() {
                                     Log.i("VaultExplorer_C++", "File unlock using ${keyfileFds.size} keyfile(s)")
                                 }
 
-                                val files = synchronized(VeraCryptSession.locks[targetVolId]) {
+                                val files = synchronized(ContainerSessionRegistry.locks[targetVolId]) {
                                     ContainerEngine.unlockFile(fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds)
                                 }
 
@@ -1018,7 +1018,7 @@ class MainActivity : FlutterFragmentActivity() {
                                                 storeDerivedKeyBytes(uriString, derived)
                                             }
                                         }
-                                        VeraCryptSession.activeSessions[targetVolId] = ContainerSession(
+                                        ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                                             uri = uriString,
                                             volId = targetVolId,
                                             cachedFilesList = files.toList(),
@@ -1178,7 +1178,7 @@ class MainActivity : FlutterFragmentActivity() {
                         ioExecutor.execute {
                             var retriever: MediaMetadataRetriever? = null
                             try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+                                val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                                     ?: run {
                                         runOnUiThread {
                                             result.error("NOT_MOUNTED", "Container not mounted", null)
@@ -1242,7 +1242,7 @@ class MainActivity : FlutterFragmentActivity() {
 
                         ioExecutor.execute {
                             try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+                                val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                                     ?: run {
                                         runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
                                         return@execute
@@ -1300,7 +1300,7 @@ class MainActivity : FlutterFragmentActivity() {
 
                         ioExecutor.execute {
                             try {
-                                val volId = VeraCryptSession.getVolumeIdByUri(uriString) ?: return@execute
+                                val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return@execute
                                 val inputStream = VeraCryptInputStream(this, uriString, fileName, volId)
                                 
                                 val options = BitmapFactory.Options().apply {
@@ -1369,18 +1369,18 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "filePath is required", null)
                             return@setMethodCallHandler
                         }
-                        val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+                        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                         if (volId != null) {
-                            val session = VeraCryptSession.activeSessions[volId]
+                            val session = ContainerSessionRegistry.activeSessions[volId]
                             ioExecutor.execute {
                                 try {
-                                    synchronized(VeraCryptSession.locks[volId]) {
+                                    synchronized(ContainerSessionRegistry.locks[volId]) {
                                         ContainerEngine.lock(volId)
                                     }
                                     if (session?.isUsbSource == true) {
                                         UsbBlockBridge.unregister(volId)
                                     }
-                                    VeraCryptSession.removeSession(volId)
+                                    ContainerSessionRegistry.removeSession(volId)
                                     runOnUiThread {
                                         contentResolver.notifyChange(
                                             DocumentsContract.buildRootsUri(
@@ -1405,9 +1405,9 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "filePath is required", null)
                             return@setMethodCallHandler
                         }
-                        val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+                        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                         if (volId != null) {
-                            val session = VeraCryptSession.activeSessions[volId]
+                            val session = ContainerSessionRegistry.activeSessions[volId]
                             if (session != null) {
                                 session.displayName = displayName
                                 session.documentProvider = docProvider
@@ -1430,7 +1430,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName and destPath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.extractToFile(volId, fileName, destPath)
+                            ContainerFileSystem.extractToFile(volId, fileName, destPath)
                         }
                     }
 
@@ -1440,14 +1440,14 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.getFileSize(volId, fileName)
+                            ContainerFileSystem.getFileSize(volId, fileName)
                         }
                     }
 
                     ChannelMethods.GET_FOLDER_SIZE -> {
                         val dirPath = call.argument<String>("dirPath") ?: ""
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.getFolderSize(volId, dirPath)
+                            ContainerFileSystem.getFolderSize(volId, dirPath)
                         }
                     }
 
@@ -1463,14 +1463,14 @@ class MainActivity : FlutterFragmentActivity() {
                             return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.readFileChunk(volId, fileName, offset, length)
+                            ContainerFileSystem.readFileChunk(volId, fileName, offset, length)
                         }
                     }
 
                     ChannelMethods.LIST_DIRECTORY -> {
                         val dirPath = call.argument<String>("dirPath") ?: ""
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.listDirectory(volId, dirPath)?.toList()
+                            ContainerFileSystem.listDirectory(volId, dirPath)?.toList()
                         }
                     }
 
@@ -1480,7 +1480,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "dirPath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.createDirectory(volId, dirPath)
+                            ContainerFileSystem.createDirectory(volId, dirPath)
                         }
                     }
 
@@ -1491,7 +1491,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "oldPath and newPath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.renameFile(volId, oldPath, newPath)
+                            ContainerFileSystem.renameFile(volId, oldPath, newPath)
                         }
                     }
 
@@ -1502,7 +1502,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName and sourcePath required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.writeBackFile(volId, fileName, sourcePath)
+                            ContainerFileSystem.writeBackFile(volId, fileName, sourcePath)
                         }
                     }
 
@@ -1513,13 +1513,13 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName and epochSeconds required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.setLastModifiedTime(volId, fileName, epochSecs)
+                            ContainerFileSystem.setLastModifiedTime(volId, fileName, epochSecs)
                         }
                     }
 
                     ChannelMethods.GET_SPACE_INFO -> {
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.getSpaceInfo(volId)?.toList()
+                            ContainerFileSystem.getSpaceInfo(volId)?.toList()
                         }
                     }
 
@@ -1529,7 +1529,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.deleteFile(volId, fileName)
+                            ContainerFileSystem.deleteFile(volId, fileName)
                         }
                     }
 
@@ -1541,7 +1541,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "filePath and fileName required", null); return@setMethodCallHandler
                         }
                         try {
-                            val volId = VeraCryptSession.getVolumeIdByUri(uriString)
+                            val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                                 ?: run {
                                     result.error("NOT_MOUNTED", "Container not mounted", null)
                                     return@setMethodCallHandler
@@ -1601,7 +1601,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "filePath is required", null)
                             return@setMethodCallHandler
                         }
-                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                        val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
                         if (volId == null) {
                             result.error("NOT_MOUNTED", "Container is not mounted", null)
                             return@setMethodCallHandler
@@ -1621,7 +1621,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "filePath is required", null)
                             return@setMethodCallHandler
                         }
-                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                        val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
                         if (volId == null) {
                             result.error("NOT_MOUNTED", "Container not mounted", null)
                             return@setMethodCallHandler
@@ -1639,7 +1639,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "filePath is required", null)
                             return@setMethodCallHandler
                         }
-                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                        val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
                         if (volId == null) {
                             result.error("NOT_MOUNTED", "Container is not mounted", null)
                             return@setMethodCallHandler
@@ -1656,7 +1656,7 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("INVALID_ARGS", "filePath and sourcePath required", null)
                             return@setMethodCallHandler
                         }
-                        val volId = VeraCryptSession.getVolumeIdByUri(containerUri)
+                        val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
                         if (volId == null) {
                             result.error("NOT_MOUNTED", "Container not mounted", null)
                             return@setMethodCallHandler
@@ -1684,7 +1684,7 @@ class MainActivity : FlutterFragmentActivity() {
                             return@setMethodCallHandler
                         }
                         runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            VeraCryptBridge.writeFileChunk(volId, fileName, offset, data)
+                            ContainerFileSystem.writeFileChunk(volId, fileName, offset, data)
                         }
                     }
 
@@ -1706,7 +1706,7 @@ class MainActivity : FlutterFragmentActivity() {
         if (!isDir) {
             return try {
                 val tempFile = File(cacheDir, "export_${System.nanoTime()}")
-                val ok = VeraCryptBridge.extractToFile(volId, fatPath, tempFile.absolutePath)
+                val ok = ContainerFileSystem.extractToFile(volId, fatPath, tempFile.absolutePath)
                 var written = 0
                 if (ok && tempFile.exists()) {
                     destParent.findFile(name)?.delete()
@@ -1722,7 +1722,7 @@ class MainActivity : FlutterFragmentActivity() {
             } catch (_: Exception) { 0 }
         }
         val destDir = destParent.createDirectory(name) ?: return 0
-        val children = VeraCryptBridge.listDirectory(volId, fatPath) ?: return 0
+        val children = ContainerFileSystem.listDirectory(volId, fatPath) ?: return 0
         var count = 0
         for (entry in children) {
             if (entry.startsWith("System:")) continue
@@ -1738,13 +1738,13 @@ class MainActivity : FlutterFragmentActivity() {
         srcDoc: DocumentFile, containerUri: String, targetFatPath: String, volId: Int
     ): Int {
         if (srcDoc.isDirectory) {
-            val ok = VeraCryptBridge.createDirectory(volId, targetFatPath)
+            val ok = ContainerFileSystem.createDirectory(volId, targetFatPath)
             if (!ok) {
                 throw java.io.IOException("Failed to create directory: $targetFatPath. Storage might be full or write-protected.")
             }
             val lastModified = srcDoc.lastModified() / 1000L
             if (lastModified > 0) {
-                VeraCryptBridge.setLastModifiedTime(volId, targetFatPath, lastModified)
+                ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
             }
             var count = 0
             for (child in srcDoc.listFiles()) {
@@ -1760,13 +1760,13 @@ class MainActivity : FlutterFragmentActivity() {
             stream.use { inp ->
                 tempFile.outputStream().use { inp.copyTo(it) }
             }
-            val ok = VeraCryptBridge.writeBackFile(volId, targetFatPath, tempFile.absolutePath)
+            val ok = ContainerFileSystem.writeBackFile(volId, targetFatPath, tempFile.absolutePath)
             if (!ok) {
                 throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
             }
             val lastModified = srcDoc.lastModified() / 1000L
             if (lastModified > 0) {
-                VeraCryptBridge.setLastModifiedTime(volId, targetFatPath, lastModified)
+                ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
             }
             return 1
         } finally {
@@ -1789,7 +1789,7 @@ class VeraCryptInputStream(
     private var markedPosition: Long = 0L
 
     init {
-        fileSize = VeraCryptBridge.getFileSize(volId, fileName)
+        fileSize = ContainerFileSystem.getFileSize(volId, fileName)
     }
 
     override fun read(): Int {
@@ -1803,7 +1803,7 @@ class VeraCryptInputStream(
         if (fileSize >= 0 && position >= fileSize) return -1
         val toRead = minOf(len.toLong(), fileSize - position).toInt()
         if (toRead <= 0) return -1
-        val chunk = VeraCryptBridge.readFileChunk(volId, fileName, position, toRead) ?: return -1
+        val chunk = ContainerFileSystem.readFileChunk(volId, fileName, position, toRead) ?: return -1
         if (chunk.isEmpty()) return -1
         val actual = minOf(chunk.size, toRead)
         System.arraycopy(chunk, 0, b, off, actual)
@@ -1845,7 +1845,7 @@ class VeraCryptMediaDataSource(
     override fun getSize(): Long {
         if (cachedSize >= 0) return cachedSize
         cachedSize = try {
-            VeraCryptBridge.getFileSize(volId, fileName)
+            ContainerFileSystem.getFileSize(volId, fileName)
         } catch (_: Exception) { 0L }
         return cachedSize
     }
@@ -1856,7 +1856,7 @@ class VeraCryptMediaDataSource(
         val readSize = minOf(size.toLong(), fileLength - position).toInt()
         if (readSize <= 0) return -1
         return try {
-            val chunk = VeraCryptBridge.readFileChunk(volId, fileName, position, readSize)
+            val chunk = ContainerFileSystem.readFileChunk(volId, fileName, position, readSize)
                 ?: return -1
             if (chunk.isEmpty()) return -1
             val actualRead = minOf(chunk.size, readSize)

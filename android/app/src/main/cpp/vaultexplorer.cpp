@@ -688,21 +688,26 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
         return nullptr;
     }
 
-    jobjectArray result = nullptr;
+
+    bool mountOk;
     {
         std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-        if (ensureMounted(volId)) {
-            result = buildDirectoryListing(env, volId, nullptr);
-        } else {
-            LOGI("FATFS/NTFS Mount failed on volume %d", volId);
-        }
+        mountOk = ensureMounted(volId);
     }
 
     if (preservedKey != nullptr) {
         env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
     }
     env->ReleaseStringUTFChars(password, nativePass);
-    return result;
+
+    if (!mountOk) {
+        LOGI("FATFS/NTFS Mount failed on volume %d", volId);
+        return nullptr;
+    }
+
+    // Empty (non-null) array — preserves the existing "null == AUTH_FAIL"
+    jclass strClass = env->FindClass("java/lang/String");
+    return env->NewObjectArray(0, strClass, nullptr);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -1696,16 +1701,20 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
         volumes[volId].fileSize = static_cast<uint64_t>(deviceSizeBytes);
     }
 
-    jobjectArray result = nullptr;
+    // See the matching comment in unlockAndListNative — mount only, defer
+    // the directory walk to a separate listDirectory("") call.
+    bool mountOk;
     {
         std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
-        if (ensureMounted(volId)) {
-            result = buildDirectoryListing(env, volId, nullptr);
-        } else {
-            LOGI("FATFS/NTFS Mount failed on USB volume %d", volId);
-        }
+        mountOk = ensureMounted(volId);
     }
-    return result;
+    if (!mountOk) {
+        LOGI("FATFS/NTFS Mount failed on USB volume %d", volId);
+        return nullptr;
+    }
+
+    jclass strClass = env->FindClass("java/lang/String");
+    return env->NewObjectArray(0, strClass, nullptr);
 }
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void* reserved);

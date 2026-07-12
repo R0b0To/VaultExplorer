@@ -207,7 +207,8 @@ static bool pbkdf2HmacCustom(HashId hash,
                             const unsigned char* password, size_t passwordLen,
                             const unsigned char* salt, size_t saltLen,
                             unsigned int iterations,
-                            unsigned char* out, size_t outLen) {
+                            unsigned char* out, size_t outLen,
+                            const std::atomic<bool>* abortFlag = nullptr) {
     size_t digestSize = hashDigestSize(hash);
     if (digestSize == 0) return false;
 
@@ -233,11 +234,13 @@ static bool pbkdf2HmacCustom(HashId hash,
         std::memcpy(T, U, digestSize);
 
         for (unsigned int iter = 1; iter < iterations; iter++) {
-            hashHmacFast(hash, pre, U, digestSize, U);
-            for (size_t i = 0; i < digestSize; i++) {
-                T[i] ^= U[i];
-            }
+        if (abortFlag && (iter & 0x3FF) == 0 &&
+            abortFlag->load(std::memory_order_relaxed)) {
+            return false; // another thread already found the answer
         }
+        hashHmacFast(hash, pre, U, digestSize, U);
+        for (size_t i = 0; i < digestSize; i++) T[i] ^= U[i];
+    }
 
         size_t copyLen = std::min(digestSize, outLen - outOffset);
         std::memcpy(out + outOffset, T, copyLen);

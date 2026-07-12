@@ -53,12 +53,30 @@ internal object VeraCryptEngine {
         keyfileFds: IntArray? = null
     ): Array<String>?
 
-    /** Writes a new VeraCrypt container to fd, formats it.
-     *  cipherId/hashId: 255 = auto (defaults to AES + SHA-512). */
+    /** Writes a new container to fd and formats it.
+     *
+     *  containerFormat: 0 = VeraCrypt, 1 = LUKS1, 2 = LUKS2 (matches
+     *  ContainerFormat's native ordinal, see container_format.h).
+     *
+     *  cipherId/hashId: for VeraCrypt (containerFormat==0), 255 = auto
+     *  (defaults to AES + SHA-512). For LUKS (containerFormat==1 or 2),
+     *  both must be concrete — creation always knows exactly which
+     *  algorithm it's using — restricted to AES(0)/Serpent(1)/Twofish(2)
+     *  for cipherId (LUKS1 additionally requires AES specifically) and
+     *  SHA-512(0)/SHA-256(1)/Argon2id(5) for hashId (Argon2id only valid
+     *  for LUKS2).
+     *
+     *  keyfileFds: see [deriveKeyMaterialNative] for the fd ownership
+     *  contract. For VeraCrypt, keyfiles mix additively into the typed
+     *  password (including allowing an empty password when keyfiles alone
+     *  are supplied). For LUKS, a keyfile REPLACES the typed password
+     *  entirely — matching real `cryptsetup --key-file` — and only the
+     *  first keyfile is used. */
     @JvmStatic
     external fun createContainerNative(
         fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
-        cipherId: Int = 255, hashId: Int = 255
+        containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
+        keyfileFds: IntArray? = null
     ): Boolean
 
     /** PBKDF2-SHA512 via mbedTLS; no volId, no session required. */

@@ -10,9 +10,9 @@ import '../models/crypto_algorithms.dart';
 
 /// A single keyfile picked via [VaultExplorerApi.pickKeyfiles]: [uri] is
 /// what gets sent back to native (and round-tripped through
-/// [VaultExplorerApi.unlockContainer]/[unlockUsbContainer]/[deriveDerivedKey]
-/// as a `keyfilePaths` entry); [displayName] is purely for showing a chip
-/// or list entry in the unlock UI.
+/// [VaultExplorerApi.unlockContainer]/[unlockUsbContainer]/[deriveDerivedKey]/
+/// [createContainer] as a `keyfilePaths` entry); [displayName] is purely for
+/// showing a chip or list entry in the unlock/create UI.
 typedef KeyfileRef = ({String uri, String displayName});
 
 /// One "onUnlockProgress" push from native during cipher/hash auto-detect.
@@ -254,14 +254,25 @@ class VaultExplorerApi {
 
   // ── Container lifecycle ───────────────────────────────────────────────────
 
+  /// [containerFormat]: 0 = VeraCrypt, 1 = LUKS1, 2 = LUKS2 (see
+  /// [CreateFormat] in crypto_algorithms.dart) — matches the native
+  /// ContainerFormat ordinal.
+  ///
+  /// [keyfilePaths]: for VeraCrypt, keyfiles mix ADDITIVELY into
+  /// [password] (an empty password with keyfiles alone is valid, matching
+  /// real VeraCrypt). For LUKS, a keyfile REPLACES [password] entirely
+  /// (matching real `cryptsetup --key-file`) and only the first keyfile is
+  /// used.
   Future<bool> createContainer({
     required String displayName,
     required int sizeBytes,
     required String password,
     required int pim,
     required String fileSystem,
+    int containerFormat = 0,
     int? cipherId,
     int? hashId,
+    List<String>? keyfilePaths,
   }) async {
     final bool? success = await _channel
         .invokeMethod<bool>(ChannelMethods.createContainer, {
@@ -270,8 +281,11 @@ class VaultExplorerApi {
           'password': password,
           'pim': pim,
           'fileSystem': fileSystem,
+          'containerFormat': containerFormat,
           'cipherId': cipherId ?? 255,
           'hashId': hashId ?? 255,
+          if (keyfilePaths != null && keyfilePaths.isNotEmpty)
+            'keyfilePaths': keyfilePaths,
         });
     return success ?? false;
   }

@@ -54,6 +54,18 @@ class HashAlgo {
 
   static const List<HashAlgo> withAuto = [auto, ...concrete];
 
+  /// LUKS1 keyslot KDF is always PBKDF2 (no Argon2 support in the LUKS1
+  /// spec). SHA-256 matches modern cryptsetup's own default (`--hash
+  /// sha256`); SHA-512 is offered as a stronger alternative. Whirlpool/
+  /// Streebog/BLAKE2s aren't real `cryptsetup --hash` options, so they're
+  /// excluded here even though they're valid for VeraCrypt.
+  static const List<HashAlgo> luks1Choices = [sha256, sha512];
+
+  /// LUKS2 additionally supports Argon2id — real cryptsetup's own default
+  /// keyslot KDF (`luksFormat --type luks2` defaults to `--pbkdf argon2id`).
+  /// SHA-256/512 remain available as PBKDF2 choices.
+  static const List<HashAlgo> luks2Choices = [sha256, sha512, argon2id];
+
   static String nameFor(int id) {
     for (final h in withAuto) {
       if (h.id == id) return h.label;
@@ -120,6 +132,21 @@ class CipherAlgo {
 
   static const List<CipherAlgo> withAuto = [auto, ...concrete];
 
+  /// LUKS2 data-cipher choices — aes-xts-plain64/serpent-xts-plain64/
+  /// twofish-xts-plain64 are all real `cryptsetup luksFormat --cipher`
+  /// options with a single (non-cascaded) block cipher. Cascades
+  /// (Camellia/Kuznyechik/multi-layer combos) aren't valid LUKS ciphers, so
+  /// they're excluded here even though they're valid for VeraCrypt.
+  static const List<CipherAlgo> luks2Choices = [aes, serpent, twofish];
+
+  /// LUKS1 creation only ever offers AES: this app's own LUKS1 unlock path
+  /// always decrypts the keyslot with AES-CBC regardless of the header's
+  /// declared cipher (see luksCreateHeader()'s doc comment in
+  /// luks_header.h), so creating a LUKS1 container with a different data
+  /// cipher here would make it unopenable by this app again afterward —
+  /// real cryptsetup would still open it fine, just not this app.
+  static const List<CipherAlgo> luks1Choices = [aes];
+
   static String nameFor(int id) {
     for (final c in withAuto) {
       if (c.id == id) return c.label;
@@ -133,4 +160,19 @@ class CipherAlgo {
         .map((c) => DropdownMenuItem(value: c.id, child: Text(c.label)))
         .toList();
   }
+}
+
+/// Container format chosen at CREATION time. Numeric values match
+/// container_format.h / ContainerEngine.ContainerFormat.fromNative() in
+/// Kotlin so they can be sent directly as the native `containerFormat`
+/// creation parameter — independent of the (already-mounted) [ContainerFormat]
+/// wire strings used elsewhere ("veracrypt"/"luks1"/"luks2").
+enum CreateFormat {
+  veracrypt(0, 'VeraCrypt'),
+  luks1(1, 'LUKS1'),
+  luks2(2, 'LUKS2');
+
+  final int id;
+  final String label;
+  const CreateFormat(this.id, this.label);
 }

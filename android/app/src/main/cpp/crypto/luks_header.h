@@ -107,3 +107,69 @@ bool luksRecoverMasterKey(int fd,
                           std::function<void(int, int, int, int)> progressCallback = nullptr,
                           const uint8_t* candidateMasterKey = nullptr,
                           size_t candidateMasterKeyLen = 0);
+
+// ── Container creation ──────────────────────────────────────────────────
+
+// Parameters describing how to format a brand-new LUKS1 or LUKS2 container.
+// Kept as plain strings/ints (mirroring LuksVolumeInfo's own style) so this
+// header stays independent of the app's CascadeId/HashId enums — callers
+// (container_create.cpp) translate those into the fields below.
+struct LuksCreateParams {
+    int version = 2;                // 1 or 2
+
+    // "aes" | "serpent" | "twofish". LUKS1 creation only accepts "aes" —
+    // see luksCreateHeader()'s doc comment for why.
+    std::string cipherName;
+
+    // Keyslot PBKDF2 hash ("sha256" | "sha512"), and — for LUKS2 — also
+    // the digest hash. Ignored for the keyslot KDF itself when
+    // useArgon2id is true (LUKS2 only), but always used for the digest.
+    std::string hashName = "sha256";
+
+    // LUKS2 only. When true, the keyslot uses Argon2id instead of PBKDF2
+    // and pbkdf2Iterations is ignored for the keyslot (the digest is
+    // still always PBKDF2, per real cryptsetup behavior).
+    bool useArgon2id = false;
+    uint32_t argon2MemoryKiB = 0;
+    uint32_t argon2TimeCost = 0;
+    uint32_t argon2Parallelism = 0;
+
+    // Keyslot PBKDF2 iteration count. Used directly for LUKS1, and for
+    // LUKS2 whenever useArgon2id is false.
+    uint32_t pbkdf2Iterations = 0;
+};
+
+// Writes a fresh LUKS1 or LUKS2 header, JSON metadata (LUKS2 only), and a
+// single occupied keyslot to [fd] — encrypting a freshly-generated random
+// master key with [password] (already resolved: for LUKS, a keyfile
+// REPLACES the typed password rather than mixing with it, matching real
+// `cryptsetup --key-file`, so callers must have already made that
+// substitution before calling this). [sizeBytes] is the container's total
+// size; the resulting data-area offset/length are reported back via
+// [outInfo] so the caller can zero-fill the data area and format a
+// filesystem exactly as it would after a real unlock — [outInfo] is filled
+// with the same fields luksRecoverMasterKey() populates on a subsequent
+// unlock (cipherName/cipherMode/keyBytes/dataOffsetBytes/dataSectorSize/
+// ivTweak(always 0 for a fresh format)/masterKey), so no re-derivation is
+// needed after this call.
+//
+// LUKS1 creation only accepts cipherName "aes": this app's own LUKS1
+// unlock path (luks1Unlock, see luks_header.cpp) always decrypts the
+// keyslot's AF area with AES-CBC regardless of the header's declared
+// cipher — matching the historical LUKS1 convention of reusing the data
+// cipher for the keyslot too, which real cryptsetup does NOT hardcode to
+// AES. Creating a LUKS1 container with a different data cipher here would
+// therefore produce a container this app could never unlock again itself
+// (real cryptsetup would still open it fine, using its declared cipher
+// for the keyslot). LUKS2 has no such restriction: its keyslot area is
+// (both in this app's unlock path and in real cryptsetup's own default
+// behavior) always AES-XTS regardless of the segment's data cipher, so
+// "serpent"/"twofish" are safe choices there.
+//
+// Does not touch [fd] beyond writing the header/keyslot/JSON region —
+// truncating/expanding the file to [sizeBytes], zero-filling the data
+// area, and formatting a filesystem on top remain the caller's job (see
+// createLuksContainer() in container_create.cpp).
+bool luksCreateHeader(int fd, const uint8_t* password, size_t passwordLen,
+                      int64_t sizeBytes, const LuksCreateParams& params,
+                      LuksVolumeInfo& outInfo);

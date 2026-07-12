@@ -15,5 +15,46 @@
 // session_prepare.h.
 //
 // cipherId/hashId: 255 = auto, which defaults to AES + SHA-512.
+//
+// keyfileFds/keyfileCount: same detach/ownership contract as elsewhere —
+// every fd is closed exactly once (success or failure), either by
+// applyKeyfilesToPassword() or by this function directly if it never gets
+// that far. Keyfiles are mixed ADDITIVELY into the password (same as
+// VeraCrypt's unlock-side behavior in prepareSession), including allowing
+// an empty typed password when keyfiles alone are supplied — matching
+// real VeraCrypt, which also allows a keyfile-only volume.
 bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
-                     const char* fileSystem, int cipherId, int hashId);
+                     const char* fileSystem, int cipherId, int hashId,
+                     const int* keyfileFds = nullptr, int keyfileCount = 0);
+
+// Creates a new LUKS1 or LUKS2 container at [fd]: generates a random
+// master key, writes a fresh header + single occupied keyslot (see
+// luksCreateHeader() in crypto/luks_header.h for the on-disk format
+// details and the LUKS1-is-AES-only restriction), zero-fills the data
+// area, then formats an ext2/ext3/ext4 filesystem on top — LUKS containers
+// are restricted to the ext family since that's the realistic pairing for
+// a container the user intends to also mount on Linux.
+//
+// [luksVersion]: 1 or 2.
+//
+// cipherId/hashId: unlike VeraCrypt's 255-means-auto convention, these
+// must both be concrete (non-255) here — container creation always knows
+// exactly which algorithm it's using, there is no auto-detect at creation
+// time. cipherId is restricted to AES(0)/Serpent(1)/Twofish(2); for
+// luksVersion==1, only AES(0) is accepted (see luksCreateHeader()'s doc
+// comment for why). hashId is restricted to SHA-512(0)/SHA-256(1)/
+// Argon2id(5) — Argon2id is only valid for luksVersion==2, since LUKS1 has
+// no Argon2 support in the real spec.
+//
+// keyfileFds/keyfileCount: matches real `cryptsetup --key-file` semantics
+// (also documented on prepareLuksSession in session_prepare.cpp) — when
+// present, the first keyfile's raw bytes REPLACE the typed password
+// entirely rather than mixing with it, and only the first keyfile is
+// used.
+//
+// Always takes ownership of [fd] (closed before returning, regardless of
+// outcome) and of every fd in [keyfileFds], matching the ownership
+// convention used throughout this codebase.
+bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeBytes,
+                         const char* fileSystem, int luksVersion, int cipherId, int hashId,
+                         const int* keyfileFds = nullptr, int keyfileCount = 0);

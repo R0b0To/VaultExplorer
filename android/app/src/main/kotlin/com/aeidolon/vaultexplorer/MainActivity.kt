@@ -182,7 +182,9 @@ class MainActivity : FlutterFragmentActivity() {
     private data class PendingCreate(
         val name: String, val sizeBytes: Long, val password: String,
         val pim: Int, val fileSystem: String,
+        val containerFormat: Int = 0,
         val cipherId: Int = 255, val hashId: Int = 255,
+        val keyfilePaths: List<String>? = null,
     )
     private var pendingCreate: PendingCreate? = null
 
@@ -199,12 +201,13 @@ class MainActivity : FlutterFragmentActivity() {
             val destUri = data.data!!
             ioExecutor.execute {
                 try {
+                    val keyfileFds = openKeyfileFds(create.keyfilePaths)
                     val pfd = contentResolver.openFileDescriptor(destUri, "rw")
                         ?: throw Exception("Could not open file descriptor")
                     val success = synchronized(createContainerLock) {
                         ContainerEngine.create(
                             pfd.detachFd(), create.password, create.pim, create.sizeBytes, create.fileSystem,
-                            create.cipherId, create.hashId
+                            create.containerFormat, create.cipherId, create.hashId, keyfileFds
                         )
                     }
                     runOnUiThread { res.success(success) }
@@ -354,9 +357,9 @@ class MainActivity : FlutterFragmentActivity() {
             ioExecutor.execute {
                 try {
                     val tempFile = File(cacheDir, "export_temp")
-                    val success = ContainerFileSystem.extractToFile(pending.volId, pending.sourcePath, tempFile.absolutePath)
+                    val ok = ContainerFileSystem.extractToFile(pending.volId, pending.sourcePath, tempFile.absolutePath)
                     
-                    if (success && tempFile.exists()) {
+                    if (ok && tempFile.exists()) {
                         contentResolver.openOutputStream(destUri)?.use { out ->
                             tempFile.inputStream().use { it.copyTo(out) }
                         }
@@ -928,23 +931,23 @@ class MainActivity : FlutterFragmentActivity() {
 
                     ChannelMethods.CREATE_CONTAINER -> {
                         val name = call.argument<String>("displayName") ?: "vault.hc"
-                        val password = call.argument<String>("password")
-                        if (password == null) {
-                            result.error("INVALID_ARGS", "password required", null)
+                        val password = call.argument<String>("password") ?: ""
+                        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+                        if (password.isEmpty() && keyfilePaths.isNullOrEmpty()) {
+                            result.error("INVALID_ARGS", "password or keyfiles required", null)
                             return@setMethodCallHandler
                         }
 
                         pendingCreate = PendingCreate(
                             name        = name,
                             sizeBytes   = call.argument<Number>("sizeBytes")?.toLong() ?: 0L,
-                            password    = password ?: run {
-                                result.error("INVALID_ARGS", "password required", null)
-                                return@setMethodCallHandler
-                            },
+                            password    = password,
                             pim         = call.argument<Number>("pim")?.toInt() ?: 0,
                             fileSystem  = call.argument<String>("fileSystem") ?: "fat",
+                            containerFormat = call.argument<Number>("containerFormat")?.toInt() ?: 0,
                             cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255,
                             hashId      = call.argument<Number>("hashId")?.toInt() ?: 255,
+                            keyfilePaths = keyfilePaths,
                         )
                         pendingResultCheck(result)
                         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {

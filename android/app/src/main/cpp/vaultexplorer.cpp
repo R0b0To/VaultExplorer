@@ -747,13 +747,25 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
-        jint cipherId, jint hashId) {
+        jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds) {
 
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const char* nativeFS   = env->GetStringUTFChars(fileSystem, nullptr);
 
-    const bool success = createContainer(fd, nativePass, pim, static_cast<int64_t>(sizeBytes),
-                                         nativeFS, cipherId, hashId);
+    bool success;
+    if (containerFormat == 1 || containerFormat == 2) {
+        // 1 = LUKS1, 2 = LUKS2 — see ContainerFormat (container_format.h).
+        success = createLuksContainer(fd, nativePass, pim, static_cast<int64_t>(sizeBytes),
+                                      nativeFS, containerFormat, cipherId, hashId,
+                                      kfFds.empty() ? nullptr : kfFds.data(),
+                                      static_cast<int>(kfFds.size()));
+    } else {
+        success = createContainer(fd, nativePass, pim, static_cast<int64_t>(sizeBytes),
+                                  nativeFS, cipherId, hashId,
+                                  kfFds.empty() ? nullptr : kfFds.data(),
+                                  static_cast<int>(kfFds.size()));
+    }
 
     env->ReleaseStringUTFChars(password, nativePass);
     env->ReleaseStringUTFChars(fileSystem, nativeFS);

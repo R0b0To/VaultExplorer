@@ -19,13 +19,45 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
   final _passwordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
 
+  static const _veraCryptFileSystems = ['FAT', 'exFAT', 'NTFS', 'ext2', 'ext3', 'ext4'];
+  // LUKS containers are restricted to the ext family — the realistic
+  // pairing for a container the user also intends to mount on Linux.
+  static const _luksFileSystems = ['ext2', 'ext3', 'ext4'];
+
   String _sizeUnit = 'MB';
+  CreateFormat _format = CreateFormat.veracrypt;
   String _fileSystem = 'FAT';
   int _cipherId = 0; // AES
   int _hashId = 0; // SHA-512
   bool _obscure = true;
   bool _loading = false;
   String? _error;
+
+  List<KeyfileRef> _keyfiles = [];
+  bool _pickingKeyfiles = false;
+
+  List<String> get _availableFileSystems =>
+      _format == CreateFormat.veracrypt ? _veraCryptFileSystems : _luksFileSystems;
+
+  List<CipherAlgo> get _cipherChoices => switch (_format) {
+        CreateFormat.veracrypt => CipherAlgo.concrete,
+        CreateFormat.luks1 => CipherAlgo.luks1Choices,
+        CreateFormat.luks2 => CipherAlgo.luks2Choices,
+      };
+
+  List<HashAlgo> get _hashChoices => switch (_format) {
+        CreateFormat.veracrypt => HashAlgo.concrete,
+        CreateFormat.luks1 => HashAlgo.luks1Choices,
+        CreateFormat.luks2 => HashAlgo.luks2Choices,
+      };
+
+  List<DropdownMenuItem<int>> get _cipherItems => _cipherChoices
+      .map((c) => DropdownMenuItem(value: c.id, child: Text(c.label)))
+      .toList();
+
+  List<DropdownMenuItem<int>> get _hashItems => _hashChoices
+      .map((h) => DropdownMenuItem(value: h.id, child: Text(h.label)))
+      .toList();
 
   @override
   void dispose() {
@@ -34,6 +66,43 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     _passwordCtrl.dispose();
     _pimCtrl.dispose();
     super.dispose();
+  }
+
+  void _onFormatChanged(CreateFormat format) {
+    setState(() {
+      _format = format;
+      if (!_availableFileSystems.contains(_fileSystem)) {
+        _fileSystem = _availableFileSystems.first;
+      }
+      if (!_cipherChoices.any((c) => c.id == _cipherId)) {
+        _cipherId = _cipherChoices.first.id;
+      }
+      if (!_hashChoices.any((h) => h.id == _hashId)) {
+        _hashId = _hashChoices.first.id;
+      }
+    });
+  }
+
+  Future<void> _pickKeyfiles() async {
+    setState(() => _pickingKeyfiles = true);
+    try {
+      final picked = await vaultExplorerApi.pickKeyfiles();
+      if (picked.isNotEmpty) {
+        setState(() {
+          for (final k in picked) {
+            if (!_keyfiles.any((existing) => existing.uri == k.uri)) {
+              _keyfiles.add(k);
+            }
+          }
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _pickingKeyfiles = false);
+    }
+  }
+
+  void _removeKeyfile(KeyfileRef keyfile) {
+    setState(() => _keyfiles.remove(keyfile));
   }
 
   Future<void> _create() async {
@@ -46,8 +115,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
       setState(() => _error = 'Enter a valid size greater than 0');
       return;
     }
-    if (_passwordCtrl.text.isEmpty) {
-      setState(() => _error = 'Password is required');
+    if (_passwordCtrl.text.isEmpty && _keyfiles.isEmpty) {
+      setState(() => _error = 'A password or at least one keyfile is required');
       return;
     }
 
@@ -70,8 +139,10 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
         password: _passwordCtrl.text,
         pim: pim,
         fileSystem: _fileSystem.toLowerCase(),
+        containerFormat: _format.id,
         cipherId: _cipherId,
         hashId: _hashId,
+        keyfilePaths: _keyfiles.map((k) => k.uri).toList(),
       );
 
       if (success) {
@@ -120,12 +191,41 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     );
   }
 
+  Widget _buildFormatSelector(ColorScheme cs) {
+    return DropdownButtonFormField<CreateFormat>(
+      initialValue: _format,
+      decoration: _getInputDecoration(
+        cs,
+        labelText: 'Container Format',
+        prefixIcon: Icons.dns_outlined,
+      ),
+      items: CreateFormat.values
+          .map((f) => DropdownMenuItem(value: f, child: Text(f.label)))
+          .toList(),
+      onChanged: (val) {
+        if (val != null) _onFormatChanged(val);
+      },
+    );
+  }
+
+  Widget _buildKeyfilesPicker() {
+    return KeyfilesPicker(
+      keyfiles: _keyfiles,
+      picking: _pickingKeyfiles,
+      onPick: _pickKeyfiles,
+      onRemove: _removeKeyfile,
+      enabled: !_loading,
+    );
+  }
+
   Widget _buildAdvancedTile(BuildContext context) {
     return AdvancedParamsPanel(
       pimController: _pimCtrl,
       cipherId: _cipherId,
       hashId: _hashId,
       includeAuto: false,
+      cipherItems: _cipherItems,
+      hashItems: _hashItems,
       onCipherChanged: (val) => setState(() => _cipherId = val),
       onHashChanged: (val) => setState(() => _hashId = val),
       extraFields: [
@@ -135,14 +235,9 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
             labelText: 'Format File System',
             prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
           ),
-          items: const [
-            DropdownMenuItem(value: 'FAT', child: Text('FAT (FAT32)')),
-            DropdownMenuItem(value: 'exFAT', child: Text('exFAT')),
-            DropdownMenuItem(value: 'NTFS', child: Text('NTFS')),
-            DropdownMenuItem(value: 'ext2', child: Text('ext2')),
-            DropdownMenuItem(value: 'ext3', child: Text('ext3')),
-            DropdownMenuItem(value: 'ext4', child: Text('ext4')),
-          ],
+          items: _availableFileSystems
+              .map((fs) => DropdownMenuItem(value: fs, child: Text(fs)))
+              .toList(),
           onChanged: (val) {
             if (val != null) setState(() => _fileSystem = val);
           },
@@ -159,7 +254,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create VeraCrypt Container'),
+        title: const Text('Create Encrypted Container'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -174,6 +269,9 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            _buildFormatSelector(cs),
+                            const SizedBox(height: 16),
+
                             // File name
                             TextField(
                               controller: _nameCtrl,
@@ -241,6 +339,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                                 ),
                               ),
                             ),
+                            const SizedBox(height: 16),
+                            _buildKeyfilesPicker(),
                           ],
                         ),
                       ),
@@ -283,6 +383,9 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      _buildFormatSelector(cs),
+                      const SizedBox(height: 16),
+
                       // File name
                       TextField(
                         controller: _nameCtrl,
@@ -350,6 +453,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      _buildKeyfilesPicker(),
                       const SizedBox(height: 16),
 
                       _buildAdvancedTile(context),

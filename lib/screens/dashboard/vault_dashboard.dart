@@ -695,7 +695,7 @@ class _VaultDashboardState extends State<VaultDashboard>
       onPointerDown: (_) => _lockController.scheduleAutoLock(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('vaultexplorer'),
+          title: const Text('Vault Explorer'),
           actions: [
             IconButton(
               icon: const Icon(Icons.settings_rounded),

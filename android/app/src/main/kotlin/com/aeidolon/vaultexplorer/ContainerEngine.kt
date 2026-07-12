@@ -34,9 +34,16 @@ object ContainerEngine {
         partitionOffsetHint, keyfileFds
     )
 
-    fun create(fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
-               cipherId: Int = 255, hashId: Int = 255): Boolean =
-        VeraCryptEngine.createContainerNative(fd, password, pim, sizeBytes, fileSystem, cipherId, hashId)
+    /** containerFormat: 0 = VeraCrypt, 1 = LUKS1, 2 = LUKS2. See
+     *  createContainerNative's doc comment in [VeraCryptEngine] for the
+     *  cipherId/hashId/keyfileFds semantics, which differ by format. */
+    fun create(
+        fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
+        containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
+        keyfileFds: IntArray? = null,
+    ): Boolean = VeraCryptEngine.createContainerNative(
+        fd, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId, keyfileFds
+    )
 
     fun lock(volId: Int) = VeraCryptEngine.lockNative(volId)
     fun requestUnlockCancellation(volId: Int) = VeraCryptEngine.requestCancelUnlockNative(volId)

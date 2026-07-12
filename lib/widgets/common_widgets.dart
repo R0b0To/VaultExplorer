@@ -643,6 +643,14 @@ class AdvancedParamsPanel extends StatelessWidget {
   /// inside this same panel instead of needing its own separate one.
   final List<Widget> extraFields;
 
+  /// Optional overrides for the cipher/hash dropdown item lists. Defaults
+  /// to the full `CipherAlgo`/`HashAlgo` catalog (via [includeAuto]) when
+  /// null — pass a filtered list (e.g. `CipherAlgo.luks2Choices`) for
+  /// callers that need to restrict the choices to a container-format
+  /// specific subset, without affecting any other call site.
+  final List<DropdownMenuItem<int>>? cipherItems;
+  final List<DropdownMenuItem<int>>? hashItems;
+
   const AdvancedParamsPanel({
     super.key,
     this.pimController,
@@ -654,6 +662,8 @@ class AdvancedParamsPanel extends StatelessWidget {
     this.subtitle,
     this.includeAuto = true,
     this.extraFields = const [],
+    this.cipherItems,
+    this.hashItems,
   });
 
   @override
@@ -706,7 +716,7 @@ class AdvancedParamsPanel extends StatelessWidget {
               labelText: 'Encryption Algorithm',
               prefixIcon: Icon(Icons.security_rounded, size: AppIconSize.small),
             ),
-            items: CipherAlgo.dropdownItems(includeAuto: includeAuto),
+            items: cipherItems ?? CipherAlgo.dropdownItems(includeAuto: includeAuto),
             onChanged: enabled
                 ? (val) {
                     if (val != null) onCipherChanged(val);
@@ -720,7 +730,7 @@ class AdvancedParamsPanel extends StatelessWidget {
               labelText: 'Hash Algorithm',
               prefixIcon: Icon(Icons.tag_rounded, size: AppIconSize.small),
             ),
-            items: HashAlgo.dropdownItems(includeAuto: includeAuto),
+            items: hashItems ?? HashAlgo.dropdownItems(includeAuto: includeAuto),
             onChanged: enabled
                 ? (val) {
                     if (val != null) onHashChanged(val);

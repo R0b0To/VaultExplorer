@@ -16,6 +16,9 @@
 #include "mbedtls/aes.h"
 #include "mbedtls/platform_util.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 const uint8_t LUKS_MAGIC[6] = {'L', 'U', 'K', 'S', 0xBA, 0xBE};
@@ -768,5 +771,538 @@ bool luksRecoverMasterKey(int fd,
     }
 
     LOGI("luksRecoverMasterKey: unknown LUKS version %u", version);
+    return false;
+}
+
+// ── Container creation ──────────────────────────────────────────────────
+
+// ── Small helpers shared by both LUKS1 and LUKS2 creation ──────────────
+
+static bool randomBytes(uint8_t* buf, size_t len) {
+    FILE* urnd = fopen("/dev/urandom", "rb");
+    if (!urnd) return false;
+    bool ok = (fread(buf, 1, len, urnd) == len);
+    fclose(urnd);
+    return ok;
+}
+
+static std::string generateUuidV4() {
+    uint8_t raw[16] = {0};
+    randomBytes(raw, sizeof(raw));
+    raw[6] = (raw[6] & 0x0F) | 0x40; // version 4
+    raw[8] = (raw[8] & 0x3F) | 0x80; // variant 10xx
+    char buf[37];
+    std::snprintf(buf, sizeof(buf),
+        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+        raw[0], raw[1], raw[2], raw[3], raw[4], raw[5], raw[6], raw[7],
+        raw[8], raw[9], raw[10], raw[11], raw[12], raw[13], raw[14], raw[15]);
+    return std::string(buf);
+}
+
+static std::string base64Encode(const uint8_t* data, size_t len) {
+    size_t olen = 0;
+    mbedtls_base64_encode(nullptr, 0, &olen, data, len);
+    std::string out(olen, '\0');
+    size_t actual = 0;
+    if (mbedtls_base64_encode(reinterpret_cast<unsigned char*>(&out[0]), out.size(), &actual, data, len) != 0) {
+        return std::string();
+    }
+    out.resize(actual);
+    return out;
+}
+
+static void writeBE16(uint8_t* p, uint16_t v) {
+    p[0] = (v >> 8) & 0xFF; p[1] = v & 0xFF;
+}
+static void writeBE32(uint8_t* p, uint32_t v) {
+    p[0] = (v >> 24) & 0xFF; p[1] = (v >> 16) & 0xFF; p[2] = (v >> 8) & 0xFF; p[3] = v & 0xFF;
+}
+static void writeBE64(uint8_t* p, uint64_t v) {
+    for (int i = 0; i < 8; i++) p[i] = (v >> (56 - i * 8)) & 0xFF;
+}
+
+// Anti-forensic split — the inverse of afMerge() above. Fills the
+// stripes*keySize-byte output with stripes-1 random blocks followed by a
+// final block chosen so that afMerge(afSplit(masterKey)) == masterKey:
+// afMerge folds src[0..stripes-2] through the same running
+// XOR-then-diffuse "block" accumulator computed here, so setting
+// dst[stripes-1] = masterKey XOR block reproduces masterKey exactly once
+// merged back.
+static int afSplit(mbedtls_md_type_t mdType, size_t keySize, uint32_t stripes,
+                   const uint8_t* masterKey, uint8_t* dst) {
+    if (stripes == 0) return -1;
+    std::unique_ptr<uint8_t[]> block(new uint8_t[keySize]());
+
+    if (stripes > 1) {
+        const size_t randLen = (size_t)(stripes - 1) * keySize;
+        if (!randomBytes(dst, randLen)) return -1;
+        for (uint32_t i = 0; i < stripes - 1; i++) {
+            afXor(keySize, dst + (size_t)i * keySize, block.get(), block.get());
+            if (afDiffuse(mdType, keySize, block.get()) < 0) return -1;
+        }
+    }
+    afXor(keySize, masterKey, block.get(), dst + (size_t)(stripes - 1) * keySize);
+    mbedtls_platform_zeroize(block.get(), keySize);
+    return 0;
+}
+
+// Real cryptsetup's LUKS1 default: 4000 AF stripes, keyslots 4096-byte
+// aligned, integrity-check-only master-key-digest iteration count (not
+// security critical — see luks2CreateHeader()'s digest comment below for
+// why a fixed, modest count is fine here).
+static constexpr uint32_t kLuks1Stripes = 4000;
+static constexpr uint64_t kLuks1AlignBytes = 4096;
+static constexpr uint64_t kLuks1PayloadAlign = 1024 * 1024;
+static constexpr uint32_t kLuks1MkDigestIter = 100000;
+static constexpr uint64_t kLuksMinExtraSpace = 300 * 1024; // headroom for a usable ext2/3/4 fs
+
+static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLen,
+                              int64_t sizeBytes, const LuksCreateParams& params,
+                              LuksVolumeInfo& outInfo) {
+    if (params.cipherName != "aes") {
+        LOGI("luks1CreateHeader: LUKS1 creation only supports the aes cipher");
+        return false;
+    }
+    mbedtls_md_type_t mdType = mapHashSpec(params.hashName);
+    if (mdType == MBEDTLS_MD_NONE) {
+        LOGI("luks1CreateHeader: unsupported hash %s", params.hashName.c_str());
+        return false;
+    }
+
+    constexpr uint32_t keyBytes = 64; // aes-xts-plain64, 512-bit key (32B data + 32B tweak)
+    const uint64_t slot0Offset = kLuks1AlignBytes; // 8 sectors in
+    const uint64_t afMaterialLen = (uint64_t)keyBytes * kLuks1Stripes; // 256000 bytes, 500 sectors
+    uint64_t payloadOffsetBytes = slot0Offset + afMaterialLen;
+    payloadOffsetBytes = ((payloadOffsetBytes + kLuks1PayloadAlign - 1) / kLuks1PayloadAlign) * kLuks1PayloadAlign;
+
+    if (sizeBytes <= 0 || (uint64_t)sizeBytes <= payloadOffsetBytes + kLuksMinExtraSpace) {
+        LOGI("luks1CreateHeader: sizeBytes too small for header+keyslot+filesystem");
+        return false;
+    }
+
+    uint8_t masterKey[keyBytes];
+    uint8_t mkDigestSalt[32];
+    uint8_t keyslotSalt[32];
+    if (!randomBytes(masterKey, sizeof(masterKey)) ||
+        !randomBytes(mkDigestSalt, sizeof(mkDigestSalt)) ||
+        !randomBytes(keyslotSalt, sizeof(keyslotSalt))) {
+        LOGI("luks1CreateHeader: urandom read failed");
+        return false;
+    }
+
+    uint8_t mkDigest[20];
+    if (!luksDeriveKeyslotKey(mdType, masterKey, keyBytes, mkDigestSalt, sizeof(mkDigestSalt),
+                              kLuks1MkDigestIter, mkDigest, sizeof(mkDigest))) {
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        return false;
+    }
+
+    // Keyslot PBKDF2 iteration count is the security-critical one (what an
+    // attacker has to redo per password guess) — always caller-supplied,
+    // see the argon2ParamsForPim()/iterationsForHash() callers in
+    // container_create.cpp's createLuksContainer().
+    std::vector<uint8_t> slotKey(keyBytes);
+    if (!luksDeriveKeyslotKey(mdType, password, passwordLen, keyslotSalt, sizeof(keyslotSalt),
+                              params.pbkdf2Iterations, slotKey.data(), slotKey.size())) {
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        return false;
+    }
+
+    std::vector<uint8_t> afMaterial(afMaterialLen);
+    if (afSplit(mdType, keyBytes, kLuks1Stripes, masterKey, afMaterial.data()) != 0) {
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
+        return false;
+    }
+
+    // LUKS1 keyslot AF material is always AES-CBC-plain(IV=0), regardless
+    // of the header's declared cipher — see luksCreateHeader()'s doc
+    // comment for why this app restricts LUKS1 creation to cipherName
+    // "aes" so this always matches what luks1Unlock() will later decrypt.
+    std::vector<uint8_t> afEncrypted(afMaterialLen);
+    {
+        mbedtls_aes_context aesCtx;
+        mbedtls_aes_init(&aesCtx);
+        bool keyOk = (mbedtls_aes_setkey_enc(&aesCtx, slotKey.data(), keyBytes * 8) == 0);
+        uint8_t iv[16] = {0};
+        bool cryptOk = keyOk && (mbedtls_aes_crypt_cbc(&aesCtx, MBEDTLS_AES_ENCRYPT, afMaterialLen,
+                                                        iv, afMaterial.data(), afEncrypted.data()) == 0);
+        mbedtls_aes_free(&aesCtx);
+        mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
+        mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+        if (!cryptOk) {
+            LOGI("luks1CreateHeader: keyslot AF encryption failed");
+            mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+            return false;
+        }
+    }
+
+    if (pwrite(fd, afEncrypted.data(), afEncrypted.size(), (off_t)slot0Offset) != (ssize_t)afEncrypted.size()) {
+        LOGI("luks1CreateHeader: keyslot write failed");
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        return false;
+    }
+
+    Luks1Phdr phdr;
+    std::memset(&phdr, 0, sizeof(phdr));
+    std::memcpy(phdr.magic, LUKS_MAGIC, 6);
+    writeBE16((uint8_t*)&phdr.version, 1);
+    std::strncpy(phdr.cipherName, "aes", sizeof(phdr.cipherName) - 1);
+    std::strncpy(phdr.cipherMode, "xts-plain64", sizeof(phdr.cipherMode) - 1);
+    std::strncpy(phdr.hashSpec, params.hashName.c_str(), sizeof(phdr.hashSpec) - 1);
+    writeBE32((uint8_t*)&phdr.payloadOffset, (uint32_t)(payloadOffsetBytes / 512));
+    writeBE32((uint8_t*)&phdr.keyBytes, keyBytes);
+    std::memcpy(phdr.mkDigest, mkDigest, sizeof(mkDigest));
+    std::memcpy(phdr.mkDigestSalt, mkDigestSalt, sizeof(mkDigestSalt));
+    writeBE32((uint8_t*)&phdr.mkDigestIter, kLuks1MkDigestIter);
+    std::string uuid = generateUuidV4();
+    std::strncpy(phdr.uuid, uuid.c_str(), sizeof(phdr.uuid) - 1);
+
+    // Slot 0: active. Slots 1-7 stay zeroed — active==0 never matches the
+    // 0x00AC71F3 marker luks1Unlock() checks for, so they're just skipped
+    // (both by this app and by real cryptsetup).
+    writeBE32((uint8_t*)&phdr.keySlots[0].active, 0x00AC71F3);
+    writeBE32((uint8_t*)&phdr.keySlots[0].iterations, params.pbkdf2Iterations);
+    std::memcpy(phdr.keySlots[0].salt, keyslotSalt, sizeof(keyslotSalt));
+    writeBE32((uint8_t*)&phdr.keySlots[0].keyMaterialOffset, (uint32_t)(slot0Offset / 512));
+    writeBE32((uint8_t*)&phdr.keySlots[0].stripes, kLuks1Stripes);
+
+    if (pwrite(fd, &phdr, sizeof(phdr), 0) != (ssize_t)sizeof(phdr)) {
+        LOGI("luks1CreateHeader: phdr write failed");
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        return false;
+    }
+
+    outInfo.version = 1;
+    outInfo.cipherName = "aes";
+    outInfo.cipherMode = "xts-plain64";
+    outInfo.keyBytes = keyBytes;
+    outInfo.dataOffsetBytes = payloadOffsetBytes;
+    outInfo.dataSectorSize = 512;
+    outInfo.ivTweak = 0;
+    outInfo.masterKey.assign(masterKey, masterKey + keyBytes);
+    mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+    LOGI("luks1CreateHeader: created, dataOffset=%llu", (unsigned long long)payloadOffsetBytes);
+    return true;
+}
+
+// ── LUKS2 binary header (4096 bytes) — see the real cryptsetup on-disk
+// format spec. Multi-byte integer fields are written big-endian via the
+// writeBE* helpers directly into these raw byte buffers, mirroring how
+// Luks1Phdr's fields are read elsewhere in this file, rather than relying
+// on the struct's declared integer types (which would depend on host
+// endianness). ──
+#pragma pack(push, 1)
+struct Luks2HdrDisk {
+    char     magic[6];
+    uint16_t version;
+    uint64_t hdrSize;
+    uint64_t seqid;
+    char     label[48];
+    char     checksumAlg[32];
+    uint8_t  salt[64];
+    char     uuid[40];
+    char     subsystem[48];
+    uint64_t hdrOffset;
+    uint8_t  padding[184];
+    uint8_t  csum[64];
+    uint8_t  padding4096[7 * 512];
+};
+#pragma pack(pop)
+static_assert(sizeof(Luks2HdrDisk) == 4096, "Luks2HdrDisk must match the real 4096-byte LUKS2 binary header layout");
+
+static constexpr uint64_t kLuks2BinHdrSize = 4096;
+static constexpr uint64_t kLuks2HdrCopySize = 16384;                             // one header copy (bin + JSON)
+static constexpr uint64_t kLuks2JsonAreaSize = kLuks2HdrCopySize - kLuks2BinHdrSize; // 12288
+static constexpr uint64_t kLuks2HeadersTotal = 2 * kLuks2HdrCopySize;            // primary + secondary copy
+static constexpr uint32_t kLuks2AfStripes = 4000;
+static constexpr uint64_t kLuks2KeyslotAlign = 4096;
+static constexpr uint64_t kLuks2DataAlign = 1024 * 1024;
+static constexpr uint32_t kLuks2DigestIter = 100000; // integrity check only, not security critical
+
+static bool luks2CreateHeader(int fd, const uint8_t* password, size_t passwordLen,
+                              int64_t sizeBytes, const LuksCreateParams& params,
+                              LuksVolumeInfo& outInfo) {
+    if (params.cipherName != "aes" && params.cipherName != "serpent" && params.cipherName != "twofish") {
+        LOGI("luks2CreateHeader: unsupported cipher %s", params.cipherName.c_str());
+        return false;
+    }
+    mbedtls_md_type_t digestMd = mapHashSpec(params.hashName);
+    if (digestMd == MBEDTLS_MD_NONE) {
+        LOGI("luks2CreateHeader: unsupported hash %s", params.hashName.c_str());
+        return false;
+    }
+
+    constexpr uint32_t keyBytes = 64;           // *-xts-plain64, 512-bit key — all 3 supported ciphers
+    constexpr uint32_t keyslotAreaKeyBytes = 64; // keyslot area is always AES-XTS — see doc comment
+
+    const uint64_t keyslotAreaOffset = kLuks2HeadersTotal; // single keyslot, right after both header copies
+    const uint64_t afMaterialLen = (uint64_t)keyBytes * kLuks2AfStripes; // 256000 bytes, 500 sectors
+    const uint64_t afReservedLen = ((afMaterialLen + kLuks2KeyslotAlign - 1) / kLuks2KeyslotAlign) * kLuks2KeyslotAlign;
+    uint64_t dataOffsetBytes = keyslotAreaOffset + afReservedLen;
+    dataOffsetBytes = ((dataOffsetBytes + kLuks2DataAlign - 1) / kLuks2DataAlign) * kLuks2DataAlign;
+
+    if (sizeBytes <= 0 || (uint64_t)sizeBytes <= dataOffsetBytes + kLuksMinExtraSpace) {
+        LOGI("luks2CreateHeader: sizeBytes too small for header+keyslot+filesystem");
+        return false;
+    }
+
+    uint8_t masterKey[keyBytes];
+    uint8_t digestSalt[32];
+    uint8_t keyslotSalt[32];
+    if (!randomBytes(masterKey, sizeof(masterKey)) ||
+        !randomBytes(digestSalt, sizeof(digestSalt)) ||
+        !randomBytes(keyslotSalt, sizeof(keyslotSalt))) {
+        LOGI("luks2CreateHeader: urandom read failed");
+        return false;
+    }
+
+    // Digest: always PBKDF2 regardless of the keyslot's own KDF, matching
+    // real cryptsetup — it's a cheap integrity check of the master key
+    // (which is only ever reached AFTER the expensive keyslot KDF/AF
+    // recovery succeeds), not something worth memory-hardening itself.
+    size_t digestLen = getDigestSize(digestMd);
+    std::vector<uint8_t> digestBuf(digestLen);
+    if (!luksDeriveKeyslotKey(digestMd, masterKey, keyBytes, digestSalt, sizeof(digestSalt),
+                              kLuks2DigestIter, digestBuf.data(), digestBuf.size())) {
+        LOGI("luks2CreateHeader: digest derivation failed");
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        return false;
+    }
+
+    // Keyslot KDF → derive the key that encrypts the AF-split master key.
+    std::vector<uint8_t> slotKey(keyslotAreaKeyBytes);
+    bool kdfOk;
+    if (params.useArgon2id) {
+        kdfOk = argon2idDeriveKey(password, passwordLen, keyslotSalt, sizeof(keyslotSalt),
+                                  params.argon2MemoryKiB, params.argon2TimeCost, params.argon2Parallelism,
+                                  slotKey.data(), slotKey.size());
+    } else {
+        mbedtls_md_type_t keyslotMd = mapHashSpec(params.hashName);
+        kdfOk = luksDeriveKeyslotKey(keyslotMd, password, passwordLen, keyslotSalt, sizeof(keyslotSalt),
+                                     params.pbkdf2Iterations, slotKey.data(), slotKey.size());
+    }
+    if (!kdfOk) {
+        LOGI("luks2CreateHeader: keyslot KDF failed");
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        return false;
+    }
+
+    // AF stripe hash: reuse the digest's hash family — real cryptsetup
+    // ties these together too ("af": {"hash": <same as digest/kdf hash>}).
+    std::vector<uint8_t> afMaterial(afMaterialLen);
+    if (afSplit(digestMd, keyBytes, kLuks2AfStripes, masterKey, afMaterial.data()) != 0) {
+        LOGI("luks2CreateHeader: afSplit failed");
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
+        return false;
+    }
+
+    std::vector<uint8_t> afEncrypted(afMaterial.size());
+    {
+        mbedtls_aes_xts_context xtsCtx;
+        mbedtls_aes_xts_init(&xtsCtx);
+        bool ok = (mbedtls_aes_xts_setkey_enc(&xtsCtx, slotKey.data(), keyslotAreaKeyBytes * 8) == 0);
+        for (size_t sec = 0; ok && sec < afMaterial.size() / 512; sec++) {
+            uint8_t tweakBuf[16] = {0};
+            for (int b = 0; b < 8; b++) tweakBuf[b] = (sec >> (b * 8)) & 0xFF;
+            if (mbedtls_aes_crypt_xts(&xtsCtx, MBEDTLS_AES_ENCRYPT, 512, tweakBuf,
+                                      afMaterial.data() + sec * 512,
+                                      afEncrypted.data() + sec * 512) != 0) {
+                ok = false;
+            }
+        }
+        mbedtls_aes_xts_free(&xtsCtx);
+        mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
+        mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+        if (!ok) {
+            LOGI("luks2CreateHeader: keyslot area encryption failed");
+            mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+            return false;
+        }
+    }
+
+    if (pwrite(fd, afEncrypted.data(), afEncrypted.size(), (off_t)keyslotAreaOffset) != (ssize_t)afEncrypted.size()) {
+        LOGI("luks2CreateHeader: keyslot area write failed");
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        return false;
+    }
+
+    // ── Build JSON metadata ──────────────────────────────────────────
+    cJSON* root = cJSON_CreateObject();
+    cJSON* keyslots = cJSON_CreateObject();
+    cJSON* tokens = cJSON_CreateObject();
+    cJSON* segments = cJSON_CreateObject();
+    cJSON* digests = cJSON_CreateObject();
+    cJSON* config = cJSON_CreateObject();
+
+    {
+        cJSON* ks = cJSON_CreateObject();
+        cJSON_AddStringToObject(ks, "type", "luks2");
+        cJSON_AddNumberToObject(ks, "key_size", keyslotAreaKeyBytes);
+
+        cJSON* kdf = cJSON_CreateObject();
+        std::string keyslotSaltB64 = base64Encode(keyslotSalt, sizeof(keyslotSalt));
+        if (params.useArgon2id) {
+            cJSON_AddStringToObject(kdf, "type", "argon2id");
+            cJSON_AddNumberToObject(kdf, "time", params.argon2TimeCost);
+            cJSON_AddNumberToObject(kdf, "memory", params.argon2MemoryKiB);
+            cJSON_AddNumberToObject(kdf, "cpus", params.argon2Parallelism);
+        } else {
+            cJSON_AddStringToObject(kdf, "type", "pbkdf2");
+            cJSON_AddStringToObject(kdf, "hash", params.hashName.c_str());
+            cJSON_AddNumberToObject(kdf, "iterations", params.pbkdf2Iterations);
+        }
+        cJSON_AddStringToObject(kdf, "salt", keyslotSaltB64.c_str());
+        cJSON_AddItemToObject(ks, "kdf", kdf);
+
+        cJSON* af = cJSON_CreateObject();
+        cJSON_AddStringToObject(af, "type", "luks1"); // real cryptsetup's name for this AF-splitter scheme
+        cJSON_AddNumberToObject(af, "stripes", kLuks2AfStripes);
+        cJSON_AddStringToObject(af, "hash", params.hashName.c_str());
+        cJSON_AddItemToObject(ks, "af", af);
+
+        cJSON* area = cJSON_CreateObject();
+        cJSON_AddStringToObject(area, "type", "raw");
+        cJSON_AddStringToObject(area, "offset", std::to_string(keyslotAreaOffset).c_str());
+        cJSON_AddStringToObject(area, "size", std::to_string(afEncrypted.size()).c_str());
+        cJSON_AddStringToObject(area, "encryption", "aes-xts-plain64");
+        cJSON_AddNumberToObject(area, "key_size", keyslotAreaKeyBytes);
+        cJSON_AddItemToObject(ks, "area", area);
+
+        cJSON_AddItemToObject(keyslots, "0", ks);
+    }
+
+    {
+        cJSON* seg = cJSON_CreateObject();
+        cJSON_AddStringToObject(seg, "type", "crypt");
+        cJSON_AddStringToObject(seg, "offset", std::to_string(dataOffsetBytes).c_str());
+        cJSON_AddStringToObject(seg, "size", "dynamic");
+        cJSON_AddStringToObject(seg, "iv_tweak", "0");
+        std::string encName = params.cipherName + "-xts-plain64";
+        cJSON_AddStringToObject(seg, "encryption", encName.c_str());
+        cJSON_AddNumberToObject(seg, "sector_size", 512);
+        cJSON_AddItemToObject(segments, "0", seg);
+    }
+
+    {
+        cJSON* dg = cJSON_CreateObject();
+        cJSON_AddStringToObject(dg, "type", "pbkdf2");
+        cJSON* ksArr = cJSON_CreateArray();
+        cJSON_AddItemToArray(ksArr, cJSON_CreateString("0"));
+        cJSON_AddItemToObject(dg, "keyslots", ksArr);
+        cJSON* segArr = cJSON_CreateArray();
+        cJSON_AddItemToArray(segArr, cJSON_CreateString("0"));
+        cJSON_AddItemToObject(dg, "segments", segArr);
+        cJSON_AddStringToObject(dg, "hash", params.hashName.c_str());
+        cJSON_AddNumberToObject(dg, "iterations", kLuks2DigestIter);
+        cJSON_AddStringToObject(dg, "salt", base64Encode(digestSalt, sizeof(digestSalt)).c_str());
+        cJSON_AddStringToObject(dg, "digest", base64Encode(digestBuf.data(), digestBuf.size()).c_str());
+        cJSON_AddItemToObject(digests, "0", dg);
+    }
+
+    cJSON_AddStringToObject(config, "json_size", std::to_string(kLuks2JsonAreaSize).c_str());
+    cJSON_AddStringToObject(config, "keyslots_size",
+                            std::to_string(dataOffsetBytes - keyslotAreaOffset).c_str());
+
+    cJSON_AddItemToObject(root, "keyslots", keyslots);
+    cJSON_AddItemToObject(root, "tokens", tokens);
+    cJSON_AddItemToObject(root, "segments", segments);
+    cJSON_AddItemToObject(root, "digests", digests);
+    cJSON_AddItemToObject(root, "config", config);
+
+    char* jsonText = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!jsonText) {
+        LOGI("luks2CreateHeader: JSON serialization failed");
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        return false;
+    }
+    size_t jsonTextLen = std::strlen(jsonText);
+    if (jsonTextLen + 1 > kLuks2JsonAreaSize) {
+        LOGI("luks2CreateHeader: JSON too large for reserved area (%zu > %llu)",
+             jsonTextLen, (unsigned long long)kLuks2JsonAreaSize);
+        free(jsonText);
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        return false;
+    }
+    std::vector<uint8_t> jsonArea(kLuks2JsonAreaSize, 0);
+    std::memcpy(jsonArea.data(), jsonText, jsonTextLen);
+    free(jsonText);
+
+    std::string uuid = generateUuidV4();
+    auto buildBinHdr = [&](uint64_t hdrOffsetField) {
+        Luks2HdrDisk hdr;
+        std::memset(&hdr, 0, sizeof(hdr));
+        std::memcpy(hdr.magic, LUKS_MAGIC, 6);
+        writeBE16((uint8_t*)&hdr.version, 2);
+        writeBE64((uint8_t*)&hdr.hdrSize, kLuks2HdrCopySize);
+        writeBE64((uint8_t*)&hdr.seqid, 1);
+        std::strncpy(hdr.checksumAlg, "sha256", sizeof(hdr.checksumAlg) - 1);
+        randomBytes(hdr.salt, sizeof(hdr.salt));
+        std::strncpy(hdr.uuid, uuid.c_str(), sizeof(hdr.uuid) - 1);
+        writeBE64((uint8_t*)&hdr.hdrOffset, hdrOffsetField);
+        return hdr;
+    };
+
+    Luks2HdrDisk primaryHdr = buildBinHdr(0);
+    Luks2HdrDisk secondaryHdr = buildBinHdr(kLuks2HdrCopySize);
+
+    // Checksum covers the full header copy (binary header with csum
+    // zeroed, followed by the JSON area) — matches real cryptsetup so a
+    // Linux `cryptsetup luksDump`/mount will accept these headers.
+    auto computeChecksum = [&](Luks2HdrDisk& hdr, const std::vector<uint8_t>& json, uint8_t out[32]) {
+        std::memset(hdr.csum, 0, sizeof(hdr.csum));
+        mbedtls_md_context_t ctx;
+        mbedtls_md_init(&ctx);
+        const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+        mbedtls_md_setup(&ctx, info, 0);
+        mbedtls_md_starts(&ctx);
+        mbedtls_md_update(&ctx, reinterpret_cast<const uint8_t*>(&hdr), sizeof(hdr));
+        mbedtls_md_update(&ctx, json.data(), json.size());
+        mbedtls_md_finish(&ctx, out);
+        mbedtls_md_free(&ctx);
+    };
+
+    uint8_t csum1[32], csum2[32];
+    computeChecksum(primaryHdr, jsonArea, csum1);
+    computeChecksum(secondaryHdr, jsonArea, csum2);
+    std::memcpy(primaryHdr.csum, csum1, sizeof(csum1));
+    std::memcpy(secondaryHdr.csum, csum2, sizeof(csum2));
+
+    if (pwrite(fd, &primaryHdr, sizeof(primaryHdr), 0) != (ssize_t)sizeof(primaryHdr) ||
+        pwrite(fd, jsonArea.data(), jsonArea.size(), (off_t)kLuks2BinHdrSize) != (ssize_t)jsonArea.size() ||
+        pwrite(fd, &secondaryHdr, sizeof(secondaryHdr), (off_t)kLuks2HdrCopySize) != (ssize_t)sizeof(secondaryHdr) ||
+        pwrite(fd, jsonArea.data(), jsonArea.size(),
+               (off_t)(kLuks2HdrCopySize + kLuks2BinHdrSize)) != (ssize_t)jsonArea.size()) {
+        LOGI("luks2CreateHeader: header/JSON write failed");
+        mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+        return false;
+    }
+
+    outInfo.version = 2;
+    outInfo.cipherName = params.cipherName;
+    outInfo.cipherMode = "xts-plain64";
+    outInfo.keyBytes = keyBytes;
+    outInfo.dataOffsetBytes = dataOffsetBytes;
+    outInfo.dataSectorSize = 512;
+    outInfo.ivTweak = 0;
+    outInfo.masterKey.assign(masterKey, masterKey + keyBytes);
+    mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
+    LOGI("luks2CreateHeader: created, cipher=%s, dataOffset=%llu",
+         params.cipherName.c_str(), (unsigned long long)dataOffsetBytes);
+    return true;
+}
+
+bool luksCreateHeader(int fd, const uint8_t* password, size_t passwordLen,
+                      int64_t sizeBytes, const LuksCreateParams& params,
+                      LuksVolumeInfo& outInfo) {
+    if (fd < 0 || passwordLen == 0) return false;
+    if (params.version == 1) {
+        return luks1CreateHeader(fd, password, passwordLen, sizeBytes, params, outInfo);
+    } else if (params.version == 2) {
+        return luks2CreateHeader(fd, password, passwordLen, sizeBytes, params, outInfo);
+    }
+    LOGI("luksCreateHeader: unsupported version %d", params.version);
     return false;
 }

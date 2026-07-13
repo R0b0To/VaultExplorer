@@ -57,7 +57,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
     _initialFieldValues = {};
     for (final f in _fields) {
-      final val = f.value ?? '';
+      final val = f.value;
       _initialFieldValues[f.key] = val;
 
       final ctrl = TextEditingController(text: val);

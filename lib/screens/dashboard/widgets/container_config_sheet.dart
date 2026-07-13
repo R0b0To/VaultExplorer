@@ -10,7 +10,6 @@ import '../../../widgets/common_widgets.dart';
 import '../../lock/pattern_setup_sheet.dart';
 import '../../lock/pattern_lock_view.dart';
 import '../../../utils/validation_utils.dart';
-import '../../../models/crypto_algorithms.dart';
 
 class ContainerConfigScreen extends StatefulWidget {
   final String uri;

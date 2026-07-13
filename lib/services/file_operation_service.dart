@@ -345,93 +345,96 @@ class FileOperationService extends ChangeNotifier {
       final semaphore = _CopySemaphore(_maxConcurrentItems);
       final createdDestPaths = <String>[];
 
-      await Future.wait(
-        resolved.asMap().entries.map((entry) async {
-          final idx = entry.key;
-          final r = entry.value;
+      try {
+        await Future.wait(
+          resolved.asMap().entries.map((entry) async {
+            final idx = entry.key;
+            final r = entry.value;
 
-          await semaphore.acquire();
-          try {
-            if (op.cancelRequested) throw const _CancelledException();
+            await semaphore.acquire();
+            try {
+              if (op.cancelRequested) throw const _CancelledException();
 
-            if (r.skip) {
-              op._recordItemResult(idx, FileItemResult.skipped);
-              return;
-            }
-
-            op._setActivity(
-              '${op.isCut ? "Moving" : "Copying"} ${r.item.name}…',
-            );
-
-            bool ok = false;
-            if (op.isCut && src.volId == dest.volId) {
-              ok = await vaultExplorerApi.renameFile(
-                src,
-                r.item.path,
-                r.destPath,
-              );
-              if (!ok) {
-                op._recordItemResult(
-                  idx,
-                  FileItemResult.failed,
-                  errorMessage: 'Move failed',
-                );
-              } else {
-                op._recordItemResult(idx, FileItemResult.success);
+              if (r.skip) {
+                op._recordItemResult(idx, FileItemResult.skipped);
+                return;
               }
-            } else {
-              ok = await _copyEntry(
-                src,
-                dest,
-                r.item.path,
-                r.destPath,
-                r.item.isDir,
-                createdDestPaths,
-                op,
-                r.item.modifiedSecs,
+
+              op._setActivity(
+                '${op.isCut ? "Moving" : "Copying"} ${r.item.name}…',
               );
 
-              if (!ok) {
-                op._recordItemResult(
-                  idx,
-                  FileItemResult.failed,
-                  errorMessage: 'Copy failed',
+              bool ok = false;
+              if (op.isCut && src.volId == dest.volId) {
+                ok = await vaultExplorerApi.renameFile(
+                  src,
+                  r.item.path,
+                  r.destPath,
                 );
-              } else if (op.isCut) {
-                await _deleteEntryRecursive(src, r.item.path, r.item.isDir);
-                op._recordItemResult(idx, FileItemResult.success);
+                if (!ok) {
+                  op._recordItemResult(
+                    idx,
+                    FileItemResult.failed,
+                    errorMessage: 'Move failed',
+                  );
+                } else {
+                  op._recordItemResult(idx, FileItemResult.success);
+                }
               } else {
-                op._recordItemResult(idx, FileItemResult.success);
+                ok = await _copyEntry(
+                  src,
+                  dest,
+                  r.item.path,
+                  r.destPath,
+                  r.item.isDir,
+                  createdDestPaths,
+                  op,
+                  r.item.modifiedSecs,
+                );
+
+                if (!ok) {
+                  op._recordItemResult(
+                    idx,
+                    FileItemResult.failed,
+                    errorMessage: 'Copy failed',
+                  );
+                } else if (op.isCut) {
+                  await _deleteEntryRecursive(src, r.item.path, r.item.isDir);
+                  op._recordItemResult(idx, FileItemResult.success);
+                } else {
+                  op._recordItemResult(idx, FileItemResult.success);
+                }
               }
+            } on _DiskFullException {
+              op._recordItemResult(
+                idx,
+                FileItemResult.failed,
+                errorMessage: 'Disk full',
+              );
+              rethrow;
+            } on _CancelledException {
+              op._recordItemResult(
+                idx,
+                FileItemResult.skipped,
+                errorMessage: 'Cancelled',
+              );
+              rethrow;
+            } catch (e) {
+              op._recordItemResult(
+                idx,
+                FileItemResult.failed,
+                errorMessage: e.toString(),
+              );
+            } finally {
+              semaphore.release();
             }
-          } on _DiskFullException {
-            op._recordItemResult(
-              idx,
-              FileItemResult.failed,
-              errorMessage: 'Disk full',
-            );
-            rethrow;
-          } on _CancelledException {
-            op._recordItemResult(
-              idx,
-              FileItemResult.skipped,
-              errorMessage: 'Cancelled',
-            );
-            rethrow;
-          } catch (e) {
-            op._recordItemResult(
-              idx,
-              FileItemResult.failed,
-              errorMessage: e.toString(),
-            );
-          } finally {
-            semaphore.release();
-          }
-        }),
-      ).catchError((Object e) {
-        if (e is _DiskFullException || e is _CancelledException) return 0;
-        debugPrint('FileOperationService unhandled: $e');
-      });
+          }),
+        );
+      } catch (e) {
+        if (e is! _DiskFullException && e is! _CancelledException) {
+          debugPrint('FileOperationService unhandled: $e');
+        }
+      }
 
       // ── Final status ──────────────────────────────────────────────────
       final diskFull = op.itemStatuses.any(

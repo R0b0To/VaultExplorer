@@ -1,6 +1,5 @@
 import 'package:vaultexplorer/services/container_repository.dart';
 
-import '../services/vaultexplorer_api.dart';
 import 'mounted_container.dart';
 
 /// Unifies the two "things that can appear in the vault list" — an

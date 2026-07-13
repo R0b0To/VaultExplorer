@@ -280,6 +280,21 @@ bool pbkdf2Hmac(HashId hash,
     return pbkdf2HmacCustom(hash, password, passwordLen, salt, saltLen, iterations, out, outLen, abortFlag);
 }
 
+size_t genericHashOneShot(HashId hash,
+                           const unsigned char* data1, size_t len1,
+                           const unsigned char* data2, size_t len2,
+                           unsigned char* out) {
+    if (hash != HashId::kWhirlpool && hash != HashId::kStreebog && hash != HashId::kBlake2s256) {
+        return 0; // not one of the custom hashes this function covers
+    }
+    HashCtx ctx;
+    hashInit(hash, &ctx);
+    if (data1 && len1) hashUpdate(hash, &ctx, data1, len1);
+    if (data2 && len2) hashUpdate(hash, &ctx, data2, len2);
+    hashFinal(hash, &ctx, out);
+    return hashDigestSize(hash);
+}
+
 bool argon2idDeriveKey(const unsigned char* password, size_t passwordLen,
                        const unsigned char* salt, size_t saltLen,
                        uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,

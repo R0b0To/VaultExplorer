@@ -1,5 +1,6 @@
 #include "luks_header.h"
 #include "cipher_shim.h"
+#include "cascade.h"
 #include <cstring>
 #include <algorithm>
 #include <atomic>
@@ -81,10 +82,119 @@ static size_t getDigestSize(mbedtls_md_type_t mdType) {
     return mdInfo ? mbedtls_md_get_size(mdInfo) : 0;
 }
 
+// ── Hash spec resolution ─────────────────────────────────────────────────
+//
+// LUKS hash names ("sha256", "whirlpool", ...) resolve to one of two
+// disjoint backends: the four hashes mbedTLS provides natively
+// (sha1/sha256/sha512/ripemd160, via mapHashSpec() above), or the three
+// hashes this app implements itself in cipher_shim.cpp for VeraCrypt
+// (whirlpool/streebog/blake2s-256). Real cryptsetup/libgcrypt LUKS1
+// volumes commonly use "whirlpool" in particular — previously only the
+// mbedTLS four were recognized here, so any volume hashed with anything
+// else (most notably whirlpool) failed to unlock outright, on both LUKS1
+// and LUKS2. Every PBKDF2/digest/AF-diffusion call site below should go
+// through this instead of calling mapHashSpec() directly.
+enum class HashBackend { kNone, kMbedtls, kCustom };
+struct DigestSpec {
+    HashBackend backend = HashBackend::kNone;
+    mbedtls_md_type_t mbedtlsType = MBEDTLS_MD_NONE;
+    HashId customId = HashId::kSha512; // meaningful only when backend == kCustom
+    size_t digestLen = 0;
+};
+
+static DigestSpec resolveHashSpec(const std::string& hashSpecIn) {
+    std::string h = hashSpecIn;
+    std::transform(h.begin(), h.end(), h.begin(), ::tolower);
+
+    DigestSpec spec;
+    mbedtls_md_type_t mdType = mapHashSpec(h);
+    if (mdType != MBEDTLS_MD_NONE) {
+        spec.backend = HashBackend::kMbedtls;
+        spec.mbedtlsType = mdType;
+        spec.digestLen = getDigestSize(mdType);
+        return spec;
+    }
+    if (h == "whirlpool") {
+        spec.backend = HashBackend::kCustom;
+        spec.customId = HashId::kWhirlpool;
+        spec.digestLen = 64;
+    } else if (h == "streebog512" || h == "streebog-512" || h == "streebog") {
+        // This app's Streebog implementation is the 512-bit variant only
+        // (see hashDigestSize() in cipher_shim.cpp) — "streebog256" isn't
+        // recognized here since we can't correctly produce it.
+        spec.backend = HashBackend::kCustom;
+        spec.customId = HashId::kStreebog;
+        spec.digestLen = 64;
+    } else if (h == "blake2s-256" || h == "blake2s256") {
+        spec.backend = HashBackend::kCustom;
+        spec.customId = HashId::kBlake2s256;
+        spec.digestLen = 32;
+    }
+    return spec;
+}
+
+// Wraps an already-resolved mbedTLS type as a DigestSpec, for the
+// container-creation paths below — those only ever pass sha256/sha512
+// (LuksCreateParams::hashName is documented as accepting only those two),
+// so they have no need for resolveHashSpec()'s custom-hash branch.
+static DigestSpec digestSpecForMbedtls(mbedtls_md_type_t mdType) {
+    DigestSpec spec;
+    if (mdType == MBEDTLS_MD_NONE) return spec;
+    spec.backend = HashBackend::kMbedtls;
+    spec.mbedtlsType = mdType;
+    spec.digestLen = getDigestSize(mdType);
+    return spec;
+}
+
+// ── Keyslot-area cipher ──────────────────────────────────────────────────
+//
+// Real LUKS1 and LUKS2 both encrypt a keyslot's AF-split key material with
+// the SAME cipher as the volume's data area (LUKS1: the header's
+// cipherName/cipherMode; LUKS2: the keyslot's own "area.encryption",
+// which cryptsetup sets to match the segment cipher) — never a cipher
+// fixed to AES regardless of what the volume actually uses. This app only
+// implements the xts-plain64 data mode, so the keyslot area is likewise
+// always single-layer XTS here, just keyed to whichever of
+// AES/Serpent/Twofish/Camellia/Kuznyechik the container declares.
+//
+// Maps a LUKS cipher-name string ("aes", "serpent", ...) to this app's
+// CascadeId. Returns false for anything not supported.
+static bool cascadeIdForCipherName(const std::string& name, CascadeId& out) {
+    if (name == "aes") { out = CascadeId::kAes; return true; }
+    if (name == "serpent") { out = CascadeId::kSerpent; return true; }
+    if (name == "twofish") { out = CascadeId::kTwofish; return true; }
+    if (name == "camellia") { out = CascadeId::kCamellia; return true; }
+    if (name == "kuznyechik") { out = CascadeId::kKuznyechik; return true; }
+    return false;
+}
+
+// Encrypts/decrypts a LUKS keyslot AF-area, sector by sector, using
+// single-layer XTS with cipher [cipherId] and key material [keyMaterial]
+// (must be >= 64 bytes: 32B data key + 32B tweak key, matching
+// cascadeSetKeys()'s single-layer requirement — the master-key-length
+// PBKDF2/Argon2 output this app always derives for LUKS keyslots). Sector
+// tweaks are counted from 0 at the start of [in]/[out] — i.e. relative to
+// the keyslot/keyslot-area's own start, not the container's — matching
+// where real cryptsetup resets its tweak counter for this region.
+// [dataLen] must be a whole multiple of 512.
+static bool keyslotAreaCrypt(CascadeId cipherId, bool encrypt,
+                              const unsigned char* keyMaterial, size_t keyMaterialLen,
+                              const unsigned char* in, unsigned char* out, size_t dataLen) {
+    if (dataLen == 0 || dataLen % 512 != 0) return false;
+    CascadeContext ctx;
+    if (!cascadeSetKeys(ctx, cipherId, keyMaterial, keyMaterialLen)) return false;
+    const size_t sectorCount = dataLen / 512;
+    for (size_t sec = 0; sec < sectorCount; sec++) {
+        if (encrypt) cascadeEncryptSector(ctx, sec, in + sec * 512, out + sec * 512);
+        else         cascadeDecryptSector(ctx, sec, in + sec * 512, out + sec * 512);
+    }
+    return true;
+}
+
 // ── AF Diffusion & Merge ───────────────────────────────────────────────────
 
-static int afDiffuse(mbedtls_md_type_t mdType, size_t blocklen, uint8_t* block) {
-    size_t digestlen = getDigestSize(mdType);
+static int afDiffuse(const DigestSpec& spec, size_t blocklen, uint8_t* block) {
+    size_t digestlen = spec.digestLen;
     if (digestlen == 0) return -1;
 
     size_t hashcount = blocklen / digestlen;
@@ -95,8 +205,13 @@ static int afDiffuse(mbedtls_md_type_t mdType, size_t blocklen, uint8_t* block) 
         finallen = digestlen;
     }
 
-    const mbedtls_md_info_t* mdInfo = mbedtls_md_info_from_type(mdType);
-    if (!mdInfo) return -1;
+    const mbedtls_md_info_t* mdInfo = nullptr;
+    if (spec.backend == HashBackend::kMbedtls) {
+        mdInfo = mbedtls_md_info_from_type(spec.mbedtlsType);
+        if (!mdInfo) return -1;
+    } else if (spec.backend != HashBackend::kCustom) {
+        return -1;
+    }
 
     for (uint32_t i = 0; i < hashcount; i++) {
         uint32_t iv = i;
@@ -107,21 +222,28 @@ static int afDiffuse(mbedtls_md_type_t mdType, size_t blocklen, uint8_t* block) 
         ivBuf[2] = (iv >> 8)  & 0xFF;
         ivBuf[3] = iv         & 0xFF;
 
-        mbedtls_md_context_t ctx;
-        mbedtls_md_init(&ctx);
-        if (mbedtls_md_setup(&ctx, mdInfo, 0) != 0) {
-            mbedtls_md_free(&ctx);
-            return -1;
-        }
-
-        mbedtls_md_starts(&ctx);
-        mbedtls_md_update(&ctx, ivBuf, 4);
         size_t chunkLen = (i == (hashcount - 1)) ? finallen : digestlen;
-        mbedtls_md_update(&ctx, block + (i * digestlen), chunkLen);
-
         uint8_t digest[64];
-        mbedtls_md_finish(&ctx, digest);
-        mbedtls_md_free(&ctx);
+
+        if (spec.backend == HashBackend::kMbedtls) {
+            mbedtls_md_context_t ctx;
+            mbedtls_md_init(&ctx);
+            if (mbedtls_md_setup(&ctx, mdInfo, 0) != 0) {
+                mbedtls_md_free(&ctx);
+                return -1;
+            }
+
+            mbedtls_md_starts(&ctx);
+            mbedtls_md_update(&ctx, ivBuf, 4);
+            mbedtls_md_update(&ctx, block + (i * digestlen), chunkLen);
+            mbedtls_md_finish(&ctx, digest);
+            mbedtls_md_free(&ctx);
+        } else {
+            if (genericHashOneShot(spec.customId, ivBuf, 4,
+                                    block + (i * digestlen), chunkLen, digest) == 0) {
+                return -1;
+            }
+        }
 
         std::memcpy(block + (i * digestlen), digest, chunkLen);
     }
@@ -134,13 +256,13 @@ static void afXor(size_t blocklen, const uint8_t* in1, const uint8_t* in2, uint8
     }
 }
 
-static int afMerge(mbedtls_md_type_t mdType, size_t keySize, uint32_t stripes,
+static int afMerge(const DigestSpec& spec, size_t keySize, uint32_t stripes,
                    const uint8_t* src, uint8_t* dst) {
     std::unique_ptr<uint8_t[]> block(new uint8_t[keySize]());
     size_t i;
     for (i = 0; i < (stripes - 1); i++) {
         afXor(keySize, src + (i * keySize), block.get(), block.get());
-        if (afDiffuse(mdType, keySize, block.get()) < 0) {
+        if (afDiffuse(spec, keySize, block.get()) < 0) {
             return -1;
         }
     }
@@ -151,35 +273,41 @@ static int afMerge(mbedtls_md_type_t mdType, size_t keySize, uint32_t stripes,
 
 // ── Keyslot PBKDF2 Helper ──────────────────────────────────────────────────
 
-static bool luksDeriveKeyslotKey(mbedtls_md_type_t mdType,
-                                 const uint8_t* password, size_t passwordLen,
-                                 const uint8_t* salt, size_t saltLen,
-                                 uint32_t iterations,
-                                 uint8_t* outKey, size_t outKeyLen) {
-    const mbedtls_md_info_t* mdInfo = mbedtls_md_info_from_type(mdType);
-    if (!mdInfo) return false;
+static bool luksDeriveKdfKey(const DigestSpec& spec,
+                             const uint8_t* password, size_t passwordLen,
+                             const uint8_t* salt, size_t saltLen,
+                             uint32_t iterations,
+                             uint8_t* outKey, size_t outKeyLen) {
+    if (spec.backend == HashBackend::kMbedtls) {
+        const mbedtls_md_info_t* mdInfo = mbedtls_md_info_from_type(spec.mbedtlsType);
+        if (!mdInfo) return false;
 
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    if (mbedtls_md_setup(&ctx, mdInfo, 1) != 0) {
+        mbedtls_md_context_t ctx;
+        mbedtls_md_init(&ctx);
+        if (mbedtls_md_setup(&ctx, mdInfo, 1) != 0) {
+            mbedtls_md_free(&ctx);
+            return false;
+        }
+
+        int ret = mbedtls_pkcs5_pbkdf2_hmac(&ctx, password, passwordLen, salt, saltLen, iterations, outKeyLen, outKey);
         mbedtls_md_free(&ctx);
-        return false;
+        return ret == 0;
     }
-
-    int ret = mbedtls_pkcs5_pbkdf2_hmac(&ctx, password, passwordLen, salt, saltLen, iterations, outKeyLen, outKey);
-    mbedtls_md_free(&ctx);
-    return ret == 0;
+    if (spec.backend == HashBackend::kCustom) {
+        return pbkdf2Hmac(spec.customId, password, passwordLen, salt, saltLen, iterations, outKey, outKeyLen);
+    }
+    return false;
 }
 
 // ── Master Key Verification PBKDF2 Helper ──────────────────────────────────
 
-static bool luksVerifyMasterKey(mbedtls_md_type_t mdType,
+static bool luksVerifyMasterKey(const DigestSpec& spec,
                                 const uint8_t* candidateKey, size_t keyLen,
                                 const uint8_t* salt, size_t saltLen,
                                 uint32_t iterations,
                                 const uint8_t* expectedDigest, size_t expectedDigestLen) {
     std::vector<uint8_t> derived(expectedDigestLen);
-    if (!luksDeriveKeyslotKey(mdType, candidateKey, keyLen, salt, saltLen, iterations, derived.data(), derived.size())) {
+    if (!luksDeriveKdfKey(spec, candidateKey, keyLen, salt, saltLen, iterations, derived.data(), derived.size())) {
         return false;
     }
     bool match = (std::memcmp(derived.data(), expectedDigest, expectedDigestLen) == 0);
@@ -212,8 +340,8 @@ static bool luks1Unlock(int fd,
     uint32_t mkDigestIter = readBE32((const uint8_t*)&phdr.mkDigestIter);
 
     std::string hashSpec = phdr.hashSpec;
-    mbedtls_md_type_t mdType = mapHashSpec(hashSpec);
-    if (mdType == MBEDTLS_MD_NONE) {
+    DigestSpec hashDigest = resolveHashSpec(hashSpec);
+    if (hashDigest.backend == HashBackend::kNone) {
         LOGI("LUKS1: Unsupported hashSpec: %s", hashSpec.c_str());
         return false;
     }
@@ -223,7 +351,7 @@ static bool luks1Unlock(int fd,
     // the whole point of quick-unlock. ──
     if (candidateMasterKey != nullptr) {
         if (candidateMasterKeyLen == keyBytes &&
-            luksVerifyMasterKey(mdType, candidateMasterKey, keyBytes,
+            luksVerifyMasterKey(hashDigest, candidateMasterKey, keyBytes,
                                  phdr.mkDigestSalt, 32, mkDigestIter,
                                  phdr.mkDigest, 20)) {
             outInfo.version = 1;
@@ -238,6 +366,16 @@ static bool luks1Unlock(int fd,
         }
         LOGI("LUKS1: quick-unlock candidate key stale/invalid");
         return false; // stale cached key — caller falls back to password/keyfile
+    }
+
+    // Keyslot AF-area decryption uses the same cipher as the data area
+    // (see keyslotAreaCrypt()'s doc comment) — resolve it once up front so
+    // every keyslot-try thread below can reuse it.
+    std::string cipherNameStr = phdr.cipherName;
+    CascadeId slotCipher;
+    if (!cascadeIdForCipherName(cipherNameStr, slotCipher)) {
+        LOGI("LUKS1: Unsupported cipher: %s", cipherNameStr.c_str());
+        return false;
     }
 
     // Collect active keyslot indices, then try them concurrently — one
@@ -261,7 +399,13 @@ static bool luks1Unlock(int fd,
         if (found.load(std::memory_order_acquire) || (cancelCheck && cancelCheck(volId))) return;
 
         if (progressCallback) {
-            progressCallback(attemptedCount.fetch_add(1) + 1, activeSlotsCount, static_cast<int>(mdType), 0);
+            // Display-only ID: mbedTLS's own type enum for the four
+            // mbedTLS-backed hashes, or 1000+HashId for the three custom
+            // ones, so the two spaces never collide.
+            int displayHashId = (hashDigest.backend == HashBackend::kMbedtls)
+                                     ? static_cast<int>(hashDigest.mbedtlsType)
+                                     : (1000 + static_cast<int>(hashDigest.customId));
+            progressCallback(attemptedCount.fetch_add(1) + 1, activeSlotsCount, displayHashId, 0);
         }
 
         uint32_t iterations = readBE32((const uint8_t*)&phdr.keySlots[i].iterations);
@@ -270,7 +414,7 @@ static bool luks1Unlock(int fd,
 
         // 1. Derive keyslot key
         std::vector<uint8_t> slotKey(keyBytes);
-        if (!luksDeriveKeyslotKey(mdType, password, passwordLen, phdr.keySlots[i].salt, 32, iterations, slotKey.data(), slotKey.size())) {
+        if (!luksDeriveKdfKey(hashDigest, password, passwordLen, phdr.keySlots[i].salt, 32, iterations, slotKey.data(), slotKey.size())) {
             return;
         }
 
@@ -289,30 +433,21 @@ static bool luks1Unlock(int fd,
             return;
         }
 
-        // 3. Decrypt AF key material using AES-CBC with slotKey (LUKS1 is typically AES-CBC-ESSIV or plain)
-        // Note: For LUKS1, keyslots are encrypted with AES-CBC, IV=0.
-        // We set up mbedtls aes cbc — a local context, safe per-thread.
-        mbedtls_aes_context aesCtx;
-        mbedtls_aes_init(&aesCtx);
-        if (mbedtls_aes_setkey_dec(&aesCtx, slotKey.data(), keyBytes * 8) != 0) {
-            mbedtls_aes_free(&aesCtx);
-            mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
-            mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
-            return;
-        }
-        uint8_t iv[16] = {0};
+        // 3. Decrypt AF key material with the same cipher as the data area
+        // (single-layer XTS, sector tweaks counted from 0 at the start of
+        // this keyslot's AF material) — see keyslotAreaCrypt()'s doc
+        // comment.
         std::vector<uint8_t> afDecrypted(afLen);
-        if (mbedtls_aes_crypt_cbc(&aesCtx, MBEDTLS_AES_DECRYPT, afLen, iv, afMaterial.data(), afDecrypted.data()) != 0) {
-            mbedtls_aes_free(&aesCtx);
+        if (!keyslotAreaCrypt(slotCipher, false, slotKey.data(), slotKey.size(),
+                              afMaterial.data(), afDecrypted.data(), afLen)) {
             mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
             mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
             return;
         }
-        mbedtls_aes_free(&aesCtx);
 
         // 4. Merge AF stripes to candidate master key
         std::vector<uint8_t> candidateKey(keyBytes);
-        if (afMerge(mdType, keyBytes, stripes, afDecrypted.data(), candidateKey.data()) != 0) {
+        if (afMerge(hashDigest, keyBytes, stripes, afDecrypted.data(), candidateKey.data()) != 0) {
             mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
             mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
             mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
@@ -320,7 +455,7 @@ static bool luks1Unlock(int fd,
         }
 
         // 5. Verify master key candidate
-        bool verified = luksVerifyMasterKey(mdType, candidateKey.data(), keyBytes, phdr.mkDigestSalt, 32, mkDigestIter, phdr.mkDigest, 20);
+        bool verified = luksVerifyMasterKey(hashDigest, candidateKey.data(), keyBytes, phdr.mkDigestSalt, 32, mkDigestIter, phdr.mkDigest, 20);
         if (verified) {
             bool expected = false;
             if (found.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
@@ -488,9 +623,9 @@ static bool luks2Unlock(int fd,
     if (candidateMasterKey != nullptr) {
         bool verified = false;
         for (const auto& d : digests) {
-            mbedtls_md_type_t digestMd = mapHashSpec(d.hashName);
-            if (digestMd == MBEDTLS_MD_NONE) continue;
-            if (luksVerifyMasterKey(digestMd, candidateMasterKey, candidateMasterKeyLen,
+            DigestSpec digestSpec = resolveHashSpec(d.hashName);
+            if (digestSpec.backend == HashBackend::kNone) continue;
+            if (luksVerifyMasterKey(digestSpec, candidateMasterKey, candidateMasterKeyLen,
                                      d.salt.data(), d.salt.size(), d.iterations,
                                      d.digest.data(), d.digest.size())) {
                 outInfo.version = 2;
@@ -602,9 +737,13 @@ static bool luks2Unlock(int fd,
         }
         if (!matchDigest) return;
 
-        mbedtls_md_type_t mdType = mapHashSpec(ks.hashName);
+        DigestSpec kdfSpec = resolveHashSpec(ks.hashName);
         if (progressCallback) {
-            progressCallback(attemptedCount.fetch_add(1) + 1, activeSlotsCount, static_cast<int>(mdType), 1);
+            // Display-only ID, same collision-avoidance scheme as LUKS1's.
+            int displayHashId = (kdfSpec.backend == HashBackend::kMbedtls)
+                                     ? static_cast<int>(kdfSpec.mbedtlsType)
+                                     : (1000 + static_cast<int>(kdfSpec.customId));
+            progressCallback(attemptedCount.fetch_add(1) + 1, activeSlotsCount, displayHashId, 1);
         }
 
         // 1. Derive keyslot key
@@ -614,7 +753,11 @@ static bool luks2Unlock(int fd,
 
         bool kdfSuccess = false;
         if (ks.kdfType == "pbkdf2") {
-            kdfSuccess = luksDeriveKeyslotKey(mdType, password, passwordLen, ks.salt.data(), ks.salt.size(), ks.iterations, derivedKey.data(), derivedKeyLen);
+            if (kdfSpec.backend == HashBackend::kNone) {
+                LOGI("LUKS2: keyslot %d has unsupported kdf hash '%s'", ks.index, ks.hashName.c_str());
+            } else {
+                kdfSuccess = luksDeriveKdfKey(kdfSpec, password, passwordLen, ks.salt.data(), ks.salt.size(), ks.iterations, derivedKey.data(), derivedKeyLen);
+            }
         } else if (ks.kdfType == "argon2id" || ks.kdfType == "argon2i") {
             uint32_t memoryKiB = ks.memory;
             if (memoryKiB > 1048576) memoryKiB = 1048576;
@@ -640,35 +783,29 @@ static bool luks2Unlock(int fd,
             return;
         }
 
-        // 3. Decrypt AF key material using AES-XTS — a local context, safe per-thread.
-        mbedtls_aes_xts_context decCtx;
-        mbedtls_aes_xts_init(&decCtx);
-        if (mbedtls_aes_xts_setkey_dec(&decCtx, derivedKey.data(), derivedKeyLen * 8) != 0) {
-            mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
-            mbedtls_aes_xts_free(&decCtx);
-            return;
+        // 3. Decrypt AF key material using this keyslot's own declared
+        // area cipher (ks.areaEncryption, e.g. "aes-xts-plain64", "serpent-
+        // xts-plain64", ...) rather than a fixed AES-XTS — sector tweaks
+        // counted from 0 at the start of the keyslot area. See
+        // keyslotAreaCrypt()'s doc comment.
+        CascadeId slotCipher;
+        {
+            std::string areaCipherName = ks.areaEncryption;
+            const size_t dash = areaCipherName.find('-');
+            if (dash != std::string::npos) areaCipherName = areaCipherName.substr(0, dash);
+            if (areaCipherName.empty() || !cascadeIdForCipherName(areaCipherName, slotCipher)) {
+                mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
+                return;
+            }
         }
 
         std::vector<uint8_t> afDecrypted(ks.areaSize);
-        int decRet = 0;
-        for (size_t sec = 0; sec < ks.areaSize / 512; sec++) {
-            unsigned char tweakBuf[16] = {0};
-            for (int b = 0; b < 8; b++) {
-                tweakBuf[b] = (sec >> (b * 8)) & 0xFF;
-            }
-            int ret = mbedtls_aes_crypt_xts(&decCtx, MBEDTLS_AES_DECRYPT, 512, tweakBuf,
-                                            afMaterial.data() + (sec * 512),
-                                            afDecrypted.data() + (sec * 512));
-            if (ret != 0) {
-                decRet = ret;
-                break;
-            }
-        }
+        const bool decOk = keyslotAreaCrypt(slotCipher, false, derivedKey.data(), derivedKeyLen,
+                                            afMaterial.data(), afDecrypted.data(), ks.areaSize);
 
         mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
-        mbedtls_aes_xts_free(&decCtx);
 
-        if (decRet != 0) {
+        if (!decOk) {
             mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
             mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
             return;
@@ -677,8 +814,8 @@ static bool luks2Unlock(int fd,
         // 4. Merge AF stripes to get candidate master key
         size_t masterKeySize = ks.areaKeySize;
         std::vector<uint8_t> candidateKey(masterKeySize);
-        mbedtls_md_type_t afMd = mapHashSpec(ks.afHash);
-        if (afMerge(afMd, masterKeySize, ks.afStripes, afDecrypted.data(), candidateKey.data()) != 0) {
+        DigestSpec afSpec = resolveHashSpec(ks.afHash);
+        if (afMerge(afSpec, masterKeySize, ks.afStripes, afDecrypted.data(), candidateKey.data()) != 0) {
             mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
             mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
             mbedtls_platform_zeroize(candidateKey.data(), candidateKey.size());
@@ -686,8 +823,8 @@ static bool luks2Unlock(int fd,
         }
 
         // 5. Verify candidate master key using Digest
-        mbedtls_md_type_t digestMd = mapHashSpec(matchDigest->hashName);
-        bool verified = luksVerifyMasterKey(digestMd, candidateKey.data(), masterKeySize, matchDigest->salt.data(), matchDigest->salt.size(), matchDigest->iterations, matchDigest->digest.data(), matchDigest->digest.size());
+        DigestSpec digestSpec = resolveHashSpec(matchDigest->hashName);
+        bool verified = luksVerifyMasterKey(digestSpec, candidateKey.data(), masterKeySize, matchDigest->salt.data(), matchDigest->salt.size(), matchDigest->iterations, matchDigest->digest.data(), matchDigest->digest.size());
 
         if (verified) {
             bool expected = false;
@@ -828,7 +965,7 @@ static void writeBE64(uint8_t* p, uint64_t v) {
 // XOR-then-diffuse "block" accumulator computed here, so setting
 // dst[stripes-1] = masterKey XOR block reproduces masterKey exactly once
 // merged back.
-static int afSplit(mbedtls_md_type_t mdType, size_t keySize, uint32_t stripes,
+static int afSplit(const DigestSpec& spec, size_t keySize, uint32_t stripes,
                    const uint8_t* masterKey, uint8_t* dst) {
     if (stripes == 0) return -1;
     std::unique_ptr<uint8_t[]> block(new uint8_t[keySize]());
@@ -838,7 +975,7 @@ static int afSplit(mbedtls_md_type_t mdType, size_t keySize, uint32_t stripes,
         if (!randomBytes(dst, randLen)) return -1;
         for (uint32_t i = 0; i < stripes - 1; i++) {
             afXor(keySize, dst + (size_t)i * keySize, block.get(), block.get());
-            if (afDiffuse(mdType, keySize, block.get()) < 0) return -1;
+            if (afDiffuse(spec, keySize, block.get()) < 0) return -1;
         }
     }
     afXor(keySize, masterKey, block.get(), dst + (size_t)(stripes - 1) * keySize);
@@ -859,8 +996,9 @@ static constexpr uint64_t kLuksMinExtraSpace = 300 * 1024; // headroom for a usa
 static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLen,
                               int64_t sizeBytes, const LuksCreateParams& params,
                               LuksVolumeInfo& outInfo) {
-    if (params.cipherName != "aes") {
-        LOGI("luks1CreateHeader: LUKS1 creation only supports the aes cipher");
+    CascadeId dataCipherId;
+    if (!cascadeIdForCipherName(params.cipherName, dataCipherId)) {
+        LOGI("luks1CreateHeader: unsupported cipher %s", params.cipherName.c_str());
         return false;
     }
     mbedtls_md_type_t mdType = mapHashSpec(params.hashName);
@@ -868,8 +1006,9 @@ static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLe
         LOGI("luks1CreateHeader: unsupported hash %s", params.hashName.c_str());
         return false;
     }
+    DigestSpec hashDigest = digestSpecForMbedtls(mdType);
 
-    constexpr uint32_t keyBytes = 64; // aes-xts-plain64, 512-bit key (32B data + 32B tweak)
+    constexpr uint32_t keyBytes = 64; // *-xts-plain64, 512-bit key (32B data + 32B tweak) — all 5 supported ciphers
     const uint64_t slot0Offset = kLuks1AlignBytes; // 8 sectors in
     const uint64_t afMaterialLen = (uint64_t)keyBytes * kLuks1Stripes; // 256000 bytes, 500 sectors
     uint64_t payloadOffsetBytes = slot0Offset + afMaterialLen;
@@ -891,7 +1030,7 @@ static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLe
     }
 
     uint8_t mkDigest[20];
-    if (!luksDeriveKeyslotKey(mdType, masterKey, keyBytes, mkDigestSalt, sizeof(mkDigestSalt),
+    if (!luksDeriveKdfKey(hashDigest, masterKey, keyBytes, mkDigestSalt, sizeof(mkDigestSalt),
                               kLuks1MkDigestIter, mkDigest, sizeof(mkDigest))) {
         mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
         return false;
@@ -902,32 +1041,29 @@ static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLe
     // see the argon2ParamsForPim()/iterationsForHash() callers in
     // container_create.cpp's createLuksContainer().
     std::vector<uint8_t> slotKey(keyBytes);
-    if (!luksDeriveKeyslotKey(mdType, password, passwordLen, keyslotSalt, sizeof(keyslotSalt),
+    if (!luksDeriveKdfKey(hashDigest, password, passwordLen, keyslotSalt, sizeof(keyslotSalt),
                               params.pbkdf2Iterations, slotKey.data(), slotKey.size())) {
         mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
         return false;
     }
 
     std::vector<uint8_t> afMaterial(afMaterialLen);
-    if (afSplit(mdType, keyBytes, kLuks1Stripes, masterKey, afMaterial.data()) != 0) {
+    if (afSplit(hashDigest, keyBytes, kLuks1Stripes, masterKey, afMaterial.data()) != 0) {
         mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
         mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
         return false;
     }
 
-    // LUKS1 keyslot AF material is always AES-CBC-plain(IV=0), regardless
-    // of the header's declared cipher — see luksCreateHeader()'s doc
-    // comment for why this app restricts LUKS1 creation to cipherName
-    // "aes" so this always matches what luks1Unlock() will later decrypt.
+    // Keyslot AF material uses the SAME cipher as the data area, in
+    // single-layer XTS with sector tweaks counted from 0 at the start of
+    // the AF area — matching real LUKS1's keyslot encryption convention.
+    // (Previously hardcoded to AES-CBC-plain(IV=0) regardless of
+    // cipherName, which both mismatched the spec and produced containers
+    // that non-AES ciphers could never actually be unlocked again with.)
     std::vector<uint8_t> afEncrypted(afMaterialLen);
     {
-        mbedtls_aes_context aesCtx;
-        mbedtls_aes_init(&aesCtx);
-        bool keyOk = (mbedtls_aes_setkey_enc(&aesCtx, slotKey.data(), keyBytes * 8) == 0);
-        uint8_t iv[16] = {0};
-        bool cryptOk = keyOk && (mbedtls_aes_crypt_cbc(&aesCtx, MBEDTLS_AES_ENCRYPT, afMaterialLen,
-                                                        iv, afMaterial.data(), afEncrypted.data()) == 0);
-        mbedtls_aes_free(&aesCtx);
+        const bool cryptOk = keyslotAreaCrypt(dataCipherId, true, slotKey.data(), slotKey.size(),
+                                              afMaterial.data(), afEncrypted.data(), afMaterialLen);
         mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
         mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
         if (!cryptOk) {
@@ -947,7 +1083,7 @@ static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLe
     std::memset(&phdr, 0, sizeof(phdr));
     std::memcpy(phdr.magic, LUKS_MAGIC, 6);
     writeBE16((uint8_t*)&phdr.version, 1);
-    std::strncpy(phdr.cipherName, "aes", sizeof(phdr.cipherName) - 1);
+    std::strncpy(phdr.cipherName, params.cipherName.c_str(), sizeof(phdr.cipherName) - 1);
     std::strncpy(phdr.cipherMode, "xts-plain64", sizeof(phdr.cipherMode) - 1);
     std::strncpy(phdr.hashSpec, params.hashName.c_str(), sizeof(phdr.hashSpec) - 1);
     writeBE32((uint8_t*)&phdr.payloadOffset, (uint32_t)(payloadOffsetBytes / 512));
@@ -974,7 +1110,7 @@ static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLe
     }
 
     outInfo.version = 1;
-    outInfo.cipherName = "aes";
+    outInfo.cipherName = params.cipherName;
     outInfo.cipherMode = "xts-plain64";
     outInfo.keyBytes = keyBytes;
     outInfo.dataOffsetBytes = payloadOffsetBytes;
@@ -1032,6 +1168,7 @@ static bool luks2CreateHeader(int fd, const uint8_t* password, size_t passwordLe
         LOGI("luks2CreateHeader: unsupported hash %s", params.hashName.c_str());
         return false;
     }
+    DigestSpec digestSpec = digestSpecForMbedtls(digestMd);
 
     constexpr uint32_t keyBytes = 64;           // *-xts-plain64, 512-bit key — all 3 supported ciphers
     constexpr uint32_t keyslotAreaKeyBytes = 64; // keyslot area is always AES-XTS — see doc comment
@@ -1063,7 +1200,7 @@ static bool luks2CreateHeader(int fd, const uint8_t* password, size_t passwordLe
     // recovery succeeds), not something worth memory-hardening itself.
     size_t digestLen = getDigestSize(digestMd);
     std::vector<uint8_t> digestBuf(digestLen);
-    if (!luksDeriveKeyslotKey(digestMd, masterKey, keyBytes, digestSalt, sizeof(digestSalt),
+    if (!luksDeriveKdfKey(digestSpec, masterKey, keyBytes, digestSalt, sizeof(digestSalt),
                               kLuks2DigestIter, digestBuf.data(), digestBuf.size())) {
         LOGI("luks2CreateHeader: digest derivation failed");
         mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
@@ -1079,7 +1216,8 @@ static bool luks2CreateHeader(int fd, const uint8_t* password, size_t passwordLe
                                   slotKey.data(), slotKey.size());
     } else {
         mbedtls_md_type_t keyslotMd = mapHashSpec(params.hashName);
-        kdfOk = luksDeriveKeyslotKey(keyslotMd, password, passwordLen, keyslotSalt, sizeof(keyslotSalt),
+        DigestSpec keyslotSpec = digestSpecForMbedtls(keyslotMd);
+        kdfOk = luksDeriveKdfKey(keyslotSpec, password, passwordLen, keyslotSalt, sizeof(keyslotSalt),
                                      params.pbkdf2Iterations, slotKey.data(), slotKey.size());
     }
     if (!kdfOk) {
@@ -1091,7 +1229,7 @@ static bool luks2CreateHeader(int fd, const uint8_t* password, size_t passwordLe
     // AF stripe hash: reuse the digest's hash family — real cryptsetup
     // ties these together too ("af": {"hash": <same as digest/kdf hash>}).
     std::vector<uint8_t> afMaterial(afMaterialLen);
-    if (afSplit(digestMd, keyBytes, kLuks2AfStripes, masterKey, afMaterial.data()) != 0) {
+    if (afSplit(digestSpec, keyBytes, kLuks2AfStripes, masterKey, afMaterial.data()) != 0) {
         LOGI("luks2CreateHeader: afSplit failed");
         mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
         mbedtls_platform_zeroize(slotKey.data(), slotKey.size());

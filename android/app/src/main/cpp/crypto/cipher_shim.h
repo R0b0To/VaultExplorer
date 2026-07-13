@@ -62,6 +62,27 @@ bool pbkdf2Hmac(HashId hash,
 
 int iterationsForHash(HashId hash, int clampedPim);
 
+// One-shot raw digest (NOT HMAC/PBKDF2) for the three hashes this app
+// implements itself rather than getting from mbedTLS — Whirlpool,
+// Streebog, Blake2s-256. Hashes [data1,len1] followed by [data2,len2] as
+// a single contiguous message (pass len2 = 0 / data2 = nullptr to hash
+// just data1). [out] must hold at least the hash's digest size (64 bytes
+// for Whirlpool/Streebog, 32 for Blake2s-256 — see kMaxHashOutputBytes).
+// Returns the digest size written on success, 0 if [hash] isn't one of
+// the three custom hashes (callers should fall back to mbedTLS's own
+// digest API for SHA-1/256/512/RIPEMD-160, which this function doesn't
+// handle).
+//
+// Added for luks_header.cpp's afDiffuse(), which needs a raw iterated
+// hash (not pbkdf2Hmac's HMAC construction) so that LUKS volumes hashed
+// with something other than mbedTLS's four built-ins — most commonly
+// real cryptsetup's "whirlpool" — can still have their AF-split keyslot
+// material recombined.
+size_t genericHashOneShot(HashId hash,
+                           const unsigned char* data1, size_t len1,
+                           const unsigned char* data2, size_t len2,
+                           unsigned char* out);
+
 // Clamps a user-supplied PIM into the range this codebase supports:
 // [0, 2000]. 0 means "use the format default" (baseline PBKDF2 iteration
 // count, or Argon2id's PIM-12 default — see argon2ParamsForPim below);

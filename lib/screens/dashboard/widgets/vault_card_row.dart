@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart'; // Added import
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import '../../../models/vault_list_item.dart';
@@ -22,6 +23,51 @@ class SwipeRowGroupController extends ChangeNotifier {
       _openId = null;
       notifyListeners();
     }
+  }
+}
+
+/// A horizontal drag recognizer that rejects itself if the gesture is predominantly vertical,
+/// allowing the parent ListView to handle scrolling without horizontal interruption.
+class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecognizer {
+  StrictHorizontalDragGestureRecognizer({super.debugOwner});
+
+  final Map<int, Offset> _startPositions = {};
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    super.addAllowedPointer(event);
+    _startPositions[event.pointer] = event.position;
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    super.handleEvent(event);
+    if (event is PointerMoveEvent) {
+      final startPosition = _startPositions[event.pointer];
+      if (startPosition != null) {
+        final delta = event.position - startPosition;
+        final double dx = delta.dx.abs();
+        final double dy = delta.dy.abs();
+
+        // If movement is predominantly vertical, reject this gesture early
+        // to let the parent Scrollable (ListView) handle vertical scrolling.
+        if (dy > dx && dy > 6.0) {
+          rejectGesture(event.pointer);
+          _startPositions.remove(event.pointer);
+        } else if (dx > 12.0) {
+          // If a horizontal gesture is established, stop tracking to prevent rejection.
+          _startPositions.remove(event.pointer);
+        }
+      }
+    } else if (event is PointerUpEvent || event is PointerCancelEvent) {
+      _startPositions.remove(event.pointer);
+    }
+  }
+
+  @override
+  void dispose() {
+    _startPositions.clear();
+    super.dispose();
   }
 }
 
@@ -286,11 +332,22 @@ class _VaultCardRowState extends State<VaultCardRow>
                               ],
                             ),
                           ),
-                          GestureDetector(
-                            onHorizontalDragStart: _onDragStart,
-                            onHorizontalDragUpdate: _onDragUpdate,
-                            onHorizontalDragEnd: _onDragEnd,
-                            onHorizontalDragCancel: _onDragCancel,
+                          // Replaced standard GestureDetector with RawGestureDetector configured
+                          // with our custom StrictHorizontalDragGestureRecognizer
+                          RawGestureDetector(
+                            gestures: <Type, GestureRecognizerFactory>{
+                              StrictHorizontalDragGestureRecognizer:
+                                  GestureRecognizerFactoryWithHandlers<StrictHorizontalDragGestureRecognizer>(
+                                () => StrictHorizontalDragGestureRecognizer(),
+                                (StrictHorizontalDragGestureRecognizer instance) {
+                                  instance
+                                    ..onStart = _onDragStart
+                                    ..onUpdate = _onDragUpdate
+                                    ..onEnd = _onDragEnd
+                                    ..onCancel = _onDragCancel;
+                                },
+                              ),
+                            },
                             child: Transform.translate(
                               offset: Offset(_dx, 0),
                               child: AnimatedSwitcher(

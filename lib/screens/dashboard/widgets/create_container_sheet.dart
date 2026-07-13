@@ -14,8 +14,8 @@ class CreateContainerSheet extends StatefulWidget {
 }
 
 class _CreateContainerSheetState extends State<CreateContainerSheet> {
-  final _nameCtrl = TextEditingController(text: 'vault.hc');
-  final _sizeCtrl = TextEditingController(text: '10');
+  final _nameCtrl = TextEditingController(text: 'vault');
+  final _sizeCtrl = TextEditingController(text: '100');
   final _passwordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
 

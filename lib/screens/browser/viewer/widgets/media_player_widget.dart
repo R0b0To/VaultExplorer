@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:vector_math/vector_math_64.dart' show Vector3;
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import '/../../models/mounted_container.dart';
@@ -103,10 +104,15 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   bool _showLeftIndicator = false;
   bool _showRightIndicator = false;
   bool _isSpeedHeld = false;
+  final GlobalKey _interactiveViewerKey = GlobalKey();
 
   final TransformationController _videoTransformationController =
       TransformationController();
-  double _videoScale = 1.0;
+  
+  static const double _minZoomScale = 1.0;
+  static const double _maxZoomScale = 2.2;
+  
+  double _videoScale = _minZoomScale;
   TapDownDetails? _videoDoubleTapDetails;
 
   @override
@@ -208,29 +214,54 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     setState(() => _isSpeedHeld = false);
   }
 
+  /// Calculates the zoom matrix given a local position within the viewport and the target scale.
+  Matrix4 _calculateZoomMatrix({required Offset localPosition, required double scale}) {
+    final x = -localPosition.dx * (scale - 1.0);
+    final y = -localPosition.dy * (scale - 1.0);
+    return Matrix4.identity()
+      ..translateByVector3(Vector3(x, y, 0.0))
+      ..scaleByVector3(Vector3(scale, scale, 1.0));
+  }
+
   void _handleVideoDoubleTap() {
     if (widget.isAudio) return;
-    final position = _videoDoubleTapDetails?.localPosition;
-    setState(() {
-      if (_videoScale == 1.0) {
-        _videoScale = 2.2;
-        if (position != null) {
-          // Precisely calculate the correct coordinate matrix relative to tap position
-          final x = -position.dx * (_videoScale - 1);
-          final y = -position.dy * (_videoScale - 1);
-          _videoTransformationController.value = Matrix4.identity()
-            ..translate(x, y)
-            ..scale(_videoScale);
+    final doubleTapDetails = _videoDoubleTapDetails;
+    if (doubleTapDetails == null) return;
+
+    final context = _interactiveViewerKey.currentContext;
+    if (context == null || !context.mounted) return;
+
+    final box = context.findRenderObject();
+    if (box is! RenderBox) return;
+
+    final double targetScale;
+    final Matrix4 targetMatrix;
+    final bool zoomIn = _videoScale == _minZoomScale;
+
+    if (zoomIn) {
+      targetScale = _maxZoomScale;
+      if (box.hasSize) {
+        final position = box.globalToLocal(doubleTapDetails.globalPosition);
+        if (position.isFinite) {
+          targetMatrix = _calculateZoomMatrix(
+            localPosition: position,
+            scale: targetScale,
+          );
         } else {
-          _videoTransformationController.value = Matrix4.identity()
-            ..scale(_videoScale);
+          targetMatrix = Matrix4.identity()..scaleByVector3(Vector3(targetScale, targetScale, 1.0));
         }
-        widget.onZoomChanged(false);
       } else {
-        _videoScale = 1.0;
-        _videoTransformationController.value = Matrix4.identity();
-        widget.onZoomChanged(true);
+        targetMatrix = Matrix4.identity()..scaleByVector3(Vector3(targetScale, targetScale, 1.0));
       }
+    } else {
+      targetScale = _minZoomScale;
+      targetMatrix = Matrix4.identity();
+    }
+
+    setState(() {
+      _videoScale = targetScale;
+      _videoTransformationController.value = targetMatrix;
+      widget.onZoomChanged(!zoomIn);
     });
   }
 
@@ -376,6 +407,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
     if (!widget.isAudio) {
       corePlayerWidget = InteractiveViewer(
+        key: _interactiveViewerKey,
         transformationController: _videoTransformationController,
         maxScale: MediaViewerConstants.maxVideoZoom,
         minScale: 1.0,

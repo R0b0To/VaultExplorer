@@ -101,9 +101,15 @@ class VideoPlaybackManager {
         if (activeControllerNotifier.value == evicted) {
           activeControllerNotifier.value = null;
         }
-        Future.microtask(() {
+        Future.microtask(() async {
           try {
-            evicted.dispose();
+            // Workaround for fvp/libmdk crash (wang-bin/fvp#362)
+            // Disposing the player while its AAudio stream is in STARTING state
+            // results in a Scudo memory allocation error and fatal crash.
+            // Pausing and waiting briefly gives the audio engine time to settle.
+            await evicted.pause();
+            await Future.delayed(const Duration(milliseconds: 150));
+            await evicted.dispose();
           } catch (e) {
             debugPrint('Failed evicting video controller safely: $e');
           }
@@ -116,7 +122,13 @@ class VideoPlaybackManager {
     activeControllerNotifier.dispose();
     for (final ctrl in _controllers.values) {
       try {
-        ctrl.dispose();
+        // Apply the same dispose workaround to prevent AAudio crashes during UI exit
+        ctrl.pause();
+        Future.delayed(const Duration(milliseconds: 150), () async {
+          try {
+            await ctrl.dispose();
+          } catch (_) {}
+        });
       } catch (_) {}
     }
     _controllers.clear();

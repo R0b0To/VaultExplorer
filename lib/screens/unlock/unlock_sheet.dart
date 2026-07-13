@@ -1036,12 +1036,15 @@ Future<void> _pickFile() async {
 
                       // 4. Remember container Toggle
                       if (widget.initialUri == null) ...[
-                        Container(
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerLow,
+                        Material(
+                          color: cs.surfaceContainerLow,
+                          shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                            side: BorderSide(
+                              color: cs.outlineVariant.withValues(alpha: 0.3),
+                            ),
                           ),
+                          clipBehavior: Clip.antiAlias,
                           child: SwitchListTile(
                             value: _remember,
                             onChanged: (val) => setState(() => _remember = val),

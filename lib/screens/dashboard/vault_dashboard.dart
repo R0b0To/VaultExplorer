@@ -410,7 +410,7 @@ class _VaultDashboardState extends State<VaultDashboard>
               icon: Icons.lock_open_rounded,
               iconColor: cs.primary,
               title: 'Mount existing container',
-              subtitle: 'Unlock a VeraCrypt file you already have',
+              subtitle: 'Unlock a file container you already have',
               onTap: () {
                 Navigator.pop(sheetContext);
                 _showUnlockSheet();

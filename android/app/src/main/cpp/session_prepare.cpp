@@ -146,10 +146,6 @@ bool deriveHeaderKey(HashId hash,
         uint32_t timeCost = 0;
         uint32_t parallelism = 0;
         argon2ParamsForPim(clampedPim, memoryKiB, timeCost, parallelism);
-        // No early-exit here — VeraCrypt's embedded argon2.c exposes no
-        // cancellation hook. Bounded instead by the isUnlockCancelled()
-        // check between combinations in deriveAndValidateHeader's worker,
-        // same as before this change.
         return argon2idDeriveKey(password, passwordLen, salt, VC_SALT_SIZE,
                                  memoryKiB, timeCost, parallelism, out, outLen);
     }
@@ -406,14 +402,21 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         return false;
     }
 
-    // mappedCipher stays the app's existing 0/1/2 (aes/serpent/twofish)
-    // convention for matchedCipherId — unrelated to CascadeId's ordinals,
-    // and kept exactly as before so any stored records / UI reading this
-    // field keep behaving the same.
-    int mappedCipher = 0; // aes
-    if (luksInfo.cipherName == "serpent") mappedCipher = 1;
-    else if (luksInfo.cipherName == "twofish") mappedCipher = 2;
-    else if (luksInfo.cipherName != "aes") {
+    // Maps the LUKS header's plain-text cipher name to this app's CascadeId
+    // — the same canonical numbering Dart's CipherAlgo/crypto_algorithms.dart
+    // uses, so matchedCipherId reports consistently whether the session
+    // came from VeraCrypt or LUKS. Only single-layer ciphers make sense
+    // here: dm-crypt/LUKS has no concept of a cascade (one segment maps to
+    // exactly one dm-crypt cipher spec), unlike VeraCrypt's
+    // AES-Twofish-Serpent-style stacks — cryptsetup itself has no way to
+    // express those, so they were never real LUKS options to begin with.
+    CascadeId dataCipher;
+    if (luksInfo.cipherName == "aes") dataCipher = CascadeId::kAes;
+    else if (luksInfo.cipherName == "serpent") dataCipher = CascadeId::kSerpent;
+    else if (luksInfo.cipherName == "twofish") dataCipher = CascadeId::kTwofish;
+    else if (luksInfo.cipherName == "camellia") dataCipher = CascadeId::kCamellia;
+    else if (luksInfo.cipherName == "kuznyechik") dataCipher = CascadeId::kKuznyechik;
+    else {
         LOGI("prepareLuksSession(vol=%d): unsupported cipher '%s'", volId, luksInfo.cipherName.c_str());
         mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
         if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
@@ -423,12 +426,11 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
     int mappedHash = 0; // kSha512, display-only for LUKS
 
     // Cipher dispatch: AES gets mbedTLS's accelerated XTS directly (as
-    // before); Serpent/Twofish — the other ciphers cryptsetup commonly
-    // pairs with xts-plain64 — go through the same single-layer
-    // CascadeContext machinery the VeraCrypt cascade path already uses,
-    // via cascadeSetKeys(..., CascadeId::kSerpent/kTwofish, ...).
-    const bool isGenericCipher = (mappedCipher != 0);
-    const CascadeId genericCascadeId = (mappedCipher == 1) ? CascadeId::kSerpent : CascadeId::kTwofish;
+    // before); every other single-layer cipher cryptsetup commonly pairs
+    // with xts-plain64 — Serpent/Twofish/Camellia/Kuznyechik — goes through
+    // the same single-layer CascadeContext machinery the VeraCrypt cascade
+    // path already uses, via cascadeSetKeys(..., dataCipher, ...).
+    const bool isGenericCipher = (dataCipher != CascadeId::kAes);
     CascadeContext genericCascade;
 
     bool keySetupOk;
@@ -437,14 +439,14 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         keySetupOk = (mbedtls_aes_xts_setkey_dec(&v.luksXts.dec, luksInfo.masterKey.data(), xtsKeyBits) == 0 &&
                       mbedtls_aes_xts_setkey_enc(&v.luksXts.enc, luksInfo.masterKey.data(), xtsKeyBits) == 0);
     } else {
-        CascadeSpec spec = cascadeSpecFor(genericCascadeId);
+        CascadeSpec spec = cascadeSpecFor(dataCipher);
         if (spec.layerCount != 1 || luksInfo.masterKey.size() != static_cast<size_t>(spec.layerCount) * 64) {
             LOGI("prepareLuksSession(vol=%d): unsupported key size for %s (need %zu bytes, got %zu)",
                  volId, luksInfo.cipherName.c_str(), static_cast<size_t>(spec.layerCount) * 64,
                  luksInfo.masterKey.size());
             keySetupOk = false;
         } else {
-            keySetupOk = cascadeSetKeys(genericCascade, genericCascadeId,
+            keySetupOk = cascadeSetKeys(genericCascade, dataCipher,
                                          luksInfo.masterKey.data(), luksInfo.masterKey.size());
         }
     }
@@ -462,7 +464,7 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         v.dataAreaLengthBytes = fileSize - luksInfo.dataOffsetBytes;
         v.isHiddenVolume = false;
         v.fileSize = fileSize;
-        v.matchedCipherId = mappedCipher;
+        v.matchedCipherId = static_cast<int>(dataCipher);
         v.matchedHashId = mappedHash;
         v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
         v.luksUsesGenericCipher = isGenericCipher;

@@ -133,11 +133,21 @@ class CipherAlgo {
   static const List<CipherAlgo> withAuto = [auto, ...concrete];
 
   /// LUKS2 data-cipher choices — aes-xts-plain64/serpent-xts-plain64/
-  /// twofish-xts-plain64 are all real `cryptsetup luksFormat --cipher`
-  /// options with a single (non-cascaded) block cipher. Cascades
-  /// (Camellia/Kuznyechik/multi-layer combos) aren't valid LUKS ciphers, so
-  /// they're excluded here even though they're valid for VeraCrypt.
-  static const List<CipherAlgo> luks2Choices = [aes, serpent, twofish];
+  /// twofish-xts-plain64/camellia-xts-plain64/kuznyechik-xts-plain64 are
+  /// all real, single (non-cascaded) `cryptsetup luksFormat --cipher`
+  /// options (matching Linux kernel crypto API cipher names — Camellia and
+  /// Kuznyechik need that specific cipher module built into the target
+  /// kernel, same caveat Serpent/Twofish already carry). Cascades
+  /// (multi-layer combos like AES-Twofish-Serpent) aren't included: LUKS/
+  /// dm-crypt has no way to express a cascade — one segment maps to
+  /// exactly one dm-crypt cipher spec — so those stay VeraCrypt-only.
+  static const List<CipherAlgo> luks2Choices = [
+    aes,
+    serpent,
+    twofish,
+    camellia,
+    kuznyechik,
+  ];
 
   /// LUKS1 creation only ever offers AES: this app's own LUKS1 unlock path
   /// always decrypts the keyslot with AES-CBC regardless of the header's

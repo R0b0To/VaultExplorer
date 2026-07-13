@@ -467,6 +467,8 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
         if (dataCipher == CascadeId::kAes) cipherName = "aes";
         else if (dataCipher == CascadeId::kSerpent) cipherName = "serpent";
         else if (dataCipher == CascadeId::kTwofish) cipherName = "twofish";
+        else if (dataCipher == CascadeId::kCamellia) cipherName = "camellia";
+        else if (dataCipher == CascadeId::kKuznyechik) cipherName = "kuznyechik";
         else {
             LOGI("createLuksContainer: unsupported cipherId %d", cipherId);
             break;

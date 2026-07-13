@@ -117,8 +117,9 @@ bool luksRecoverMasterKey(int fd,
 struct LuksCreateParams {
     int version = 2;                // 1 or 2
 
-    // "aes" | "serpent" | "twofish". LUKS1 creation only accepts "aes" —
-    // see luksCreateHeader()'s doc comment for why.
+    // "aes" | "serpent" | "twofish" | "camellia" | "kuznyechik". Valid for
+    // both version==1 and version==2 — see luksCreateHeader()'s doc
+    // comment for why LUKS1 isn't restricted to "aes".
     std::string cipherName;
 
     // Keyslot PBKDF2 hash ("sha256" | "sha512"), and — for LUKS2 — also
@@ -153,18 +154,26 @@ struct LuksCreateParams {
 // ivTweak(always 0 for a fresh format)/masterKey), so no re-derivation is
 // needed after this call.
 //
-// LUKS1 creation only accepts cipherName "aes": this app's own LUKS1
-// unlock path (luks1Unlock, see luks_header.cpp) always decrypts the
-// keyslot's AF area with AES-CBC regardless of the header's declared
-// cipher — matching the historical LUKS1 convention of reusing the data
-// cipher for the keyslot too, which real cryptsetup does NOT hardcode to
-// AES. Creating a LUKS1 container with a different data cipher here would
-// therefore produce a container this app could never unlock again itself
-// (real cryptsetup would still open it fine, using its declared cipher
-// for the keyslot). LUKS2 has no such restriction: its keyslot area is
-// (both in this app's unlock path and in real cryptsetup's own default
-// behavior) always AES-XTS regardless of the segment's data cipher, so
-// "serpent"/"twofish" are safe choices there.
+// LUKS1 creation is NOT restricted to cipherName "aes". This app's LUKS1
+// unlock path (luks1Unlock, see luks_header.cpp) decrypts the keyslot's
+// AF area with whichever cipher the on-disk header declares
+// (cascadeIdForCipherName(phdr.cipherName, ...) feeding keyslotAreaCrypt),
+// and luks1CreateHeader() below encrypts that same AF area with the
+// caller's chosen [params.cipherName] the same way — matching real
+// LUKS1's convention of reusing the data cipher for the keyslot too. So a
+// LUKS1 container created here with Serpent/Twofish/Camellia/Kuznyechik
+// unlocks again just fine, the same as a real cryptsetup-created one
+// would. (An earlier version of this function hardcoded AES-CBC for the
+// keyslot regardless of cipherName, which both mismatched the spec and
+// produced containers that non-AES ciphers could never be unlocked with
+// again — see the inline comment further down where that was fixed.)
+//
+// LUKS2's keyslot area, by contrast, is governed by its own JSON
+// "area.encryption" field (read dynamically by luks2Unlock, written as
+// "aes-xts-plain64" by luks2CreateHeader() below) rather than following
+// the segment's data cipher — matching real cryptsetup's own default of
+// always keeping the LUKS2 keyslot area AES-XTS regardless of what
+// cipher the volume data itself uses.
 //
 // Does not touch [fd] beyond writing the header/keyslot/JSON region —
 // truncating/expanding the file to [sizeBytes], zero-filling the data

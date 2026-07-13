@@ -155,7 +155,7 @@ class CipherAlgo {
   /// luks_header.h), so creating a LUKS1 container with a different data
   /// cipher here would make it unopenable by this app again afterward —
   /// real cryptsetup would still open it fine, just not this app.
-  static const List<CipherAlgo> luks1Choices = [aes];
+  static const List<CipherAlgo> luks1Choices = [aes, serpent, twofish, camellia, kuznyechik];
 
   static String nameFor(int id) {
     for (final c in withAuto) {

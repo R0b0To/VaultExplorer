@@ -473,14 +473,12 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             LOGI("createLuksContainer: unsupported cipherId %d", cipherId);
             break;
         }
-        if (luksVersion == 1 && cipherName != "aes") {
-            // See luksCreateHeader()'s doc comment: this app's own LUKS1
-            // unlock path always AES-CBC-decrypts the keyslot regardless
-            // of the declared cipher, so any other choice here would
-            // create a container this app could never unlock again.
-            LOGI("createLuksContainer: LUKS1 creation only supports AES");
-            break;
-        }
+        // No AES-only restriction for LUKS1 here: luks1CreateHeader()
+        // encrypts the keyslot AF area with this same [cipherName] (see
+        // its keyslotAreaCrypt() call), and luks1Unlock() decrypts it by
+        // resolving the cipher straight out of the on-disk header rather
+        // than assuming AES — so LUKS1 supports the identical single-layer
+        // cipher set as LUKS2 (aes/serpent/twofish/camellia/kuznyechik).
 
         HashId createHash = static_cast<HashId>(hashId);
         LuksCreateParams params;
@@ -536,11 +534,10 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
         }
 
         // Matches prepareLuksSession's convention exactly (session_prepare.cpp),
-        // so a subsequent unlock computes the identical tweak base: LUKS1's
-        // absolute-sector convention (partitionStartSector=0) vs LUKS2's
-        // segment-relative one (partitionStartSector=dataOffsetBytes/512,
+        // so a subsequent unlock computes the identical tweak base: LUKS
+        // segment-relative convention (partitionStartSector=dataOffsetBytes/512,
         // since ivTweak==0 and sectorSize==512 for a fresh format).
-        const uint64_t partitionStartSector = (luksVersion == 1) ? 0 : (info.dataOffsetBytes / 512);
+        const uint64_t partitionStartSector = info.dataOffsetBytes / 512;
         const uint64_t dataAreaLengthBytes = static_cast<uint64_t>(sizeBytes) - info.dataOffsetBytes;
 
         bool fillOk = true;

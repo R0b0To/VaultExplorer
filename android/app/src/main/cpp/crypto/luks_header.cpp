@@ -182,12 +182,35 @@ static bool keyslotAreaCrypt(CascadeId cipherId, bool encrypt,
                               const unsigned char* in, unsigned char* out, size_t dataLen) {
     if (dataLen == 0 || dataLen % 512 != 0) return false;
     CascadeContext ctx;
-    if (!cascadeSetKeys(ctx, cipherId, keyMaterial, keyMaterialLen)) return false;
+    ctx.aesXtsFastPathReady = false;
+
+    // Fast path: bypass cascadeSetKeys (which enforces a 64-byte minimum) 
+    // for standard AES 256/512 keys used by LUKS.
+    if (cipherId == CascadeId::kAes && (keyMaterialLen == 32 || keyMaterialLen == 64)) {
+        ctx.id = cipherId;
+        ctx.layerCount = 1;
+        mbedtls_aes_xts_init(&ctx.aesXtsEncCtx);
+        mbedtls_aes_xts_init(&ctx.aesXtsDecCtx);
+        bool ok = (mbedtls_aes_xts_setkey_enc(&ctx.aesXtsEncCtx, keyMaterial, keyMaterialLen * 8) == 0) &&
+                  (mbedtls_aes_xts_setkey_dec(&ctx.aesXtsDecCtx, keyMaterial, keyMaterialLen * 8) == 0);
+        ctx.aesXtsFastPathReady = ok;
+        if (!ok) return false;
+    } else {
+        // Use standard VeraCrypt cascade init for other ciphers
+        if (!cascadeSetKeys(ctx, cipherId, keyMaterial, keyMaterialLen)) return false;
+    }
+
     const size_t sectorCount = dataLen / 512;
     for (size_t sec = 0; sec < sectorCount; sec++) {
         if (encrypt) cascadeEncryptSector(ctx, sec, in + sec * 512, out + sec * 512);
         else         cascadeDecryptSector(ctx, sec, in + sec * 512, out + sec * 512);
     }
+
+    if (ctx.aesXtsFastPathReady) {
+        mbedtls_aes_xts_free(&ctx.aesXtsEncCtx);
+        mbedtls_aes_xts_free(&ctx.aesXtsDecCtx);
+    }
+
     return true;
 }
 
@@ -1011,7 +1034,10 @@ static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLe
     constexpr uint32_t keyBytes = 64; // *-xts-plain64, 512-bit key (32B data + 32B tweak) — all 5 supported ciphers
     const uint64_t slot0Offset = kLuks1AlignBytes; // 8 sectors in
     const uint64_t afMaterialLen = (uint64_t)keyBytes * kLuks1Stripes; // 256000 bytes, 500 sectors
-    uint64_t payloadOffsetBytes = slot0Offset + afMaterialLen;
+    
+    // We must reserve space for all 8 contiguous keyslots (even if disabled)
+    // so that payloadOffsetBytes starts safely after keyslot 7's ending sector.
+    uint64_t payloadOffsetBytes = slot0Offset + 8 * afMaterialLen;
     payloadOffsetBytes = ((payloadOffsetBytes + kLuks1PayloadAlign - 1) / kLuks1PayloadAlign) * kLuks1PayloadAlign;
 
     if (sizeBytes <= 0 || (uint64_t)sizeBytes <= payloadOffsetBytes + kLuksMinExtraSpace) {
@@ -1094,14 +1120,22 @@ static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLe
     std::string uuid = generateUuidV4();
     std::strncpy(phdr.uuid, uuid.c_str(), sizeof(phdr.uuid) - 1);
 
-    // Slot 0: active. Slots 1-7 stay zeroed — active==0 never matches the
-    // 0x00AC71F3 marker luks1Unlock() checks for, so they're just skipped
-    // (both by this app and by real cryptsetup).
-    writeBE32((uint8_t*)&phdr.keySlots[0].active, 0x00AC71F3);
-    writeBE32((uint8_t*)&phdr.keySlots[0].iterations, params.pbkdf2Iterations);
-    std::memcpy(phdr.keySlots[0].salt, keyslotSalt, sizeof(keyslotSalt));
-    writeBE32((uint8_t*)&phdr.keySlots[0].keyMaterialOffset, (uint32_t)(slot0Offset / 512));
-    writeBE32((uint8_t*)&phdr.keySlots[0].stripes, kLuks1Stripes);
+    // Initialize all 8 keyslots. Linux cryptsetup checks stripes and keyMaterialOffset 
+    // unconditionally for ALL slots, even inactive ones. If we leave them zeroed, 
+    // it triggers invalid stripes or invalid offset errors and rejects the entire header.
+    for (int i = 0; i < 8; i++) {
+        uint64_t slotOffset = slot0Offset + i * afMaterialLen;
+        writeBE32((uint8_t*)&phdr.keySlots[i].active, i == 0 ? 0x00AC71F3 : 0x0000DEAD);
+        writeBE32((uint8_t*)&phdr.keySlots[i].iterations, i == 0 ? params.pbkdf2Iterations : 0);
+        writeBE32((uint8_t*)&phdr.keySlots[i].keyMaterialOffset, (uint32_t)(slotOffset / 512));
+        writeBE32((uint8_t*)&phdr.keySlots[i].stripes, kLuks1Stripes);
+        
+        if (i == 0) {
+            std::memcpy(phdr.keySlots[0].salt, keyslotSalt, sizeof(keyslotSalt));
+        } else {
+            std::memset(phdr.keySlots[i].salt, 0, 32);
+        }
+    }
 
     if (pwrite(fd, &phdr, sizeof(phdr), 0) != (ssize_t)sizeof(phdr)) {
         LOGI("luks1CreateHeader: phdr write failed");

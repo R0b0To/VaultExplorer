@@ -468,25 +468,19 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         v.matchedHashId = mappedHash;
         v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
         v.luksUsesGenericCipher = isGenericCipher;
-        if (luksInfo.version == 1) {
-            // LUKS1: cryptsetup sets dm-crypt's iv_offset = payload_offset, so
-            // the XTS tweak counter is the ABSOLUTE physical sector from the
-            // start of the container (there's no segment/iv_tweak concept).
-            v.partitionStartSector = 0;
-        } else {
-            // LUKS2: the segment's "iv_tweak" (default 0) is added to a
-            // counter that starts at 0 at the FIRST sector of the segment
-            // itself (segment-relative), not the start of the file. Folding
-            // both the segment offset and iv_tweak into partitionStartSector
-            // lets disk_read/disk_write's existing
-            // "physSector - partitionStartSector" arithmetic land on the
-            // correct dm-crypt sector value:
-            //   (physSector - segmentStartSector) / sectorsPerUnit + ivTweak
-            const uint64_t segmentStartSector = luksInfo.dataOffsetBytes / 512;
-            const uint64_t sectorsPerUnit = v.luksSectorSize / 512;
-            v.partitionStartSector = segmentStartSector - (luksInfo.ivTweak * sectorsPerUnit);
-        }
+        
+        // Both LUKS1 and LUKS2 use segment-relative tweak counters on Linux (iv_offset == 0).
+        // The segment's "iv_tweak" (always 0 for LUKS1) is added to a counter that starts at 0
+        // at the FIRST sector of the payload. Folding both the payload offset and iv_tweak
+        // into partitionStartSector lets disk_read/disk_write's existing
+        // "physSector - partitionStartSector" arithmetic land on the correct dm-crypt sector value:
+        //   (physSector - segmentStartSector) / sectorsPerUnit + ivTweak
+        const uint64_t segmentStartSector = luksInfo.dataOffsetBytes / 512;
+        const uint64_t sectorsPerUnit = v.luksSectorSize / 512;
+        v.partitionStartSector = segmentStartSector - (luksInfo.ivTweak * sectorsPerUnit);
+        
         v.containerFormat = luksInfo.version == 1
+
             ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
         if (isGenericCipher) {
             v.luksGenericCascade = genericCascade;

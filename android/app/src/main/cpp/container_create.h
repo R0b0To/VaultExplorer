@@ -40,9 +40,13 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
 // cipherId/hashId: unlike VeraCrypt's 255-means-auto convention, these
 // must both be concrete (non-255) here — container creation always knows
 // exactly which algorithm it's using, there is no auto-detect at creation
-// time. cipherId is restricted to AES(0)/Serpent(1)/Twofish(2); for
-// luksVersion==1, only AES(0) is accepted (see luksCreateHeader()'s doc
-// comment for why). hashId is restricted to SHA-512(0)/SHA-256(1)/
+// time. cipherId is restricted to the single-layer ciphers LUKS can
+// express — AES(0)/Serpent(1)/Twofish(2)/Camellia(8)/Kuznyechik(9) — and
+// that set is the same for luksVersion==1 and luksVersion==2: both
+// luks1CreateHeader() and luks1Unlock() encrypt/decrypt the keyslot AF
+// area with whatever cipher the container declares rather than assuming
+// AES (see luksCreateHeader()'s doc comment), so LUKS1 is no longer
+// restricted to AES-only. hashId is restricted to SHA-512(0)/SHA-256(1)/
 // Argon2id(5) — Argon2id is only valid for luksVersion==2, since LUKS1 has
 // no Argon2 support in the real spec.
 //

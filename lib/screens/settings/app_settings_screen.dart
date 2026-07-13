@@ -21,6 +21,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   AppSettings _settings = AppSettings();
   bool _loading = true;
   bool _saving = false;
+  
 
   bool _showPwFields = false;
   final _pwCtrl = TextEditingController();
@@ -404,6 +405,18 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                         _persist();
                       },
                     ),
+                    const Divider(height: 24),
+                    SettingsToggleRow(
+                      icon: Icons.gesture_rounded,
+                      title: 'Swipe Tutorial Nudge',
+                      subtitle:
+                          'Play a quick nudge animation on the first card to teach swipe-to-reveal gestures.',
+                      value: !_settings.hasSeenSwipeTutorial,
+                      onChanged: (v) {
+                        setState(() => _settings.hasSeenSwipeTutorial = !v);
+                        _persist();
+                      },
+                    ),
                   ],
                 ),
 
@@ -605,5 +618,3 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
     );
   }
 }
-
-// ── Sub-widgets ───────────────────────────────────────────────────────────────

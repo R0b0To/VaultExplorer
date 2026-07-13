@@ -28,6 +28,7 @@ class AppSettings {
   bool defaultDerivedKeyCacheEnabled;
   bool lockContainersOnScreenLock;
   int autoLockMins;
+  bool hasSeenSwipeTutorial;
 
   /// App-wide default thumbnail cache mode, applied to every container whose
   /// [ContainerRecord.thumbnailCacheMode] is null.
@@ -48,6 +49,7 @@ class AppSettings {
     this.defaultDocumentProvider = false,
     this.videoAutoPlay = true,
     this.blockScreenshots = false,
+    this.hasSeenSwipeTutorial = false,
     this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
     this.autoLockMins = 0,
@@ -80,6 +82,41 @@ class AppSettings {
       (_masterPasswordSalt == null || _masterPasswordSalt!.isEmpty) &&
       _masterPasswordHash!.length == 8;
 
+  /// Helper to allow clean, non-mutating updates of settings fields.
+  AppSettings copyWith({
+    bool? useMasterPassword,
+    bool? masterPasswordIsFingerprint,
+    bool? defaultDocumentProvider,
+    bool? videoAutoPlay,
+    bool? blockScreenshots,
+    bool? defaultDerivedKeyCacheEnabled,
+    bool? lockContainersOnScreenLock,
+    int? autoLockMins,
+    bool? hasSeenSwipeTutorial,
+    ThumbnailCacheMode? defaultThumbnailCacheMode,
+    ThumbnailQuality? defaultThumbnailQuality,
+    Map<String, String>? extensionPreferences,
+    String? masterPasswordHash,
+    String? masterPasswordSalt,
+  }) {
+    return AppSettings(
+      useMasterPassword: useMasterPassword ?? this.useMasterPassword,
+      masterPasswordIsFingerprint: masterPasswordIsFingerprint ?? this.masterPasswordIsFingerprint,
+      defaultDocumentProvider: defaultDocumentProvider ?? this.defaultDocumentProvider,
+      videoAutoPlay: videoAutoPlay ?? this.videoAutoPlay,
+      blockScreenshots: blockScreenshots ?? this.blockScreenshots,
+      defaultDerivedKeyCacheEnabled: defaultDerivedKeyCacheEnabled ?? this.defaultDerivedKeyCacheEnabled,
+      lockContainersOnScreenLock: lockContainersOnScreenLock ?? this.lockContainersOnScreenLock,
+      autoLockMins: autoLockMins ?? this.autoLockMins,
+      hasSeenSwipeTutorial: hasSeenSwipeTutorial ?? this.hasSeenSwipeTutorial,
+      defaultThumbnailCacheMode: defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
+      defaultThumbnailQuality: defaultThumbnailQuality ?? this.defaultThumbnailQuality,
+      extensionPreferences: extensionPreferences ?? this.extensionPreferences,
+      masterPasswordHash: masterPasswordHash ?? _masterPasswordHash,
+      masterPasswordSalt: masterPasswordSalt ?? _masterPasswordSalt,
+    );
+  }
+
   /// Serialises only non-secret preferences to JSON.
   /// Hash material is intentionally excluded.
   Map<String, dynamic> toJson() => {
@@ -91,6 +128,7 @@ class AppSettings {
     'defaultDerivedKeyCacheEnabled': defaultDerivedKeyCacheEnabled,
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
     'autoLockMins': autoLockMins,
+    'hasSeenSwipeTutorial': hasSeenSwipeTutorial, // Added serialization
     'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
     'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
     'extensionPreferences': extensionPreferences,
@@ -98,12 +136,13 @@ class AppSettings {
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
     useMasterPassword: j['useMasterPassword'] as bool? ?? false,
-    masterPasswordIsFingerprint:j['masterPasswordIsFingerprint'] as bool? ?? false,
+    masterPasswordIsFingerprint: j['masterPasswordIsFingerprint'] as bool? ?? false,
     defaultDocumentProvider: j['defaultDocumentProvider'] as bool? ?? false,
     videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
-    defaultDerivedKeyCacheEnabled:j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
-    lockContainersOnScreenLock:j['lockContainersOnScreenLock'] as bool? ?? true,
+    hasSeenSwipeTutorial: j['hasSeenSwipeTutorial'] as bool? ?? false, // Added deserialization
+    defaultDerivedKeyCacheEnabled: j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
+    lockContainersOnScreenLock: j['lockContainersOnScreenLock'] as bool? ?? true,
     autoLockMins: j['autoLockMins'] as int? ?? 0,
 
     // Resolve nullable parsed mode and default to appCache if null

@@ -1,4 +1,5 @@
-import 'package:flutter/gestures.dart'; // Added import
+import 'dart:async';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import '../../../models/vault_list_item.dart';
@@ -26,8 +27,6 @@ class SwipeRowGroupController extends ChangeNotifier {
   }
 }
 
-/// A horizontal drag recognizer that rejects itself if the gesture is predominantly vertical,
-/// allowing the parent ListView to handle scrolling without horizontal interruption.
 class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecognizer {
   StrictHorizontalDragGestureRecognizer({super.debugOwner});
 
@@ -49,13 +48,10 @@ class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecogni
         final double dx = delta.dx.abs();
         final double dy = delta.dy.abs();
 
-        // If movement is predominantly vertical, reject this gesture early
-        // to let the parent Scrollable (ListView) handle vertical scrolling.
         if (dy > dx && dy > 6.0) {
           rejectGesture(event.pointer);
           _startPositions.remove(event.pointer);
         } else if (dx > 12.0) {
-          // If a horizontal gesture is established, stop tracking to prevent rejection.
           _startPositions.remove(event.pointer);
         }
       }
@@ -81,6 +77,8 @@ class VaultCardRow extends StatefulWidget {
   final SwipeRowGroupController group;
   final bool isRemoving;
   final bool isInserting;
+  final bool triggerNudge;             // Passed down from dashboard
+  final VoidCallback? onNudgeComplete; // Callback when finished
 
   const VaultCardRow({
     super.key,
@@ -93,6 +91,8 @@ class VaultCardRow extends StatefulWidget {
     required this.group,
     this.isRemoving = false,
     this.isInserting = false,
+    this.triggerNudge = false,
+    this.onNudgeComplete,
   });
 
   @override
@@ -112,6 +112,9 @@ class _VaultCardRowState extends State<VaultCardRow>
   
   bool _isDragging = false;
   bool _isCurrentlyInserting = false;
+  
+  // Guard flag to prevent triggering the nudge multiple times within the same cycle
+  bool _hasTriggeredNudge = false;
 
   @override
   void initState() {
@@ -129,6 +132,14 @@ class _VaultCardRowState extends State<VaultCardRow>
         }
       });
     }
+
+    // Handles trigger on fresh initial build
+    if (widget.triggerNudge && !widget.isInserting) {
+      _hasTriggeredNudge = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _triggerPeekNudge();
+      });
+    }
   }
 
   @override
@@ -137,6 +148,17 @@ class _VaultCardRowState extends State<VaultCardRow>
     if (oldWidget.group != widget.group) {
       oldWidget.group.removeListener(_onGroupChanged);
       widget.group.addListener(_onGroupChanged);
+    }
+
+    // Checks for transitions when returning from other screens (like AppSettingsScreen)
+    if (widget.triggerNudge && !oldWidget.triggerNudge && !_hasTriggeredNudge) {
+      _hasTriggeredNudge = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _triggerPeekNudge();
+      });
+    } else if (!widget.triggerNudge) {
+      // Reset the local trigger flag once triggerNudge becomes false
+      _hasTriggeredNudge = false;
     }
   }
 
@@ -153,6 +175,51 @@ class _VaultCardRowState extends State<VaultCardRow>
     }
   }
 
+  Future<void> _triggerPeekNudge() async {
+    debugPrint('[VaultCardRow] Nudge checks passed. Starting delayed trigger...');
+    if (!mounted || _isDragging || _openSide != _OpenSide.none) return;
+
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+
+    debugPrint('[VaultCardRow] Executing nudge slide actions...');
+    await _animatePeekTo(-100.0, const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 650));
+
+    await _animatePeekTo(100.0, const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 650));
+
+    await _animatePeekTo(0.0, const Duration(milliseconds: 500));
+    
+    if (mounted) {
+      debugPrint('[VaultCardRow] Nudge complete, calling onNudgeComplete callback.');
+      widget.onNudgeComplete?.call();
+    }
+  }
+
+  Future<void> _animatePeekTo(double targetDx, Duration duration) {
+    final completer = Completer<void>();
+    if (!mounted) return Future.value();
+
+    _controller.stop();
+    _controller.duration = duration;
+    _controller.reset();
+
+    final animation = Tween<double>(begin: _dx, end: targetDx).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
+    );
+
+    void listener() => setState(() => _dx = animation.value);
+    animation.addListener(listener);
+
+    _controller.forward().whenCompleteOrCancel(() {
+      animation.removeListener(listener);
+      completer.complete();
+    });
+
+    return completer.future;
+  }
+
   void _animateTo(_OpenSide target) {
     final targetDx = switch (target) {
       _OpenSide.start => _revealExtent,
@@ -161,13 +228,16 @@ class _VaultCardRowState extends State<VaultCardRow>
     };
 
     _controller.stop();
+    _controller.duration = const Duration(milliseconds: 220);
     _controller.reset();
     final animation = Tween<double>(begin: _dx, end: targetDx).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
     );
     void listener() => setState(() => _dx = animation.value);
     animation.addListener(listener);
-    _controller.forward().whenCompleteOrCancel(() => animation.removeListener(listener));
+    _controller.forward().whenCompleteOrCancel(() {
+      animation.removeListener(listener);
+    });
 
     setState(() => _openSide = target);
     if (target == _OpenSide.none) {
@@ -332,8 +402,6 @@ class _VaultCardRowState extends State<VaultCardRow>
                               ],
                             ),
                           ),
-                          // Replaced standard GestureDetector with RawGestureDetector configured
-                          // with our custom StrictHorizontalDragGestureRecognizer
                           RawGestureDetector(
                             gestures: <Type, GestureRecognizerFactory>{
                               StrictHorizontalDragGestureRecognizer:

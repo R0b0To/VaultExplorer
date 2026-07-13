@@ -665,6 +665,7 @@ class _VaultDashboardState extends State<VaultDashboard>
             onReorder: _handleReorder,
             itemBuilder: (context, i) {
               final item = displayItems[i];
+               final bool triggerNudge = i == 0 && !_appSettings.hasSeenSwipeTutorial;
               return VaultCardRow(
                 key: ValueKey(item.uri),
                 index: i,
@@ -676,6 +677,16 @@ class _VaultDashboardState extends State<VaultDashboard>
                 onLocked: _onContainerLocked,
                 isRemoving: _animatingOutUris.contains(item.uri),
                 isInserting: _animatingInUris.contains(item.uri),
+                triggerNudge: triggerNudge, // Map property here
+                onNudgeComplete: () async {
+                  final updated = _appSettings.copyWith(hasSeenSwipeTutorial: true);
+                  await AppSettingsService.saveSettings(updated);
+                  if (mounted) {
+                    setState(() {
+                      _appSettings = updated;
+                    });
+                  }
+                },
               );
             },
           ),

@@ -397,8 +397,7 @@ target_link_libraries(
         e2fs_ext2fs
         e2fs_com_err
         e2fs_uuid
-        cjson
-        -pthread)                  # <-- Native Android multithreading backend linked
+        cjson)                  
 
 if(NOT ANDROID)
     add_executable(sector_batching_test test/sector_batching_test.cpp)

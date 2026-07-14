@@ -21,7 +21,6 @@ enum class CascadeId : uint8_t {
     kTwofishSerpent,
     kAesTwofishSerpent,
     kSerpentTwofishAes,
-    // Appended to preserve the persisted IDs of the original eight entries.
     kCamellia,
     kKuznyechik,
     kCamelliaKuznyechik,

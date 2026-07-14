@@ -28,12 +28,21 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    defaultConfig {
+   defaultConfig {
         applicationId = "com.aeidolon.vaultexplorer"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        
+        externalNativeBuild {
+            cmake {
+                arguments("-DCMAKE_BUILD_TYPE=Release")
+                cFlags("-O3", "-funroll-loops")
+                cppFlags("-O3", "-funroll-loops")
+            }
+        }
     }
 
     if (keystorePropertiesFile.exists()) {

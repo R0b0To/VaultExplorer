@@ -343,10 +343,16 @@ add_library(
         ${VC_ARGON2_DIR}/src/opt_sse2.c
         ${VC_ARGON2_DIR}/src/opt_avx2.c
         ${VC_ARGON2_DIR}/src/blake2/blake2b.c
+        crypto/thread.c 
         # ── NTFS-3G Sources ──
         ${NTFS_3G_SOURCES}
         ${MKNTFS_EMBEDDED_SOURCE}
 )
+
+# Force core.c to include your local thread.h at compile time without modifying core.c on disk
+set_source_files_properties(${VC_ARGON2_DIR}/src/core.c
+        TARGET_DIRECTORY vaultexplorer
+        PROPERTIES COMPILE_OPTIONS "-include;${CMAKE_CURRENT_SOURCE_DIR}/crypto/thread.h")
 
 target_compile_definitions(vaultexplorer PRIVATE
         CRYPTOPP_DISABLE_ASM
@@ -356,7 +362,6 @@ target_compile_definitions(vaultexplorer PRIVATE
         # referencing its SHA-NI self-test, which is not compiled when ASM is
         # disabled (notably on Android x86_64).
         CRYPTOPP_DISABLE_SHANI
-        ARGON2_NO_THREADS # VeraCrypt uses one Argon2id lane for volume headers.
         HAVE_CONFIG_H  # Forces NTFS-3G files to look up our generated config.h
         _GNU_SOURCE
         _FILE_OFFSET_BITS=64
@@ -392,7 +397,8 @@ target_link_libraries(
         e2fs_ext2fs
         e2fs_com_err
         e2fs_uuid
-        cjson)
+        cjson
+        -pthread)                  # <-- Native Android multithreading backend linked
 
 if(NOT ANDROID)
     add_executable(sector_batching_test test/sector_batching_test.cpp)

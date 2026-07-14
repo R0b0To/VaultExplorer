@@ -650,3 +650,428 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
     close(fd);
     return success;
 }
+
+bool createContainerWithHidden(int fd,
+                               const char* outerPassword, const char* hiddenPassword,
+                               int outerPim, int hiddenPim,
+                               int64_t sizeBytes,
+                               const char* outerFileSystem, const char* hiddenFileSystem,
+                               int64_t hiddenSizeBytes,
+                               int outerCipherId, int outerHashId,
+                               int hiddenCipherId, int hiddenHashId,
+                               const int* outerKeyfileFds, int outerKeyfileCount,
+                               const int* hiddenKeyfileFds, int hiddenKeyfileCount) {
+    int fdOuter = dup(fd);
+    if (fdOuter < 0) {
+        LOGI("createContainerWithHidden: failed to dup fd");
+        close(fd);
+        if (outerKeyfileFds) for (int i = 0; i < outerKeyfileCount; i++) if (outerKeyfileFds[i] >= 0) close(outerKeyfileFds[i]);
+        if (hiddenKeyfileFds) for (int i = 0; i < hiddenKeyfileCount; i++) if (hiddenKeyfileFds[i] >= 0) close(hiddenKeyfileFds[i]);
+        return false;
+    }
+    
+    // Outer format consumes fdOuter and outerKeyfileFds
+    bool outerSuccess = createContainer(fdOuter, outerPassword, outerPim, sizeBytes, outerFileSystem,
+                                        outerCipherId, outerHashId, outerKeyfileFds, outerKeyfileCount);
+    if (!outerSuccess) {
+        LOGI("createContainerWithHidden: outer volume creation failed");
+        close(fd);
+        if (hiddenKeyfileFds) for (int i = 0; i < hiddenKeyfileCount; i++) if (hiddenKeyfileFds[i] >= 0) close(hiddenKeyfileFds[i]);
+        return false;
+    }
+
+    LOGI("createContainerWithHidden: outer volume created successfully, proceeding with hidden volume");
+
+    bool success = false;
+    unsigned char hiddenMixedPassword[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize hiddenMixedPasswordGuard(hiddenMixedPassword, sizeof(hiddenMixedPassword));
+    size_t hiddenMixedPasswordLen = std::min(strlen(hiddenPassword), sizeof(hiddenMixedPassword));
+    memcpy(hiddenMixedPassword, hiddenPassword, hiddenMixedPasswordLen);
+    
+    if (hiddenKeyfileCount > 0 && hiddenKeyfileFds != nullptr) {
+        if (!applyKeyfilesToPassword(hiddenKeyfileFds, hiddenKeyfileCount, hiddenMixedPassword, &hiddenMixedPasswordLen)) {
+            LOGI("createContainerWithHidden: hidden keyfile mixing failed");
+            close(fd);
+            return false;
+        }
+    }
+    if (hiddenMixedPasswordLen == 0) {
+        LOGI("createContainerWithHidden: empty hidden password");
+        close(fd);
+        return false;
+    }
+
+    CascadeId createCipher = (hiddenCipherId != 255) ? static_cast<CascadeId>(hiddenCipherId) : CascadeId::kAes;
+    HashId    createHash   = (hiddenHashId   != 255) ? static_cast<HashId>(hiddenHashId)      : HashId::kSha512;
+    CascadeSpec cSpec      = cascadeSpecFor(createCipher);
+    const int masterKeyLen = cSpec.layerCount * 64;
+
+    unsigned char hiddenSalt[VC_SALT_SIZE] = {0};
+    unsigned char hiddenCombinedMasterKey[192] = {0};
+
+    do {
+        const uint64_t VOLUME_SIZE = static_cast<uint64_t>(sizeBytes);
+        uint64_t hiddenDataSize = static_cast<uint64_t>(hiddenSizeBytes);
+        hiddenDataSize = (hiddenDataSize / 512) * 512;
+        
+        if (hiddenDataSize == 0 || VOLUME_SIZE <= VC_DATA_AREA_OFFSET + hiddenDataSize) {
+            LOGI("createContainerWithHidden: invalid hidden size");
+            break;
+        }
+        
+        uint64_t hiddenDataStartAbsolute = VOLUME_SIZE - hiddenDataSize;
+        
+        int volId = -1;
+        {
+            std::lock_guard<std::mutex> allocLock(slotAllocMutex);
+            for (int i = 0; i < MAX_VOLUMES; i++) {
+                if (!volumes[i].dataCtxInitialized) { volId = i; break; }
+            }
+        }
+        if (volId < 0) {
+            LOGI("createContainerWithHidden: no free volume slots");
+            break;
+        }
+        VolumeState& v = volumes[volId];
+
+        FILE* urandom = fopen("/dev/urandom", "rb");
+        if (!urandom) break;
+        fread(hiddenSalt, 1, sizeof(hiddenSalt), urandom);
+        fread(hiddenCombinedMasterKey, 1, masterKeyLen, urandom);
+        fclose(urandom);
+
+        int clampedPim = clampPim(hiddenPim);
+        unsigned char hiddenHeaderKey[192] = {0};
+        ScopeZeroize hiddenHeaderKeyGuard(hiddenHeaderKey, sizeof(hiddenHeaderKey));
+        
+        if (!deriveHeaderKey(createHash, hiddenMixedPassword, hiddenMixedPasswordLen,
+                             hiddenSalt, clampedPim, hiddenHeaderKey, sizeof(hiddenHeaderKey))) {
+            LOGI("createContainerWithHidden: hidden deriveHeaderKey failed");
+            break;
+        }
+
+        unsigned char body[VC_HEADER_BODY_SIZE] = {0};
+        const char magic[] = "VERA";
+        memcpy(body, magic, 4);
+        
+        uint16_t version = 5;
+        body[4] = (version >> 8) & 0xFF;
+        body[5] = version & 0xFF;
+        uint16_t reqVersion = 6;
+        body[6] = (reqVersion >> 8) & 0xFF;
+        body[7] = reqVersion & 0xFF;
+
+        auto writeBE64 = [](unsigned char* buf, int offset, uint64_t val) {
+            for (int i = 7; i >= 0; --i) { buf[offset + i] = val & 0xFF; val >>= 8; }
+        };
+        auto writeBE32 = [](unsigned char* buf, int offset, uint32_t val) {
+            for (int i = 3; i >= 0; --i) { buf[offset + i] = val & 0xFF; val >>= 8; }
+        };
+
+        writeBE64(body, VC_HDR_OFF_HIDDEN_VOL_SIZE, hiddenDataSize);
+        writeBE64(body, VC_HDR_OFF_VOLUME_SIZE, hiddenDataSize);
+        writeBE64(body, VC_HDR_OFF_KEY_SCOPE_START, hiddenDataStartAbsolute);
+        writeBE64(body, VC_HDR_OFF_KEY_SCOPE_SIZE, hiddenDataSize);
+        writeBE32(body, VC_HDR_OFF_SECTOR_SIZE, VC_SUPPORTED_SECTOR_SIZE);
+
+        memcpy(&body[VC_KEY_OFFSET_MASTER], hiddenCombinedMasterKey, masterKeyLen);
+
+        uint32_t keyCrc = crc32(&body[VC_KEY_OFFSET_MASTER], VC_HDR_KEY_CRC_COVERAGE_LEN);
+        writeBE32(body, VC_HDR_OFF_KEY_CRC, keyCrc);
+
+        uint32_t hdrCrc = crc32(body, VC_HDR_CRC_COVERAGE_LEN);
+        writeBE32(body, VC_HDR_OFF_HEADER_CRC, hdrCrc);
+
+        unsigned char encBody[VC_HEADER_BODY_SIZE];
+        {
+            CascadeContext hdrCtx;
+            if (!cascadeSetKeys(hdrCtx, createCipher, hiddenHeaderKey, masterKeyLen)) {
+                LOGI("createContainerWithHidden: cascadeSetKeys failed for header");
+                break;
+            }
+            std::memcpy(encBody, body, VC_HEADER_BODY_SIZE);
+            for (int layer = cSpec.layerCount - 1; layer >= 0; layer--) {
+                const XtsLayerKey& lk = hdrCtx.layers[layer];
+                unsigned char T[16] = {0};
+                blockCipherEncryptBlock(lk.tweakKey, T, T);
+                for (int blk = 0; blk < 28; blk++) {
+                    unsigned char* bp = encBody + blk * 16;
+                    unsigned char tmp[16];
+                    for (int j = 0; j < 16; j++) tmp[j] = bp[j] ^ T[j];
+                    blockCipherEncryptBlock(lk.dataKeyEnc, tmp, tmp);
+                    for (int j = 0; j < 16; j++) bp[j] = tmp[j] ^ T[j];
+                    xtsMultiplyTweak(T);
+                }
+            }
+        }
+
+        mbedtls_platform_zeroize(body, sizeof(body));
+
+        unsigned char hdrSector[VC_FULL_HEADER_SIZE];
+        memcpy(hdrSector,                  hiddenSalt,    VC_SALT_SIZE);
+        memcpy(hdrSector + VC_SALT_SIZE,   encBody, VC_HEADER_BODY_SIZE);
+
+        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, VC_HIDDEN_HEADER_OFFSET) != VC_FULL_HEADER_SIZE) {
+            LOGI("createContainerWithHidden: hidden header write failed"); break;
+        }
+
+        {
+            CascadeContext dataCtx;
+            if (!cascadeSetKeys(dataCtx, createCipher, hiddenCombinedMasterKey, masterKeyLen)) {
+                LOGI("createContainerWithHidden: cascadeSetKeys failed for data");
+                break;
+            }
+
+            const uint64_t START_SECTOR  = hiddenDataStartAbsolute / 512;
+            const uint64_t TOTAL_SECTORS = hiddenDataSize / 512;
+
+            const unsigned char ZERO_SECTOR[512] = {0};
+            const size_t batchBufBytes = CREATE_FILL_BATCH * 512;
+            std::unique_ptr<unsigned char[]> batch(new unsigned char[batchBufBytes]);
+            bool writeOk = true;
+
+            for (uint64_t s = 0; s < TOTAL_SECTORS && writeOk; ) {
+                const uint64_t rem   = TOTAL_SECTORS - s;
+                const uint64_t count = (rem < CREATE_FILL_BATCH) ? rem : CREATE_FILL_BATCH;
+
+                for (uint64_t i = 0; i < count; ++i) {
+                    cascadeEncryptSector(dataCtx, START_SECTOR + s + i, ZERO_SECTOR,
+                                        batch.get() + i * 512);
+                }
+
+                const ssize_t want = static_cast<ssize_t>(count * 512);
+                if (pwrite(fd, batch.get(), want,
+                           static_cast<off_t>((START_SECTOR + s) * 512)) != want) {
+                    LOGI("createContainerWithHidden: data fill write failed at sector %llu",
+                         (unsigned long long)(START_SECTOR + s));
+                    writeOk = false;
+                }
+                s += count;
+            }
+            if (!writeOk) break;
+        }
+
+        fsync(fd);
+
+        {
+            std::lock_guard<std::mutex> vlock(v.mutex);
+            cascadeSetKeys(v.cascade, createCipher, hiddenCombinedMasterKey, masterKeyLen);
+            v.dataCtxInitialized = true;
+            v.fd                 = fd;
+            v.dataOffset         = hiddenDataStartAbsolute;
+            v.dataAreaLengthBytes = hiddenDataSize;
+            v.fileSize           = VOLUME_SIZE;
+            v.isHiddenVolume     = true;
+
+            const bool useExFat = (strncasecmp(hiddenFileSystem, "exfat", 5) == 0);
+            const bool useNtfs = (strncasecmp(hiddenFileSystem, "ntfs", 4) == 0);
+            const bool useExt = strncasecmp(hiddenFileSystem, "ext2", 4) == 0 ||
+                                strncasecmp(hiddenFileSystem, "ext3", 4) == 0 ||
+                                strncasecmp(hiddenFileSystem, "ext4", 4) == 0;
+
+            if (useExt) {
+                v.partitionStartSector = 0;
+                v.dataOffset = hiddenDataStartAbsolute;
+                v.dataAreaLengthBytes = hiddenDataSize;
+                v.isUsbSource = false;
+                if (!formatExtVolume(volId, hiddenFileSystem)) {
+                    LOGI("createContainerWithHidden: formatExtVolume failed");
+                    v.dataCtxInitialized = false;
+                    break;
+                }
+            } else if (useNtfs) {
+                char deviceName[16];
+                std::snprintf(deviceName, sizeof(deviceName), "ve%d", volId);
+                char* args[] = {
+                    const_cast<char*>("mkntfs"), const_cast<char*>("-F"),
+                    const_cast<char*>("-Q"), const_cast<char*>("-s"),
+                    const_cast<char*>("512"), const_cast<char*>("-p"),
+                    const_cast<char*>("0"), deviceName, nullptr
+                };
+                int mkntfsRet = vaultexplorer_mkntfs_main(8, args);
+                if (mkntfsRet != 0) {
+                    LOGI("createContainerWithHidden: mkntfs failed (%d)", mkntfsRet);
+                    v.dataCtxInitialized = false;
+                    break;
+                }
+            } else {
+                std::unique_ptr<BYTE[]> workBuf(new BYTE[MKFS_WORK_BUF_SIZE]);
+                MKFS_PARM opt = {0};
+                opt.fmt = (useExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
+                opt.n_fat = 1;
+                opt.align = 0;
+                opt.n_root = 512;
+                opt.au_size = 0;
+
+                FRESULT fr = f_mkfs(drivePaths[volId], &opt, workBuf.get(), MKFS_WORK_BUF_SIZE);
+                if (fr != FR_OK) {
+                    LOGI("createContainerWithHidden: f_mkfs failed (%d)", fr);
+                    v.dataCtxInitialized = false;
+                    break;
+                }
+            }
+        }
+
+        {
+            std::lock_guard<std::mutex> vlock(v.mutex);
+            v.fsMounted = false;
+            v.fd = -1;
+            v.dataCtxInitialized = false;
+        }
+
+        success = true;
+        LOGI("createContainerWithHidden: complete - hidden size %lld bytes, fs=%s",
+             (long long)hiddenDataSize, hiddenFileSystem);
+
+    } while (false);
+
+    mbedtls_platform_zeroize(hiddenCombinedMasterKey, sizeof(hiddenCombinedMasterKey));
+    mbedtls_platform_zeroize(hiddenSalt, sizeof(hiddenSalt));
+
+    if (success) {
+        fsync(fd);
+        LOGI("createContainerWithHidden: SUCCESS.");
+    }
+    close(fd);
+
+    return success;
+}
+
+bool changeContainerPassword(int fd,
+                             const char* oldPassword, const char* newPassword,
+                             int oldPim, int newPim,
+                             int cipherId, int hashId,
+                             const int* oldKeyfileFds, int oldKeyfileCount,
+                             const int* newKeyfileFds, int newKeyfileCount) {
+    bool success = false;
+    unsigned char oldMixedPassword[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize oldMixedPasswordGuard(oldMixedPassword, sizeof(oldMixedPassword));
+    size_t oldMixedPasswordLen = std::min(strlen(oldPassword), sizeof(oldMixedPassword));
+    memcpy(oldMixedPassword, oldPassword, oldMixedPasswordLen);
+    
+    if (oldKeyfileCount > 0 && oldKeyfileFds != nullptr) {
+        if (!applyKeyfilesToPassword(oldKeyfileFds, oldKeyfileCount, oldMixedPassword, &oldMixedPasswordLen)) {
+            LOGI("changeContainerPassword: old keyfile mixing failed");
+            close(fd);
+            if (newKeyfileFds) for (int i = 0; i < newKeyfileCount; i++) if (newKeyfileFds[i] >= 0) close(newKeyfileFds[i]);
+            return false;
+        }
+    }
+
+    unsigned char newMixedPassword[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize newMixedPasswordGuard(newMixedPassword, sizeof(newMixedPassword));
+    size_t newMixedPasswordLen = std::min(strlen(newPassword), sizeof(newMixedPassword));
+    memcpy(newMixedPassword, newPassword, newMixedPasswordLen);
+    
+    if (newKeyfileCount > 0 && newKeyfileFds != nullptr) {
+        if (!applyKeyfilesToPassword(newKeyfileFds, newKeyfileCount, newMixedPassword, &newMixedPasswordLen)) {
+            LOGI("changeContainerPassword: new keyfile mixing failed");
+            close(fd);
+            return false;
+        }
+    }
+    
+    do {
+        uint64_t targetOffset = 0;
+        bool foundMatch = false;
+        
+        unsigned char recoveredKeyMaterial[192] = {0};
+        unsigned char decryptedBody[VC_HEADER_BODY_SIZE] = {0};
+        CascadeId matchedCipher;
+        HashId matchedHash;
+        ParsedHeaderFields fields;
+
+        struct HeaderSlot { uint64_t fileOffset; };
+        static constexpr HeaderSlot kHeaderSlots[] = { { 0 }, { VC_HIDDEN_HEADER_OFFSET } };
+        
+        for (const auto& slot : kHeaderSlots) {
+            unsigned char primaryHeaderSector[VC_FULL_HEADER_SIZE];
+            if (pread(fd, primaryHeaderSector, VC_FULL_HEADER_SIZE, slot.fileOffset) != VC_FULL_HEADER_SIZE) {
+                continue;
+            }
+            if (deriveAndValidateHeader(primaryHeaderSector, oldMixedPassword, oldMixedPasswordLen, oldPim,
+                                        cipherId, hashId,
+                                        recoveredKeyMaterial, decryptedBody,
+                                        matchedCipher, matchedHash, fields)) {
+                foundMatch = true;
+                targetOffset = slot.fileOffset;
+                break;
+            }
+        }
+
+        if (!foundMatch) {
+            LOGI("changeContainerPassword: old password/keyfile verification failed");
+            break;
+        }
+        
+        mbedtls_platform_zeroize(recoveredKeyMaterial, sizeof(recoveredKeyMaterial)); // Unused for re-encryption
+
+        FILE* urandom = fopen("/dev/urandom", "rb");
+        if (!urandom) break;
+        unsigned char newSalt[VC_SALT_SIZE];
+        fread(newSalt, 1, sizeof(newSalt), urandom);
+        fclose(urandom);
+
+        int clampedNewPim = clampPim(newPim);
+        unsigned char newHeaderKey[192] = {0};
+        ScopeZeroize newHeaderKeyGuard(newHeaderKey, sizeof(newHeaderKey));
+        
+        if (!deriveHeaderKey(matchedHash, newMixedPassword, newMixedPasswordLen,
+                             newSalt, clampedNewPim, newHeaderKey, sizeof(newHeaderKey))) {
+            LOGI("changeContainerPassword: new header key derivation failed");
+            break;
+        }
+
+        unsigned char encBody[VC_HEADER_BODY_SIZE];
+        {
+            CascadeSpec cSpec = cascadeSpecFor(matchedCipher);
+            int masterKeyLen = cSpec.layerCount * 64;
+            CascadeContext hdrCtx;
+            if (!cascadeSetKeys(hdrCtx, matchedCipher, newHeaderKey, masterKeyLen)) {
+                LOGI("changeContainerPassword: cascadeSetKeys failed for header");
+                break;
+            }
+            std::memcpy(encBody, decryptedBody, VC_HEADER_BODY_SIZE);
+            for (int layer = cSpec.layerCount - 1; layer >= 0; layer--) {
+                const XtsLayerKey& lk = hdrCtx.layers[layer];
+                unsigned char T[16] = {0};
+                blockCipherEncryptBlock(lk.tweakKey, T, T);
+                for (int blk = 0; blk < 28; blk++) {
+                    unsigned char* bp = encBody + blk * 16;
+                    unsigned char tmp[16];
+                    for (int j = 0; j < 16; j++) tmp[j] = bp[j] ^ T[j];
+                    blockCipherEncryptBlock(lk.dataKeyEnc, tmp, tmp);
+                    for (int j = 0; j < 16; j++) bp[j] = tmp[j] ^ T[j];
+                    xtsMultiplyTweak(T);
+                }
+            }
+        }
+        mbedtls_platform_zeroize(decryptedBody, sizeof(decryptedBody));
+
+        unsigned char hdrSector[VC_FULL_HEADER_SIZE];
+        memcpy(hdrSector,                  newSalt, VC_SALT_SIZE);
+        memcpy(hdrSector + VC_SALT_SIZE,   encBody, VC_HEADER_BODY_SIZE);
+
+        if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE, targetOffset) != VC_FULL_HEADER_SIZE) {
+            LOGI("changeContainerPassword: primary header write failed"); break;
+        }
+
+        if (targetOffset == 0) {
+            uint64_t containerVolumeSize = fields.volumeSize;
+            if (pwrite(fd, hdrSector, VC_FULL_HEADER_SIZE,
+                       static_cast<off_t>(containerVolumeSize - VC_DATA_AREA_OFFSET)) != VC_FULL_HEADER_SIZE) {
+                LOGI("changeContainerPassword: backup header write failed"); break;
+            }
+        } else {
+            LOGI("changeContainerPassword: Note - changed hidden volume password. No backup header to update.");
+        }
+
+        success = true;
+        LOGI("changeContainerPassword: SUCCESS");
+
+    } while(false);
+
+    if (success) fsync(fd);
+    close(fd);
+    return success;
+}

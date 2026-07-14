@@ -604,527 +604,535 @@ Future<void> _pickFile() async {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.initialUri != null ? 'Unlock Container' : 'Mount Container',
+    return PopScope(
+      canPop: !_loading,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _loading && _activeVolId != null) {
+          vaultExplorerApi.cancelUnlock(_activeVolId!);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            widget.initialUri != null ? 'Unlock Container' : 'Mount Container',
+          ),
+          bottom: _loading
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(4),
+                  child: LinearProgressIndicator(
+                    color: cs.primary,
+                    backgroundColor: cs.primaryContainer,
+                  ),
+                )
+              : null,
         ),
-        bottom: _loading
-            ? PreferredSize(
-                preferredSize: const Size.fromHeight(4),
-                child: LinearProgressIndicator(
-                  color: cs.primary,
-                  backgroundColor: cs.primaryContainer,
-                ),
-              )
-            : null,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // ── Modernized File Picker Card ───────────────────────────
-              GestureDetector(
-                onTap: _loading ? null : _pickFile,
-                child: Card(
-                  elevation: 0,
-                  color: _selectedUri != null
-                      ? cs.primaryContainer.withValues(alpha: 0.12)
-                      : cs.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(
-                      color: _selectedUri != null
-                          ? cs.primary
-                          : cs.outlineVariant.withValues(alpha: 0.5),
-                      width: _selectedUri != null ? 1.5 : 1,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── Modernized File Picker Card ───────────────────────────
+                GestureDetector(
+                  onTap: _loading ? null : _pickFile,
+                  child: Card(
+                    elevation: 0,
+                    color: _selectedUri != null
+                        ? cs.primaryContainer.withValues(alpha: 0.12)
+                        : cs.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: _selectedUri != null
+                            ? cs.primary
+                            : cs.outlineVariant.withValues(alpha: 0.5),
+                        width: _selectedUri != null ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _selectedUri != null
+                                  ? cs.primaryContainer
+                                  : cs.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              _selectedUri != null
+                                  ? Icons.folder_zip_rounded
+                                  : Icons.folder_zip_rounded,
+                              size: 24,
+                              color: _selectedUri != null
+                                  ? cs.onPrimaryContainer
+                                  : cs.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _selectedUri != null
+                                      ? (_isLuks
+                                          ? 'LUKS Container'
+                                          : 'Selected Container')
+                                      : 'Encrypted Container',
+                                  style: textTheme.labelLarge?.copyWith(
+                                    color: _selectedUri != null
+                                        ? cs.primary
+                                        : cs.onSurfaceVariant,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _selectedName ?? 'Tap to select container file…',
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: _selectedUri != null
+                                        ? cs.onSurface
+                                        : cs.onSurfaceVariant,
+                                    fontWeight: _selectedUri != null
+                                        ? FontWeight.w500
+                                        : null,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_selectedUri != null && widget.initialUri == null) ...[
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 20),
+                              onPressed: _loading
+                                  ? null
+                                  : () => setState(() {
+                                        _selectedUri = null;
+                                        _selectedName = null;
+                                      }),
+                              style: IconButton.styleFrom(
+                                backgroundColor: cs.surfaceContainerHigh,
+                                padding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ] else if (_selectedUri != null && widget.initialUri != null) ...[
+                          ] else ...[
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: _selectedUri != null
-                                ? cs.primaryContainer
-                                : cs.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            _selectedUri != null
-                                ? Icons.folder_zip_rounded
-                                : Icons.folder_zip_rounded,
-                            size: 24,
-                            color: _selectedUri != null
-                                ? cs.onPrimaryContainer
-                                : cs.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                const SizedBox(height: 24),
+
+                // ── Auth-specific UI ──────────────────────────────────────────
+                if (_loadingAuth)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: CircularProgressIndicator(strokeWidth: 3),
+                    ),
+                  )
+                // ── Container file unreachable Card ────────────────────────
+                else if (_containerMissing) ...[
+                  Card(
+                    elevation: 0,
+                    color: cs.errorContainer.withValues(alpha: 0.15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                      side: BorderSide(color: cs.error.withValues(alpha: 0.25)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Text(
-                                _selectedUri != null
-                                    ? (_isLuks
-                                        ? 'LUKS Container'
-                                        : 'Selected Container')
-                                    : 'Encrypted Container',
-                                style: textTheme.labelLarge?.copyWith(
-                                  color: _selectedUri != null
-                                      ? cs.primary
-                                      : cs.onSurfaceVariant,
-                                  fontWeight: FontWeight.bold,
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: cs.errorContainer,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.find_in_page_outlined,
+                                  color: cs.error,
+                                  size: 28,
                                 ),
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _selectedName ?? 'Tap to select container file…',
-                                style: textTheme.bodyMedium?.copyWith(
-                                  color: _selectedUri != null
-                                      ? cs.onSurface
-                                      : cs.onSurfaceVariant,
-                                  fontWeight: _selectedUri != null
-                                      ? FontWeight.w500
-                                      : null,
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Container missing',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: cs.onErrorContainer,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'File path could not be resolved',
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: cs.onErrorContainer.withValues(alpha: 0.8),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
-                        ),
-                        if (_selectedUri != null && widget.initialUri == null) ...[
-                          IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 20),
-                            onPressed: _loading
-                                ? null
-                                : () => setState(() {
-                                      _selectedUri = null;
-                                      _selectedName = null;
-                                    }),
-                            style: IconButton.styleFrom(
-                              backgroundColor: cs.surfaceContainerHigh,
-                              padding: EdgeInsets.zero,
+                          const SizedBox(height: 16),
+                          Text(
+                            'The container file may have been moved, deleted, or its host storage is currently disconnected.',
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.4,
                             ),
                           ),
-                        ] else if (_selectedUri != null && widget.initialUri != null) ...[
-                        ] else ...[
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                          const SizedBox(height: 24),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _loadingAuth = true;
+                                      _containerMissing = false;
+                                    });
+                                    _initUnlockMethod();
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  child: const Text('Retry'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: _relocateContainer,
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  child: const Text('Locate file'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ]
+                // ── Biometric Card ─────────────────────────────────────────
+                else if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
+                  Card(
+                    elevation: 0,
+                    color: cs.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                      side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: cs.primaryContainer.withValues(alpha: 0.4),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.fingerprint_rounded,
+                              size: 64,
+                              color: cs.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Biometric Unlock',
+                            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Authenticate to securely mount the container',
+                            style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 32),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => setState(() => _showPasswordFallback = true),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: const Text('Use Password'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: _tryBiometric,
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                  ),
+                                  child: const Text('Authenticate'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ]
+                // ── Pattern Card ───────────────────────────────────────────
+                else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
+                  Card(
+                    elevation: 0,
+                    color: cs.surfaceContainerLow,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
+                      side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Draw Unlock Pattern',
+                            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _patternError ? 'Wrong pattern — try again' : 'Connect your pattern sequence',
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: _patternError ? cs.error : cs.onSurfaceVariant,
+                              fontWeight: _patternError ? FontWeight.bold : null,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          PatternLockView(
+                            key: ValueKey(_patternResetKey),
+                            onPatternComplete: _onPatternComplete,
+                            showError: _patternError,
+                          ),
+                          const SizedBox(height: 24),
+                          OutlinedButton(
+                            onPressed: () => setState(() => _showPasswordFallback = true),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text('Use Password instead'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ]
+                // ── Standard password fields ───────────────────────────────
+                else if (_showPasswordUI) ...[
+                  AutofillGroup(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 1. Password Field
+                        TextField(
+                          controller: _passwordCtrl,
+                          obscureText: _obscure,
+                          autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
+                          onChanged: (_) => setState(() {}),
+                          keyboardType: TextInputType.visiblePassword,
+                          autofillHints: const [AutofillHints.password],
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            hintText: 'Enter container password',
+                            prefixIcon: Icon(Icons.lock_outline_rounded, size: 22, color: cs.primary),
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_passwordPrefilled)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 4),
+                                    child: Tooltip(
+                                      message: 'Using saved password',
+                                      child: Icon(
+                                        Icons.bookmark_rounded,
+                                        size: 20,
+                                        color: cs.primary,
+                                      ),
+                                    ),
+                                  ),
+                                PasswordVisibilityToggle(
+                                  obscured: _obscure,
+                                  onToggle: () => setState(() => _obscure = !_obscure),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // 2. Keyfiles Selection Box. LUKS keyfiles work too —
+                        // cryptsetup treats a keyfile as a *replacement* for
+                        // the typed password, not an additive mix-in.
+                        KeyfilesPicker(
+                          keyfiles: _keyfiles,
+                          picking: _pickingKeyfiles,
+                          onPick: _pickKeyfiles,
+                          onRemove: _removeKeyfile,
+                        ),
+                        if (_isLuks && _keyfiles.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4, left: 4),
+                            child: Text(
+                              'For LUKS containers the keyfile replaces the password.',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                        const SizedBox(height: 16),
+
+                        // 3. Collapsible Advanced parameters (PIM, Cipher, Hash)
+                        //    LUKS doesn't use PIM or VeraCrypt cipher/hash selection.
+                        if (!_isLuks)
+                          AdvancedParamsPanel(
+                            pimController: _pimCtrl,
+                            cipherId: _cipherId,
+                            hashId: _hashId,
+                            enabled: !_loading,
+                            onCipherChanged: (val) => setState(() => _cipherId = val),
+                            onHashChanged: (val) => setState(() => _hashId = val),
+                          ),
+                        const SizedBox(height: 16),
+
+                        // 4. Remember container Toggle
+                        if (widget.initialUri == null) ...[
+                          Material(
+                            color: cs.surfaceContainerLow,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                color: cs.outlineVariant.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: SwitchListTile(
+                              value: _remember,
+                              onChanged: (val) => setState(() => _remember = val),
+                              title: Text(
+                                'Remember container',
+                                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                              ),
+                              subtitle: Text(
+                                'Pin container on dashboard for quick access',
+                                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                              secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            ),
                           ),
                         ],
                       ],
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 24),
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    InlineErrorBanner(_error!),
+                  ],
+                  const SizedBox(height: 32),
 
-              // ── Auth-specific UI ──────────────────────────────────────────
-              if (_loadingAuth)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
-                    child: CircularProgressIndicator(strokeWidth: 3),
-                  ),
-                )
-              // ── Container file unreachable Card ────────────────────────
-              else if (_containerMissing) ...[
-                Card(
-                  elevation: 0,
-                  color: cs.errorContainer.withValues(alpha: 0.15),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.xl),
-                    side: BorderSide(color: cs.error.withValues(alpha: 0.25)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: cs.errorContainer,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.find_in_page_outlined,
-                                color: cs.error,
-                                size: 28,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Container missing',
-                                    style: textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: cs.onErrorContainer,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'File path could not be resolved',
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color: cs.onErrorContainer.withValues(alpha: 0.8),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'The container file may have been moved, deleted, or its host storage is currently disconnected.',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _loadingAuth = true;
-                                    _containerMissing = false;
-                                  });
-                                  _initUnlockMethod();
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: const Text('Retry'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: _relocateContainer,
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: const Text('Locate file'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                  // Primary Unlock Action Button
+                  FilledButton(
+                    onPressed: _loading ? null : _unlock,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(56),
+                      shape: const StadiumBorder(),
                     ),
-                  ),
-                ),
-              ]
-              // ── Biometric Card ─────────────────────────────────────────
-              else if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
-                Card(
-                  elevation: 0,
-                  color: cs.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.xl),
-                    side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            color: cs.primaryContainer.withValues(alpha: 0.4),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.fingerprint_rounded,
-                            size: 64,
-                            color: cs.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'Biometric Unlock',
-                          style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Authenticate to securely mount the container',
-                          style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 32),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => setState(() => _showPasswordFallback = true),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: const Text('Use Password'),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: _tryBiometric,
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: const Text('Authenticate'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ]
-              // ── Pattern Card ───────────────────────────────────────────
-              else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
-                Card(
-                  elevation: 0,
-                  color: cs.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.xl),
-                    side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Draw Unlock Pattern',
-                          style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _patternError ? 'Wrong pattern — try again' : 'Connect your pattern sequence',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: _patternError ? cs.error : cs.onSurfaceVariant,
-                            fontWeight: _patternError ? FontWeight.bold : null,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        PatternLockView(
-                          key: ValueKey(_patternResetKey),
-                          onPatternComplete: _onPatternComplete,
-                          showError: _patternError,
-                        ),
-                        const SizedBox(height: 24),
-                        OutlinedButton(
-                          onPressed: () => setState(() => _showPasswordFallback = true),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: const Text('Use Password instead'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ]
-              // ── Standard password fields ───────────────────────────────
-              else if (_showPasswordUI) ...[
-                AutofillGroup(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // 1. Password Field
-                      TextField(
-                        controller: _passwordCtrl,
-                        obscureText: _obscure,
-                        autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
-                        onChanged: (_) => setState(() {}),
-                        keyboardType: TextInputType.visiblePassword,
-                        autofillHints: const [AutofillHints.password],
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          hintText: 'Enter container password',
-                          prefixIcon: Icon(Icons.lock_outline_rounded, size: 22, color: cs.primary),
-                          suffixIcon: Row(
-                            mainAxisSize: MainAxisSize.min,
+                    child: _loading
+                        ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              if (_passwordPrefilled)
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 4),
-                                  child: Tooltip(
-                                    message: 'Using saved password',
-                                    child: Icon(
-                                      Icons.bookmark_rounded,
-                                      size: 20,
-                                      color: cs.primary,
-                                    ),
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: cs.onPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Flexible(
+                                child: Text(
+                                  _unlockProgressLabel,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.titleMedium?.copyWith(
+                                    color: cs.primary,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              PasswordVisibilityToggle(
-                                obscured: _obscure,
-                                onToggle: () => setState(() => _obscure = !_obscure),
                               ),
-                              const SizedBox(width: 8),
                             ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // 2. Keyfiles Selection Box. LUKS keyfiles work too —
-                      // cryptsetup treats a keyfile as a *replacement* for
-                      // the typed password, not an additive mix-in.
-                      KeyfilesPicker(
-                        keyfiles: _keyfiles,
-                        picking: _pickingKeyfiles,
-                        onPick: _pickKeyfiles,
-                        onRemove: _removeKeyfile,
-                      ),
-                      if (_isLuks && _keyfiles.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4, left: 4),
-                          child: Text(
-                            'For LUKS containers the keyfile replaces the password.',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                ),
-                          ),
-                        ),
-                      const SizedBox(height: 16),
-
-                      // 3. Collapsible Advanced parameters (PIM, Cipher, Hash)
-                      //    LUKS doesn't use PIM or VeraCrypt cipher/hash selection.
-                      if (!_isLuks)
-                        AdvancedParamsPanel(
-                          pimController: _pimCtrl,
-                          cipherId: _cipherId,
-                          hashId: _hashId,
-                          enabled: !_loading,
-                          onCipherChanged: (val) => setState(() => _cipherId = val),
-                          onHashChanged: (val) => setState(() => _hashId = val),
-                        ),
-                      const SizedBox(height: 16),
-
-                      // 4. Remember container Toggle
-                      if (widget.initialUri == null) ...[
-                        Material(
-                          color: cs.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            side: BorderSide(
-                              color: cs.outlineVariant.withValues(alpha: 0.3),
+                          )
+                        : Text(
+                            'Unlock Container',
+                            style: textTheme.titleMedium?.copyWith(
+                              color: cs.onPrimary,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          clipBehavior: Clip.antiAlias,
-                          child: SwitchListTile(
-                            value: _remember,
-                            onChanged: (val) => setState(() => _remember = val),
-                            title: Text(
-                              'Remember container',
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                            ),
-                            subtitle: Text(
-                              'Pin container on dashboard for quick access',
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                            secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          ),
-                        ),
-                      ],
-                    ],
                   ),
-                ),
-                if (_error != null) ...[
+                  if (_loading && _activeVolId != null) ...[
+                    const SizedBox(height: 8),
+                    Center(
+                      child: TextButton(
+                        onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                  ],
+                ] else if (_error != null) ...[
                   const SizedBox(height: 16),
                   InlineErrorBanner(_error!),
                 ],
-                const SizedBox(height: 32),
-
-                // Primary Unlock Action Button
-                FilledButton(
-                  onPressed: _loading ? null : _unlock,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(56),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: _loading
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: cs.onPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Flexible(
-                              child: Text(
-                                _unlockProgressLabel,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.titleMedium?.copyWith(
-                                  color: cs.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        )
-                      : Text(
-                          'Unlock Container',
-                          style: textTheme.titleMedium?.copyWith(
-                            color: cs.onPrimary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                ),
-                if (_loading && _activeVolId != null) ...[
-                  const SizedBox(height: 8),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                ],
-              ] else if (_error != null) ...[
-                const SizedBox(height: 16),
-                InlineErrorBanner(_error!),
               ],
-            ],
+            ),
           ),
         ),
       ),

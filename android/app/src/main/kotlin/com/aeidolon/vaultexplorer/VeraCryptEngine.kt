@@ -79,6 +79,35 @@ internal object VeraCryptEngine {
         keyfileFds: IntArray? = null
     ): Boolean
 
+    /** Creates a VeraCrypt container with an embedded hidden volume.
+     *  The outer volume is created first, then the hidden volume's header
+     *  is written at offset 65536 and the hidden data area at the end of
+     *  the container is zero-encrypted with its own independent master key.
+     *  keyfileFds / hiddenKeyfileFds: same detach/ownership contract. */
+    @JvmStatic
+    external fun createContainerWithHiddenNative(
+        fd: Int, outerPassword: String, hiddenPassword: String,
+        outerPim: Int, hiddenPim: Int, sizeBytes: Long,
+        outerFileSystem: String, hiddenFileSystem: String,
+        hiddenSizeBytes: Long,
+        outerCipherId: Int = 255, outerHashId: Int = 255,
+        hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
+        outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null
+    ): Boolean
+
+    /** Re-encrypts a VeraCrypt container's header with a new password.
+     *  Decrypts the header with [oldPassword]/[oldPim], re-derives the
+     *  header key from [newPassword]/[newPim] with a fresh random salt,
+     *  then writes the re-encrypted header (primary + backup).
+     *  Always takes ownership of [fd]. */
+    @JvmStatic
+    external fun changeContainerPasswordNative(
+        fd: Int, oldPassword: String, newPassword: String,
+        oldPim: Int, newPim: Int,
+        cipherId: Int = 255, hashId: Int = 255,
+        oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null
+    ): Boolean
+
     /** PBKDF2-SHA512 via mbedTLS; no volId, no session required. */
     @JvmStatic
     external fun hashPasswordNative(

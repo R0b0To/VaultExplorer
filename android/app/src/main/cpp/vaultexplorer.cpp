@@ -773,6 +773,63 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerWithHiddenNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring outerPassword, jstring hiddenPassword,
+        jint outerPim, jint hiddenPim, jlong sizeBytes, jstring outerFileSystem, jstring hiddenFileSystem,
+        jlong hiddenSizeBytes,
+        jint outerCipherId, jint outerHashId,
+        jint hiddenCipherId, jint hiddenHashId,
+        jintArray outerKeyfileFds, jintArray hiddenKeyfileFds) {
+
+    std::vector<int> outerKfFds = extractKeyfileFds(env, outerKeyfileFds);
+    std::vector<int> hiddenKfFds = extractKeyfileFds(env, hiddenKeyfileFds);
+    
+    const char* nativeOuterPass = env->GetStringUTFChars(outerPassword, nullptr);
+    const char* nativeHiddenPass = env->GetStringUTFChars(hiddenPassword, nullptr);
+    const char* nativeOuterFS   = env->GetStringUTFChars(outerFileSystem, nullptr);
+    const char* nativeHiddenFS   = env->GetStringUTFChars(hiddenFileSystem, nullptr);
+
+    bool success = createContainerWithHidden(fd, nativeOuterPass, nativeHiddenPass, outerPim, hiddenPim, static_cast<int64_t>(sizeBytes),
+                                             nativeOuterFS, nativeHiddenFS, static_cast<int64_t>(hiddenSizeBytes),
+                                             outerCipherId, outerHashId,
+                                             hiddenCipherId, hiddenHashId,
+                                             outerKfFds.empty() ? nullptr : outerKfFds.data(), static_cast<int>(outerKfFds.size()),
+                                             hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()));
+
+    env->ReleaseStringUTFChars(outerPassword, nativeOuterPass);
+    env->ReleaseStringUTFChars(hiddenPassword, nativeHiddenPass);
+    env->ReleaseStringUTFChars(outerFileSystem, nativeOuterFS);
+    env->ReleaseStringUTFChars(hiddenFileSystem, nativeHiddenFS);
+
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_changeContainerPasswordNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring oldPassword, jstring newPassword,
+        jint oldPim, jint newPim,
+        jint cipherId, jint hashId, jintArray oldKeyfileFds, jintArray newKeyfileFds) {
+
+    std::vector<int> oldKfFds = extractKeyfileFds(env, oldKeyfileFds);
+    std::vector<int> newKfFds = extractKeyfileFds(env, newKeyfileFds);
+    
+    const char* nativeOldPass = env->GetStringUTFChars(oldPassword, nullptr);
+    const char* nativeNewPass = env->GetStringUTFChars(newPassword, nullptr);
+
+    bool success = changeContainerPassword(fd, nativeOldPass, nativeNewPass, oldPim, newPim,
+                                           cipherId, hashId,
+                                           oldKfFds.empty() ? nullptr : oldKfFds.data(), static_cast<int>(oldKfFds.size()),
+                                           newKfFds.empty() ? nullptr : newKfFds.data(), static_cast<int>(newKfFds.size()));
+
+    env->ReleaseStringUTFChars(oldPassword, nativeOldPass);
+    env->ReleaseStringUTFChars(newPassword, nativeNewPass);
+
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
 // ----------------------------------------------------------------====
 // PBKDF2-SHA512
 // ----------------------------------------------------------------====

@@ -270,24 +270,76 @@ class VaultExplorerApi {
     required int pim,
     required String fileSystem,
     int containerFormat = 0,
-    int? cipherId,
-    int? hashId,
-    List<String>? keyfilePaths,
+    required int cipherId,
+    required int hashId,
+    required List<String> keyfilePaths,
+    bool createHiddenVolume = false,
+    String? hiddenPassword,
+    String? hiddenFileSystem,
+    int? hiddenSizeBytes,
+    List<String>? hiddenKeyfilePaths,
+    int? hiddenPim,
+    int? hiddenCipherId,
+    int? hiddenHashId,
   }) async {
-    final bool? success = await _channel
-        .invokeMethod<bool>(ChannelMethods.createContainer, {
-          'displayName': displayName,
-          'sizeBytes': sizeBytes,
-          'password': password,
-          'pim': pim,
-          'fileSystem': fileSystem,
-          'containerFormat': containerFormat,
-          'cipherId': cipherId ?? 255,
-          'hashId': hashId ?? 255,
-          if (keyfilePaths != null && keyfilePaths.isNotEmpty)
-            'keyfilePaths': keyfilePaths,
-        });
-    return success ?? false;
+    try {
+      final success = await _channel
+          .invokeMethod<bool>(ChannelMethods.createContainer, {
+        'displayName': displayName,
+        'sizeBytes': sizeBytes,
+        'password': password,
+        'pim': pim,
+        'fileSystem': fileSystem,
+        'containerFormat': containerFormat,
+        'cipherId': cipherId,
+        'hashId': hashId,
+        'keyfilePaths': keyfilePaths,
+        'createHiddenVolume': createHiddenVolume,
+        'hiddenPassword': hiddenPassword,
+        'hiddenFileSystem': hiddenFileSystem,
+        'hiddenSizeBytes': hiddenSizeBytes,
+        'hiddenKeyfilePaths': hiddenKeyfilePaths ?? [],
+        'hiddenPim': hiddenPim,
+        'hiddenCipherId': hiddenCipherId,
+        'hiddenHashId': hiddenHashId,
+      });
+      return success ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Changes the password (and optionally PIM) of a VeraCrypt container.
+  /// For LUKS containers, password change is not supported in-app — the user
+  /// should use `cryptsetup luksChangeKey` on a Linux machine.
+  Future<bool> changeContainerPassword({
+    required String uri,
+    required String oldPassword,
+    required String newPassword,
+    int oldPim = 0,
+    int newPim = 0,
+    int cipherId = 255,
+    int hashId = 255,
+    List<String>? oldKeyfilePaths,
+    List<String>? newKeyfilePaths,
+  }) async {
+    try {
+      final success = await _channel
+          .invokeMethod<bool>(ChannelMethods.changeContainerPassword, {
+        'uri': uri,
+        'oldPassword': oldPassword,
+        'newPassword': newPassword,
+        'oldPim': oldPim,
+        'newPim': newPim,
+        'cipherId': cipherId,
+        'hashId': hashId,
+        'oldKeyfilePaths': oldKeyfilePaths ?? [],
+        'newKeyfilePaths': newKeyfilePaths ?? [],
+      });
+      return success ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<({String uri, String displayName})?> pickContainer() async {

@@ -45,6 +45,31 @@ object ContainerEngine {
         fd, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId, keyfileFds
     )
 
+    fun createWithHidden(
+        fd: Int, outerPassword: String, hiddenPassword: String,
+        outerPim: Int, hiddenPim: Int, sizeBytes: Long,
+        outerFileSystem: String, hiddenFileSystem: String,
+        hiddenSizeBytes: Long,
+        outerCipherId: Int = 255, outerHashId: Int = 255,
+        hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
+        outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
+    ): Boolean = VeraCryptEngine.createContainerWithHiddenNative(
+        fd, outerPassword, hiddenPassword, outerPim, hiddenPim, sizeBytes,
+        outerFileSystem, hiddenFileSystem, hiddenSizeBytes,
+        outerCipherId, outerHashId, hiddenCipherId, hiddenHashId,
+        outerKeyfileFds, hiddenKeyfileFds
+    )
+
+    fun changePassword(
+        fd: Int, oldPassword: String, newPassword: String,
+        oldPim: Int, newPim: Int,
+        cipherId: Int = 255, hashId: Int = 255,
+        oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null,
+    ): Boolean = VeraCryptEngine.changeContainerPasswordNative(
+        fd, oldPassword, newPassword, oldPim, newPim, cipherId, hashId,
+        oldKeyfileFds, newKeyfileFds
+    )
+
     fun lock(volId: Int) = VeraCryptEngine.lockNative(volId)
     fun requestUnlockCancellation(volId: Int) = VeraCryptEngine.requestCancelUnlockNative(volId)
     fun hashPassword(password: String, salt: ByteArray, iterations: Int): ByteArray? =

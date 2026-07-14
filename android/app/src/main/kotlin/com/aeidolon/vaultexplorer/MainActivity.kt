@@ -79,6 +79,7 @@ private object ChannelMethods {
     const val UNLOCK_USB_CONTAINER = "unlockUsbContainer"
     const val DOCUMENT_EXISTS = "documentExists"
     const val CANCEL_UNLOCK = "cancelUnlock"
+    const val CHANGE_CONTAINER_PASSWORD = "changeContainerPassword"
     const val SET_LAST_MODIFIED_TIME = "setLastModifiedTime"
 }
 
@@ -185,6 +186,14 @@ class MainActivity : FlutterFragmentActivity() {
         val containerFormat: Int = 0,
         val cipherId: Int = 255, val hashId: Int = 255,
         val keyfilePaths: List<String>? = null,
+        val createHiddenVolume: Boolean = false,
+        val hiddenPassword: String? = null,
+        val hiddenFileSystem: String? = null,
+        val hiddenSizeBytes: Long = 0,
+        val hiddenKeyfilePaths: List<String>? = null,
+        val hiddenPim: Int = 0,
+        val hiddenCipherId: Int = 255,
+        val hiddenHashId: Int = 255,
     )
     private var pendingCreate: PendingCreate? = null
 
@@ -205,10 +214,23 @@ class MainActivity : FlutterFragmentActivity() {
                     val pfd = contentResolver.openFileDescriptor(destUri, "rw")
                         ?: throw Exception("Could not open file descriptor")
                     val success = synchronized(createContainerLock) {
-                        ContainerEngine.create(
-                            pfd.detachFd(), create.password, create.pim, create.sizeBytes, create.fileSystem,
-                            create.containerFormat, create.cipherId, create.hashId, keyfileFds
-                        )
+                        if (create.createHiddenVolume && create.containerFormat == 0) {
+                            val hiddenKeyfileFds = openKeyfileFds(create.hiddenKeyfilePaths)
+                            ContainerEngine.createWithHidden(
+                                pfd.detachFd(), create.password, create.hiddenPassword ?: "",
+                                create.pim, create.hiddenPim, create.sizeBytes,
+                                create.fileSystem, create.hiddenFileSystem ?: "fat",
+                                create.hiddenSizeBytes,
+                                create.cipherId, create.hashId,
+                                create.hiddenCipherId, create.hiddenHashId,
+                                keyfileFds, hiddenKeyfileFds
+                            )
+                        } else {
+                            ContainerEngine.create(
+                                pfd.detachFd(), create.password, create.pim, create.sizeBytes, create.fileSystem,
+                                create.containerFormat, create.cipherId, create.hashId, keyfileFds
+                            )
+                        }
                     }
                     runOnUiThread { res.success(success) }
                 } catch (e: Exception) {
@@ -948,6 +970,14 @@ class MainActivity : FlutterFragmentActivity() {
                             cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255,
                             hashId      = call.argument<Number>("hashId")?.toInt() ?: 255,
                             keyfilePaths = keyfilePaths,
+                            createHiddenVolume = call.argument<Boolean>("createHiddenVolume") ?: false,
+                            hiddenPassword = call.argument<String>("hiddenPassword"),
+                            hiddenFileSystem = call.argument<String>("hiddenFileSystem"),
+                            hiddenSizeBytes = call.argument<Number>("hiddenSizeBytes")?.toLong() ?: 0L,
+                            hiddenKeyfilePaths = call.argument<List<String>>("hiddenKeyfilePaths"),
+                            hiddenPim = call.argument<Number>("hiddenPim")?.toInt() ?: 0,
+                            hiddenCipherId = call.argument<Number>("hiddenCipherId")?.toInt() ?: 255,
+                            hiddenHashId = call.argument<Number>("hiddenHashId")?.toInt() ?: 255,
                         )
                         pendingResultCheck(result)
                         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
@@ -1061,6 +1091,41 @@ class MainActivity : FlutterFragmentActivity() {
                         }
                         ContainerEngine.requestUnlockCancellation(volId)
                         result.success(true)
+                    }
+
+                    ChannelMethods.CHANGE_CONTAINER_PASSWORD -> {
+                        val uri = call.argument<String>("uri")
+                        val oldPassword = call.argument<String>("oldPassword") ?: ""
+                        val newPassword = call.argument<String>("newPassword") ?: ""
+                        val oldPim = call.argument<Number>("oldPim")?.toInt() ?: 0
+                        val newPim = call.argument<Number>("newPim")?.toInt() ?: 0
+                        val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
+                        val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
+                        val oldKeyfilePaths = call.argument<List<String>>("oldKeyfilePaths")
+                        val newKeyfilePaths = call.argument<List<String>>("newKeyfilePaths")
+
+                        if (uri.isNullOrEmpty() || newPassword.isEmpty()) {
+                            result.error("INVALID_ARGS", "uri and newPassword required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        ioExecutor.execute {
+                            try {
+                                val docUri = android.net.Uri.parse(uri)
+                                val pfd = contentResolver.openFileDescriptor(docUri, "rw")
+                                    ?: throw Exception("Could not open file descriptor")
+                                val oldKfFds = openKeyfileFds(oldKeyfilePaths)
+                                val newKfFds = openKeyfileFds(newKeyfilePaths)
+                                val success = ContainerEngine.changePassword(
+                                    pfd.detachFd(), oldPassword, newPassword,
+                                    oldPim, newPim, cipherId, hashId,
+                                    oldKfFds, newKfFds
+                                )
+                                runOnUiThread { result.success(success) }
+                            } catch (e: Exception) {
+                                runOnUiThread { dispatchNativeError(e, result) }
+                            }
+                        }
                     }
 
                     ChannelMethods.DERIVE_DERIVED_KEY -> {

@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include "thread_pool.h"
 #include <unistd.h>
 #include <android/log.h>
 #include <cJSON.h>
@@ -229,9 +230,19 @@ static int afDiffuse(const DigestSpec& spec, size_t blocklen, uint8_t* block) {
     }
 
     const mbedtls_md_info_t* mdInfo = nullptr;
+    mbedtls_md_context_t ctx;
+    bool mbedtlsInitialized = false;
+
     if (spec.backend == HashBackend::kMbedtls) {
         mdInfo = mbedtls_md_info_from_type(spec.mbedtlsType);
         if (!mdInfo) return -1;
+        
+        mbedtls_md_init(&ctx);
+        if (mbedtls_md_setup(&ctx, mdInfo, 0) != 0) {
+            mbedtls_md_free(&ctx);
+            return -1;
+        }
+        mbedtlsInitialized = true;
     } else if (spec.backend != HashBackend::kCustom) {
         return -1;
     }
@@ -249,18 +260,10 @@ static int afDiffuse(const DigestSpec& spec, size_t blocklen, uint8_t* block) {
         uint8_t digest[64];
 
         if (spec.backend == HashBackend::kMbedtls) {
-            mbedtls_md_context_t ctx;
-            mbedtls_md_init(&ctx);
-            if (mbedtls_md_setup(&ctx, mdInfo, 0) != 0) {
-                mbedtls_md_free(&ctx);
-                return -1;
-            }
-
             mbedtls_md_starts(&ctx);
             mbedtls_md_update(&ctx, ivBuf, 4);
             mbedtls_md_update(&ctx, block + (i * digestlen), chunkLen);
             mbedtls_md_finish(&ctx, digest);
-            mbedtls_md_free(&ctx);
         } else {
             if (genericHashOneShot(spec.customId, ivBuf, 4,
                                     block + (i * digestlen), chunkLen, digest) == 0) {
@@ -270,6 +273,11 @@ static int afDiffuse(const DigestSpec& spec, size_t blocklen, uint8_t* block) {
 
         std::memcpy(block + (i * digestlen), digest, chunkLen);
     }
+    
+    if (mbedtlsInitialized) {
+        mbedtls_md_free(&ctx);
+    }
+    
     return 0;
 }
 
@@ -498,10 +506,10 @@ static bool luks1Unlock(int fd,
     if (activeSlotIndices.size() <= 1) {
         if (!activeSlotIndices.empty()) tryOneSlot(activeSlotIndices[0]);
     } else {
-        std::vector<std::thread> threads;
-        threads.reserve(activeSlotIndices.size());
-        for (int i : activeSlotIndices) threads.emplace_back(tryOneSlot, i);
-        for (auto& t : threads) t.join();
+        std::vector<std::future<void>> futures;
+        futures.reserve(activeSlotIndices.size());
+        for (int i : activeSlotIndices) futures.push_back(ThreadPool::getInstance().enqueue(tryOneSlot, i));
+        for (auto& f : futures) f.get();
     }
 
     if (!found.load(std::memory_order_acquire)) {
@@ -883,10 +891,10 @@ static bool luks2Unlock(int fd,
     if (keyslots.size() <= 1) {
         if (!keyslots.empty()) tryOneKeyslot(0);
     } else {
-        std::vector<std::thread> threads;
-        threads.reserve(keyslots.size());
-        for (size_t idx = 0; idx < keyslots.size(); idx++) threads.emplace_back(tryOneKeyslot, idx);
-        for (auto& t : threads) t.join();
+        std::vector<std::future<void>> futures;
+        futures.reserve(keyslots.size());
+        for (size_t idx = 0; idx < keyslots.size(); idx++) futures.push_back(ThreadPool::getInstance().enqueue(tryOneKeyslot, idx));
+        for (auto& f : futures) f.get();
     }
 
     const bool unlocked = found.load(std::memory_order_acquire);

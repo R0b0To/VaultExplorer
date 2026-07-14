@@ -88,6 +88,25 @@ s64 ntfsSeek(ntfs_device* device, s64 offset, int whence) {
     return newPosition;
 }
 
+class AlignedBuffer {
+    void* ptr = nullptr;
+    size_t capacity = 0;
+public:
+    ~AlignedBuffer() { std::free(ptr); }
+    unsigned char* get(size_t size) {
+        if (capacity < size) {
+            std::free(ptr);
+            if (posix_memalign(&ptr, 16, size) != 0) {
+                ptr = nullptr;
+                capacity = 0;
+                return nullptr;
+            }
+            capacity = size;
+        }
+        return static_cast<unsigned char*>(ptr);
+    }
+};
+
 s64 ntfsPread(ntfs_device* device, void* buffer, s64 count, s64 offset) {
     if (count <= 0 || offset < 0) return count == 0 ? 0 : -1;
     const int volumeId = ntfsVolumeId(device);
@@ -104,22 +123,23 @@ s64 ntfsPread(ntfs_device* device, void* buffer, s64 count, s64 offset) {
     const uint64_t physicalStartSector = volume.dataOffset / 512 + startSector;
     const size_t transferBytes = static_cast<size_t>(sectorCount) * 512;
 
-    void* rawEncrypted = nullptr;
-    if (posix_memalign(&rawEncrypted, 16, transferBytes) != 0) return -1;
-    std::unique_ptr<unsigned char, decltype(&std::free)> encrypted(
-        static_cast<unsigned char*>(rawEncrypted), &std::free);
-    if (!physicalRead(volumeId, physicalStartSector * 512, encrypted.get(), transferBytes)) return -1;
+    thread_local AlignedBuffer tlsEncrypted;
+    thread_local AlignedBuffer tlsPlaintext;
 
-    void* rawPlaintext = nullptr;
-    if (posix_memalign(&rawPlaintext, 16, transferBytes) != 0) return -1;
-    std::unique_ptr<unsigned char, decltype(&std::free)> plaintext(
-        static_cast<unsigned char*>(rawPlaintext), &std::free);
+    unsigned char* encrypted = tlsEncrypted.get(transferBytes);
+    if (!encrypted) return -1;
+    
+    if (!physicalRead(volumeId, physicalStartSector * 512, encrypted, transferBytes)) return -1;
+
+    unsigned char* plaintext = tlsPlaintext.get(transferBytes);
+    if (!plaintext) return -1;
+    
     for (uint32_t i = 0; i < sectorCount; ++i) {
         const uint64_t tweak = physicalStartSector + i - volume.partitionStartSector;
-        cascadeDecryptSector(volume.cascade, tweak, encrypted.get() + i * 512, plaintext.get() + i * 512);
+        cascadeDecryptSector(volume.cascade, tweak, encrypted + i * 512, plaintext + i * 512);
     }
 
-    std::memcpy(buffer, plaintext.get() + startByte % 512, transferBytes == 0 ? 0 : byteCount);
+    std::memcpy(buffer, plaintext + startByte % 512, transferBytes == 0 ? 0 : byteCount);
     return count;
 }
 
@@ -139,34 +159,32 @@ s64 ntfsPwrite(ntfs_device* device, const void* buffer, s64 count, s64 offset) {
     const uint64_t physicalStartSector = volume.dataOffset / 512 + startSector;
     const size_t transferBytes = static_cast<size_t>(sectorCount) * 512;
 
-    void* rawSectors = nullptr;
-    if (posix_memalign(&rawSectors, 16, transferBytes) != 0) return -1;
-    std::unique_ptr<unsigned char, decltype(&std::free)> sectors(
-        static_cast<unsigned char*>(rawSectors), &std::free);
+    thread_local AlignedBuffer tlsSectors;
+    unsigned char* sectors = tlsSectors.get(transferBytes);
+    if (!sectors) return -1;
 
     const bool partialTransfer = startByte % 512 != 0 || byteCount % 512 != 0;
     if (partialTransfer) {
-        void* rawEncrypted = nullptr;
-        if (posix_memalign(&rawEncrypted, 16, transferBytes) != 0) return -1;
-        std::unique_ptr<unsigned char, decltype(&std::free)> encrypted(
-            static_cast<unsigned char*>(rawEncrypted), &std::free);
-        if (!physicalRead(volumeId, physicalStartSector * 512, encrypted.get(), transferBytes)) return -1;
+        thread_local AlignedBuffer tlsEncrypted;
+        unsigned char* encrypted = tlsEncrypted.get(transferBytes);
+        if (!encrypted) return -1;
+        
+        if (!physicalRead(volumeId, physicalStartSector * 512, encrypted, transferBytes)) return -1;
         for (uint32_t i = 0; i < sectorCount; ++i) {
             const uint64_t tweak = physicalStartSector + i - volume.partitionStartSector;
-            cascadeDecryptSector(volume.cascade, tweak, encrypted.get() + i * 512, sectors.get() + i * 512);
+            cascadeDecryptSector(volume.cascade, tweak, encrypted + i * 512, sectors + i * 512);
         }
     }
-    std::memcpy(sectors.get() + startByte % 512, buffer, byteCount);
+    std::memcpy(sectors + startByte % 512, buffer, byteCount);
 
-    void* rawEncrypted = nullptr;
-    if (posix_memalign(&rawEncrypted, 16, transferBytes) != 0) return -1;
-    std::unique_ptr<unsigned char, decltype(&std::free)> encrypted(
-        static_cast<unsigned char*>(rawEncrypted), &std::free);
+    thread_local AlignedBuffer tlsEncryptedOut;
+    unsigned char* encryptedOut = tlsEncryptedOut.get(transferBytes);
+    if (!encryptedOut) return -1;
     for (uint32_t i = 0; i < sectorCount; ++i) {
         const uint64_t tweak = physicalStartSector + i - volume.partitionStartSector;
-        cascadeEncryptSector(volume.cascade, tweak, sectors.get() + i * 512, encrypted.get() + i * 512);
+        cascadeEncryptSector(volume.cascade, tweak, sectors + i * 512, encryptedOut + i * 512);
     }
-    if (!physicalWrite(volumeId, physicalStartSector * 512, encrypted.get(), transferBytes)) return -1;
+    if (!physicalWrite(volumeId, physicalStartSector * 512, encryptedOut, transferBytes)) return -1;
     return count;
 }
 

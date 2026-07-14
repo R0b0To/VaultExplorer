@@ -1,3 +1,4 @@
+#include "crypto/thread_pool.h"
 #include "session_prepare.h"
 
 #include <algorithm>
@@ -299,10 +300,12 @@ bool deriveAndValidateHeader(
     if (hashesToTry.size() <= 1) {
         worker(hashesToTry[0]);
     } else {
-        std::vector<std::thread> threads;
-        threads.reserve(hashesToTry.size());
-        for (HashId h : hashesToTry) threads.emplace_back(worker, h);
-        for (auto& t : threads) t.join();
+        std::vector<std::future<void>> futures;
+        futures.reserve(hashesToTry.size());
+        for (HashId h : hashesToTry) {
+            futures.push_back(ThreadPool::getInstance().enqueue(worker, h));
+        }
+        for (auto& f : futures) f.get();
     }
 
     if (!found.load(std::memory_order_acquire)) {

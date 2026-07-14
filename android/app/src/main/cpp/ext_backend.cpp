@@ -109,7 +109,8 @@ bool extTransfer(int volumeId, uint64_t offset, void* data, size_t bytes, bool w
     const uint64_t firstSector = offset / 512;
     const uint64_t lastSector = (offset + bytes + 511) / 512;
     const size_t sectorBytes = static_cast<size_t>(lastSector - firstSector) * 512;
-    std::vector<unsigned char> sectors(sectorBytes);
+    thread_local std::vector<unsigned char> sectors;
+    if (sectors.size() < sectorBytes) sectors.resize(sectorBytes);
     const size_t inSector = static_cast<size_t>(offset % 512);
     const bool wholeSectors = inSector == 0 && bytes % 512 == 0;
 

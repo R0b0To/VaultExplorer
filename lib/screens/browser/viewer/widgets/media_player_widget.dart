@@ -100,7 +100,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   late VideoPlayerController _controller;
   bool _initialized = false;
   String? _playerError;
-
+  bool _isSeeking = false;
   bool _showLeftIndicator = false;
   bool _showRightIndicator = false;
   bool _isSpeedHeld = false;
@@ -264,8 +264,12 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       widget.onZoomChanged(!zoomIn);
     });
   }
+  
 
-  void _skip({required bool backwards}) {
+Future<void> _skip({required bool backwards}) async {
+    if (_isSeeking) return; // Prevent overlapping seek commands
+    _isSeeking = true;
+    
     HapticFeedback.lightImpact();
     final currentPos = _controller.value.position;
     final duration = _controller.value.duration;
@@ -275,7 +279,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     final clampedPos = targetPos < Duration.zero
         ? Duration.zero
         : (targetPos > duration ? duration : targetPos);
-    _controller.seekTo(clampedPos);
+
 
     setState(() {
       if (backwards) {
@@ -284,6 +288,11 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         _showRightIndicator = true;
       }
     });
+    
+    await _controller.seekTo(clampedPos);
+    
+    if (!mounted) return; // Prevent memory leaks if widget disposed during await
+    _isSeeking = false;
 
     Timer(MediaViewerConstants.doubleTapIndicatorDelay, () {
       if (mounted) {

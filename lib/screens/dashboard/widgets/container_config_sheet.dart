@@ -10,6 +10,7 @@ import '../../../widgets/common_widgets.dart';
 import '../../lock/pattern_setup_sheet.dart';
 import '../../lock/pattern_lock_view.dart';
 import '../../../utils/validation_utils.dart';
+import 'change_password_screen.dart';
 
 class ContainerConfigScreen extends StatefulWidget {
   final String uri;
@@ -540,6 +541,39 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                       onCipherChanged: (val) => setState(() => _cipherId = val),
                       onHashChanged: (val) => setState(() => _hashId = val),
                     ),
+                    if (widget.existingRecord != null) ...[
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          if (widget.existingRecord?.containerFormat == 'luks1' ||
+                              widget.existingRecord?.containerFormat == 'luks2') {
+                            showAppSnackBar(
+                              context,
+                              message: 'LUKS password changing is not supported in-app. Use cryptsetup on Linux.',
+                              tone: AppBannerTone.warning,
+                            );
+                          } else {
+                            Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChangePasswordScreen(
+            uri: widget.uri,
+            initialCipherId: widget.existingRecord!.cipherId,
+            initialHashId: widget.existingRecord!.hashId,
+          ),
+        ),
+      );
+    }
+  },
+  icon: const Icon(Icons.password_rounded),
+                        label: const Text('Change Container Password'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 44),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          foregroundColor: cs.error,
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ),

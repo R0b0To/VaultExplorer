@@ -12,6 +12,7 @@ abstract final class ChannelMethods {
   static const lockContainer = 'lockContainer';
   static const updateContainerSettings = 'updateContainerSettings';
   static const cancelUnlock = 'cancelUnlock';
+  static const changeContainerPassword = 'changeContainerPassword';
 
   // ── File I/O ─────────────────────────────────────────────────────────────
   static const decryptFile = 'decryptFile';

@@ -89,18 +89,16 @@ static bool tryDecryptHeader(
 
     std::memcpy(decH, encH, VC_HEADER_BODY_SIZE);
 
-    for (int i = spec.layerCount - 1; i >= 0; i--) {
+    for (int i = 0; i < spec.layerCount; i++) {
         const XtsLayerKey& layer = tempCtx.layers[i];
         unsigned char T[16] = {0};
         blockCipherEncryptBlock(layer.tweakKey, T, T);
-
         for (int block = 0; block < 28; block++) {
             unsigned char* blockPtr = decH + block * 16;
             unsigned char tmp[16];
             for (int j = 0; j < 16; j++) tmp[j] = blockPtr[j] ^ T[j];
             blockCipherDecryptBlock(layer.dataKeyDec, tmp, tmp);
             for (int j = 0; j < 16; j++) blockPtr[j] = tmp[j] ^ T[j];
-
             xtsMultiplyTweak(T);
         }
     }

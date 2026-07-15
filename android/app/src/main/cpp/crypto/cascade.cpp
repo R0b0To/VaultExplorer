@@ -75,22 +75,32 @@ bool cascadeSetKeys(CascadeContext& ctx, CascadeId id,
     ctx.id = id;
     CascadeSpec spec = cascadeSpecFor(id);
     ctx.layerCount = spec.layerCount;
-    
+
     if (keyMaterialLen < static_cast<size_t>(ctx.layerCount) * 64) {
         return false;
     }
-    
+
+    // Real VeraCrypt's key layout for a cascade is GROUPED, not interleaved:
+    // all N primary/data keys concatenated first, followed by all N secondary/tweak keys.
+    const unsigned char* dataKeysBase  = keyMaterial;
+    const unsigned char* tweakKeysBase = keyMaterial + static_cast<size_t>(ctx.layerCount) * 32;
+
     for (int i = 0; i < ctx.layerCount; i++) {
         CipherId cipher = spec.layers[i];
-        const unsigned char* layerKey = keyMaterial + i * 64;
         
-        if (!blockCipherSetKey(ctx.layers[i].dataKeyEnc, cipher, layerKey)) return false;
-        if (!blockCipherSetKey(ctx.layers[i].dataKeyDec, cipher, layerKey)) return false;
-        if (!blockCipherSetKey(ctx.layers[i].tweakKey, cipher, layerKey + 32)) return false;
+        // FIX: VeraCrypt assigns keys from innermost to outermost.
+        // spec.layers` arrays are defined from outermost to innermost.
+        // Therefore, we must read the keys in reverse order to match VeraCrypt.
+        int vcIndex = ctx.layerCount - 1 - i;
+        
+        const unsigned char* dataKey  = dataKeysBase  + vcIndex * 32;
+        const unsigned char* tweakKey = tweakKeysBase + vcIndex * 32;
+
+        if (!blockCipherSetKey(ctx.layers[i].dataKeyEnc, cipher, dataKey)) return false;
+        if (!blockCipherSetKey(ctx.layers[i].dataKeyDec, cipher, dataKey)) return false;
+        if (!blockCipherSetKey(ctx.layers[i].tweakKey, cipher, tweakKey)) return false;
     }
-    // Initialize the hardware-accelerated mbedTLS XTS contexts for single-layer AES.
-    // mbedtls_aes_crypt_xts requires a concatenated 512-bit key (32-byte data key + 32-byte tweak key),
-    // which corresponds exactly to keyMaterial[0..63] of the first layer.
+
     ctx.aesXtsFastPathReady = false;
     if (ctx.layerCount == 1 && id == CascadeId::kAes) {
         mbedtls_aes_xts_init(&ctx.aesXtsEncCtx);
@@ -122,29 +132,24 @@ void cascadeDecryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
 
     unsigned char temp[512];
     std::memcpy(temp, in, 512);
-    
-    for (int i = ctx.layerCount - 1; i >= 0; i--) {
+
+    // Inverse of the above: undo layers[0] (outermost) first, walk 0 -> N-1.
+    for (int i = 0; i < ctx.layerCount; i++) {
         const XtsLayerKey& layer = ctx.layers[i];
         unsigned char tweakBuf[16];
         setTweak(tweakBuf, sectorNumber);
-        
         unsigned char T[16];
         blockCipherEncryptBlock(layer.tweakKey, tweakBuf, T);
-        
         for (int block = 0; block < 32; block++) {
             unsigned char* blockOut = out + block * 16;
             const unsigned char* blockIn = temp + block * 16;
-            
             unsigned char tmp[16];
             for (int j = 0; j < 16; j++) tmp[j] = blockIn[j] ^ T[j];
             blockCipherDecryptBlock(layer.dataKeyDec, tmp, tmp);
             for (int j = 0; j < 16; j++) blockOut[j] = tmp[j] ^ T[j];
-            
             xtsMultiplyTweak(T);
         }
-        if (i > 0) {
-            std::memcpy(temp, out, 512);
-        }
+        if (i < ctx.layerCount - 1) std::memcpy(temp, out, 512);  // was: i > 0
     }
 }
 
@@ -160,28 +165,24 @@ void cascadeEncryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
 
     unsigned char temp[512];
     std::memcpy(temp, in, 512);
-    
-    for (int i = 0; i < ctx.layerCount; i++) {
+
+    // VeraCrypt convention: layers[0] (first-named cipher) is OUTERMOST /
+    // last-applied during encryption. Walk N-1 -> 0.
+    for (int i = ctx.layerCount - 1; i >= 0; i--) {
         const XtsLayerKey& layer = ctx.layers[i];
         unsigned char tweakBuf[16];
         setTweak(tweakBuf, sectorNumber);
-        
         unsigned char T[16];
         blockCipherEncryptBlock(layer.tweakKey, tweakBuf, T);
-        
         for (int block = 0; block < 32; block++) {
             unsigned char* blockOut = out + block * 16;
             const unsigned char* blockIn = temp + block * 16;
-            
             unsigned char tmp[16];
             for (int j = 0; j < 16; j++) tmp[j] = blockIn[j] ^ T[j];
             blockCipherEncryptBlock(layer.dataKeyEnc, tmp, tmp);
             for (int j = 0; j < 16; j++) blockOut[j] = tmp[j] ^ T[j];
-            
             xtsMultiplyTweak(T);
         }
-        if (i < ctx.layerCount - 1) {
-            std::memcpy(temp, out, 512);
-        }
+        if (i > 0) std::memcpy(temp, out, 512);   // was: i < layerCount - 1
     }
 }

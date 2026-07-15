@@ -1,5 +1,4 @@
 class MediaViewerConstants {
-  static const Duration slideshowDuration = Duration(seconds: 4);
   static const Duration uiHideDelay = Duration(seconds: 3);
   static const Duration animationDuration = Duration(milliseconds: 250);
   static const Duration pageTransitionDuration = Duration(milliseconds: 300);
@@ -11,6 +10,10 @@ class MediaViewerConstants {
   static const int maxPrefetchCacheSize = 5;
   static const int maxLiveVideoControllers = 3;
   static const int maxDirectorySearchDepth = 20;
+  // Caps how many subdirectories _scanDirectoryRecursively will walk
+  // concurrently at each level, so a huge "All (incl. subfolders)" vault
+  // doesn't burst hundreds of simultaneous native channel calls at once.
+  static const int maxDirectoryScanConcurrency = 8;
   static const int thumbnailTargetSize = 360;
   static const int carouselThumbnailTargetSize = 160;
 

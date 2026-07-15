@@ -61,7 +61,13 @@ class MediaPlayerWidget extends StatefulWidget {
   final bool subtitlesEnabled;
   final int rotationQuarterTurns;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
-  final ValueChanged<VideoPlayerController> onVideoControllerInitialized;
+  // Called once the controller has initialized. [onEvicted] should be
+  // stashed and invoked by the caller (via VideoPlaybackManager) if this
+  // controller is later forced out to make room for another page, so this
+  // widget gets a chance to reinitialize instead of freezing on a disposed
+  // controller.
+  final void Function(VideoPlayerController controller, VoidCallback onEvicted)
+      onVideoControllerInitialized;
   final VoidCallback onVideoControllerDisposed;
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
   // Whether this page is the one currently on-screen. Up to
@@ -106,6 +112,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   bool _isSpeedHeld = false;
   final GlobalKey _interactiveViewerKey = GlobalKey();
 
+  Timer? _indicatorTimer;
+
   final TransformationController _videoTransformationController =
       TransformationController();
   
@@ -128,14 +136,25 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
     _controller.addListener(_onControllerTick);
     try {
-      final captionFile = await _loadCaptions(widget.fileName);
+      // Kick off subtitle discovery (up to two vault round trips to probe
+      // for .srt/.vtt) alongside controller initialization instead of
+      // serially before it — subtitles are the uncommon case, so most
+      // videos shouldn't pay that extra latency before playback can start.
+      final captionsFuture = _loadCaptions(widget.fileName);
+      final initFuture = _controller.initialize();
+
+      final captionFile = await captionsFuture;
       if (captionFile != null && mounted) {
         _controller.setClosedCaptionFile(Future.value(captionFile));
       }
-      await _controller.initialize();
+
+      await initFuture;
       if (mounted) {
-        setState(() => _initialized = true);
-        widget.onVideoControllerInitialized(_controller);
+        setState(() {
+          _initialized = true;
+          _playerError = null;
+        });
+        widget.onVideoControllerInitialized(_controller, _handleEvicted);
         await _controller.setVolume(1.0);
         await _controller.setLooping(false);
         if (widget.autoPlay) {
@@ -147,6 +166,22 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         setState(() => _playerError = 'Media stream initialization failed: $e');
       }
     }
+  }
+
+  /// Invoked by VideoPlaybackManager if this file's controller was forced
+  /// out (see maxLiveVideoControllers) while this widget may still be
+  /// mounted. The manager handles safely pausing/disposing the old
+  /// controller on its own — we just need to drop our reference and
+  /// reinitialize a fresh one so this page recovers automatically instead
+  /// of being left with a frozen video and dead controls until the user
+  /// navigates away and back.
+  void _handleEvicted() {
+    if (!mounted) return;
+    _controller.removeListener(_onControllerTick);
+    setState(() {
+      _initialized = false;
+    });
+    _initPlayer();
   }
 
   void _onControllerTick() {
@@ -192,6 +227,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   @override
   void dispose() {
+    _indicatorTimer?.cancel();
     _controller.removeListener(_onControllerTick);
     widget.onVideoControllerDisposed();
     _videoTransformationController.dispose();
@@ -294,7 +330,8 @@ Future<void> _skip({required bool backwards}) async {
     if (!mounted) return; // Prevent memory leaks if widget disposed during await
     _isSeeking = false;
 
-    Timer(MediaViewerConstants.doubleTapIndicatorDelay, () {
+    _indicatorTimer?.cancel();
+    _indicatorTimer = Timer(MediaViewerConstants.doubleTapIndicatorDelay, () {
       if (mounted) {
         setState(() {
           _showLeftIndicator = false;

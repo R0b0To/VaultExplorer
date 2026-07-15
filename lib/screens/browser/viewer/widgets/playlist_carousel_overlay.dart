@@ -109,8 +109,8 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
           colors: [
-            Colors.black.withOpacity(0.95),
-            Colors.black.withOpacity(0.95),
+            Colors.black.withValues(alpha: 0.95),
+            Colors.black.withValues(alpha: 0.95),
             Colors.transparent,
           ],
         ),
@@ -199,7 +199,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                             activeTrackColor: cs.primary,
                             inactiveTrackColor: Colors.white24,
                             thumbColor: cs.primary,
-                            overlayColor: cs.primary.withOpacity(0.2),
+                            overlayColor: cs.primary.withValues(alpha: 0.2),
                           ),
                           child: ValueListenableBuilder<double>(
                             valueListenable: _sliderProportion,

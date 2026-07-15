@@ -60,6 +60,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   int _activeMenuCount = 0;
   bool _isCarouselVisible = false;
 
+  // Tracks only the playlist's isEmpty transition so _onPlaylistUpdate can
+  // avoid a blanket setState on every single notifyListeners() (e.g. every
+  // swipe) — see _onPlaylistUpdate for why.
+  late bool _wasEmpty;
+
   Timer? _slideshowTimer;
   Timer? _hideTimer;
 
@@ -99,6 +104,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       initialIndex: widget.initialIndex,
       startingFolder: widget.startingFolder,
     );
+    _wasEmpty = _playlistController.isEmpty;
 
     _playbackManager = VideoPlaybackManager();
     _pageController = PageController(initialPage: widget.initialIndex);
@@ -115,14 +121,32 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   GlobalKey _getMediaKey(String fileName) {
-    if (!_mediaKeys.containsKey(fileName)) {
-      // Keep a modest cache to prevent memory leaks during long browsing sessions
-      if (_mediaKeys.length > MediaViewerConstants.maxPrefetchCacheSize * 2) {
-        _mediaKeys.remove(_mediaKeys.keys.first);
-      }
-      _mediaKeys[fileName] = GlobalKey(debugLabel: fileName);
+    final existing = _mediaKeys.remove(fileName);
+    if (existing != null) {
+      // Touch: move to the MRU end. Without this, eviction below falls
+      // back to plain insertion order, which can evict the key for a page
+      // that's still mounted (just visited a while ago) — forcing an
+      // unwanted full remount (fresh decrypt, or a fresh video
+      // re-initialize) the next time that page is revisited, even though
+      // nothing about it actually changed.
+      _mediaKeys[fileName] = existing;
+      return existing;
     }
-    return _mediaKeys[fileName]!;
+    if (_mediaKeys.length >= MediaViewerConstants.maxPrefetchCacheSize * 2) {
+      _mediaKeys.remove(_mediaKeys.keys.first);
+    }
+    return _mediaKeys[fileName] = GlobalKey(debugLabel: fileName);
+  }
+
+  /// Reads a prefetched image's bytes, touching its LRU position so the
+  /// eviction in [_prefetchThumbnail] evicts true least-recently-used
+  /// entries instead of oldest-inserted ones.
+  Uint8List? _prefetchedBytesFor(String fileName) {
+    final bytes = _prefetchedImages.remove(fileName);
+    if (bytes != null) {
+      _prefetchedImages[fileName] = bytes;
+    }
+    return bytes;
   }
 
   void _onContainerDetached(int volId) {
@@ -131,7 +155,20 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   void _onPlaylistUpdate() {
-    if (mounted) setState(() {});
+    // Most playlist-driven UI (current index/count, the "scanning…"
+    // indicator, prev/next enablement) is handled by the ListenableBuilders
+    // scoped around MediaViewerTopBar/MediaViewerBottomControls in build()
+    // below, so it doesn't need a full-screen rebuild on every single
+    // notifyListeners() call — which fires on every swipe via updateIndex().
+    // The one thing that still needs a screen-level rebuild is the
+    // loading -> populated transition, in case the viewer is ever opened
+    // before the initial file list has resolved.
+    if (!mounted) return;
+    final nowEmpty = _playlistController.isEmpty;
+    if (nowEmpty != _wasEmpty) {
+      _wasEmpty = nowEmpty;
+      setState(() {});
+    }
   }
 
   void _onActiveVideoControllerChanged() {
@@ -343,6 +380,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     if (success && mounted) {
       _prefetchedImages.remove(fileToDelete);
       _mediaKeys.remove(fileToDelete);
+      _rotations.remove(fileToDelete);
       _playlistController.removeCurrent();
 
       if (_playlistController.isEmpty) {
@@ -550,9 +588,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       );
     }
 
-    final total = _playlistController.playlist.length;
-    final currentName = _playlistController.currentFile;
-    final isCurrentAnImage = MediaViewerConstants.isImage(currentName);
+    // Only needed for the wakelock decision below — MediaViewerTopBar and
+    // MediaViewerBottomControls now recompute their own playlist-derived
+    // values fresh inside their own ListenableBuilders further down, so
+    // they stay correct even when this outer build() isn't re-run on every
+    // single playlist notification.
+    final isCurrentAnImage =
+        MediaViewerConstants.isImage(_playlistController.currentFile);
 
     bool isPlayingState = false;
     if (isCurrentAnImage) {
@@ -591,7 +633,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   ),
                   controller: _pageController,
                   physics: physics,
-                  itemCount: total,
+                  itemCount: _playlistController.playlist.length,
                   onPageChanged: (index) {
                     _playlistController.updateIndex(index);
                     _prefetchSurroundingItems();
@@ -604,7 +646,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     final contentUriString =
                         'content://com.aeidolon.vaultexplorer.documents/document/$volId%3Afile%3A$escapedPath';
                     final fileName = _playlistController.playlist[index];
-                    final prefetchedBytes = _prefetchedImages[fileName];
+                    final prefetchedBytes = _prefetchedBytesFor(fileName);
 
                     final isImg = MediaViewerConstants.isImage(fileName);
                     final isAudio = MediaViewerConstants.isAudio(fileName);
@@ -652,13 +694,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                                     ? const BouncingScrollPhysics()
                                     : const NeverScrollableScrollPhysics();
                               },
-                              onVideoControllerInitialized: (controller) {
+                              onVideoControllerInitialized: (controller, onEvicted) {
                                 _playbackManager.registerController(
                                   fileName: fileName,
                                   controller: controller,
                                   currentFocus: fileName == _playlistController.currentFile,
                                   playlist: _playlistController.playlist,
                                   currentIndex: _playlistController.currentIndex,
+                                  onEvicted: onEvicted,
                                 );
                                 if (fileName == _playlistController.currentFile &&
                                     !_isSwiping &&
@@ -684,43 +727,50 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             top: _showUI ? 0 : -120,
             left: 0,
             right: 0,
-            child: MediaViewerTopBar(
-              container: widget.container,
-              playlistController: _playlistController,
-              currentFileName: currentName,
-              totalCount: total,
-              onBackPressed: () {
-                HapticFeedback.lightImpact();
-                Navigator.pop(context);
-              },
-              onDeletePressed: _deleteCurrentFile,
-              onPlaylistChanged: () {
-                _startHideTimer(); // Reset hide timer on playlist adjustments
-                if (!_playlistController.isPlaylistMode) {
-                  if (_isCarouselVisible) _toggleCarousel();
-                  if (_autoAdvance) {
-                    _updatePlaybackMode(VideoPlaybackMode.playOnce);
+            // Scoped to _playlistController: updates the "x of y" count and
+            // the "scanning…" indicator live on every playlist notify (index
+            // changes, folder scans, shuffle) without forcing the PageView
+            // and its pages to rebuild too.
+            child: ListenableBuilder(
+              listenable: _playlistController,
+              builder: (context, _) => MediaViewerTopBar(
+                container: widget.container,
+                playlistController: _playlistController,
+                currentFileName: _playlistController.currentFile,
+                totalCount: _playlistController.playlist.length,
+                onBackPressed: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.pop(context);
+                },
+                onDeletePressed: _deleteCurrentFile,
+                onPlaylistChanged: () {
+                  _startHideTimer(); // Reset hide timer on playlist adjustments
+                  if (!_playlistController.isPlaylistMode) {
+                    if (_isCarouselVisible) _toggleCarousel();
+                    if (_autoAdvance) {
+                      _updatePlaybackMode(VideoPlaybackMode.playOnce);
+                    }
                   }
-                }
 
-                // By perfectly re-creating the PageController whenever the playlist
-                // radically changes its count, we bypass any possibility of scroll constraints
-                // clamping and triggering a sudden image flash/disappearance.
-                if (_pageController.hasClients) {
-                  final oldController = _pageController;
-                  _pageController = PageController(initialPage: _playlistController.currentIndex);
+                  // By perfectly re-creating the PageController whenever the playlist
+                  // radically changes its count, we bypass any possibility of scroll constraints
+                  // clamping and triggering a sudden image flash/disappearance.
+                  if (_pageController.hasClients) {
+                    final oldController = _pageController;
+                    _pageController = PageController(initialPage: _playlistController.currentIndex);
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      oldController.dispose();
+                    });
+                  }
+
+                  setState(() {});
+                  
+                  // Fire off the finalization logic the frame after state resolves
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    oldController.dispose();
+                    _onScrollEnd();
                   });
-                }
-
-                setState(() {});
-                
-                // Fire off the finalization logic the frame after state resolves
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _onScrollEnd();
-                });
-              },
+                },
+              ),
             ),
           ),
 
@@ -731,50 +781,60 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             left: 0,
             right: 0,
             bottom: _showUI ? 0 : -200,
-            child: MediaViewerBottomControls(
-              playlistController: _playlistController,
-              playbackManager: _playbackManager,
-              videoProgressNotifier: _videoProgressNotifier,
-              isImage: isCurrentAnImage,
-              showUI: _showUI,
-              isPlaylistMode: _playlistController.isPlaylistMode,
-              autoAdvance: _autoAdvance,
-              slideshowDelaySeconds: _slideshowDelaySeconds,
-              isMuted: _isMuted,
-              videoPlaybackMode: _videoPlaybackMode,
-              onNavigateToPrev: _navigateToPrev,
-              onNavigateToNext: _navigateToNext,
-              onTogglePlayPause: (wasPlaying) {
-                _startHideTimer(); // Reset hide timer on pause/play clicks
-                if (isCurrentAnImage) {
-                  _updatePlaybackMode(
-                    wasPlaying ? VideoPlaybackMode.playOnce : VideoPlaybackMode.playAndAdvance,
-                  );
-                } else {
-                  final controller = _playbackManager.activeController;
-                  if (controller != null) {
-                    setState(() {
-                      if (controller.value.isPlaying) {
-                        controller.pause();
-                      } else {
-                        controller.play();
+            // Scoped the same way as the top bar: keeps isImage/prev-next
+            // state fresh on every playlist notify without rebuilding the
+            // PageView.
+            child: ListenableBuilder(
+              listenable: _playlistController,
+              builder: (context, _) {
+                final isImg =
+                    MediaViewerConstants.isImage(_playlistController.currentFile);
+                return MediaViewerBottomControls(
+                  playlistController: _playlistController,
+                  playbackManager: _playbackManager,
+                  videoProgressNotifier: _videoProgressNotifier,
+                  isImage: isImg,
+                  showUI: _showUI,
+                  isPlaylistMode: _playlistController.isPlaylistMode,
+                  autoAdvance: _autoAdvance,
+                  slideshowDelaySeconds: _slideshowDelaySeconds,
+                  isMuted: _isMuted,
+                  videoPlaybackMode: _videoPlaybackMode,
+                  onNavigateToPrev: _navigateToPrev,
+                  onNavigateToNext: _navigateToNext,
+                  onTogglePlayPause: (wasPlaying) {
+                    _startHideTimer(); // Reset hide timer on pause/play clicks
+                    if (isImg) {
+                      _updatePlaybackMode(
+                        wasPlaying ? VideoPlaybackMode.playOnce : VideoPlaybackMode.playAndAdvance,
+                      );
+                    } else {
+                      final controller = _playbackManager.activeController;
+                      if (controller != null) {
+                        setState(() {
+                          if (controller.value.isPlaying) {
+                            controller.pause();
+                          } else {
+                            controller.play();
+                          }
+                        });
                       }
-                    });
-                  }
-                }
+                    }
+                  },
+                  onPlaybackModeChanged: _updatePlaybackMode,
+                  onToggleMute: () {
+                    HapticFeedback.lightImpact();
+                    _startHideTimer(); // Reset hide timer on mute clicks
+                    setState(() => _isMuted = !_isMuted);
+                    _playbackManager.activeController?.setVolume(_isMuted ? 0.0 : 1.0);
+                  },
+                  onAdvancedSettingsPressed: () => _showAdvancedSettings(context, isImg),
+                  onStartHideTimer: _startHideTimer,
+                  onShowUIChanged: _setUIVisibility,
+                  isCarouselVisible: _isCarouselVisible,
+                  onToggleCarousel: _playlistController.isPlaylistMode ? _toggleCarousel : null,
+                );
               },
-              onPlaybackModeChanged: _updatePlaybackMode,
-              onToggleMute: () {
-                HapticFeedback.lightImpact();
-                _startHideTimer(); // Reset hide timer on mute clicks
-                setState(() => _isMuted = !_isMuted);
-                _playbackManager.activeController?.setVolume(_isMuted ? 0.0 : 1.0);
-              },
-              onAdvancedSettingsPressed: () => _showAdvancedSettings(context, isCurrentAnImage),
-              onStartHideTimer: _startHideTimer,
-              onShowUIChanged: _setUIVisibility,
-              isCarouselVisible: _isCarouselVisible,
-              onToggleCarousel: _playlistController.isPlaylistMode ? _toggleCarousel : null,
             ),
           ),
 

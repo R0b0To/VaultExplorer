@@ -39,7 +39,7 @@ class MediaViewerTopBar extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Colors.black.withOpacity(0.85),
+            Colors.black.withValues(alpha: 0.85),
             Colors.transparent,
           ],
         ),
@@ -74,7 +74,7 @@ class MediaViewerTopBar extends StatelessWidget {
                         ? '${playlistController.currentIndex + 1} of $totalCount${playlistController.isScanningSubfolders ? '  ·  scanning…' : ''}'
                         : 'Scanning…',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       fontSize: 12,
                     ),
                   ),

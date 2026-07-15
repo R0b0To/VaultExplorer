@@ -17,6 +17,11 @@ class VideoPlaybackManager {
   final Map<String, VideoPlayerController> _controllers = {};
   final Map<String, bool> _subtitlesAvailableMap = {};
 
+  // Lets the owning MediaPlayerWidget know if its controller is forced out
+  // by _evictDistantControllers while it may still be mounted, so it can
+  // reinitialize instead of being left holding a disposed controller.
+  final Map<String, VoidCallback> _evictionCallbacks = {};
+
   final ValueNotifier<VideoPlayerController?> activeControllerNotifier =
       ValueNotifier<VideoPlayerController?>(null);
 
@@ -30,15 +35,26 @@ class VideoPlaybackManager {
   /// describe the current playlist ordering/position and are only used to
   /// decide which *other* live controllers are safe to evict (the ones
   /// furthest from where the user currently is).
+  ///
+  /// [onEvicted], if provided, is invoked if this controller later gets
+  /// forced out by [_evictDistantControllers] to make room for another
+  /// page — giving a still-mounted widget the chance to reinitialize
+  /// cleanly instead of freezing on a disposed controller.
   void registerController({
     required String fileName,
     required VideoPlayerController controller,
     required bool currentFocus,
     required List<String> playlist,
     required int currentIndex,
+    VoidCallback? onEvicted,
   }) {
     _evictDistantControllers(playlist, currentIndex, keep: fileName);
     _controllers[fileName] = controller;
+    if (onEvicted != null) {
+      _evictionCallbacks[fileName] = onEvicted;
+    } else {
+      _evictionCallbacks.remove(fileName);
+    }
 
     if (currentFocus) {
       activeControllerNotifier.value = controller;
@@ -67,6 +83,7 @@ class VideoPlaybackManager {
   void handleDisposed(String fileName) {
     final removed = _controllers.remove(fileName);
     _subtitlesAvailableMap.remove(fileName);
+    _evictionCallbacks.remove(fileName);
     if (removed != null && activeControllerNotifier.value == removed) {
       activeControllerNotifier.value = null;
     }
@@ -96,6 +113,15 @@ class VideoPlaybackManager {
       if (furthestFile == null) break;
       final evicted = _controllers.remove(furthestFile);
       _subtitlesAvailableMap.remove(furthestFile);
+
+      // Notify the owning widget (if it registered a callback) *before* we
+      // pause/dispose below, so a page that's still mounted — e.g. one that
+      // was mid-initialize during a fast swipe — can drop its reference and
+      // reinitialize instead of being left holding a disposed controller
+      // (frozen video, dead controls, until the user navigates away and
+      // back).
+      final onEvicted = _evictionCallbacks.remove(furthestFile);
+      onEvicted?.call();
 
       if (evicted != null) {
         if (activeControllerNotifier.value == evicted) {
@@ -133,5 +159,6 @@ class VideoPlaybackManager {
     }
     _controllers.clear();
     _subtitlesAvailableMap.clear();
+    _evictionCallbacks.clear();
   }
 }

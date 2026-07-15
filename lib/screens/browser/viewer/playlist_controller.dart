@@ -93,11 +93,10 @@ class PlaylistController extends ChangeNotifier {
   /// for a given scope triggers a real directory scan to populate it.
   Future<void> enablePlaylist(String folder) async {
     final anchor = currentFile;
-    _selectedFolder = folder;
-
     final needsScan = !_isPlaylistMode || (folder == 'All' && !_allFilesScanned);
 
     if (!needsScan) {
+      _selectedFolder = folder;
       _isPlaylistMode = true;
       _applyFolderFiltering(folder, anchor);
       notifyListeners();
@@ -120,6 +119,14 @@ class PlaylistController extends ChangeNotifier {
         _allFilesScanned = false;
       }
 
+      // Only publish the new folder scope once the scan and filtering have
+      // fully resolved. MediaViewerScreen keys its PageView off
+      // selectedFolder (among other things) — flipping it earlier, before
+      // _currentPlaylist/_currentIndex below are updated to match, causes a
+      // premature rebuild with stale playlist/index data mid-scan, tearing
+      // down whatever page/video controller was live for the file the user
+      // was actually viewing.
+      _selectedFolder = folder;
       _isPlaylistMode = true;
       _applyFolderFiltering(folder, anchor);
     } finally {
@@ -216,9 +223,19 @@ class PlaylistController extends ChangeNotifier {
           }
         }
 
-        if (subdirNames.isNotEmpty) {
+        // Walk subdirectories in bounded-size batches instead of firing off
+        // every nested scan simultaneously — a large "All (incl.
+        // subfolders)" vault can otherwise burst hundreds of concurrent
+        // native channel calls at once.
+        for (var i = 0;
+            i < subdirNames.length;
+            i += MediaViewerConstants.maxDirectoryScanConcurrency) {
+          final end = (i + MediaViewerConstants.maxDirectoryScanConcurrency)
+              .clamp(0, subdirNames.length);
+          final batch = subdirNames.sublist(i, end);
+
           final nested = await Future.wait(
-            subdirNames.map((name) {
+            batch.map((name) {
               final subPath = baseDir.isEmpty ? name : '$baseDir/$name';
               return _scanDirectoryRecursively(subPath, depth: depth + 1);
             }),

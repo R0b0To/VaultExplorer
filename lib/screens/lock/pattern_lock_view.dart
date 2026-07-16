@@ -27,12 +27,12 @@ class PatternLockView extends StatefulWidget {
   final bool enabled;
 
   const PatternLockView({
-    Key? key,
+    super.key,
     required this.onPatternComplete,
     this.gridSize = 3,
     this.showError = false,
     this.enabled = true,
-  }) : super(key: key);
+  });
 
   @override
   State<PatternLockView> createState() => _PatternLockViewState();

@@ -24,12 +24,10 @@ import 'app_settings_service.dart';
 /// ```
 class SessionLockController {
   SessionLockController({
-    required AppSettings Function() settings,
-    required Future<void> Function() lockAllMountedContainers,
-    required VoidCallback enforceAppLock,
-  })  : _settings = settings,
-        _lockAllMountedContainers = lockAllMountedContainers,
-        _enforceAppLock = enforceAppLock;
+    required this._settings,
+    required this._lockAllMountedContainers,
+    required this._enforceAppLock,
+  });
 
   final AppSettings Function() _settings;
   final Future<void> Function() _lockAllMountedContainers;

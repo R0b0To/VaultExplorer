@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../services/vaultexplorer_api.dart';
-import '../../../theme.dart';
 import '../../../widgets/common_widgets.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -10,11 +9,11 @@ class ChangePasswordScreen extends StatefulWidget {
   final int initialHashId;
 
   const ChangePasswordScreen({
-    Key? key,
+    super.key,
     required this.uri,
     required this.initialCipherId,
     required this.initialHashId,
-  }) : super(key: key);
+  });
 
   @override
   State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
@@ -27,10 +26,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _oldPimCtrl = TextEditingController();
   final _newPimCtrl = TextEditingController();
 
-  List<KeyfileRef> _oldKeyfiles = [];
+  final List<KeyfileRef> _oldKeyfiles = [];
   bool _pickingOldKeyfiles = false;
   
-  List<KeyfileRef> _newKeyfiles = [];
+  final List<KeyfileRef> _newKeyfiles = [];
   bool _pickingNewKeyfiles = false;
 
   bool _oldObscure = true;

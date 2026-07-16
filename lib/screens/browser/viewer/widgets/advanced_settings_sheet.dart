@@ -20,7 +20,7 @@ class AdvancedSettingsSheet extends StatefulWidget {
   final ValueChanged<bool> onSubtitlesEnabledChanged;
 
   const AdvancedSettingsSheet({
-    Key? key,
+    super.key,
     required this.isPlaylistMode,
     required this.isImage,
     required this.currentFileName,
@@ -35,7 +35,7 @@ class AdvancedSettingsSheet extends StatefulWidget {
     required this.onSlideshowDelayChanged,
     required this.onPlaybackSpeedChanged,
     required this.onSubtitlesEnabledChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<AdvancedSettingsSheet> createState() => _AdvancedSettingsSheetState();
@@ -252,7 +252,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
               secondary: const Icon(Icons.subtitles_rounded),
               title: const Text('Subtitles'),
               value: _currentSubtitlesEnabled,
-              activeColor: cs.primary,
+              activeThumbColor: cs.primary,
               onChanged: (val) {
                 HapticFeedback.lightImpact();
                 setState(() => _currentSubtitlesEnabled = val);
@@ -305,7 +305,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
         return ListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(
-            '${delay} seconds',
+            '$delay seconds',
             style: TextStyle(
               color: isSelected ? cs.primary : null,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

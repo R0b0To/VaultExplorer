@@ -18,14 +18,14 @@ class UnlockSheet extends StatefulWidget {
   final List<String> mountedUris;
 
   const UnlockSheet({
-    Key? key,
+    super.key,
     required this.onMounted,
     this.initialUri,
     this.initialName,
     this.prefillPassword,
     this.documentProvider = false,
     this.mountedUris = const [],
-  }) : super(key: key);
+  });
 
   @override
   State<UnlockSheet> createState() => _UnlockSheetState();
@@ -581,10 +581,7 @@ Future<void> _pickFile() async {
         _unlockMethod == ContainerUnlockMethod.rememberPassword;
   }
 
-  /// Live label for the unlock button while [_loading] — "Decrypting..."
-  /// until the first progress event arrives (most re-unlocks of a known
-  /// container skip auto-detect entirely and never get one), then "Trying
-  /// <hash> (i of N)…" for as long as the cipher/hash search is running.
+
   String get _unlockProgressLabel {
     final p = _progress;
     if (p == null || p.total <= 0) return 'Decrypting...';

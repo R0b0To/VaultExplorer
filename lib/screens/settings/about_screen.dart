@@ -15,7 +15,7 @@ const _kContributorsUrl = '$_kGithubUrl/graphs/contributors';
 const _kKofiUrl = 'https://ko-fi.com/r0b0to';
 
 class AboutScreen extends StatelessWidget {
-  const AboutScreen({Key? key}) : super(key: key);
+  const AboutScreen({super.key});
 
   Future<void> _openUrl(BuildContext context, String url) async {
     try {
@@ -517,7 +517,7 @@ class _PrivacySheet extends StatelessWidget {
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: points.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 16),
+                separatorBuilder: (_, _) => const SizedBox(height: 16),
                 itemBuilder: (_, i) {
                   final (icon, title, body) = points[i];
                   return Row(

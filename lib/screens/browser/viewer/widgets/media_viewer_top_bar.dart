@@ -14,7 +14,7 @@ class MediaViewerTopBar extends StatelessWidget {
   final VoidCallback onPlaylistChanged;
 
   const MediaViewerTopBar({
-    Key? key,
+    super.key,
     required this.container,
     required this.playlistController,
     required this.currentFileName,
@@ -22,7 +22,7 @@ class MediaViewerTopBar extends StatelessWidget {
     required this.onBackPressed,
     required this.onDeletePressed,
     required this.onPlaylistChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

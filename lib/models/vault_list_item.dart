@@ -30,11 +30,10 @@ sealed class VaultListItem {
 }
 
 final class MountedVaultItem extends VaultListItem {
-  MountedVaultItem(this.container, {required DateTime sortDate})
+  MountedVaultItem(this.container, {required super.sortDate})
       : super(
           uri: container.uri,
           name: container.displayName,
-          sortDate: sortDate,
           size: container.totalSpace,
           isMounted: true,
         );
@@ -43,13 +42,12 @@ final class MountedVaultItem extends VaultListItem {
 }
 
 final class LockedVaultItem extends VaultListItem {
-  LockedVaultItem(this.record, {required DateTime sortDate})
+  LockedVaultItem(this.record, {required super.sortDate})
       : super(
           uri: record.uri,
           name: record.label.isNotEmpty
               ? record.label
               : record.uri.split('/').last,
-          sortDate: sortDate,
           size: 0,
           isMounted: false,
         );

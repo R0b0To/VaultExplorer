@@ -6,7 +6,7 @@ import 'dart:collection';
 /// Every [operator []] call that hits promotes the entry to most-recent.
 class LruCache<K, V> {
   final int capacity;
-  final _map = LinkedHashMap<K, V>();
+  final _map = <K, V>{};
 
   LruCache(this.capacity) : assert(capacity > 0, 'capacity must be > 0');
 

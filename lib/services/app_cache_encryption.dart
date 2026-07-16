@@ -3,7 +3,6 @@ import 'package:encrypt/encrypt.dart' as enc;
 
 class AppCacheEncryption {
   static const _secure = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
   static const _kCacheKey = 'app_cache_aes_key';
 

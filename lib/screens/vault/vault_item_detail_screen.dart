@@ -28,7 +28,7 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
   late VaultItem _item;
   late String _currentFilePath;
   final Map<String, bool> _revealed = {};
-  bool _modified = false;
+
 
   @override
   void initState() {
@@ -38,21 +38,15 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
   }
 
   Future<void> _delete() async {
-     final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete item?'),
-        content: Text('"${_item.title}" will be permanently deleted from the vault.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-          ),
-        ],
-      ),
+
+    final confirm = await showAppConfirmDialog(
+      context,
+      title: 'Delete item?',
+      message: '"${_item.title}" will be permanently deleted from the vault.',
+      confirmLabel: 'Delete',
+      isDestructive: true,
     );
-    if (confirm != true || !mounted) return;
+    if (!confirm || !mounted) return;
 
     await vaultExplorerApi.deleteFile(widget.container, _currentFilePath);
     if (mounted) Navigator.pop(context, true);
@@ -77,7 +71,6 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
         setState(() {
           _item = updated;
           _currentFilePath = resultPath;
-          _modified = true;
         });
       }
     }
@@ -86,13 +79,15 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
   Future<void> _toggleFavourite() async {
     final updated = _item.copyWithFavourite(!_item.favourite);
     await VaultItemsService.instance.saveItem(widget.container, _currentFilePath, updated);
-    setState(() { _item = updated; _modified = true; });
+    setState(() { _item = updated; });
   }
 
   void _copy(String label, String value) {
     Clipboard.setData(ClipboardData(text: value));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label copied to clipboard')),
+    showAppSnackBar(
+      context,
+      message: '$label copied to clipboard',
+      tone: AppBannerTone.success,
     );
   }
 
@@ -105,11 +100,6 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
 
     return PopScope(
       canPop: true,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop && _modified) {
-          // Signal caller to reload
-        }
-      },
       child: Scaffold(
         appBar: AppBar(
           title: Text(_item.title),
@@ -117,7 +107,7 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
             IconButton(
               icon: Icon(
                 _item.favourite ? Icons.star_rounded : Icons.star_outline_rounded,
-                color: _item.favourite ? const Color(0xFFFFC107) : null,
+                color: _item.favourite ? context.semanticColors.favourite : null,
               ),
               onPressed: _toggleFavourite,
               tooltip: _item.favourite ? 'Remove from favourites' : 'Add to favourites',
@@ -142,14 +132,6 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
             ),
           ],
         ),
-        // FIX: previously the ListView had padding: fromLTRB(0, 8, 0, 32)
-        // and every single child (_HeaderCard, the two SectionLabels, both
-        // Cards) re-declared its own Padding(horizontal: 16) wrapper. That's
-        // the "unnecessary nested widgets / repeated styling" pattern flagged
-        // in the audit — six separate horizontal-padding wrappers doing the
-        // same job the ListView should do once. Now the ListView carries the
-        // horizontal inset via AppSpacing.pagePadding and every child was
-        // un-wrapped accordingly.
         body: ListView(
           padding: AppSpacing.pagePadding,
           children: [
@@ -170,41 +152,31 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
               )
             else ...[
               const SectionLabel('Details'),
-              Card(
-                child: Column(
-                  children: fields.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final f = entry.value;
-                    return Column(
-                      children: [
-                        _FieldRow(
-                          field: f,
-                          revealed: _revealed[f.key] ?? false,
-                          onReveal: () => setState(() =>
-                              _revealed[f.key] = !(_revealed[f.key] ?? false)),
-                          onCopy: () => _copy(f.label, f.value),
-                        ),
-                        if (i < fields.length - 1)
-                          const Divider(height: 1, indent: 16),
-                      ],
-                    );
-                  }).toList(),
-                ),
+              AppCard.rows(
+                dividerIndent: 16,
+                children: fields
+                    .map(
+                      (f) => _FieldRow(
+                        field: f,
+                        revealed: _revealed[f.key] ?? false,
+                        onReveal: () => setState(() =>
+                            _revealed[f.key] = !(_revealed[f.key] ?? false)),
+                        onCopy: () => _copy(f.label, f.value),
+                      ),
+                    )
+                    .toList(),
               ),
             ],
 
             const SizedBox(height: 20),
             const SectionLabel('Info'),
-            Card(
-              child: Column(
-                children: [
-                  _MetaRow(label: 'Type', value: _item.type.label),
-                  const Divider(height: 1, indent: 16),
-                  _MetaRow(label: 'Created', value: _formatDate(_item.createdAt)),
-                  const Divider(height: 1, indent: 16),
-                  _MetaRow(label: 'Modified', value: _formatDate(_item.updatedAt)),
-                ],
-              ),
+            AppCard.rows(
+              dividerIndent: 16,
+              children: [
+                _MetaRow(label: 'Type', value: _item.type.label),
+                _MetaRow(label: 'Created', value: _formatDate(_item.createdAt)),
+                _MetaRow(label: 'Modified', value: _formatDate(_item.updatedAt)),
+              ],
             ),
           ],
         ),
@@ -272,7 +244,11 @@ class _HeaderCard extends StatelessWidget {
                     ),
                     if (item.favourite) ...[
                       const SizedBox(width: 8),
-                      const Icon(Icons.star_rounded, size: AppIconSize.inline, color: Color(0xFFFFC107)),
+                      Icon(
+                        Icons.star_rounded,
+                        size: AppIconSize.inline,
+                        color: context.semanticColors.favourite,
+                      ),
                     ],
                   ]),
                 ],

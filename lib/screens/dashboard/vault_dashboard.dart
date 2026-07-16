@@ -7,7 +7,9 @@ import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
 import '../../services/session_lock_controller.dart';
 import '../../services/vaultexplorer_api.dart';
+import '../../theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../widgets/floating_activity_stack.dart';
 import '../settings/app_settings_screen.dart';
 import '../unlock/unlock_sheet.dart';
 import 'widgets/container_config_sheet.dart';
@@ -37,7 +39,7 @@ class SlideRightRoute<T> extends PageRouteBuilder<T> {
 }
 
 class VaultDashboard extends StatefulWidget {
-  const VaultDashboard({Key? key}) : super(key: key);
+  const VaultDashboard({super.key});
 
   @override
   State<VaultDashboard> createState() => _VaultDashboardState();
@@ -87,7 +89,9 @@ class _VaultDashboardState extends State<VaultDashboard>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    for (final t in _autoCloseTimers.values) t.cancel();
+    for (final t in _autoCloseTimers.values) {
+      t.cancel();
+    }
     _autoCloseTimers.clear();
     _lockController.dispose();
     VaultExplorerApi.removeUsbContainerDetachedListener(_onUsbContainerDetached);
@@ -323,6 +327,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     final docProvider = record?.documentProvider ?? _appSettings.defaultDocumentProvider;
 
     try {
+      if (!mounted) return; 
       await Navigator.push(
         context,
         SlideRightRoute(
@@ -352,6 +357,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
 
     try {
+      if (!mounted) return; 
       await Navigator.push(
         context,
         SlideRightRoute(
@@ -662,7 +668,7 @@ class _VaultDashboardState extends State<VaultDashboard>
             buildDefaultDragHandles: false,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
             itemCount: displayItems.length,
-            onReorder: _handleReorder,
+            onReorderItem: _handleReorder,
             itemBuilder: (context, i) {
               final item = displayItems[i];
                final bool triggerNudge = i == 0 && !_appSettings.hasSeenSwipeTutorial;
@@ -740,9 +746,15 @@ class _VaultDashboardState extends State<VaultDashboard>
                   builder: (context, _) {
                     final clipboard = CrossContainerClipboard.instance;
                     if (!clipboard.hasItems) return const SizedBox.shrink();
-                    return _FloatingClipboardDashboardBanner(
-                      clipboard: clipboard,
-                      onClear: clipboard.clear,
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ClipboardActivityPill(
+                        isCutOperation: clipboard.isCutOperation,
+                        itemCount: clipboard.items.length,
+                        sourceLabel: clipboard.sourceDisplayName,
+                        onCancel: clipboard.clear,
+                        onPaste: null, // Dashboard has no paste target of its own.
+                      ),
                     );
                   },
                 ),
@@ -780,90 +792,6 @@ class _VaultDashboardState extends State<VaultDashboard>
   }
 }
 
-class _FloatingClipboardDashboardBanner extends StatelessWidget {
-  final CrossContainerClipboard clipboard;
-  final VoidCallback onClear;
-
-  const _FloatingClipboardDashboardBanner({
-    required this.clipboard,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Material(
-        color: cs.inverseSurface,
-        elevation: 0,
-        shape: const StadiumBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                clipboard.isCutOperation ? Icons.cut_rounded : Icons.copy_rounded,
-                size: 22,
-                color: cs.onInverseSurface,
-              ),
-              const SizedBox(width: 14),
-              Flexible(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      clipboard.summary,
-                      style: textTheme.labelLarge?.copyWith(
-                        color: cs.onInverseSurface,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      'Open a container to paste',
-                      style: textTheme.labelSmall?.copyWith(
-                        color: cs.onInverseSurface.withValues(alpha: 0.8),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              Container(
-                width: 1,
-                height: 28,
-                color: cs.onInverseSurface.withValues(alpha: 0.2),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: Icon(
-                  Icons.close_rounded,
-                  size: 22,
-                  color: cs.onInverseSurface,
-                ),
-                tooltip: 'Cancel',
-                onPressed: onClear,
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                padding: EdgeInsets.zero,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _FloatingUndoBar extends StatelessWidget {
   final String label;
   final VoidCallback onUndo;
@@ -878,52 +806,47 @@ class _FloatingUndoBar extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    return Material(
+    return FloatingPill(
       color: cs.inverseSurface,
-      elevation: 4,
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Row(
-          children: [
-            Icon(
-              Icons.delete_outline_rounded,
-              size: 22,
-              color: cs.onInverseSurface,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Text(
-                  'Removed "$label"',
-                  key: ValueKey(label),
-                  style: textTheme.labelLarge?.copyWith(
-                    color: cs.onInverseSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.delete_outline_rounded,
+            size: AppIconSize.standard,
+            color: cs.onInverseSurface,
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: AnimatedSwitcher(
+              duration: AppMotion.short2,
+              child: Text(
+                'Removed "$label"',
+                key: ValueKey(label),
+                style: textTheme.labelLarge?.copyWith(
+                  color: cs.onInverseSurface,
+                  fontWeight: FontWeight.w600,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: onUndo,
-              style: TextButton.styleFrom(
-                foregroundColor: cs.inversePrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text(
-                'Undo',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: onUndo,
+            style: TextButton.styleFrom(
+              foregroundColor: cs.inversePrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-          ],
-        ),
+            child: const Text(
+              'Undo',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }

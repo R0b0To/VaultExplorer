@@ -3,8 +3,7 @@ import '../models/crypto_algorithms.dart';
 import '../services/vaultexplorer_api.dart' show KeyfileRef;
 import '../theme.dart';
 
-/// Uppercased, letter-spaced section header used above grouped settings
-/// cards. Single source of truth — do not re-inline this elsewhere.
+
 class SectionLabel extends StatelessWidget {
   final String text;
   const SectionLabel(this.text, {super.key});
@@ -216,31 +215,29 @@ class PasswordVisibilityToggle extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NEW: shared M3 building blocks
-// ─────────────────────────────────────────────────────────────────────────────
 
-/// Grouped settings/tile card — the pattern that used to be hand-copied as
-/// `_Card` (app_settings_screen.dart) and `_AboutGroup` (about_screen.dart).
-/// One rounded tonal Card containing rows separated by hairline dividers
-/// (or, for [SettingsToggleRow]-style content, plain spacing — pass
-/// [dividers]: false to omit them).
 class AppCard extends StatelessWidget {
   final List<Widget> children;
   final bool dividers;
   final EdgeInsetsGeometry padding;
+
+  final double dividerIndent;
 
   const AppCard({
     super.key,
     required this.children,
     this.dividers = false,
     this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    this.dividerIndent = 68,
   });
 
   /// A card whose children are full-bleed rows (e.g. tappable list tiles)
   /// separated by inset dividers, matching about_screen's `_AboutGroup`.
-  const AppCard.rows({super.key, required this.children})
-      : dividers = true,
+  const AppCard.rows({
+    super.key,
+    required this.children,
+    this.dividerIndent = 68,
+  })  : dividers = true,
         padding = EdgeInsets.zero;
 
   @override
@@ -255,7 +252,7 @@ class AppCard extends StatelessWidget {
                 for (int i = 0; i < children.length; i++) ...[
                   children[i],
                   if (i < children.length - 1)
-                    const Divider(height: 1, indent: 68, endIndent: 16),
+                    Divider(height: 1, indent: dividerIndent, endIndent: 16),
                 ],
               ],
             )
@@ -455,10 +452,39 @@ void showAppSnackBar(
     );
 }
 
-/// A tappable option row for bottom sheets that present a small set of
-/// choices (e.g. "Mount file" / "Mount USB" / "Create new") — replaces the
-/// ad hoc PopupMenuButton + Icon + Text rows previously hand-built per
-/// screen. Designed to sit inside a [showModalBottomSheet].
+Future<bool> showAppConfirmDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  String confirmLabel = 'Confirm',
+  String cancelLabel = 'Cancel',
+  bool isDestructive = false,
+}) async {
+  final cs = context.colors;
+  final result = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, false),
+          child: Text(cancelLabel),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext, true),
+          child: Text(
+            confirmLabel,
+            style: isDestructive ? TextStyle(color: cs.error) : null,
+          ),
+        ),
+      ],
+    ),
+  );
+  return result ?? false;
+}
+
+
 class SheetOptionTile extends StatelessWidget {
   final IconData icon;
   final Color? iconColor;

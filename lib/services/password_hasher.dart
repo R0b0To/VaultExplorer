@@ -78,7 +78,9 @@ class PasswordHasher {
   static bool _secureEqual(Uint8List a, Uint8List b) {
     if (a.length != b.length) return false;
     var result = 0;
-    for (var i = 0; i < a.length; i++) result |= a[i] ^ b[i];
+    for (var i = 0; i < a.length; i++) {
+      result |= a[i] ^ b[i];
+    }
     return result == 0;
   }
 }

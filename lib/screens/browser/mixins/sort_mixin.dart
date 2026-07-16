@@ -65,31 +65,4 @@ mixin SortMixin<T extends StatefulWidget> on State<T> {
     return sortAscending ? result : -result;
   }
 
-  /// Builds a [PopupMenuItem] for the sort menu, annotated with the current
-  /// direction arrow when active.
-  PopupMenuItem<SortBy> buildSortMenuItem(SortBy value, String label) {
-    final cs = Theme.of(context).colorScheme;
-    final isActive = sortBy == value;
-    return PopupMenuItem(
-      value: value,
-      child: Row(
-        children: [
-          Icon(
-            isActive
-                ? (sortAscending ? Icons.arrow_upward : Icons.arrow_downward)
-                : Icons.sort,
-            size: 16,
-            color: isActive ? cs.primary : null,
-          ),
-          const SizedBox(width: 10),
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

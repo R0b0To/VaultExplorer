@@ -17,7 +17,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onOpenWithApp;
 
   const SelectionAppBar({
-    Key? key,
+    super.key,
     required this.selectedCount,
     required this.selectionLabel,
     required this.singleSelected,
@@ -30,7 +30,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onExport,
     required this.onDelete,
     required this.onOpenWithApp,
-  }) : super(key: key);
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);

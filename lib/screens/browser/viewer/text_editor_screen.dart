@@ -10,10 +10,10 @@ class TextEditorScreen extends StatefulWidget {
   final String filePath;
 
   const TextEditorScreen({
-    Key? key,
+    super.key,
     required this.container,
     required this.filePath,
-  }) : super(key: key);
+  });
 
   @override
   State<TextEditorScreen> createState() => _TextEditorScreenState();
@@ -219,7 +219,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         final shouldPop = await _onWillPop();
-        if (shouldPop && mounted) {
+        if (shouldPop && context.mounted) {
           Navigator.of(context).pop();
         }
       },

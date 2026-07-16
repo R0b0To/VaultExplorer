@@ -79,7 +79,7 @@ class MediaPlayerWidget extends StatefulWidget {
   final bool isCurrent;
 
   const MediaPlayerWidget({
-    Key? key,
+    super.key,
     required this.container,
     required this.fileName,
     required this.contentUriString,
@@ -96,7 +96,7 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.onVideoControllerDisposed,
     required this.progressNotifier,
     required this.isCurrent,
-  }) : super(key: key);
+  });
 
   @override
   State<MediaPlayerWidget> createState() => _MediaPlayerWidgetState();
@@ -612,7 +612,7 @@ Future<void> _skip({required bool backwards}) async {
 
 class _AudioVisualizer extends StatefulWidget {
   final bool isPlaying;
-  const _AudioVisualizer({Key? key, required this.isPlaying}) : super(key: key);
+  const _AudioVisualizer({required this.isPlaying});
 
   @override
   State<_AudioVisualizer> createState() => _AudioVisualizerState();

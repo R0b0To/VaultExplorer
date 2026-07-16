@@ -279,6 +279,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
         if (mounted) setState(() => _settingsLocked = false);
         return;
       }
+      if (!mounted) return;
       final ok = await showDialog<bool>(
         context: context,
         builder: (context) => _PasswordVerifyDialog(uri: widget.uri),
@@ -686,7 +687,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
           : Container(
               decoration: BoxDecoration(
                 color: cs.surfaceContainerLow,
-                border: Border(top: BorderSide(color: cs.outlineVariant.withOpacity(0.5))),
+                border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha:0.5))),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.05),
@@ -751,7 +752,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
 class _SectionHeader extends StatelessWidget {
   final String title;
   final IconData icon;
-  const _SectionHeader({Key? key, required this.title, required this.icon}) : super(key: key);
+  const _SectionHeader({required this.title, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -780,7 +781,7 @@ class _SectionHeader extends StatelessWidget {
 
 class _PatternVerifySheet extends StatefulWidget {
   final String storedHash;
-  const _PatternVerifySheet({Key? key, required this.storedHash}) : super(key: key);
+  const _PatternVerifySheet({required this.storedHash});
 
   @override
   State<_PatternVerifySheet> createState() => _PatternVerifySheetState();
@@ -850,7 +851,7 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
 
 class _PasswordVerifyDialog extends StatefulWidget {
   final String uri;
-  const _PasswordVerifyDialog({Key? key, required this.uri}) : super(key: key);
+  const _PasswordVerifyDialog({required this.uri});
 
   @override
   State<_PasswordVerifyDialog> createState() => _PasswordVerifyDialogState();

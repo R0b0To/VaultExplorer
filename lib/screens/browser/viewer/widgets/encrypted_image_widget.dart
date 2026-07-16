@@ -10,12 +10,12 @@ class EncryptedImageWidget extends StatefulWidget {
   final BoxFit fit;
 
   const EncryptedImageWidget({
-    Key? key,
+    super.key,
     required this.container,
     required this.fileName,
     this.prefetchedBytes,
     required this.fit,
-  }) : super(key: key);
+  });
 
   @override
   State<EncryptedImageWidget> createState() => _EncryptedImageWidgetState();

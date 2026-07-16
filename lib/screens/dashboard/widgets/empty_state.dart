@@ -7,7 +7,7 @@ import '/widgets/common_widgets.dart';
 /// behavior is shared with every other empty state in the app.
 class EmptyState extends StatelessWidget {
   final VoidCallback onAdd;
-  const EmptyState({Key? key, required this.onAdd}) : super(key: key);
+  const EmptyState({super.key, required this.onAdd});
 
   @override
   Widget build(BuildContext context) {

@@ -37,8 +37,8 @@ enum ContainerUnlockMethod {
   };
 
   IconData get icon => switch (this) {
-    ContainerUnlockMethod.password => Icons.key,
-    ContainerUnlockMethod.rememberPassword => Icons.lock_open,
+    ContainerUnlockMethod.password => Icons.key_rounded,
+    ContainerUnlockMethod.rememberPassword => Icons.lock_open_rounded,
     ContainerUnlockMethod.biometrics => Icons.fingerprint,
     ContainerUnlockMethod.pattern => Icons.pattern,
   };
@@ -69,7 +69,6 @@ class ContainerRepository {
   // ── Backing stores ────────────────────────────────────────────────────────
 
   static const _secure = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
   // In-memory cache — loaded once on first access, written-through on every mutation.
@@ -234,16 +233,6 @@ class ContainerRecord {
   /// True for containers mounted from a USB mass-storage device (uri format
   /// `usb:<deviceName>`) rather than a picked container file (content:// or
   /// file:// uri).
-  ///
-  /// FIX: this distinction previously didn't exist anywhere — a USB-mounted
-  /// volume got saved to the dashboard exactly like a file container, and
-  /// re-unlocking it from the saved entry routed to the file-based
-  /// UnlockSheet, which handed the raw `usb:...` string to
-  /// `contentResolver.openFileDescriptor()` and failed with "no content
-  /// provider" (there IS no content provider for a `usb:` scheme — it's
-  /// resolved entirely differently, via UsbUnlockSheet / unlockUsbContainer).
-  /// Callers now check this to route to the correct unlock sheet instead of
-  /// guessing from context.
   bool get isUsbSource => uri.startsWith('usb:');
 
   ContainerRecord copyWith({

@@ -7,7 +7,7 @@ import '../../../widgets/common_widgets.dart';
 import '../../../models/crypto_algorithms.dart';
 
 class CreateContainerSheet extends StatefulWidget {
-  const CreateContainerSheet({Key? key}) : super(key: key);
+  const CreateContainerSheet({super.key});
 
   @override
   State<CreateContainerSheet> createState() => _CreateContainerSheetState();
@@ -39,13 +39,13 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
   bool _hiddenObscure = true;
   String _hiddenSizeUnit = 'MB';
   final _hiddenSizeCtrl = TextEditingController(text: '10');
-  List<KeyfileRef> _hiddenKeyfiles = [];
+  final List<KeyfileRef> _hiddenKeyfiles = [];
   bool _pickingHiddenKeyfiles = false;
   String _hiddenFileSystem = 'FAT';
   int _hiddenCipherId = 0; // AES
   int _hiddenHashId = 0; // SHA-512
 
-  List<KeyfileRef> _keyfiles = [];
+  final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
 
   List<String> get _availableFileSystems =>
@@ -283,7 +283,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
 
   Widget _buildFormatSelector(ColorScheme cs) {
     return DropdownButtonFormField<CreateFormat>(
-      value: _format,
+      initialValue: _format,
       decoration: _getInputDecoration(
         cs,
         labelText: 'Container Format',
@@ -320,7 +320,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
       onHashChanged: (val) => setState(() => _hashId = val),
       extraFields: [
         DropdownButtonFormField<String>(
-          value: _fileSystem,
+          initialValue: _fileSystem,
           decoration: const InputDecoration(
             labelText: 'Format File System',
             prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
@@ -385,7 +385,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: _sizeUnit,
+                        initialValue: _sizeUnit,
                         isExpanded: true,
                         decoration: _getInputDecoration(
                           cs,
@@ -500,7 +500,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           isExpanded: true,
-                          value: _hiddenSizeUnit,
+                          initialValue: _hiddenSizeUnit,
                           decoration: _getInputDecoration(
                             cs,
                             labelText: 'Unit',
@@ -536,7 +536,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                     onHashChanged: (val) => setState(() => _hiddenHashId = val),
                     extraFields: [
                       DropdownButtonFormField<String>(
-                        value: _hiddenFileSystem,
+                        initialValue: _hiddenFileSystem,
                         decoration: const InputDecoration(
                           labelText: 'Hidden File System',
                           prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),

@@ -10,7 +10,7 @@ import 'pattern_lock_view.dart';
 ///
 /// The return value is `String?` — null if the user cancels.
 class PatternSetupSheet extends StatefulWidget {
-  const PatternSetupSheet({Key? key}) : super(key: key);
+  const PatternSetupSheet({super.key});
 
   @override
   State<PatternSetupSheet> createState() => _PatternSetupSheetState();

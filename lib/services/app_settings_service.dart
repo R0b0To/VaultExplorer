@@ -56,11 +56,9 @@ class AppSettings {
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
     this.defaultThumbnailQuality = ThumbnailQuality.medium,
     Map<String, String>? extensionPreferences,
-    String? masterPasswordHash,
-    String? masterPasswordSalt,
-  }) : extensionPreferences = extensionPreferences ?? {},
-       _masterPasswordHash = masterPasswordHash,
-       _masterPasswordSalt = masterPasswordSalt;
+    this._masterPasswordHash,
+    this._masterPasswordSalt,
+  }) : extensionPreferences = extensionPreferences ?? {};
 
   // Read-only accessors — callers must not store these; use Keystore directly.
   String? get masterPasswordHash => _masterPasswordHash;

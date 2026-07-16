@@ -548,7 +548,7 @@ class VaultExplorerApi {
         .invokeMethod<bool>(ChannelMethods.openWithApp, {
           'filePath': container.uri,
           'fileName': fileName,
-          if (packageName != null) 'packageName': packageName,
+          'packageName': ?packageName,
         });
     return result ?? false;
   }

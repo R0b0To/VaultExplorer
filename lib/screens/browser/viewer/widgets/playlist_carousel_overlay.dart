@@ -21,7 +21,7 @@ class PlaylistCarouselOverlay extends StatefulWidget {
   final VoidCallback onClose;
 
   const PlaylistCarouselOverlay({
-    Key? key,
+    super.key,
     required this.container,
     required this.playlist,
     required this.currentIndex,
@@ -29,7 +29,7 @@ class PlaylistCarouselOverlay extends StatefulWidget {
     required this.thumbnailCacheMode,
     required this.onSelect,
     required this.onClose,
-  }) : super(key: key);
+  });
 
   // Height adjusted to comfortably fit the thumbnails + the seekbar
   static const double height = 230;
@@ -256,12 +256,12 @@ class _CarouselThumb extends StatefulWidget {
   final ThumbnailCacheMode thumbnailCacheMode;
 
   const _CarouselThumb({
-    Key? key,
+    super.key,
     required this.container,
     required this.fileName,
     required this.thumbnailQuality,
     required this.thumbnailCacheMode,
-  }) : super(key: key);
+  });
 
   @override
   State<_CarouselThumb> createState() => _CarouselThumbState();

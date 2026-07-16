@@ -20,14 +20,14 @@ class UsbUnlockSheet extends StatefulWidget {
   final List<String> mountedUris; // <--- Added validation parameter
 
   const UsbUnlockSheet({
-    Key? key,
+    super.key,
     required this.onMounted,
     this.documentProvider = false,
     this.existingRecord,
     this.prefillPassword,
     this.onReconnected,
-    this.mountedUris = const [], // <--- Default value
-  }) : super(key: key);
+    this.mountedUris = const [],
+  });
 
   @override
   State<UsbUnlockSheet> createState() => _UsbUnlockSheetState();
@@ -699,130 +699,133 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                           ),
                         ),
                       ),
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _devices.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final d = _devices[index];
-                          final deviceUri = 'usb:${d.deviceName}';
-                          final isAlreadyMounted = widget.mountedUris.contains(deviceUri);
-                          final isSelected = _selected?.deviceName == d.deviceName;
-                          
-                          return GestureDetector(
-                            onTap: (busy || isAlreadyMounted) ? null : () => setState(() => _selected = d),
-                            child: Card(
-                              elevation: 0,
-                              color: isAlreadyMounted
-                                  ? cs.surfaceContainerLow.withValues(alpha: 0.5)
-                                  : isSelected
-                                      ? cs.primaryContainer.withValues(alpha: 0.12)
-                                      : cs.surfaceContainerLow,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                side: BorderSide(
-                                  color: isAlreadyMounted
-                                      ? cs.outlineVariant.withValues(alpha: 0.2)
-                                      : isSelected
-                                          ? cs.primary
-                                          : cs.outlineVariant.withValues(alpha: 0.5),
-                                  width: isSelected ? 1.5 : 1,
-                                ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: isAlreadyMounted
-                                            ? cs.surfaceContainer
-                                            : isSelected
-                                                ? cs.primaryContainer
-                                                : cs.surfaceContainerHigh,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Icon(
-                                        isAlreadyMounted
-                                            ? Icons.lock_outline_rounded
-                                            : Icons.usb_rounded,
-                                        size: 22,
-                                        color: isAlreadyMounted
-                                            ? cs.onSurfaceVariant.withValues(alpha: 0.5)
-                                            : isSelected
-                                                ? cs.onPrimaryContainer
-                                                : cs.primary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            d.productName,
-                                            style: textTheme.bodyLarge?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                              color: isAlreadyMounted
-                                                  ? cs.onSurfaceVariant.withValues(alpha: 0.5)
-                                                  : cs.onSurface,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            isAlreadyMounted
-                                                ? 'Already active'
-                                                : d.hasPermission
-                                                    ? 'Ready to unlock'
-                                                    : 'Permission required',
-                                            style: textTheme.bodySmall?.copyWith(
-                                              color: isAlreadyMounted
-                                                  ? cs.error
-                                                  : d.hasPermission
-                                                      ? cs.primary
-                                                      : cs.onSurfaceVariant,
-                                              fontWeight: isAlreadyMounted || d.hasPermission
-                                                  ? FontWeight.w500
-                                                  : null,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (isAlreadyMounted) ...[
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: cs.surfaceContainerHigh,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          'Active',
-                                          style: textTheme.labelSmall?.copyWith(
-                                            color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ] else ...[
-                                      Radio<UsbDeviceInfo>(
-                                        value: d,
-                                        groupValue: _selected,
-                                        onChanged: busy ? null : (v) => setState(() => _selected = v),
-                                        activeColor: cs.primary,
-                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                        visualDensity: VisualDensity.compact,
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+RadioGroup<UsbDeviceInfo>(
+  groupValue: _selected,
+  onChanged: (v) => setState(() => _selected = v), 
+  child: ListView.separated(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    itemCount: _devices.length,
+    separatorBuilder: (_, _) => const SizedBox(height: 10),
+    itemBuilder: (context, index) {
+      final d = _devices[index];
+      final deviceUri = 'usb:${d.deviceName}';
+      final isAlreadyMounted = widget.mountedUris.contains(deviceUri);
+      final isSelected = _selected?.deviceName == d.deviceName;
+      
+      return GestureDetector(
+        onTap: (busy || isAlreadyMounted) ? null : () => setState(() => _selected = d),
+        child: Card(
+          elevation: 0,
+          color: isAlreadyMounted
+              ? cs.surfaceContainerLow.withValues(alpha: 0.5)
+              : isSelected
+                  ? cs.primaryContainer.withValues(alpha: 0.12)
+                  : cs.surfaceContainerLow,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: isAlreadyMounted
+                  ? cs.outlineVariant.withValues(alpha: 0.2)
+                  : isSelected
+                      ? cs.primary
+                      : cs.outlineVariant.withValues(alpha: 0.5),
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isAlreadyMounted
+                        ? cs.surfaceContainer
+                        : isSelected
+                            ? cs.primaryContainer
+                            : cs.surfaceContainerHigh,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isAlreadyMounted
+                        ? Icons.lock_outline_rounded
+                        : Icons.usb_rounded,
+                    size: 22,
+                    color: isAlreadyMounted
+                        ? cs.onSurfaceVariant.withValues(alpha: 0.5)
+                        : isSelected
+                            ? cs.onPrimaryContainer
+                            : cs.primary,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        d.productName,
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: isAlreadyMounted
+                              ? cs.onSurfaceVariant.withValues(alpha: 0.5)
+                              : cs.onSurface,
+                        ),
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isAlreadyMounted
+                            ? 'Already active'
+                            : d.hasPermission
+                                ? 'Ready to unlock'
+                                : 'Permission required',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: isAlreadyMounted
+                              ? cs.error
+                              : d.hasPermission
+                                  ? cs.primary
+                                  : cs.onSurfaceVariant,
+                          fontWeight: isAlreadyMounted || d.hasPermission
+                              ? FontWeight.w500
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isAlreadyMounted) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Active',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Radio<UsbDeviceInfo>(
+                    value: d,
+                    enabled: !busy, // <-- The disabled state is now set here
+                    activeColor: cs.primary,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  ),
+)
                     ],
                   ),
                   const SizedBox(height: 24),

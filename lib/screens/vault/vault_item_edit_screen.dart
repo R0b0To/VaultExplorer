@@ -4,10 +4,12 @@ import '../../services/vaultexplorer_api.dart';
 
 import '../../models/mounted_container.dart';
 import '../../models/vault_item.dart';
+import '../../models/file_operation.dart';
 import '../../services/vault_items_service.dart';
 import '../../theme.dart';
 import '../../widgets/common_widgets.dart';
 import '../../utils/filename_utils.dart';
+import '../../utils/raw_entry.dart';
 
 class VaultItemEditScreen extends StatefulWidget {
   final MountedContainer container;
@@ -119,34 +121,41 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
     final newTitle = _titleCtrl.text.trim();
     final safeTitle = sanitizeFatFileName(newTitle);
-    
+
     String finalPath = widget.filePath ?? '';
 
+    final destDirPath = _isNew
+        ? widget.currentDirPath
+        : (widget.filePath!.contains('/')
+            ? widget.filePath!.substring(0, widget.filePath!.lastIndexOf('/'))
+            : '');
+
+    final existingRaw =
+        await vaultExplorerApi.listDirectory(widget.container, destDirPath) ?? [];
+    final existingNames = existingRaw
+        .where((e) => !e.startsWith('System:'))
+        .map((e) => RawEntry.parse(e).name.toLowerCase())
+        .toSet();
+
     if (_isNew) {
-      String name = '$safeTitle.${widget.type.name}';
-      finalPath = widget.currentDirPath.isEmpty ? name : '${widget.currentDirPath}/$name';
-      
-      int c = 1;
-      while (await vaultExplorerApi.getFileSize(widget.container, finalPath) > 0) {
-         name = '$safeTitle ($c).${widget.type.name}';
-         finalPath = widget.currentDirPath.isEmpty ? name : '${widget.currentDirPath}/$name';
-         c++;
-      }
+      final desiredName = '$safeTitle.${widget.type.name}';
+      final uniqueName = FileOperationService.makeUniqueName(desiredName, existingNames);
+      finalPath = destDirPath.isEmpty ? uniqueName : '$destDirPath/$uniqueName';
     } else if (widget.existing!.title != newTitle) {
       final oldPath = widget.filePath!;
-      final dir = oldPath.contains('/') ? oldPath.substring(0, oldPath.lastIndexOf('/')) : '';
-      
-      String newName = '$safeTitle.${widget.type.name}';
-      String tempPath = dir.isEmpty ? newName : '$dir/$newName';
-      
-      int c = 1;
-      while (await vaultExplorerApi.getFileSize(widget.container, tempPath) > 0) {
-         newName = '$safeTitle ($c).${widget.type.name}';
-         tempPath = dir.isEmpty ? newName : '$dir/$newName';
-         c++;
-      }
-      await vaultExplorerApi.renameFile(widget.container, oldPath, tempPath);
-      finalPath = tempPath;
+      final oldName = oldPath.contains('/')
+          ? oldPath.substring(oldPath.lastIndexOf('/') + 1)
+          : oldPath;
+
+
+      final namesExcludingSelf = existingNames.difference({oldName.toLowerCase()});
+
+      final desiredName = '$safeTitle.${widget.type.name}';
+      final uniqueName = FileOperationService.makeUniqueName(desiredName, namesExcludingSelf);
+      final newPath = destDirPath.isEmpty ? uniqueName : '$destDirPath/$uniqueName';
+
+      await vaultExplorerApi.renameFile(widget.container, oldPath, newPath);
+      finalPath = newPath;
     }
 
     final item = _isNew
@@ -167,22 +176,20 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
   Future<bool> _confirmDiscard() async {
     if (!_wasDirty) return true;
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Discard changes?'),
-        content: const Text('Your unsaved changes will be lost.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep editing')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Discard')),
-        ],
-      ),
+
+    return showAppConfirmDialog(
+      context,
+      title: 'Discard changes?',
+      message: 'Your unsaved changes will be lost.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep editing',
+      isDestructive: true,
     );
-    return result ?? false;
   }
 
+
   void _showSnack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showAppSnackBar(context, message: msg, tone: AppBannerTone.error);
   }
 
   @override
@@ -307,8 +314,11 @@ class _FieldInput extends StatelessWidget {
                     icon: Icon(Icons.copy_rounded, size: AppIconSize.small),
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: controller.text));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('${field.label} copied')),
+
+                      showAppSnackBar(
+                        context,
+                        message: '${field.label} copied',
+                        tone: AppBannerTone.success,
                       );
                     },
                     tooltip: 'Copy',

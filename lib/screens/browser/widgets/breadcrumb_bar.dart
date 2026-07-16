@@ -6,8 +6,7 @@ class BreadcrumbBar extends StatelessWidget {
   final List<PathSegment> stack;
   final ValueChanged<int> onTap;
 
-  const BreadcrumbBar({Key? key, required this.stack, required this.onTap})
-    : super(key: key);
+  const BreadcrumbBar({super.key, required this.stack, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

@@ -16,7 +16,7 @@ class ImagePageItem extends StatefulWidget {
   final ValueChanged<bool> onZoomChanged;
 
   const ImagePageItem({
-    Key? key,
+    super.key,
     required this.fileName,
     required this.prefetchedBytes,
     required this.container,
@@ -25,7 +25,7 @@ class ImagePageItem extends StatefulWidget {
     required this.showUI,
     required this.onToggleUI,
     required this.onZoomChanged,
-  }) : super(key: key);
+  });
 
   @override
   State<ImagePageItem> createState() => _ImagePageItemState();
@@ -130,10 +130,11 @@ class _ImagePageItemState extends State<ImagePageItem> {
             final x = -position.dx * (_scale - 1);
             final y = -position.dy * (_scale - 1);
             _transformationController.value = Matrix4.identity()
-              ..translate(x, y)
-              ..scale(_scale);
+              ..translateByDouble(x, y, 0.0, 1.0)
+              ..scaleByDouble(_scale, _scale, _scale, 1.0);
           } else {
-            _transformationController.value = Matrix4.identity()..scale(_scale);
+            _transformationController.value = Matrix4.identity()
+            ..scaleByDouble(_scale, _scale, _scale, 1.0);
           }
           widget.onZoomChanged(false);
         } else {

@@ -137,7 +137,7 @@ class FileListView extends StatelessWidget {
             // Increased safe padding for bottom sheets & floating clipboards
             padding: EdgeInsets.only(
               top: 0,
-              bottom: 112 + MediaQuery.paddingOf(context).bottom,
+              bottom: AppSpacing.floatingStackClearance + MediaQuery.paddingOf(context).bottom,
             ),
             itemCount: total,
             itemBuilder: (_, index) {

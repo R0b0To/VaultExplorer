@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'dart:collection';
+
 
 // ---------------------------------------------------------------------------
 // Inline copies of the pure functions under test.
@@ -38,7 +38,7 @@ int clampPim(int value) {
 
 class LruCache<K, V> {
   final int capacity;
-  final _map = LinkedHashMap<K, V>();
+  final _map = <K, V>{};
 
   LruCache(this.capacity) : assert(capacity > 0, 'capacity must be > 0');
 

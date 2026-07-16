@@ -9,7 +9,7 @@ import '../dashboard/vault_dashboard.dart';
 /// Shown at app start when a master password is configured.
 /// Replaced by VaultDashboard on successful authentication.
 class LockGateScreen extends StatefulWidget {
-  const LockGateScreen({Key? key}) : super(key: key);
+  const LockGateScreen({super.key});
 
   @override
   State<LockGateScreen> createState() => _LockGateScreenState();
@@ -17,7 +17,6 @@ class LockGateScreen extends StatefulWidget {
 
 class _LockGateScreenState extends State<LockGateScreen> {
   static const _secure = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
   static const _kFailedAttempts = 'lock_gate_failed_attempts_v1';
   static const _kLockedUntilMs = 'lock_gate_locked_until_ms_v1';

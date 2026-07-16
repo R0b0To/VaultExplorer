@@ -37,6 +37,7 @@ abstract final class AppSpacing {
 
   static const pagePadding = EdgeInsets.fromLTRB(16, 12, 16, 32);
   static const sheetPadding = EdgeInsets.fromLTRB(24, 8, 24, 24);
+  static const floatingStackClearance = 112.0;
 }
 
 /// Material 3 motion tokens (durations follow the M3 "easing & duration"
@@ -77,6 +78,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   final Color onWarning;
   final Color warningContainer;
   final Color onWarningContainer;
+  final Color favourite;
 
   const AppSemanticColors({
     required this.success,
@@ -87,6 +89,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     required this.onWarning,
     required this.warningContainer,
     required this.onWarningContainer,
+    required this.favourite,
   });
 
   static const dark = AppSemanticColors(
@@ -98,6 +101,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     onWarning: Color(0xFF412D00),
     warningContainer: Color(0xFF5D4200),
     onWarningContainer: Color(0xFFFFDEA1),
+    favourite: Color(0xFFFFC107),
   );
 
   static const light = AppSemanticColors(
@@ -109,6 +113,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     onWarning: Color(0xFFFFFFFF),
     warningContainer: Color(0xFFFFDEA1),
     onWarningContainer: Color(0xFF271900),
+    favourite: Color(0xFF8F6300),
   );
 
   @override
@@ -121,6 +126,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     Color? onWarning,
     Color? warningContainer,
     Color? onWarningContainer,
+    Color? favourite,
   }) {
     return AppSemanticColors(
       success: success ?? this.success,
@@ -131,6 +137,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       onWarning: onWarning ?? this.onWarning,
       warningContainer: warningContainer ?? this.warningContainer,
       onWarningContainer: onWarningContainer ?? this.onWarningContainer,
+      favourite: favourite ?? this.favourite,
     );
   }
 
@@ -146,6 +153,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       onWarning: Color.lerp(onWarning, other.onWarning, t)!,
       warningContainer: Color.lerp(warningContainer, other.warningContainer, t)!,
       onWarningContainer: Color.lerp(onWarningContainer, other.onWarningContainer, t)!,
+      favourite: Color.lerp(favourite, other.favourite, t)!,
     );
   }
 }

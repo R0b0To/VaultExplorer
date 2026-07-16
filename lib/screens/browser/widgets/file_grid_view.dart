@@ -124,10 +124,10 @@ class _FileGridViewState extends State<FileGridView> {
       child: GridView.builder(
         // Generous bottom padding for Edge-to-Edge compliance and FloatingActivityStack clearance
         padding: EdgeInsets.fromLTRB(
-          10, 
-          12, 
-          10, 
-          100 + MediaQuery.paddingOf(context).bottom,
+          10,
+          12,
+          10,
+          AppSpacing.floatingStackClearance + MediaQuery.paddingOf(context).bottom,
         ),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _crossAxisCount,
@@ -560,7 +560,7 @@ class _AsyncThumbState extends State<_AsyncThumb> {
       _bytes!,
       fit: BoxFit.cover,
       cacheHeight: 180,
-      errorBuilder: (_, __, ___) => _errorPlaceholder(cs),
+      errorBuilder: (_, _, _) => _errorPlaceholder(cs),
     );
   }
 

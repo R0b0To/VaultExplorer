@@ -84,7 +84,7 @@ Future<void> _cleanupOrphanedTempFiles() async {
 }
 
 class VaultExplorerApp extends StatelessWidget {
-  const VaultExplorerApp({Key? key}) : super(key: key);
+  const VaultExplorerApp({super.key});
 
   @override
   Widget build(BuildContext context) {

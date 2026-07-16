@@ -25,21 +25,17 @@ class MediaViewerScreen extends StatefulWidget {
   final int initialIndex;
   final String? startingFolder;
   final ThumbnailQuality thumbnailQuality;
-  // NOTE: pass the same ThumbnailCacheMode here that you already pass to
-  // FileGridView, so the carousel reuses the grid's cached thumbnails
-  // instead of regenerating them. There's no safe default to guess here —
-  // wire it through from wherever this screen is pushed.
   final ThumbnailCacheMode thumbnailCacheMode;
 
   const MediaViewerScreen({
-    Key? key,
+    super.key,
     required this.container,
     required this.mediaFiles,
     required this.initialIndex,
     this.startingFolder,
     this.thumbnailQuality = ThumbnailQuality.medium,
     required this.thumbnailCacheMode,
-  }) : super(key: key);
+  });
 
   @override
   State<MediaViewerScreen> createState() => _MediaViewerScreenState();
@@ -68,13 +64,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   Timer? _slideshowTimer;
   Timer? _hideTimer;
 
-  bool _autoPlay = true;
+  final bool _autoPlay = true;
   bool _autoAdvance = false;
   int _slideshowDelaySeconds = 4;
   VideoPlaybackMode _videoPlaybackMode = VideoPlaybackMode.playOnce;
   double _playbackSpeed = 1.0;
   bool _subtitlesEnabled = true;
-  int _doubleTapSkipSeconds = 5;
+  final int _doubleTapSkipSeconds = 5;
   BoxFit _imageFit = BoxFit.contain;
   bool _isMuted = false;
   bool _isSwiping = false;

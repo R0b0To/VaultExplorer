@@ -11,7 +11,7 @@ import '../../theme.dart';
 import '../../widgets/common_widgets.dart';
 
 class AppSettingsScreen extends StatefulWidget {
-  const AppSettingsScreen({Key? key}) : super(key: key);
+  const AppSettingsScreen({super.key});
 
   @override
   State<AppSettingsScreen> createState() => _AppSettingsScreenState();
@@ -471,7 +471,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<ThumbnailQuality>(
-                      value: _settings.defaultThumbnailQuality,
+                      initialValue: _settings.defaultThumbnailQuality,
                       decoration: InputDecoration(
                         labelText: 'Thumbnail Quality (default)',
                         prefixIcon: Icon(Icons.high_quality_rounded, size: AppIconSize.small),

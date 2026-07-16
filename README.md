@@ -13,7 +13,7 @@ VaultExplorer lets you mount, browse, and manage VeraCrypt and LUKS encrypted vo
 - Full **AES-256-XTS** decryption and encryption matching the VeraCrypt/LUKS standard
 - Additional ciphers and cascades: **Serpent**, **Twofish**, **Camellia**, and **Kuznyechik**, plus the cascaded combinations VeraCrypt supports — AES-Twofish, Serpent-AES, Twofish-Serpent, AES-Twofish-Serpent, Serpent-Twofish-AES, Camellia-Kuznyechik, Camellia-Serpent, Kuznyechik-AES, Kuznyechik-Serpent-Camellia, Kuznyechik-Twofish (15 cipher/cascade combinations in total)
 - Multiple key-derivation options: PBKDF2 with **SHA-512**, SHA-256, Whirlpool, Streebog, or BLAKE2s-256, plus the memory-hard **Argon2id** KDF used by newer VeraCrypt volumes
-- LUKS1 and LUKS2 volumes are supported with AES/Serpent/Twofish in `xts-plain64` mode, PBKDF2 or Argon2id/Argon2i keyslot KDFs, and standard AF-splitting keyslot recovery — including LUKS2's per-segment sector size and IV-tweak offset
+- LUKS1 and LUKS2 volumes are supported with AES, Serpent, Twofish, Camellia, or Kuznyechik in `xts-plain64` mode, PBKDF2 or Argon2id/Argon2i keyslot KDFs, and standard AF-splitting keyslot recovery — including LUKS2's per-segment sector size and IV-tweak offset
 - **Auto-detect mode** tries every cipher/hash combination in parallel when the algorithm isn't known, with a live "trying combination X of Y" progress indicator and the ability to cancel mid-search
 - Once a container has been unlocked, its matched cipher/hash is remembered so the next unlock skips straight to the right combination
 - **Keyfile support** — mix one or more files into the password using VeraCrypt's own pool-mixing algorithm for VeraCrypt volumes (including keyfile-only, passwordless volumes), or supply a keyfile as a direct passphrase replacement for LUKS volumes, matching `cryptsetup --key-file` semantics
@@ -99,6 +99,8 @@ Android (Kotlin)
 
 C++ (NDK)
   ├── vaultexplorer.cpp — native orchestration, crypto sessions, disk hooks, JNI exports
+  ├── session_prepare.cpp — VeraCrypt/LUKS session establishment (header auto-detect, key derivation)
+  ├── container_create.cpp — new-container header formatting for VeraCrypt, LUKS, and hidden volumes
   ├── volume_state / block_io — shared unlocked-volume lifecycle and file/USB backing-store transport
   ├── jni_runtime / jni_callbacks — JNI lifetime, progress, and USB upcalls
   ├── container_{format,header,utils} — format IDs, decrypted-header decoding, and common data utilities
@@ -120,7 +122,7 @@ C++ (NDK)
 ## Requirements
 
 - Android 6.0+ (API 23)
-- Android 8.0+ (API 26) required for video thumbnail generation
+- Video thumbnails use a faster scaled-frame extraction path on Android 8.1+ (API 27), falling back automatically to standard frame extraction on older versions
 - USB OTG support on-device (and a USB OTG cable/adapter) for USB drive mounting
 - NDK support (CMake build)
 
@@ -150,22 +152,22 @@ The C++ engine is built automatically by CMake during the Android build. mbedTLS
 
 | Package | Purpose |
 |---|---|
-| `file_picker` | SAF-based container file selection |
 | `path_provider` | App document/cache directory access |
 | `video_player` / `fvp` | Video and audio playback (FFmpeg-backed) |
-| `get_thumbnail_video` | Video thumbnail generation helpers |
 | `local_auth` | Biometric / fingerprint unlock |
 | `flutter_secure_storage` | Master password, saved container passwords, pattern hashes, cached derived keys |
 | `encrypt` / `pointycastle` | AES-GCM thumbnail cache, SHA-256 pattern hashing |
-| `permission_handler` | Storage permission handling |
 | `url_launcher` | Opening external links (GitHub, Ko-fi, etc.) |
 | `wakelock_plus` | Keeps the screen on during media playback |
 | `package_info_plus` | App version display in Settings |
+| `vector_math` | Zoom/pan matrix math for the video player's pinch and double-tap gestures |
 | `mbedTLS 3.6.0` | AES-256-XTS, PBKDF2-HMAC-SHA512/256 (C++) |
 | `ChaN FatFs` | FAT32 / exFAT filesystem (C++) |
 | `NTFS-3G` | NTFS filesystem, including the embedded `mkntfs` formatter (C++) |
 | `e2fsprogs` (`libext2fs`) | ext2 / ext3 / ext4 filesystem (C++) |
 | `cJSON` | LUKS2 JSON metadata parsing (C++) |
+
+Container/keyfile picking, video thumbnail generation, and biometric-key storage are implemented natively in Kotlin (SAF intents, `MediaMetadataRetriever`, Android Keystore) rather than through Flutter plugins.
 
 VeraCrypt crypto primitives are fetched by CMake from the pinned VeraCrypt 1.26.29 source release. This includes Serpent, Twofish, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, and Argon2id, without carrying a local fork of those sources.
 
@@ -183,6 +185,12 @@ VeraCrypt crypto primitives are fetched by CMake from the pinned VeraCrypt 1.26.
 ## Limitations
 
 - **Android only** (the native engine uses Android JNI / NDK APIs)
+
+---
+
+## License
+
+GNU General Public License v3.0. See [LICENSE](LICENSE) for the full text.
 
 ---
 

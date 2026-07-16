@@ -12,12 +12,68 @@ bool hasControlChar(const std::string& value) {
     return false;
 }
 
-} // namespace
+// Replaces any invalid UTF-8 byte sequence in [value] with '?'.
+bool sanitizeUtf8InPlace(std::string& value) {
+    std::string out;
+    out.reserve(value.size());
+    bool changed = false;
+    const auto* bytes = reinterpret_cast<const unsigned char*>(value.data());
+    const size_t len = value.size();
+    size_t i = 0;
+
+    while (i < len) {
+        const unsigned char b0 = bytes[i];
+        if (b0 < 0x80) {
+            out.push_back(static_cast<char>(b0));
+            i++;
+            continue;
+        }
+
+        int extra;
+        unsigned char minB1 = 0x80, maxB1 = 0xBF;
+        if ((b0 & 0xE0) == 0xC0) {
+            extra = 1;
+            if (b0 < 0xC2) { out.push_back('?'); changed = true; i++; continue; } // overlong
+        } else if ((b0 & 0xF0) == 0xE0) {
+            extra = 2;
+            if (b0 == 0xE0) minB1 = 0xA0;      // overlong guard
+            else if (b0 == 0xED) maxB1 = 0x9F; // surrogate-range guard
+        } else if ((b0 & 0xF8) == 0xF0 && b0 <= 0xF4) {
+            extra = 3;
+            if (b0 == 0xF0) minB1 = 0x90;      // overlong guard
+            else if (b0 == 0xF4) maxB1 = 0x8F; // > U+10FFFF guard
+        } else {
+            out.push_back('?'); changed = true; i++; continue; // stray continuation / invalid lead
+        }
+
+        if (i + extra >= len) { out.push_back('?'); changed = true; i++; continue; }
+
+        bool valid = true;
+        for (int k = 1; k <= extra && valid; k++) {
+            const unsigned char bk = bytes[i + k];
+            const unsigned char lo = (k == 1) ? minB1 : 0x80;
+            const unsigned char hi = (k == 1) ? maxB1 : 0xBF;
+            valid = bk >= lo && bk <= hi;
+        }
+
+        if (!valid) { out.push_back('?'); changed = true; i++; continue; }
+
+        out.append(reinterpret_cast<const char*>(bytes + i), extra + 1);
+        i += extra + 1;
+    }
+
+    if (changed) value = out;
+    return changed;
+}
+
+} 
 
 void sanitizeString(std::string& value) {
-    if (!hasControlChar(value)) return;
-    std::replace_if(value.begin(), value.end(),
-        [](unsigned char c) { return c < 32 || c == 127; }, '?');
+    if (hasControlChar(value)) {
+        std::replace_if(value.begin(), value.end(),
+            [](unsigned char c) { return c < 32 || c == 127; }, '?');
+    }
+    sanitizeUtf8InPlace(value);
 }
 
 uint32_t readUint32LE(const unsigned char* data) {

@@ -264,10 +264,10 @@ class MainActivity : FlutterFragmentActivity() {
                     try {
                         var successCount = 0
                         for (pickedUri in uris) {
-                            val srcDoc = DocumentFile.fromSingleUri(this, pickedUri) ?: continue
-                            val name = srcDoc.name ?: "imported_file"
-                            val targetFatPath = if (pending.targetDir.isEmpty()) name else "${pending.targetDir}/$name"
-                            successCount += importEntryRecursive(srcDoc, pending.containerUri, targetFatPath, pending.volId)
+                        val srcDoc = DocumentFile.fromSingleUri(this, pickedUri) ?: continue
+                        val name = FatFileNameSanitizer.sanitize(srcDoc.name ?: "imported_file")
+                        val targetFatPath = if (pending.targetDir.isEmpty()) name else "${pending.targetDir}/$name"
+                        successCount += importEntryRecursive(srcDoc, pending.containerUri, targetFatPath, pending.volId)
                         }
                         runOnUiThread { res.success(successCount) }
                     } catch (e: Exception) {
@@ -343,7 +343,7 @@ class MainActivity : FlutterFragmentActivity() {
             )
             val srcRoot = DocumentFile.fromTreeUri(this, treeUri)
             if (srcRoot != null) {
-                val folderName = srcRoot.name ?: "imported_folder"
+                val folderName = FatFileNameSanitizer.sanitize(srcRoot.name ?: "imported_folder")
                 val targetFatPath = if (pending.targetDir.isEmpty()) folderName else "${pending.targetDir}/$folderName"
                 ioExecutor.execute {
                     try {
@@ -1816,7 +1816,7 @@ class MainActivity : FlutterFragmentActivity() {
             }
             var count = 0
             for (child in srcDoc.listFiles()) {
-                val childName = child.name ?: continue
+                val childName = FatFileNameSanitizer.sanitize(child.name ?: continue)
                 count += importEntryRecursive(child, containerUri, "$targetFatPath/$childName", volId)
             }
             return count

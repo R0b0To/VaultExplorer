@@ -1399,6 +1399,23 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
+// ── EXT2/3/4 rename support ──────────────────────────────────────────────
+struct ExtDotDotFixupContext {
+    ext2_ino_t newParentIno;
+};
+
+static int extDotDotFixupCallback(ext2_ino_t, int, struct ext2_dir_entry* dirent,
+                                   int, int, char*, void* priv) {
+    auto* ctx = static_cast<ExtDotDotFixupContext*>(priv);
+    if (ext2fs_dirent_name_len(dirent) == 2 &&
+        dirent->name[0] == '.' && dirent->name[1] == '.') {
+        dirent->inode = ctx->newParentIno;
+        return DIRENT_CHANGED;
+    }
+    return 0;
+}
+
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
         JNIEnv* env, jobject,
@@ -1476,6 +1493,71 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
                 }
                 if (uOld) free(uOld);
                 if (uNew) free(uNew);
+            } else if (v.fsType == VolumeState::FS_EXT) {
+                const std::string oldFull(nativeOld);
+                const std::string newFull(nativeNew);
+                const size_t oldSlash = oldFull.find_last_of('/');
+                const std::string oldParentPath = oldSlash == std::string::npos ? "" : oldFull.substr(0, oldSlash);
+                const std::string oldName = oldSlash == std::string::npos ? oldFull : oldFull.substr(oldSlash + 1);
+                const size_t newSlash = newFull.find_last_of('/');
+                const std::string newParentPath = newSlash == std::string::npos ? "" : newFull.substr(0, newSlash);
+                const std::string newName = newSlash == std::string::npos ? newFull : newFull.substr(newSlash + 1);
+
+                ext2_ino_t oldParentIno = 0, newParentIno = 0, srcIno = 0;
+                if (!oldName.empty() && !newName.empty() &&
+                    extResolvePath(v.extFs, oldParentPath, &oldParentIno) &&
+                    extResolvePath(v.extFs, newParentPath, &newParentIno) &&
+                    extResolvePath(v.extFs, oldFull, &srcIno)) {
+
+                    struct ext2_inode srcInode{};
+                    const bool isDir = ext2fs_read_inode(v.extFs, srcIno, &srcInode) == 0 &&
+                                        LINUX_S_ISDIR(srcInode.i_mode);
+                    const int fileType = isDir ? EXT2_FT_DIR : EXT2_FT_REG_FILE;
+
+                    ext2_ino_t destIno = 0;
+                    if (extResolvePath(v.extFs, newFull, &destIno) && destIno != srcIno) {
+                        if (ext2fs_unlink(v.extFs, newParentIno, newName.c_str(), destIno, 0) == 0) {
+                            struct ext2_inode destInode{};
+                            if (ext2fs_read_inode(v.extFs, destIno, &destInode) == 0 && destInode.i_links_count) {
+                                --destInode.i_links_count;
+                                ext2fs_write_inode(v.extFs, destIno, &destInode);
+                            }
+                        }
+                    }
+
+                    errcode_t linkErr = ext2fs_link(v.extFs, newParentIno, newName.c_str(), srcIno, fileType);
+                    if (linkErr == EXT2_ET_DIR_NO_SPACE) {
+                        if (ext2fs_expand_dir(v.extFs, newParentIno) == 0) {
+                            linkErr = ext2fs_link(v.extFs, newParentIno, newName.c_str(), srcIno, fileType);
+                        }
+                    }
+
+                    if (linkErr == 0) {
+                        if (ext2fs_unlink(v.extFs, oldParentIno, oldName.c_str(), srcIno, 0) == 0) {
+                            success = true;
+                            if (isDir && oldParentIno != newParentIno) {
+                                ExtDotDotFixupContext ctx{newParentIno};
+                                ext2fs_dir_iterate2(v.extFs, srcIno, 0, nullptr, extDotDotFixupCallback, &ctx);
+
+                                struct ext2_inode oldParentInode{};
+                                if (ext2fs_read_inode(v.extFs, oldParentIno, &oldParentInode) == 0 &&
+                                    oldParentInode.i_links_count) {
+                                    --oldParentInode.i_links_count;
+                                    ext2fs_write_inode(v.extFs, oldParentIno, &oldParentInode);
+                                }
+                                struct ext2_inode newParentInode{};
+                                if (ext2fs_read_inode(v.extFs, newParentIno, &newParentInode) == 0) {
+                                    ++newParentInode.i_links_count;
+                                    ext2fs_write_inode(v.extFs, newParentIno, &newParentInode);
+                                }
+                            }
+                        } else {
+                            ext2fs_unlink(v.extFs, newParentIno, newName.c_str(), srcIno, 0);
+                        }
+                    }
+
+                    if (success) ext2fs_flush(v.extFs);
+                }
             }
         }
     }

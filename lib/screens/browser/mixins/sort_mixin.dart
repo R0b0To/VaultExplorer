@@ -64,5 +64,4 @@ mixin SortMixin<T extends StatefulWidget> on State<T> {
 
     return sortAscending ? result : -result;
   }
-
 }

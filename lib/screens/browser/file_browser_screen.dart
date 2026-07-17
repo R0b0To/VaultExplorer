@@ -27,6 +27,8 @@ import 'widgets/conflict_resolution_sheet.dart';
 import 'widgets/file_grid_view.dart';
 import 'widgets/file_list_view.dart';
 import 'widgets/selection_app_bar.dart';
+import 'widgets/stats_bar.dart';
+import 'widgets/truncated_banner.dart';
 import '../vault/vault_item_detail_screen.dart';
 import '../vault/vault_item_edit_screen.dart';
 import '../../utils/file_type_utils.dart';
@@ -164,9 +166,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         autoClear ??
         (error ? const Duration(seconds: 5) : const Duration(seconds: 3));
     Future.delayed(delay, () {
-      if (mounted && _statusMessage == msg) {
+      if (mounted && _statusMessage == msg)
         setState(() => _statusMessage = null);
-      }
     });
   }
 
@@ -261,11 +262,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   void _handleDirTap(String rawItem) {
     _signalActivity();
-    if (isSelectionMode) {
+    if (isSelectionMode)
       toggleSelectItem(rawItem);
-    } else {
+    else
       _enterDirectory(rawItem);
-    }
   }
 
   Future<void> _handleFileTap(String rawItem) async {
@@ -673,9 +673,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               return _scanMediaRecursively(subPath, depth: depth + 1);
             }),
           );
-          for (final list in nested) {
-            foundFiles.addAll(list);
-          }
+          for (final list in nested) foundFiles.addAll(list);
         }
       }
     } catch (e) {
@@ -1067,6 +1065,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 
+  // ── Create-options sheet (replaces the old flat "+" PopupMenuButton) ──────
+
   void _showCreateOptionsSheet() {
     _signalActivity();
     final cs = Theme.of(context).colorScheme;
@@ -1244,7 +1244,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _StatsBar(
+                              StatsBar(
                                 dirCount: filteredDirs.length,
                                 fileCount: filteredFiles.length,
                                 freeSpaceBytes: _freeSpace,
@@ -1311,7 +1311,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                 : Column(
                     children: [
                       BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-                      _StatsBar(
+                      StatsBar(
                         dirCount: filteredDirs.length,
                         fileCount: filteredFiles.length,
                         freeSpaceBytes: _freeSpace,
@@ -1577,6 +1577,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
     }
     if (_currentItems.isEmpty) {
+      // FIX (audit, Duplicate Components): was a private _EmptyPlaceholder
+      // class reimplementing the same icon/title/message/action pattern
+      // AppEmptyState already generalizes (and animates).
       return AppEmptyState(
         icon: Icons.folder_open_rounded,
         title: 'Empty Folder',
@@ -1587,6 +1590,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       );
     }
     if (_searchQuery.trim().isNotEmpty && dirs.isEmpty && files.isEmpty) {
+      // FIX (audit, Duplicate Components): was a private _SearchEmptyState
+      // class — same consolidation as above.
       return AppEmptyState(
         icon: Icons.search_off_rounded,
         title: 'No results',
@@ -1618,160 +1623,19 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             onItemLongPress: _handleItemLongPress,
           );
 
+    // FIX (audit C1): previously `_TruncatedBanner()` was constructed here
+    // and immediately discarded — never inserted into the returned widget
+    // tree, so the "folder has more files than shown" warning could never
+    // actually render. Now it's placed above the list/grid content whenever
+    // the listing was truncated. (Also now extracted to widgets/ — see
+    // truncated_banner.dart.)
     if (!_isListingTruncated) return content;
 
     return Column(
       children: [
-        const _TruncatedBanner(),
+        const TruncatedBanner(),
         Expanded(child: content),
       ],
     );
   }
 }
-
-// ── Truncated banner ──────────────────────────────────────────────────────────
-
-class _TruncatedBanner extends StatelessWidget {
-  const _TruncatedBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      color: cs.tertiaryContainer,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(children: [
-        Icon(Icons.warning_amber_rounded, size: AppIconSize.small, color: cs.onTertiaryContainer),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Showing first 50,000 items — this folder has more files.',
-            style: textTheme.bodySmall?.copyWith(
-              color: cs.onTertiaryContainer,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ]),
-    );
-  }
-}
-
-// ── Filter chips bar ──────────────────────────────────────────────────────────
-
-
-// ── Stats bar ─────────────────────────────────────────────────────────────────
-
-class _StatsBar extends StatelessWidget {
-  final int dirCount;
-  final int fileCount;
-  final int freeSpaceBytes;
-  final bool isFiltered;
-  final bool isVertical;
-  const _StatsBar({
-    required this.dirCount,
-    required this.fileCount,
-    required this.freeSpaceBytes,
-    this.isFiltered = false,
-    this.isVertical = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    if (isVertical) {
-      return Container(
-        color: cs.surfaceContainerLow,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'STORAGE',
-              style: textTheme.labelSmall?.copyWith(
-                color: cs.primary,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _stat(context, Icons.folder_rounded, '$dirCount folders'),
-            const SizedBox(height: 8),
-            _stat(context, Icons.description_rounded, '$fileCount files'),
-            const SizedBox(height: 8),
-            _stat(context, Icons.storage_rounded, '${formatBytes(freeSpaceBytes)} free'),
-            if (isFiltered) ...[
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(100),
-                ),
-                child: Text(
-                  'filtered',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: cs.onPrimaryContainer,
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      color: cs.surface,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
-        children: [
-          _stat(context, Icons.folder_rounded, '$dirCount folders'),
-          const SizedBox(width: 12),
-          _stat(context, Icons.description_rounded, '$fileCount files'),
-          const Spacer(),
-          if (isFiltered) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(100),
-              ),
-              child: Text(
-                'filtered',
-                style: textTheme.labelSmall?.copyWith(
-                  color: cs.onPrimaryContainer,
-                  fontSize: 8,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-          _stat(context, Icons.storage_rounded, '${formatBytes(freeSpaceBytes)} free'),
-        ],
-      ),
-    );
-  }
-
-  Widget _stat(BuildContext context, IconData icon, String text) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: AppIconSize.inline, color: cs.onSurfaceVariant),
-        const SizedBox(width: 6),
-        Text(text, style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-      ],
-    );
-  }
-}
-
-// ── Stats bar ─────────────────────────────────────────────────────────────────

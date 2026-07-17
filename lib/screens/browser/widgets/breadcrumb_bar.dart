@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../theme.dart';
 
 import '../file_browser_screen.dart';
 
@@ -40,7 +41,7 @@ class BreadcrumbBar extends StatelessWidget {
                       ? Icon(
                           Icons.home_rounded,
                           color: cs.onSurface,
-                          size: 20,
+                          size: AppIconSize.standard,
                         )
                       : Text(
                           stack[i].label,
@@ -54,7 +55,7 @@ class BreadcrumbBar extends StatelessWidget {
                 // Clickable historical directories
                 InkWell(
                   onTap: () => onTap(i),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -64,7 +65,7 @@ class BreadcrumbBar extends StatelessWidget {
                         ? Icon(
                             Icons.home_outlined,
                             color: cs.primary,
-                            size: 20,
+                            size: AppIconSize.standard,
                           )
                         : Text(
                             stack[i].label,
@@ -80,7 +81,7 @@ class BreadcrumbBar extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Icon(
                     Icons.chevron_right_rounded, // Softer rounded chevron
-                    size: 16,
+                    size: AppIconSize.small,
                     color: cs.onSurfaceVariant.withValues(alpha: 0.5),
                   ),
                 ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../theme.dart';
 
 /// App bar shown while the user has one or more items selected.
 class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -67,7 +68,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 decoration: BoxDecoration(
                   color: cs.primaryContainer,
                   borderRadius: BorderRadius.circular(
-                    100,
+                    AppRadius.full,
                   ), // Perfect pill shape
                 ),
                 child: Text(
@@ -94,7 +95,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
               Icon(
                 Icons.arrow_drop_down_rounded,
                 color: cs.onSurface,
-                size: 22,
+                size: AppIconSize.standard,
               ),
             ],
           ),
@@ -151,7 +152,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                   Icon(
                     Icons.drive_folder_upload_rounded,
                     color: cs.onSurfaceVariant,
-                    size: 18,
+                    size: AppIconSize.small,
                   ),
                   const SizedBox(width: 12),
                   const Text('Export to device'),
@@ -166,7 +167,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     Icon(
                       Icons.open_in_new_rounded,
                       color: cs.onSurfaceVariant,
-                      size: 18,
+                      size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
                     const Text('Open with App'),

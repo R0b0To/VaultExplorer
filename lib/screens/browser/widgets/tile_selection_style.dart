@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../theme.dart';
 
 /// Single source of truth for the selection-mode visual language shared by
 /// every row-style list tile in the file browser ([FileTile], [DirectoryTile]).
@@ -67,6 +68,122 @@ class TileSelectionIndicator extends StatelessWidget {
           : Icons.radio_button_unchecked_rounded,
       size: 20,
       color: selected ? cs.primary : cs.outline,
+    );
+  }
+}
+
+/// Shared row shell for [DirectoryTile] and [FileTile] — the squircle
+/// leading icon, name, date column, and trailing slot, wrapped in the
+/// tap/long-press/selection treatment from [TileSelectionStyle].
+
+class FileRowShell extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+
+  /// Squircle background when NOT selected — differs between directories
+  /// (a tinted secondaryContainer) and files (surfaceContainerHighest).
+  final Color unselectedIconBackground;
+
+  final String displayName;
+  final String dateStr;
+  final Widget trailing;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  const FileRowShell({
+    super.key,
+    required this.icon,
+    required this.iconColor,
+    required this.unselectedIconBackground,
+    required this.displayName,
+    required this.dateStr,
+    required this.trailing,
+    required this.isSelected,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final squircleBackground =
+        isSelected ? cs.primaryContainer : unselectedIconBackground;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16), // Rounded ripples
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: isSelected
+                ? TileSelectionStyle.selectedBackground(cs)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10, // Plush interior targets
+          ),
+          child: Row(
+            children: [
+              // 1. The plush "Squircle" leading icon
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: squircleBackground,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: AppIconSize.action,
+                  color: TileSelectionStyle.leadingIconColor(
+                    cs,
+                    selected: isSelected,
+                    unselectedColor: iconColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+
+              // 2. Name
+              Expanded(
+                child: Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: TileSelectionStyle.titleWeight(isSelected),
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // 3. Date column
+              SizedBox(
+                width: 90,
+                child: Text(
+                  dateStr,
+                  textAlign: TextAlign.right,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // 4. Trailing column (size, selection indicator, or "⋯" menu)
+              SizedBox(width: 96, child: trailing),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

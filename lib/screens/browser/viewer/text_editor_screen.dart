@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/models/mounted_container.dart';
 import 'package:vaultexplorer/services/vaultexplorer_api.dart';
+import 'package:vaultexplorer/theme.dart';
+import 'package:vaultexplorer/widgets/common_widgets.dart';
 
 class TextEditorScreen extends StatefulWidget {
   final MountedContainer container;
@@ -147,8 +149,10 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Changes saved successfully')),
+        showAppSnackBar(
+          context,
+          message: 'Changes saved successfully',
+          tone: AppBannerTone.success,
         );
       }
       return true;
@@ -157,11 +161,10 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         _isSaving = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Save failed: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+        showAppSnackBar(
+          context,
+          message: 'Save failed: $e',
+          tone: AppBannerTone.error,
         );
       }
       return false;
@@ -353,7 +356,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
             Text(
               'Unsaved Changes',
               style: TextStyle(
-                color: Colors.amber[300],
+                color: context.semanticColors.warning,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
@@ -362,7 +365,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
             Text(
               'Saved to vault',
               style: TextStyle(
-                color: Colors.green[300],
+                color: context.semanticColors.success,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),

@@ -24,10 +24,12 @@ class AboutScreen extends StatelessWidget {
         mode: LaunchMode.externalApplication,
       );
       if (!ok && context.mounted) {
-        _showSnack(context, 'Could not open link');
+        _showSnack(context, 'Could not open link', tone: AppBannerTone.error);
       }
     } catch (_) {
-      if (context.mounted) _showSnack(context, 'Could not open link');
+      if (context.mounted) {
+        _showSnack(context, 'Could not open link', tone: AppBannerTone.error);
+      }
     }
   }
 
@@ -36,7 +38,7 @@ class AboutScreen extends StatelessWidget {
       ClipboardData(text: 'VaultExplorer v$appVersion (Android)'),
     );
     if (context.mounted) {
-      _showSnack(context, 'Version info copied — handy for bug reports');
+      _showSnack(context, 'Version info copied — handy for bug reports', tone: AppBannerTone.success);
     }
   }
 
@@ -47,7 +49,7 @@ class AboutScreen extends StatelessWidget {
         'encrypted container.\n\n$_kGithubUrl';
     await Clipboard.setData(const ClipboardData(text: text));
     if (context.mounted) {
-      _showSnack(context, 'Copied a shareable link to your clipboard');
+      _showSnack(context, 'Copied a shareable link to your clipboard', tone: AppBannerTone.success);
     }
   }
 
@@ -78,8 +80,12 @@ class AboutScreen extends StatelessWidget {
     );
   }
 
-  static void _showSnack(BuildContext context, String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  static void _showSnack(
+    BuildContext context,
+    String msg, {
+    AppBannerTone tone = AppBannerTone.info,
+  }) {
+    showAppSnackBar(context, message: msg, tone: tone);
   }
 
   @override

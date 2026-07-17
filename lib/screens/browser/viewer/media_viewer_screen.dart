@@ -6,6 +6,7 @@ import '/../../models/mounted_container.dart';
 import '/../../models/thumbnail_cache_mode.dart';
 import '/../../models/thumbnail_quality.dart';
 import '/../../services/vaultexplorer_api.dart';
+import '../../../widgets/common_widgets.dart';
 import 'media_viewer_constants.dart';
 import 'playlist_controller.dart';
 import 'video_playback_manager.dart';
@@ -388,15 +389,18 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _prefetchSurroundingItems();
       _onScrollEnd();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('File deleted successfully')),
-      );
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: 'File deleted successfully',
+          tone: AppBannerTone.success,
+        );
+      }
     } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Failed to delete file'),
-          backgroundColor: cs.error,
-        ),
+      showAppSnackBar(
+        context,
+        message: 'Failed to delete file',
+        tone: AppBannerTone.error,
       );
     }
   }

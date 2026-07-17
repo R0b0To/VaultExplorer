@@ -9,16 +9,22 @@ class DirectoryTile extends StatelessWidget {
   final String rawItem;
   final bool isSelectionMode;
   final bool isSelected;
+  final String? searchQuery;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final bool isCompact;
+  final double zoomLevel;
 
   const DirectoryTile({
     super.key,
     required this.rawItem,
     required this.isSelectionMode,
     required this.isSelected,
+    this.searchQuery,
     required this.onTap,
     required this.onLongPress,
+    this.isCompact = false,
+    this.zoomLevel = 1.0,
   });
 
   @override
@@ -31,6 +37,7 @@ class DirectoryTile extends StatelessWidget {
       iconColor: cs.secondary,
       unselectedIconBackground: cs.secondaryContainer.withValues(alpha: 0.4),
       displayName: entry.name,
+      searchQuery: searchQuery,
       dateStr: formatEntryDate(entry.modifiedSecs),
       trailing: isSelectionMode && isSelected
           ? const Align(
@@ -41,6 +48,8 @@ class DirectoryTile extends StatelessWidget {
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,
+      isCompact: isCompact,
+      zoomLevel: zoomLevel,
     );
   }
 }

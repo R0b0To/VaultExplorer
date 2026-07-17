@@ -261,7 +261,7 @@ class _OperationRow extends StatelessWidget {
                       ),
                     ],
                   ),
-                ] else ...[
+                ] else if (op.skipCount > 0 || op.failCount > 0) ...[
                   const SizedBox(height: 4),
                   Text(
                     op.completionSummary,
@@ -282,9 +282,9 @@ class _OperationRow extends StatelessWidget {
                 ),
               ],
 
-              // ── Per-item detail (errors only, collapsed by default) ────────
-              if (!isActive && op.failCount > 0)
-                _FailedItemsDetail(op: op, cs: cs, textTheme: textTheme),
+              // ── Per-item detail (expandable) ────────
+              if (!isActive && (op.items.length > 1 || op.failCount > 0))
+                _BatchItemsDetail(op: op, cs: cs, textTheme: textTheme),
             ],
           ),
         );
@@ -297,7 +297,7 @@ class _OperationRow extends StatelessWidget {
       return '${op.sourceDisplayName} → ${op.destDisplayName}';
     }
     final dest = op.destDirPath.isEmpty ? 'Root' : op.destDirPath;
-    return op.isCut ? 'Move to $dest' : 'Copy to $dest';
+    return '→ $dest';
   }
 }
 
@@ -340,88 +340,99 @@ class _StatusIcon extends StatelessWidget {
   }
 }
 
-// ── Failed items detail (expandable) ─────────────────────────────────────────
+// ── Batch items detail ────────────────────────────────────────────────────────
 
-class _FailedItemsDetail extends StatefulWidget {
+class _BatchItemsDetail extends StatelessWidget {
   final FileOperation op;
   final ColorScheme cs;
   final TextTheme textTheme;
-  const _FailedItemsDetail({
+  const _BatchItemsDetail({
     required this.op,
     required this.cs,
     required this.textTheme,
   });
 
   @override
-  State<_FailedItemsDetail> createState() => _FailedItemsDetailState();
-}
-
-class _FailedItemsDetailState extends State<_FailedItemsDetail> {
-  bool _expanded = false;
-
-  @override
   Widget build(BuildContext context) {
-    final failed = widget.op.itemStatuses
-        .where((s) => s.result == FileItemResult.failed)
-        .toList();
+    final hasErrors = op.failCount > 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 6),
-        GestureDetector(
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Row(
-            children: [
-              Icon(
-                _expanded
-                    ? Icons.keyboard_arrow_up_rounded
-                    : Icons.keyboard_arrow_down_rounded,
-                size: 16,
-                color: widget.cs.error,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${failed.length} item${failed.length == 1 ? '' : 's'} failed',
-                style: widget.textTheme.bodySmall?.copyWith(
-                  color: widget.cs.error,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (_expanded) ...[
+        if (hasErrors) ...[
           const SizedBox(height: 6),
-          ...failed.map(
-            (s) => Padding(
-              padding: const EdgeInsets.only(left: 20, bottom: 4),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.subdirectory_arrow_right_rounded,
-                    size: 12,
-                    color: widget.cs.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      s.item.name +
-                          (s.errorMessage != null
-                              ? ' — ${s.errorMessage}'
-                              : ''),
-                      style: widget.textTheme.bodySmall?.copyWith(
-                        color: widget.cs.onSurfaceVariant,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
+          Text(
+            '${op.failCount} item${op.failCount == 1 ? '' : 's'} failed:',
+            style: textTheme.bodySmall?.copyWith(
+              color: cs.error,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
+        const SizedBox(height: 6),
+        ..._buildItemList(),
       ],
     );
+  }
+
+  List<Widget> _buildItemList() {
+    // Sort so failures are at the top
+    final sorted = List<FileItemStatus>.from(op.itemStatuses)
+      ..sort((a, b) {
+        if (a.result == FileItemResult.failed && b.result != FileItemResult.failed) return -1;
+        if (a.result != FileItemResult.failed && b.result == FileItemResult.failed) return 1;
+        return 0;
+      });
+
+    final displayCount = sorted.length > 50 ? 50 : sorted.length;
+    final toDisplay = sorted.take(displayCount);
+
+    final widgets = toDisplay.map((s) {
+      final isFailed = s.result == FileItemResult.failed;
+      final itemColor = isFailed ? cs.error : cs.onSurfaceVariant;
+      return Padding(
+        padding: const EdgeInsets.only(left: 20, bottom: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Icon(
+                isFailed ? Icons.close_rounded : Icons.subdirectory_arrow_right_rounded,
+                size: 12,
+                color: itemColor,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                s.item.name + (s.errorMessage != null ? ' — ${s.errorMessage}' : ''),
+                style: textTheme.bodySmall?.copyWith(
+                  color: itemColor,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
+
+    if (sorted.length > displayCount) {
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(left: 20, bottom: 4, top: 2),
+          child: Text(
+            '+ ${sorted.length - displayCount} more',
+            style: textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
+      );
+    }
+    return widgets;
   }
 }

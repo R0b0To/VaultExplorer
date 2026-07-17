@@ -157,14 +157,21 @@ class FileOperation extends ChangeNotifier {
   String get shortSummary {
     final n = items.length;
     final label = n == 1 ? items.first.name : '$n items';
-    return '$verbIng $label';
+    final isActive = _status == FileOperationStatus.pending || _status == FileOperationStatus.running;
+    return '${isActive ? verbIng : verbPast} $label';
   }
 
   String get completionSummary {
     final parts = <String>[];
-    if (_doneCount > 0) parts.add('$verbPast $_doneCount item(s)');
+    if (_doneCount > 0) parts.add('$_doneCount item${_doneCount == 1 ? '' : 's'} ${verbPast.toLowerCase()}');
     if (_skipCount > 0) parts.add('$_skipCount skipped');
     if (_failCount > 0) parts.add('$_failCount failed');
+    
+    if (parts.isEmpty) {
+      if (_status == FileOperationStatus.cancelled) return 'Cancelled';
+      if (_status == FileOperationStatus.failed) return 'Failed';
+      return 'Completed';
+    }
     return parts.join(' · ');
   }
 

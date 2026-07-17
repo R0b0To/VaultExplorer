@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../theme.dart';
+import 'highlighted_text.dart';
 
 /// Single source of truth for the selection-mode visual language shared by
 /// every row-style list tile in the file browser ([FileTile], [DirectoryTile]).
@@ -79,12 +80,15 @@ class TileSelectionIndicator extends StatelessWidget {
 class FileRowShell extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
+  final bool isCompact;
+  final double zoomLevel;
 
   /// Squircle background when NOT selected — differs between directories
   /// (a tinted secondaryContainer) and files (surfaceContainerHighest).
   final Color unselectedIconBackground;
 
   final String displayName;
+  final String? searchQuery;
   final String dateStr;
   final Widget trailing;
   final bool isSelected;
@@ -97,11 +101,14 @@ class FileRowShell extends StatelessWidget {
     required this.iconColor,
     required this.unselectedIconBackground,
     required this.displayName,
+    this.searchQuery,
     required this.dateStr,
     required this.trailing,
     required this.isSelected,
     required this.onTap,
     required this.onLongPress,
+    this.isCompact = false,
+    this.zoomLevel = 1.0,
   });
 
   @override
@@ -125,23 +132,23 @@ class FileRowShell extends StatelessWidget {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
           ),
-          padding: const EdgeInsets.symmetric(
+          padding: EdgeInsets.symmetric(
             horizontal: 12,
-            vertical: 10, // Plush interior targets
+            vertical: (isCompact ? 4 : 10) * zoomLevel, // Plush interior targets
           ),
           child: Row(
             children: [
               // 1. The plush "Squircle" leading icon
               Container(
-                width: 44,
-                height: 44,
+                width: (isCompact ? 32 : 44) * zoomLevel,
+                height: (isCompact ? 32 : 44) * zoomLevel,
                 decoration: BoxDecoration(
                   color: squircleBackground,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   icon,
-                  size: AppIconSize.action,
+                  size: AppIconSize.action * zoomLevel,
                   color: TileSelectionStyle.leadingIconColor(
                     cs,
                     selected: isSelected,
@@ -153,8 +160,9 @@ class FileRowShell extends StatelessWidget {
 
               // 2. Name
               Expanded(
-                child: Text(
-                  displayName,
+                child: HighlightedText(
+                  text: displayName,
+                  query: searchQuery,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.titleMedium?.copyWith(
@@ -163,23 +171,33 @@ class FileRowShell extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              if (!isCompact) ...[
+                const SizedBox(width: 12),
 
-              // 3. Date column
-              SizedBox(
-                width: 90,
-                child: Text(
-                  dateStr,
-                  textAlign: TextAlign.right,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
+                // 3. Date column
+                SizedBox(
+                  width: 80, // Reduced from 90 to give more space to file name
+                  child: Text(
+                    dateStr,
+                    textAlign: TextAlign.right,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
+              ],
+              
+              if (!isCompact) ...[
+                const SizedBox(width: 12),
 
-              // 4. Trailing column (size, selection indicator, or "⋯" menu)
-              SizedBox(width: 96, child: trailing),
+                // 4. Trailing column (size, selection indicator, or "⋯" menu)
+                SizedBox(width: 80, child: trailing), // Reduced from 96
+              ] else ...[
+                const SizedBox(width: 8),
+                trailing,
+              ],
             ],
           ),
         ),

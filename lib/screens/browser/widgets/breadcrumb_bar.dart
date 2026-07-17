@@ -43,12 +43,22 @@ class BreadcrumbBar extends StatelessWidget {
                           color: cs.onSurface,
                           size: AppIconSize.standard,
                         )
-                      : Text(
-                          stack[i].label,
-                          style: textTheme.labelLarge?.copyWith(
-                            color: cs.onSurface,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (stack[i].isArchiveRoot)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 6),
+                                child: Icon(Icons.archive_rounded, color: Color(0xFFFF8F00), size: 16),
+                              ),
+                            Text(
+                              stack[i].label,
+                              style: textTheme.labelLarge?.copyWith(
+                                color: stack[i].isArchiveRoot ? const Color(0xFFFF8F00) : cs.onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                 )
               else
@@ -67,12 +77,22 @@ class BreadcrumbBar extends StatelessWidget {
                             color: cs.primary,
                             size: AppIconSize.standard,
                           )
-                        : Text(
-                            stack[i].label,
-                            style: textTheme.labelLarge?.copyWith(
-                              color: cs.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (stack[i].isArchiveRoot)
+                                const Padding(
+                                  padding: EdgeInsets.only(right: 6),
+                                  child: Icon(Icons.archive_rounded, color: Color(0xFFFF8F00), size: 16),
+                                ),
+                              Text(
+                                stack[i].label,
+                                style: textTheme.labelLarge?.copyWith(
+                                  color: stack[i].isArchiveRoot ? const Color(0xFFFF8F00) : cs.primary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                   ),
                 ),

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../models/file_operation.dart';
 import '../../models/mounted_container.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../utils/filename_utils.dart';
 import '../../widgets/common_widgets.dart';
-
 
 abstract class BrowserDialogs {
   static void showCreateFolder(
@@ -106,16 +106,25 @@ abstract class BrowserDialogs {
   static void showRename(
     BuildContext context, {
     required MountedContainer container,
-    required String oldName,
+    required List<String> oldNames,
+    required Set<String> existingNamesInDir,
     required String currentDirPath,
     required VoidCallback onSuccess,
   }) {
-    final ctrl = TextEditingController(text: oldName);
+    final ctrl = TextEditingController(text: oldNames.length == 1 ? oldNames.first : '');
+    final title = oldNames.length == 1 ? 'Rename' : 'Rename ${oldNames.length} items';
+
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Rename'),
-        content: TextField(controller: ctrl, autofocus: true),
+        title: Text(title),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: oldNames.length == 1 ? 'New name' : 'Base name',
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -123,28 +132,72 @@ abstract class BrowserDialogs {
           ),
           TextButton(
             onPressed: () async {
-              final newName = sanitizeFatFileName(ctrl.text.trim());
-              if (newName.isEmpty || newName == oldName) return;
+              final newNameBase = sanitizeFatFileName(ctrl.text.trim());
+              if (newNameBase.isEmpty) return;
               Navigator.pop(dialogContext);
-              final oldFull = currentDirPath.isEmpty
-                  ? oldName
-                  : '$currentDirPath/$oldName';
-              final newFull = currentDirPath.isEmpty
-                  ? newName
-                  : '$currentDirPath/$newName';
-              final ok = await vaultExplorerApi.renameFile(
-                container,
-                oldFull,
-                newFull,
-              );
-              if (ok) {
-                onSuccess();
-              } else if (context.mounted) {
-                showAppSnackBar(
-                  context,
-                  message: 'Couldn\'t rename "$oldName" — a file with that name may already exist',
-                  tone: AppBannerTone.error,
+
+              if (oldNames.length == 1) {
+                final oldName = oldNames.first;
+                if (newNameBase == oldName) return;
+                
+                final oldFull = currentDirPath.isEmpty
+                    ? oldName
+                    : '$currentDirPath/$oldName';
+                final newFull = currentDirPath.isEmpty
+                    ? newNameBase
+                    : '$currentDirPath/$newNameBase';
+                final ok = await vaultExplorerApi.renameFile(
+                  container,
+                  oldFull,
+                  newFull,
                 );
+                if (ok) {
+                  onSuccess();
+                } else if (context.mounted) {
+                  showAppSnackBar(
+                    context,
+                    message: 'Couldn\'t rename "$oldName" — a file with that name may already exist',
+                    tone: AppBannerTone.error,
+                  );
+                }
+              } else {
+                int successCount = 0;
+                int failCount = 0;
+                final existing = Set<String>.from(existingNamesInDir);
+                
+                for (final oldName in oldNames) {
+                  final parts = oldName.split('.');
+                  final ext = parts.length > 1 ? '.${parts.last}' : '';
+                  
+                  String desiredName;
+                  if (newNameBase.toLowerCase().endsWith(ext.toLowerCase())) {
+                    desiredName = newNameBase;
+                  } else {
+                    desiredName = '$newNameBase$ext';
+                  }
+
+                  final uniqueName = FileOperationService.makeUniqueName(desiredName, existing);
+                  existing.add(uniqueName.toLowerCase());
+                  
+                  final oldFull = currentDirPath.isEmpty ? oldName : '$currentDirPath/$oldName';
+                  final newFull = currentDirPath.isEmpty ? uniqueName : '$currentDirPath/$uniqueName';
+                  
+                  final ok = await vaultExplorerApi.renameFile(container, oldFull, newFull);
+                  if (ok) {
+                    successCount++;
+                  } else {
+                    failCount++;
+                  }
+                }
+                
+                if (successCount > 0) onSuccess();
+                if (failCount > 0 && context.mounted) {
+                  showAppSnackBar(
+                    context,
+                    message: 'Couldn\'t rename $failCount items',
+                    tone: AppBannerTone.error,
+                  );
+                }
               }
             },
             child: const Text('Rename'),

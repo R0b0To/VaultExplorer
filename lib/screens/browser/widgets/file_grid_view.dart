@@ -11,6 +11,7 @@ import '../../../utils/lru_cache.dart';
 import '../../../utils/raw_entry.dart';
 import '../viewer/media_viewer_constants.dart';
 import '../../../theme.dart'; // Design tokens for AppRadius, AppIconSize, AppSpacing
+import 'highlighted_text.dart';
 
 /// A dynamic gallery grid for the file browser supporting pinch-to-zoom.
 class FileGridView extends StatefulWidget {
@@ -27,6 +28,9 @@ class FileGridView extends StatefulWidget {
   final ValueChanged<String> onItemLongPress;
   final ValueChanged<String>? onFileLongMenu;
 
+  /// Active search query for text highlighting (null or empty = no highlight).
+  final String? searchQuery;
+
   const FileGridView({
     super.key,
     required this.container,
@@ -41,6 +45,7 @@ class FileGridView extends StatefulWidget {
     required this.onFileTap,
     required this.onItemLongPress,
     this.onFileLongMenu,
+    this.searchQuery,
   });
 
   @override
@@ -167,6 +172,7 @@ class _FileGridViewState extends State<FileGridView> {
         ),
       ),
       label: name,
+      searchQuery: widget.searchQuery,
     );
   }
 
@@ -240,6 +246,7 @@ class _FileGridViewState extends State<FileGridView> {
           : () => widget.onFileLongMenu?.call(rawItem),
       preview: previewWidget,
       label: displayName,
+      searchQuery: widget.searchQuery,
     );
   }
 }
@@ -251,6 +258,7 @@ class _FileGridViewState extends State<FileGridView> {
 class _GridCell extends StatelessWidget {
   final Widget preview;
   final String label;
+  final String? searchQuery;
   final bool isSelected;
   final bool isSelectionMode;
   final VoidCallback onTap;
@@ -260,6 +268,7 @@ class _GridCell extends StatelessWidget {
   const _GridCell({
     required this.preview,
     required this.label,
+    this.searchQuery,
     required this.isSelected,
     required this.isSelectionMode,
     required this.onTap,
@@ -324,8 +333,9 @@ class _GridCell extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    label,
+                  HighlightedText(
+                    text: label,
+                    query: searchQuery,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: textTheme.labelMedium?.copyWith(

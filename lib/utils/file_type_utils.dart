@@ -32,6 +32,7 @@ IconData iconForFile(String name) {
     case 'gz':
     case 'tar':
     case '7z':
+    case 'rar':
       return Icons.archive_outlined;
     default:
       return Icons.insert_drive_file_outlined;
@@ -66,6 +67,14 @@ Color colorForFile(String name) {
     case 'md':
     case 'csv':
       return const Color(0xFF78909C);
+    case 'zip':
+    case 'gz':
+    case 'tar':
+    case '7z':
+    case 'rar':
+    case 'bz2':
+    case 'xz':
+      return const Color(0xFFFF8F00); // Amber for archives
     default:
       return const Color(0xFF546E7A);
   }

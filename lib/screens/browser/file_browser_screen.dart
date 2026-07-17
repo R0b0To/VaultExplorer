@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/clipboard_item.dart';
+import '../../models/file_manager_action.dart';
+import '../../models/file_manager_toolbar_config.dart';
 import '../../models/file_operation.dart';
 import '../../models/mounted_container.dart';
 import '../../models/thumbnail_cache_mode.dart';
@@ -9,23 +12,30 @@ import '../../models/thumbnail_quality.dart';
 import '../../models/vault_item.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
+import '../../services/file_manager_toolbar_service.dart';
 import '../../services/vault_items_service.dart';
 import '../../services/vaultexplorer_api.dart';
+import '../../models/archive_context.dart';
+import '../../services/archive_service.dart';
 import '../../theme.dart';
 import '../../utils/format_utils.dart';
 import '../../utils/raw_entry.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/floating_activity_stack.dart';
+import '../settings/file_manager_toolbar_settings_screen.dart';
+import 'archive_file_viewer.dart';
 import 'browser_dialogs.dart';
 import 'viewer/media_viewer_constants.dart';
 import 'viewer/media_viewer_screen.dart';
 import 'viewer/text_editor_screen.dart';
 import 'mixins/selection_mixin.dart';
 import 'mixins/sort_mixin.dart';
+import 'widgets/bottom_search_bar.dart';
 import 'widgets/breadcrumb_bar.dart';
 import 'widgets/conflict_resolution_sheet.dart';
 import 'widgets/file_grid_view.dart';
 import 'widgets/file_list_view.dart';
+import 'widgets/file_manager_action_bar.dart';
 import 'widgets/selection_app_bar.dart';
 import 'widgets/stats_bar.dart';
 import 'widgets/truncated_banner.dart';
@@ -35,18 +45,30 @@ import '../../utils/file_type_utils.dart';
 
 // ── Layout mode ───────────────────────────────────────────────────────────────
 
-enum BrowserLayoutMode { list, grid }
+enum BrowserLayoutMode { list, compact, grid }
 
 // ── Path segment model ────────────────────────────────────────────────────────
 
 class PathSegment {
   final String label;
   final String fatPath;
-  const PathSegment(this.label, this.fatPath);
+  final bool isArchiveRoot;
+  const PathSegment(this.label, this.fatPath, {this.isArchiveRoot = false});
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
-
+//
+// Layout philosophy (modularity):
+//   - The app bar is deliberately minimal: back button, container name, and
+//     a single "settings" menu holding Filters + a link to the toolbar
+//     customization screen. It never turns into a search field.
+//   - Every functional action (search, add, view mode, sort, play media)
+//     lives in one reusable [FileManagerActionBar] — rendered horizontally
+//     as the portrait bottom bar, and vertically as the landscape sidebar
+//     rail — driven by a user-editable [FileManagerToolbarConfig] so people
+//     can reorder or hide entries from FileManagerToolbarSettingsScreen.
+//   - Search results in a bottom-docked field (see [BottomSearchBar]) that
+//     rides above the keyboard instead of replacing the app bar.
 class FileBrowserScreen extends StatefulWidget {
   final MountedContainer container;
   final MountedContainer? Function(int volId)? resolveContainer;
@@ -74,20 +96,24 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   bool _isListingTruncated = false;
   String? _statusMessage;
   bool _statusIsError = false;
-
   CrossContainerClipboard get _clip => CrossContainerClipboard.instance;
   FileOperationService get _opSvc => FileOperationService.instance;
-
-  bool _isSearchActive = false;
+  bool _searchActive = false;
   String _searchQuery = '';
-  final _searchController = TextEditingController();
 
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
   String? _currentFilter;
   double _sidebarWidth = 200.0;
+  Orientation? _lastOrientation;
+  bool _menuIsOpen = false;
+  ArchiveContext? _archiveContext;
 
   ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.medium;
+
+  // User-customizable ordering/visibility of the action bar — see
+  // FileManagerToolbarSettingsScreen.
+  FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
 
   static const int _maxScanDepth = 20;
 
@@ -108,18 +134,18 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     super.initState();
     _freeSpace = widget.container.freeSpace;
     _initSettingsAndContents();
+    _loadToolbarConfig();
     VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
   }
 
   @override
   void dispose() {
+    _closeArchive();
     VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
-    _searchController.dispose();
     super.dispose();
   }
 
   void _signalActivity() => widget.onUserActivity?.call();
-
 
   void _onContainerDetached(int volId) {
     if (!mounted || volId != widget.container.volId) return;
@@ -154,6 +180,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     await _loadDirectoryContents(_currentDirPath);
   }
 
+  Future<void> _loadToolbarConfig() async {
+    final config = await FileManagerToolbarService.instance.load();
+    if (!mounted) return;
+    setState(() => _toolbarConfig = config);
+  }
+
   // ── Inline status ─────────────────────────────────────────────────────────
 
   void _setStatus(String msg, {bool error = false, Duration? autoClear}) {
@@ -166,8 +198,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         autoClear ??
         (error ? const Duration(seconds: 5) : const Duration(seconds: 3));
     Future.delayed(delay, () {
-      if (mounted && _statusMessage == msg)
+      if (mounted && _statusMessage == msg) {
         setState(() => _statusMessage = null);
+      }
     });
   }
 
@@ -180,16 +213,22 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Future<void> _loadDirectoryContents(String path) async {
     setState(() => _isLoading = true);
     _signalActivity();
+
+    if (_archiveContext != null) {
+      _loadArchiveContents(path);
+      return;
+    }
+
     try {
       final items = await vaultExplorerApi.listDirectory(
         widget.container,
         path,
       );
       final space = await vaultExplorerApi.getSpaceInfo(widget.container);
-      
+
       if (mounted) {
         final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
-        
+
         setState(() {
             _currentItems = items?.where((f) => !f.startsWith('System:')).toList() ?? [];
             _isListingTruncated = isTruncated;
@@ -205,12 +244,65 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
+  void _loadArchiveContents(String path) {
+    if (_archiveContext == null) return;
+    
+    // The subPath we pass to archiveContext should be relative to the archive root
+    // To calculate this, we take the current fatPath and strip the archive root's fatPath
+    final archiveRootPath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+    String subPath = '';
+    if (path.length > archiveRootPath.length) {
+      subPath = path.substring(archiveRootPath.length);
+      if (subPath.startsWith('/')) subPath = subPath.substring(1);
+    }
+
+    final items = _archiveContext!.listDirectory(subPath);
+    if (mounted) {
+      setState(() {
+        _currentItems = items;
+        _isListingTruncated = false;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _openArchive(String fullPath, String archiveName) async {
+    setState(() => _isLoading = true);
+    _signalActivity();
+
+    try {
+      final ctx = await ArchiveService.open(
+        container: widget.container,
+        archivePathInContainer: fullPath,
+        pathStackEntryIndex: _pathStack.length,
+      );
+      
+      setState(() {
+        _archiveContext = ctx;
+        _pathStack.add(PathSegment(archiveName, fullPath, isArchiveRoot: true));
+        _clearSearch();
+        _currentFilter = null;
+      });
+      
+      _loadArchiveContents(fullPath);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _setStatus('Failed to read archive: ${e.runtimeType}', error: true);
+      }
+    }
+  }
+
+  void _closeArchive() {
+    _archiveContext?.dispose();
+    _archiveContext = null;
+  }
+
   // ── Search ────────────────────────────────────────────────────────────────
 
   void _clearSearch() {
-    _isSearchActive = false;
+    _searchActive = false;
     _searchQuery = '';
-    _searchController.clear();
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
@@ -230,6 +322,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   void _navigateUp() {
     if (_atRoot) return;
+    
+    // Check if we're about to leave the archive
+    if (_archiveContext != null && 
+        _pathStack.length - 1 <= _archiveContext!.pathStackEntryIndex) {
+      _closeArchive();
+    }
+    
     setState(() {
       _pathStack.removeLast();
       _clearSearch();
@@ -240,6 +339,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   void _jumpTo(int index) {
     if (index == _pathStack.length - 1) return;
+    
+    // Check if we jumped out of the archive
+    if (_archiveContext != null && index < _archiveContext!.pathStackEntryIndex) {
+      _closeArchive();
+    }
+    
     setState(() {
       _pathStack.removeRange(index + 1, _pathStack.length);
       _clearSearch();
@@ -262,10 +367,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   void _handleDirTap(String rawItem) {
     _signalActivity();
-    if (isSelectionMode)
+    if (isSelectionMode) {
       toggleSelectItem(rawItem);
-    else
+    } else {
       _enterDirectory(rawItem);
+    }
   }
 
   Future<void> _handleFileTap(String rawItem) async {
@@ -283,6 +389,54 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final parts = entry.name.split('.');
     final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
 
+    // Check if it's an archive we can browse
+    if (ArchiveService.isArchive(ext)) {
+      if (ArchiveService.isSupported(ext)) {
+        await _openArchive(fullPath, entry.name);
+      } else {
+        _setStatus('Archive format .$ext is not yet supported', error: true);
+      }
+      return;
+    }
+
+    // Check if we are inside an archive
+    if (_archiveContext != null) {
+      _signalActivity();
+      setState(() => _isLoading = true);
+      try {
+        final archiveRootPath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+        String subPath = '';
+        if (fullPath.length > archiveRootPath.length) {
+          subPath = fullPath.substring(archiveRootPath.length);
+          if (subPath.startsWith('/')) subPath = subPath.substring(1);
+        }
+
+        final tempFilePath = await _archiveContext!.extractEntry(subPath);
+        if (mounted) {
+          setState(() => _isLoading = false);
+          if (tempFilePath != null) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ArchiveFileViewer(
+                  file: File(tempFilePath),
+                  fileName: entry.name,
+                ),
+              ),
+            );
+          } else {
+            _setStatus('Failed to read file from archive', error: true);
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _setStatus('Failed to extract file: ${e.runtimeType}', error: true);
+        }
+      }
+      return;
+    }
+
     // Check if it's a VaultItem (secure item)
     if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
       final item = await VaultItemsService.instance.loadItem(widget.container, fullPath);
@@ -297,7 +451,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             context,
             MaterialPageRoute(
               builder: (_) => VaultItemDetailScreen(
-                container: widget.container, 
+                container: widget.container,
                 item: item,
                 filePath: fullPath,
               ),
@@ -673,7 +827,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               return _scanMediaRecursively(subPath, depth: depth + 1);
             }),
           );
-          for (final list in nested) foundFiles.addAll(list);
+          for (final list in nested) {
+            foundFiles.addAll(list);
+          }
         }
       }
     } catch (e) {
@@ -889,7 +1045,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         await _loadDirectoryContents(_currentDirPath);
         _setStatus(
           failCount == 0
-              ? 'Deleted $deleted item(s)'
+              ? 'Deleted $deleted iteasdasdm(s)'
               : '$deleted deleted · $failCount failed',
           error: failCount > 0,
         );
@@ -899,7 +1055,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _exportSelectedToStorage() async {
     _signalActivity();
-    
+
     final items = selectedItems.map((raw) {
       final e = RawEntry.parse(raw);
       final path = _currentDirPath.isEmpty
@@ -907,7 +1063,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           : '$_currentDirPath/${e.name}';
       return <String, dynamic>{'path': path, 'isDir': e.isDir};
     }).toList();
-    
+
     if (items.isEmpty) return;
 
     setState(() => _isLoading = true);
@@ -1011,33 +1167,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  Widget _buildSortMenuButton(
-    SortBy value,
-    String label,
-    ColorScheme cs,
-    TextTheme textTheme,
-  ) {
-    final isActive = sortBy == value;
-    return MenuItemButton(
-      onPressed: () => setSort(value),
-      leadingIcon: Icon(
-        isActive
-            ? (sortAscending
-                  ? Icons.arrow_upward_rounded
-                  : Icons.arrow_downward_rounded)
-            : Icons.sort_rounded,
-        size: 16,
-        color: isActive ? cs.primary : cs.onSurfaceVariant,
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
-        ),
-      ),
-    );
-  }
-
   Widget _buildFilterMenuButton(
     String? value,
     String label,
@@ -1065,110 +1194,301 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 
-  // ── Create-options sheet (replaces the old flat "+" PopupMenuButton) ──────
+  Future<void> _extractArchive() async {
+    if (_archiveContext == null) return;
+    
+    final archivePath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+    final parentDir = archivePath.contains('/') 
+        ? archivePath.substring(0, archivePath.lastIndexOf('/')) 
+        : '';
+        
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Extract Archive'),
+        content: Text('Extract all files to the folder "${parentDir.isEmpty ? 'Root' : parentDir}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Extract')),
+        ],
+      ),
+    );
+    
+    if (confirm != true || !mounted) return;
+    
+    setState(() => _isLoading = true);
+    
+    try {
+      final count = await ArchiveService.extractAllToContainer(
+        container: widget.container,
+        archiveContext: _archiveContext!,
+        targetDirInContainer: parentDir,
+      );
+      
+      if (mounted) {
+        _setStatus('Extracted $count files', autoClear: const Duration(seconds: 3));
+      }
+    } catch (e) {
+      if (mounted) {
+        _setStatus('Failed to extract: ${e.runtimeType}', error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
-  void _showCreateOptionsSheet() {
-    _signalActivity();
+  // ── Add / Sort popup buttons ──────────────────────────────────────────────
+
+  Widget _buildAddPopupButton(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    
+    if (_archiveContext != null) {
+      return IconButton(
+        icon: const Icon(Icons.unarchive_rounded, size: 28),
+        tooltip: 'Extract Archive',
+        onPressed: _extractArchive,
+      );
+    }
+
+    return MenuAnchor(
+      builder: (context, controller, child) => IconButton(
+        icon: const Icon(Icons.add_rounded, size: 28),
+        tooltip: 'New item',
+        onPressed: () {
+          _signalActivity();
+          if (controller.isOpen) {
+            controller.close();
+          } else {
+            controller.open();
+          }
+        },
+      ),
+      onOpen: () => setState(() => _menuIsOpen = true),
+      onClose: () => setState(() => _menuIsOpen = false),
+      menuChildren: [
+        MenuItemButton(
+          leadingIcon: Icon(Icons.create_new_folder_outlined, color: cs.primary),
+          child: const Text('New Folder'),
+          onPressed: () {
+            BrowserDialogs.showCreateFolder(
+              context,
+              container: widget.container,
+              currentDirPath: _currentDirPath,
+              onSuccess: () => _loadDirectoryContents(_currentDirPath),
+            );
+          },
+        ),
+        MenuItemButton(
+          leadingIcon: Icon(Icons.insert_drive_file_outlined, color: cs.primary),
+          child: const Text('New Text File'),
+          onPressed: () {
+            BrowserDialogs.showCreateFile(
+              context,
+              container: widget.container,
+              currentDirPath: _currentDirPath,
+              onSuccess: () => _loadDirectoryContents(_currentDirPath),
+            );
+          },
+        ),
+        MenuItemButton(
+          leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
+          child: const Text('Import Files'),
+          onPressed: _importFilesFromDevice,
+        ),
+        MenuItemButton(
+          leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.secondary),
+          child: const Text('Import Folder'),
+          onPressed: _importFolderFromDevice,
+        ),
+        const PopupMenuDivider(),
+        SubmenuButton(
+          leadingIcon: Icon(Icons.lock_rounded, color: cs.primary),
+          menuChildren: [
+            ...VaultItemType.values.map(
+              (type) => MenuItemButton(
+                leadingIcon: Icon(
+                  vaultIconForExt(type.name) ?? Icons.lock_rounded,
+                  color: vaultColorForExt(type.name) ?? cs.primary,
+                ),
+                child: Text(type.label),
+                onPressed: () => _addVaultItem(type),
+              ),
+            ),
+          ],
+          child: const Text('Secure Item'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildViewTogglePopupButton(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final currentIcon = _layoutMode == BrowserLayoutMode.list
+        ? Icons.view_list_rounded
+        : _layoutMode == BrowserLayoutMode.compact
+            ? Icons.list_rounded
+            : Icons.grid_view_rounded;
+
+    return MenuAnchor(
+      builder: (context, controller, child) => IconButton(
+        icon: Icon(currentIcon),
+        tooltip: 'Layout options',
+        onPressed: () {
+          if (controller.isOpen) {
+            controller.close();
+          } else {
+            controller.open();
+          }
+        },
+      ),
+      onOpen: () => setState(() => _menuIsOpen = true),
+      onClose: () => setState(() => _menuIsOpen = false),
+      menuChildren: [
+        for (final (mode, label, icon) in const [
+          (BrowserLayoutMode.list, 'Detailed List', Icons.view_list_rounded),
+          (BrowserLayoutMode.compact, 'Compact List', Icons.list_rounded),
+          (BrowserLayoutMode.grid, 'Gallery Grid', Icons.grid_view_rounded),
+        ])
+          MenuItemButton(
+            leadingIcon: Icon(icon, color: _layoutMode == mode ? cs.primary : cs.onSurfaceVariant),
+            trailingIcon: _layoutMode == mode
+                ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                : null,
+            onPressed: () => setState(() => _layoutMode = mode),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: _layoutMode == mode ? FontWeight.bold : FontWeight.normal,
+                color: _layoutMode == mode ? cs.primary : null,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSortPopupButton(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return MenuAnchor(
+      builder: (context, controller, child) => IconButton(
+        icon: const Icon(Icons.sort_by_alpha_rounded),
+        tooltip: 'Sort options',
+        onPressed: () {
+          if (controller.isOpen) {
+            controller.close();
+          } else {
+            controller.open();
+          }
+        },
+      ),
+      onOpen: () => setState(() => _menuIsOpen = true),
+      onClose: () => setState(() => _menuIsOpen = false),
+      menuChildren: [
+        for (final (field, label, icon) in const [
+          (SortBy.name, 'Name', Icons.sort_by_alpha_rounded),
+          (SortBy.size, 'Size', Icons.data_usage_rounded),
+          (SortBy.extension, 'Type', Icons.category_outlined),
+          (SortBy.date, 'Date', Icons.schedule_rounded),
+        ])
+          MenuItemButton(
+            leadingIcon: Icon(icon, color: sortBy == field ? cs.primary : cs.onSurfaceVariant),
+            trailingIcon: sortBy == field
+                ? Icon(
+                    sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                    size: 16,
+                    color: cs.primary,
+                  )
+                : null,
+            onPressed: () => setSort(field),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: sortBy == field ? FontWeight.bold : FontWeight.normal,
+                color: sortBy == field ? cs.primary : null,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ── Action bar wiring ─────────────────────────────────────────────────────
+
+  Map<FileManagerAction, WidgetBuilder> _buildActionBuilders() {
+    final hasLocalMedia = _currentItems
+        .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
+        .map((f) => RawEntry.parse(f).name)
+        .any(_isSupportedMedia);
+    final hasSubfolders = _currentItems.any((f) => f.startsWith('[DIR] '));
+    final canPlayMedia = hasLocalMedia || hasSubfolders;
+
+    return {
+      FileManagerAction.search: (context) => IconButton(
+            icon: Icon(_searchActive ? Icons.search_off_rounded : Icons.search_rounded),
+            tooltip: _searchActive ? 'Close search' : 'Search in this folder',
+            onPressed: () => setState(() {
+              _searchActive = !_searchActive;
+              if (!_searchActive) _searchQuery = '';
+            }),
+          ),
+      FileManagerAction.add: (context) => _buildAddPopupButton(context),
+      FileManagerAction.viewToggle: (context) => _buildViewTogglePopupButton(context),
+      FileManagerAction.sort: (context) => _buildSortPopupButton(context),
+      FileManagerAction.playMedia: (context) => IconButton(
+            icon: const Icon(Icons.play_circle_outline_rounded),
+            tooltip: 'Play media here',
+            onPressed: canPlayMedia ? _startMediaViewerFromCurrentLocation : null,
+          ),
+    };
+  }
+
+  // ── Settings menu (app bar) ───────────────────────────────────────────────
+  //
+  // The app bar's only action: Filters + a link to the toolbar customize
+  // screen. Everything functional (search/add/sort/view/play) lives in the
+  // action bar instead.
+
+  Widget _buildSettingsMenuButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => AppBottomSheet(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 4),
-                child: Text(
-                  'New item',
-                  style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ),
-              const SizedBox(height: 4),
-              SheetOptionTile(
-                icon: Icons.create_new_folder_outlined,
-                iconColor: cs.primary,
-                title: 'New Folder',
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  BrowserDialogs.showCreateFolder(
-                    context,
-                    container: widget.container,
-                    currentDirPath: _currentDirPath,
-                    onSuccess: () => _loadDirectoryContents(_currentDirPath),
-                  );
-                },
-              ),
-              SheetOptionTile(
-                icon: Icons.insert_drive_file_outlined,
-                iconColor: cs.primary,
-                title: 'New Text File',
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  BrowserDialogs.showCreateFile(
-                    context,
-                    container: widget.container,
-                    currentDirPath: _currentDirPath,
-                    onSuccess: () => _loadDirectoryContents(_currentDirPath),
-                  );
-                },
-              ),
-              SheetOptionTile(
-                icon: Icons.upload_file_outlined,
-                iconColor: cs.secondary,
-                title: 'Import Files',
-                subtitle: 'Copy files in from your device',
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _importFilesFromDevice();
-                },
-              ),
-              SheetOptionTile(
-                icon: Icons.drive_folder_upload_outlined,
-                iconColor: cs.secondary,
-                title: 'Import Folder',
-                subtitle: 'Copy an entire folder in from your device',
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _importFolderFromDevice();
-                },
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 4),
-                child: Text(
-                  'SECURE ITEM',
-                  style: textTheme.labelSmall?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-              ...VaultItemType.values.map(
-                (type) => SheetOptionTile(
-                  icon: vaultIconForExt(type.name) ?? Icons.lock_rounded,
-                  iconColor: vaultColorForExt(type.name) ?? cs.primary,
-                  title: type.label,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    _addVaultItem(type);
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
+    return MenuAnchor(
+      builder: (ctx, controller, child) => IconButton(
+        onPressed: () =>
+            controller.isOpen ? controller.close() : controller.open(),
+        icon: const Icon(Icons.settings_outlined),
+        tooltip: 'Settings',
       ),
+      menuChildren: [
+        SubmenuButton(
+          leadingIcon: Icon(Icons.filter_alt_outlined, color: cs.onSurfaceVariant),
+          menuChildren: [
+            _buildFilterMenuButton(null, 'All Files', Icons.all_inclusive_rounded, cs, textTheme),
+            _buildFilterMenuButton('image', 'Images', Icons.image_outlined, cs, textTheme),
+            _buildFilterMenuButton('video', 'Videos', Icons.videocam_outlined, cs, textTheme),
+            _buildFilterMenuButton('audio', 'Audio', Icons.audiotrack_rounded, cs, textTheme),
+            _buildFilterMenuButton('document', 'Documents', Icons.description_outlined, cs, textTheme),
+          ],
+          child: const Text('Filters'),
+        ),
+        const PopupMenuDivider(),
+        MenuItemButton(
+          leadingIcon: Icon(Icons.tune_rounded, color: cs.onSurfaceVariant),
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FileManagerToolbarSettingsScreen()),
+            );
+            await _loadToolbarConfig();
+          },
+          child: const Text('Settings'),
+        ),
+      ],
     );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
- @override
+  @override
   Widget build(BuildContext context) {
     final dirs = _currentItems.where((f) => f.startsWith('[DIR]')).toList()
       ..sort(compareItems);
@@ -1199,6 +1519,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
     final cs = Theme.of(context).colorScheme;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final actionBuilders = _buildActionBuilders();
+    final showActionBar = !isSelectionMode && !_searchActive;
 
     return PopScope(
       canPop: false,
@@ -1206,11 +1528,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         if (didPop) return;
         if (isSelectionMode) {
           exitSelectionMode();
-        } else if (_clip.hasItems &&
-            _clip.isFromVolume(widget.container.volId)) {
-          _clip.clear();
-          setState(() {});
-        } else if (_isSearchActive) {
+        } else if (_searchActive) {
           setState(() => _clearSearch());
         } else if (!_atRoot) {
           _navigateUp();
@@ -1219,17 +1537,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       },
       child: Scaffold(
+        // Handled manually by BottomSearchBar via MediaQuery.viewInsets, so
+        // the search bar's own positioning stays deterministic instead of
+        // fighting with Scaffold's automatic resize.
+        resizeToAvoidBottomInset: false,
         appBar: _buildAppBar(context, filteredDirs, filteredFiles),
+        bottomNavigationBar: (!isLandscape && showActionBar)
+            ? FileManagerActionBar(
+                axis: Axis.horizontal,
+                actions: _toolbarConfig.visible,
+                builders: actionBuilders,
+              )
+            : null,
 
-        // ── Floating activity stack ───────────────────────────────────────
-        //
-        // FIX: previously the clipboard pill was a `floatingActionButton`
-        // (centerFloat) while the operation progress bar was a *different*,
-        // differently-styled widget docked in-flow inside the body Column
-        // above the status bar. The two could overlap unpredictably and
-        // shared no color language. Both now live in one FloatingActivityStack
-        // overlaid via Stack, matching the exact pattern used on the
-        // dashboard, so the two screens now feel like one coherent system.
+        // ── Floating activity stack / search bar ────────────────────────
         body: Stack(
           children: [
             isLandscape
@@ -1237,72 +1558,57 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Sidebar on the left
-                      Container(
-                        width: _sidebarWidth,
-                        color: cs.surfaceContainerLow,
-                        child: SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              StatsBar(
-                                dirCount: filteredDirs.length,
-                                fileCount: filteredFiles.length,
-                                freeSpaceBytes: _freeSpace,
-                                isFiltered: query.isNotEmpty || _currentFilter != null,
-                                isVertical: true,
-                              ),
-                            ],
+                      if (_toolbarConfig.showStatsBar) ...[
+                        Container(
+                          width: _sidebarWidth,
+                          color: cs.surfaceContainerLow,
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                StatsBar(
+                                  dirCount: filteredDirs.length,
+                                  fileCount: filteredFiles.length,
+                                  freeSpaceBytes: _freeSpace,
+                                  isFiltered: query.isNotEmpty || _currentFilter != null,
+                                  isVertical: true,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      GestureDetector(
-                        behavior: HitTestBehavior.translucent,
-                        onHorizontalDragUpdate: (details) {
-                          setState(() {
-                            _sidebarWidth = (_sidebarWidth + details.delta.dx)
-                                .clamp(160.0, 300.0);
-                          });
-                        },
-                        child: MouseRegion(
-                          cursor: SystemMouseCursors.resizeLeftRight,
-                          child: Container(
-                            width: 8,
-                            color: Colors.transparent,
-                            child: const Center(
-                              child: VerticalDivider(
-                                width: 1,
-                                thickness: 1,
+                        GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onHorizontalDragUpdate: (details) {
+                            setState(() {
+                              _sidebarWidth = (_sidebarWidth + details.delta.dx)
+                                  .clamp(160.0, 300.0);
+                            });
+                          },
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.resizeLeftRight,
+                            child: Container(
+                              width: 8,
+                              color: Colors.transparent,
+                              child: const Center(
+                                child: VerticalDivider(
+                                  width: 1,
+                                  thickness: 1,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
+                      ],
                       // Main content area on the right
                       Expanded(
                         child: Column(
                           children: [
-                            BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-                            const Divider(),
+                            if (_toolbarConfig.showBreadcrumbBar) ...[
+                              BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+                              const Divider(),
+                            ],
                             Expanded(child: _buildBody(filteredDirs, filteredFiles)),
-                            if (_statusMessage != null)
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                                child: AnimatedSwitcher(
-                                  duration: AppMotion.short2,
-                                  child: InlineBanner(
-                                    _statusMessage!,
-                                    key: ValueKey(_statusMessage),
-                                    tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
-                                    trailing: IconButton(
-                                      icon: const Icon(Icons.close_rounded, size: AppIconSize.small),
-                                      onPressed: _clearStatus,
-                                      visualDensity: VisualDensity.compact,
-                                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                      padding: EdgeInsets.zero,
-                                    ),
-                                  ),
-                                ),
-                              ),
                           ],
                         ),
                       ),
@@ -1310,42 +1616,61 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   )
                 : Column(
                     children: [
-                      BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-                      StatsBar(
-                        dirCount: filteredDirs.length,
-                        fileCount: filteredFiles.length,
-                        freeSpaceBytes: _freeSpace,
-                        isFiltered: query.isNotEmpty || _currentFilter != null,
-                      ),
-                      const Divider(),
-                      Expanded(child: _buildBody(filteredDirs, filteredFiles)),
-                      if (_statusMessage != null)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                          child: AnimatedSwitcher(
-                            duration: AppMotion.short2,
-                            child: InlineBanner(
-                              _statusMessage!,
-                              key: ValueKey(_statusMessage),
-                              tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
-                              trailing: IconButton(
-                                icon: const Icon(Icons.close_rounded, size: AppIconSize.small),
-                                onPressed: _clearStatus,
-                                visualDensity: VisualDensity.compact,
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                                padding: EdgeInsets.zero,
-                              ),
-                            ),
-                          ),
+                      if (_toolbarConfig.showBreadcrumbBar)
+                        BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+                      if (_toolbarConfig.showStatsBar)
+                        StatsBar(
+                          dirCount: filteredDirs.length,
+                          fileCount: filteredFiles.length,
+                          freeSpaceBytes: _freeSpace,
+                          isFiltered: query.isNotEmpty || _currentFilter != null,
                         ),
+                      if (_toolbarConfig.showBreadcrumbBar || _toolbarConfig.showStatsBar)
+                        const Divider(),
+                      Expanded(child: _buildBody(filteredDirs, filteredFiles)),
                     ],
                   ),
             Positioned(
               left: 0,
               right: 0,
-              bottom: 16,
-              child: Center(
-                child: FloatingActivityStack(onPaste: _paste),
+              bottom: _searchActive ? 0 : 16,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_statusMessage != null)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: _searchActive ? 16 : 8, left: 16, right: 16),
+                      child: AnimatedSwitcher(
+                        duration: AppMotion.short2,
+                        child: InlineBanner(
+                          _statusMessage!,
+                          key: ValueKey(_statusMessage),
+                          tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.close_rounded, size: AppIconSize.small),
+                            onPressed: _clearStatus,
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (_searchActive)
+                    BottomSearchBar(
+                      initialQuery: _searchQuery,
+                      onChanged: (q) => setState(() => _searchQuery = q),
+                      onClose: () => setState(() {
+                        _searchActive = false;
+                        _searchQuery = '';
+                      }),
+                    )
+                  else
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FloatingActivityStack(onPaste: _paste),
+                    ),
+                ],
               ),
             ),
           ],
@@ -1355,14 +1680,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   // ── App bar ───────────────────────────────────────────────────────────────
+  //
+  // Deliberately minimal: back button, container name, and one settings
+  // menu (Filters + "Customize toolbar"). It never swaps into a search
+  // field — see BottomSearchBar for where search actually lives.
 
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
     List<String> dirs,
     List<String> files,
   ) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final allItems = [...dirs, ...files];
 
     if (isSelectionMode) {
@@ -1385,21 +1712,26 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         onClose: exitSelectionMode,
         onSelectAll: () => setState(() => selectedItems.addAll(allItems)),
         onRename: () {
-          final raw = selectedItems.first;
-          final entry = RawEntry.parse(raw);
-          final parts = entry.name.split('.');
-          final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
+          final entries = selectedItems.map((raw) => RawEntry.parse(raw)).toList();
           
-          if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-             _setStatus('Edit secure items to rename them');
-             exitSelectionMode();
-             return;
+          for (final entry in entries) {
+            final parts = entry.name.split('.');
+            final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
+            if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
+               _setStatus('Edit secure items to rename them');
+               exitSelectionMode();
+               return;
+            }
           }
-          
+
+          final oldNames = entries.map((e) => e.name).toList();
+          final existingNames = allItems.map((raw) => RawEntry.parse(raw).name).toSet();
+
           BrowserDialogs.showRename(
             context,
             container: widget.container,
-            oldName: entry.name,
+            oldNames: oldNames,
+            existingNamesInDir: existingNames,
             currentDirPath: _currentDirPath,
             onSuccess: () => _loadDirectoryContents(_currentDirPath),
           );
@@ -1418,12 +1750,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           final parts = entry.name.split('.');
           final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
           exitSelectionMode();
-          
+
           if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
              _setStatus('Vault items cannot be opened in external apps', error: true);
              return;
           }
-          
+
           final settings = await AppSettingsService.loadSettings();
           if (mounted) {
             await _showOpenWithDialog(entry.name, path, ext, settings);
@@ -1432,43 +1764,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       );
     }
 
-    if (_isSearchActive) {
-      return AppBar(
-        backgroundColor: cs.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          tooltip: 'Close search',
-          onPressed: () => setState(() => _clearSearch()),
-        ),
-        title: TextField(
-          controller: _searchController,
-          autofocus: true,
-          onChanged: (val) => setState(() => _searchQuery = val),
-          style: textTheme.bodyMedium?.copyWith(color: cs.onSurface),
-          decoration: InputDecoration(
-            hintText: 'Search in this folder…',
-            hintStyle: TextStyle(color: cs.outline, fontSize: 14),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            filled: false,
-            contentPadding: EdgeInsets.zero,
-          ),
-        ),
-        actions: [
-          if (_searchQuery.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              tooltip: 'Clear',
-              onPressed: () => setState(() {
-                _searchQuery = '';
-                _searchController.clear();
-              }),
-            ),
-        ],
-      );
-    }
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final showActionBar = !isSelectionMode && !_searchActive;
+    final actionBuilders = _buildActionBuilders();
 
     return AppBar(
       leading: IconButton(
@@ -1478,94 +1776,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       ),
       title: Text(widget.container.displayName),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.search),
-          tooltip: 'Search in this folder',
-          onPressed: () => setState(() => _isSearchActive = true),
-        ),
-        // ── + menu ────────────────────────────────────────────────────────
-        // FIX (audit C3): previously a flat PopupMenuButton mixing New
-        // Folder/New File/Import Files/Import Folder with all six vault item
-        // types in one 10+ item menu. VaultDashboard already solved this
-        // exact "too many creation choices" problem with a grouped
-        // AppBottomSheet of SheetOptionTiles (_showAddOptionsSheet) — this
-        // now reuses that same pattern instead of a second, differently
-        // shaped solution to the same UX problem.
-        IconButton(
-          icon: const Icon(Icons.add),
-          tooltip: 'New item',
-          onPressed: _showCreateOptionsSheet,
-        ),
-        MenuAnchor(
-          builder: (ctx, controller, child) => IconButton(
-            onPressed: () =>
-                controller.isOpen ? controller.close() : controller.open(),
-            icon: const Icon(Icons.more_vert_rounded),
-            tooltip: 'Folder options',
-          ),
-          menuChildren: [
-            MenuItemButton(
-              onPressed: () {
-                final hasLocalMedia = _currentItems
-                    .where(
-                      (f) => !f.startsWith('[DIR]') && !f.startsWith('System:'),
-                    )
-                    .map((f) => RawEntry.parse(f).name)
-                    .any(_isSupportedMedia);
-                final hasSubfolders = _currentItems.any(
-                  (f) => f.startsWith('[DIR] '),
-                );
-                if (hasLocalMedia || hasSubfolders) {
-                  _startMediaViewerFromCurrentLocation();
-                }
-              },
-              leadingIcon: Icon(
-                Icons.play_circle_outline_rounded,
-                color: cs.primary,
-              ),
-              child: const Text('Play Media Here'),
-            ),
-            const PopupMenuDivider(),
-            MenuItemButton(
-              onPressed: () => setState(() {
-                _layoutMode = _layoutMode == BrowserLayoutMode.list
-                    ? BrowserLayoutMode.grid
-                    : BrowserLayoutMode.list;
-              }),
-              leadingIcon: Icon(
-                _layoutMode == BrowserLayoutMode.list
-                    ? Icons.grid_view_rounded
-                    : Icons.view_list_rounded,
-              ),
-              child: Text(
-                _layoutMode == BrowserLayoutMode.list
-                    ? 'Switch to Gallery'
-                    : 'Switch to List',
-              ),
-            ),
-            const PopupMenuDivider(),
-            SubmenuButton(
-              menuChildren: [
-                _buildSortMenuButton(SortBy.name, 'Name', cs, textTheme),
-                _buildSortMenuButton(SortBy.size, 'Size', cs, textTheme),
-                _buildSortMenuButton(SortBy.extension, 'Type', cs, textTheme),
-                _buildSortMenuButton(SortBy.date, 'Date', cs, textTheme),
-              ],
-              child: const Text('Sort By'),
-            ),
-            const PopupMenuDivider(),
-            SubmenuButton(
-              menuChildren: [
-                _buildFilterMenuButton(null, 'All Files', Icons.all_inclusive_rounded, cs, textTheme),
-                _buildFilterMenuButton('image', 'Images', Icons.image_outlined, cs, textTheme),
-                _buildFilterMenuButton('video', 'Videos', Icons.videocam_outlined, cs, textTheme),
-                _buildFilterMenuButton('audio', 'Audio', Icons.audiotrack_rounded, cs, textTheme),
-                _buildFilterMenuButton('document', 'Documents', Icons.description_outlined, cs, textTheme),
-              ],
-              child: const Text('Filter By'),
-            ),
-          ],
-        ),
+        if (isLandscape && showActionBar) ...[
+          ..._toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
+        ],
+        _buildSettingsMenuButton(context),
       ],
     );
   }
@@ -1583,7 +1797,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       return AppEmptyState(
         icon: Icons.folder_open_rounded,
         title: 'Empty Folder',
-        message: 'Tap + to create files or import from device.',
+        message: 'Use the Add action to create files or import from device.',
         actionLabel: _atRoot ? null : 'Go back',
         actionIcon: Icons.arrow_upward_rounded,
         onAction: _atRoot ? null : _navigateUp,
@@ -1612,23 +1826,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             onDirTap: _handleDirTap,
             onFileTap: _handleFileTap,
             onItemLongPress: _handleItemLongPress,
+            searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
           )
         : FileListView(
             dirs: dirs,
             files: files,
             isSelectionMode: isSelectionMode,
+            isCompact: _layoutMode == BrowserLayoutMode.compact,
             selectedItems: selectedItems,
             onDirTap: _handleDirTap,
             onFileTap: _handleFileTap,
             onItemLongPress: _handleItemLongPress,
+            searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
           );
 
-    // FIX (audit C1): previously `_TruncatedBanner()` was constructed here
-    // and immediately discarded — never inserted into the returned widget
-    // tree, so the "folder has more files than shown" warning could never
-    // actually render. Now it's placed above the list/grid content whenever
-    // the listing was truncated. (Also now extracted to widgets/ — see
-    // truncated_banner.dart.)
     if (!_isListingTruncated) return content;
 
     return Column(

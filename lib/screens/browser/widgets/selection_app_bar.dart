@@ -131,12 +131,11 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
           tooltip: 'Move',
           onPressed: onCut,
         ),
-        if (singleSelected)
-          IconButton(
-            icon: const Icon(Icons.drive_file_rename_outline_rounded),
-            tooltip: 'Rename',
-            onPressed: onRename,
-          ),
+        IconButton(
+          icon: const Icon(Icons.drive_file_rename_outline_rounded),
+          tooltip: 'Rename',
+          onPressed: onRename,
+        ),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert_rounded),
           tooltip: 'More options',

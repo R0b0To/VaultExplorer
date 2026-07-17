@@ -568,7 +568,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _videoProgressNotifier.dispose();
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
   }
 

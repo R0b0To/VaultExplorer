@@ -736,28 +736,12 @@ class _VaultDashboardState extends State<VaultDashboard>
         body: Stack(
           children: [
             _buildBody(displayItems),
-            Positioned(
+            const Positioned(
               left: 0,
               right: 0,
-              bottom: 16,
+              bottom: 88,
               child: Center(
-                child: ListenableBuilder(
-                  listenable: CrossContainerClipboard.instance,
-                  builder: (context, _) {
-                    final clipboard = CrossContainerClipboard.instance;
-                    if (!clipboard.hasItems) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: ClipboardActivityPill(
-                        isCutOperation: clipboard.isCutOperation,
-                        itemCount: clipboard.items.length,
-                        sourceLabel: clipboard.sourceDisplayName,
-                        onCancel: clipboard.clear,
-                        onPaste: null, // Dashboard has no paste target of its own.
-                      ),
-                    );
-                  },
-                ),
+                child: FloatingActivityStack(),
               ),
             ),
           ],

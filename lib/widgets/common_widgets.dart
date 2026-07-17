@@ -155,10 +155,10 @@ class InlineBanner extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.md)),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(100)),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(icon ?? defaultIcon, size: AppIconSize.standard, color: fg),
           const SizedBox(width: 10),

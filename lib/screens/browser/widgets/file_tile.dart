@@ -10,18 +10,24 @@ class FileTile extends StatelessWidget {
   final String rawItem;
   final bool isSelectionMode;
   final bool isSelected;
+  final String? searchQuery;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final ValueChanged<String>? onLongMenu;
+  final bool isCompact;
+  final double zoomLevel;
 
   const FileTile({
     super.key,
     required this.rawItem,
     required this.isSelectionMode,
     required this.isSelected,
+    this.searchQuery,
     required this.onTap,
     required this.onLongPress,
     this.onLongMenu,
+    this.isCompact = false,
+    this.zoomLevel = 1.0,
   });
 
   @override
@@ -51,11 +57,14 @@ class FileTile extends StatelessWidget {
       iconColor: iconColor,
       unselectedIconBackground: cs.surfaceContainerHighest,
       displayName: displayName,
+      searchQuery: searchQuery,
       dateStr: formatEntryDate(entry.modifiedSecs),
       trailing: _buildTrailing(context, sizeStr),
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,
+      isCompact: isCompact,
+      zoomLevel: zoomLevel,
     );
   }
 
@@ -76,7 +85,7 @@ class FileTile extends StatelessWidget {
         alignment: Alignment.centerRight,
         child: isSelected
             ? const TileSelectionIndicator(selected: true)
-            : sizeWidget,
+            : (isCompact ? const SizedBox.shrink() : sizeWidget),
       );
     }
 
@@ -84,9 +93,10 @@ class FileTile extends StatelessWidget {
       return Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Expanded(
-            child: Align(alignment: Alignment.centerRight, child: sizeWidget),
-          ),
+          if (!isCompact)
+            Expanded(
+              child: Align(alignment: Alignment.centerRight, child: sizeWidget),
+            ),
           const SizedBox(width: 4),
           SizedBox(
             width: 32,
@@ -103,6 +113,8 @@ class FileTile extends StatelessWidget {
       );
     }
 
-    return Align(alignment: Alignment.centerRight, child: sizeWidget);
+    return isCompact
+        ? const SizedBox.shrink()
+        : Align(alignment: Alignment.centerRight, child: sizeWidget);
   }
 }

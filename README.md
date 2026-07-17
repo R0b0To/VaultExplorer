@@ -65,7 +65,7 @@ Mount, browse, and manage VeraCrypt and LUKS encrypted volumes directly on your 
 
 ## Requirements
 
-- Android 6.0+ (API 23)
+- Android 8.0+ (API 26)
 - USB OTG support for USB drive mounting
 - NDK / CMake (for building)
 

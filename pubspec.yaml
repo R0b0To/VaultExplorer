@@ -20,6 +20,8 @@ dependencies:
   wakelock_plus: ^1.5.2
   package_info_plus: ^9.0.1
   vector_math: ^2.1.4
+  archive: ^4.0.4      # ZIP/TAR/GZ archive parsing (pure Dart)
+  path: ^1.9.0          # Path manipulation for archive entry paths
 
 dev_dependencies:
   flutter_test:

@@ -41,6 +41,54 @@ int extDirectoryEntry(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, c
     return 0;
 }
 
+namespace {
+
+// Recursion context for recursiveExtFolderSize(): accumulates the byte
+// total of every regular file found under the starting directory,
+// descending into subdirectories inline rather than collecting entries
+// into a results list the way extDirectoryEntry() does for directory
+// listings.
+struct ExtSizeContext {
+    ext2_filsys fs;
+    uint64_t totalSize = 0;
+};
+
+int extSizeEntryCallback(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, char*, void* data) {
+    auto* context = static_cast<ExtSizeContext*>(data);
+    if (!entry->inode) return 0;
+
+    std::string name(entry->name, ext2fs_dirent_name_len(entry));
+    if (name == "." || name == "..") return 0;
+
+    struct ext2_inode inode{};
+    if (ext2fs_read_inode(context->fs, entry->inode, &inode) != 0) return 0;
+
+    if (LINUX_S_ISDIR(inode.i_mode)) {
+        ExtSizeContext childContext{context->fs, 0};
+        ext2fs_dir_iterate2(context->fs, entry->inode, 0, nullptr, extSizeEntryCallback, &childContext);
+        context->totalSize += childContext.totalSize;
+    } else {
+        const uint64_t size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
+        context->totalSize += size;
+    }
+    return 0;
+}
+
+} // namespace
+
+uint64_t recursiveExtFolderSize(int volumeId, const std::string& path) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return 0;
+    VolumeState& v = volumes[volumeId];
+    if (!v.extFs) return 0;
+
+    ext2_ino_t dirIno = 0;
+    if (!extResolvePath(v.extFs, path, &dirIno)) return 0;
+
+    ExtSizeContext context{v.extFs, 0};
+    ext2fs_dir_iterate2(v.extFs, dirIno, 0, nullptr, extSizeEntryCallback, &context);
+    return context.totalSize;
+}
+
 bool extOpenFile(ext2_filsys fs, const std::string& path, bool write, bool create, ext2_file_t* out) {
     ext2_ino_t inodeNumber = 0;
     if (!extResolvePath(fs, path, &inodeNumber)) {

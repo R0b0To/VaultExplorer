@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:encrypt/encrypt.dart' as enc;
+import 'package:flutter/services.dart';
 
 import '../models/mounted_container.dart';
 import '../models/thumbnail_cache_mode.dart';
@@ -35,6 +36,8 @@ import 'app_cache_encryption.dart';
 /// a slot at different times never collide on disk.
 class ThumbnailCacheService {
   ThumbnailCacheService._();
+
+  static const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
 
   // ── Constants ──────────────────────────────────────────────────────────────
   static const inContainerDir = '.thumbcache';
@@ -229,6 +232,50 @@ class ThumbnailCacheService {
     } catch (e) {
       debugPrint('ThumbnailCacheService.get: $e');
       return null;
+    }
+  }
+
+  /// Clears on-disk local app cache directories using only the container URI.
+  static Future<void> clearAppCacheByUri(String uri) async {
+    try {
+      _appCacheRoot ??= (await getApplicationCacheDirectory()).path;
+      final dir = Directory('$_appCacheRoot/thumbs/${_encodeKey(uri)}');
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+      }
+    } catch (_) {}
+    _memoryCache.clear();
+  }
+
+  /// Clears the .thumbcache directory inside the mounted volume by direct channel invocations.
+  /// Throws PlatformException if the container is locked (not mounted).
+  static Future<void> clearInContainerCacheByUri(String uri) async {
+    try {
+      final entries = await _channel.invokeMethod<List<Object?>>(
+        'listDirectory',
+        {'filePath': uri, 'dirPath': inContainerDir},
+      );
+      if (entries != null) {
+        final casted = entries.cast<String>();
+        for (final entry in casted) {
+          if (entry.startsWith('System:')) continue;
+          final isDir = entry.startsWith('[DIR] ');
+          String name = entry.split('|').first;
+          if (isDir) {
+            name = name.replaceFirst('[DIR] ', '');
+          }
+          await _channel.invokeMethod<bool>(
+            'deleteFile',
+            {'filePath': uri, 'fileName': '$inContainerDir/$name'},
+          );
+        }
+      }
+      await _channel.invokeMethod<bool>(
+        'deleteFile',
+        {'filePath': uri, 'fileName': inContainerDir},
+      );
+    } catch (_) {
+      rethrow;
     }
   }
 

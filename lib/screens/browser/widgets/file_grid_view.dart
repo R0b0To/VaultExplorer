@@ -10,7 +10,7 @@ import '../../../utils/file_type_utils.dart';
 import '../../../utils/lru_cache.dart';
 import '../../../utils/raw_entry.dart';
 import '../viewer/media_viewer_constants.dart';
-import '../../../theme.dart'; // Design tokens for AppRadius, AppIconSize, AppSpacing
+import '../../../theme.dart';
 import 'highlighted_text.dart';
 
 /// A dynamic gallery grid for the file browser supporting pinch-to-zoom.
@@ -383,6 +383,7 @@ class _AsyncThumb extends StatefulWidget {
   final _FetchFn fetchFn;
   final Duration debounce;
   final _SyncLookup? syncLookup;
+  final int? cacheHeight;
 
   const _AsyncThumb({
     required Key key,
@@ -393,6 +394,7 @@ class _AsyncThumb extends StatefulWidget {
     required this.fetchFn,
     this.debounce = const Duration(milliseconds: 100),
     this.syncLookup,
+    this.cacheHeight,
   }) : super(key: key);
 
   @override
@@ -569,7 +571,7 @@ class _AsyncThumbState extends State<_AsyncThumb> {
     return Image.memory(
       _bytes!,
       fit: BoxFit.cover,
-      cacheHeight: 180,
+      cacheHeight: widget.cacheHeight,
       errorBuilder: (_, _, _) => _errorPlaceholder(cs),
     );
   }
@@ -620,7 +622,7 @@ class _EncryptedImageGridThumb extends StatelessWidget {
     Uint8List? thumbBytes = await vaultExplorerApi.getImageThumbnail(
       container,
       path,
-      targetSize: 180,
+      targetSize: quality.scaledSize(180), 
       quality: quality.jpegQuality,
     );
 
@@ -665,9 +667,9 @@ class _EncryptedImageGridThumb extends StatelessWidget {
     fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
     debounce: const Duration(milliseconds: 100),
     syncLookup: () => ThumbnailCacheService.getFromMemory(container, filePath),
+    cacheHeight: quality.scaledSize(180), // Added key
   );
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Video thumbnail
 // ─────────────────────────────────────────────────────────────────────────────
@@ -703,8 +705,14 @@ class _VideoThumb extends StatelessWidget {
       if (cached != null && cached.isNotEmpty) return cached;
     }
 
-    final data = await vaultExplorerApi.getVideoThumbnail(container, path, quality: quality.jpegQuality);
+    final data = await vaultExplorerApi.getVideoThumbnail(
+      container, 
+      path, 
+      quality: quality.jpegQuality,
+      targetSize: quality.scaledSize(180),
+    );
     if (data == null || data.isEmpty) return Uint8List(0);
+   
 
     ThumbnailCacheService.putInMemory(container, path, data);
     if (mode != ThumbnailCacheMode.disabled) {
@@ -738,6 +746,7 @@ class _VideoThumb extends StatelessWidget {
           debounce: const Duration(milliseconds: 150),
           syncLookup: () =>
               ThumbnailCacheService.getFromMemory(container, filePath),
+          cacheHeight: quality.scaledSize(180), // Added key
         ),
         Align(
           alignment: Alignment.bottomRight,

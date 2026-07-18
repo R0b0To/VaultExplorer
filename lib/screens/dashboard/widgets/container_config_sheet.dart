@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import '../../../models/mounted_container.dart';
 import '../../../models/thumbnail_cache_mode.dart';
 import '../../../models/thumbnail_quality.dart';
 import '../../../services/app_settings_service.dart';
@@ -11,6 +12,7 @@ import '../../lock/pattern_setup_sheet.dart';
 import '../../lock/pattern_lock_view.dart';
 import '../../../utils/validation_utils.dart';
 import 'change_password_screen.dart';
+import '../../../services/thumbnail_cache_service.dart';
 
 class ContainerConfigScreen extends StatefulWidget {
   final String uri;
@@ -18,6 +20,7 @@ class ContainerConfigScreen extends StatefulWidget {
   final ContainerRecord? existingRecord;
   final void Function(ContainerRecord record) onSaved;
   final AppSettings? appSettings;
+  final MountedContainer? mountedContainer;
 
   const ContainerConfigScreen({
     super.key,
@@ -26,6 +29,7 @@ class ContainerConfigScreen extends StatefulWidget {
     this.existingRecord,
     required this.onSaved,
     this.appSettings,
+    this.mountedContainer,
   });
 
   @override
@@ -96,6 +100,62 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     _hashId = _initialHashId;
     _settingsLocked = rec != null;
     _initAsync();
+  }
+
+  bool _clearingCache = false;
+
+  Future<void> _clearThumbnailCache() async {
+    setState(() => _clearingCache = true);
+    
+    bool appCacheCleared = false;
+    bool containerCacheCleared = false;
+    bool isLocked = false;
+
+    try {
+      // 1. Clear local App Cache (always runs as it is stored in device application storage)
+      await ThumbnailCacheService.clearAppCacheByUri(widget.uri);
+      appCacheCleared = true;
+
+      // 2. Clear inside-container cache
+      await ThumbnailCacheService.clearInContainerCacheByUri(widget.uri);
+      containerCacheCleared = true;
+    } on PlatformException catch (e) {
+      if (e.code == 'NOT_MOUNTED') {
+        isLocked = true;
+      }
+    } catch (_) {
+      // Handle other unexpected issues silently or via flags
+    } finally {
+      if (mounted) {
+        setState(() => _clearingCache = false);
+        
+        if (isLocked) {
+          showAppSnackBar(
+            context,
+            message: 'App cache cleared. Unlock container to clear inside cache.',
+            tone: AppBannerTone.warning,
+          );
+        } else if (appCacheCleared && containerCacheCleared) {
+          showAppSnackBar(
+            context,
+            message: 'All thumbnail caches cleared successfully.',
+            tone: AppBannerTone.success,
+          );
+        } else if (appCacheCleared) {
+          showAppSnackBar(
+            context,
+            message: 'App cache cleared, but failed to clear inside container.',
+            tone: AppBannerTone.warning,
+          );
+        } else {
+          showAppSnackBar(
+            context,
+            message: 'Failed to clear thumbnail caches.',
+            tone: AppBannerTone.error,
+          );
+        }
+      }
+    }
   }
 
   Future<void> _initAsync() async {
@@ -647,8 +707,8 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           ?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  if (!_loadingPassword)
+                 const SizedBox(height: 16),
+                  if (!_loadingPassword) ...[
                     DropdownButtonFormField<ThumbnailQuality?>(
                       initialValue: _thumbnailQuality,
                       decoration: InputDecoration(
@@ -663,6 +723,27 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           .toList(),
                       onChanged: (v) => setState(() => _thumbnailQuality = v),
                     ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: _clearingCache ? null : _clearThumbnailCache,
+                      icon: _clearingCache
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.delete_sweep_rounded),
+                      label: const Text('Clear Thumbnail Cache'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        foregroundColor: cs.error,
+                      ),
+                    ),
+                  ],
+                    
                 ],
               ),
             ],

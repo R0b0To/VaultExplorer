@@ -612,7 +612,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         .invokeMethod<bool>(ChannelMethods.openWithApp, {
           'filePath': container.uri,
           'fileName': fileName,
-          'packageName': ?packageName,
+          'packageName': packageName,
         });
     return result ?? false;
   }
@@ -712,6 +712,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     required String filePath,
     required List<int> keyBytes,
     int quality = 70,
+    int targetSize = 180,
   }) async {
     try {
       await _channel.invokeMethod<void>('generateAndCacheThumbnail', {
@@ -719,6 +720,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         'fileName': filePath,
         'keyBytes': Uint8List.fromList(keyBytes),
         'quality': quality,
+        'targetSize': targetSize,
       });
     } catch (e) {
       debugPrint('Background thumbnail build request failed: $e');
@@ -871,24 +873,26 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
   /// Requests a scaled video thumbnail from the native layer.
   /// Returns null on any error — callers should show a fallback icon.
   Future<Uint8List?> getVideoThumbnail(
-    MountedContainer container,
-    String fileName, {
-    int quality = 60,
-  }) async {
-    try {
-      final Uint8List? bytes = await _channel.invokeMethod<Uint8List>(
-        ChannelMethods.getVideoThumbnail,
-        {
-          'filePath': container.uri,
-          'fileName': fileName,
-          'quality': quality,
-        },
-      );
-      return bytes;
-    } catch (_) {
-      return null;
-    }
+  MountedContainer container,
+  String fileName, {
+  int quality = 60,
+  int targetSize = 180,
+}) async {
+  try {
+    final Uint8List? bytes = await _channel.invokeMethod<Uint8List>(
+      ChannelMethods.getVideoThumbnail,
+      {
+        'filePath': container.uri,
+        'fileName': fileName,
+        'quality': quality,
+        'targetSize': targetSize,
+      },
+    );
+    return bytes;
+  } catch (_) {
+    return null;
   }
+}
 
   Future<bool> setSecureScreen(bool enabled) async {
     try {

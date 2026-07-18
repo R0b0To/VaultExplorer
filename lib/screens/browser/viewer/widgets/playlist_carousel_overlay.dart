@@ -295,11 +295,6 @@ class _CarouselThumbState extends State<_CarouselThumb> {
     try {
       Uint8List? data;
 
-      // Check the shared persistent/disk cache first — mirrors
-      // _EncryptedImageGridThumb / _VideoThumb in file_grid_view.dart so the
-      // carousel reuses whatever the grid already generated and stored,
-      // instead of regenerating thumbnails (which is especially expensive
-      // for video) every time the carousel is opened or scrolled.
       if (widget.thumbnailCacheMode != ThumbnailCacheMode.disabled) {
         final cached = await ThumbnailCacheService.get(
           container: widget.container,
@@ -311,13 +306,16 @@ class _CarouselThumbState extends State<_CarouselThumb> {
         }
       }
 
-      // Only hit the generator if there was no cache hit.
       if (data == null || data.isEmpty) {
+        final scaledTargetSize = widget.thumbnailQuality.scaledSize(
+          MediaViewerConstants.carouselThumbnailTargetSize,
+        );
+
         if (MediaViewerConstants.isImage(target)) {
           data = await vaultExplorerApi.getImageThumbnail(
             widget.container,
             target,
-            targetSize: MediaViewerConstants.carouselThumbnailTargetSize,
+            targetSize: scaledTargetSize, // Scaled size
             quality: widget.thumbnailQuality.jpegQuality,
           );
         } else if (MediaViewerConstants.isVideo(target)) {
@@ -325,6 +323,7 @@ class _CarouselThumbState extends State<_CarouselThumb> {
             widget.container,
             target,
             quality: widget.thumbnailQuality.jpegQuality,
+            targetSize: scaledTargetSize, // Scaled size
           );
         }
 
@@ -353,6 +352,7 @@ class _CarouselThumbState extends State<_CarouselThumb> {
       if (mounted) setState(() => _failed = true);
     }
   }
+  
 
   @override
   Widget build(BuildContext context) {

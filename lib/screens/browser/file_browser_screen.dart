@@ -42,10 +42,8 @@ import 'widgets/truncated_banner.dart';
 import '../vault/vault_item_detail_screen.dart';
 import '../vault/vault_item_edit_screen.dart';
 import '../../utils/file_type_utils.dart';
+import '../../models/browser_layout_mode.dart';
 
-// ── Layout mode ───────────────────────────────────────────────────────────────
-
-enum BrowserLayoutMode { list, compact, grid }
 
 // ── Path segment model ────────────────────────────────────────────────────────
 
@@ -155,30 +153,38 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   // ── Init ──────────────────────────────────────────────────────────────────
 
   Future<void> _initSettingsAndContents() async {
-    setState(() => _isLoading = true);
-    try {
-      if (widget.thumbnailCacheMode != null) {
-        _resolvedThumbnailCacheMode = widget.thumbnailCacheMode!;
-      } else {
-        final appSettings = await AppSettingsService.loadSettings();
-        final records = await ContainerRepository.instance.loadAll();
-        final record = records[widget.container.uri];
-        if (mounted) {
-          setState(() {
-            _resolvedThumbnailCacheMode =
-                record?.thumbnailCacheMode ??
-                appSettings.defaultThumbnailCacheMode;
-            _resolvedThumbnailQuality =
-                record?.thumbnailQuality ??
-                appSettings.defaultThumbnailQuality;
-          });
-        }
+  setState(() => _isLoading = true);
+  try {
+    final appSettings = await AppSettingsService.loadSettings();
+    
+    if (widget.thumbnailCacheMode != null) {
+      _resolvedThumbnailCacheMode = widget.thumbnailCacheMode!;
+    } else {
+      final records = await ContainerRepository.instance.loadAll();
+      final record = records[widget.container.uri];
+      if (mounted) {
+        setState(() {
+          _resolvedThumbnailCacheMode =
+              record?.thumbnailCacheMode ??
+              appSettings.defaultThumbnailCacheMode;
+          _resolvedThumbnailQuality =
+              record?.thumbnailQuality ??
+              appSettings.defaultThumbnailQuality;
+        });
       }
-    } catch (e) {
-      debugPrint('Failed to resolve settings: $e');
     }
-    await _loadDirectoryContents(_currentDirPath);
+
+    // Load default layout mode here
+    if (mounted) {
+      setState(() {
+        _layoutMode = appSettings.defaultLayoutMode;
+      });
+    }
+  } catch (e) {
+    debugPrint('Failed to resolve settings: $e');
   }
+  await _loadDirectoryContents(_currentDirPath);
+}
 
   Future<void> _loadToolbarConfig() async {
     final config = await FileManagerToolbarService.instance.load();
@@ -1349,20 +1355,30 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           (BrowserLayoutMode.compact, 'Compact List', Icons.list_rounded),
           (BrowserLayoutMode.grid, 'Gallery Grid', Icons.grid_view_rounded),
         ])
-          MenuItemButton(
-            leadingIcon: Icon(icon, color: _layoutMode == mode ? cs.primary : cs.onSurfaceVariant),
-            trailingIcon: _layoutMode == mode
-                ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-                : null,
-            onPressed: () => setState(() => _layoutMode = mode),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: _layoutMode == mode ? FontWeight.bold : FontWeight.normal,
-                color: _layoutMode == mode ? cs.primary : null,
-              ),
-            ),
-          ),
+          // Inside the menuChildren list builder:
+MenuItemButton(
+  leadingIcon: Icon(icon, color: _layoutMode == mode ? cs.primary : cs.onSurfaceVariant),
+  trailingIcon: _layoutMode == mode
+      ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+      : null,
+  onPressed: () async {
+    setState(() => _layoutMode = mode);
+    try {
+      final settings = await AppSettingsService.loadSettings();
+      final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
+      await AppSettingsService.saveSettings(updatedSettings);
+    } catch (e) {
+      debugPrint('Failed to save layout mode: $e');
+    }
+  },
+  child: Text(
+    label,
+    style: TextStyle(
+      fontWeight: _layoutMode == mode ? FontWeight.bold : FontWeight.normal,
+      color: _layoutMode == mode ? cs.primary : null,
+    ),
+  ),
+),
       ],
     );
   }

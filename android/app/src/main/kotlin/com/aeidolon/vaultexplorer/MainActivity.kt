@@ -1350,6 +1350,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_VIDEO_THUMBNAIL -> {
                     val uriString = call.argument<String>("filePath")
                     val fileName  = call.argument<String>("fileName")
+                    val targetSize = call.argument<Int>("targetSize") ?: 180
 
                     if (uriString == null || fileName == null) {
                         result.error("INVALID_ARGS", "filePath and fileName required", null)
@@ -1378,17 +1379,18 @@ class MainActivity : FlutterFragmentActivity() {
                                     ?.toLongOrNull() ?: 10_000L
                                 val timeMs = minOf(1000L, durationMs / 4)
 
-                                val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                               val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                                     runCatching {
                                         retriever.getScaledFrameAtTime(
-                                            timeMs * 1000L,
-                                            MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                                            180, 180)
-                                    }.getOrNull()
-                                        ?: retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                                } else {
-                                    retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                                }
+                                        timeMs * 1000L,
+                                        MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                                        targetSize,
+                                        targetSize
+        )
+    }.getOrNull() ?: retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+} else {
+    retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+}
 
                                  if (frame != null) {
                                     val quality = call.argument<Int>("quality") ?: 60
@@ -1471,7 +1473,7 @@ class MainActivity : FlutterFragmentActivity() {
                     val uriString = call.argument<String>("filePath")
                     val fileName  = call.argument<String>("fileName")
                     val keyBytes  = call.argument<ByteArray>("keyBytes")
-                    val targetSize = 180
+                    val targetSize = call.argument<Int>("targetSize") ?: 180
                     val quality = call.argument<Int>("quality") ?: 70
 
                     if (uriString == null || fileName == null || keyBytes == null) {

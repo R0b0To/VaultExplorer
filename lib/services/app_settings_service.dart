@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
+import '../models/browser_layout_mode.dart';
 import '../models/thumbnail_cache_mode.dart';
 import '../models/thumbnail_quality.dart';
 import 'container_repository.dart';
@@ -13,7 +14,6 @@ export 'container_repository.dart'
 
 const _secure = FlutterSecureStorage(aOptions: AndroidOptions());
 
-// Keystore keys for master password material.
 const _kMasterHash = 'vc_master_hash_v2';
 const _kMasterSalt = 'vc_master_salt_v2';
 
@@ -29,6 +29,9 @@ class AppSettings {
   bool lockContainersOnScreenLock;
   int autoLockMins;
   bool hasSeenSwipeTutorial;
+
+  /// Default browser layout mode (list, compact, grid).
+  BrowserLayoutMode defaultLayoutMode;
 
   /// App-wide default thumbnail cache mode, applied to every container whose
   /// [ContainerRecord.thumbnailCacheMode] is null.
@@ -53,6 +56,7 @@ class AppSettings {
     this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
     this.autoLockMins = 0,
+    this.defaultLayoutMode = BrowserLayoutMode.list, // Default added
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
     this.defaultThumbnailQuality = ThumbnailQuality.medium,
     Map<String, String>? extensionPreferences,
@@ -60,11 +64,9 @@ class AppSettings {
     this._masterPasswordSalt,
   }) : extensionPreferences = extensionPreferences ?? {};
 
-  // Read-only accessors — callers must not store these; use Keystore directly.
   String? get masterPasswordHash => _masterPasswordHash;
   String? get masterPasswordSalt => _masterPasswordSalt;
 
-  // Used internally by AppSettingsService after a successful hash derivation.
   void _setHashMaterial(String hash, String salt) {
     _masterPasswordHash = hash;
     _masterPasswordSalt = salt;
@@ -80,7 +82,6 @@ class AppSettings {
       (_masterPasswordSalt == null || _masterPasswordSalt!.isEmpty) &&
       _masterPasswordHash!.length == 8;
 
-  /// Helper to allow clean, non-mutating updates of settings fields.
   AppSettings copyWith({
     bool? useMasterPassword,
     bool? masterPasswordIsFingerprint,
@@ -91,6 +92,7 @@ class AppSettings {
     bool? lockContainersOnScreenLock,
     int? autoLockMins,
     bool? hasSeenSwipeTutorial,
+    BrowserLayoutMode? defaultLayoutMode,
     ThumbnailCacheMode? defaultThumbnailCacheMode,
     ThumbnailQuality? defaultThumbnailQuality,
     Map<String, String>? extensionPreferences,
@@ -107,6 +109,7 @@ class AppSettings {
       lockContainersOnScreenLock: lockContainersOnScreenLock ?? this.lockContainersOnScreenLock,
       autoLockMins: autoLockMins ?? this.autoLockMins,
       hasSeenSwipeTutorial: hasSeenSwipeTutorial ?? this.hasSeenSwipeTutorial,
+      defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       defaultThumbnailCacheMode: defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
       defaultThumbnailQuality: defaultThumbnailQuality ?? this.defaultThumbnailQuality,
       extensionPreferences: extensionPreferences ?? this.extensionPreferences,
@@ -115,8 +118,6 @@ class AppSettings {
     );
   }
 
-  /// Serialises only non-secret preferences to JSON.
-  /// Hash material is intentionally excluded.
   Map<String, dynamic> toJson() => {
     'useMasterPassword': useMasterPassword,
     'masterPasswordIsFingerprint': masterPasswordIsFingerprint,
@@ -126,7 +127,8 @@ class AppSettings {
     'defaultDerivedKeyCacheEnabled': defaultDerivedKeyCacheEnabled,
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
     'autoLockMins': autoLockMins,
-    'hasSeenSwipeTutorial': hasSeenSwipeTutorial, // Added serialization
+    'hasSeenSwipeTutorial': hasSeenSwipeTutorial,
+    'defaultLayoutMode': defaultLayoutMode.toJson(), // Serialize layout mode
     'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
     'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
     'extensionPreferences': extensionPreferences,
@@ -138,12 +140,18 @@ class AppSettings {
     defaultDocumentProvider: j['defaultDocumentProvider'] as bool? ?? false,
     videoAutoPlay: j['videoAutoPlay'] as bool? ?? true,
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
-    hasSeenSwipeTutorial: j['hasSeenSwipeTutorial'] as bool? ?? false, // Added deserialization
+    hasSeenSwipeTutorial: j['hasSeenSwipeTutorial'] as bool? ?? false,
     defaultDerivedKeyCacheEnabled: j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
     lockContainersOnScreenLock: j['lockContainersOnScreenLock'] as bool? ?? true,
     autoLockMins: j['autoLockMins'] as int? ?? 0,
 
-    // Resolve nullable parsed mode and default to appCache if null
+    // Deserialize layout mode, defaulting to list if missing
+    defaultLayoutMode:
+        BrowserLayoutMode.fromJson(
+          j['defaultLayoutMode'] as String?,
+        ) ??
+        BrowserLayoutMode.list,
+
     defaultThumbnailCacheMode:
         ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?,
@@ -185,7 +193,6 @@ class AppSettingsService {
       settings = AppSettings();
     }
 
-    // Populate in-memory hash material from Keystore.
     if (settings.useMasterPassword) {
       final hash = await _secure.read(key: _kMasterHash);
       final salt = await _secure.read(key: _kMasterSalt) ?? '';
@@ -197,8 +204,6 @@ class AppSettingsService {
     return settings;
   }
 
-  /// Saves non-secret preferences to JSON.
-  /// Hash material is written to Keystore separately via [saveMasterPassword].
   static Future<void> saveSettings(AppSettings settings) async {
     try {
       final file = await _settingsFile;
@@ -206,7 +211,6 @@ class AppSettingsService {
     } catch (_) {}
   }
 
-  /// Writes master-password hash + salt to Android Keystore.
   static Future<void> saveMasterPassword(
     AppSettings settings,
     String hash,
@@ -218,7 +222,6 @@ class AppSettingsService {
     await saveSettings(settings);
   }
 
-  /// Removes master-password hash + salt from Keystore and resets settings.
   static Future<void> clearMasterPassword(AppSettings settings) async {
     settings._clearHashMaterial();
     await _secure.delete(key: _kMasterHash);

@@ -101,8 +101,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
   String? _currentFilter;
-  double _sidebarWidth = 200.0;
-  Orientation? _lastOrientation;
   bool _menuIsOpen = false;
   ArchiveContext? _archiveContext;
 
@@ -1569,83 +1567,15 @@ MenuItemButton(
         // ── Floating activity stack / search bar ────────────────────────
         body: Stack(
           children: [
-            isLandscape
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Sidebar on the left
-                      if (_toolbarConfig.showStatsBar) ...[
-                        Container(
-                          width: _sidebarWidth,
-                          color: cs.surfaceContainerLow,
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                StatsBar(
-                                  dirCount: filteredDirs.length,
-                                  fileCount: filteredFiles.length,
-                                  freeSpaceBytes: _freeSpace,
-                                  isFiltered: query.isNotEmpty || _currentFilter != null,
-                                  isVertical: true,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          behavior: HitTestBehavior.translucent,
-                          onHorizontalDragUpdate: (details) {
-                            setState(() {
-                              _sidebarWidth = (_sidebarWidth + details.delta.dx)
-                                  .clamp(160.0, 300.0);
-                            });
-                          },
-                          child: MouseRegion(
-                            cursor: SystemMouseCursors.resizeLeftRight,
-                            child: Container(
-                              width: 8,
-                              color: Colors.transparent,
-                              child: const Center(
-                                child: VerticalDivider(
-                                  width: 1,
-                                  thickness: 1,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                      // Main content area on the right
-                      Expanded(
-                        child: Column(
-                          children: [
-                            if (_toolbarConfig.showBreadcrumbBar) ...[
-                              BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-                              const Divider(),
-                            ],
-                            Expanded(child: _buildBody(filteredDirs, filteredFiles)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      if (_toolbarConfig.showBreadcrumbBar)
-                        BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-                      if (_toolbarConfig.showStatsBar)
-                        StatsBar(
-                          dirCount: filteredDirs.length,
-                          fileCount: filteredFiles.length,
-                          freeSpaceBytes: _freeSpace,
-                          isFiltered: query.isNotEmpty || _currentFilter != null,
-                        ),
-                      if (_toolbarConfig.showBreadcrumbBar || _toolbarConfig.showStatsBar)
-                        const Divider(),
-                      Expanded(child: _buildBody(filteredDirs, filteredFiles)),
-                    ],
-                  ),
+            Column(
+              children: [
+                if (_toolbarConfig.showBreadcrumbBar) ...[
+                  BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+                  const Divider(),
+                ],
+                Expanded(child: _buildBody(filteredDirs, filteredFiles)),
+              ],
+            ),
             Positioned(
               left: 0,
               right: 0,
@@ -1783,6 +1713,8 @@ MenuItemButton(
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !isSelectionMode && !_searchActive;
     final actionBuilders = _buildActionBuilders();
+    final query = _searchQuery.trim().toLowerCase();
+    final isFiltered = query.isNotEmpty || _currentFilter != null;
 
     return AppBar(
       leading: IconButton(
@@ -1790,13 +1722,56 @@ MenuItemButton(
         tooltip: 'Back to dashboard',
         onPressed: () => Navigator.of(context).pop(),
       ),
-      title: Text(widget.container.displayName),
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.container.displayName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (_toolbarConfig.showStatsBar)
+            _buildAppBarStatsSubtitle(
+              dirCount: dirs.length,
+              fileCount: files.length,
+              isFiltered: isFiltered,
+            ),
+        ],
+      ),
       actions: [
         if (isLandscape && showActionBar) ...[
           ..._toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
         ],
         _buildSettingsMenuButton(context),
       ],
+    );
+  }
+
+  /// Compact "N folders · N files · free space [· filtered]" line shown
+  /// under the container name in the app bar — same information as
+  /// [StatsBar], condensed to fit as a title subtitle.
+  Widget _buildAppBarStatsSubtitle({
+    required int dirCount,
+    required int fileCount,
+    required bool isFiltered,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final style = textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant);
+
+    final parts = <String>[
+      '$dirCount folder${dirCount == 1 ? '' : 's'}',
+      '$fileCount file${fileCount == 1 ? '' : 's'}',
+      '${formatBytes(_freeSpace)} free',
+      if (isFiltered) 'filtered',
+    ];
+
+    return Text(
+      parts.join(' · '),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: style,
     );
   }
 

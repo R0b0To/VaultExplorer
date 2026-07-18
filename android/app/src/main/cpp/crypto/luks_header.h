@@ -87,6 +87,8 @@ struct LuksVolumeInfo {
     std::vector<uint8_t> masterKey;
 };
 
+
+
 // Check if the header starts with LUKS magic bytes
 bool isLuksContainer(const uint8_t* header, size_t len);
 
@@ -140,6 +142,7 @@ struct LuksCreateParams {
     uint32_t pbkdf2Iterations = 0;
 };
 
+using LuksByteWriter = std::function<bool(uint64_t offset, const void* data, size_t len)>;
 // Writes a fresh LUKS1 or LUKS2 header, JSON metadata (LUKS2 only), and a
 // single occupied keyslot to [fd] — encrypting a freshly-generated random
 // master key with [password] (already resolved: for LUKS, a keyfile
@@ -182,3 +185,8 @@ struct LuksCreateParams {
 bool luksCreateHeader(int fd, const uint8_t* password, size_t passwordLen,
                       int64_t sizeBytes, const LuksCreateParams& params,
                       LuksVolumeInfo& outInfo);
+
+bool luksCreateHeader(const LuksByteWriter& writer, const uint8_t* password, size_t passwordLen,
+                      int64_t sizeBytes, const LuksCreateParams& params,
+                      LuksVolumeInfo& outInfo);               
+

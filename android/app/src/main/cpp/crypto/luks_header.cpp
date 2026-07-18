@@ -1024,7 +1024,7 @@ static constexpr uint64_t kLuks1PayloadAlign = 1024 * 1024;
 static constexpr uint32_t kLuks1MkDigestIter = 100000;
 static constexpr uint64_t kLuksMinExtraSpace = 300 * 1024; // headroom for a usable ext2/3/4 fs
 
-static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLen,
+static bool luks1CreateHeader(const LuksByteWriter& writer, const uint8_t* password, size_t passwordLen,
                               int64_t sizeBytes, const LuksCreateParams& params,
                               LuksVolumeInfo& outInfo) {
     CascadeId dataCipherId;
@@ -1107,7 +1107,7 @@ static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLe
         }
     }
 
-    if (pwrite(fd, afEncrypted.data(), afEncrypted.size(), (off_t)slot0Offset) != (ssize_t)afEncrypted.size()) {
+    if (!writer(slot0Offset, afEncrypted.data(), afEncrypted.size())) {
         LOGI("luks1CreateHeader: keyslot write failed");
         mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
         return false;
@@ -1145,7 +1145,7 @@ static bool luks1CreateHeader(int fd, const uint8_t* password, size_t passwordLe
         }
     }
 
-    if (pwrite(fd, &phdr, sizeof(phdr), 0) != (ssize_t)sizeof(phdr)) {
+    if (!writer(0, &phdr, sizeof(phdr))) {
         LOGI("luks1CreateHeader: phdr write failed");
         mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
         return false;
@@ -1198,7 +1198,7 @@ static constexpr uint64_t kLuks2KeyslotAlign = 4096;
 static constexpr uint64_t kLuks2DataAlign = 1024 * 1024;
 static constexpr uint32_t kLuks2DigestIter = 100000; // integrity check only, not security critical
 
-static bool luks2CreateHeader(int fd, const uint8_t* password, size_t passwordLen,
+static bool luks2CreateHeader(const LuksByteWriter& writer, const uint8_t* password, size_t passwordLen,
                               int64_t sizeBytes, const LuksCreateParams& params,
                               LuksVolumeInfo& outInfo) {
     if (params.cipherName != "aes" && params.cipherName != "serpent" && params.cipherName != "twofish") {
@@ -1302,7 +1302,7 @@ static bool luks2CreateHeader(int fd, const uint8_t* password, size_t passwordLe
         }
     }
 
-    if (pwrite(fd, afEncrypted.data(), afEncrypted.size(), (off_t)keyslotAreaOffset) != (ssize_t)afEncrypted.size()) {
+    if (!writer(keyslotAreaOffset, afEncrypted.data(), afEncrypted.size())) {
         LOGI("luks2CreateHeader: keyslot area write failed");
         mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
         return false;
@@ -1450,11 +1450,10 @@ static bool luks2CreateHeader(int fd, const uint8_t* password, size_t passwordLe
     std::memcpy(primaryHdr.csum, csum1, sizeof(csum1));
     std::memcpy(secondaryHdr.csum, csum2, sizeof(csum2));
 
-    if (pwrite(fd, &primaryHdr, sizeof(primaryHdr), 0) != (ssize_t)sizeof(primaryHdr) ||
-        pwrite(fd, jsonArea.data(), jsonArea.size(), (off_t)kLuks2BinHdrSize) != (ssize_t)jsonArea.size() ||
-        pwrite(fd, &secondaryHdr, sizeof(secondaryHdr), (off_t)kLuks2HdrCopySize) != (ssize_t)sizeof(secondaryHdr) ||
-        pwrite(fd, jsonArea.data(), jsonArea.size(),
-               (off_t)(kLuks2HdrCopySize + kLuks2BinHdrSize)) != (ssize_t)jsonArea.size()) {
+    if (!writer(0, &primaryHdr, sizeof(primaryHdr)) ||
+        !writer(kLuks2BinHdrSize, jsonArea.data(), jsonArea.size()) ||
+        !writer(kLuks2HdrCopySize, &secondaryHdr, sizeof(secondaryHdr)) ||
+        !writer(kLuks2HdrCopySize + kLuks2BinHdrSize, jsonArea.data(), jsonArea.size())) {
         LOGI("luks2CreateHeader: header/JSON write failed");
         mbedtls_platform_zeroize(masterKey, sizeof(masterKey));
         return false;
@@ -1474,15 +1473,25 @@ static bool luks2CreateHeader(int fd, const uint8_t* password, size_t passwordLe
     return true;
 }
 
+bool luksCreateHeader(const LuksByteWriter& writer, const uint8_t* password, size_t passwordLen,
+                      int64_t sizeBytes, const LuksCreateParams& params,
+                      LuksVolumeInfo& outInfo) {
+    if (!writer || passwordLen == 0) return false;
+    if (params.version == 1) {
+        return luks1CreateHeader(writer, password, passwordLen, sizeBytes, params, outInfo);
+    } else if (params.version == 2) {
+        return luks2CreateHeader(writer, password, passwordLen, sizeBytes, params, outInfo);
+    }
+    LOGI("luksCreateHeader: unsupported version %d", params.version);
+    return false;
+}
+
 bool luksCreateHeader(int fd, const uint8_t* password, size_t passwordLen,
                       int64_t sizeBytes, const LuksCreateParams& params,
                       LuksVolumeInfo& outInfo) {
     if (fd < 0 || passwordLen == 0) return false;
-    if (params.version == 1) {
-        return luks1CreateHeader(fd, password, passwordLen, sizeBytes, params, outInfo);
-    } else if (params.version == 2) {
-        return luks2CreateHeader(fd, password, passwordLen, sizeBytes, params, outInfo);
-    }
-    LOGI("luksCreateHeader: unsupported version %d", params.version);
-    return false;
+    LuksByteWriter writer = [fd](uint64_t offset, const void* data, size_t len) -> bool {
+        return pwrite(fd, data, len, static_cast<off_t>(offset)) == static_cast<ssize_t>(len);
+    };
+    return luksCreateHeader(writer, password, passwordLen, sizeBytes, params, outInfo);
 }

@@ -15,6 +15,8 @@
 #include "ff.h"
 #include "filesystem_paths.h"
 #include <cstdio>
+#include "crypto/luks_header.h"
+#include <unistd.h>
 #undef min
 #undef max
 #include <algorithm>
@@ -305,8 +307,228 @@ success = true;
 bool createUsbLuksContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
                             const char* fileSystem, int luksVersion, int cipherId, int hashId,
                             const int* keyfileFds, int keyfileCount, bool quickFormat) {
-    LOGI("createUsbLuksContainer: not implemented yet");
-    return false;
+    LOGI("createUsbLuksContainer: ENTER volId=%d startSector=%llu sizeBytes=%lld fs=%s luksVersion=%d",
+         volId, (unsigned long long)startSector, (long long)sizeBytes, fileSystem, luksVersion);
+
+    if (volId < 0 || volId >= FF_VOLUMES) {
+        LOGI("createUsbLuksContainer: invalid volId %d", volId);
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        return false;
+    }
+
+    // Passphrase resolution: matches real `cryptsetup --key-file` — a
+    // keyfile REPLACES the typed password entirely (see prepareLuksSession's
+    // doc comment in session_prepare.cpp). Only the first keyfile is used.
+    std::vector<unsigned char> keyfileBuf;
+    const unsigned char* effectivePassword = reinterpret_cast<const unsigned char*>(password);
+    size_t effectivePasswordLen = strlen(password);
+
+    if (keyfileCount > 0 && keyfileFds != nullptr && keyfileFds[0] >= 0) {
+        constexpr size_t kMaxKeyfileBytes = 1024 * 1024;
+        keyfileBuf.resize(kMaxKeyfileBytes);
+        ssize_t total = 0, n;
+        while (total < static_cast<ssize_t>(kMaxKeyfileBytes) &&
+               (n = read(keyfileFds[0], keyfileBuf.data() + total, kMaxKeyfileBytes - total)) > 0) {
+            total += n;
+        }
+        keyfileBuf.resize(total > 0 ? total : 0);
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        if (keyfileBuf.empty()) {
+            LOGI("createUsbLuksContainer: keyfile unreadable or empty");
+            return false;
+        }
+        effectivePassword = keyfileBuf.data();
+        effectivePasswordLen = keyfileBuf.size();
+    } else {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+    }
+
+    if (effectivePasswordLen == 0) {
+        LOGI("createUsbLuksContainer: empty password and no usable keyfiles");
+        return false;
+    }
+
+    // Mark USB-backed before any physicalWrite — same reason as
+    // createUsbContainer() above: a fresh VolumeState defaults
+    // isUsbSource=false/fd=-1, which would silently route every write into
+    // pwrite(-1, ...).
+    VolumeState& v = volumes[volId];
+    {
+        std::lock_guard<std::mutex> vlock(v.mutex);
+        v.isUsbSource = true;
+        v.fd = -1;
+        v.partitionStartSector = startSector;
+        v.dataCtxInitialized = false;
+    }
+
+    bool success = false;
+    do {
+        // LUKS2's header+keyslot overhead alone exceeds 1 MiB — more
+        // headroom than VeraCrypt's 300 KiB floor (matches createLuksContainer).
+        if (sizeBytes < static_cast<int64_t>(2 * 1024 * 1024)) {
+            LOGI("createUsbLuksContainer: sizeBytes too small (%lld)", (long long)sizeBytes);
+            break;
+        }
+
+        const bool useExt = strncasecmp(fileSystem, "ext2", 4) == 0 ||
+                            strncasecmp(fileSystem, "ext3", 4) == 0 ||
+                            strncasecmp(fileSystem, "ext4", 4) == 0;
+        if (!useExt) {
+            LOGI("createUsbLuksContainer: unsupported filesystem '%s' (LUKS supports ext2/ext3/ext4 only)", fileSystem);
+            break;
+        }
+        if (luksVersion != 1 && luksVersion != 2) {
+            LOGI("createUsbLuksContainer: unsupported luksVersion %d", luksVersion);
+            break;
+        }
+
+        CascadeId dataCipher = static_cast<CascadeId>(cipherId);
+        std::string cipherName;
+        if (dataCipher == CascadeId::kAes) cipherName = "aes";
+        else if (dataCipher == CascadeId::kSerpent) cipherName = "serpent";
+        else if (dataCipher == CascadeId::kTwofish) cipherName = "twofish";
+        else if (dataCipher == CascadeId::kCamellia) cipherName = "camellia";
+        else if (dataCipher == CascadeId::kKuznyechik) cipherName = "kuznyechik";
+        else {
+            LOGI("createUsbLuksContainer: unsupported cipherId %d", cipherId);
+            break;
+        }
+
+        HashId createHash = static_cast<HashId>(hashId);
+        LuksCreateParams params;
+        params.version = luksVersion;
+        params.cipherName = cipherName;
+        const int safePim = clampPim(pim);
+
+        if (createHash == HashId::kArgon2id) {
+            if (luksVersion == 1) {
+                LOGI("createUsbLuksContainer: LUKS1 does not support Argon2id");
+                break;
+            }
+            params.useArgon2id = true;
+            params.hashName = "sha256";
+            argon2ParamsForPim(safePim, params.argon2MemoryKiB, params.argon2TimeCost, params.argon2Parallelism);
+        } else if (createHash == HashId::kSha256) {
+            params.hashName = "sha256";
+            params.pbkdf2Iterations = static_cast<uint32_t>(iterationsForHash(HashId::kSha256, safePim));
+        } else if (createHash == HashId::kSha512) {
+            params.hashName = "sha512";
+            params.pbkdf2Iterations = static_cast<uint32_t>(iterationsForHash(HashId::kSha512, safePim));
+        } else {
+            LOGI("createUsbLuksContainer: unsupported hashId %d for LUKS", hashId);
+            break;
+        }
+
+        const uint64_t baseOffset = startSector * 512;
+        LuksByteWriter writer = [volId, baseOffset](uint64_t offset, const void* data, size_t len) -> bool {
+            return physicalWrite(volId, baseOffset + offset, static_cast<const unsigned char*>(data), len);
+        };
+
+        LuksVolumeInfo info;
+        if (!luksCreateHeader(writer, effectivePassword, effectivePasswordLen, sizeBytes, params, info)) {
+            LOGI("createUsbLuksContainer: luksCreateHeader failed");
+            break;
+        }
+
+        // Matches prepareLuksSession's convention: partitionStartSector is
+        // the absolute physical sector of the first sector of the LUKS data
+        // area (ivTweak==0, sectorSize==512 for a fresh format), so
+        // disk_read/disk_write's tweak = physSector - partitionStartSector
+        // lands on 0 at the start of the data area.
+        const uint64_t partitionStartSectorAbs = startSector + (info.dataOffsetBytes / 512);
+        const uint64_t dataAreaLengthBytes = static_cast<uint64_t>(sizeBytes) - info.dataOffsetBytes;
+
+        bool fillOk = true;
+        if (!quickFormat) {
+            CascadeContext fillCtx;
+            if (!cascadeSetKeys(fillCtx, dataCipher, info.masterKey.data(), info.masterKey.size())) {
+                LOGI("createUsbLuksContainer: cascadeSetKeys failed for zero-fill");
+                fillOk = false;
+            } else {
+                const uint64_t totalSectors = dataAreaLengthBytes / 512;
+                const uint64_t startSectorRel = info.dataOffsetBytes / 512; // relative to baseOffset
+                const unsigned char ZERO_SECTOR[512] = {0};
+                std::unique_ptr<unsigned char[]> batch(new unsigned char[CREATE_FILL_BATCH * 512]);
+
+                for (uint64_t s = 0; s < totalSectors && fillOk; ) {
+                    const uint64_t count = std::min<uint64_t>(totalSectors - s, CREATE_FILL_BATCH);
+                    for (uint64_t i = 0; i < count; ++i) {
+                        cascadeEncryptSector(fillCtx, s + i, ZERO_SECTOR, batch.get() + i * 512);
+                    }
+                    const size_t want = static_cast<size_t>(count) * 512;
+                    if (!physicalWrite(volId, baseOffset + (startSectorRel + s) * 512, batch.get(), want)) {
+                        LOGI("createUsbLuksContainer: data fill write failed at relative sector %llu",
+                             (unsigned long long)(startSectorRel + s));
+                        fillOk = false;
+                    }
+                    s += count;
+                }
+            }
+        } else {
+            LOGI("createUsbLuksContainer: skipping zero-fill data area (quick format)");
+        }
+        if (!fillOk) {
+            mbedtls_platform_zeroize(info.masterKey.data(), info.masterKey.size());
+            break;
+        }
+
+        // Set up VolumeState exactly as prepareLuksSession would after a
+        // real unlock, so ext2 mkfs's disk_read/disk_write calls
+        // decrypt/encrypt consistently with how this will be read later.
+        bool keySetupOk;
+        {
+            std::lock_guard<std::mutex> vlock(v.mutex);
+            const bool isGenericCipher = (dataCipher != CascadeId::kAes);
+            if (!isGenericCipher) {
+                keySetupOk = (mbedtls_aes_xts_setkey_dec(&v.luksXts.dec, info.masterKey.data(), 512) == 0 &&
+                              mbedtls_aes_xts_setkey_enc(&v.luksXts.enc, info.masterKey.data(), 512) == 0);
+                v.luksXts.initialized = keySetupOk;
+            } else {
+                keySetupOk = cascadeSetKeys(v.luksGenericCascade, dataCipher,
+                                            info.masterKey.data(), info.masterKey.size());
+            }
+
+            if (keySetupOk) {
+                v.isUsbSource = true;
+                v.fd = -1;
+                v.dataOffset = baseOffset + info.dataOffsetBytes;
+                v.dataAreaLengthBytes = dataAreaLengthBytes;
+                v.isHiddenVolume = false;
+                v.fileSize = static_cast<uint64_t>(sizeBytes);
+                v.luksSectorSize = 512;
+                v.luksUsesGenericCipher = isGenericCipher;
+                v.partitionStartSector = partitionStartSectorAbs;
+                v.containerFormat = (luksVersion == 1) ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
+                v.dataCtxInitialized = true;
+            }
+        }
+
+        mbedtls_platform_zeroize(info.masterKey.data(), info.masterKey.size());
+
+        if (!keySetupOk) {
+            LOGI("createUsbLuksContainer: data cipher key setup failed");
+            break;
+        }
+
+        if (!formatExtVolume(volId, fileSystem)) {
+            LOGI("createUsbLuksContainer: %s formatter failed", fileSystem);
+            break;
+        }
+
+        success = true;
+        LOGI("createUsbLuksContainer: complete – LUKS%d, cipher=%s, %lld bytes, fs=%s",
+             luksVersion, cipherName.c_str(), (long long)sizeBytes, fileSystem);
+    } while (false);
+
+    // One-shot creation call, not a persistent session — leave the slot
+    // fully clean either way (matches createUsbContainer's convention).
+    {
+        std::lock_guard<std::mutex> vlock(v.mutex);
+        v.reset();
+    }
+
+    LOGI("createUsbLuksContainer: EXIT success=%d", success ? 1 : 0);
+    return success;
 }
 
 bool createUsbContainerWithHidden(

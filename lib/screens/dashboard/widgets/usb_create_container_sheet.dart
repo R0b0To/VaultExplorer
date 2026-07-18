@@ -11,9 +11,8 @@ import '../../../models/crypto_algorithms.dart';
 /// erasing everything currently on it.
 ///
 /// Unlike [CreateContainerSheet] (which targets a file via SAF), this picks
-/// a physical USB device and writes an MBR + VeraCrypt header straight to
-/// its blocks. LUKS-on-USB isn't wired up on the native side yet, so this
-/// always creates a VeraCrypt container.
+/// a physical USB device and writes an MBR + VeraCrypt/LUKS header straight to
+/// its blocks.
 class UsbCreateContainerSheet extends StatefulWidget {
   const UsbCreateContainerSheet({super.key});
 
@@ -22,7 +21,8 @@ class UsbCreateContainerSheet extends StatefulWidget {
 }
 
 class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
-  static const _fileSystems = ['FAT', 'exFAT', 'NTFS', 'ext2', 'ext3', 'ext4'];
+  static const _veraCryptFileSystems = ['FAT', 'exFAT', 'NTFS', 'ext2', 'ext3', 'ext4'];
+  static const _luksFileSystems = ['ext2', 'ext3', 'ext4'];
 
   final _sizeCtrl = TextEditingController(text: '1024');
   final _passwordCtrl = TextEditingController();
@@ -61,13 +61,35 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
   int? _usableCapacityBytes;
   bool _fetchingCapacity = false;
 
-  List<DropdownMenuItem<int>> get _cipherItems => CipherAlgo.concrete
-      .map((c) => DropdownMenuItem(value: c.id, child: Text(c.label)))
-      .toList();
+  CreateFormat _format = CreateFormat.veracrypt;
 
-  List<DropdownMenuItem<int>> get _hashItems => HashAlgo.concrete
-      .map((h) => DropdownMenuItem(value: h.id, child: Text(h.label)))
-      .toList();
+  List<String> get _availableFileSystems =>
+      _format == CreateFormat.veracrypt ? _veraCryptFileSystems : _luksFileSystems;
+
+  List<CipherAlgo> get _cipherChoices => switch (_format) {
+        CreateFormat.veracrypt => CipherAlgo.concrete,
+        CreateFormat.luks1 => CipherAlgo.luks1Choices,
+        CreateFormat.luks2 => CipherAlgo.luks2Choices,
+      };
+  List<HashAlgo> get _hashChoices => switch (_format) {
+        CreateFormat.veracrypt => HashAlgo.concrete,
+        CreateFormat.luks1 => HashAlgo.luks1Choices,
+        CreateFormat.luks2 => HashAlgo.luks2Choices,
+      };
+  List<DropdownMenuItem<int>> get _cipherItems =>
+      _cipherChoices.map((c) => DropdownMenuItem(value: c.id, child: Text(c.label))).toList();
+  List<DropdownMenuItem<int>> get _hashItems =>
+      _hashChoices.map((h) => DropdownMenuItem(value: h.id, child: Text(h.label))).toList();
+
+  void _onFormatChanged(CreateFormat format) {
+    setState(() {
+      _format = format;
+      _fileSystem = format == CreateFormat.veracrypt ? 'exFAT' : 'ext4';
+      if (!_cipherChoices.any((c) => c.id == _cipherId)) _cipherId = _cipherChoices.first.id;
+      if (!_hashChoices.any((h) => h.id == _hashId)) _hashId = _hashChoices.first.id;
+      if (format != CreateFormat.veracrypt) _enableHiddenVolume = false; // LUKS has no hidden volumes
+    });
+  }
 
   @override
   void initState() {
@@ -250,7 +272,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
 
       int hiddenSizeBytes = 0;
-      if (_enableHiddenVolume) {
+      if (_enableHiddenVolume && _format == CreateFormat.veracrypt) {
         final hiddenSizeVal = double.tryParse(_hiddenSizeCtrl.text);
         if (hiddenSizeVal == null || hiddenSizeVal <= 0) {
           setState(() => _error = 'Enter a valid hidden size greater than 0');
@@ -294,19 +316,21 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
         password: _passwordCtrl.text,
         pim: pim,
         fileSystem: _fileSystem.toLowerCase(),
-        containerFormat: 0, // VeraCrypt only
+        containerFormat: _format.id,
         cipherId: _cipherId,
         hashId: _hashId,
         keyfilePaths: _keyfiles.map((k) => k.uri).toList(),
         quickFormat: _quickFormat,
-        createHiddenVolume: _enableHiddenVolume,
+        createHiddenVolume: _enableHiddenVolume && _format == CreateFormat.veracrypt,
         hiddenPassword: _hiddenPasswordCtrl.text,
         hiddenFileSystem: _hiddenFileSystem.toLowerCase(),
         hiddenSizeBytes: hiddenSizeBytes,
         hiddenKeyfilePaths: _hiddenKeyfiles.map((k) => k.uri).toList(),
-        hiddenPim: _enableHiddenVolume ? clampPim(_hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0) : 0,
-        hiddenCipherId: _enableHiddenVolume ? _hiddenCipherId : 255,
-        hiddenHashId: _enableHiddenVolume ? _hiddenHashId : 255,
+        hiddenPim: (_enableHiddenVolume && _format == CreateFormat.veracrypt)
+            ? clampPim(_hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0)
+            : 0,
+        hiddenCipherId: (_enableHiddenVolume && _format == CreateFormat.veracrypt) ? _hiddenCipherId : 255,
+        hiddenHashId: (_enableHiddenVolume && _format == CreateFormat.veracrypt) ? _hiddenHashId : 255,
       );
 
       if (!mounted) return;
@@ -382,6 +406,27 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
                 InlineBanner(
                   'Formatting erases everything currently on the selected drive.',
                   tone: AppBannerTone.warning,
+                ),
+                const SizedBox(height: 20),
+
+                DropdownButtonFormField<CreateFormat>(
+                  value: _format,
+                  decoration: _getInputDecoration(
+                    cs,
+                    labelText: 'Container Format',
+                    prefixIcon: Icons.layers_outlined,
+                  ),
+                  items: CreateFormat.values.map((f) {
+                    final label = switch (f) {
+                      CreateFormat.veracrypt => 'VeraCrypt',
+                      CreateFormat.luks1 => 'LUKS 1',
+                      CreateFormat.luks2 => 'LUKS 2',
+                    };
+                    return DropdownMenuItem(value: f, child: Text(label));
+                  }).toList(),
+                  onChanged: busy ? null : (val) {
+                    if (val != null) _onFormatChanged(val);
+                  },
                 ),
                 const SizedBox(height: 20),
 
@@ -478,7 +523,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        initialValue: _sizeUnit,
+                        value: _sizeUnit,
                         isExpanded: true,
                         decoration: _getInputDecoration(cs, labelText: 'Unit'),
                         items: const [
@@ -543,12 +588,12 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
                   onHashChanged: (val) => setState(() => _hashId = val),
                   extraFields: [
                     DropdownButtonFormField<String>(
-                      initialValue: _fileSystem,
+                      value: _fileSystem,
                       decoration: const InputDecoration(
                         labelText: 'Format File System',
                         prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
                       ),
-                      items: _fileSystems
+                      items: _availableFileSystems
                           .map((fs) => DropdownMenuItem(value: fs, child: Text(fs)))
                           .toList(),
                       onChanged: busy ? null : (val) { if (val != null) setState(() => _fileSystem = val); },
@@ -644,7 +689,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           isExpanded: true,
-                          initialValue: _hiddenSizeUnit,
+                          value: _hiddenSizeUnit,
                           decoration: _getInputDecoration(cs, labelText: 'Unit'),
                           items: const [
                             DropdownMenuItem(value: 'MB', child: Text('MB')),
@@ -678,12 +723,12 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
                     onHashChanged: (val) => setState(() => _hiddenHashId = val),
                     extraFields: [
                       DropdownButtonFormField<String>(
-                        initialValue: _hiddenFileSystem,
+                        value: _hiddenFileSystem,
                         decoration: const InputDecoration(
                           labelText: 'Hidden File System',
                           prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
                         ),
-                        items: _fileSystems.map((fs) => DropdownMenuItem(value: fs, child: Text(fs))).toList(),
+                        items: _veraCryptFileSystems.map((fs) => DropdownMenuItem(value: fs, child: Text(fs))).toList(),
                         onChanged: busy ? null : (val) {
                           if (val != null) setState(() => _hiddenFileSystem = val);
                         },
@@ -768,25 +813,34 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
                         Expanded(
                           child: _buildMainVolumeSection(cs, textTheme),
                         ),
-                        const SizedBox(width: 24),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _buildHiddenVolumeSection(cs, textTheme),
-                              const SizedBox(height: 24),
-                              errorAndSubmit,
-                            ],
+                        if (_format == CreateFormat.veracrypt) ...[
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _buildHiddenVolumeSection(cs, textTheme),
+                                const SizedBox(height: 24),
+                                errorAndSubmit,
+                              ],
+                            ),
                           ),
-                        ),
+                        ] else ...[
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: errorAndSubmit,
+                          ),
+                        ],
                       ],
                     )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _buildMainVolumeSection(cs, textTheme),
-                        const SizedBox(height: 24),
-                        _buildHiddenVolumeSection(cs, textTheme),
+                        if (_format == CreateFormat.veracrypt) ...[
+                          const SizedBox(height: 24),
+                          _buildHiddenVolumeSection(cs, textTheme),
+                        ],
                         const SizedBox(height: 24),
                         errorAndSubmit,
                       ],

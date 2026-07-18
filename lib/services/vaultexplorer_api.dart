@@ -309,6 +309,70 @@ class VaultExplorerApi {
     }
   }
 
+/// Returns usable capacity in bytes (device capacity minus the MBR
+/// partition offset), or null on failure. Requires [deviceName] to
+/// already have USB permission granted.
+Future<int?> getUsbDeviceCapacity(String deviceName) async {
+  try {
+    final result = await _channel.invokeMethod<int>(
+      ChannelMethods.getUsbDeviceCapacity,
+      {'deviceName': deviceName},
+    );
+    return result;
+  } on PlatformException {
+    return null;
+  }
+}
+  Future<bool> createUsbContainer({
+    required String deviceName,
+    required int sizeBytes,
+    required String password,
+    required int pim,
+    required String fileSystem,
+    int containerFormat = 0,
+    required int cipherId,
+    required int hashId,
+    required List<String> keyfilePaths,
+    String partitionScheme = 'mbr',
+    bool quickFormat = false,
+    bool createHiddenVolume = false,
+    String? hiddenPassword,
+    String? hiddenFileSystem,
+    int? hiddenSizeBytes,
+    List<String>? hiddenKeyfilePaths,
+    int? hiddenPim,
+    int? hiddenCipherId,
+    int? hiddenHashId,
+  }) async {
+    try {
+      final success = await _channel
+          .invokeMethod<bool>(ChannelMethods.createUsbContainer, {
+        'deviceName': deviceName,
+        'sizeBytes': sizeBytes,
+        'password': password,
+        'pim': pim,
+        'fileSystem': fileSystem,
+        'containerFormat': containerFormat,
+        'cipherId': cipherId,
+        'hashId': hashId,
+        'keyfilePaths': keyfilePaths,
+        'partitionScheme': partitionScheme,
+        'quickFormat': quickFormat,
+        'createHiddenVolume': createHiddenVolume,
+        'hiddenPassword': hiddenPassword,
+        'hiddenFileSystem': hiddenFileSystem,
+        'hiddenSizeBytes': hiddenSizeBytes,
+        'hiddenKeyfilePaths': hiddenKeyfilePaths ?? [],
+        'hiddenPim': hiddenPim,
+        'hiddenCipherId': hiddenCipherId,
+        'hiddenHashId': hiddenHashId,
+      });
+      return success ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Changes the password (and optionally PIM) of a VeraCrypt container.
   /// For LUKS containers, password change is not supported in-app — the user
   /// should use `cryptsetup luksChangeKey` on a Linux machine.

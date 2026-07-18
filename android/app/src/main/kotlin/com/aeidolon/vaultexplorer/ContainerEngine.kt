@@ -45,6 +45,14 @@ object ContainerEngine {
         fd, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId, keyfileFds
     )
 
+    fun createUsb(
+        volId: Int, partitionScheme: String, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
+        containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
+        keyfileFds: IntArray? = null, quickFormat: Boolean = false
+    ): Boolean = VeraCryptEngine.createUsbContainerNative(
+        volId, partitionScheme, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId, keyfileFds, quickFormat
+    )
+
     fun createWithHidden(
         fd: Int, outerPassword: String, hiddenPassword: String,
         outerPim: Int, hiddenPim: Int, sizeBytes: Long,
@@ -58,6 +66,21 @@ object ContainerEngine {
         outerFileSystem, hiddenFileSystem, hiddenSizeBytes,
         outerCipherId, outerHashId, hiddenCipherId, hiddenHashId,
         outerKeyfileFds, hiddenKeyfileFds
+    )
+    fun createUsbWithHidden(
+        volId: Int, partitionScheme: String,
+        outerPassword: String, hiddenPassword: String,
+        outerPim: Int, hiddenPim: Int, sizeBytes: Long,
+        outerFileSystem: String, hiddenFileSystem: String,
+        hiddenSizeBytes: Long,
+        outerCipherId: Int = 255, outerHashId: Int = 255,
+        hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
+        outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
+        quickFormat: Boolean = false
+    ): Boolean = VeraCryptEngine.createUsbContainerWithHiddenNative(
+        volId, partitionScheme, outerPassword, hiddenPassword, outerPim, hiddenPim, sizeBytes,
+        outerFileSystem, hiddenFileSystem, hiddenSizeBytes, outerCipherId, outerHashId,
+        hiddenCipherId, hiddenHashId, outerKeyfileFds, hiddenKeyfileFds, quickFormat
     )
 
     fun changePassword(

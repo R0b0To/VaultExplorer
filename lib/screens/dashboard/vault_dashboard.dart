@@ -19,6 +19,7 @@ import 'widgets/vault_card_row.dart';
 import '../browser/file_browser_screen.dart';
 import '../unlock/usb_unlock_sheet.dart';
 import '../lock/lock_gate_screen.dart';
+import 'widgets/usb_create_container_sheet.dart';
 
 class SlideRightRoute<T> extends PageRouteBuilder<T> {
   final Widget page;
@@ -376,6 +377,16 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
   }
 
+void _showUsbCreateSheet() {
+    if (_actionInFlight) return;
+    setState(() => _actionInFlight = true);
+    Navigator.push(
+      context,
+      SlideRightRoute(page: const UsbCreateContainerSheet()),
+    ).whenComplete(() {
+      if (mounted) setState(() => _actionInFlight = false);
+    });
+  }
   void _showCreateSheet() {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
@@ -387,10 +398,27 @@ class _VaultDashboardState extends State<VaultDashboard>
     });
   }
 
-  void _showAddOptionsSheet() {
+  Future<void> _showAddOptionsSheet() async {
+    if (_actionInFlight) return;
+    
+    // Briefly lock the UI to prevent double-taps while we query the USB manager
+    setState(() => _actionInFlight = true);
+    
+    bool hasUsb = false;
+    try {
+      final devices = await vaultExplorerApi.listUsbDevices();
+      hasUsb = devices.isNotEmpty;
+    } catch (e) {
+      debugPrint('Failed to check USB devices: $e');
+    }
+
+    if (!mounted) return;
+    setState(() => _actionInFlight = false);
+
     HapticFeedback.lightImpact();
     final cs = Theme.of(context).colorScheme;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: isLandscape,
@@ -422,16 +450,31 @@ class _VaultDashboardState extends State<VaultDashboard>
                 _showUnlockSheet();
               },
             ),
-            SheetOptionTile(
-              icon: Icons.usb_rounded,
-              iconColor: cs.tertiary,
-              title: 'Mount USB drive',
-              subtitle: 'Unlock a container on an OTG flash drive',
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showUsbUnlockSheet();
-              },
-            ),
+            
+            // Only show USB options if an OTG flash drive is actually plugged in
+            if (hasUsb) ...[
+              SheetOptionTile(
+                icon: Icons.usb_rounded,
+                iconColor: cs.tertiary,
+                title: 'Mount USB drive',
+                subtitle: 'Unlock a container on an OTG flash drive',
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showUsbUnlockSheet();
+                },
+              ),
+              SheetOptionTile(
+                icon: Icons.usb_off_rounded,
+                iconColor: cs.error,
+                title: 'Format USB drive',
+                subtitle: 'Erase a drive and create a new encrypted container on it',
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showUsbCreateSheet();
+                },
+              ),
+            ],
+            
             SheetOptionTile(
               icon: Icons.add_box_rounded,
               iconColor: cs.secondary,
@@ -447,7 +490,6 @@ class _VaultDashboardState extends State<VaultDashboard>
       ),
     );
   }
-
   void _showContainerConfig({required String uri, required String currentLabel}) {
     HapticFeedback.mediumImpact();
     final existing = _records[uri];

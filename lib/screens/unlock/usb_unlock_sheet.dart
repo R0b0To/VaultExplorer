@@ -1030,27 +1030,24 @@ RadioGroup<UsbDeviceInfo>(
 
                     // Remember Drive Toggle
                     if (!isReconnect) ...[
-                      Container(
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerLow,
+                      SwitchListTile(
+                        value: _remember,
+                        onChanged: busy ? null : (val) => setState(() => _remember = val),
+                        title: Text(
+                          'Remember drive',
+                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                        ),
+                        subtitle: Text(
+                          'Pin drive on dashboard for quick access',
+                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
                         ),
-                        child: SwitchListTile(
-                          value: _remember,
-                          onChanged: busy ? null : (val) => setState(() => _remember = val),
-                          title: Text(
-                            'Remember drive',
-                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                          ),
-                          subtitle: Text(
-                            'Pin drive on dashboard for quick access',
-                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                          ),
-                          secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        ),
+                        tileColor: cs.surfaceContainerLow,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       ),
                       const SizedBox(height: 16),
                     ],

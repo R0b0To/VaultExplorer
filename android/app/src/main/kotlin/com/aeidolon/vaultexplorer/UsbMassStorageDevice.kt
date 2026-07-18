@@ -4,6 +4,7 @@ import android.hardware.usb.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import android.util.Log
+import android.os.Build
 /**
  * Minimal USB Mass Storage (Bulk-Only Transport) client.
  * Talks SCSI READ(10)/WRITE(10) (or READ(16)/WRITE(16) for drives >2TB —
@@ -33,6 +34,12 @@ class UsbMassStorageDevice private constructor(
         private const val CSW_SIGNATURE = 0x53425355 // "USBS"
         private const val TIMEOUT_MS = 5000
         private const val TAG = "UsbMassStorage"
+        private const val MAX_BULK_CHUNK_BYTES = 16 * 1024
+        private const val INITIAL_MAX_SECTORS_PER_COMMAND = 1024 // 512 KB @ 512B — slightly more conservative starting guess
+        private const val MIN_SECTORS_PER_COMMAND = 8             // 4 KB floor
+
+        @Volatile private var maxSectorsPerCommand: Int = INITIAL_MAX_SECTORS_PER_COMMAND
+        
 
         fun open(usbManager: UsbManager, device: UsbDevice): UsbMassStorageDevice? {
 
@@ -80,6 +87,36 @@ class UsbMassStorageDevice private constructor(
 }
     }
 
+    /** USB Mass Storage Class Bulk-Only Transport §5.3.4 "Reset Recovery".
+ *  Must be run after any command that fails mid-transfer (CBW sent but the
+ *  data phase or CSW never completed cleanly) — without this, the device's
+ *  BOT state machine stays desynced and every subsequent command fails,
+ *  even ones that would otherwise succeed at a smaller size. */
+private fun resetRecovery() {
+    try {
+        connection.controlTransfer(
+            0x21, // host-to-device, class, interface
+            0xFF, // Bulk-Only Mass Storage Reset
+            0, intf.id, null, 0, TIMEOUT_MS
+        )
+        clearHalt(epIn)
+        clearHalt(epOut)
+    } catch (e: Exception) {
+        Log.w(TAG, "resetRecovery: failed: ${e.message}")
+    }
+}
+
+private fun clearHalt(endpoint: UsbEndpoint) {
+    // ClearFeature(ENDPOINT_HALT) — standard USB request, sent as a raw
+    // control transfer for broad API-level compatibility.
+    connection.controlTransfer(
+        0x02,               // host-to-device, standard, endpoint
+        0x01,               // CLEAR_FEATURE
+        0x00,               // ENDPOINT_HALT
+        endpoint.address, null, 0, TIMEOUT_MS
+    )
+}
+
     private fun requestSense(): Triple<Int, Int, Int>? {
     // REQUEST SENSE(6) — must use its own CBW/CSW cycle, separate from
     // the failed command. Returns (senseKey, additionalSenseCode, ascQualifier).
@@ -122,42 +159,68 @@ class UsbMassStorageDevice private constructor(
 
     /** Sends CBW, transfers [dataLen] bytes via [transfer], reads CSW. Returns true on success. */
     private fun executeCommand(
-    cdb: ByteArray, dataLen: Int, dirIn: Boolean,
-    transfer: ((ByteArray) -> Unit)?
+    cdb: ByteArray, 
+    buffer: ByteArray?, 
+    bufferOffset: Int, 
+    dataLen: Int, 
+    dirIn: Boolean
 ): Boolean {
     tag++
     val cbw = buildCbw(cdb, dataLen, dirIn)
     val cbwSent = connection.bulkTransfer(epOut, cbw, cbw.size, TIMEOUT_MS)
     if (cbwSent != cbw.size) {
+        Log.w(TAG, "executeCommand: CBW send failed (sent=$cbwSent, expected=${cbw.size})")
+        resetRecovery()
         return false
     }
 
-    if (dataLen > 0 && transfer != null) {
-        val dataBuf = ByteArray(dataLen)
-        if (dirIn) {
-            val got = connection.bulkTransfer(epIn, dataBuf, dataLen, TIMEOUT_MS)
-            if (got < 0) return false
-            transfer(dataBuf.copyOf(got))
-        } else {
-            transfer(dataBuf)
-            val sent = connection.bulkTransfer(epOut, dataBuf, dataLen, TIMEOUT_MS)
-            if (sent != dataLen) return false
+    if (dataLen > 0 && buffer != null) {
+        var totalTransferred = 0
+        val endpoint = if (dirIn) epIn else epOut
+        
+        while (totalTransferred < dataLen) {
+            val chunkSize = minOf(MAX_BULK_CHUNK_BYTES, dataLen - totalTransferred)
+            
+            // ZERO-COPY: Write/Read directly from/to the exact offset of the master array
+            val result = connection.bulkTransfer(
+                endpoint, 
+                buffer, 
+                bufferOffset + totalTransferred, 
+                chunkSize, 
+                TIMEOUT_MS
+            )
+            
+            if (result <= 0) {
+                Log.w(TAG, "executeCommand: bulk transfer failed at offset=$totalTransferred chunkSize=$chunkSize (result=$result)")
+                resetRecovery()
+                return false
+            }
+            
+            totalTransferred += result
+            
+            // For IN transfers, receiving less data than requested might indicate the end
+            if (dirIn && result < chunkSize) break 
         }
     }
 
     val csw = ByteArray(13)
     val cswLen = connection.bulkTransfer(epIn, csw, 13, TIMEOUT_MS)
     if (cswLen != 13) {
+        Log.w(TAG, "executeCommand: CSW read failed (got=$cswLen)")
+        resetRecovery()
         return false
     }
     val sig = ByteBuffer.wrap(csw, 0, 4).order(ByteOrder.LITTLE_ENDIAN).int
     val status = csw[12].toInt()
-    if (sig != CSW_SIGNATURE || status != 0) {
-        if (status == 1) {
-            requestSense()
-        }
+    if (sig != CSW_SIGNATURE) {
+        Log.w(TAG, "executeCommand: CSW signature mismatch")
+        resetRecovery()
+        return false
     }
-    return sig == CSW_SIGNATURE && status == 0
+    if (status != 0) {
+        if (status == 1) requestSense() else resetRecovery()
+    }
+    return status == 0
 }
     // ── SCSI commands ────────────────────────────────────────────────────
 
@@ -173,65 +236,132 @@ class UsbMassStorageDevice private constructor(
     }
 
     private fun readCapacity10(): Boolean {
-        val cdb = byteArrayOf(0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        return executeCommand(cdb, 8, dirIn = true) { data ->
-            val bb = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
-            val lastLba = bb.int.toLong() and 0xFFFFFFFFL
-            val blockSize = bb.int
-            sectorCount = lastLba + 1
-            sectorSize = blockSize
-        }
+    val cdb = byteArrayOf(0x25, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+    val data = ByteArray(8)
+    
+    if (executeCommand(cdb, data, 0, 8, dirIn = true)) {
+        val bb = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
+        val lastLba = bb.int.toLong() and 0xFFFFFFFFL
+        sectorCount = lastLba + 1
+        sectorSize = bb.int
+        return true
     }
-
-    // SERVICE ACTION IN(16) / READ CAPACITY(16) — SBC-3 §5.15. CDB:
-    //   byte 0:      0x9E (SERVICE ACTION IN(16))
-    //   byte 1:      service action = 0x10 (READ CAPACITY(16)), bits 4:0
-    //   bytes 2-9:   reserved (must be zero)
-    //   bytes 10-13: allocation length, big-endian (response is 32 bytes)
-    //   byte 14:     reserved for this service action
-    //   byte 15:     control
-    // Response: bytes 0-7 = last LBA (big-endian, 64-bit),
-    //           bytes 8-11 = logical block length.
-    private fun readCapacity16(): Boolean {
-        val cdb = ByteArray(16)
-        cdb[0] = 0x9E.toByte()
-        cdb[1] = 0x10
-        val allocLen = 32
-        cdb[10] = ((allocLen shr 24) and 0xFF).toByte()
-        cdb[11] = ((allocLen shr 16) and 0xFF).toByte()
-        cdb[12] = ((allocLen shr 8) and 0xFF).toByte()
-        cdb[13] = (allocLen and 0xFF).toByte()
-
-        return executeCommand(cdb, allocLen, dirIn = true) { data ->
-            val bb = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
-            val lastLba = bb.long   // bytes 0-7
-            val blockSize = bb.int  // bytes 8-11
-            sectorCount = lastLba + 1
-            sectorSize = blockSize
-        }
-    }
-
- fun readSectors(startSector: Long, count: Int, out: ByteArray): Boolean {
-    val dataLen = count * sectorSize
-    require(out.size >= dataLen)
-    val cdb = if (use16ByteCdb) buildReadWriteCdb16(0x88, startSector, count)
-              else buildReadWriteCdb10(0x28, startSector, count)
-
-    return executeCommand(cdb, dataLen, dirIn = true) { data ->
-        System.arraycopy(data, 0, out, 0, minOf(data.size, dataLen))
-    }
+    return false
 }
 
-    /** Writes [count] sectors starting at [startSector] from [data] (count*sectorSize bytes). */
-    fun writeSectors(startSector: Long, count: Int, data: ByteArray): Boolean {
-        val dataLen = count * sectorSize
-        require(data.size >= dataLen)
-        val cdb = if (use16ByteCdb) buildReadWriteCdb16(0x8A, startSector, count)
-                  else buildReadWriteCdb10(0x2A, startSector, count)
-        return executeCommand(cdb, dataLen, dirIn = false) { buf ->
-            System.arraycopy(data, 0, buf, 0, dataLen)
-        }
+private fun readCapacity16(): Boolean {
+    val cdb = ByteArray(16).apply {
+        this[0] = 0x9E.toByte()
+        this[1] = 0x10
+        this[13] = 32 // allocLen
     }
+    val data = ByteArray(32)
+    
+    if (executeCommand(cdb, data, 0, 32, dirIn = true)) {
+        val bb = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN)
+        val lastLba = bb.long
+        sectorCount = lastLba + 1
+        sectorSize = bb.int
+        return true
+    }
+    return false
+}
+
+ fun readSectors(startSector: Long, count: Int, out: ByteArray): Boolean {
+    val totalLen = count * sectorSize
+    require(out.size >= totalLen)
+    var done = 0
+    while (done < count) {
+        val remaining = count - done
+        var chunk = minOf(maxSectorsPerCommand, remaining)
+        val attemptChunk = chunk // Remember what we originally attempted
+        var succeeded = false
+        
+        while (chunk > 0) {
+            val chunkLen = chunk * sectorSize
+            val offset = done * sectorSize
+            val cdb = if (use16ByteCdb) buildReadWriteCdb16(0x88, startSector + done, chunk)
+          else buildReadWriteCdb10(0x28, startSector + done, chunk)
+            
+            val ok = executeCommand(cdb, out, offset, chunkLen, dirIn = true)
+            if (ok) { 
+                succeeded = true
+                break 
+            }
+            
+            // If the command failed, stop backing off if we're already at/below the minimum threshold
+            if (chunk <= MIN_SECTORS_PER_COMMAND) {
+                break
+            }
+            
+            val smaller = chunk / 2
+            Log.w(TAG, "readSectors: $chunk-sector command failed, backing off to $smaller")
+            chunk = smaller
+        }
+        
+        if (!succeeded) {
+            Log.e(TAG, "readSectors: failed even at minimum chunk size at sector ${startSector + done}")
+            return false
+        }
+        
+        // Only throttle global maxSectorsPerCommand if we actually had to back off to succeed
+        if (chunk < attemptChunk && chunk < maxSectorsPerCommand) {
+            maxSectorsPerCommand = chunk
+        }
+        
+        done += chunk
+    }
+    return true
+}
+
+fun writeSectors(startSector: Long, count: Int, data: ByteArray): Boolean {
+    val totalLen = count * sectorSize
+    require(data.size >= totalLen)
+    var done = 0
+    while (done < count) {
+        val remaining = count - done
+        var chunk = minOf(maxSectorsPerCommand, remaining)
+        val attemptChunk = chunk // Remember what we originally attempted
+        var succeeded = false
+        
+        while (chunk > 0) {
+            val chunkLen = chunk * sectorSize
+            val offset = done * sectorSize
+
+            val cdb = if (use16ByteCdb) buildReadWriteCdb16(0x8A, startSector + done, chunk)
+            else buildReadWriteCdb10(0x2A, startSector + done, chunk)
+
+
+            val ok = executeCommand(cdb, data, offset, chunkLen, dirIn = false)
+            if (ok) { 
+                succeeded = true
+                break 
+            }
+            
+            // If the command failed, stop backing off if we're already at/below the minimum threshold
+            if (chunk <= MIN_SECTORS_PER_COMMAND) {
+                break
+            }
+            
+            val smaller = chunk / 2
+            Log.w(TAG, "writeSectors: $chunk-sector command failed, backing off to $smaller")
+            chunk = smaller
+        }
+        
+        if (!succeeded) {
+            Log.e(TAG, "writeSectors: failed even at minimum chunk size at sector ${startSector + done}")
+            return false
+        }
+        
+        // Only throttle global maxSectorsPerCommand if we actually had to back off to succeed
+        if (chunk < attemptChunk && chunk < maxSectorsPerCommand) {
+            maxSectorsPerCommand = chunk
+        }
+        
+        done += chunk
+    }
+    return true
+}
 
     // READ(10) opcode 0x28 / WRITE(10) opcode 0x2A — 10-byte CDB, 32-bit
     // LBA field, max addressable sector 0xFFFFFFFE (~2TB at 512B sectors).

@@ -42,6 +42,7 @@
 #include "session_guard.h"
 #include "volume_state.h"
 #include <thread>
+#include "partition_writer.h"
 
 #include <fcntl.h>
 
@@ -806,6 +807,97 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerWithHiddenNative(
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
+#include "partition_writer.h"
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createUsbContainerNative(
+        JNIEnv* env, jobject,
+        jint volId, jstring partitionScheme, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
+        jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds, jboolean quickFormat) {
+
+    if (volId < 0 || volId >= MAX_VOLUMES) return JNI_FALSE;
+
+    std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
+    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    const char* nativeFS   = env->GetStringUTFChars(fileSystem, nullptr);
+
+    static constexpr uint64_t kUsbPartitionStartSector = 2048;
+    const uint64_t numSectors = static_cast<uint64_t>(sizeBytes) / 512;
+
+    LOGI("createUsbContainerNative: volId=%d sizeBytes=%lld fs=%s format=%d numSectors=%llu",
+         volId, (long long)sizeBytes, nativeFS, containerFormat, (unsigned long long)numSectors);
+
+    bool success = writeMbrPartitionTable(volId, kUsbPartitionStartSector, numSectors);
+    LOGI("createUsbContainerNative: writeMbrPartitionTable success=%d", success ? 1 : 0);
+
+    if (success) {
+        success = (containerFormat == 1 || containerFormat == 2)
+            ? createUsbLuksContainer(volId, kUsbPartitionStartSector, nativePass, pim,
+                                     static_cast<int64_t>(sizeBytes), nativeFS,
+                                     containerFormat, cipherId, hashId,
+                                     kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()), quickFormat)
+            : createUsbContainer(volId, kUsbPartitionStartSector, nativePass, pim,
+                                 static_cast<int64_t>(sizeBytes), nativeFS,
+                                 cipherId, hashId,
+                                 kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()), quickFormat);
+    } else {
+        closeUnusedKeyfileFds(kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()));
+    }
+
+    LOGI("createUsbContainerNative: EXIT success=%d", success ? 1 : 0);
+    env->ReleaseStringUTFChars(password, nativePass);
+    env->ReleaseStringUTFChars(fileSystem, nativeFS);
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createUsbContainerWithHiddenNative(
+        JNIEnv* env, jobject,
+        jint volId, jstring partitionScheme,
+        jstring outerPassword, jstring hiddenPassword,
+        jint outerPim, jint hiddenPim, jlong sizeBytes,
+        jstring outerFileSystem, jstring hiddenFileSystem, jlong hiddenSizeBytes,
+        jint outerCipherId, jint outerHashId, jint hiddenCipherId, jint hiddenHashId,
+        jintArray outerKeyfileFds, jintArray hiddenKeyfileFds, jboolean quickFormat) {
+
+    if (volId < 0 || volId >= MAX_VOLUMES) return JNI_FALSE;
+
+    std::vector<int> outerKfFds = extractKeyfileFds(env, outerKeyfileFds);
+    std::vector<int> hiddenKfFds = extractKeyfileFds(env, hiddenKeyfileFds);
+    
+    const char* nativeOuterPass = env->GetStringUTFChars(outerPassword, nullptr);
+    const char* nativeHiddenPass = env->GetStringUTFChars(hiddenPassword, nullptr);
+    const char* nativeOuterFS   = env->GetStringUTFChars(outerFileSystem, nullptr);
+    const char* nativeHiddenFS   = env->GetStringUTFChars(hiddenFileSystem, nullptr);
+
+    static constexpr uint64_t kUsbPartitionStartSector = 2048;
+    const uint64_t numSectors = static_cast<uint64_t>(sizeBytes) / 512;
+
+    bool success = writeMbrPartitionTable(volId, kUsbPartitionStartSector, numSectors);
+
+    if (success) {
+        success = createUsbContainerWithHidden(
+            volId, kUsbPartitionStartSector,
+            nativeOuterPass, nativeHiddenPass, outerPim, hiddenPim, static_cast<int64_t>(sizeBytes),
+            nativeOuterFS, nativeHiddenFS, static_cast<int64_t>(hiddenSizeBytes),
+            outerCipherId, outerHashId, hiddenCipherId, hiddenHashId,
+            outerKfFds.empty() ? nullptr : outerKfFds.data(), static_cast<int>(outerKfFds.size()),
+            hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()),
+            quickFormat
+        );
+    } else {
+        closeUnusedKeyfileFds(outerKfFds.empty() ? nullptr : outerKfFds.data(), static_cast<int>(outerKfFds.size()));
+        closeUnusedKeyfileFds(hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()));
+    }
+
+    env->ReleaseStringUTFChars(outerPassword, nativeOuterPass);
+    env->ReleaseStringUTFChars(hiddenPassword, nativeHiddenPass);
+    env->ReleaseStringUTFChars(outerFileSystem, nativeOuterFS);
+    env->ReleaseStringUTFChars(hiddenFileSystem, nativeHiddenFS);
+
+    return success ? JNI_TRUE : JNI_FALSE;
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_changeContainerPasswordNative(
         JNIEnv* env, jobject,
@@ -829,6 +921,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_changeContainerPasswordNative(
 
     return success ? JNI_TRUE : JNI_FALSE;
 }
+
 
 // ----------------------------------------------------------------====
 // PBKDF2-SHA512

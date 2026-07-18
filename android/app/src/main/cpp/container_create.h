@@ -63,6 +63,25 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
                          const char* fileSystem, int luksVersion, int cipherId, int hashId,
                          const int* keyfileFds = nullptr, int keyfileCount = 0);
 
+bool createUsbContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
+                        const char* fileSystem, int cipherId, int hashId,
+                        const int* keyfileFds = nullptr, int keyfileCount = 0, bool quickFormat = false);
+
+bool createUsbLuksContainer(int volId, uint64_t startSector, const char* password, int pim, int64_t sizeBytes,
+                            const char* fileSystem, int luksVersion, int cipherId, int hashId,
+                            const int* keyfileFds = nullptr, int keyfileCount = 0, bool quickFormat = false);
+
+bool createUsbContainerWithHidden(
+    int volId, uint64_t startSector,
+    const char* outerPassword, const char* hiddenPassword,
+    int outerPim, int hiddenPim, int64_t sizeBytes,
+    const char* outerFileSystem, const char* hiddenFileSystem,
+    int64_t hiddenSizeBytes,
+    int outerCipherId, int outerHashId,
+    int hiddenCipherId, int hiddenHashId,
+    const int* outerKeyfileFds = nullptr, int outerKeyfileCount = 0,
+    const int* hiddenKeyfileFds = nullptr, int hiddenKeyfileCount = 0,
+    bool quickFormat = false);                           
 // Creates a VeraCrypt container with an embedded hidden volume.
 // The outer volume is created and formatted first, then a hidden volume
 // header is written at VC_HIDDEN_HEADER_OFFSET (65536) with its own

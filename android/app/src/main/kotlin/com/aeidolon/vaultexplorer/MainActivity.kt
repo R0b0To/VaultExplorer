@@ -46,6 +46,8 @@ private object ChannelMethods {
     const val PICK_CONTAINER      = "pickContainer"
     const val PICK_KEYFILES       = "pickKeyfiles"
     const val CREATE_CONTAINER    = "createContainer"
+    const val CREATE_USB_CONTAINER = "createUsbContainer"
+    const val GET_USB_DEVICE_CAPACITY = "getUsbDeviceCapacity"
     const val UNLOCK_CONTAINER    = "unlockContainer"
     const val LOCK_CONTAINER      = "lockContainer"
     const val DECRYPT_FILE        = "decryptFile"
@@ -109,9 +111,6 @@ class MainActivity : FlutterFragmentActivity() {
     // Warm Thread Pool to process I/O tasks dynamically without thread-spawning latency
     private val ioExecutor = Executors.newFixedThreadPool(4)
 
-    // BroadcastReceiver for physically detached USB mass storage devices.
-    // Fired by the OS (protected system broadcast) when a drive goes away.
-    // This notifies the Dart layer to update the active session mount list.
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
 
@@ -125,7 +124,6 @@ class MainActivity : FlutterFragmentActivity() {
 
     // ── Activity Result Launchers ──────────────────────────────────────────
 
-    // 1. Pick Container Launcher
     private val pickContainerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -179,7 +177,6 @@ class MainActivity : FlutterFragmentActivity() {
         res.success(picked)
     }
 
-    // 2. Create Container Launcher
     private data class PendingCreate(
         val name: String, val sizeBytes: Long, val password: String,
         val pim: Int, val fileSystem: String,
@@ -242,7 +239,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    // 3. Import File Launcher
     private data class PendingImport(val containerUri: String, val targetDir: String, val volId: Int)
     private var pendingImport: PendingImport? = null
 
@@ -282,7 +278,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    // 4. Export Files/Folder Launcher (Tree)
     private data class PendingExportMulti(val containerUri: String, val items: List<Map<String, Any?>>, val volId: Int)
     private var pendingExportMulti: PendingExportMulti? = null
 
@@ -322,7 +317,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    // 5. Import Folder Launcher (Tree)
     private data class PendingImportFolder(val containerUri: String, val targetDir: String, val volId: Int)
     private var pendingImportFolder: PendingImportFolder? = null
 
@@ -361,7 +355,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    // 6. Export File Launcher
     private data class PendingExportFile(val containerUri: String, val sourcePath: String, val volId: Int)
     private var pendingExportFile: PendingExportFile? = null
 
@@ -427,7 +420,6 @@ class MainActivity : FlutterFragmentActivity() {
     private fun isNotUnlockedException(e: Throwable): Boolean =
         e is IllegalStateException && e.message?.startsWith("NOT_UNLOCKED") == true
 
-
     private fun dispatchNativeError(e: Exception, result: MethodChannel.Result) {
         if (e is UnlockCancelledException) {
             result.error("CANCELLED", e.message, null)
@@ -455,7 +447,6 @@ class MainActivity : FlutterFragmentActivity() {
             throw e
         }
     }
-
 
     private fun calculateInSampleSize(width: Int, height: Int, targetSize: Int): Int {
         var inSampleSize = 1
@@ -513,7 +504,6 @@ class MainActivity : FlutterFragmentActivity() {
         val trimmed = encoded.trim()
         return if (trimmed.length > 180) trimmed.substring(0, 180) else trimmed
     }
-
 
     private fun containerFingerprint(filePath: String): String? {
         return try {
@@ -625,6 +615,7 @@ class MainActivity : FlutterFragmentActivity() {
             .putString(alias, encoded)
             .commit()
     }
+
     private fun loadDerivedKeyBytes(filePath: String): ByteArray? {
         val alias = derivedKeyAlias(filePath)
         val encoded = getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
@@ -643,7 +634,6 @@ class MainActivity : FlutterFragmentActivity() {
             .remove(derivedKeyAlias(filePath))
             .commit()
     }
-
 
     private fun handleUsbDeviceDetached(device: UsbDevice) {
         val containerUri = "usb:${device.deviceName}"
@@ -771,880 +761,988 @@ class MainActivity : FlutterFragmentActivity() {
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
 
-                    ChannelMethods.SET_SECURE_SCREEN -> {
-                        val enabled = call.argument<Boolean>("enabled") ?: false
-                        if (enabled) {
-                            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
-                        } else {
-                            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                ChannelMethods.SET_SECURE_SCREEN -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    if (enabled) {
+                        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                    } else {
+                        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                    }
+                    result.success(true)
+                }
+
+                ChannelMethods.LIST_USB_DEVICES -> {
+                    val list = usbManager.deviceList.values
+                        .filter { device -> (0 until device.interfaceCount).any { i ->
+                            val intf = device.getInterface(i)
+                            intf.interfaceClass == 0x08 && intf.interfaceSubclass == 0x06 && intf.interfaceProtocol == 0x50
+                        } }
+                        .map { device ->
+                            mapOf(
+                                "deviceName" to device.deviceName,
+                                "productName" to (device.productName ?: device.deviceName),
+                                "hasPermission" to usbManager.hasPermission(device),
+                            )
                         }
+                    result.success(list)
+                }
+
+                ChannelMethods.REQUEST_USB_PERMISSION -> {
+                    val deviceName = call.argument<String>("deviceName")
+                    val device = deviceName?.let { usbManager.deviceList[it] }
+                    if (device == null) {
+                        result.error("USB_NOT_FOUND", "USB device not found: $deviceName", null)
+                        return@setMethodCallHandler
+                    }
+                    if (usbManager.hasPermission(device)) {
                         result.success(true)
+                        return@setMethodCallHandler
+                    }
+                    pendingUsbPermissionResult = result
+                    pendingUsbPermissionDeviceName = deviceName
+                    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                    } else {
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                    }
+                    val permissionIntent = PendingIntent.getBroadcast(
+                        this, 0, Intent(ACTION_USB_PERMISSION), flags
+                    )
+                    usbManager.requestPermission(device, permissionIntent)
+                }
+
+                ChannelMethods.UNLOCK_USB_CONTAINER -> {
+                    val deviceName    = call.argument<String>("deviceName")
+                    val password      = call.argument<String>("password")
+                    val pim           = call.argument<Number>("pim")?.toInt() ?: 0
+                    val displayName   = call.argument<String>("displayName")
+                    val docProvider   = call.argument<Boolean>("documentProvider") ?: false
+                    val cipherId      = call.argument<Number>("cipherId")?.toInt() ?: 255
+                    val hashId        = call.argument<Number>("hashId")?.toInt() ?: 255
+                    val preservedKeyBase64 = call.argument<String>("preservedKey")
+                    val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+                    if (preservedKey != null) {
+                        Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
+                    }
+                    val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
+                    val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+
+                    if (deviceName == null || password == null) {
+                        result.error("INVALID_ARGS", "deviceName and password required", null)
+                        return@setMethodCallHandler
+                    }
+                    if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
+                        result.error("INVALID_ARGS", "password or keyfiles required", null)
+                        return@setMethodCallHandler
+                    }
+                    val device = usbManager.deviceList[deviceName]
+                    if (device == null) {
+                        result.error("USB_NOT_FOUND", "USB device not found: $deviceName", null)
+                        return@setMethodCallHandler
+                    }
+                    if (!usbManager.hasPermission(device)) {
+                        result.error("USB_NO_PERMISSION", "Permission not granted for device", null)
+                        return@setMethodCallHandler
                     }
 
-                    ChannelMethods.LIST_USB_DEVICES -> {
-                        val list = usbManager.deviceList.values
-                            .filter { device -> (0 until device.interfaceCount).any { i ->
-                                val intf = device.getInterface(i)
-                                intf.interfaceClass == 0x08 && intf.interfaceSubclass == 0x06 && intf.interfaceProtocol == 0x50
-                            } }
-                            .map { device ->
-                                mapOf(
-                                    "deviceName" to device.deviceName,
-                                    "productName" to (device.productName ?: device.deviceName),
-                                    "hasPermission" to usbManager.hasPermission(device),
+                    val containerUri = "usb:$deviceName"
+                    val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
+                        ?: ContainerSessionRegistry.getFreeVolumeId()
+                    if (targetVolId == null) {
+                        result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
+                        return@setMethodCallHandler
+                    }
+                    methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
+
+                    ioExecutor.execute {
+                        var msd: UsbMassStorageDevice? = null
+                        try {
+                            msd = UsbMassStorageDevice.open(usbManager, device)
+                                ?: throw Exception("Failed to open USB mass storage device")
+
+                            val sizeBytes = msd.sectorCount * msd.sectorSize
+                            UsbBlockBridge.register(targetVolId, msd)
+
+                            val keyfileFds = openKeyfileFds(keyfilePaths)
+
+                            if (preservedKey != null) {
+                                Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${preservedKey.size})")
+                            } else if (cacheDerivedKey) {
+                                Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
+                            }
+                            if (keyfileFds != null && keyfileFds.isNotEmpty()) {
+                                Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
+                            }
+
+                            val files = synchronized(ContainerSessionRegistry.locks[targetVolId]) {
+                                ContainerEngine.unlockUsb(
+                                    password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
+                                    keyfileFds = keyfileFds
                                 )
                             }
-                        result.success(list)
-                    }
 
-                    ChannelMethods.REQUEST_USB_PERMISSION -> {
-                        val deviceName = call.argument<String>("deviceName")
-                        val device = deviceName?.let { usbManager.deviceList[it] }
-                        if (device == null) {
-                            result.error("USB_NOT_FOUND", "USB device not found: $deviceName", null)
-                            return@setMethodCallHandler
-                        }
-                        if (usbManager.hasPermission(device)) {
-                            result.success(true)
-                            return@setMethodCallHandler
-                        }
-                        pendingUsbPermissionResult = result
-                        pendingUsbPermissionDeviceName = deviceName
-                        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-                        } else {
-                            PendingIntent.FLAG_UPDATE_CURRENT
-                        }
-                        val permissionIntent = PendingIntent.getBroadcast(
-                            this, 0, Intent(ACTION_USB_PERMISSION), flags
-                        )
-                        usbManager.requestPermission(device, permissionIntent)
-                    }
-
-                    ChannelMethods.UNLOCK_USB_CONTAINER -> {
-                        val deviceName    = call.argument<String>("deviceName")
-                        val password      = call.argument<String>("password")
-                        val pim           = call.argument<Number>("pim")?.toInt() ?: 0
-                        val displayName   = call.argument<String>("displayName")
-                        val docProvider   = call.argument<Boolean>("documentProvider") ?: false
-                        val cipherId      = call.argument<Number>("cipherId")?.toInt() ?: 255
-                        val hashId        = call.argument<Number>("hashId")?.toInt() ?: 255
-                        val preservedKeyBase64 = call.argument<String>("preservedKey")
-                        val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
-                        if (preservedKey != null) {
-                            Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
-                        }
-                        val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
-                        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
-
-                        if (deviceName == null || password == null) {
-                            result.error("INVALID_ARGS", "deviceName and password required", null)
-                            return@setMethodCallHandler
-                        }
-                        if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
-                            result.error("INVALID_ARGS", "password or keyfiles required", null)
-                            return@setMethodCallHandler
-                        }
-                        val device = usbManager.deviceList[deviceName]
-                        if (device == null) {
-                            result.error("USB_NOT_FOUND", "USB device not found: $deviceName", null)
-                            return@setMethodCallHandler
-                        }
-                        if (!usbManager.hasPermission(device)) {
-                            result.error("USB_NO_PERMISSION", "Permission not granted for device", null)
-                            return@setMethodCallHandler
-                        }
-
-                        val containerUri = "usb:$deviceName"
-                        val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
-                            ?: ContainerSessionRegistry.getFreeVolumeId()
-                        if (targetVolId == null) {
-                            result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
-                            return@setMethodCallHandler
-                        }
-                        methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
-
-                        ioExecutor.execute {
-                            var msd: UsbMassStorageDevice? = null
-                            try {
-                                msd = UsbMassStorageDevice.open(usbManager, device)
-                                    ?: throw Exception("Failed to open USB mass storage device")
-
-                                val sizeBytes = msd.sectorCount * msd.sectorSize
-                                UsbBlockBridge.register(targetVolId, msd)
-
-                                val keyfileFds = openKeyfileFds(keyfilePaths)
-
-                                if (preservedKey != null) {
-                                    Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${preservedKey.size})")
-                                } else if (cacheDerivedKey) {
-                                    Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
-                                }
-                                if (keyfileFds != null && keyfileFds.isNotEmpty()) {
-                                    Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
-                                }
-
-                                val files = synchronized(ContainerSessionRegistry.locks[targetVolId]) {
-                                    ContainerEngine.unlockUsb(
-                                        password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
-                                        keyfileFds = keyfileFds
+                            runOnUiThread {
+                                if (files != null) {
+                                    if (cacheDerivedKey && preservedKey == null) {
+                                        val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
+                                        if (derived != null) {
+                                            storeDerivedKeyBytes(deviceName, derived)
+                                        }
+                                    }
+                                    ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
+                                        uri = containerUri,
+                                        volId = targetVolId,
+                                        cachedFilesList = files.toList(),
+                                        displayName = displayName ?: device.productName ?: deviceName,
+                                        documentProvider = docProvider,
+                                        isUsbSource = true,
                                     )
-                                }
-
-                                runOnUiThread {
-                                    if (files != null) {
-                                        if (cacheDerivedKey && preservedKey == null) {
-                                            val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
-                                            if (derived != null) {
-                                                storeDerivedKeyBytes(deviceName, derived)
-                                            }
-                                        }
-                                        ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
-                                            uri = containerUri,
-                                            volId = targetVolId,
-                                            cachedFilesList = files.toList(),
-                                            displayName = displayName ?: device.productName ?: deviceName,
-                                            documentProvider = docProvider,
-                                            isUsbSource = true,
-                                        )
-                                        if (docProvider) {
-                                            contentResolver.notifyChange(
-                                                DocumentsContract.buildRootsUri(
-                                                    "com.aeidolon.vaultexplorer.documents"), null)
-                                        }
-                                        val fmt = ContainerEngine.format(targetVolId).wireName
-                                        result.success(mapOf(
-                                            "volId" to targetVolId,
-                                            "files" to files.toList(),
-                                            "matchedCipherId" to ContainerEngine.matchedCipherId(targetVolId),
-                                            "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
-                                            "containerFormat" to fmt
-                                        ))
-                                    } else {
-                                        UsbBlockBridge.unregister(targetVolId)
-                                        result.error("AUTH_FAIL", "Incorrect password/keyfiles or invalid drive", null)
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                UsbBlockBridge.unregister(targetVolId)
-                                runOnUiThread { dispatchNativeError(e, result) }
-                            }
-                        }
-                    }
-
-                    ChannelMethods.PICK_CONTAINER -> {
-                        pendingResultCheck(result)
-                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "*/*"
-                        }
-                        pickContainerLauncher.launch(intent)
-                    }
-
-                    ChannelMethods.PICK_KEYFILES -> {
-                        pendingResultCheck(result)
-                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "*/*"
-                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                        }
-                        pickKeyfilesLauncher.launch(intent)
-                    }
-
-                    ChannelMethods.CREATE_CONTAINER -> {
-                        val name = call.argument<String>("displayName") ?: "vault.hc"
-                        val password = call.argument<String>("password") ?: ""
-                        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
-                        if (password.isEmpty() && keyfilePaths.isNullOrEmpty()) {
-                            result.error("INVALID_ARGS", "password or keyfiles required", null)
-                            return@setMethodCallHandler
-                        }
-
-                        pendingCreate = PendingCreate(
-                            name        = name,
-                            sizeBytes   = call.argument<Number>("sizeBytes")?.toLong() ?: 0L,
-                            password    = password,
-                            pim         = call.argument<Number>("pim")?.toInt() ?: 0,
-                            fileSystem  = call.argument<String>("fileSystem") ?: "fat",
-                            containerFormat = call.argument<Number>("containerFormat")?.toInt() ?: 0,
-                            cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255,
-                            hashId      = call.argument<Number>("hashId")?.toInt() ?: 255,
-                            keyfilePaths = keyfilePaths,
-                            createHiddenVolume = call.argument<Boolean>("createHiddenVolume") ?: false,
-                            hiddenPassword = call.argument<String>("hiddenPassword"),
-                            hiddenFileSystem = call.argument<String>("hiddenFileSystem"),
-                            hiddenSizeBytes = call.argument<Number>("hiddenSizeBytes")?.toLong() ?: 0L,
-                            hiddenKeyfilePaths = call.argument<List<String>>("hiddenKeyfilePaths"),
-                            hiddenPim = call.argument<Number>("hiddenPim")?.toInt() ?: 0,
-                            hiddenCipherId = call.argument<Number>("hiddenCipherId")?.toInt() ?: 255,
-                            hiddenHashId = call.argument<Number>("hiddenHashId")?.toInt() ?: 255,
-                        )
-                        pendingResultCheck(result)
-                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "application/octet-stream"
-                            putExtra(Intent.EXTRA_TITLE, name)
-                        }
-                        createContainerLauncher.launch(intent)
-                    }
-                    ChannelMethods.UNLOCK_CONTAINER -> {
-                        val uriString   = call.argument<String>("filePath")
-                        val password    = call.argument<String>("password")
-                        val pim         = call.argument<Number>("pim")?.toInt() ?: 0
-                        val displayName = call.argument<String>("displayName")
-                        val docProvider = call.argument<Boolean>("documentProvider") ?: false
-                        val cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255
-                        val hashId      = call.argument<Number>("hashId")?.toInt() ?: 255
-                        val preservedKeyBase64 = call.argument<String>("preservedKey")
-                        val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
-                        if (preservedKey != null) {
-                            Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
-                        }
-                        val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
-                        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
-
-                        if (uriString == null || password == null) {
-                            result.error("INVALID_ARGS", "filePath and password required", null)
-                            return@setMethodCallHandler
-                        }
-                        if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
-                            result.error("INVALID_ARGS", "password or keyfiles required", null)
-                            return@setMethodCallHandler
-                        }
-
-                        val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-                            ?: ContainerSessionRegistry.getFreeVolumeId()
-                        if (targetVolId == null) {
-                            result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
-                            return@setMethodCallHandler
-                        }
-                        methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
-
-                        ioExecutor.execute {
-                            var pfd: ParcelFileDescriptor? = null
-                            try {
-                                val uri = Uri.parse(uriString)
-                                pfd = contentResolver.openFileDescriptor(uri, "rw")
-                                    ?: throw Exception("Could not open file descriptor")
-
-                                val keyfileFds = openKeyfileFds(keyfilePaths)
-                                val fd = pfd.detachFd()
-
-                                if (preservedKey != null) {
-                                    Log.i("VaultExplorer_C++", "File unlock using preserved derived key (len=${preservedKey.size})")
-                                } else if (cacheDerivedKey) {
-                                    Log.i("VaultExplorer_C++", "File unlock will derive and cache a fresh key")
-                                }
-                                if (keyfileFds != null && keyfileFds.isNotEmpty()) {
-                                    Log.i("VaultExplorer_C++", "File unlock using ${keyfileFds.size} keyfile(s)")
-                                }
-
-                                val files = synchronized(ContainerSessionRegistry.locks[targetVolId]) {
-                                    ContainerEngine.unlockFile(fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds)
-                                }
-
-                                runOnUiThread {
-                                    if (files != null) {
-                                        if (cacheDerivedKey && preservedKey == null) {
-                                            val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
-                                            if (derived != null) {
-                                                storeDerivedKeyBytes(uriString, derived)
-                                            }
-                                        }
-                                        ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
-                                            uri = uriString,
-                                            volId = targetVolId,
-                                            cachedFilesList = files.toList(),
-                                            displayName = displayName,
-                                            documentProvider = docProvider,
-                                        )
-                                        if (docProvider) {
-                                            contentResolver.notifyChange(
-                                                DocumentsContract.buildRootsUri(
-                                                    "com.aeidolon.vaultexplorer.documents"), null)
-                                        }
-                                        val fmt = ContainerEngine.format(targetVolId).wireName
-                                        result.success(mapOf(
-                                            "volId" to targetVolId,
-                                            "files" to files.toList(),
-                                            "matchedCipherId" to ContainerEngine.matchedCipherId(targetVolId),
-                                            "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
-                                            "containerFormat" to fmt
-                                        ))
-                                    } else {
-                                        result.error("AUTH_FAIL",
-                                            "Incorrect password/keyfiles or invalid container", null)
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                try { pfd?.close() } catch (_: Exception) {}
-                                runOnUiThread { dispatchNativeError(e, result) }
-                            }
-                        }
-                    }
-
-                    ChannelMethods.CANCEL_UNLOCK -> {
-                        val volId = call.argument<Number>("volId")?.toInt()
-                        if (volId == null) {
-                            result.error("INVALID_ARGS", "volId required", null)
-                            return@setMethodCallHandler
-                        }
-                        ContainerEngine.requestUnlockCancellation(volId)
-                        result.success(true)
-                    }
-
-                    ChannelMethods.CHANGE_CONTAINER_PASSWORD -> {
-                        val uri = call.argument<String>("uri")
-                        val oldPassword = call.argument<String>("oldPassword") ?: ""
-                        val newPassword = call.argument<String>("newPassword") ?: ""
-                        val oldPim = call.argument<Number>("oldPim")?.toInt() ?: 0
-                        val newPim = call.argument<Number>("newPim")?.toInt() ?: 0
-                        val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
-                        val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
-                        val oldKeyfilePaths = call.argument<List<String>>("oldKeyfilePaths")
-                        val newKeyfilePaths = call.argument<List<String>>("newKeyfilePaths")
-
-                        if (uri.isNullOrEmpty() || newPassword.isEmpty()) {
-                            result.error("INVALID_ARGS", "uri and newPassword required", null)
-                            return@setMethodCallHandler
-                        }
-
-                        ioExecutor.execute {
-                            try {
-                                val docUri = android.net.Uri.parse(uri)
-                                val pfd = contentResolver.openFileDescriptor(docUri, "rw")
-                                    ?: throw Exception("Could not open file descriptor")
-                                val oldKfFds = openKeyfileFds(oldKeyfilePaths)
-                                val newKfFds = openKeyfileFds(newKeyfilePaths)
-                                val success = ContainerEngine.changePassword(
-                                    pfd.detachFd(), oldPassword, newPassword,
-                                    oldPim, newPim, cipherId, hashId,
-                                    oldKfFds, newKfFds
-                                )
-                                runOnUiThread { result.success(success) }
-                            } catch (e: Exception) {
-                                runOnUiThread { dispatchNativeError(e, result) }
-                            }
-                        }
-                    }
-
-                    ChannelMethods.DERIVE_DERIVED_KEY -> {
-                        val filePath = call.argument<String>("filePath")
-                        val password = call.argument<String>("password")
-                        val pim = call.argument<Number>("pim")?.toInt() ?: 0
-                        val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
-                        val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
-                        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
-
-                        if (filePath == null || password == null) {
-                            result.error("INVALID_ARGS", "filePath and password required", null)
-                            return@setMethodCallHandler
-                        }
-
-                        ioExecutor.execute {
-                            var pfd: ParcelFileDescriptor? = null
-                            try {
-                                pfd = contentResolver.openFileDescriptor(Uri.parse(filePath), "r")
-                                    ?: throw Exception("Could not open file descriptor")
-                                val keyfileFds = openKeyfileFds(keyfilePaths)
-                                val fd = pfd.detachFd()
-                                val derived = ContainerEngine.deriveKeyMaterial(fd, password, pim, cipherId, hashId, keyfileFds)
-                                val encoded = derived?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
-                                runOnUiThread { result.success(encoded) }
-                            } catch (e: Exception) {
-                                try { pfd?.close() } catch (_: Exception) {}
-                                runOnUiThread { dispatchNativeError(e, result) }
-                            }
-                        }
-                    }
-
-                    ChannelMethods.DOCUMENT_EXISTS -> {
-                        val filePath = call.argument<String>("filePath")
-
-                        if (filePath == null) {
-                            result.error("INVALID_ARGS", "filePath required", null)
-                            return@setMethodCallHandler
-                        }
-
-                        ioExecutor.execute {
-                            val exists = try {
-                                if (filePath.startsWith("content://")) {
-                                    DocumentFile.fromSingleUri(this, Uri.parse(filePath))
-                                        ?.exists() == true
-                                } else {
-                                    File(filePath).exists()
-                                }
-                            } catch (e: Exception) {
-                                false
-                            }
-                            runOnUiThread { result.success(exists) }
-                        }
-                    }
-
-                    ChannelMethods.STORE_DERIVED_KEY -> {
-                        val filePath = call.argument<String>("filePath")
-                        val derivedKeyBase64 = call.argument<String>("derivedKey")
-                        val derived = derivedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
-                        if (filePath == null || derived == null) {
-                            result.success(false)
-                            return@setMethodCallHandler
-                        }
-                        result.success(storeDerivedKeyBytes(filePath, derived))
-                    }
-
-                    ChannelMethods.LOAD_DERIVED_KEY -> {
-                        val filePath = call.argument<String>("filePath")
-                        if (filePath == null) {
-                            result.success(null)
-                            return@setMethodCallHandler
-                        }
-                        val derivedKey = loadDerivedKeyBytes(filePath)
-                        result.success(derivedKey?.let { Base64.encodeToString(it, Base64.NO_WRAP) })
-                    }
-
-                    ChannelMethods.CLEAR_DERIVED_KEY -> {
-                        val filePath = call.argument<String>("filePath")
-                        if (filePath == null) {
-                            result.success(false)
-                            return@setMethodCallHandler
-                        }
-                        result.success(clearDerivedKeyBytes(filePath))
-                    }
-
-                    ChannelMethods.HASH_PASSWORD -> {
-                        val password   = call.argument<String>("password")
-                        val saltBytes  = call.argument<ByteArray>("salt")
-                        val iterations = call.argument<Int>("iterations") ?: 200_000
-
-                        if (password == null || saltBytes == null || saltBytes.isEmpty()) {
-                            result.error("INVALID_ARGS", "password and non-empty salt required", null)
-                            return@setMethodCallHandler
-                        }
-
-                        ioExecutor.execute {
-                            try {
-                                val hash = ContainerEngine.hashPassword(password, saltBytes, iterations)
-                                runOnUiThread {
-                                    if (hash != null) result.success(hash)
-                                    else result.error("KDF_FAILED", "PBKDF2 derivation failed", null)
-                                }
-                            } catch (e: Exception) {
-                                runOnUiThread { dispatchNativeError(e, result) }
-                            }
-                        }
-                    }
-
-                    ChannelMethods.GET_VIDEO_THUMBNAIL -> {
-                        val uriString = call.argument<String>("filePath")
-                        val fileName  = call.argument<String>("fileName")
-
-                        if (uriString == null || fileName == null) {
-                            result.error("INVALID_ARGS", "filePath and fileName required", null)
-                            return@setMethodCallHandler
-                        }
-
-                        ioExecutor.execute {
-                            var retriever: MediaMetadataRetriever? = null
-                            try {
-                                val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread {
-                                            result.error("NOT_MOUNTED", "Container not mounted", null)
-                                        }
-                                        return@execute
-                                    }
-
-                                retriever = MediaMetadataRetriever()
-
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                    val dataSource = VeraCryptMediaDataSource(this, uriString, fileName, volId)
-                                    retriever.setDataSource(dataSource)
-
-                                    val durationMs = retriever
-                                        .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                                        ?.toLongOrNull() ?: 10_000L
-                                    val timeMs = minOf(1000L, durationMs / 4)
-
-                                    val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                                        runCatching {
-                                            retriever.getScaledFrameAtTime(
-                                                timeMs * 1000L,
-                                                MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                                                180, 180)
-                                        }.getOrNull()
-                                            ?: retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                                    } else {
-                                        retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                                    }
-
-                                     if (frame != null) {
-                                        val quality = call.argument<Int>("quality") ?: 60
-                                        val stream = ByteArrayOutputStream()
-                                        frame.compress(Bitmap.CompressFormat.JPEG, quality, stream)
-                                        val bytes = stream.toByteArray()
-                                        runOnUiThread { result.success(bytes) }
-                                    } else {
-                                        runOnUiThread { result.error("FRAME_FAILED", "Failed to extract frame", null) }
-                                    }
-                                } else {
-                                    runOnUiThread { result.error("UNSUPPORTED_OS", "Requires Android 6.0+", null) }
-                                }
-                            } catch (e: Exception) {
-                                runOnUiThread { dispatchNativeError(e, result) }
-                            } finally {
-                                runCatching { retriever?.release() }
-                            }
-                        }
-                    }
-
-                    ChannelMethods.GET_IMAGE_THUMBNAIL -> {
-                        val uriString  = call.argument<String>("filePath")
-                        val fileName   = call.argument<String>("fileName")
-                        val targetSize = call.argument<Int>("targetSize") ?: 180
-                        val quality = call.argument<Int>("quality") ?: 70
-
-                        if (uriString == null || fileName == null) {
-                            result.error("INVALID_ARGS", "filePath and fileName required", null)
-                            return@setMethodCallHandler
-                        }
-
-                        ioExecutor.execute {
-                            try {
-                                val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-                                    ?: run {
-                                        runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                                        return@execute
-                                    }
-
-                                val inputStream = VeraCryptInputStream(this, uriString, fileName, volId)
-                                
-                                val options = BitmapFactory.Options().apply {
-                                    inJustDecodeBounds = true
-                                }
-                                BitmapFactory.decodeStream(inputStream, null, options)
-                                inputStream.reset()
-
-                                val width = options.outWidth
-                                val height = options.outHeight
-
-                                val inSampleSize = calculateInSampleSize(width, height, targetSize)
-
-                                val decodeOptions = BitmapFactory.Options().apply {
-                                    this.inSampleSize = inSampleSize
-                                }
-                                val rawBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
-                                inputStream.close()
-
-                                if (rawBitmap != null) {
-                                    val scaledBitmap = scaledToFit(rawBitmap, targetSize)
-                                    if (scaledBitmap != rawBitmap) rawBitmap.recycle()
-
-                                    val stream = ByteArrayOutputStream()
-                                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
-                                    val bytes = stream.toByteArray()
-                                    scaledBitmap.recycle()
-
-                                    runOnUiThread { result.success(bytes) }
-                                } else {
-                                    runOnUiThread { result.error("DECODE_FAILED", "Failed to decode image bytes", null) }
-                                }
-                            } catch (e: Exception) {
-                                runOnUiThread { dispatchNativeError(e, result) }
-                            }
-                        }
-                    }
-
-                    ChannelMethods.GENERATE_AND_CACHE_THUMBNAIL -> {
-                        val uriString = call.argument<String>("filePath")
-                        val fileName  = call.argument<String>("fileName")
-                        val keyBytes  = call.argument<ByteArray>("keyBytes")
-                        val targetSize = 180
-                        val quality = call.argument<Int>("quality") ?: 70
-
-                        if (uriString == null || fileName == null || keyBytes == null) {
-                            result.success(null)
-                            return@setMethodCallHandler
-                        }
-
-                        ioExecutor.execute {
-                            try {
-                                val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return@execute
-                                val inputStream = VeraCryptInputStream(this, uriString, fileName, volId)
-                                
-                                val options = BitmapFactory.Options().apply {
-                                    inJustDecodeBounds = true
-                                }
-                                BitmapFactory.decodeStream(inputStream, null, options)
-                                inputStream.reset()
-
-                                val width = options.outWidth
-                                val height = options.outHeight
-
-                                val inSampleSize = calculateInSampleSize(width, height, targetSize)
-
-                                val decodeOptions = BitmapFactory.Options().apply {
-                                    this.inSampleSize = inSampleSize
-                                }
-                                val rawBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
-                                inputStream.close()
-
-                                if (rawBitmap != null) {
-                                    val scaledBitmap = Bitmap.createScaledBitmap(rawBitmap, targetSize, targetSize, true)
-                                    if (scaledBitmap != rawBitmap) {
-                                        rawBitmap.recycle()
-                                    }
-
-                                    val stream = ByteArrayOutputStream()
-                                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
-                                    val thumbData = stream.toByteArray()
-                                    scaledBitmap.recycle()
-
-                                    val secureRandom = java.security.SecureRandom()
-                                    val nonce = ByteArray(12)
-                                    secureRandom.nextBytes(nonce)
-
-                                    val secretKeySpec = javax.crypto.spec.SecretKeySpec(keyBytes, "AES")
-                                    val gcmParameterSpec = javax.crypto.spec.GCMParameterSpec(128, nonce)
-
-                                    val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
-                                    cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKeySpec, gcmParameterSpec)
-                                    val encryptedData = cipher.doFinal(thumbData)
-
-                                    val outBytes = ByteArray(nonce.size + encryptedData.size)
-                                    System.arraycopy(nonce, 0, outBytes, 0, nonce.size)
-                                    System.arraycopy(encryptedData, 0, outBytes, nonce.size, encryptedData.size)
-
-                                    val cacheDir = this.cacheDir
-                                    val volDir = File(cacheDir, "thumbs/$volId")
-                                    if (!volDir.exists()) volDir.mkdirs()
-
-                                    val encodedKey = encodeKey(fileName)
-                                    val file = File(volDir, encodedKey)
-
-                                    val tmpFile = File(volDir, "$encodedKey.tmp")
-                                    tmpFile.writeBytes(outBytes)
-                                    tmpFile.renameTo(file)
-                                }
-                            } catch (_: Exception) {}
-                        }
-
-                        result.success(null)
-                    }
-
-                    ChannelMethods.LOCK_CONTAINER -> {
-                        val uriString = call.argument<String>("filePath")
-                        if (uriString == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null)
-                            return@setMethodCallHandler
-                        }
-                        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-                        if (volId != null) {
-                            val session = ContainerSessionRegistry.activeSessions[volId]
-                            ioExecutor.execute {
-                                try {
-                                    synchronized(ContainerSessionRegistry.locks[volId]) {
-                                        ContainerEngine.lock(volId)
-                                    }
-                                    if (session?.isUsbSource == true) {
-                                        UsbBlockBridge.unregister(volId)
-                                    }
-                                    ContainerSessionRegistry.removeSession(volId)
-                                    runOnUiThread {
+                                    if (docProvider) {
                                         contentResolver.notifyChange(
                                             DocumentsContract.buildRootsUri(
                                                 "com.aeidolon.vaultexplorer.documents"), null)
-                                        result.success(true)
                                     }
-                                } catch (e: Exception) {
-                                    runOnUiThread { dispatchNativeError(e, result) }
+                                    val fmt = ContainerEngine.format(targetVolId).wireName
+                                    result.success(mapOf(
+                                        "volId" to targetVolId,
+                                        "files" to files.toList(),
+                                        "matchedCipherId" to ContainerEngine.matchedCipherId(targetVolId),
+                                        "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
+                                        "containerFormat" to fmt
+                                    ))
+                                } else {
+                                    UsbBlockBridge.unregister(targetVolId)
+                                    result.error("AUTH_FAIL", "Incorrect password/keyfiles or invalid drive", null)
                                 }
                             }
-                        } else {
-                            result.success(false)
+                        } catch (e: Exception) {
+                            UsbBlockBridge.unregister(targetVolId)
+                            runOnUiThread { dispatchNativeError(e, result) }
                         }
                     }
+                }
 
-                    ChannelMethods.UPDATE_CONTAINER_SETTINGS -> {
-                        val uriString = call.argument<String>("filePath")
-                        val displayName = call.argument<String>("displayName")
-                        val docProvider = call.argument<Boolean>("documentProvider") ?: false
+                ChannelMethods.PICK_CONTAINER -> {
+                    pendingResultCheck(result)
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                    }
+                    pickContainerLauncher.launch(intent)
+                }
 
-                        if (uriString == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null)
-                            return@setMethodCallHandler
-                        }
-                        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-                        if (volId != null) {
-                            val session = ContainerSessionRegistry.activeSessions[volId]
-                            if (session != null) {
-                                session.displayName = displayName
-                                session.documentProvider = docProvider
-                                contentResolver.notifyChange(
-                                    DocumentsContract.buildRootsUri(
-                                        "com.aeidolon.vaultexplorer.documents"), null)
-                                result.success(true)
-                            } else {
-                                result.success(false)
+                ChannelMethods.PICK_KEYFILES -> {
+                    pendingResultCheck(result)
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    }
+                    pickKeyfilesLauncher.launch(intent)
+                }
+
+                ChannelMethods.CREATE_CONTAINER -> {
+                    val name = call.argument<String>("displayName") ?: "vault.hc"
+                    val password = call.argument<String>("password") ?: ""
+                    val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+                    if (password.isEmpty() && keyfilePaths.isNullOrEmpty()) {
+                        result.error("INVALID_ARGS", "password or keyfiles required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    pendingCreate = PendingCreate(
+                        name        = name,
+                        sizeBytes   = call.argument<Number>("sizeBytes")?.toLong() ?: 0L,
+                        password    = password,
+                        pim         = call.argument<Number>("pim")?.toInt() ?: 0,
+                        fileSystem  = call.argument<String>("fileSystem") ?: "fat",
+                        containerFormat = call.argument<Number>("containerFormat")?.toInt() ?: 0,
+                        cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255,
+                        hashId      = call.argument<Number>("hashId")?.toInt() ?: 255,
+                        keyfilePaths = keyfilePaths,
+                        createHiddenVolume = call.argument<Boolean>("createHiddenVolume") ?: false,
+                        hiddenPassword = call.argument<String>("hiddenPassword"),
+                        hiddenFileSystem = call.argument<String>("hiddenFileSystem"),
+                        hiddenSizeBytes = call.argument<Number>("hiddenSizeBytes")?.toLong() ?: 0L,
+                        hiddenKeyfilePaths = call.argument<List<String>>("hiddenKeyfilePaths"),
+                        hiddenPim = call.argument<Number>("hiddenPim")?.toInt() ?: 0,
+                        hiddenCipherId = call.argument<Number>("hiddenCipherId")?.toInt() ?: 255,
+                        hiddenHashId = call.argument<Number>("hiddenHashId")?.toInt() ?: 255,
+                    )
+                    pendingResultCheck(result)
+                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "application/octet-stream"
+                        putExtra(Intent.EXTRA_TITLE, name)
+                    }
+                    createContainerLauncher.launch(intent)
+                }
+
+                ChannelMethods.CREATE_USB_CONTAINER -> {
+                    val deviceName   = call.argument<String>("deviceName")
+                    val password     = call.argument<String>("password") ?: ""
+                    val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+                    val sizeBytes    = call.argument<Number>("sizeBytes")?.toLong() ?: 0L
+                    if (deviceName == null || (password.isEmpty() && keyfilePaths.isNullOrEmpty())) {
+                        result.error("INVALID_ARGS", "deviceName and password/keyfiles required", null)
+                        return@setMethodCallHandler
+                    }
+                    val device = usbManager.deviceList[deviceName]
+                    if (device == null || !usbManager.hasPermission(device)) {
+                        result.error("USB_NOT_FOUND", "Device not found or no permission", null)
+                        return@setMethodCallHandler
+                    }
+                    val volId = ContainerSessionRegistry.getFreeVolumeId()
+                    if (volId == null) {
+                        result.error("MAX_CONTAINERS", "Maximum containers already mounted", null)
+                        return@setMethodCallHandler
+                    }
+                    ioExecutor.execute {
+                        var msd: UsbMassStorageDevice? = null
+                        try {
+                            msd = UsbMassStorageDevice.open(usbManager, device) ?: throw Exception("Failed to open USB device")
+
+                            val deviceCapacityBytes = msd.sectorCount * msd.sectorSize
+                            val partitionStartBytes = 2048L * 512L
+                            Log.i("VaultExplorer_C++", "createUsbContainer: device=$deviceName capacity=$deviceCapacityBytes requested=$sizeBytes")
+                            if (sizeBytes <= 0 || sizeBytes > deviceCapacityBytes - partitionStartBytes) {
+                                Log.w("VaultExplorer_C++", "createUsbContainer: requested size exceeds usable capacity")
+                                msd.close()
+                                runOnUiThread {
+                                    result.error(
+                                        "SIZE_TOO_LARGE",
+                                        "Requested size ($sizeBytes bytes) exceeds usable device capacity " +
+                                            "(${deviceCapacityBytes - partitionStartBytes} bytes)",
+                                        null
+                                    )
+                                }
+                                return@execute
                             }
-                        } else {
-                            result.success(false)
+
+                            UsbBlockBridge.register(volId, msd)
+                            
+                            val createHiddenVolume = call.argument<Boolean>("createHiddenVolume") ?: false
+                            val quickFormat = call.argument<Boolean>("quickFormat") ?: false
+                            val keyfileFds = openKeyfileFds(keyfilePaths)
+
+                            val success = if (createHiddenVolume) {
+                                val hiddenPassword = call.argument<String>("hiddenPassword") ?: ""
+                                val hiddenPim = call.argument<Number>("hiddenPim")?.toInt() ?: 0
+                                val hiddenSizeBytes = call.argument<Number>("hiddenSizeBytes")?.toLong() ?: 0L
+                                val hiddenFileSystem = call.argument<String>("hiddenFileSystem") ?: "fat"
+                                val hiddenCipherId = call.argument<Number>("hiddenCipherId")?.toInt() ?: 255
+                                val hiddenHashId = call.argument<Number>("hiddenHashId")?.toInt() ?: 255
+                                val hiddenKeyfilePaths = call.argument<List<String>>("hiddenKeyfilePaths")
+                                val hiddenKeyfileFds = openKeyfileFds(hiddenKeyfilePaths)
+
+                                ContainerEngine.createUsbWithHidden(
+                                    volId, "mbr", password, hiddenPassword,
+                                    call.argument<Number>("pim")?.toInt() ?: 0, hiddenPim,
+                                    sizeBytes,
+                                    call.argument<String>("fileSystem") ?: "ext4", hiddenFileSystem,
+                                    hiddenSizeBytes,
+                                    call.argument<Number>("cipherId")?.toInt() ?: 255,
+                                    call.argument<Number>("hashId")?.toInt() ?: 255,
+                                    hiddenCipherId, hiddenHashId,
+                                    keyfileFds, hiddenKeyfileFds, quickFormat
+                                )
+                            } else {
+                                ContainerEngine.createUsb(
+                                    volId, "mbr", password,
+                                    call.argument<Number>("pim")?.toInt() ?: 0,
+                                    sizeBytes,
+                                    call.argument<String>("fileSystem") ?: "ext4",
+                                    call.argument<Number>("containerFormat")?.toInt() ?: 0,
+                                    call.argument<Number>("cipherId")?.toInt() ?: 255,
+                                    call.argument<Number>("hashId")?.toInt() ?: 255,
+                                    keyfileFds, quickFormat
+                                )
+                            }
+                            Log.i("VaultExplorer_C++", "createUsbContainer: native result=$success")
+                            runOnUiThread { result.success(success) }
+                        } catch (e: Exception) {
+                            Log.e("VaultExplorer_C++", "createUsbContainer: exception", e)
+                            runOnUiThread { dispatchNativeError(e, result) }
+                        } finally {
+                            UsbBlockBridge.unregister(volId)
                         }
                     }
+                }
 
-                    ChannelMethods.DECRYPT_FILE -> {
-                        val fileName = call.argument<String>("fileName")
-                        val destPath = call.argument<String>("destPath")
-                        if (fileName == null || destPath == null) {
-                            result.error("INVALID_ARGS", "fileName and destPath required", null); return@setMethodCallHandler
-                        }
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.extractToFile(volId, fileName, destPath)
+                ChannelMethods.GET_USB_DEVICE_CAPACITY -> {
+                    val deviceName = call.argument<String>("deviceName")
+                    val device = deviceName?.let { usbManager.deviceList[it] }
+                    if (device == null) {
+                        result.error("USB_NOT_FOUND", "USB device not found: $deviceName", null)
+                        return@setMethodCallHandler
+                    }
+                    if (!usbManager.hasPermission(device)) {
+                        result.error("USB_NO_PERMISSION", "Permission not granted for device", null)
+                        return@setMethodCallHandler
+                    }
+                    ioExecutor.execute {
+                        var msd: UsbMassStorageDevice? = null
+                        try {
+                            msd = UsbMassStorageDevice.open(usbManager, device)
+                            if (msd == null) {
+                                runOnUiThread { result.error("USB_OPEN_FAILED", "Failed to open USB device", null) }
+                                return@execute
+                            }
+                            val capacityBytes = msd.sectorCount * msd.sectorSize
+                            val partitionStartBytes = 2048L * 512L
+                            val usableBytes = (capacityBytes - partitionStartBytes).coerceAtLeast(0L)
+                            runOnUiThread { result.success(usableBytes) }
+                        } catch (e: Exception) {
+                            runOnUiThread { dispatchNativeError(e, result) }
+                        } finally {
+                            msd?.close()
                         }
                     }
+                }
 
-                    ChannelMethods.GET_FILE_SIZE -> {
-                        val fileName = call.argument<String>("fileName")
-                        if (fileName == null) {
-                            result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
-                        }
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.getFileSize(volId, fileName)
-                        }
+                ChannelMethods.UNLOCK_CONTAINER -> {
+                    val uriString   = call.argument<String>("filePath")
+                    val password    = call.argument<String>("password")
+                    val pim         = call.argument<Number>("pim")?.toInt() ?: 0
+                    val displayName = call.argument<String>("displayName")
+                    val docProvider = call.argument<Boolean>("documentProvider") ?: false
+                    val cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255
+                    val hashId      = call.argument<Number>("hashId")?.toInt() ?: 255
+                    val preservedKeyBase64 = call.argument<String>("preservedKey")
+                    val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+                    if (preservedKey != null) {
+                        Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
+                    }
+                    val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
+                    val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+
+                    if (uriString == null || password == null) {
+                        result.error("INVALID_ARGS", "filePath and password required", null)
+                        return@setMethodCallHandler
+                    }
+                    if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
+                        result.error("INVALID_ARGS", "password or keyfiles required", null)
+                        return@setMethodCallHandler
                     }
 
-                    ChannelMethods.GET_FOLDER_SIZE -> {
-                        val dirPath = call.argument<String>("dirPath") ?: ""
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.getFolderSize(volId, dirPath)
+                    val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                        ?: ContainerSessionRegistry.getFreeVolumeId()
+                    if (targetVolId == null) {
+                        result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
+                        return@setMethodCallHandler
+                    }
+                    methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
+
+                    ioExecutor.execute {
+                        var pfd: ParcelFileDescriptor? = null
+                        try {
+                            val uri = Uri.parse(uriString)
+                            pfd = contentResolver.openFileDescriptor(uri, "rw")
+                                ?: throw Exception("Could not open file descriptor")
+
+                            val keyfileFds = openKeyfileFds(keyfilePaths)
+                            val fd = pfd.detachFd()
+
+                            if (preservedKey != null) {
+                                Log.i("VaultExplorer_C++", "File unlock using preserved derived key (len=${preservedKey.size})")
+                            } else if (cacheDerivedKey) {
+                                Log.i("VaultExplorer_C++", "File unlock will derive and cache a fresh key")
+                            }
+                            if (keyfileFds != null && keyfileFds.isNotEmpty()) {
+                                Log.i("VaultExplorer_C++", "File unlock using ${keyfileFds.size} keyfile(s)")
+                            }
+
+                            val files = synchronized(ContainerSessionRegistry.locks[targetVolId]) {
+                                ContainerEngine.unlockFile(fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds)
+                            }
+
+                            runOnUiThread {
+                                if (files != null) {
+                                    if (cacheDerivedKey && preservedKey == null) {
+                                        val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
+                                        if (derived != null) {
+                                            storeDerivedKeyBytes(uriString, derived)
+                                        }
+                                    }
+                                    ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
+                                        uri = uriString,
+                                        volId = targetVolId,
+                                        cachedFilesList = files.toList(),
+                                        displayName = displayName,
+                                        documentProvider = docProvider,
+                                    )
+                                    if (docProvider) {
+                                        contentResolver.notifyChange(
+                                            DocumentsContract.buildRootsUri(
+                                                "com.aeidolon.vaultexplorer.documents"), null)
+                                    }
+                                    val fmt = ContainerEngine.format(targetVolId).wireName
+                                    result.success(mapOf(
+                                        "volId" to targetVolId,
+                                        "files" to files.toList(),
+                                        "matchedCipherId" to ContainerEngine.matchedCipherId(targetVolId),
+                                        "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
+                                        "containerFormat" to fmt
+                                    ))
+                                } else {
+                                    result.error("AUTH_FAIL",
+                                        "Incorrect password/keyfiles or invalid container", null)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            try { pfd?.close() } catch (_: Exception) {}
+                            runOnUiThread { dispatchNativeError(e, result) }
                         }
                     }
+                }
 
-                    ChannelMethods.READ_FILE_CHUNK -> {
-                        val fileName = call.argument<String>("fileName")
-                        val offset    = call.argument<Number>("offset")?.toLong() ?: 0L
-                        val length    = call.argument<Number>("length")?.toInt() ?: 0
-                        if (fileName == null) {
-                            result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
-                        }
-                        if (length <= 0 || length > MAX_CHUNK_BYTES) {
-                            result.error("INVALID_ARGS", "length must be between 1 and $MAX_CHUNK_BYTES bytes", null)
-                            return@setMethodCallHandler
-                        }
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.readFileChunk(volId, fileName, offset, length)
-                        }
+                ChannelMethods.CANCEL_UNLOCK -> {
+                    val volId = call.argument<Number>("volId")?.toInt()
+                    if (volId == null) {
+                        result.error("INVALID_ARGS", "volId required", null)
+                        return@setMethodCallHandler
+                    }
+                    ContainerEngine.requestUnlockCancellation(volId)
+                    result.success(true)
+                }
+
+                ChannelMethods.CHANGE_CONTAINER_PASSWORD -> {
+                    val uri = call.argument<String>("uri")
+                    val oldPassword = call.argument<String>("oldPassword") ?: ""
+                    val newPassword = call.argument<String>("newPassword") ?: ""
+                    val oldPim = call.argument<Number>("oldPim")?.toInt() ?: 0
+                    val newPim = call.argument<Number>("newPim")?.toInt() ?: 0
+                    val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
+                    val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
+                    val oldKeyfilePaths = call.argument<List<String>>("oldKeyfilePaths")
+                    val newKeyfilePaths = call.argument<List<String>>("newKeyfilePaths")
+
+                    if (uri.isNullOrEmpty() || newPassword.isEmpty()) {
+                        result.error("INVALID_ARGS", "uri and newPassword required", null)
+                        return@setMethodCallHandler
                     }
 
-                    ChannelMethods.LIST_DIRECTORY -> {
-                        val dirPath = call.argument<String>("dirPath") ?: ""
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.listDirectory(volId, dirPath)?.toList()
+                    ioExecutor.execute {
+                        try {
+                            val docUri = android.net.Uri.parse(uri)
+                            val pfd = contentResolver.openFileDescriptor(docUri, "rw")
+                                ?: throw Exception("Could not open file descriptor")
+                            val oldKfFds = openKeyfileFds(oldKeyfilePaths)
+                            val newKfFds = openKeyfileFds(newKeyfilePaths)
+                            val success = ContainerEngine.changePassword(
+                                pfd.detachFd(), oldPassword, newPassword,
+                                oldPim, newPim, cipherId, hashId,
+                                oldKfFds, newKfFds
+                            )
+                            runOnUiThread { result.success(success) }
+                        } catch (e: Exception) {
+                            runOnUiThread { dispatchNativeError(e, result) }
                         }
                     }
+                }
 
-                    ChannelMethods.CREATE_DIRECTORY -> {
-                        val dirPath = call.argument<String>("dirPath")
-                        if (dirPath == null) {
-                            result.error("INVALID_ARGS", "dirPath required", null); return@setMethodCallHandler
-                        }
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.createDirectory(volId, dirPath)
-                        }
+                ChannelMethods.DERIVE_DERIVED_KEY -> {
+                    val filePath = call.argument<String>("filePath")
+                    val password = call.argument<String>("password")
+                    val pim = call.argument<Number>("pim")?.toInt() ?: 0
+                    val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
+                    val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
+                    val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+
+                    if (filePath == null || password == null) {
+                        result.error("INVALID_ARGS", "filePath and password required", null)
+                        return@setMethodCallHandler
                     }
 
-                    ChannelMethods.RENAME_FILE -> {
-                        val oldPath = call.argument<String>("oldPath")
-                        val newPath = call.argument<String>("newPath")
-                        if (oldPath == null || newPath == null) {
-                            result.error("INVALID_ARGS", "oldPath and newPath required", null); return@setMethodCallHandler
-                        }
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.renameFile(volId, oldPath, newPath)
-                        }
-                    }
-
-                    ChannelMethods.WRITE_BACK_FILE -> {
-                        val fileName   = call.argument<String>("fileName")
-                        val sourcePath = call.argument<String>("sourcePath")
-                        if (fileName == null || sourcePath == null) {
-                            result.error("INVALID_ARGS", "fileName and sourcePath required", null); return@setMethodCallHandler
-                        }
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.writeBackFile(volId, fileName, sourcePath)
+                    ioExecutor.execute {
+                        var pfd: ParcelFileDescriptor? = null
+                        try {
+                            pfd = contentResolver.openFileDescriptor(Uri.parse(filePath), "r")
+                                ?: throw Exception("Could not open file descriptor")
+                            val keyfileFds = openKeyfileFds(keyfilePaths)
+                            val fd = pfd.detachFd()
+                            val derived = ContainerEngine.deriveKeyMaterial(fd, password, pim, cipherId, hashId, keyfileFds)
+                            val encoded = derived?.let { Base64.encodeToString(it, Base64.NO_WRAP) }
+                            runOnUiThread { result.success(encoded) }
+                        } catch (e: Exception) {
+                            try { pfd?.close() } catch (_: Exception) {}
+                            runOnUiThread { dispatchNativeError(e, result) }
                         }
                     }
+                }
 
-                    ChannelMethods.SET_LAST_MODIFIED_TIME -> {
-                        val fileName = call.argument<String>("fileName")
-                        val epochSecs = call.argument<Number>("epochSeconds")?.toLong()
-                        if (fileName == null || epochSecs == null) {
-                            result.error("INVALID_ARGS", "fileName and epochSeconds required", null); return@setMethodCallHandler
-                        }
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.setLastModifiedTime(volId, fileName, epochSecs)
-                        }
+                ChannelMethods.DOCUMENT_EXISTS -> {
+                    val filePath = call.argument<String>("filePath")
+
+                    if (filePath == null) {
+                        result.error("INVALID_ARGS", "filePath required", null)
+                        return@setMethodCallHandler
                     }
 
-                    ChannelMethods.GET_SPACE_INFO -> {
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.getSpaceInfo(volId)?.toList()
+                    ioExecutor.execute {
+                        val exists = try {
+                            if (filePath.startsWith("content://")) {
+                                DocumentFile.fromSingleUri(this, Uri.parse(filePath))
+                                    ?.exists() == true
+                            } else {
+                                File(filePath).exists()
+                            }
+                        } catch (e: Exception) {
+                            false
                         }
+                        runOnUiThread { result.success(exists) }
+                    }
+                }
+
+                ChannelMethods.STORE_DERIVED_KEY -> {
+                    val filePath = call.argument<String>("filePath")
+                    val derivedKeyBase64 = call.argument<String>("derivedKey")
+                    val derived = derivedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+                    if (filePath == null || derived == null) {
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    result.success(storeDerivedKeyBytes(filePath, derived))
+                }
+
+                ChannelMethods.LOAD_DERIVED_KEY -> {
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath == null) {
+                        result.success(null)
+                        return@setMethodCallHandler
+                    }
+                    val derivedKey = loadDerivedKeyBytes(filePath)
+                    result.success(derivedKey?.let { Base64.encodeToString(it, Base64.NO_WRAP) })
+                }
+
+                ChannelMethods.CLEAR_DERIVED_KEY -> {
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath == null) {
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    result.success(clearDerivedKeyBytes(filePath))
+                }
+
+                ChannelMethods.HASH_PASSWORD -> {
+                    val password   = call.argument<String>("password")
+                    val saltBytes  = call.argument<ByteArray>("salt")
+                    val iterations = call.argument<Int>("iterations") ?: 200_000
+
+                    if (password == null || saltBytes == null || saltBytes.isEmpty()) {
+                        result.error("INVALID_ARGS", "password and non-empty salt required", null)
+                        return@setMethodCallHandler
                     }
 
-                    ChannelMethods.DELETE_FILE -> {
-                        val fileName = call.argument<String>("fileName")
-                        if (fileName == null) {
-                            result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
-                        }
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.deleteFile(volId, fileName)
+                    ioExecutor.execute {
+                        try {
+                            val hash = ContainerEngine.hashPassword(password, saltBytes, iterations)
+                            runOnUiThread {
+                                if (hash != null) result.success(hash)
+                                else result.error("KDF_FAILED", "PBKDF2 derivation failed", null)
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { dispatchNativeError(e, result) }
                         }
                     }
+                }
 
-                    ChannelMethods.OPEN_WITH_APP -> {
-                        val uriString = call.argument<String>("filePath")
-                        val fileName  = call.argument<String>("fileName")
-                        val packageName = call.argument<String>("packageName")
-                        if (uriString == null || fileName == null) {
-                            result.error("INVALID_ARGS", "filePath and fileName required", null); return@setMethodCallHandler
-                        }
+                ChannelMethods.GET_VIDEO_THUMBNAIL -> {
+                    val uriString = call.argument<String>("filePath")
+                    val fileName  = call.argument<String>("fileName")
+
+                    if (uriString == null || fileName == null) {
+                        result.error("INVALID_ARGS", "filePath and fileName required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    ioExecutor.execute {
+                        var retriever: MediaMetadataRetriever? = null
                         try {
                             val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                                 ?: run {
-                                    result.error("NOT_MOUNTED", "Container not mounted", null)
-                                    return@setMethodCallHandler
-                                }
-                            val docUri = DocumentsContract.buildDocumentUri(
-                                "com.aeidolon.vaultexplorer.documents", "$volId:file:$fileName")
-                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(docUri, MimeTypeHelper.getMimeType(fileName))
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                         Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                                if (!packageName.isNullOrEmpty()) {
-                                    setPackage(packageName)
-                                }
-                            }
-                            
-                            if (!packageName.isNullOrEmpty()) {
-                                try {
-                                    startActivity(intent)
-                                } catch (e: Exception) {
-                                    intent.setPackage(null)
-                                    val receiverIntent = Intent(ACTION_CHOOSER).apply {
-                                        val ext = fileName.substringAfterLast('.', "")
-                                        putExtra("extension", ext)
-                                        `package` = this@MainActivity.packageName
+                                    runOnUiThread {
+                                        result.error("NOT_MOUNTED", "Container not mounted", null)
                                     }
-                                    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-                                    } else {
-                                        PendingIntent.FLAG_UPDATE_CURRENT
-                                    }
-                                    val pendingIntent = PendingIntent.getBroadcast(this, 0, receiverIntent, flags)
-                                    val chooser = Intent.createChooser(intent, "Open file with…", pendingIntent.intentSender)
-                                    startActivity(chooser)
+                                    return@execute
+                                }
+
+                            retriever = MediaMetadataRetriever()
+
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                val dataSource = VeraCryptMediaDataSource(this, uriString, fileName, volId)
+                                retriever.setDataSource(dataSource)
+
+                                val durationMs = retriever
+                                    .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                    ?.toLongOrNull() ?: 10_000L
+                                val timeMs = minOf(1000L, durationMs / 4)
+
+                                val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                                    runCatching {
+                                        retriever.getScaledFrameAtTime(
+                                            timeMs * 1000L,
+                                            MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                                            180, 180)
+                                    }.getOrNull()
+                                        ?: retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                } else {
+                                    retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                                }
+
+                                 if (frame != null) {
+                                    val quality = call.argument<Int>("quality") ?: 60
+                                    val stream = ByteArrayOutputStream()
+                                    frame.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+                                    val bytes = stream.toByteArray()
+                                    runOnUiThread { result.success(bytes) }
+                                } else {
+                                    runOnUiThread { result.error("FRAME_FAILED", "Failed to extract frame", null) }
                                 }
                             } else {
+                                runOnUiThread { result.error("UNSUPPORTED_OS", "Requires Android 6.0+", null) }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { dispatchNativeError(e, result) }
+                        } finally {
+                            runCatching { retriever?.release() }
+                        }
+                    }
+                }
+
+                ChannelMethods.GET_IMAGE_THUMBNAIL -> {
+                    val uriString  = call.argument<String>("filePath")
+                    val fileName   = call.argument<String>("fileName")
+                    val targetSize = call.argument<Int>("targetSize") ?: 180
+                    val quality = call.argument<Int>("quality") ?: 70
+
+                    if (uriString == null || fileName == null) {
+                        result.error("INVALID_ARGS", "filePath and fileName required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    ioExecutor.execute {
+                        try {
+                            val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                                ?: run {
+                                    runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
+                                    return@execute
+                                }
+
+                            val inputStream = VeraCryptInputStream(this, uriString, fileName, volId)
+                            
+                            val options = BitmapFactory.Options().apply {
+                                inJustDecodeBounds = true
+                            }
+                            BitmapFactory.decodeStream(inputStream, null, options)
+                            inputStream.reset()
+
+                            val width = options.outWidth
+                            val height = options.outHeight
+
+                            val inSampleSize = calculateInSampleSize(width, height, targetSize)
+
+                            val decodeOptions = BitmapFactory.Options().apply {
+                                this.inSampleSize = inSampleSize
+                            }
+                            val rawBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
+                            inputStream.close()
+
+                            if (rawBitmap != null) {
+                                val scaledBitmap = scaledToFit(rawBitmap, targetSize)
+                                if (scaledBitmap != rawBitmap) rawBitmap.recycle()
+
+                                val stream = ByteArrayOutputStream()
+                                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+                                val bytes = stream.toByteArray()
+                                scaledBitmap.recycle()
+
+                                runOnUiThread { result.success(bytes) }
+                            } else {
+                                runOnUiThread { result.error("DECODE_FAILED", "Failed to decode image bytes", null) }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { dispatchNativeError(e, result) }
+                        }
+                    }
+                }
+
+                ChannelMethods.GENERATE_AND_CACHE_THUMBNAIL -> {
+                    val uriString = call.argument<String>("filePath")
+                    val fileName  = call.argument<String>("fileName")
+                    val keyBytes  = call.argument<ByteArray>("keyBytes")
+                    val targetSize = 180
+                    val quality = call.argument<Int>("quality") ?: 70
+
+                    if (uriString == null || fileName == null || keyBytes == null) {
+                        result.success(null)
+                        return@setMethodCallHandler
+                    }
+
+                    ioExecutor.execute {
+                        try {
+                            val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return@execute
+                            val inputStream = VeraCryptInputStream(this, uriString, fileName, volId)
+                            
+                            val options = BitmapFactory.Options().apply {
+                                inJustDecodeBounds = true
+                            }
+                            BitmapFactory.decodeStream(inputStream, null, options)
+                            inputStream.reset()
+
+                            val width = options.outWidth
+                            val height = options.outHeight
+
+                            val inSampleSize = calculateInSampleSize(width, height, targetSize)
+
+                            val decodeOptions = BitmapFactory.Options().apply {
+                                this.inSampleSize = inSampleSize
+                            }
+                            val rawBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
+                            inputStream.close()
+
+                            if (rawBitmap != null) {
+                                val scaledBitmap = Bitmap.createScaledBitmap(rawBitmap, targetSize, targetSize, true)
+                                if (scaledBitmap != rawBitmap) {
+                                    rawBitmap.recycle()
+                                }
+
+                                val stream = ByteArrayOutputStream()
+                                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+                                val thumbData = stream.toByteArray()
+                                scaledBitmap.recycle()
+
+                                val secureRandom = java.security.SecureRandom()
+                                val nonce = ByteArray(12)
+                                secureRandom.nextBytes(nonce)
+
+                                val secretKeySpec = javax.crypto.spec.SecretKeySpec(keyBytes, "AES")
+                                val gcmParameterSpec = javax.crypto.spec.GCMParameterSpec(128, nonce)
+
+                                val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+                                cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKeySpec, gcmParameterSpec)
+                                val encryptedData = cipher.doFinal(thumbData)
+
+                                val outBytes = ByteArray(nonce.size + encryptedData.size)
+                                System.arraycopy(nonce, 0, outBytes, 0, nonce.size)
+                                System.arraycopy(encryptedData, 0, outBytes, nonce.size, encryptedData.size)
+
+                                val cacheDir = this.cacheDir
+                                val volDir = File(cacheDir, "thumbs/$volId")
+                                if (!volDir.exists()) volDir.mkdirs()
+
+                                val encodedKey = encodeKey(fileName)
+                                val file = File(volDir, encodedKey)
+
+                                val tmpFile = File(volDir, "$encodedKey.tmp")
+                                tmpFile.writeBytes(outBytes)
+                                tmpFile.renameTo(file)
+                            }
+                        } catch (_: Exception) {}
+                    }
+
+                    result.success(null)
+                }
+
+                ChannelMethods.LOCK_CONTAINER -> {
+                    val uriString = call.argument<String>("filePath")
+                    if (uriString == null) {
+                        result.error("INVALID_ARGS", "filePath is required", null)
+                        return@setMethodCallHandler
+                    }
+                    val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                    if (volId != null) {
+                        val session = ContainerSessionRegistry.activeSessions[volId]
+                        ioExecutor.execute {
+                            try {
+                                synchronized(ContainerSessionRegistry.locks[volId]) {
+                                    ContainerEngine.lock(volId)
+                                }
+                                if (session?.isUsbSource == true) {
+                                    UsbBlockBridge.unregister(volId)
+                                }
+                                ContainerSessionRegistry.removeSession(volId)
+                                runOnUiThread {
+                                    contentResolver.notifyChange(
+                                        DocumentsContract.buildRootsUri(
+                                            "com.aeidolon.vaultexplorer.documents"), null)
+                                    result.success(true)
+                                }
+                            } catch (e: Exception) {
+                                runOnUiThread { dispatchNativeError(e, result) }
+                            }
+                        }
+                    } else {
+                        result.success(false)
+                    }
+                }
+
+                ChannelMethods.UPDATE_CONTAINER_SETTINGS -> {
+                    val uriString = call.argument<String>("filePath")
+                    val displayName = call.argument<String>("displayName")
+                    val docProvider = call.argument<Boolean>("documentProvider") ?: false
+
+                    if (uriString == null) {
+                        result.error("INVALID_ARGS", "filePath is required", null)
+                        return@setMethodCallHandler
+                    }
+                    val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                    if (volId != null) {
+                        val session = ContainerSessionRegistry.activeSessions[volId]
+                        if (session != null) {
+                            session.displayName = displayName
+                            session.documentProvider = docProvider
+                            contentResolver.notifyChange(
+                                DocumentsContract.buildRootsUri(
+                                    "com.aeidolon.vaultexplorer.documents"), null)
+                            result.success(true)
+                        } else {
+                            result.success(false)
+                        }
+                    } else {
+                        result.success(false)
+                    }
+                }
+
+                ChannelMethods.DECRYPT_FILE -> {
+                    val fileName = call.argument<String>("fileName")
+                    val destPath = call.argument<String>("destPath")
+                    if (fileName == null || destPath == null) {
+                        result.error("INVALID_ARGS", "fileName and destPath required", null); return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.extractToFile(volId, fileName, destPath)
+                    }
+                }
+
+                ChannelMethods.GET_FILE_SIZE -> {
+                    val fileName = call.argument<String>("fileName")
+                    if (fileName == null) {
+                        result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.getFileSize(volId, fileName)
+                    }
+                }
+
+                ChannelMethods.GET_FOLDER_SIZE -> {
+                    val dirPath = call.argument<String>("dirPath") ?: ""
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.getFolderSize(volId, dirPath)
+                    }
+                }
+
+                ChannelMethods.READ_FILE_CHUNK -> {
+                    val fileName = call.argument<String>("fileName")
+                    val offset    = call.argument<Number>("offset")?.toLong() ?: 0L
+                    val length    = call.argument<Number>("length")?.toInt() ?: 0
+                    if (fileName == null) {
+                        result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
+                    }
+                    if (length <= 0 || length > MAX_CHUNK_BYTES) {
+                        result.error("INVALID_ARGS", "length must be between 1 and $MAX_CHUNK_BYTES bytes", null)
+                        return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.readFileChunk(volId, fileName, offset, length)
+                    }
+                }
+
+                ChannelMethods.LIST_DIRECTORY -> {
+                    val dirPath = call.argument<String>("dirPath") ?: ""
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.listDirectory(volId, dirPath)?.toList()
+                    }
+                }
+
+                ChannelMethods.CREATE_DIRECTORY -> {
+                    val dirPath = call.argument<String>("dirPath")
+                    if (dirPath == null) {
+                        result.error("INVALID_ARGS", "dirPath required", null); return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.createDirectory(volId, dirPath)
+                    }
+                }
+
+                ChannelMethods.RENAME_FILE -> {
+                    val oldPath = call.argument<String>("oldPath")
+                    val newPath = call.argument<String>("newPath")
+                    if (oldPath == null || newPath == null) {
+                        result.error("INVALID_ARGS", "oldPath and newPath required", null); return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.renameFile(volId, oldPath, newPath)
+                    }
+                }
+
+                ChannelMethods.WRITE_BACK_FILE -> {
+                    val fileName   = call.argument<String>("fileName")
+                    val sourcePath = call.argument<String>("sourcePath")
+                    if (fileName == null || sourcePath == null) {
+                        result.error("INVALID_ARGS", "fileName and sourcePath required", null); return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.writeBackFile(volId, fileName, sourcePath)
+                    }
+                }
+
+                ChannelMethods.SET_LAST_MODIFIED_TIME -> {
+                    val fileName = call.argument<String>("fileName")
+                    val epochSecs = call.argument<Number>("epochSeconds")?.toLong()
+                    if (fileName == null || epochSecs == null) {
+                        result.error("INVALID_ARGS", "fileName and epochSeconds required", null); return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.setLastModifiedTime(volId, fileName, epochSecs)
+                    }
+                }
+
+                ChannelMethods.GET_SPACE_INFO -> {
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.getSpaceInfo(volId)?.toList()
+                    }
+                }
+
+                ChannelMethods.DELETE_FILE -> {
+                    val fileName = call.argument<String>("fileName")
+                    if (fileName == null) {
+                        result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.deleteFile(volId, fileName)
+                    }
+                }
+
+                ChannelMethods.OPEN_WITH_APP -> {
+                    val uriString = call.argument<String>("filePath")
+                    val fileName  = call.argument<String>("fileName")
+                    val packageName = call.argument<String>("packageName")
+                    if (uriString == null || fileName == null) {
+                        result.error("INVALID_ARGS", "filePath and fileName required", null); return@setMethodCallHandler
+                    }
+                    try {
+                        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                            ?: run {
+                                result.error("NOT_MOUNTED", "Container not mounted", null)
+                                return@setMethodCallHandler
+                            }
+                        val docUri = DocumentsContract.buildDocumentUri(
+                            "com.aeidolon.vaultexplorer.documents", "$volId:file:$fileName")
+                        val intent = Intent(Intent.ACTION_VIEW).apply {
+                            setDataAndType(docUri, MimeTypeHelper.getMimeType(fileName))
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                     Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                            if (!packageName.isNullOrEmpty()) {
+                                setPackage(packageName)
+                            }
+                        }
+                        
+                        if (!packageName.isNullOrEmpty()) {
+                            try {
+                                startActivity(intent)
+                            } catch (e: Exception) {
+                                intent.setPackage(null)
                                 val receiverIntent = Intent(ACTION_CHOOSER).apply {
                                     val ext = fileName.substringAfterLast('.', "")
                                     putExtra("extension", ext)
@@ -1657,108 +1755,123 @@ class MainActivity : FlutterFragmentActivity() {
                                 }
                                 val pendingIntent = PendingIntent.getBroadcast(this, 0, receiverIntent, flags)
                                 val chooser = Intent.createChooser(intent, "Open file with…", pendingIntent.intentSender)
-                                  startActivity(chooser)
+                                startActivity(chooser)
                             }
-                            result.success(true)
-                        } catch (e: Exception) { result.error("OPEN_WITH_ERROR", e.message, null) }
-                    }
-
-                    ChannelMethods.IMPORT_FILE -> {
-                        val containerUri = call.argument<String>("filePath")
-                        if (containerUri == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null)
-                            return@setMethodCallHandler
+                        } else {
+                            val receiverIntent = Intent(ACTION_CHOOSER).apply {
+                                val ext = fileName.substringAfterLast('.', "")
+                                putPathExtra("extension", ext)
+                                `package` = this@MainActivity.packageName
+                            }
+                            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                            } else {
+                                PendingIntent.FLAG_UPDATE_CURRENT
+                            }
+                            val pendingIntent = PendingIntent.getBroadcast(this, 0, receiverIntent, flags)
+                            val chooser = Intent.createChooser(intent, "Open file with…", pendingIntent.intentSender)
+                            startActivity(chooser)
                         }
-                        val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
-                        if (volId == null) {
-                            result.error("NOT_MOUNTED", "Container is not mounted", null)
-                            return@setMethodCallHandler
-                        }
-                        pendingImport = PendingImport(containerUri, call.argument<String>("targetPath") ?: "", volId)
-                        pendingResultCheck(result)
-                        importFileLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = "*/*"
-                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-                        })
-                    }
-
-                    ChannelMethods.EXPORT_FILES_FOLDER -> {
-                        val containerUri = call.argument<String>("filePath")
-                        if (containerUri == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null)
-                            return@setMethodCallHandler
-                        }
-                        val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
-                        if (volId == null) {
-                            result.error("NOT_MOUNTED", "Container not mounted", null)
-                            return@setMethodCallHandler
-                        }
-                        @Suppress("UNCHECKED_CAST")
-                        val items = (call.argument<List<*>>("items"))?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
-                        pendingExportMulti = PendingExportMulti(containerUri, items, volId)
-                        pendingResultCheck(result)
-                        exportFilesFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
-                    }
-
-                    ChannelMethods.IMPORT_FOLDER -> {
-                        val containerUri = call.argument<String>("filePath")
-                        if (containerUri == null) {
-                            result.error("INVALID_ARGS", "filePath is required", null)
-                            return@setMethodCallHandler
-                        }
-                        val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
-                        if (volId == null) {
-                            result.error("NOT_MOUNTED", "Container is not mounted", null)
-                            return@setMethodCallHandler
-                        }
-                        pendingImportFolder = PendingImportFolder(containerUri, call.argument<String>("targetPath") ?: "", volId)
-                        pendingResultCheck(result)
-                        importFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
-                    }
-
-                    ChannelMethods.EXPORT_FILE -> {
-                        val containerUri = call.argument<String>("filePath")
-                        val sourcePath = call.argument<String>("sourcePath")
-                        if (containerUri == null || sourcePath == null) {
-                            result.error("INVALID_ARGS", "filePath and sourcePath required", null)
-                            return@setMethodCallHandler
-                        }
-                        val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
-                        if (volId == null) {
-                            result.error("NOT_MOUNTED", "Container not mounted", null)
-                            return@setMethodCallHandler
-                        }
-                        pendingExportFile = PendingExportFile(containerUri, sourcePath, volId)
-                        pendingResultCheck(result)
-                        val fileName = sourcePath.split("/").last()
-                        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            type = MimeTypeHelper.getMimeType(fileName)
-                            putExtra(Intent.EXTRA_TITLE, fileName)
-                        }
-                        exportFileLauncher.launch(intent)
-                    }
-
-                    ChannelMethods.WRITE_FILE_CHUNK -> {
-                        val fileName = call.argument<String>("fileName")
-                        val offset   = call.argument<Number>("offset")?.toLong() ?: 0L
-                        val data     = call.argument<ByteArray>("data")
-                        if (fileName == null || data == null) {
-                            result.error("INVALID_ARGS", "fileName and data required", null); return@setMethodCallHandler
-                        }
-                        if (data.size > MAX_CHUNK_BYTES) {
-                            result.error("INVALID_ARGS", "Chunk too large (max $MAX_CHUNK_BYTES bytes)", null)
-                            return@setMethodCallHandler
-                        }
-                        runNativeOp(call.argument<String>("filePath"), result) { volId ->
-                            ContainerFileSystem.writeFileChunk(volId, fileName, offset, data)
-                        }
-                    }
-
-                    else -> result.notImplemented()
+                        result.success(true)
+                    } catch (e: Exception) { result.error("OPEN_WITH_ERROR", e.message, null) }
                 }
+
+                ChannelMethods.IMPORT_FILE -> {
+                    val containerUri = call.argument<String>("filePath")
+                    if (containerUri == null) {
+                        result.error("INVALID_ARGS", "filePath is required", null)
+                        return@setMethodCallHandler
+                    }
+                    val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
+                    if (volId == null) {
+                        result.error("NOT_MOUNTED", "Container is not mounted", null)
+                        return@setMethodCallHandler
+                    }
+                    pendingImport = PendingImport(containerUri, call.argument<String>("targetPath") ?: "", volId)
+                    pendingResultCheck(result)
+                    importFileLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "*/*"
+                        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    })
+                }
+
+                ChannelMethods.EXPORT_FILES_FOLDER -> {
+                    val containerUri = call.argument<String>("filePath")
+                    if (containerUri == null) {
+                        result.error("INVALID_ARGS", "filePath is required", null)
+                        return@setMethodCallHandler
+                    }
+                    val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
+                    if (volId == null) {
+                        result.error("NOT_MOUNTED", "Container not mounted", null)
+                        return@setMethodCallHandler
+                    }
+                    @Suppress("UNCHECKED_CAST")
+                    val items = (call.argument<List<*>>("items"))?.mapNotNull { it as? Map<String, Any?> } ?: emptyList()
+                    pendingExportMulti = PendingExportMulti(containerUri, items, volId)
+                    pendingResultCheck(result)
+                    exportFilesFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
+                }
+
+                ChannelMethods.IMPORT_FOLDER -> {
+                    val containerUri = call.argument<String>("filePath")
+                    if (containerUri == null) {
+                        result.error("INVALID_ARGS", "filePath is required", null)
+                        return@setMethodCallHandler
+                    }
+                    val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
+                    if (volId == null) {
+                        result.error("NOT_MOUNTED", "Container is not mounted", null)
+                        return@setMethodCallHandler
+                    }
+                    pendingImportFolder = PendingImportFolder(containerUri, call.argument<String>("targetPath") ?: "", volId)
+                    pendingResultCheck(result)
+                    importFolderLauncher.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE))
+                }
+
+                ChannelMethods.EXPORT_FILE -> {
+                    val containerUri = call.argument<String>("filePath")
+                    val sourcePath = call.argument<String>("sourcePath")
+                    if (containerUri == null || sourcePath == null) {
+                        result.error("INVALID_ARGS", "filePath and sourcePath required", null)
+                        return@setMethodCallHandler
+                    }
+                    val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
+                    if (volId == null) {
+                        result.error("NOT_MOUNTED", "Container not mounted", null)
+                        return@setMethodCallHandler
+                    }
+                    pendingExportFile = PendingExportFile(containerUri, sourcePath, volId)
+                    pendingResultCheck(result)
+                    val fileName = sourcePath.split("/").last()
+                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = MimeTypeHelper.getMimeType(fileName)
+                        putExtra(Intent.EXTRA_TITLE, fileName)
+                    }
+                    exportFileLauncher.launch(intent)
+                }
+
+                ChannelMethods.WRITE_FILE_CHUNK -> {
+                    val fileName = call.argument<String>("fileName")
+                    val offset   = call.argument<Number>("offset")?.toLong() ?: 0L
+                    val data     = call.argument<ByteArray>("data")
+                    if (fileName == null || data == null) {
+                        result.error("INVALID_ARGS", "fileName and data required", null); return@setMethodCallHandler
+                    }
+                    if (data.size > MAX_CHUNK_BYTES) {
+                        result.error("INVALID_ARGS", "Chunk too large (max $MAX_CHUNK_BYTES bytes)", null)
+                        return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.writeFileChunk(volId, fileName, offset, data)
+                    }
+                }
+
+                else -> result.notImplemented()
             }
+        }
     }
 
     private fun pendingResultCheck(result: MethodChannel.Result) {
@@ -1786,7 +1899,8 @@ class MainActivity : FlutterFragmentActivity() {
                         written = 1
                     }
                 }
-                tempFile.delete(); written
+                tempFile.delete()
+                written
             } catch (_: Exception) { 0 }
         }
         val destDir = destParent.createDirectory(name) ?: return 0
@@ -1840,6 +1954,10 @@ class MainActivity : FlutterFragmentActivity() {
         } finally {
             tempFile.delete()
         }
+    }
+    
+    private fun Intent.putPathExtra(name: String, value: String) {
+        this.putExtra(name, value)
     }
 }
 

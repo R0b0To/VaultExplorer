@@ -152,6 +152,32 @@ internal object VeraCryptEngine {
         partitionOffsetHint: Long = -1L, keyfileFds: IntArray? = null
     ): Array<String>?
 
+    /** Creates a new container directly on a raw (unformatted) USB block device.
+ *  [volId] must already have a UsbMassStorageDevice registered in
+ *  UsbBlockBridge (MainActivity does this before calling). Writes an MBR
+ *  partition table via writeMbrPartitionTable() then formats the container
+ *  starting at that partition. See createContainerNative for the
+ *  cipherId/hashId/keyfileFds semantics — identical here. */
+@JvmStatic
+external fun createUsbContainerNative(
+    volId: Int, partitionScheme: String, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
+    containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
+    keyfileFds: IntArray? = null, quickFormat: Boolean = false
+): Boolean
+
+@JvmStatic
+    external fun createUsbContainerWithHiddenNative(
+        volId: Int, partitionScheme: String,
+        outerPassword: String, hiddenPassword: String,
+        outerPim: Int, hiddenPim: Int, sizeBytes: Long,
+        outerFileSystem: String, hiddenFileSystem: String,
+        hiddenSizeBytes: Long,
+        outerCipherId: Int = 255, outerHashId: Int = 255,
+        hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
+        outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
+        quickFormat: Boolean = false
+    ): Boolean
+
     // ── Tier 2: stream lifecycle ───────────────────────────────────────────
     // Used exclusively by VeraCryptProxyCallback. Passes a raw C++ FIL*
     // as a Long — kept separate from the one-shot stateless methods above

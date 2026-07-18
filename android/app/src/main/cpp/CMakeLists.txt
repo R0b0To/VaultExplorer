@@ -313,6 +313,8 @@ add_library(
         jni_runtime.cpp
         jni_callbacks.cpp
         block_io.cpp
+        partition_writer.cpp
+        container_create_usb.cpp
         volume_state.cpp
         ext_backend.cpp
         fat_backend.cpp

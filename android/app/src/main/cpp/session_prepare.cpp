@@ -99,6 +99,20 @@ static bool tryDecryptHeader(
             for (int j = 0; j < 16; j++) tmp[j] = blockPtr[j] ^ T[j];
             blockCipherDecryptBlock(layer.dataKeyDec, tmp, tmp);
             for (int j = 0; j < 16; j++) blockPtr[j] = tmp[j] ^ T[j];
+
+            // Only the FINAL cascade layer (i == spec.layerCount - 1) ever
+            // produces the real header plaintext at block 0 — for
+            // single-layer ciphers (AES/Serpent/... alone) that's every
+            // call, so bail here instead of decrypting the remaining 27
+            // blocks of a combination we already know is wrong. Earlier
+            // layers (i < layerCount - 1) must always run to completion:
+            // their block 0 is only an intermediate cascade state, not
+            // plaintext, so checking it here would be meaningless.
+            if (block == 0 && i == spec.layerCount - 1 &&
+                (blockPtr[0] != 'V' || blockPtr[1] != 'E' || blockPtr[2] != 'R' || blockPtr[3] != 'A')) {
+                return false;
+            }
+
             xtsMultiplyTweak(T);
         }
     }
@@ -204,32 +218,9 @@ bool deriveAndValidateHeader(
 
     if (isUnlockCancelled(volId)) return false;
 
-    // Optimistic check: try a 64-byte Fast Path (AES + SHA-512) directly to avoid trying all combinations if default is used.
-    if (cipherIdParam == 255 && hashIdParam == 255) {
-        reportUnlockProgress(volId, 0, totalHashSteps,
-                              static_cast<int>(HashId::kSha512), static_cast<int>(CascadeId::kAes));
-        const int fastIter = iterationsForHash(HashId::kSha512, safePim);
-        
-        unsigned char fastKey[64]; 
-        if (pbkdf2Hmac(HashId::kSha512, password, passwordLen,
-                        salt, VC_SALT_SIZE, fastIter, fastKey, 64)) {
-            unsigned char decH[VC_HEADER_BODY_SIZE];
-            ParsedHeaderFields fastFields;
-            if (tryDecryptHeader(encH, CascadeId::kAes, fastKey, decH, &fastFields)) {
-                std::memcpy(outKeyMaterial, &decH[VC_KEY_OFFSET_MASTER], 64);
-                std::memcpy(outDecryptedHeader, decH, VC_HEADER_BODY_SIZE);
-                outMatchedCipher = CascadeId::kAes;
-                outMatchedHash   = HashId::kSha512;
-                outFields        = fastFields;
-                mbedtls_platform_zeroize(decH, sizeof(decH));
-                mbedtls_platform_zeroize(fastKey, sizeof(fastKey));
-                return true;
-            }
-            mbedtls_platform_zeroize(decH, sizeof(decH));
-        }
-        mbedtls_platform_zeroize(fastKey, sizeof(fastKey));
-        
-    }
+    reportUnlockProgress(volId, 0, totalHashSteps,
+                          static_cast<int>(hashesToTry.front()),
+                          static_cast<int>(ciphersToTry.front()));
 
     if (isUnlockCancelled(volId)) return false;
 
@@ -973,6 +964,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
                 continue;
             }
 
+            // Extract Master Key from decH
             CascadeSpec spec = cascadeSpecFor(matchedCipher);
             const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER];
 

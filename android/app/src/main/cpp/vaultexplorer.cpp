@@ -108,20 +108,24 @@ static bool ensureMounted(int volId) {
     auto& v = volumes[volId];
     if (v.fsMounted) return true;
 
-    alignas(16) unsigned char decS[512];
-    DRESULT dr = disk_read(static_cast<BYTE>(volId), decS, 0, 1);
-    if (dr != RES_OK) {
+    // Single batched read covering the boot sector (0) and the ext2
+    // superblock's magic-number location (sector 2) -- one physical/USB
+    // round trip instead of two. The FAT/NTFS boot-sector signature is
+    // checked FIRST, so the overwhelmingly common case (FAT/exFAT/NTFS)
+    // never even looks at the ext2 probe sector it already fetched; only a
+    // container that *doesn't* look like FAT/NTFS pays for the ext2 check.
+    alignas(16) unsigned char probe[3 * 512];
+    if (disk_read(static_cast<BYTE>(volId), probe, 0, 3) != RES_OK) {
         LOGI("ensureMounted: failed to read boot sector for volume %d", volId);
         return false;
     }
-
-    alignas(16) unsigned char extSuperSector[512];
-    if (disk_read(static_cast<BYTE>(volId), extSuperSector, 2, 1) == RES_OK &&
-        extSuperSector[0x38] == 0x53 && extSuperSector[0x39] == 0xEF) {
-        return mountExtVolume(volId);
-    }
+    unsigned char* decS = probe;
 
     if (decS[510] != 0x55 || decS[511] != 0xAA) {
+        unsigned char* extSuperSector = probe + 2 * 512;
+        if (extSuperSector[0x38] == 0x53 && extSuperSector[0x39] == 0xEF) {
+            return mountExtVolume(volId);
+        }
         LOGI("ensureMounted: invalid signature in boot sector for volume %d", volId);
         return false;
     }
@@ -922,7 +926,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_changeContainerPasswordNative(
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
-
 // ----------------------------------------------------------------====
 // PBKDF2-SHA512
 // ----------------------------------------------------------------====
@@ -1072,6 +1075,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSize(
                 total = static_cast<jlong>(recursiveFatFolderSize(volId, nativePath));
             } else if (v.fsType == VolumeState::FS_NTFS) {
                 total = static_cast<jlong>(recursiveNtfsFolderSize(volId, nativePath));
+            } else if (v.fsType == VolumeState::FS_EXT) {
+                total = static_cast<jlong>(recursiveExtFolderSize(volId, nativePath));
             }
         }
     }

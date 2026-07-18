@@ -1,4 +1,5 @@
 #include "jni_callbacks.h"
+#include "crypto/thread_pool.h"
 #include <android/log.h>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
@@ -44,6 +45,15 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         LOGI("JNI_OnLoad: UnlockProgressBridge.reportProgress not found");
         return JNI_ERR;
     }
+
+    // Pre-warm the shared KDF worker pool now, during library load, instead
+    // of paying OS thread-spawn cost (roughly 5-30 ms across
+    // hardware_concurrency() threads, depending on device) during the
+    // user's first unlock attempt. This runs well before the user can
+    // possibly reach the unlock screen, so it's effectively free from
+    // their perspective.
+    ThreadPool::getInstance();
+
     return JNI_VERSION_1_6;
 }
 

@@ -504,19 +504,6 @@ Future<void> _pickFile() async {
           }
         }
 
-        final tempContainer = MountedContainer(
-          uri: _selectedUri!,
-          displayName: name,
-          volId: result.volId,
-          rootFiles: result.files,
-          mountedAt: DateTime.now(),
-          totalSpace: 0,
-          freeSpace: 0,
-        );
-
-        final space = await vaultExplorerApi.getSpaceInfo(tempContainer);
-        final total = (space != null && space.isNotEmpty) ? space[0] : 0;
-        final free = (space != null && space.length > 1) ? space[1] : 0;
 
         widget.onMounted(
           MountedContainer(
@@ -525,8 +512,8 @@ Future<void> _pickFile() async {
             volId: result.volId,
             rootFiles: result.files,
             mountedAt: DateTime.now(),
-            totalSpace: total,
-            freeSpace: free,
+            totalSpace: 0,
+            freeSpace: 0,
           ),
           record: savedRecord,
         );

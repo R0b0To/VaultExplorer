@@ -237,6 +237,7 @@ class _VaultDashboardState extends State<VaultDashboard>
       _ensureOrdered(container.uri);
     });
     _scheduleAutoClose(container);
+    _refreshContainerSpace(container.volId); 
   }
 
   void _onUsbContainerDetached(int volId) {

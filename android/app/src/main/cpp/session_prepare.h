@@ -67,15 +67,14 @@ bool deriveHeaderKey(HashId hash,
 bool prepareSession(int fd, const unsigned char* password, size_t passwordLen,
                     int pim, int volId, bool forceDerive, int cipherId, int hashId,
                     const unsigned char* preservedKey = nullptr, size_t preservedKeyLen = 0,
-                    const int* keyfileFds = nullptr, int keyfileCount = 0);
+                    const int* keyfileFds = nullptr, int keyfileCount = 0,
+                    bool readOnly = false);
 
-// USB-backed counterpart to prepareSession: scans the device's MBR/GPT
-// partition table (plus an unpartitioned whole-disk fallback) for a
-// VeraCrypt or LUKS header, trying [partitionOffsetHint] first when given.
 bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId,
                        int cipherId, int hashId, const unsigned char* preservedKey = nullptr,
                        size_t preservedKeyLen = 0, int64_t partitionOffsetHint = -1,
-                       const int* keyfileFds = nullptr, int keyfileCount = 0);
+                       const int* keyfileFds = nullptr, int keyfileCount = 0,
+                       bool readOnly = false);
 
 // ── Per-volume unlock cancellation ──────────────────────────────────────
 //

@@ -11,6 +11,7 @@ void VolumeState::reset() {
     isHiddenVolume = false;
     fileSize = 0;
     isUsbSource = false;
+    readOnly = false;
     partitionStartSector = 0;
     dataCtxInitialized = false;
     cascade.initialized = false;

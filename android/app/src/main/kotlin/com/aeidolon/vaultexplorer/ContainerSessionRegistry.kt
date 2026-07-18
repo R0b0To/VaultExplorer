@@ -7,6 +7,7 @@ data class ContainerSession(
     var displayName: String? = null,
     var documentProvider: Boolean = false,
     val isUsbSource: Boolean = false,
+    val readOnly: Boolean = false,
 )
 
 object ContainerSessionRegistry {

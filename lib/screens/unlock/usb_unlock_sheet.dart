@@ -43,6 +43,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   bool _loadingDevices = true;
   bool _requestingPermission = false;
   bool _unlocking = false;
+  bool _readOnly = false;
   String? _error;
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
@@ -136,6 +137,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
 
     try {
       _unlockMethod = record.unlockMethod;
+      _readOnly = record.readOnly;
 
       if (_unlockMethod == ContainerUnlockMethod.pattern) {
         _storedPatternHash = await ContainerRepository.instance.getPatternHash(record.uri);
@@ -397,6 +399,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
               preservedKey: resolvedPreservedKey,
               cacheDerivedKey: shouldCacheDerivedKey,
               keyfilePaths: keyfilePaths,
+              readOnly: _readOnly,
             )
           : await _unlockSwallowingStaleAuthFail(() => vaultExplorerApi.unlockUsbContainer(
               device.deviceName,
@@ -409,6 +412,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
               preservedKey: resolvedPreservedKey,
               cacheDerivedKey: shouldCacheDerivedKey,
               keyfilePaths: keyfilePaths,
+              readOnly: _readOnly,
             ));
 
       if (result == null && resolvedPreservedKey != null) {
@@ -429,6 +433,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
             preservedKey: null,
             cacheDerivedKey: shouldCacheDerivedKey,
             keyfilePaths: keyfilePaths,
+            readOnly: _readOnly,
           );
         }
       }
@@ -446,6 +451,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         mountedAt: DateTime.now(),
         totalSpace: 0,
         freeSpace: 0,
+        readOnly: _readOnly,
       );
       final space = await vaultExplorerApi.getSpaceInfo(tempContainer);
       final total = (space != null && space.isNotEmpty) ? space[0] : 0;
@@ -470,6 +476,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
           documentProvider: existing.documentProvider,
           thumbnailCacheMode: existing.thumbnailCacheMode,
           cacheDerivedKey: shouldCacheDerivedKey,
+          readOnly: _readOnly,
           pendingPassword: savedPassword,
           pendingPatternHash: savedPatternHash,
           cipherId: result.matchedCipherId,
@@ -483,9 +490,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         var effectiveExisting = existing;
         if (existing.cipherId != result.matchedCipherId ||
             existing.hashId != result.matchedHashId ||
-            existing.containerFormat != result.containerFormat) {
+            existing.containerFormat != result.containerFormat ||
+            existing.readOnly != _readOnly) {   
           effectiveExisting = existing.copyWith(
             cacheDerivedKey: shouldCacheDerivedKey,
+            readOnly: _readOnly,   
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
             containerFormat: result.containerFormat,
@@ -501,6 +510,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
             label: displayName,
             documentProvider: widget.documentProvider,
             cacheDerivedKey: shouldCacheDerivedKey,
+            readOnly: _readOnly,
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
             containerFormat: result.containerFormat,

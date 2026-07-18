@@ -7,6 +7,7 @@ class MountedContainer {
   final int totalSpace;
   final int freeSpace;
   final String containerFormat;
+  final bool readOnly;   
 
   const MountedContainer({
     required this.uri,
@@ -17,6 +18,7 @@ class MountedContainer {
     required this.totalSpace,
     required this.freeSpace,
     this.containerFormat = 'veracrypt',
+    this.readOnly = false,   
   });
 
   MountedContainer copyWith({
@@ -25,6 +27,7 @@ class MountedContainer {
     int? totalSpace,
     int? freeSpace,
     String? containerFormat,
+    bool? readOnly,   
   }) {
     return MountedContainer(
       uri: uri,
@@ -35,6 +38,7 @@ class MountedContainer {
       totalSpace: totalSpace ?? this.totalSpace,
       freeSpace: freeSpace ?? this.freeSpace,
       containerFormat: containerFormat ?? this.containerFormat,
+      readOnly: readOnly ?? this.readOnly,   
     );
   }
 }

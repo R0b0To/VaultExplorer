@@ -326,7 +326,8 @@ bool mountExtVolume(int volumeId) {
     auto& volume = volumes[volumeId];
     const std::string deviceName = std::to_string(volumeId);
     volume.fsType = VolumeState::FS_EXT;
-    const errcode_t openError = ext2fs_open(deviceName.c_str(), EXT2_FLAG_RW | EXT2_FLAG_64BITS,
+    const int openFlags = (volume.readOnly ? 0 : EXT2_FLAG_RW) | EXT2_FLAG_64BITS;
+    const errcode_t openError = ext2fs_open(deviceName.c_str(), openFlags,
                                              0, 0, &encryptedExtIoManager, &volume.extFs);
     if (openError != 0) {
         EXT_LOGI("mountExtVolume: ext2fs_open failed on volume %d: %s (err=%lu)", volumeId,

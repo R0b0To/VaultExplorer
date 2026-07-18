@@ -26,3 +26,18 @@ void throwNotUnlocked(JNIEnv* env, int volumeId, const char* operation) {
              volumeId, operation);
     env->ThrowNew(exceptionClass, message);
 }
+
+bool isVolumeReadOnly(int volumeId) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    VolumeState& volume = volumes[volumeId];
+    std::lock_guard<std::mutex> lock(volume.mutex);
+    return volume.readOnly;
+}
+
+void throwReadOnly(JNIEnv* env, int volumeId, const char* operation) {
+    jclass exceptionClass = env->FindClass("java/lang/IllegalStateException");
+    char message[160];
+    snprintf(message, sizeof(message), "READ_ONLY: volume %d is mounted read-only (%s)",
+             volumeId, operation);
+    env->ThrowNew(exceptionClass, message);
+}

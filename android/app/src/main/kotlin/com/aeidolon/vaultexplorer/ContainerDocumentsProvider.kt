@@ -56,18 +56,20 @@ class ContainerDocumentsProvider : DocumentsProvider() {
     // ── Roots ──────────────────────────────────────────────────────────────
 
     override fun queryRoots(projection: Array<out String>?): Cursor {
-        var flags = DocumentsContract.Root.FLAG_SUPPORTS_CREATE or
-                DocumentsContract.Root.FLAG_LOCAL_ONLY or
-                DocumentsContract.Root.FLAG_SUPPORTS_EJECT
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            flags = flags or DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD
-        }
-
         val resolvedProjection = projection ?: defaultRootProjection
         val cursor = MatrixCursor(resolvedProjection)
         cursor.setNotificationUri(context?.contentResolver, DocumentsContract.buildRootsUri(AUTHORITY))
         
         for ((volId, session) in ContainerSessionRegistry.activeSessions.filter { it.value.documentProvider }) {
+            var flags = DocumentsContract.Root.FLAG_LOCAL_ONLY or
+                    DocumentsContract.Root.FLAG_SUPPORTS_EJECT
+            if (!session.readOnly) {
+                flags = flags or DocumentsContract.Root.FLAG_SUPPORTS_CREATE          
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                flags = flags or DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD
+            }
+
             val rootTitle = session.displayName
                 ?: UriNameResolver.resolve(context?.contentResolver, Uri.parse(session.uri))
             val (totalBytes, freeBytes) = ContainerFileSystem.getSpacePair(volId)
@@ -129,17 +131,18 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         mimeType: String,
         size: Long,
         isDir: Boolean,
-        isRoot: Boolean
+        isRoot: Boolean,
+        readOnly: Boolean,
     ) {
         var flags = 0
-        if (!isRoot) {
+        if (!isRoot && !readOnly) {
             flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_DELETE
             flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_RENAME
         }
         if (isDir) {
-            flags = flags or DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
+            if (!readOnly) flags = flags or DocumentsContract.Document.FLAG_DIR_SUPPORTS_CREATE
         } else {
-            flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_WRITE
+            if (!readOnly) flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_WRITE
             if (mimeType.startsWith("image/"))
                 flags = flags or DocumentsContract.Document.FLAG_SUPPORTS_THUMBNAIL
         }
@@ -173,6 +176,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val fatPath = doc.fatPath
 
         ContainerFileSystem.requireSession(volId)
+        val readOnly = ContainerSessionRegistry.activeSessions[volId]?.readOnly == true
 
         var actualIsDir = doc.isDir
         var actualSize = 0L
@@ -211,7 +215,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
 
         addDocumentRow(
             cursor, resolvedProjection, doc.toString(), displayName,
-            mimeType, actualSize, actualIsDir, fatPath.isEmpty()
+            mimeType, actualSize, actualIsDir, fatPath.isEmpty(), readOnly
         )
         return cursor
     }
@@ -233,6 +237,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val volId         = parent.volId
         val parentFatPath = parent.fatPath
         ContainerFileSystem.requireSession(volId)
+        val readOnly = ContainerSessionRegistry.activeSessions[volId]?.readOnly == true
 
         try {
             val files = ContainerFileSystem.listDirectory(volId, parentFatPath)
@@ -250,7 +255,7 @@ class ContainerDocumentsProvider : DocumentsProvider() {
 
                 addDocumentRow(
                     cursor, resolvedProjection, DocumentId(volId, childType, childFatPath).toString(),
-                    cleanName, childMime, size, isDir, false
+                    cleanName, childMime, size, isDir, false, readOnly
                 )
             }
         } catch (e: FileNotFoundException) {
@@ -262,15 +267,14 @@ class ContainerDocumentsProvider : DocumentsProvider() {
     }
 
     @Throws(FileNotFoundException::class)
-    override fun createDocument(
-        parentDocumentId: String?,
-        mimeType: String?,
-        displayName: String?
-    ): String {
-        val parent        = DocumentId.parse(parentDocumentId, "parent")
-        val volId         = parent.volId
+    override fun createDocument(parentDocumentId: String?, mimeType: String?, displayName: String?): String {
+        val parent = DocumentId.parse(parentDocumentId, "parent")
+        val volId  = parent.volId
         val parentFatPath = parent.fatPath
         ContainerFileSystem.requireSession(volId)
+        if (ContainerSessionRegistry.activeSessions[volId]?.readOnly == true) {   
+            throw FileNotFoundException("Container is mounted read-only")
+        }
         
         val fileName  = displayName?.replace("/", "_") ?: throw FileNotFoundException("No file name provided")
         val cleanPath = if (parentFatPath.isEmpty()) fileName else "$parentFatPath/$fileName"
@@ -328,6 +332,10 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val fatPath = doc.fatPath
         ContainerFileSystem.requireSession(volId)
 
+        if (ContainerSessionRegistry.activeSessions[volId]?.readOnly == true) {                                        
+            throw FileNotFoundException("Container is mounted read-only")
+        }
+
         val success = deleteRecursive(volId, fatPath, doc.isDir)
         if (!success) throw FileNotFoundException("Delete failed for $fatPath")
 
@@ -341,6 +349,13 @@ class ContainerDocumentsProvider : DocumentsProvider() {
     @Throws(FileNotFoundException::class)
     override fun renameDocument(documentId: String?, displayName: String?): String {
         val doc = DocumentId.parse(documentId, "document")
+        val volId = doc.volId
+        ContainerFileSystem.requireSession(volId)
+
+        if (ContainerSessionRegistry.activeSessions[volId]?.readOnly == true) {                                        
+            throw FileNotFoundException("Container is mounted read-only")
+        }
+
         val newName = displayName?.replace("/", "_") ?: throw FileNotFoundException("No name provided")
 
         val oldFatPath = doc.fatPath
@@ -372,7 +387,11 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         val volId   = doc.volId
         val session = ContainerFileSystem.requireSession(volId)
         val fatPath = doc.fatPath
+
         val isWrite = mode?.contains("w") == true || mode?.contains("r+") == true
+        if (isWrite && session.readOnly) {                                        
+            throw FileNotFoundException("Container is mounted read-only")
+        }
 
         val storageManager = context?.getSystemService(Context.STORAGE_SERVICE) as? StorageManager
             ?: throw FileNotFoundException("Could not obtain StorageManager")

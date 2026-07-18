@@ -46,11 +46,11 @@ internal object VeraCryptEngine {
     external fun getLastDerivedKeyMaterialNative(volId: Int): ByteArray?
 
     /** keyfileFds: see [deriveKeyMaterialNative] — same detach/ownership contract. */
-    @JvmStatic
+   @JvmStatic
     external fun unlockAndListNative(
         fd: Int, password: String, pim: Int, volId: Int,
         cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null,
-        keyfileFds: IntArray? = null
+        keyfileFds: IntArray? = null, readOnly: Boolean = false
     ): Array<String>?
 
     /** Writes a new container to fd and formats it.
@@ -149,7 +149,7 @@ internal object VeraCryptEngine {
     @JvmStatic external fun unlockUsbAndListNative(
         password: String, pim: Int, volId: Int, deviceSizeBytes: Long,
         cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null,
-        partitionOffsetHint: Long = -1L, keyfileFds: IntArray? = null
+        partitionOffsetHint: Long = -1L, keyfileFds: IntArray? = null, readOnly: Boolean = false
     ): Array<String>?
 
     /** Creates a new container directly on a raw (unformatted) USB block device.

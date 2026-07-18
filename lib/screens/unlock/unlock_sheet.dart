@@ -39,6 +39,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
   bool _obscure = true;
   bool _loading = false;
   bool _remember = false;
+  bool _readOnly = false;
   String? _error;
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
@@ -150,6 +151,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
       _cipherId = record.cipherId;
       _hashId = record.hashId;
       _containerFormat = record.containerFormat;
+      _readOnly = record.readOnly;
 
       if (_unlockMethod == ContainerUnlockMethod.pattern) {
         _storedPatternHash = await ContainerRepository.instance.getPatternHash(
@@ -431,6 +433,7 @@ Future<void> _pickFile() async {
               preservedKey: resolvedPreservedKey,
               cacheDerivedKey: shouldCacheDerivedKey,
               keyfilePaths: keyfilePaths,
+              readOnly: _readOnly,
             )
           : await _unlockSwallowingStaleAuthFail(() => vaultExplorerApi.unlockContainer(
               _selectedUri!,
@@ -443,6 +446,7 @@ Future<void> _pickFile() async {
               preservedKey: resolvedPreservedKey,
               cacheDerivedKey: shouldCacheDerivedKey,
               keyfilePaths: keyfilePaths,
+              readOnly: _readOnly,
             ));
 
       if (result == null && resolvedPreservedKey != null) {
@@ -463,6 +467,7 @@ Future<void> _pickFile() async {
             preservedKey: null,
             cacheDerivedKey: shouldCacheDerivedKey,
             keyfilePaths: keyfilePaths,
+            readOnly: _readOnly,
           );
         }
       }
@@ -478,6 +483,7 @@ Future<void> _pickFile() async {
             label: name,
             rememberPassword: false,
             cacheDerivedKey: shouldCacheDerivedKey,
+            readOnly: _readOnly,
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
             containerFormat: result.containerFormat,
@@ -490,10 +496,12 @@ Future<void> _pickFile() async {
           if (existing != null &&
               (existing.cipherId != result.matchedCipherId ||
                   existing.hashId != result.matchedHashId ||
-                  existing.containerFormat != result.containerFormat)) {
+                  existing.containerFormat != result.containerFormat ||
+                  existing.readOnly != _readOnly)) { 
             final updated = existing.copyWith(
               cacheDerivedKey: shouldCacheDerivedKey,
               cipherId: result.matchedCipherId,
+              readOnly: _readOnly,
               hashId: result.matchedHashId,
               containerFormat: result.containerFormat,
             );
@@ -514,6 +522,7 @@ Future<void> _pickFile() async {
             mountedAt: DateTime.now(),
             totalSpace: 0,
             freeSpace: 0,
+            readOnly: _readOnly,
           ),
           record: savedRecord,
         );
@@ -1024,7 +1033,30 @@ Future<void> _pickFile() async {
                             onHashChanged: (val) => setState(() => _hashId = val),
                           ),
                         const SizedBox(height: 16),
-
+                        Material(
+                          color: cs.surfaceContainerLow,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: SwitchListTile(
+                            value: _readOnly,
+                            onChanged: _loading ? null : (val) => setState(() => _readOnly = val),
+                            title: Text(
+                              'Read-only mode',
+                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                            ),
+                            subtitle: Text(
+                              'Mount without allowing any changes to this container',
+                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(Icons.visibility_outlined, color: cs.primary),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         // 4. Remember container Toggle
                         if (widget.initialUri == null) ...[
                           Material(

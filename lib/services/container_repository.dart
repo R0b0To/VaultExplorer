@@ -202,6 +202,7 @@ class ContainerRecord {
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
   final bool cacheDerivedKey;
+  final bool readOnly;
   final String? pendingPassword;
   final String? pendingPatternHash;
 
@@ -222,6 +223,7 @@ class ContainerRecord {
     this.documentProvider = false,
     this.thumbnailCacheMode,
     this.thumbnailQuality,
+    this.readOnly = false,
     this.cacheDerivedKey = false,
     this.pendingPassword,
     this.pendingPatternHash,
@@ -244,6 +246,7 @@ class ContainerRecord {
     Object? thumbnailCacheMode = _keep,
     Object? thumbnailQuality = _keep,
     bool? cacheDerivedKey,
+    bool? readOnly,
     String? pendingPassword,
     String? pendingPatternHash,
     int? cipherId,
@@ -264,6 +267,7 @@ class ContainerRecord {
           ? this.thumbnailQuality
           : thumbnailQuality as ThumbnailQuality?,
       cacheDerivedKey: cacheDerivedKey ?? this.cacheDerivedKey,
+      readOnly: readOnly ?? this.readOnly,
       pendingPassword: pendingPassword,
       pendingPatternHash: pendingPatternHash,
       cipherId: cipherId ?? this.cipherId,
@@ -284,6 +288,7 @@ class ContainerRecord {
     if (thumbnailQuality != null)
       'thumbnailQuality': thumbnailQuality!.toJson(),
     'cacheDerivedKey': cacheDerivedKey,
+    'readOnly': readOnly,
     'cipherId': cipherId,
     'hashId': hashId,
     'containerFormat': containerFormat,
@@ -306,6 +311,7 @@ class ContainerRecord {
           ? ThumbnailQuality.fromJson(j['thumbnailQuality'] as String?)
           : null,
       cacheDerivedKey: j['cacheDerivedKey'] as bool? ?? false,
+      readOnly: j['readOnly'] as bool? ?? false,
       cipherId: j['cipherId'] as int? ?? 255,
       hashId: j['hashId'] as int? ?? 255,
       containerFormat: j['containerFormat'] as String? ?? 'veracrypt',

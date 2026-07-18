@@ -133,7 +133,7 @@ static bool ensureMounted(int volId) {
     // Inspect Boot Sector for NTFS Oem ID
     if (std::memcmp(&decS[3], "NTFS    ", 8) == 0) {
         v.fsType = VolumeState::FS_NTFS;
-        LOGI("ensureMounted: detected NTFS on volume %d", volId);
+        LOGI("ensureMounted: detected NTFS on volume %d (readOnly=%d)", volId, v.readOnly ? 1 : 0);
 
         int* privVolId = new int(volId);
         struct ntfs_device* dev = ntfs_device_alloc("vaultexplorer", 0, &vExplorer_ntfs_ops, privVolId);
@@ -142,8 +142,9 @@ static bool ensureMounted(int volId) {
             return false;
         }
 
-        v.ntfsVol = ntfs_device_mount(dev, 0);
-        if (!v.ntfsVol) {
+        const unsigned long mountFlags = v.readOnly ? NTFS_MNT_RDONLY : 0;
+        v.ntfsVol = ntfs_device_mount(dev, mountFlags);
+        if (!v.ntfsVol && !v.readOnly) {
             v.ntfsVol = ntfs_device_mount(dev, NTFS_MNT_RECOVER);
         }
 
@@ -669,7 +670,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
 
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
-        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds) {
+        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds, jboolean readOnly) {
 
     clearUnlockCancellation(volId);
 
@@ -683,8 +684,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     
-    if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, true, cipherId, hashId, preservedBytes, preservedLen,
-                         kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()))) {
+if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, true, cipherId, hashId, preservedBytes, preservedLen,
+                         kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
+                         readOnly == JNI_TRUE)) {
         if (preservedKey != nullptr) {
             env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);
         }
@@ -1159,6 +1161,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
     if (!requireActiveSession(volId, "writeFileChunk")) {
         throwNotUnlocked(env, volId, "writeFileChunk"); return JNI_FALSE;
     }
+    if (isVolumeReadOnly(volId)) {
+        throwReadOnly(env, volId, "writeFileChunk"); return JNI_FALSE;
+    }
     const char* targetName = env->GetStringUTFChars(fileName, nullptr);
     jbyte* body = env->GetByteArrayElements(data, nullptr);
     bool success = false;
@@ -1230,6 +1235,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
         jstring targetFileName, jstring sourcePath, jint volId) {
     if (!requireActiveSession(volId, "writeBackFile")) {
         throwNotUnlocked(env, volId, "writeBackFile"); return JNI_FALSE;
+    }
+    if (isVolumeReadOnly(volId)) {                                   
+        throwReadOnly(env, volId, "writeBackFile"); return JNI_FALSE;
     }
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     const char* source     = env->GetStringUTFChars(sourcePath, nullptr);
@@ -1383,6 +1391,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
     if (!requireActiveSession(volId, "deleteFile")) {
         throwNotUnlocked(env, volId, "deleteFile"); return JNI_FALSE;
     }
+    if (isVolumeReadOnly(volId)) {                                   
+        throwReadOnly(env, volId, "deleteFile"); return JNI_FALSE;
+    }
     const char* targetName = env->GetStringUTFChars(targetFileName, nullptr);
     bool success = false;
     auto& v = volumes[volId];
@@ -1448,6 +1459,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
         JNIEnv* env, jobject, jstring dirPath, jint volId) {
     if (!requireActiveSession(volId, "createDirectory")) {
         throwNotUnlocked(env, volId, "createDirectory"); return JNI_FALSE;
+    }
+    if (isVolumeReadOnly(volId)) {                                   
+        throwReadOnly(env, volId, "createDirectory"); return JNI_FALSE;
     }
     const char* nativePath = env->GetStringUTFChars(dirPath, nullptr);
     bool success = false;
@@ -1520,6 +1534,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
         jstring oldPath, jstring newPath, jint volId) {
     if (!requireActiveSession(volId, "renameFile")) {
         throwNotUnlocked(env, volId, "renameFile"); return JNI_FALSE;
+    }
+    if (isVolumeReadOnly(volId)) {                                   
+        throwReadOnly(env, volId, "renameFile"); return JNI_FALSE;
     }
     const char* nativeOld = env->GetStringUTFChars(oldPath, nullptr);
     const char* nativeNew = env->GetStringUTFChars(newPath, nullptr);
@@ -1670,6 +1687,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_setLastModifiedTime(
         jstring path, jlong epochSeconds, jint volId) {
     if (!requireActiveSession(volId, "setLastModifiedTime")) {
         throwNotUnlocked(env, volId, "setLastModifiedTime"); return JNI_FALSE;
+    }
+    if (isVolumeReadOnly(volId)) {                                   
+        throwReadOnly(env, volId, "setLastModifiedTime"); return JNI_FALSE;
     }
     const char* nativePath = env->GetStringUTFChars(path, nullptr);
     bool success = false;
@@ -1917,7 +1937,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getHashIdCount(JNIEnv*, jobject)
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
-        jlong partitionOffsetHint, jintArray keyfileFds) {
+        jlong partitionOffsetHint, jintArray keyfileFds, jboolean readOnly) {
 
     clearUnlockCancellation(volId);
 
@@ -1934,7 +1954,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
     // Prepare the USB session with the password and explicit length parameter.
     const bool ok = prepareUsbSession(reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass), pim, volId, cipherId, hashId, preservedBytes, preservedLen,
                                        static_cast<int64_t>(partitionOffsetHint),
-                                       kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()));
+                                       kfFds.empty() ? nullptr : kfFds.data(), static_cast<int>(kfFds.size()),
+                                       readOnly == JNI_TRUE);
     
     if (preservedKey != nullptr) {
         env->ReleaseByteArrayElements(preservedKey, reinterpret_cast<jbyte*>(const_cast<unsigned char*>(preservedBytes)), JNI_ABORT);

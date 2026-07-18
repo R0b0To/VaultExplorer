@@ -320,7 +320,8 @@ bool deriveAndValidateHeader(
 
 static bool prepareLuksSession(int fd, const unsigned char* password, size_t passwordLen, int volId,
                                 const unsigned char* preservedKey, size_t preservedKeyLen,
-                                const int* keyfileFds, int keyfileCount) {
+                                const int* keyfileFds, int keyfileCount,
+                                bool readOnly) {
     if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
     if (fd < 0) { closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
 
@@ -460,6 +461,7 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         v.matchedHashId = mappedHash;
         v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
         v.luksUsesGenericCipher = isGenericCipher;
+        v.readOnly = readOnly;
         
         // Both LUKS1 and LUKS2 use segment-relative tweak counters on Linux (iv_offset == 0).
         // The segment's "iv_tweak" (always 0 for LUKS1) is added to a counter that starts at 0
@@ -504,7 +506,7 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
     return true;
 }
 
-bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, const int* keyfileFds, int keyfileCount) {
+bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, const int* keyfileFds, int keyfileCount, bool readOnly) {
     const auto opStart = std::chrono::steady_clock::now();
     if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
     VolumeState& v = volumes[volId];
@@ -527,7 +529,7 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
         if (pread(fd, magicBuf, 6, 0) == 6 && isLuksContainer(magicBuf, 6)) {
             return prepareLuksSession(fd, password, passwordLen, volId,
                                        preservedKey, preservedKeyLen,
-                                       keyfileFds, keyfileCount);
+                                       keyfileFds, keyfileCount, readOnly);
         }
     }
 
@@ -611,6 +613,7 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
         v.matchedCipherId = (int)matchedCipher;
         v.matchedHashId = (int)matchedHash;
         v.partitionStartSector = 0; // For files, absolute tweak = physical sector
+        v.readOnly = readOnly;
     }
     return true;
 }
@@ -643,7 +646,8 @@ static bool usbReadBytes(int volId, uint64_t byteOffset, void* outData, size_t l
 static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partitionSizeBytes,
                                    const unsigned char* password, size_t passwordLen, int volId,
                                    const unsigned char* preservedKey, size_t preservedKeyLen,
-                                   const int* keyfileFds, int keyfileCount) {
+                                   const int* keyfileFds, int keyfileCount,
+                                   bool readOnly) {
     VolumeState& v = volumes[volId];
 
     // Keyfile-replaces-password semantics — identical to prepareLuksSession.
@@ -756,6 +760,7 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
         v.matchedHashId = mappedHash;
         v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
         v.luksUsesGenericCipher = isGenericCipher;
+        v.readOnly = readOnly;
 
         const uint64_t segmentStartSector = (baseOffset + luksInfo.dataOffsetBytes) / 512;
         const uint64_t sectorsPerUnit = v.luksSectorSize / 512;
@@ -786,7 +791,7 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
     return true;
 }
 
-bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, int64_t partitionOffsetHint, const int* keyfileFds, int keyfileCount) {
+bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, int64_t partitionOffsetHint, const int* keyfileFds, int keyfileCount, bool readOnly) {
     if (volId < 0 || volId >= MAX_VOLUMES) { closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
     VolumeState& v = volumes[volId];
     std::lock_guard<std::mutex> derivationLock(derivationMutexes[volId]);
@@ -889,7 +894,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
         if (prepareUsbLuksSession(part.startSector, partitionSizeBytes,
                                   password, passwordLen, volId,
                                   preservedKey, preservedKeyLen,
-                                  attemptKeyfileFds, attemptKeyfileCount)) {
+                                  attemptKeyfileFds, attemptKeyfileCount,readOnly)) {
             return true;
         }
     }
@@ -1012,6 +1017,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
         v.partitionStartSector = matchedPartitionStart;
         v.matchedCipherId      = static_cast<int>(matchedCipherFound);
         v.matchedHashId        = static_cast<int>(matchedHashFound);
+        v.readOnly             = readOnly;
     }
     return true;
 }

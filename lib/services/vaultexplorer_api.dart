@@ -464,6 +464,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     Uint8List? preservedKey,
     bool cacheDerivedKey = false,
     List<String>? keyfilePaths,
+    bool readOnly = false,
   }) async {
     final raw = await _channel
         .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockContainer, {
@@ -478,6 +479,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
           'cacheDerivedKey': cacheDerivedKey,
           if (keyfilePaths != null && keyfilePaths.isNotEmpty)
             'keyfilePaths': keyfilePaths,
+            'readOnly': readOnly,
         });
     if (raw == null) return null;
     final volId = raw['volId'] as int;
@@ -550,6 +552,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     Uint8List? preservedKey,
     bool cacheDerivedKey = false,
     List<String>? keyfilePaths,
+    bool readOnly = false,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockUsbContainer,
@@ -565,6 +568,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         'cacheDerivedKey': cacheDerivedKey,
         if (keyfilePaths != null && keyfilePaths.isNotEmpty)
           'keyfilePaths': keyfilePaths,
+          'readOnly': readOnly,
       },
     );
     if (raw == null) return null;

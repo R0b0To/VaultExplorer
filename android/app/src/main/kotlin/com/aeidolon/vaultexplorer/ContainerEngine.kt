@@ -21,17 +21,18 @@ object ContainerEngine {
     fun unlockFile(
         fd: Int, password: String, pim: Int, volId: Int, cipherId: Int = 255,
         hashId: Int = 255, preservedKey: ByteArray? = null, keyfileFds: IntArray? = null,
+        readOnly: Boolean = false,
     ): Array<String>? = VeraCryptEngine.unlockAndListNative(
-        fd, password, pim, volId, cipherId, hashId, preservedKey, keyfileFds
+        fd, password, pim, volId, cipherId, hashId, preservedKey, keyfileFds, readOnly
     )
 
     fun unlockUsb(
         password: String, pim: Int, volId: Int, deviceSizeBytes: Long, cipherId: Int = 255,
         hashId: Int = 255, preservedKey: ByteArray? = null, partitionOffsetHint: Long = -1L,
-        keyfileFds: IntArray? = null,
+        keyfileFds: IntArray? = null, readOnly: Boolean = false,
     ): Array<String>? = VeraCryptEngine.unlockUsbAndListNative(
         password, pim, volId, deviceSizeBytes, cipherId, hashId, preservedKey,
-        partitionOffsetHint, keyfileFds
+        partitionOffsetHint, keyfileFds, readOnly
     )
 
     /** containerFormat: 0 = VeraCrypt, 1 = LUKS1, 2 = LUKS2. See

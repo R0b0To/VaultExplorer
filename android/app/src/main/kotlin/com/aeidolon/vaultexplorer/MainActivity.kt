@@ -419,13 +419,17 @@ class MainActivity : FlutterFragmentActivity() {
 
     private fun isNotUnlockedException(e: Throwable): Boolean =
         e is IllegalStateException && e.message?.startsWith("NOT_UNLOCKED") == true
+    private fun isReadOnlyException(e: Throwable): Boolean =                      
+        e is IllegalStateException && e.message?.startsWith("READ_ONLY") == true
 
     private fun dispatchNativeError(e: Exception, result: MethodChannel.Result) {
         if (e is UnlockCancelledException) {
             result.error("CANCELLED", e.message, null)
         } else if (isNotUnlockedException(e)) {
             result.error("NOT_UNLOCKED", e.message, null)
-        } else {
+        } else if (isReadOnlyException(e)) {                                      
+            result.error("READ_ONLY", e.message, null)
+        }else {
             result.error("C++_ERROR", e.message, null)
         }
     }
@@ -826,6 +830,7 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                     val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
                     val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+                    val readOnly = call.argument<Boolean>("readOnly") ?: false 
 
                     if (deviceName == null || password == null) {
                         result.error("INVALID_ARGS", "deviceName and password required", null)
@@ -877,7 +882,7 @@ class MainActivity : FlutterFragmentActivity() {
                             val files = synchronized(ContainerSessionRegistry.locks[targetVolId]) {
                                 ContainerEngine.unlockUsb(
                                     password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
-                                    keyfileFds = keyfileFds
+                                    keyfileFds = keyfileFds, readOnly = readOnly
                                 )
                             }
 
@@ -896,6 +901,8 @@ class MainActivity : FlutterFragmentActivity() {
                                         displayName = displayName ?: device.productName ?: deviceName,
                                         documentProvider = docProvider,
                                         isUsbSource = true,
+                                        readOnly = readOnly,                          
+
                                     )
                                     if (docProvider) {
                                         contentResolver.notifyChange(
@@ -1115,6 +1122,7 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                     val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
                     val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+                    val readOnly = call.argument<Boolean>("readOnly") ?: false 
 
                     if (uriString == null || password == null) {
                         result.error("INVALID_ARGS", "filePath and password required", null)
@@ -1153,7 +1161,7 @@ class MainActivity : FlutterFragmentActivity() {
                             }
 
                             val files = synchronized(ContainerSessionRegistry.locks[targetVolId]) {
-                                ContainerEngine.unlockFile(fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds)
+                                ContainerEngine.unlockFile(fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds, readOnly)
                             }
 
                             runOnUiThread {
@@ -1170,6 +1178,7 @@ class MainActivity : FlutterFragmentActivity() {
                                         cachedFilesList = files.toList(),
                                         displayName = displayName,
                                         documentProvider = docProvider,
+                                        readOnly = readOnly,
                                     )
                                     if (docProvider) {
                                         contentResolver.notifyChange(

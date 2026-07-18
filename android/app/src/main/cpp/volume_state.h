@@ -53,6 +53,7 @@ struct VolumeState {
     uint64_t fileSize = 0;
     bool fsMounted = false;
     bool isUsbSource = false;
+    bool readOnly = false;
     uint64_t partitionStartSector = 0;
     int matchedCipherId = -1;
     int matchedHashId = -1;

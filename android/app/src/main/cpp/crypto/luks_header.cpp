@@ -348,7 +348,7 @@ static bool luksVerifyMasterKey(const DigestSpec& spec,
 
 // ── LUKS1 Unlocking ─────────────────────────────────────────────────────────
 
-static bool luks1Unlock(int fd,
+static bool luks1Unlock(const LuksByteReader& reader,
                         const uint8_t* password, size_t passwordLen,
                         LuksVolumeInfo& outInfo,
                         int volId,
@@ -357,7 +357,7 @@ static bool luks1Unlock(int fd,
                         const uint8_t* candidateMasterKey = nullptr,
                         size_t candidateMasterKeyLen = 0) {
     Luks1Phdr phdr;
-    if (pread(fd, &phdr, sizeof(Luks1Phdr), 0) != sizeof(Luks1Phdr)) {
+    if (!reader(0, &phdr, sizeof(Luks1Phdr))) {
         LOGI("LUKS1: Failed to read phdr");
         return false;
     }
@@ -454,12 +454,10 @@ static bool luks1Unlock(int fd,
             return;
         }
 
-        // 2. Read AF key material — pread is thread-safe across concurrent
-        // calls on the same fd (unlike read/write, it doesn't touch the
-        // shared file position), so no locking needed here.
+        // 2. Read AF key material
         size_t afLen = keyBytes * stripes;
         std::vector<uint8_t> afMaterial(afLen);
-        if (pread(fd, afMaterial.data(), afLen, (uint64_t)keyMaterialOffset * 512) != (ssize_t)afLen) {
+        if (!reader((uint64_t)keyMaterialOffset * 512, afMaterial.data(), afLen)) {
             mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
             return;
         }
@@ -531,7 +529,7 @@ static bool luks1Unlock(int fd,
 
 // ── LUKS2 Unlocking ─────────────────────────────────────────────────────────
 
-static bool luks2Unlock(int fd,
+static bool luks2Unlock(const LuksByteReader& reader,
                         const uint8_t* password, size_t passwordLen,
                         LuksVolumeInfo& outInfo,
                         int volId,
@@ -542,8 +540,8 @@ static bool luks2Unlock(int fd,
     LOGI("LUKS2: Starting unlock...");
     // Read the binary header area (4096 bytes)
     uint8_t hdr[4096];
-    if (pread(fd, hdr, 4096, 0) != 4096) {
-        LOGI("LUKS2: pread of binary header failed");
+    if (!reader(0, hdr, 4096)) {
+        LOGI("LUKS2: header read failed");
         return false;
     }
 
@@ -557,9 +555,7 @@ static bool luks2Unlock(int fd,
     // Read the JSON metadata. It starts at offset 4096, and has length (hdrSize - 4096).
     size_t jsonLen = hdrSize - 4096;
     std::vector<char> jsonBuf(jsonLen + 1, 0);
-    ssize_t readLen = pread(fd, jsonBuf.data(), jsonLen, 4096);
-    LOGI("LUKS2: JSON readLen = %zd, expected = %zu", readLen, jsonLen);
-    if (readLen != (ssize_t)jsonLen) {
+    if (!reader(4096, jsonBuf.data(), jsonLen)) {
         LOGI("LUKS2: JSON read failed");
         return false;
     }
@@ -805,11 +801,9 @@ static bool luks2Unlock(int fd,
             return;
         }
 
-        // 2. Read AF key material — pread is thread-safe across concurrent
-        // calls on the same fd, no locking needed here.
+        // 2. Read AF key material
         std::vector<uint8_t> afMaterial(ks.areaSize);
-        ssize_t afReadLen = pread(fd, afMaterial.data(), ks.areaSize, ks.areaOffset);
-        if (afReadLen != (ssize_t)ks.areaSize) {
+        if (!reader(ks.areaOffset, afMaterial.data(), ks.areaSize)) {
             mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
             return;
         }
@@ -911,6 +905,37 @@ static bool luks2Unlock(int fd,
 
 // ── Main Entry Point ────────────────────────────────────────────────────────
 
+bool luksRecoverMasterKey(const LuksByteReader& reader,
+                          const uint8_t* password,
+                          size_t passwordLen,
+                          LuksVolumeInfo& outInfo,
+                          int volId,
+                          std::function<bool(int)> cancelCheck,
+                          std::function<void(int, int, int, int)> progressCallback,
+                          const uint8_t* candidateMasterKey,
+                          size_t candidateMasterKeyLen) {
+    if (!reader) return false;
+    if (!password && !candidateMasterKey) return false;
+
+    // Read the version to determine path
+    uint8_t verBuf[2];
+    if (!reader(6, verBuf, 2)) return false;
+
+    uint16_t version = (uint16_t(verBuf[0]) << 8) | verBuf[1];
+    if (version == 1) {
+        LOGI("luksRecoverMasterKey: detected LUKS1 container");
+        return luks1Unlock(reader, password, passwordLen, outInfo, volId, cancelCheck, progressCallback,
+                            candidateMasterKey, candidateMasterKeyLen);
+    } else if (version == 2) {
+        LOGI("luksRecoverMasterKey: detected LUKS2 container");
+        return luks2Unlock(reader, password, passwordLen, outInfo, volId, cancelCheck, progressCallback,
+                            candidateMasterKey, candidateMasterKeyLen);
+    }
+
+    LOGI("luksRecoverMasterKey: unknown LUKS version %u", version);
+    return false;
+}
+
 bool luksRecoverMasterKey(int fd,
                           const uint8_t* password,
                           size_t passwordLen,
@@ -921,25 +946,12 @@ bool luksRecoverMasterKey(int fd,
                           const uint8_t* candidateMasterKey,
                           size_t candidateMasterKeyLen) {
     if (fd < 0) return false;
-    if (!password && !candidateMasterKey) return false;
-
-    // Read the version to determine path
-    uint8_t verBuf[2];
-    if (pread(fd, verBuf, 2, 6) != 2) return false;
-
-    uint16_t version = (uint16_t(verBuf[0]) << 8) | verBuf[1];
-    if (version == 1) {
-        LOGI("luksRecoverMasterKey: detected LUKS1 container");
-        return luks1Unlock(fd, password, passwordLen, outInfo, volId, cancelCheck, progressCallback,
-                            candidateMasterKey, candidateMasterKeyLen);
-    } else if (version == 2) {
-        LOGI("luksRecoverMasterKey: detected LUKS2 container");
-        return luks2Unlock(fd, password, passwordLen, outInfo, volId, cancelCheck, progressCallback,
-                            candidateMasterKey, candidateMasterKeyLen);
-    }
-
-    LOGI("luksRecoverMasterKey: unknown LUKS version %u", version);
-    return false;
+    LuksByteReader reader = [fd](uint64_t offset, void* outData, size_t len) -> bool {
+        return pread(fd, outData, len, static_cast<off_t>(offset)) == static_cast<ssize_t>(len);
+    };
+    return luksRecoverMasterKey(reader, password, passwordLen, outInfo, volId,
+                                std::move(cancelCheck), std::move(progressCallback),
+                                candidateMasterKey, candidateMasterKeyLen);
 }
 
 // ── Container creation ──────────────────────────────────────────────────

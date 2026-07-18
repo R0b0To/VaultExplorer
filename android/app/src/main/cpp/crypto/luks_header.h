@@ -87,10 +87,21 @@ struct LuksVolumeInfo {
     std::vector<uint8_t> masterKey;
 };
 
-
-
 // Check if the header starts with LUKS magic bytes
 bool isLuksContainer(const uint8_t* header, size_t len);
+
+
+using LuksByteReader = std::function<bool(uint64_t offset, void* outData, size_t len)>;
+
+bool luksRecoverMasterKey(const LuksByteReader& reader,
+                          const uint8_t* password,
+                          size_t passwordLen,
+                          LuksVolumeInfo& outInfo,
+                          int volId = -1,
+                          std::function<bool(int)> cancelCheck = nullptr,
+                          std::function<void(int, int, int, int)> progressCallback = nullptr,
+                          const uint8_t* candidateMasterKey = nullptr,
+                          size_t candidateMasterKeyLen = 0);
 
 // Main master key recovery entry point for LUKS containers.
 // Handled callbacks for cancellation and progress reporting to keep JNI logic decoupled.
@@ -166,10 +177,7 @@ using LuksByteWriter = std::function<bool(uint64_t offset, const void* data, siz
 // LUKS1's convention of reusing the data cipher for the keyslot too. So a
 // LUKS1 container created here with Serpent/Twofish/Camellia/Kuznyechik
 // unlocks again just fine, the same as a real cryptsetup-created one
-// would. (An earlier version of this function hardcoded AES-CBC for the
-// keyslot regardless of cipherName, which both mismatched the spec and
-// produced containers that non-AES ciphers could never be unlocked with
-// again — see the inline comment further down where that was fixed.)
+// would. 
 //
 // LUKS2's keyslot area, by contrast, is governed by its own JSON
 // "area.encryption" field (read dynamically by luks2Unlock, written as
@@ -188,5 +196,4 @@ bool luksCreateHeader(int fd, const uint8_t* password, size_t passwordLen,
 
 bool luksCreateHeader(const LuksByteWriter& writer, const uint8_t* password, size_t passwordLen,
                       int64_t sizeBytes, const LuksCreateParams& params,
-                      LuksVolumeInfo& outInfo);               
-
+                      LuksVolumeInfo& outInfo);

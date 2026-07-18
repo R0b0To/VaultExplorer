@@ -481,7 +481,6 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         v.partitionStartSector = segmentStartSector - (luksInfo.ivTweak * sectorsPerUnit);
         
         v.containerFormat = luksInfo.version == 1
-
             ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
         if (isGenericCipher) {
             v.luksGenericCascade = genericCascade;
@@ -625,6 +624,176 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     return true;
 }
 
+// Turns an arbitrary (possibly unaligned) byte range into one or more whole
+// 512-byte usbReadSectors() calls, trimming the result to [byteOffset, len).
+// LUKS header/JSON/AF-material reads aren't always sector-aligned (e.g. the
+// LUKS magic/version check at byte offset 6), unlike VeraCrypt's own header
+// reads which are always a single full sector.
+static bool usbReadBytes(int volId, uint64_t byteOffset, void* outData, size_t len) {
+    if (len == 0) return true;
+    const uint64_t startSector = byteOffset / 512;
+    const uint64_t endSector = (byteOffset + len + 511) / 512;
+    const uint32_t sectorCount = static_cast<uint32_t>(endSector - startSector);
+    std::vector<unsigned char> buf(static_cast<size_t>(sectorCount) * 512);
+    if (!usbReadSectors(volId, startSector, sectorCount, buf.data())) return false;
+    const size_t innerOffset = static_cast<size_t>(byteOffset - startSector * 512);
+    std::memcpy(outData, buf.data() + innerOffset, len);
+    return true;
+}
+
+
+// [partitionStartSector] is the absolute physical sector where this LUKS
+// container begins (already resolved by the caller from the partition
+// table). [partitionSizeBytes] is that partition's total size — LUKS2's
+// "dynamic" segment size has no stored container length the way VeraCrypt's
+// header does, so it's derived from here instead of from device capacity,
+// matching the exact size this app's own createUsbLuksContainer() wrote into
+// the MBR partition entry at creation time.
+static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partitionSizeBytes,
+                                   const unsigned char* password, size_t passwordLen, int volId,
+                                   const unsigned char* preservedKey, size_t preservedKeyLen,
+                                   const int* keyfileFds, int keyfileCount) {
+    VolumeState& v = volumes[volId];
+
+    // Keyfile-replaces-password semantics — identical to prepareLuksSession.
+    std::vector<unsigned char> keyfileBuf;
+    const unsigned char* effectivePassword = password;
+    size_t effectivePasswordLen = passwordLen;
+
+    if (keyfileCount > 0 && keyfileFds != nullptr && keyfileFds[0] >= 0) {
+        constexpr size_t kMaxKeyfileBytes = 1024 * 1024;
+        keyfileBuf.resize(kMaxKeyfileBytes);
+        ssize_t total = 0, n;
+        while (total < static_cast<ssize_t>(kMaxKeyfileBytes) &&
+               (n = read(keyfileFds[0], keyfileBuf.data() + total, kMaxKeyfileBytes - total)) > 0) {
+            total += n;
+        }
+        keyfileBuf.resize(total > 0 ? total : 0);
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        if (keyfileBuf.empty()) {
+            LOGI("prepareUsbLuksSession(vol=%d): keyfile unreadable or empty", volId);
+            return false;
+        }
+        effectivePassword = keyfileBuf.data();
+        effectivePasswordLen = keyfileBuf.size();
+    } else {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+    }
+
+    const uint64_t baseOffset = partitionStartSector * 512;
+    auto readMutex = std::make_shared<std::mutex>();
+    LuksByteReader reader = [volId, baseOffset, readMutex](uint64_t offset, void* outData, size_t len) -> bool {
+        // usbReadSectors serializes a single mass-storage BOT transaction on
+        // the shared USB connection — unlike pread on a real fd, concurrent
+        // calls from the per-keyslot worker threads inside
+        // luksRecoverMasterKey would interleave CBW/data/CSW phases and
+        // corrupt the protocol, so this reader must serialize itself.
+        std::lock_guard<std::mutex> lock(*readMutex);
+        return usbReadBytes(volId, baseOffset + offset, outData, len);
+    };
+
+    LuksVolumeInfo luksInfo;
+    auto cancelCheck = [volId](int) -> bool { return isUnlockCancelled(volId); };
+    auto progressCb = [volId](int step, int total, int hashId, int cipherId) {
+        int format = (cipherId == 1) ? 2 : 1;
+        reportUnlockProgress(volId, step, total, hashId, 0, format);
+    };
+
+    const bool usingPreservedKey = (preservedKey != nullptr && preservedKeyLen > 0);
+    if (!luksRecoverMasterKey(reader,
+                              usingPreservedKey ? nullptr : effectivePassword,
+                              usingPreservedKey ? 0 : effectivePasswordLen,
+                              luksInfo, volId, cancelCheck, progressCb,
+                              usingPreservedKey ? preservedKey : nullptr,
+                              usingPreservedKey ? preservedKeyLen : 0)) {
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+        return false;
+    }
+
+    if (luksInfo.cipherMode.rfind("xts-plain64", 0) != 0) {
+        LOGI("prepareUsbLuksSession(vol=%d): unsupported cipher mode '%s'", volId, luksInfo.cipherMode.c_str());
+        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+        return false;
+    }
+
+    CascadeId dataCipher;
+    if (luksInfo.cipherName == "aes") dataCipher = CascadeId::kAes;
+    else if (luksInfo.cipherName == "serpent") dataCipher = CascadeId::kSerpent;
+    else if (luksInfo.cipherName == "twofish") dataCipher = CascadeId::kTwofish;
+    else if (luksInfo.cipherName == "camellia") dataCipher = CascadeId::kCamellia;
+    else if (luksInfo.cipherName == "kuznyechik") dataCipher = CascadeId::kKuznyechik;
+    else {
+        LOGI("prepareUsbLuksSession(vol=%d): unsupported cipher '%s'", volId, luksInfo.cipherName.c_str());
+        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+        return false;
+    }
+    int mappedHash = 0; // kSha512, display-only for LUKS
+
+    const bool isGenericCipher = (dataCipher != CascadeId::kAes);
+    CascadeContext genericCascade;
+    bool keySetupOk;
+    if (!isGenericCipher) {
+        const size_t xtsKeyBits = luksInfo.keyBytes * 8;
+        keySetupOk = (mbedtls_aes_xts_setkey_dec(&v.luksXts.dec, luksInfo.masterKey.data(), xtsKeyBits) == 0 &&
+                      mbedtls_aes_xts_setkey_enc(&v.luksXts.enc, luksInfo.masterKey.data(), xtsKeyBits) == 0);
+    } else {
+        CascadeSpec spec = cascadeSpecFor(dataCipher);
+        if (spec.layerCount != 1 || luksInfo.masterKey.size() != static_cast<size_t>(spec.layerCount) * 64) {
+            LOGI("prepareUsbLuksSession(vol=%d): unsupported key size for %s", volId, luksInfo.cipherName.c_str());
+            keySetupOk = false;
+        } else {
+            keySetupOk = cascadeSetKeys(genericCascade, dataCipher,
+                                         luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        }
+    }
+    if (!keySetupOk) {
+        mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+        return false;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(v.mutex);
+        v.isUsbSource = true;
+        v.fd = -1;
+        v.dataOffset = baseOffset + luksInfo.dataOffsetBytes;
+        v.dataAreaLengthBytes = partitionSizeBytes - luksInfo.dataOffsetBytes;
+        v.isHiddenVolume = false;
+        v.matchedCipherId = static_cast<int>(dataCipher);
+        v.matchedHashId = mappedHash;
+        v.luksSectorSize = (luksInfo.dataSectorSize >= 512) ? luksInfo.dataSectorSize : 512;
+        v.luksUsesGenericCipher = isGenericCipher;
+
+        const uint64_t segmentStartSector = (baseOffset + luksInfo.dataOffsetBytes) / 512;
+        const uint64_t sectorsPerUnit = v.luksSectorSize / 512;
+        v.partitionStartSector = segmentStartSector - (luksInfo.ivTweak * sectorsPerUnit);
+
+        v.containerFormat = luksInfo.version == 1 ? ContainerFormat::kLuks1 : ContainerFormat::kLuks2;
+        if (isGenericCipher) {
+            v.luksGenericCascade = genericCascade;
+            v.luksXts.initialized = false;
+        } else {
+            v.luksXts.initialized = true;
+            v.luksGenericCascade.initialized = false;
+        }
+        v.dataCtxInitialized = true;
+
+        if (v.preservedDerivedKey) delete[] v.preservedDerivedKey;
+        v.preservedDerivedKey = new unsigned char[luksInfo.masterKey.size()];
+        memcpy(v.preservedDerivedKey, luksInfo.masterKey.data(), luksInfo.masterKey.size());
+        v.preservedDerivedKeyLen = luksInfo.masterKey.size();
+    }
+
+    mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
+    if (!keyfileBuf.empty()) mbedtls_platform_zeroize(keyfileBuf.data(), keyfileBuf.size());
+
+    LOGI("prepareUsbLuksSession(vol=%d): LUKS%d unlocked, cipher=%s, dataOffset=%llu, partitionSize=%llu",
+         volId, luksInfo.version, luksInfo.cipherName.c_str(),
+         (unsigned long long)luksInfo.dataOffsetBytes, (unsigned long long)partitionSizeBytes);
+    return true;
+}
 
 bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pim, int volId, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, int64_t partitionOffsetHint, const int* keyfileFds, int keyfileCount) {
     if (volId < 0 || volId >= MAX_VOLUMES) { closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
@@ -639,21 +808,6 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
         }
     }
 
-    unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
-    ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
-    size_t mixedPasswordLen = 0;
-    const bool usingPreservedKey = (preservedKey != nullptr && preservedKeyLen > 0);
-    if (!usingPreservedKey) {
-        mixedPasswordLen = std::min(passwordLen, sizeof(mixedPassword));
-        memcpy(mixedPassword, password, mixedPasswordLen);
-        if (keyfileCount > 0 && !applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedPasswordLen)) {
-            LOGI("prepareUsbSession(vol=%d): keyfile mixing failed (unreadable/empty keyfile)", volId);
-            return false;
-        }
-    } else {
-        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
-    }
-
     std::vector<PartitionCandidate> partitions;
 
     std::unique_ptr<unsigned char[]> diskBuf(new unsigned char[34 * 512]);
@@ -664,7 +818,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
 
         if (sector0[510] == 0x55 && sector0[511] == 0xAA) {
             bool isGpt = false;
-            
+
             for (int i = 0; i < 4; i++) {
                 const unsigned char* entry = &sector0[446 + i * 16];
                 uint8_t type = entry[4];
@@ -682,11 +836,11 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
             if (isGpt && memcmp(sector1, "EFI PART", 8) == 0) {
                 uint32_t numEntries = readUint32LE(&sector1[80]);
                 uint32_t entrySize = readUint32LE(&sector1[84]);
-                
+
                 if (entrySize >= 128 && numEntries <= 128) {
                     for (uint32_t i = 0; i < numEntries; i++) {
                         const unsigned char* entry = gptEntries + (i * entrySize);
-                        
+
                         bool unused = true;
                         for (int g = 0; g < 16; g++) {
                             if (entry[g] != 0) { unused = false; break; }
@@ -717,6 +871,55 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
         }
     }
 
+    // ── LUKS detection ────────────────────────────────────────────────────
+    // Checked BEFORE any VeraCrypt-style additive keyfile mixing below —
+    // LUKS keyfile semantics are keyfile-REPLACES-password (handled inside
+    // prepareUsbLuksSession, mirroring prepareLuksSession for file-backed
+    // containers), which the mixing below would otherwise apply wrongly.
+    bool keyfilesConsumedByLuks = false;
+    for (const auto& part : partitions) {
+        if (part.sectorCount == 0) {
+            // Whole-disk fallback / hint-only candidate — no reliable
+            // container size to derive LUKS2's "dynamic" segment length
+            // from. Every LUKS container this app creates always goes
+            // through writeMbrPartitionTable() first, so a real candidate
+            // for this app's own containers always has sectorCount > 0.
+            continue;
+        }
+        unsigned char firstSector[512];
+        if (!usbReadSectors(volId, part.startSector, 1, firstSector)) continue;
+        if (!isLuksContainer(firstSector, 6)) continue;
+
+        const int* attemptKeyfileFds = keyfilesConsumedByLuks ? nullptr : keyfileFds;
+        const int attemptKeyfileCount = keyfilesConsumedByLuks ? 0 : keyfileCount;
+        keyfilesConsumedByLuks = true; // prepareUsbLuksSession always consumes/closes whatever it's given
+
+        const uint64_t partitionSizeBytes = part.sectorCount * 512ULL;
+        if (prepareUsbLuksSession(part.startSector, partitionSizeBytes,
+                                  password, passwordLen, volId,
+                                  preservedKey, preservedKeyLen,
+                                  attemptKeyfileFds, attemptKeyfileCount)) {
+            return true;
+        }
+    }
+
+    // ── VeraCrypt path ──────────────────────────────────────────────────────
+    unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
+    size_t mixedPasswordLen = 0;
+    const bool usingPreservedKey = (preservedKey != nullptr && preservedKeyLen > 0);
+    if (!usingPreservedKey) {
+        mixedPasswordLen = std::min(passwordLen, sizeof(mixedPassword));
+        memcpy(mixedPassword, password, mixedPasswordLen);
+        if (!keyfilesConsumedByLuks && keyfileCount > 0 &&
+            !applyKeyfilesToPassword(keyfileFds, keyfileCount, mixedPassword, &mixedPasswordLen)) {
+            LOGI("prepareUsbSession(vol=%d): keyfile mixing failed (unreadable/empty keyfile)", volId);
+            return false;
+        }
+    } else if (!keyfilesConsumedByLuks) {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+    }
+
     struct HeaderSlot { uint64_t sectorOffset; };
     static constexpr HeaderSlot kHeaderSlots[] = {
         { 0 },
@@ -738,7 +941,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
             const uint64_t headerSector = part.startSector + slot.sectorOffset;
 
             unsigned char dKey[192]{};
-            unsigned char decH[VC_HEADER_BODY_SIZE]; // Holds the decrypted header fields on successful decryption.
+            unsigned char decH[VC_HEADER_BODY_SIZE];
             CascadeId matchedCipher{};
             HashId matchedHash{};
             ParsedHeaderFields fields;
@@ -751,7 +954,6 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
                 CascadeId candidateCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
                 const size_t bytesToCopy = std::min(preservedKeyLen, (size_t)192);
                 memcpy(dKey, preservedKey, bytesToCopy);
-                
 
                 if (tryDecryptHeader(headerBuf + VC_SALT_SIZE, candidateCipher, dKey, decH, &fields)) {
                     matchedCipher = candidateCipher;
@@ -762,7 +964,6 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
                 unsigned char headerBuf[VC_FULL_HEADER_SIZE];
                 if (!usbReadSectors(volId, headerSector, 1, headerBuf)) continue;
 
-
                 derivedSuccessfully = deriveAndValidateHeader(headerBuf, mixedPassword, mixedPasswordLen, pim, cipherId, hashId,
                                          dKey, decH, matchedCipher, matchedHash, fields, volId);
             }
@@ -772,10 +973,9 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
                 continue;
             }
 
-            // Extract Master Key from decH
             CascadeSpec spec = cascadeSpecFor(matchedCipher);
-            const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER]; // Point to the master key material inside the decrypted header body.
-            
+            const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER];
+
             if (!cascadeSetKeys(candidateCascade, matchedCipher, masterKeyPtr, spec.layerCount * 64)) {
                 mbedtls_platform_zeroize(dKey, sizeof(dKey));
                 continue;

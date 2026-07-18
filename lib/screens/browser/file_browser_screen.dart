@@ -1051,7 +1051,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         await _loadDirectoryContents(_currentDirPath);
         _setStatus(
           failCount == 0
-              ? 'Deleted $deleted iteasdasdm(s)'
+              ? 'Deleted $deleted item(s)'
               : '$deleted deleted · $failCount failed',
           error: failCount > 0,
         );

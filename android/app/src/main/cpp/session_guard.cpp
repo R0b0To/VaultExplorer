@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <mutex>
 
+#include "jni_callbacks.h"
 #include "volume_state.h"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
@@ -20,11 +21,10 @@ bool requireActiveSession(int volumeId, const char* operation) {
 }
 
 void throwNotUnlocked(JNIEnv* env, int volumeId, const char* operation) {
-    jclass exceptionClass = env->FindClass("java/lang/IllegalStateException");
     char message[160];
     snprintf(message, sizeof(message), "NOT_UNLOCKED: volume %d has no active session (%s)",
              volumeId, operation);
-    env->ThrowNew(exceptionClass, message);
+    env->ThrowNew(g_illegalStateExceptionClass, message);
 }
 
 bool isVolumeReadOnly(int volumeId) {
@@ -35,9 +35,8 @@ bool isVolumeReadOnly(int volumeId) {
 }
 
 void throwReadOnly(JNIEnv* env, int volumeId, const char* operation) {
-    jclass exceptionClass = env->FindClass("java/lang/IllegalStateException");
     char message[160];
     snprintf(message, sizeof(message), "READ_ONLY: volume %d is mounted read-only (%s)",
              volumeId, operation);
-    env->ThrowNew(exceptionClass, message);
+    env->ThrowNew(g_illegalStateExceptionClass, message);
 }

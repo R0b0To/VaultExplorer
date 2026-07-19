@@ -12,6 +12,8 @@ jmethodID g_usbReadMethod = nullptr;
 jmethodID g_usbWriteMethod = nullptr;
 jclass    g_progressBridgeClass = nullptr;
 jmethodID g_progressReportMethod = nullptr;
+jclass    g_illegalStateExceptionClass = nullptr;
+jclass    g_unlockCancelledExceptionClass = nullptr;
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     g_vm = vm;
@@ -46,6 +48,22 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         return JNI_ERR;
     }
 
+    jclass iseLocal = env->FindClass("java/lang/IllegalStateException");
+    if (!iseLocal) {
+        LOGI("JNI_OnLoad: IllegalStateException class not found");
+        return JNI_ERR;
+    }
+    g_illegalStateExceptionClass = static_cast<jclass>(env->NewGlobalRef(iseLocal));
+    env->DeleteLocalRef(iseLocal);
+
+    jclass uceLocal = env->FindClass("com/aeidolon/vaultexplorer/UnlockCancelledException");
+    if (!uceLocal) {
+        LOGI("JNI_OnLoad: UnlockCancelledException class not found");
+        return JNI_ERR;
+    }
+    g_unlockCancelledExceptionClass = static_cast<jclass>(env->NewGlobalRef(uceLocal));
+    env->DeleteLocalRef(uceLocal);
+
     // Pre-warm the shared KDF worker pool now, during library load, instead
     // of paying OS thread-spawn cost (roughly 5-30 ms across
     // hardware_concurrency() threads, depending on device) during the
@@ -62,11 +80,15 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
     if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) {
         if (g_usbBridgeClass) env->DeleteGlobalRef(g_usbBridgeClass);
         if (g_progressBridgeClass) env->DeleteGlobalRef(g_progressBridgeClass);
+        if (g_illegalStateExceptionClass) env->DeleteGlobalRef(g_illegalStateExceptionClass);
+        if (g_unlockCancelledExceptionClass) env->DeleteGlobalRef(g_unlockCancelledExceptionClass);
     }
     g_usbBridgeClass = nullptr;
     g_usbReadMethod = nullptr;
     g_usbWriteMethod = nullptr;
     g_progressBridgeClass = nullptr;
     g_progressReportMethod = nullptr;
+    g_illegalStateExceptionClass = nullptr;
+    g_unlockCancelledExceptionClass = nullptr;
     g_vm = nullptr;
 }

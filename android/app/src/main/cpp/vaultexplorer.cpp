@@ -592,8 +592,7 @@ static std::vector<int> extractKeyfileFds(JNIEnv* env, jintArray arr) {
 }
 
 static void throwUnlockCancelledException(JNIEnv* env) {
-    jclass excClass = env->FindClass("com/aeidolon/vaultexplorer/UnlockCancelledException");
-    if (excClass) env->ThrowNew(excClass, "CANCELLED");
+    if (g_unlockCancelledExceptionClass) env->ThrowNew(g_unlockCancelledExceptionClass, "CANCELLED");
 }
 
 extern "C" JNIEXPORT jint JNICALL

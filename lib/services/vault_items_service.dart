@@ -33,13 +33,14 @@ class VaultItemsService {
       final tmpPath = '$path.tmp';
       await vaultExplorerApi.deleteFile(container, tmpPath);
       
-      final ok = await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, bytes);
-      if (!ok) return false;
-      await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
+final ok = await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, bytes);
+if (!ok) return false;
+final finished = await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
+if (!finished) return false;
 
-      await vaultExplorerApi.deleteFile(container, path);
-      await vaultExplorerApi.renameFile(container, tmpPath, path);
-      return true;
+await vaultExplorerApi.deleteFile(container, path);
+final renamed = await vaultExplorerApi.renameFile(container, tmpPath, path);
+return renamed;
     } catch (e) {
       debugPrint('VaultItemsService.saveItem error: $e');
       return false;

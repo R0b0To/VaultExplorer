@@ -260,20 +260,21 @@ class FileOperationService extends ChangeNotifier {
         }
       }
 
-      final spaceInfo = await vaultExplorerApi.getSpaceInfo(dest);
-      final freeBytes = (spaceInfo != null && spaceInfo.length > 1)
-          ? spaceInfo[1]
-          : 0;
 
-      if (requiredBytes > (freeBytes * 0.95).floor()) {
-        op._setError(
-          'Not enough space — need ${formatBytes(requiredBytes)}, '
-          'only ${formatBytes(freeBytes)} free',
-        );
-        op._setStatus(FileOperationStatus.failed);
-        notifyListeners();
-        return;
-      }
+final spaceInfo = await vaultExplorerApi.getSpaceInfo(dest);
+final freeBytes = (spaceInfo != null && spaceInfo.length > 1 && spaceInfo[1] >= 0)
+    ? spaceInfo[1]
+    : null; // destination doesn't report free space — skip the check
+
+if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
+  op._setError(
+    'Not enough space — need ${formatBytes(requiredBytes)}, '
+    'only ${formatBytes(freeBytes)} free',
+  );
+  op._setStatus(FileOperationStatus.failed);
+  notifyListeners();
+  return;
+}
 
       // ── Resolve destination names ─────────────────────────────────────
       op._setActivity('Resolving conflicts…');

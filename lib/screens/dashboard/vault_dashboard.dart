@@ -293,7 +293,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     final container = _mounted[idx];
     try {
       final space = await vaultExplorerApi.getSpaceInfo(container);
-      if (space != null && space.length > 1 && mounted) {
+if (space != null && space.length > 1 && space[0] >= 0 && space[1] >= 0 && mounted) {
         setState(() {
           final currentIdx = _mounted.indexWhere((c) => c.volId == volId);
           if (currentIdx != -1) {

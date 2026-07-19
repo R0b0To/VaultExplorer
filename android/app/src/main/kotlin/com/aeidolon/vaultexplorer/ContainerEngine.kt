@@ -128,8 +128,11 @@ object ContainerEngine {
         return ContainerFormat.fromNative(VeraCryptEngine.getContainerFormat(volId))
     }
 
-    fun listDirectory(path: String, volId: Int): Array<String>? =
-        CryptomatorSessionRegistry.get(volId)?.listDirectory(path) ?: VeraCryptEngine.listDirectory(path, volId)
+fun listDirectory(path: String, volId: Int): Array<String>? =
+    if (CryptomatorSessionRegistry.isCryptomator(volId))
+        CryptomatorSessionRegistry.get(volId)?.listDirectory(path)
+    else
+        VeraCryptEngine.listDirectory(path, volId)
 
     fun createDirectory(path: String, volId: Int): Boolean =
         CryptomatorSessionRegistry.get(volId)?.createDirectory(path) ?: VeraCryptEngine.createDirectory(path, volId)
@@ -166,8 +169,11 @@ object ContainerEngine {
     fun extractFile(path: String, destination: String, volId: Int): Boolean =
         CryptomatorSessionRegistry.get(volId)?.extractFile(path, destination) ?: VeraCryptEngine.extractFile(path, destination, volId)
 
-    fun getSpaceInfo(volId: Int): LongArray? =
-        CryptomatorSessionRegistry.get(volId)?.getSpaceInfo() ?: VeraCryptEngine.getSpaceInfo(volId)
+fun getSpaceInfo(volId: Int): LongArray? =
+    if (CryptomatorSessionRegistry.isCryptomator(volId))
+        CryptomatorSessionRegistry.get(volId)?.getSpaceInfo()
+    else
+        VeraCryptEngine.getSpaceInfo(volId)
 
     fun openStream(path: String, volId: Int): Long =
         if (CryptomatorSessionRegistry.isCryptomator(volId)) CryptomatorStreamRegistry.open(volId, path)

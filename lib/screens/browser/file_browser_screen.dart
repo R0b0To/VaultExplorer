@@ -237,38 +237,40 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   // ── Directory loading ─────────────────────────────────────────────────────
 
   Future<void> _loadDirectoryContents(String path) async {
-    setState(() => _isLoading = true);
-    _signalActivity();
+  setState(() => _isLoading = true);
+  _signalActivity();
 
-    if (_archiveContext != null) {
-      _loadArchiveContents(path);
-      return;
+  if (_archiveContext != null) {
+    _loadArchiveContents(path);
+    return;
+  }
+
+  try {
+    final items = await vaultExplorerApi.listDirectory(widget.container, path);
+
+    List<int>? space;
+    try {
+      space = await vaultExplorerApi.getSpaceInfo(widget.container);
+    } catch (_) {
+      space = null; // e.g. Cryptomator vault with no reportable free space
     }
 
-    try {
-      final items = await vaultExplorerApi.listDirectory(
-        widget.container,
-        path,
-      );
-      final space = await vaultExplorerApi.getSpaceInfo(widget.container);
-
-      if (mounted) {
-        final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
-
-        setState(() {
-            _currentItems = items?.where((f) => !f.startsWith('System:')).toList() ?? [];
-            _isListingTruncated = isTruncated;
-            if (space != null && space.length > 1) _freeSpace = space[1];
-            _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        _setStatus('Failed loading folder: ${e.runtimeType}', error: true);
-      }
+    if (mounted) {
+      final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
+      setState(() {
+        _currentItems = items?.where((f) => !f.startsWith('System:')).toList() ?? [];
+        _isListingTruncated = isTruncated;
+        if (space != null && space.length > 1 && space[1] >= 0) _freeSpace = space[1];
+        _isLoading = false;
+      });
+    }
+  } catch (e) {
+    if (mounted) {
+      setState(() => _isLoading = false);
+      _setStatus('Failed loading folder: ${e.runtimeType}', error: true);
     }
   }
+}
 
   void _loadArchiveContents(String path) {
     if (_archiveContext == null) return;
@@ -2009,12 +2011,12 @@ MenuItemButton(
     final textTheme = Theme.of(context).textTheme;
     final style = textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant);
 
-    final parts = <String>[
-      '$dirCount folder${dirCount == 1 ? '' : 's'}',
-      '$fileCount file${fileCount == 1 ? '' : 's'}',
-      '${formatBytes(_freeSpace)} free',
-      if (isFiltered) 'filtered',
-    ];
+final parts = <String>[
+  '$dirCount folder${dirCount == 1 ? '' : 's'}',
+  '$fileCount file${fileCount == 1 ? '' : 's'}',
+  if (_freeSpace >= 0) '${formatBytes(_freeSpace)} free',
+  if (isFiltered) 'filtered',
+];
 
     return Text(
       parts.join(' · '),

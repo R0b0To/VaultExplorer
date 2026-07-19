@@ -46,22 +46,31 @@ class CryptomatorSession(
     // ---- directory listing ----------------------------------------------------
 
     /** Mirrors VeraCryptEngine.listDirectory: returns child names (folders end with '/'), or null if the path doesn't exist. */
-    fun listDirectory(virtualPath: String): Array<String>? {
-        return try {
-            val normalized = normalize(virtualPath)
-            val nodes = tree.list(normalized)
-            nodes.map { node ->
-                when (node) {
-                    is VaultNode.VDir -> node.cleartextName + "/"
-                    is VaultNode.VFile -> node.cleartextName
+fun listDirectory(virtualPath: String): Array<String>? {
+    return try {
+        val normalized = normalize(virtualPath)
+        val nodes = tree.list(normalized)
+        nodes.map { node ->
+            when (node) {
+                is VaultNode.VDir -> {
+                    val mtime = node.physicalFolder.lastModified() / 1000L
+                    "[DIR] ${node.cleartextName}|0|$mtime"
                 }
-            }.toTypedArray()
-        } catch (e: VaultPathNotFoundException) {
-            null
-        } catch (e: VaultIOException) {
-            null
-        }
+                is VaultNode.VFile -> {
+                    val ciphertextSize = node.physicalFile.length()
+                    val withoutHeader = ciphertextSize - contentCryptor.headerSize
+                    val cleartextSize = if (withoutHeader < 0) 0L else contentCryptor.cleartextSize(withoutHeader)
+                    val mtime = node.physicalFile.lastModified() / 1000L
+                    "${node.cleartextName}|$cleartextSize|$mtime"
+                }
+            }
+        }.toTypedArray()
+    } catch (e: VaultPathNotFoundException) {
+        null
+    } catch (e: VaultIOException) {
+        null
     }
+}
 
     fun createDirectory(virtualPath: String): Boolean {
         if (readOnly) return false
@@ -90,8 +99,9 @@ class CryptomatorSession(
             tree.invalidate(parentPath)
             true
         } catch (e: Exception) {
-            false
-        }
+    android.util.Log.e("CryptomatorSession", "createDirectory failed for $virtualPath", e)
+    false
+}
     }
 
     fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
@@ -332,9 +342,10 @@ class CryptomatorSession(
             handle.commit()
             tree.invalidate(parentOf(normalized))
             true
-        } catch (e: Exception) {
-            false
-        }
+       } catch (e: Exception) {
+    android.util.Log.e("CryptomatorSession", "writeBackFile failed for $virtualPath", e)
+    false
+}
     }
 
     fun extractFile(virtualPath: String, destinationPath: String): Boolean {
@@ -364,33 +375,28 @@ class CryptomatorSession(
         }
     }
 
-    fun getSpaceInfo(): LongArray? {
-        // Cryptomator vaults are just a folder tree on whatever storage backs
-        // the SAF tree Uri — there's no fixed container size. Report the
-        // underlying filesystem's real free/total space via the root
-        // document's query columns where the provider exposes them; fall
-        // back to a conservative "unknown" sentinel (-1) the Dart layer can
-        // choose to hide rather than show a misleading number.
-        return try {
-            val rootUri = android.provider.DocumentsContract.buildRootsUri(vaultRootUri.authority)
-            context.contentResolver.query(
-                rootUri,
-                arrayOf(android.provider.DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, android.provider.DocumentsContract.Root.COLUMN_CAPACITY_BYTES),
-                null, null, null
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val availIdx = cursor.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_AVAILABLE_BYTES)
-                    val capIdx = cursor.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_CAPACITY_BYTES)
-                    val avail = if (availIdx >= 0) cursor.getLong(availIdx) else -1L
-                    val cap = if (capIdx >= 0) cursor.getLong(capIdx) else -1L
-                    if (cap > 0) return longArrayOf(cap, avail)
-                }
+// CryptomatorSession.kt
+fun getSpaceInfo(): LongArray? {
+    return try {
+        val rootUri = android.provider.DocumentsContract.buildRootsUri(vaultRootUri.authority)
+        context.contentResolver.query(
+            rootUri,
+            arrayOf(android.provider.DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, android.provider.DocumentsContract.Root.COLUMN_CAPACITY_BYTES),
+            null, null, null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val availIdx = cursor.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_AVAILABLE_BYTES)
+                val capIdx = cursor.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_CAPACITY_BYTES)
+                val avail = if (availIdx >= 0) cursor.getLong(availIdx) else -1L
+                val cap = if (capIdx >= 0) cursor.getLong(capIdx) else -1L
+                if (cap > 0 && avail >= 0) return longArrayOf(cap, avail)
             }
-            longArrayOf(-1L, -1L)
-        } catch (e: Exception) {
-            longArrayOf(-1L, -1L)
         }
+        null // unknown — let callers treat this as "don't gate on space", not "zero space"
+    } catch (e: Exception) {
+        null
     }
+}
 
     // ---- write-handle: buffers cleartext, flushes full ciphertext chunks -----
 

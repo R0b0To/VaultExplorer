@@ -310,16 +310,12 @@ class ThumbnailCacheService {
         final tmpPath = '$cachePath.tmp';
         await vaultExplorerApi.createDirectory(container, inContainerDir);
         await vaultExplorerApi.deleteFile(container, tmpPath);
-        final ok = await vaultExplorerApi.writeFileChunk(
-          container,
-          tmpPath,
-          0,
-          data,
-        );
-        if (ok) {
-          await vaultExplorerApi.deleteFile(container, cachePath);
-          await vaultExplorerApi.renameFile(container, tmpPath, cachePath);
-        } else {
+        final ok = await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, data);
+await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
+if (ok) {
+  await vaultExplorerApi.deleteFile(container, cachePath);
+  await vaultExplorerApi.renameFile(container, tmpPath, cachePath);
+} else {
           await vaultExplorerApi.deleteFile(container, tmpPath);
           debugPrint(
             'ThumbnailCacheService.put: inContainer write failed for $filePath',

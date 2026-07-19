@@ -14,6 +14,18 @@ abstract final class ChannelMethods {
   static const cancelUnlock = 'cancelUnlock';
   static const changeContainerPassword = 'changeContainerPassword';
 
+  // ── Cryptomator vaults ───────────────────────────────────────────────────
+  /// Opens ACTION_OPEN_DOCUMENT_TREE (a folder picker, not a file picker —
+  /// Cryptomator vaults are directory trees) and checks for
+  /// masterkey.cryptomator before returning.
+  static const pickCryptomatorVault = 'pickCryptomatorVault';
+  static const unlockCryptomatorVault = 'unlockCryptomatorVault';
+  static const createCryptomatorVault = 'createCryptomatorVault';
+  /// Must be called once after the last writeFileChunk() in a sequence for
+  /// a given path, to flush Cryptomator's buffered final chunk. No-op for
+  /// VeraCrypt/LUKS volIds.
+  static const finishWriteIfCryptomator = 'finishWriteIfCryptomator';
+
   // ── File I/O ─────────────────────────────────────────────────────────────
   static const decryptFile = 'decryptFile';
   static const exportFileToStorage = 'exportFileToStorage';

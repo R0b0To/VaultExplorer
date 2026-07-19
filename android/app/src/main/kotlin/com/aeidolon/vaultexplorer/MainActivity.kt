@@ -84,6 +84,10 @@ private object ChannelMethods {
     const val CANCEL_UNLOCK = "cancelUnlock"
     const val CHANGE_CONTAINER_PASSWORD = "changeContainerPassword"
     const val SET_LAST_MODIFIED_TIME = "setLastModifiedTime"
+    const val PICK_CRYPTOMATOR_VAULT = "pickCryptomatorVault"
+    const val UNLOCK_CRYPTOMATOR_VAULT = "unlockCryptomatorVault"
+    const val CREATE_CRYPTOMATOR_VAULT = "createCryptomatorVault"
+    const val FINISH_WRITE_IF_CRYPTOMATOR = "finishWriteIfCryptomator"
 }
 
 private const val MAX_CHUNK_BYTES = 64 * 1024 * 1024  // 64 MB
@@ -140,6 +144,29 @@ class MainActivity : FlutterFragmentActivity() {
             res.success(mapOf(
                 "uri" to uri.toString(),
                 "displayName" to UriNameResolver.resolve(contentResolver, uri)
+            ))
+        } else {
+            res.success(null)
+        }
+    }
+
+    private val pickCryptomatorVaultLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingFlutterResult ?: return@registerForActivityResult
+        pendingFlutterResult = null
+        val data = activityResult.data
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
+            val uri = data.data!!
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            val looksValid = com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.looksLikeVault(this, uri)
+            res.success(mapOf(
+                "uri" to uri.toString(),
+                "displayName" to UriNameResolver.resolve(contentResolver, uri),
+                "looksLikeVault" to looksValid,
             ))
         } else {
             res.success(null)
@@ -942,6 +969,17 @@ class MainActivity : FlutterFragmentActivity() {
                     pickContainerLauncher.launch(intent)
                 }
 
+                ChannelMethods.PICK_CRYPTOMATOR_VAULT -> {
+                    // Cryptomator vaults are folders (vault.cryptomator +
+                    // masterkey.cryptomator + d/ living side by side), not a
+                    // single file — ACTION_OPEN_DOCUMENT_TREE grants access to
+                    // the whole subtree, same as the existing import/export
+                    // folder pickers use.
+                    pendingResultCheck(result)
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                    pickCryptomatorVaultLauncher.launch(intent)
+                }
+
                 ChannelMethods.PICK_KEYFILES -> {
                     pendingResultCheck(result)
                     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -1211,6 +1249,133 @@ class MainActivity : FlutterFragmentActivity() {
                         }
                     }
                 }
+
+                ChannelMethods.UNLOCK_CRYPTOMATOR_VAULT -> {
+                    val uriString = call.argument<String>("filePath")
+                    val password = call.argument<String>("password")
+                    val displayName = call.argument<String>("displayName")
+                    val docProvider = call.argument<Boolean>("documentProvider") ?: false
+                    val readOnly = call.argument<Boolean>("readOnly") ?: false
+
+                    if (uriString == null || password == null) {
+                        result.error("INVALID_ARGS", "filePath and password required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                        ?: ContainerSessionRegistry.getFreeVolumeId()
+                    if (targetVolId == null) {
+                        result.error("MAX_CONTAINERS", "Maximum containers already mounted", null)
+                        return@setMethodCallHandler
+                    }
+                    methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
+
+                    ioExecutor.execute {
+                        try {
+                            val uri = Uri.parse(uriString)
+                            val passwordChars = password.toCharArray()
+                            val openResult = try {
+                                com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.open(this, uri, passwordChars, readOnly)
+                            } finally {
+                                passwordChars.fill('\u0000')
+                            }
+
+                            runOnUiThread {
+                                when (openResult) {
+                                    is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.Success -> {
+                                        val session = openResult.session
+                                        com.aeidolon.vaultexplorer.cryptomator.CryptomatorSessionRegistry.put(targetVolId, session)
+                                        val files = session.listDirectory("")?.toList() ?: emptyList()
+                                        ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
+                                            uri = uriString,
+                                            volId = targetVolId,
+                                            cachedFilesList = files,
+                                            displayName = displayName ?: openResult.vaultDisplayName,
+                                            documentProvider = docProvider,
+                                            readOnly = readOnly,
+                                        )
+                                        if (docProvider) {
+                                            contentResolver.notifyChange(
+                                                DocumentsContract.buildRootsUri(
+                                                    "com.aeidolon.vaultexplorer.documents"), null)
+                                        }
+                                        result.success(mapOf(
+                                            "volId" to targetVolId,
+                                            "files" to files,
+                                            "matchedCipherId" to 255,
+                                            "matchedHashId" to 255,
+                                            "containerFormat" to "cryptomator",
+                                        ))
+                                    }
+                                    is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.WrongPassword -> {
+                                        result.error("AUTH_FAIL", "Incorrect password", null)
+                                    }
+                                    is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.InvalidVault -> {
+                                        result.error("INVALID_VAULT", openResult.reason, null)
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { dispatchNativeError(e, result) }
+                        }
+                    }
+                }
+
+                ChannelMethods.CREATE_CRYPTOMATOR_VAULT -> {
+                    val uriString = call.argument<String>("filePath")
+                    val password = call.argument<String>("password") ?: ""
+                    if (uriString == null || password.isEmpty()) {
+                        result.error("INVALID_ARGS", "filePath and password required", null)
+                        return@setMethodCallHandler
+                    }
+                    ioExecutor.execute {
+                        try {
+                            val uri = Uri.parse(uriString)
+                            val passwordChars = password.toCharArray()
+                            val createResult = try {
+                                com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.create(this, uri, passwordChars)
+                            } finally {
+                                passwordChars.fill('\u0000')
+                            }
+                            runOnUiThread {
+                                when (createResult) {
+                                    is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.Success -> {
+                                        // Vault created but intentionally left locked (matching
+                                        // CREATE_CONTAINER's behavior for VeraCrypt/LUKS) —
+                                        // the user unlocks it explicitly afterward via the
+                                        // normal unlock flow.
+                                        createResult.session.close()
+                                        result.success(true)
+                                    }
+                                    is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.InvalidVault -> {
+                                        result.error("CREATE_FAILED", createResult.reason, null)
+                                    }
+                                    else -> result.error("CREATE_FAILED", "Unexpected result", null)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { dispatchNativeError(e, result) }
+                        }
+                    }
+                }
+
+ChannelMethods.FINISH_WRITE_IF_CRYPTOMATOR -> {
+    val volId = call.argument<Number>("volId")?.toInt()
+    val path = call.argument<String>("path")
+    if (volId == null || path == null) {
+        result.error("INVALID_ARGS", "volId and path required", null); return@setMethodCallHandler
+    }
+    ioExecutor.execute {
+        try {
+            val success = synchronized(ContainerSessionRegistry.locks[volId]) {
+                ContainerEngine.finishWriteIfCryptomator(path, volId)
+            }
+            runOnUiThread { result.success(success) }
+        } catch (e: Exception) {
+            runOnUiThread { dispatchNativeError(e, result) }
+        }
+    }
+}
 
                 ChannelMethods.CANCEL_UNLOCK -> {
                     val volId = call.argument<Number>("volId")?.toInt()

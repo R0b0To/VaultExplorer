@@ -436,6 +436,91 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         .toList();
   }
 
+  /// Opens a folder picker (ACTION_OPEN_DOCUMENT_TREE) for selecting a
+  /// Cryptomator vault — vaults are directory trees (vault.cryptomator +
+  /// masterkey.cryptomator + d/), not single files, so this is distinct from
+  /// [pickContainer]. [looksLikeVault] is a quick heuristic (checks for
+  /// masterkey.cryptomator) the caller can use to warn the user immediately
+  /// if they picked an unrelated folder, before asking for a password.
+  Future<({String uri, String displayName, bool looksLikeVault})?> pickCryptomatorVault() async {
+    final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+      ChannelMethods.pickCryptomatorVault,
+    );
+    if (raw == null) return null;
+    return (
+      uri: raw['uri'] as String,
+      displayName: raw['displayName'] as String,
+      looksLikeVault: raw['looksLikeVault'] as bool? ?? false,
+    );
+  }
+
+  /// Unlocks a Cryptomator vault. Result shape matches [unlockContainer]
+  /// exactly (containerFormat: 'cryptomator') so callers can treat the two
+  /// uniformly once unlocked. matchedCipherId/matchedHashId are always 255
+  /// (not applicable — Cryptomator's cipher suite is fixed per vault format,
+  /// not user-selectable).
+  Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockCryptomatorVault(
+    String filePath,
+    String password, {
+    String? displayName,
+    bool documentProvider = false,
+    bool readOnly = false,
+  }) async {
+    final raw = await _channel
+        .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockCryptomatorVault, {
+          'filePath': filePath,
+          'password': password,
+          'displayName': displayName,
+          'documentProvider': documentProvider,
+          'readOnly': readOnly,
+        });
+    if (raw == null) return null;
+    final files = (raw['files'] as List<Object?>).cast<String>();
+    return (
+      volId: raw['volId'] as int,
+      files: files,
+      matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
+      matchedHashId: raw['matchedHashId'] as int? ?? 255,
+      containerFormat: raw['containerFormat'] as String? ?? 'cryptomator',
+    );
+  }
+
+  /// Creates a new Cryptomator vault (always vault format 8 / SIV_GCM) in
+  /// an empty folder the user already granted tree access to via
+  /// [pickCryptomatorVault]. The vault is left locked afterward — the
+  /// caller should unlock it explicitly via [unlockCryptomatorVault], same
+  /// as [createContainer] leaves VeraCrypt/LUKS containers locked.
+  Future<bool> createCryptomatorVault(String folderUri, String password) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.createCryptomatorVault,
+        {'filePath': folderUri, 'password': password},
+      );
+      return success ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Must be called once after the final [writeFileChunk] call in a
+  /// sequence for a given [fileName], to flush Cryptomator's buffered final
+  /// (possibly partial) chunk and materialize the file. Safe to call
+  /// unconditionally for any container — it's a no-op for VeraCrypt/LUKS.
+  Future<bool> finishWriteIfCryptomator(
+    MountedContainer container,
+    String fileName,
+  ) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.finishWriteIfCryptomator,
+        {'volId': container.volId, 'path': fileName},
+      );
+      return success ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
   /// Asks native to abort the in-flight unlock for [volId] (see
   /// [addUnlockStartedListener] for how the caller learns [volId] before the
   /// original [unlockContainer]/[unlockUsbContainer] call has resolved).

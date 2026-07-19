@@ -562,6 +562,7 @@ class FileOperationService extends ChangeNotifier {
         if (!ok) throw const _DiskFullException();
         offset += chunk.length;
       }
+      await vaultExplorerApi.finishWriteIfCryptomator(dest, destPath);
       createdDestPaths.add(destPath);
       if (modifiedSecs > 0) {
         await vaultExplorerApi.setLastModifiedTime(dest, destPath, modifiedSecs);

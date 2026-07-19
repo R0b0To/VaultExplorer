@@ -44,6 +44,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
   String _containerFormat = 'veracrypt';
+  
   final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
 
@@ -51,6 +52,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
   /// container — hides PIM, keyfiles, and cipher/hash pickers which don't
   /// apply to LUKS.
   bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
+  bool get _isCryptomator => _containerFormat == 'cryptomator';
 
   // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
@@ -331,7 +333,40 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
 Future<void> _pickFile() async {
     if (widget.initialUri != null) return;
+    
     try {
+      // 1. --- NEW CRYPTOMATOR LOGIC ---
+      if (_containerFormat == 'cryptomator') {
+        final result = await vaultExplorerApi.pickCryptomatorVault();
+        if (result == null) return;
+        
+        if (widget.mountedUris.contains(result.uri)) {
+          setState(() {
+            _error = 'This container is already mounted.';
+            _selectedUri = null;
+            _selectedName = null;
+          });
+          return;
+        }
+        
+        if (!result.looksLikeVault) {
+          setState(() {
+            _error = 'No masterkey.cryptomator found in that folder.';
+            _selectedUri = null;
+            _selectedName = null;
+          });
+          return;
+        }
+        
+        setState(() { 
+          _selectedUri = result.uri; 
+          _selectedName = result.displayName; 
+          _error = null; 
+        });
+        return; // Exit early since we handled Cryptomator
+      }
+
+      // 2. --- EXISTING CONTAINER LOGIC ---
       final result = await vaultExplorerApi.pickContainer();
       if (result != null) {
         // Prevent selection of already mounted files
@@ -388,6 +423,73 @@ Future<void> _pickFile() async {
       setState(() => _error = 'Password or keyfiles required');
       return;
     }
+
+    // 1. --- NEW CRYPTOMATOR LOGIC ---
+    if (_isCryptomator) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+      
+      try {
+        final name = _selectedName ?? 'Vault';
+        final result = await vaultExplorerApi.unlockCryptomatorVault(
+          _selectedUri!,
+          effectivePassword,
+          displayName: name,
+          documentProvider: widget.documentProvider,
+          readOnly: _readOnly,
+        );
+        
+        if (result == null) {
+          setState(() => _error = 'Incorrect password or invalid vault');
+          return;
+        }
+
+        ContainerRecord? savedRecord;
+        if (_remember && widget.initialUri == null) {
+          savedRecord = ContainerRecord(
+            uri: _selectedUri!,
+            label: name,
+            rememberPassword: false, // Added to match your standard ContainerRecord schema
+            readOnly: _readOnly,
+            containerFormat: 'cryptomator',
+          );
+          await ContainerRepository.instance.save(savedRecord);
+        } else if (widget.initialUri != null) {
+          final records = await ContainerRepository.instance.loadAll();
+          savedRecord = records[widget.initialUri];
+        }
+
+        widget.onMounted(
+          MountedContainer(
+            uri: _selectedUri!,
+            displayName: name,
+            volId: result.volId,
+            rootFiles: result.files,
+            mountedAt: DateTime.now(),
+            totalSpace: 0,
+            freeSpace: 0,
+            readOnly: _readOnly,
+          ),
+          record: savedRecord,
+        );
+        
+        HapticFeedback.lightImpact();
+        TextInput.finishAutofillContext(shouldSave: false);
+        
+        if (mounted) Navigator.pop(context);
+      } on PlatformException catch (e) {
+        if (e.code != 'CANCELLED') {
+          setState(() => _error = e.message ?? 'Unknown error');
+        }
+      } finally {
+        if (mounted) setState(() => _loading = false);
+      }
+      return; // Exit early since we handled Cryptomator
+    }
+
+    // 2. --- EXISTING VERACRYPT/LUKS LOGIC ---
     setState(() { _loading = true; _error = null; _activeVolId = null; _progress = null; });
 
     try {
@@ -399,6 +501,7 @@ Future<void> _pickFile() async {
       final record = records[_selectedUri!];
       final appSettings = await AppSettingsService.loadSettings();
       final isKnownRecord = record != null;
+      
       // Only cache the derived key for containers we'll actually keep track of
       // (an existing record, or the user checked "remember"). Otherwise we'd
       // leave an orphaned cached key in the Keystore for a container the app
@@ -411,10 +514,12 @@ Future<void> _pickFile() async {
           _unlockMethod == ContainerUnlockMethod.rememberPassword &&
           _passwordPrefilled &&
           (record?.cacheDerivedKey ?? false);
+          
       final resolvedPreservedKey = preservedKey ??
           (shouldPreloadCachedKey
               ? await vaultExplorerApi.loadDerivedKey(_selectedUri!)
               : null);
+              
       debugPrint('unlock: method=$_unlockMethod shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
 
       // A stale cached derived key doesn't come back as a null result —
@@ -548,7 +653,6 @@ Future<void> _pickFile() async {
       }
     }
   }
-
   Future<void> _pickKeyfiles() async {
     setState(() => _pickingKeyfiles = true);
     try {
@@ -627,6 +731,34 @@ Future<void> _pickFile() async {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // ── Format Segment Selector (New Container only) ───────────
+                if (widget.initialUri == null) ...[
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                        value: 'veracrypt',
+                        label: Text('Container File'),
+                        icon: Icon(Icons.folder_zip_rounded),
+                      ),
+                      ButtonSegment(
+                        value: 'cryptomator',
+                        label: Text('Cryptomator Vault'),
+                        icon: Icon(Icons.folder_shared_rounded),
+                      ),
+                    ],
+                    selected: {_isCryptomator ? 'cryptomator' : 'veracrypt'},
+                    onSelectionChanged: _loading
+                        ? null
+                        : (sel) => setState(() {
+                              _containerFormat = sel.first;
+                              _selectedUri = null;
+                              _selectedName = null;
+                              _error = null;
+                            }),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 // ── Modernized File Picker Card ───────────────────────────
                 GestureDetector(
                   onTap: _loading ? null : _pickFile,
@@ -657,8 +789,8 @@ Future<void> _pickFile() async {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
-                              _selectedUri != null
-                                  ? Icons.folder_zip_rounded
+                              _isCryptomator
+                                  ? Icons.folder_shared_rounded
                                   : Icons.folder_zip_rounded,
                               size: 24,
                               color: _selectedUri != null
@@ -675,8 +807,12 @@ Future<void> _pickFile() async {
                                   _selectedUri != null
                                       ? (_isLuks
                                           ? 'LUKS Container'
-                                          : 'Selected Container')
-                                      : 'Encrypted Container',
+                                          : _isCryptomator
+                                              ? 'Cryptomator Vault'
+                                              : 'Selected Container')
+                                      : (_isCryptomator
+                                          ? 'Cryptomator Vault'
+                                          : 'Encrypted Container'),
                                   style: textTheme.labelLarge?.copyWith(
                                     color: _selectedUri != null
                                         ? cs.primary
@@ -686,7 +822,10 @@ Future<void> _pickFile() async {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  _selectedName ?? 'Tap to select container file…',
+                                  _selectedName ??
+                                      (_isCryptomator
+                                          ? 'Tap to select vault folder…'
+                                          : 'Tap to select container file…'),
                                   style: textTheme.bodyMedium?.copyWith(
                                     color: _selectedUri != null
                                         ? cs.onSurface
@@ -728,7 +867,7 @@ Future<void> _pickFile() async {
                 ),
                 const SizedBox(height: 24),
 
-                                // ── Auth-specific UI ──────────────────────────────────────────
+                // ── Auth-specific UI ──────────────────────────────────────────
                 if (_loadingAuth)
                   const Center(
                     child: Padding(
@@ -1000,7 +1139,7 @@ Future<void> _pickFile() async {
                           autofillHints: const [AutofillHints.password],
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            hintText: 'Enter container password',
+                            hintText: _isCryptomator ? 'Enter vault password' : 'Enter container password',
                             prefixIcon: Icon(Icons.lock_outline_rounded, size: 22, color: cs.primary),
                             suffixIcon: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1028,30 +1167,29 @@ Future<void> _pickFile() async {
                         ),
                         const SizedBox(height: 16),
 
-                        // 2. Keyfiles Selection Box. LUKS keyfiles work too —
-                        // cryptsetup treats a keyfile as a *replacement* for
-                        // the typed password, not an additive mix-in.
-                        KeyfilesPicker(
-                          keyfiles: _keyfiles,
-                          picking: _pickingKeyfiles,
-                          onPick: _pickKeyfiles,
-                          onRemove: _removeKeyfile,
-                        ),
-                        if (_isLuks && _keyfiles.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4, left: 4),
-                            child: Text(
-                              'For LUKS containers the keyfile replaces the password.',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
+                        // 2. Keyfiles Selection Box (Gated: hidden for Cryptomator)
+                        if (!_isCryptomator) ...[
+                          KeyfilesPicker(
+                            keyfiles: _keyfiles,
+                            picking: _pickingKeyfiles,
+                            onPick: _pickKeyfiles,
+                            onRemove: _removeKeyfile,
                           ),
-                        const SizedBox(height: 16),
+                          if (_isLuks && _keyfiles.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4, left: 4),
+                              child: Text(
+                                'For LUKS containers the keyfile replaces the password.',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                              ),
+                            ),
+                          const SizedBox(height: 16),
+                        ],
 
-                        // 3. Collapsible Advanced parameters (PIM, Cipher, Hash)
-                        //    LUKS doesn't use PIM or VeraCrypt cipher/hash selection.
-                         if (!_isLuks)
+                        // 3. Collapsible Advanced parameters (Gated: hidden for LUKS & Cryptomator)
+                        if (!_isLuks && !_isCryptomator) ...[
                           AdvancedParamsPanel(
                             pimController: _pimCtrl,
                             cipherId: _cipherId,
@@ -1060,7 +1198,9 @@ Future<void> _pickFile() async {
                             onCipherChanged: (val) => setState(() => _cipherId = val),
                             onHashChanged: (val) => setState(() => _hashId = val),
                           ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 16),
+                        ],
+
                         // 4. Remember container Toggle
                         if (widget.initialUri == null) ...[
                           Material(
@@ -1131,7 +1271,7 @@ Future<void> _pickFile() async {
                             ],
                           )
                         : Text(
-                            'Unlock Container',
+                            _isCryptomator ? 'Unlock Vault' : 'Unlock Container',
                             style: textTheme.titleMedium?.copyWith(
                               color: cs.onPrimary,
                               fontWeight: FontWeight.bold,

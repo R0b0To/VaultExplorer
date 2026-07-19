@@ -591,17 +591,17 @@ class ContainerDocumentsProvider : DocumentsProvider() {
             flushWriteCache()
         }
 
-        override fun onRelease() {
-            flushWriteCache()
-            
-            ContainerFileSystem.withLock(volId) {
-                if (streamPtr != 0L) {
-                    ContainerFileSystem.closeStream(volId, streamPtr)
-                    streamPtr = 0L
-                }
-            }
-            
-            if (isWrite && hasChanges) {
+override fun onRelease() {
+    flushWriteCache()
+    if (isWrite) {
+        ContainerFileSystem.withLock(volId) {
+            ContainerEngine.finishWriteIfCryptomator(fatPath, volId)
+        }
+    }
+    ContainerFileSystem.withLock(volId) {
+        if (streamPtr != 0L) { ContainerFileSystem.closeStream(volId, streamPtr); streamPtr = 0L }
+    }
+    if (isWrite && hasChanges) {
                 val parentPath = if (fatPath.contains("/")) fatPath.substringBeforeLast("/") else ""
                 val parentDocId = DocumentId(volId, "dir", parentPath).toString()
                 

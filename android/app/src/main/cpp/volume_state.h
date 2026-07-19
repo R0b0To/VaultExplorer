@@ -68,6 +68,7 @@ struct VolumeState {
     FATFS fatfs{};
     ntfs_volume* ntfsVol = nullptr;
     ext2_filsys extFs = nullptr;
+    bool extBitmapsLoaded = false;
     enum FsType { FS_UNKNOWN, FS_FATFS, FS_NTFS, FS_EXT } fsType = FS_UNKNOWN;
     std::vector<NtfsStream*> openNtfsStreams;
     std::vector<ExtStream*> openExtStreams;

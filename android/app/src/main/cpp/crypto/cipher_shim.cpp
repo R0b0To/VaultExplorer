@@ -13,6 +13,8 @@
 #include <cstring>
 #include <algorithm>
 #include <atomic>
+#include <thread>
+#include <vector>
 
 
 struct AesCtxPair {
@@ -204,6 +206,43 @@ static void hashHmac(HashId hash, const unsigned char* key, size_t keyLen,
     hashHmacFast(hash, pre, data, dataLen, out);
 }
 
+// Computes one PBKDF2 output block (RFC 8018 5.2's F(P,S,c,i)) into
+// [outBlock, outBlock+copyLen). Safe to call concurrently for different
+// [block] values against the same [pre] -- hashHmacFast() only ever reads
+// [pre] and copies it into thread-local HashCtx state before mutating.
+static bool pbkdf2SingleBlockCustom(HashId hash, const HmacPrecomputed& pre,
+                                     const unsigned char* salt, size_t saltLen,
+                                     unsigned int block, unsigned int iterations,
+                                     size_t digestSize,
+                                     unsigned char* outBlock, size_t copyLen,
+                                     const std::atomic<bool>* abortFlag,
+                                     std::atomic<bool>* localFailed) {
+    unsigned char saltWithIndex[256];
+    std::memcpy(saltWithIndex, salt, saltLen);
+    saltWithIndex[saltLen]     = (block >> 24) & 0xFF;
+    saltWithIndex[saltLen + 1] = (block >> 16) & 0xFF;
+    saltWithIndex[saltLen + 2] = (block >> 8)  & 0xFF;
+    saltWithIndex[saltLen + 3] = block         & 0xFF;
+
+    unsigned char U[64];
+    unsigned char T[64];
+    hashHmacFast(hash, pre, saltWithIndex, saltLen + 4, U);
+    std::memcpy(T, U, digestSize);
+
+    for (unsigned int iter = 1; iter < iterations; iter++) {
+        if ((iter & 0x3FF) == 0) {
+            if ((abortFlag && abortFlag->load(std::memory_order_relaxed)) ||
+                localFailed->load(std::memory_order_relaxed)) {
+                return false; // another thread/block already found the answer, or failed
+            }
+        }
+        hashHmacFast(hash, pre, U, digestSize, U);
+        for (size_t i = 0; i < digestSize; i++) T[i] ^= U[i];
+    }
+    std::memcpy(outBlock, T, copyLen);
+    return true;
+}
+
 static bool pbkdf2HmacCustom(HashId hash,
                             const unsigned char* password, size_t passwordLen,
                             const unsigned char* salt, size_t saltLen,
@@ -212,40 +251,50 @@ static bool pbkdf2HmacCustom(HashId hash,
                             const std::atomic<bool>* abortFlag = nullptr) {
     size_t digestSize = hashDigestSize(hash);
     if (digestSize == 0) return false;
-
+    if (saltLen + 4 > 256) return false;
 
     HmacPrecomputed pre;
     hmacPrecompute(hash, password, passwordLen, pre);
 
     unsigned int blockCount = (outLen + digestSize - 1) / digestSize;
-    unsigned char U[64];
-    unsigned char T[64];
-    unsigned char saltWithIndex[256];
-    if (saltLen + 4 > sizeof(saltWithIndex)) return false;
-    std::memcpy(saltWithIndex, salt, saltLen);
+    std::atomic<bool> localFailed{false};
 
-    size_t outOffset = 0;
-    for (unsigned int block = 1; block <= blockCount; block++) {
-        saltWithIndex[saltLen]     = (block >> 24) & 0xFF;
-        saltWithIndex[saltLen + 1] = (block >> 16) & 0xFF;
-        saltWithIndex[saltLen + 2] = (block >> 8)  & 0xFF;
-        saltWithIndex[saltLen + 3] = block         & 0xFF;
+    auto runBlock = [&](unsigned int block) -> bool {
+        size_t outOffset = static_cast<size_t>(block - 1) * digestSize;
+        size_t copyLen = std::min(digestSize, outLen - outOffset);
+        return pbkdf2SingleBlockCustom(hash, pre, salt, saltLen, block, iterations,
+                                       digestSize, out + outOffset, copyLen,
+                                       abortFlag, &localFailed);
+    };
 
-        hashHmacFast(hash, pre, saltWithIndex, saltLen + 4, U);
-        std::memcpy(T, U, digestSize);
-
-        for (unsigned int iter = 1; iter < iterations; iter++) {
-        if (abortFlag && (iter & 0x3FF) == 0 &&
-            abortFlag->load(std::memory_order_relaxed)) {
-            return false; // another thread already found the answer
-        }
-        hashHmacFast(hash, pre, U, digestSize, U);
-        for (size_t i = 0; i < digestSize; i++) T[i] ^= U[i];
+    if (blockCount <= 1) {
+        return runBlock(1);
     }
 
-        size_t copyLen = std::min(digestSize, outLen - outOffset);
-        std::memcpy(out + outOffset, T, copyLen);
-        outOffset += copyLen;
+    // blockCount>1 only happens when a multi-layer cascade is among the
+    // candidates during a full auto-detect scan (needs >1 digest worth of
+    // key material) -- bounded to <=6 blocks even in the worst case
+    // (Blake2s-256's 32-byte digest, 192-byte output). Deliberately raw
+    // std::thread, not the shared ThreadPool -- see doc comment above.
+    std::vector<std::thread> workers;
+    std::vector<char> results(blockCount, 0); // char, not vector<bool>: avoids bit-packed-word data race across threads
+    workers.reserve(blockCount - 1);
+    for (unsigned int block = 2; block <= blockCount; block++) {
+        workers.emplace_back([&, block]() {
+            const bool ok = runBlock(block);
+            results[block - 1] = ok ? 1 : 0;
+            if (!ok) localFailed.store(true, std::memory_order_relaxed);
+        });
+    }
+
+    const bool firstOk = runBlock(1); // block 1 runs on the calling thread
+    results[0] = firstOk ? 1 : 0;
+    if (!firstOk) localFailed.store(true, std::memory_order_relaxed);
+
+    for (auto& t : workers) t.join();
+
+    for (unsigned int i = 0; i < blockCount; i++) {
+        if (!results[i]) return false;
     }
     return true;
 }

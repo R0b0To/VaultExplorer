@@ -187,6 +187,7 @@ static void unmountVolume(int volId) {
             ext2fs_flush(v.extFs);
             ext2fs_close(v.extFs);
             v.extFs = nullptr;
+            v.extBitmapsLoaded = false;
         }
         v.fsMounted = false;
         v.fsType = VolumeState::FS_UNKNOWN;
@@ -1209,6 +1210,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
                     ntfs_inode_close(ni);
                 }
         } else if (v.fsType == VolumeState::FS_EXT) {
+            ensureExtBitmapsLoaded(volId);
             ext2_file_t file = nullptr;
             if (extOpenFile(v.extFs, targetName, true, true, &file)) {
                 __u64 position = 0;
@@ -1316,6 +1318,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
                     ntfs_inode_close(ni);
                 }
             } else if (v.fsType == VolumeState::FS_EXT) {
+                ensureExtBitmapsLoaded(volId);
                 success = extWriteFromHostFile(v.extFs, targetName, source);
                 if (success) success = ext2fs_flush(v.extFs) == 0;
             }
@@ -1495,6 +1498,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
                     ntfs_inode_close(parentNi);
                 }
             } else if (v.fsType == VolumeState::FS_EXT) {
+                ensureExtBitmapsLoaded(volId);
                 const std::string path(nativePath);
                 const size_t slash = path.find_last_of('/');
                 const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
@@ -1610,6 +1614,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
                 if (uOld) free(uOld);
                 if (uNew) free(uNew);
             } else if (v.fsType == VolumeState::FS_EXT) {
+                ensureExtBitmapsLoaded(volId);
                 const std::string oldFull(nativeOld);
                 const std::string newFull(nativeNew);
                 const size_t oldSlash = oldFull.find_last_of('/');

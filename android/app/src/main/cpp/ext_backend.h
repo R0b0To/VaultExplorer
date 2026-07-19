@@ -24,3 +24,4 @@ uint64_t recursiveExtFolderSize(int volumeId, const std::string& path);
 // Mount and format ext filesystems through the encrypted-sector I/O manager.
 bool mountExtVolume(int volumeId);
 bool formatExtVolume(int volumeId, const char* variant);
+bool ensureExtBitmapsLoaded(int volumeId);

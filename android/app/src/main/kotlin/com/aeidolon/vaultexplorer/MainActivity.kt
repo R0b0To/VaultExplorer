@@ -80,6 +80,7 @@ private object ChannelMethods {
     const val REQUEST_USB_PERMISSION = "requestUsbPermission"
     const val UNLOCK_USB_CONTAINER = "unlockUsbContainer"
     const val DOCUMENT_EXISTS = "documentExists"
+    const val WARM_CONTAINER = "warmContainer"
     const val CANCEL_UNLOCK = "cancelUnlock"
     const val CHANGE_CONTAINER_PASSWORD = "changeContainerPassword"
     const val SET_LAST_MODIFIED_TIME = "setLastModifiedTime"
@@ -1307,6 +1308,32 @@ class MainActivity : FlutterFragmentActivity() {
                         }
                         runOnUiThread { result.success(exists) }
                     }
+                }
+
+                ChannelMethods.WARM_CONTAINER -> {
+                    // Best-effort speculative warm-up: open read-only, read a
+                    // small prefix, close immediately. No fd is retained, so
+                    // there's nothing to clean up if the user cancels.
+                    // Deliberately doesn't wait for the read to finish before
+                    // responding -- this is fire-and-forget from Dart's side.
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath != null) {
+                        ioExecutor.execute {
+                            try {
+                                val uri = Uri.parse(filePath)
+                                contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
+                                    ParcelFileDescriptor.AutoCloseInputStream(pfd).use { stream ->
+                                        val buf = ByteArray(65536)
+                                        stream.read(buf)
+                                    }
+                                }
+                            } catch (_: Exception) {
+                                // Best-effort only -- the real unlockContainer call
+                                // will surface any actual problem.
+                            }
+                        }
+                    }
+                    result.success(null)
                 }
 
                 ChannelMethods.STORE_DERIVED_KEY -> {

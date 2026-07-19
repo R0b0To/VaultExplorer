@@ -54,4 +54,5 @@ abstract final class ChannelMethods {
   static const createUsbContainer = 'createUsbContainer';
   static const getUsbDeviceCapacity = 'getUsbDeviceCapacity';
   static const documentExists = 'documentExists';
+  static const warmContainer = 'warmContainer';
 }

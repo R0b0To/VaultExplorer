@@ -79,6 +79,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
       _selectedUri = widget.initialUri;
       _selectedName = widget.initialName;
       _remember = true;
+      vaultExplorerApi.warmContainer(widget.initialUri!);
     }
     _initUnlockMethod();
 
@@ -348,6 +349,7 @@ Future<void> _pickFile() async {
           _selectedName = result.displayName;
           _error = null;
         });
+        vaultExplorerApi.warmContainer(result.uri);
       }
     } catch (e) {
       setState(() => _error = 'File picker failed: $e');

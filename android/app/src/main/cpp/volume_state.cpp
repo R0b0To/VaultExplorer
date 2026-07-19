@@ -20,6 +20,7 @@ void VolumeState::reset() {
     fsType = FS_UNKNOWN;
     ntfsVol = nullptr;
     extFs = nullptr;
+    extBitmapsLoaded = false;
     containerFormat = ContainerFormat::kVeraCrypt;
     luksSectorSize = 512;
     luksUsesGenericCipher = false;

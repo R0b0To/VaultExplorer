@@ -321,6 +321,22 @@ bool formatExtVolume(int volumeId, const char* variant) {
     return true;
 }
 
+bool ensureExtBitmapsLoaded(int volumeId) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    VolumeState& volume = volumes[volumeId];
+    if (volume.extBitmapsLoaded) return true;
+    if (!volume.extFs) return false;
+
+    const errcode_t bitmapError = ext2fs_read_bitmaps(volume.extFs);
+    if (bitmapError != 0) {
+        EXT_LOGI("ensureExtBitmapsLoaded: ext2fs_read_bitmaps failed on volume %d: %s (err=%lu)",
+                 volumeId, error_message(bitmapError), static_cast<unsigned long>(bitmapError));
+        return false;
+    }
+    volume.extBitmapsLoaded = true;
+    return true;
+}
+
 bool mountExtVolume(int volumeId) {
     if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
     auto& volume = volumes[volumeId];
@@ -335,15 +351,8 @@ bool mountExtVolume(int volumeId) {
         volume.fsType = VolumeState::FS_UNKNOWN;
         return false;
     }
-    const errcode_t bitmapError = ext2fs_read_bitmaps(volume.extFs);
-    if (bitmapError != 0) {
-        EXT_LOGI("mountExtVolume: ext2fs_read_bitmaps failed on volume %d: %s (err=%lu)", volumeId,
-                 error_message(bitmapError), static_cast<unsigned long>(bitmapError));
-        ext2fs_close(volume.extFs);
-        volume.extFs = nullptr;
-        volume.fsType = VolumeState::FS_UNKNOWN;
-        return false;
-    }
+
+    volume.extBitmapsLoaded = false;
     volume.fsMounted = true;
     ext2_super_block* superblock = volume.extFs->super;
     const bool needsRecovery = EXT2_HAS_INCOMPAT_FEATURE(superblock, EXT3_FEATURE_INCOMPAT_RECOVER);

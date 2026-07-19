@@ -514,6 +514,19 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
       return true;
     }
   }
+
+  /// Speculatively warms [filePath] for a subsequent [unlockContainer]
+  /// call: opens it read-only, reads a small prefix, closes it again.
+  /// Fire-and-forget — no fd is held open, so there's nothing to cancel or
+  /// clean up if the user backs out. Purely a latency optimization; on SAF
+  /// providers this overlaps the binder round trip (and, for cloud-backed
+  /// providers, the network fetch) with the time the user spends typing
+  /// their password instead of paying it after they tap "Unlock."
+  void warmContainer(String filePath) {
+    _channel
+        .invokeMethod(ChannelMethods.warmContainer, {'filePath': filePath})
+        .catchError((_) {});
+  }
   Future<List<UsbDeviceInfo>> listUsbDevices() async {
     final raw = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.listUsbDevices,

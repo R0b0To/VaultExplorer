@@ -50,24 +50,37 @@ jobs:
           EOF
 
       # ── Build ────────────────────────────────────────────────────────────────
-      - name: Build release APK
-        run: flutter build apk --release
+      - name: Build release APKs (Split per ABI)
+        run: flutter build apk --release --split-per-abi
 
       # ── Rename with version ──────────────────────────────────────────────────
-      - name: Rename APK
+      - name: Rename APKs
         run: |
+          # Extract version from pubspec.yaml
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr '+' '-')
-          cp build/app/outputs/flutter-apk/app-release.apk \
-             build/app/outputs/flutter-apk/vaultexplorer-${VERSION}.apk
-          echo "APK_PATH=build/app/outputs/flutter-apk/vaultexplorer-${VERSION}.apk" >> $GITHUB_ENV
-          echo "APK_NAME=vaultexplorer-${VERSION}.apk" >> $GITHUB_ENV
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          
+          # Create a directory to store the renamed APKs
+          mkdir -p release-apks
+          
+          # Loop through all generated ABI-specific APKs
+          for apk in build/app/outputs/flutter-apk/app-*-release.apk; do
+            # Extract filename without the .apk extension (e.g., app-arm64-v8a-release)
+            filename=$(basename "$apk" .apk)
+            
+            # Extract the ABI by removing the 'app-' prefix and '-release' suffix
+            abi=$(echo "$filename" | sed 's/^app-//' | sed 's/-release$//')
+            
+            # Copy and rename: vaultexplorer-1.0.0-arm64-v8a.apk
+            cp "$apk" "release-apks/vaultexplorer-${VERSION}-${abi}.apk"
+          done
 
       # ── Upload artifact (always) ──────────────────────────────────────────────
-      - name: Upload APK artifact
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.APK_NAME }}
-          path: ${{ env.APK_PATH }}
+          name: VaultExplorer-${{ env.APP_VERSION }}-APKs
+          path: release-apks/*.apk
           retention-days: 30
 
       # ── Create GitHub Release (tag pushes only) ───────────────────────────────
@@ -76,7 +89,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: VaultExplorer ${{ github.ref_name }}
-          files: ${{ env.APK_PATH }}
+          files: release-apks/*.apk
           generate_release_notes: true   # auto-generates changelog from commits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

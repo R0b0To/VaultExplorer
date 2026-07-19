@@ -13,6 +13,20 @@ set(ENABLE_TESTING OFF CACHE BOOL "Disable mbedtls tests")
 set(ENABLE_PROGRAMS OFF CACHE BOOL "Disable mbedtls programs")
 FetchContent_MakeAvailable(mbedtls)
 
+# Enable ARMv8 Cryptography Extensions (hardware AES/SHA1/SHA2 instructions)
+# for mbedTLS's runtime-dispatched aesce.c backend. Without this, mbedTLS
+# falls back to scalar C for AES and SHA-256 on every device -- these are
+# the dominant cost inside PBKDF2-HMAC during unlock, so this is the
+# single biggest unlock-latency lever available. mbedTLS still
+# runtime-checks CPU support (mbedtls_aesce_has_support()) before using
+# these paths, so this is safe on devices/emulators without the
+# extensions -- it only unlocks the *possibility* of using them.
+if(ANDROID_ABI STREQUAL "arm64-v8a")
+    target_compile_options(mbedcrypto PRIVATE -march=armv8-a+crypto+sha2)
+elseif(ANDROID_ABI STREQUAL "armeabi-v7a")
+    target_compile_options(mbedcrypto PRIVATE -march=armv8-a+crypto)
+endif()
+
 # 2. Download ChaN's FatFs (Filesystem Engine)
 FetchContent_Declare(
         fatfs

@@ -517,6 +517,7 @@ static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t d
 
 static jobjectArray buildDirectoryListing(JNIEnv* env, int volId, const char* pathSuffix) {
     std::vector<std::string> results;
+    results.reserve(256);
     auto& v = volumes[volId];
 
     if (v.fsType == VolumeState::FS_FATFS) {

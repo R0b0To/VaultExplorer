@@ -40,7 +40,13 @@ bool deriveAndValidateHeader(
     CascadeId& outMatchedCipher,
     HashId& outMatchedHash,
     ParsedHeaderFields& outFields,
-    int volId = -1);
+    int volId = -1,
+    // Optional: checked alongside isUnlockCancelled(volId) at the same
+    // guard points. Lets a sibling concurrent search (e.g. the other
+    // header slot in prepareSession) signal "stop starting new work, I
+    // already found the answer" without touching real user-cancellation
+    // state.
+    const std::atomic<bool>* externalAbort = nullptr);
 
 // Derives the 192-byte VeraCrypt header key for [hash] at PIM [clampedPim]
 // (Argon2id emits the full 192 bytes directly; PBKDF2-family hashes derive

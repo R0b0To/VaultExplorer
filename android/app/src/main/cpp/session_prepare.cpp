@@ -176,7 +176,8 @@ bool deriveAndValidateHeader(
     CascadeId& outMatchedCipher,
     HashId& outMatchedHash,
     ParsedHeaderFields& outFields,
-    int volId
+    int volId,
+    const std::atomic<bool>* externalAbort
 
 ) {
     const auto timingStart = std::chrono::steady_clock::now();
@@ -238,8 +239,12 @@ bool deriveAndValidateHeader(
     }
     const size_t neededKeyBytes = static_cast<size_t>(maxLayersToTry) * 64;
 
+    auto externallyAborted = [externalAbort]() {
+        return externalAbort != nullptr && externalAbort->load(std::memory_order_acquire);
+    };
+
     auto worker = [&](HashId h) {
-        if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId)) return;
+        if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId) || externallyAborted()) return;
 
         unsigned char derivedKeyMaterial[192] = {0};
 
@@ -253,7 +258,7 @@ bool deriveAndValidateHeader(
             return;
         }
 
-        if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId)) {
+        if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId) || externallyAborted()) {
             mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
             return;
         }
@@ -261,7 +266,7 @@ bool deriveAndValidateHeader(
         unsigned char decH[VC_HEADER_BODY_SIZE];
         int lastCipherTried = -1;
         for (CascadeId c : ciphersToTry) {
-            if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId)) break;
+            if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId) || externallyAborted()) break;
             lastCipherTried = static_cast<int>(c);
             ParsedHeaderFields candidateFields;
             if (tryDecryptHeader(encH, c, derivedKeyMaterial, decH, &candidateFields)) {
@@ -559,11 +564,14 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
         closeUnusedKeyfileFds(keyfileFds, keyfileCount);
     }
 
-    for (const auto& slot : kHeaderSlots) {
-        unsigned char headerSector[VC_FULL_HEADER_SIZE];
-        if (pread(fd, headerSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(slot.fileOffset)) != VC_FULL_HEADER_SIZE) continue;
+    if (usingPreservedKey) {
+        // Quick-unlock candidate check is a single decrypt attempt per
+        // slot (no PBKDF2/Argon2) -- sub-millisecond, not worth
+        // parallelizing.
+        for (const auto& slot : kHeaderSlots) {
+            unsigned char headerSector[VC_FULL_HEADER_SIZE];
+            if (pread(fd, headerSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(slot.fileOffset)) != VC_FULL_HEADER_SIZE) continue;
 
-        if (usingPreservedKey) {
             CascadeId candidateCipher = (cipherId != 255) ? static_cast<CascadeId>(cipherId) : CascadeId::kAes;
             unsigned char candidateKey[192];
             memset(candidateKey, 0, 192);
@@ -576,8 +584,58 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
                 matched = true;
                 break;
             }
-        } else {
-            if (deriveAndValidateHeader(headerSector, mixedPassword, mixedPasswordLen, pim, cipherId, hashId, dKey, decH, matchedCipher, matchedHash, fields, volId)) {
+        }
+    } else {
+        // Full auto-detect sweep is expensive (PBKDF2/Argon2 x every hash
+        // x every cipher). Previously this ran against slot 0 to
+        // exhaustion before EVER trying slot 1 -- doubling worst-case
+        // latency for hidden-volume owners and any first-time unlock with
+        // an unknown cipher/hash. Both slots are read up front and
+        // searched concurrently here (plain pread, trivially safe to
+        // parallelize -- unlike USB reads, no shared-connection protocol
+        // to corrupt), sharing `slotAbort` so whichever slot's password
+        // matches first tells the other to stop starting new combinations.
+        struct SlotReadResult { bool ok = false; unsigned char sector[VC_FULL_HEADER_SIZE]; };
+        SlotReadResult reads[2];
+        for (size_t i = 0; i < 2; i++) {
+            reads[i].ok = pread(fd, reads[i].sector, VC_FULL_HEADER_SIZE,
+                                 static_cast<off_t>(kHeaderSlots[i].fileOffset)) == VC_FULL_HEADER_SIZE;
+        }
+
+        std::atomic<bool> slotAbort{false};
+        struct SlotResult {
+            bool matched = false;
+            unsigned char dKey[192];
+            unsigned char decH[VC_HEADER_BODY_SIZE];
+            CascadeId matchedCipher{};
+            HashId matchedHash{};
+            ParsedHeaderFields fields;
+        };
+        SlotResult results[2];
+
+        auto trySlot = [&](size_t i) {
+            if (!reads[i].ok) return;
+            results[i].matched = deriveAndValidateHeader(
+                reads[i].sector, mixedPassword, mixedPasswordLen, pim, cipherId, hashId,
+                results[i].dKey, results[i].decH, results[i].matchedCipher,
+                results[i].matchedHash, results[i].fields, volId, &slotAbort);
+            if (results[i].matched) {
+                slotAbort.store(true, std::memory_order_release);
+            }
+        };
+
+        std::thread t1(trySlot, size_t(1));
+        trySlot(0); // slot 0 runs on the calling thread
+        t1.join();
+
+        // Slot 0 wins ties, matching the original slot-order preference.
+        for (size_t i = 0; i < 2; i++) {
+            if (results[i].matched) {
+                memcpy(dKey, results[i].dKey, 192);
+                memcpy(decH, results[i].decH, VC_HEADER_BODY_SIZE);
+                matchedCipher = results[i].matchedCipher;
+                matchedHash = results[i].matchedHash;
+                fields = results[i].fields;
                 matched = true;
                 break;
             }
@@ -806,47 +864,58 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
 
     std::vector<PartitionCandidate> partitions;
 
-    std::unique_ptr<unsigned char[]> diskBuf(new unsigned char[34 * 512]);
-    if (usbReadSectors(volId, 0, 34, diskBuf.get())) {
-        const unsigned char* sector0 = diskBuf.get();
-        const unsigned char* sector1 = diskBuf.get() + 512;
-        const unsigned char* gptEntries = diskBuf.get() + 1024;
+    {
+        unsigned char sector0[512];
+        if (usbReadSectors(volId, 0, 1, sector0)) {
+            if (sector0[510] == 0x55 && sector0[511] == 0xAA) {
+                bool isGpt = false;
 
-        if (sector0[510] == 0x55 && sector0[511] == 0xAA) {
-            bool isGpt = false;
-
-            for (int i = 0; i < 4; i++) {
-                const unsigned char* entry = &sector0[446 + i * 16];
-                uint8_t type = entry[4];
-                if (type == 0xEE) {
-                    isGpt = true;
-                    break;
+                for (int i = 0; i < 4; i++) {
+                    const unsigned char* entry = &sector0[446 + i * 16];
+                    uint8_t type = entry[4];
+                    if (type == 0xEE) {
+                        isGpt = true;
+                        break;
+                    }
+                    uint32_t startLba = readUint32LE(&entry[8]);
+                    uint32_t numSectors = readUint32LE(&entry[12]);
+                    if (startLba > 0 && numSectors > 0) {
+                        partitions.push_back({startLba, numSectors});
+                    }
                 }
-                uint32_t startLba = readUint32LE(&entry[8]);
-                uint32_t numSectors = readUint32LE(&entry[12]);
-                if (startLba > 0 && numSectors > 0) {
-                    partitions.push_back({startLba, numSectors});
-                }
-            }
 
-            if (isGpt && memcmp(sector1, "EFI PART", 8) == 0) {
-                uint32_t numEntries = readUint32LE(&sector1[80]);
-                uint32_t entrySize = readUint32LE(&sector1[84]);
+                // Every container this app creates (writeMbrPartitionTable)
+                // is a plain MBR single partition -- no 0xEE protective-MBR
+                // entry, ever. Only fetch the 32-sector GPT entry array
+                // (an extra full USB BOT transaction) when a drive actually
+                // signals GPT, instead of unconditionally on every unlock.
+                if (isGpt) {
+                    std::unique_ptr<unsigned char[]> gptBuf(new unsigned char[33 * 512]);
+                    if (usbReadSectors(volId, 1, 33, gptBuf.get())) {
+                        const unsigned char* sector1 = gptBuf.get();
+                        const unsigned char* gptEntries = gptBuf.get() + 512;
 
-                if (entrySize >= 128 && numEntries <= 128) {
-                    for (uint32_t i = 0; i < numEntries; i++) {
-                        const unsigned char* entry = gptEntries + (i * entrySize);
+                        if (memcmp(sector1, "EFI PART", 8) == 0) {
+                            uint32_t numEntries = readUint32LE(&sector1[80]);
+                            uint32_t entrySize = readUint32LE(&sector1[84]);
 
-                        bool unused = true;
-                        for (int g = 0; g < 16; g++) {
-                            if (entry[g] != 0) { unused = false; break; }
-                        }
-                        if (unused) continue;
+                            if (entrySize >= 128 && numEntries <= 128) {
+                                for (uint32_t i = 0; i < numEntries; i++) {
+                                    const unsigned char* entry = gptEntries + (i * entrySize);
 
-                        uint64_t startLba = readUint64LE(&entry[32]);
-                        uint64_t endLba = readUint64LE(&entry[40]);
-                        if (startLba > 0 && endLba >= startLba) {
-                            partitions.push_back({startLba, endLba - startLba + 1});
+                                    bool unused = true;
+                                    for (int g = 0; g < 16; g++) {
+                                        if (entry[g] != 0) { unused = false; break; }
+                                    }
+                                    if (unused) continue;
+
+                                    uint64_t startLba = readUint64LE(&entry[32]);
+                                    uint64_t endLba = readUint64LE(&entry[40]);
+                                    if (startLba > 0 && endLba >= startLba) {
+                                        partitions.push_back({startLba, endLba - startLba + 1});
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -1,6 +1,16 @@
 #include "jni_callbacks.h"
+#include <atomic>
+#include <chrono>
 
 namespace {
+
+constexpr int kMaxTrackedVolumesForProgress = 8;
+std::atomic<int64_t> lastProgressReportMs[kMaxTrackedVolumesForProgress];
+
+int64_t nowMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+}
 
 struct ScopedJniEnv {
     JNIEnv* env = nullptr;
@@ -23,6 +33,20 @@ struct ScopedJniEnv {
 void reportUnlockProgress(int volId, int attempted, int total, int hashId,
                           int cipherId, int format) {
     if (volId < 0) return;
+
+    // Coalesce to a UI-relevant cadence (~12/sec). Always let the first
+    // (attempted<=1) and last (attempted>=total) updates through so the
+    // progress UI still shows immediate start/finish feedback -- only the
+    // rapid-fire middle updates during a fast auto-detect sweep get
+    // dropped, saving a JNI upcall + Handler.post + MethodChannel round
+    // trip per skipped update.
+    if (volId < kMaxTrackedVolumesForProgress && attempted > 1 && attempted < total) {
+        const int64_t now = nowMs();
+        const int64_t last = lastProgressReportMs[volId].load(std::memory_order_relaxed);
+        if (now - last < 80) return;
+        lastProgressReportMs[volId].store(now, std::memory_order_relaxed);
+    }
+
     ScopedJniEnv scope;
     if (!scope.env) return;
     scope.env->CallStaticVoidMethod(

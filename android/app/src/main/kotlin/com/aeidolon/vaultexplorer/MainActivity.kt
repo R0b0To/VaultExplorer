@@ -562,10 +562,12 @@ class MainActivity : FlutterFragmentActivity() {
         return "vc2_derived_${root}"
     }
 
+    private val androidKeyStore: KeyStore by lazy {
+        KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+    }
+
     private fun getOrCreateDerivedKey(alias: String): SecretKey {
-        val keyStore = KeyStore.getInstance("AndroidKeyStore")
-        keyStore.load(null)
-        val existing = keyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry
+        val existing = androidKeyStore.getEntry(alias, null) as? KeyStore.SecretKeyEntry
         if (existing != null) return existing.secretKey
 
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
@@ -614,10 +616,11 @@ class MainActivity : FlutterFragmentActivity() {
         Log.i("VaultExplorer_C++", "Storing derived key for ${filePath} (${derivedKey.size} bytes)")
         val encrypted = encryptDerivedKey(derivedKey, alias) ?: return false
         val encoded = android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP)
-        return getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
+        getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
             .edit()
             .putString(alias, encoded)
-            .commit()
+            .apply()
+        return true
     }
 
     private fun loadDerivedKeyBytes(filePath: String): ByteArray? {
@@ -888,12 +891,6 @@ class MainActivity : FlutterFragmentActivity() {
 
                             runOnUiThread {
                                 if (files != null) {
-                                    if (cacheDerivedKey && preservedKey == null) {
-                                        val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
-                                        if (derived != null) {
-                                            storeDerivedKeyBytes(deviceName, derived)
-                                        }
-                                    }
                                     ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                                         uri = containerUri,
                                         volId = targetVolId,
@@ -917,6 +914,12 @@ class MainActivity : FlutterFragmentActivity() {
                                         "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
                                         "containerFormat" to fmt
                                     ))
+                                    if (cacheDerivedKey && preservedKey == null) {
+                                        val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
+                                        if (derived != null) {
+                                            ioExecutor.execute { storeDerivedKeyBytes(deviceName, derived) }
+                                        }
+                                    }
                                 } else {
                                     UsbBlockBridge.unregister(targetVolId)
                                     result.error("AUTH_FAIL", "Incorrect password/keyfiles or invalid drive", null)
@@ -1166,12 +1169,6 @@ class MainActivity : FlutterFragmentActivity() {
 
                             runOnUiThread {
                                 if (files != null) {
-                                    if (cacheDerivedKey && preservedKey == null) {
-                                        val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
-                                        if (derived != null) {
-                                            storeDerivedKeyBytes(uriString, derived)
-                                        }
-                                    }
                                     ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                                         uri = uriString,
                                         volId = targetVolId,
@@ -1193,6 +1190,15 @@ class MainActivity : FlutterFragmentActivity() {
                                         "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
                                         "containerFormat" to fmt
                                     ))
+                                    // Quick-unlock cache write: Keystore binder calls + a disk
+                                    // write. Not needed to declare the container unlocked --
+                                    // do it after the user already has control, off the UI thread.
+                                    if (cacheDerivedKey && preservedKey == null) {
+                                        val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
+                                        if (derived != null) {
+                                            ioExecutor.execute { storeDerivedKeyBytes(uriString, derived) }
+                                        }
+                                    }
                                 } else {
                                     result.error("AUTH_FAIL",
                                         "Incorrect password/keyfiles or invalid container", null)

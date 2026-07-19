@@ -1,6 +1,7 @@
 #include "container_utils.h"
 
 #include <algorithm>
+#include <array>
 #include <ctime>
 
 namespace {
@@ -128,13 +129,31 @@ void unixToFatTimestamp(uint64_t unixTime, WORD& date, WORD& time) {
         ((value.tm_sec / 2) & 0x1F));
 }
 
+namespace {
+// Sarwate table-driven CRC32 -- mathematically identical to the bit-loop
+// it replaces (same reflected CRC-32 polynomial 0xEDB88320), just ~8x
+// fewer operations per byte via an 8-bit lookup table instead of 8
+// conditional shift/XOR iterations.
+const uint32_t* crc32LookupTable() {
+    static const auto table = [] {
+        std::array<uint32_t, 256> t{};
+        for (uint32_t i = 0; i < 256; i++) {
+            uint32_t c = i;
+            for (int k = 0; k < 8; k++)
+                c = (c & 1) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
+            t[i] = c;
+        }
+        return t;
+    }();
+    return table.data();
+}
+} // namespace
+
 uint32_t crc32(const unsigned char* data, size_t length) {
+    const uint32_t* table = crc32LookupTable();
     uint32_t crc = 0xFFFFFFFFu;
     for (size_t i = 0; i < length; ++i) {
-        crc ^= data[i];
-        for (int bit = 0; bit < 8; ++bit) {
-            crc = (crc >> 1) ^ (0xEDB88320u & ~((crc & 1) - 1));
-        }
+        crc = table[(crc ^ data[i]) & 0xFFu] ^ (crc >> 8);
     }
     return crc ^ 0xFFFFFFFFu;
 }

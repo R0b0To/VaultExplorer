@@ -225,15 +225,23 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     return null;
   }
 
-  @override
+@override
   void dispose() {
     _indicatorTimer?.cancel();
     _controller.removeListener(_onControllerTick);
     widget.onVideoControllerDisposed();
     _videoTransformationController.dispose();
+    
+    final ctrl = _controller;
     try {
-      _controller.dispose();
+      ctrl.pause();
+      Future.delayed(const Duration(milliseconds: 150), () async {
+        try {
+          await ctrl.dispose();
+        } catch (_) {}
+      });
     } catch (_) {}
+
     super.dispose();
   }
 

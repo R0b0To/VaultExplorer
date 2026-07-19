@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'about_screen.dart';
-
+import '../../models/container_sort_mode.dart';
 import '../../models/thumbnail_cache_mode.dart';
 import '../../models/thumbnail_quality.dart';
 import '../../services/app_settings_service.dart';
@@ -421,6 +421,57 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                 ),
 
                 const SizedBox(height: 24),
+
+                const SectionLabel('Dashboard'),
+                AppCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  children: [
+                    DropdownButtonFormField<ContainerSortMode>(
+                      initialValue: _settings.containerSortMode,
+                      decoration: InputDecoration(
+                        labelText: 'Sort container cards by',
+                        prefixIcon: Icon(Icons.sort_rounded, size: AppIconSize.small),
+                      ),
+                      items: ContainerSortMode.values.map((mode) {
+                        return DropdownMenuItem(
+                          value: mode,
+                          child: Text(mode.label),
+                        );
+                      }).toList(),
+                      onChanged: (v) {
+                        if (v != null) {
+                          setState(() => _settings.containerSortMode = v);
+                          _persist();
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Text(
+                        _settings.containerSortMode == ContainerSortMode.manual
+                            ? 'Long-press and drag a card to reorder it manually.'
+                            : 'Cards are ordered automatically; drag-to-reorder is disabled while this is active.',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 24),
+                    SettingsToggleRow(
+                      icon: Icons.swap_horiz_rounded,
+                      title: 'Swap Edit/Delete Swipe Actions',
+                      subtitle: 'Reveal Edit on the left and Delete on the right '
+                          'when swiping a container card, instead of the default.',
+                      value: _settings.swapCardActions,
+                      onChanged: (v) {
+                        setState(() => _settings.swapCardActions = v);
+                        _persist();
+                      },
+                    ),
+                  ],
+                ),
 
                 const SectionLabel('Integration'),
                 AppCard(

@@ -20,6 +20,7 @@ import '../browser/file_browser_screen.dart';
 import '../unlock/usb_unlock_sheet.dart';
 import '../lock/lock_gate_screen.dart';
 import 'widgets/usb_create_container_sheet.dart';
+import '../../models/container_sort_mode.dart';
 
 class SlideRightRoute<T> extends PageRouteBuilder<T> {
   final Widget page;
@@ -666,7 +667,7 @@ void _showUsbCreateSheet() {
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
-  List<VaultListItem> _buildDisplayItems() {
+List<VaultListItem> _buildDisplayItems() {
     final byUri = <String, VaultListItem>{
       for (final c in _mounted) c.uri: MountedVaultItem(c, sortDate: _dateAddedProxy(c.uri)),
       for (final entry in _records.entries)
@@ -681,10 +682,40 @@ void _showUsbCreateSheet() {
     for (final entry in byUri.entries) {
       if (!_recordsOrder.contains(entry.key)) ordered.add(entry.value);
     }
-    return ordered;
+    return _applySortMode(ordered);
   }
 
-  void _handleReorder(int oldIndex, int newIndex) {
+  /// Applies [_appSettings.containerSortMode] on top of the manually-tracked
+  /// [_recordsOrder]. [ContainerSortMode.manual] returns [items] untouched
+  /// (drag order); every other mode derives a fresh order every build, so
+  /// [_handleReorder] is a no-op while one of them is active — see there.
+  List<VaultListItem> _applySortMode(List<VaultListItem> items) {
+    final sorted = List<VaultListItem>.from(items);
+    switch (_appSettings.containerSortMode) {
+      case ContainerSortMode.manual:
+        return items;
+      case ContainerSortMode.unlockStatus:
+        sorted.sort((a, b) {
+          if (a.isMounted == b.isMounted) return 0;
+          return a.isMounted ? -1 : 1;
+        });
+        return sorted;
+      case ContainerSortMode.nameAZ:
+        sorted.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+        return sorted;
+      case ContainerSortMode.newest:
+        sorted.sort((a, b) => b.sortDate.compareTo(a.sortDate));
+        return sorted;
+      case ContainerSortMode.oldest:
+        sorted.sort((a, b) => a.sortDate.compareTo(b.sortDate));
+        return sorted;
+    }
+  }
+
+void _handleReorder(int oldIndex, int newIndex) {
+    if (_appSettings.containerSortMode != ContainerSortMode.manual) return;
     if (newIndex > oldIndex) newIndex -= 1;
     final items = _buildDisplayItems();
     final movedUri = items[oldIndex].uri;
@@ -726,7 +757,9 @@ void _showUsbCreateSheet() {
                 onLocked: _onContainerLocked,
                 isRemoving: _animatingOutUris.contains(item.uri),
                 isInserting: _animatingInUris.contains(item.uri),
-                triggerNudge: triggerNudge, // Map property here
+                triggerNudge: triggerNudge,
+                swapActions: _appSettings.swapCardActions,                                   
+                dragEnabled: _appSettings.containerSortMode == ContainerSortMode.manual,  
                 onNudgeComplete: () async {
                   final updated = _appSettings.copyWith(hasSeenSwipeTutorial: true);
                   await AppSettingsService.saveSettings(updated);

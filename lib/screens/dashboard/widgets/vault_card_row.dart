@@ -77,8 +77,10 @@ class VaultCardRow extends StatefulWidget {
   final SwipeRowGroupController group;
   final bool isRemoving;
   final bool isInserting;
-  final bool triggerNudge;             // Passed down from dashboard
-  final VoidCallback? onNudgeComplete; // Callback when finished
+  final bool triggerNudge;             
+  final VoidCallback? onNudgeComplete; 
+  final bool swapActions;
+  final bool dragEnabled;
 
   const VaultCardRow({
     super.key,
@@ -93,6 +95,8 @@ class VaultCardRow extends StatefulWidget {
     this.isInserting = false,
     this.triggerNudge = false,
     this.onNudgeComplete,
+    this.swapActions = false,
+    this.dragEnabled = true,
   });
 
   @override
@@ -287,6 +291,10 @@ class _VaultCardRowState extends State<VaultCardRow>
     
     _animateTo(target);
   }
+    Widget _maybeDragWrap({required Widget child}) {
+    if (!widget.dragEnabled) return child;
+    return ReorderableDelayedDragStartListener(index: widget.index, child: child);
+  }
 
   void _onDragCancel() {
     if (!_isDragging) return;
@@ -345,10 +353,28 @@ class _VaultCardRowState extends State<VaultCardRow>
         ),
     };
 
-    final deleteProgress = (_dx / _revealExtent).clamp(0.0, 1.0);
-    final editProgress = (-_dx / _revealExtent).clamp(0.0, 1.0);
+    // Progress is tied to drag *position* (left slot reveals when dragging
+    // right, right slot reveals when dragging left) — swapActions only
+    // changes which action/icon/color sits in which slot, not the physics.
+    final leftSlotProgress = (_dx / _revealExtent).clamp(0.0, 1.0);
+    final rightSlotProgress = (-_dx / _revealExtent).clamp(0.0, 1.0);
+
+    final leftIsDelete = !widget.swapActions;
+    final leftIcon = leftIsDelete ? Icons.delete_outline_rounded : Icons.edit_outlined;
+    final leftLabel = leftIsDelete ? 'Delete' : 'Edit';
+    final leftBackground = leftIsDelete ? cs.errorContainer : cs.secondaryContainer;
+    final leftForeground = leftIsDelete ? cs.onErrorContainer : cs.onSecondaryContainer;
+    final leftOnTap = leftIsDelete ? _fireDelete : _fireEdit;
+
+    final rightIsDelete = widget.swapActions;
+    final rightIcon = rightIsDelete ? Icons.delete_outline_rounded : Icons.edit_outlined;
+    final rightLabel = rightIsDelete ? 'Delete' : 'Edit';
+    final rightBackground = rightIsDelete ? cs.errorContainer : cs.secondaryContainer;
+    final rightForeground = rightIsDelete ? cs.onErrorContainer : cs.onSecondaryContainer;
+    final rightOnTap = rightIsDelete ? _fireDelete : _fireEdit;
 
     final isHidden = widget.isRemoving || _isCurrentlyInserting;
+
 
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
@@ -359,8 +385,7 @@ class _VaultCardRowState extends State<VaultCardRow>
         opacity: isHidden ? 0.0 : 1.0,
         child: isHidden
             ? const SizedBox(width: double.infinity, height: 0)
-            : ReorderableDelayedDragStartListener(
-                index: widget.index,
+            : _maybeDragWrap(
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 14),
                   child: Semantics(
@@ -379,24 +404,24 @@ class _VaultCardRowState extends State<VaultCardRow>
                                 SizedBox(
                                   width: _revealExtent,
                                   child: _SwipeActionButton(
-                                    icon: Icons.delete_outline_rounded,
-                                    label: 'Delete',
-                                    background: cs.errorContainer,
-                                    foreground: cs.onErrorContainer,
-                                    progress: deleteProgress,
-                                    onTap: _fireDelete,
+                                    icon: leftIcon,
+                                    label: leftLabel,
+                                    background: leftBackground,
+                                    foreground: leftForeground,
+                                    progress: leftSlotProgress,
+                                    onTap: leftOnTap,
                                   ),
                                 ),
                                 const Spacer(),
                                 SizedBox(
                                   width: _revealExtent,
                                   child: _SwipeActionButton(
-                                    icon: Icons.edit_outlined,
-                                    label: 'Edit',
-                                    background: cs.secondaryContainer,
-                                    foreground: cs.onSecondaryContainer,
-                                    progress: editProgress,
-                                    onTap: _fireEdit,
+                                    icon: rightIcon,
+                                    label: rightLabel,
+                                    background: rightBackground,
+                                    foreground: rightForeground,
+                                    progress: rightSlotProgress,
+                                    onTap: rightOnTap,
                                   ),
                                 ),
                               ],

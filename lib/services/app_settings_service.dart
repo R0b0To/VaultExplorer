@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/browser_layout_mode.dart';
 import '../models/thumbnail_cache_mode.dart';
 import '../models/thumbnail_quality.dart';
+import '../models/container_sort_mode.dart';
 import 'container_repository.dart';
 
 export 'container_repository.dart'
@@ -29,6 +30,8 @@ class AppSettings {
   bool lockContainersOnScreenLock;
   int autoLockMins;
   bool hasSeenSwipeTutorial;
+  ContainerSortMode containerSortMode;
+  bool swapCardActions;
 
   /// Default browser layout mode (list, compact, grid).
   BrowserLayoutMode defaultLayoutMode;
@@ -59,6 +62,8 @@ class AppSettings {
     this.defaultLayoutMode = BrowserLayoutMode.list, // Default added
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
     this.defaultThumbnailQuality = ThumbnailQuality.medium,
+    this.containerSortMode = ContainerSortMode.manual,   // ADD
+    this.swapCardActions = false,
     Map<String, String>? extensionPreferences,
     this._masterPasswordHash,
     this._masterPasswordSalt,
@@ -92,6 +97,8 @@ class AppSettings {
     bool? lockContainersOnScreenLock,
     int? autoLockMins,
     bool? hasSeenSwipeTutorial,
+    ContainerSortMode? containerSortMode,
+    bool? swapCardActions,   
     BrowserLayoutMode? defaultLayoutMode,
     ThumbnailCacheMode? defaultThumbnailCacheMode,
     ThumbnailQuality? defaultThumbnailQuality,
@@ -110,6 +117,8 @@ class AppSettings {
       autoLockMins: autoLockMins ?? this.autoLockMins,
       hasSeenSwipeTutorial: hasSeenSwipeTutorial ?? this.hasSeenSwipeTutorial,
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
+      containerSortMode: containerSortMode ?? this.containerSortMode,
+      swapCardActions: swapCardActions ?? this.swapCardActions, 
       defaultThumbnailCacheMode: defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
       defaultThumbnailQuality: defaultThumbnailQuality ?? this.defaultThumbnailQuality,
       extensionPreferences: extensionPreferences ?? this.extensionPreferences,
@@ -131,6 +140,8 @@ class AppSettings {
     'defaultLayoutMode': defaultLayoutMode.toJson(), // Serialize layout mode
     'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
     'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
+    'containerSortMode': containerSortMode.toJson(),
+    'swapCardActions': swapCardActions,
     'extensionPreferences': extensionPreferences,
   };
 
@@ -142,6 +153,8 @@ class AppSettings {
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
     hasSeenSwipeTutorial: j['hasSeenSwipeTutorial'] as bool? ?? false,
     defaultDerivedKeyCacheEnabled: j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
+    containerSortMode: ContainerSortMode.fromJson(j['containerSortMode'] as String?),  
+    swapCardActions: j['swapCardActions'] as bool? ?? false,   
     lockContainersOnScreenLock: j['lockContainersOnScreenLock'] as bool? ?? true,
     autoLockMins: j['autoLockMins'] as int? ?? 0,
 

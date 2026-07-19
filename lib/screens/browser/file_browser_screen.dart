@@ -122,6 +122,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
+  bool get _isReadOnly => widget.container.readOnly;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -865,6 +866,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   // ── Vault items ───────────────────────────────────────────────────────────
 
   Future<void> _addVaultItem(VaultItemType type) async {
+    if (_isReadOnly) {
+      _setStatus('This container is mounted read-only.', error: true);
+      return;
+    }
     _signalActivity();
     await Navigator.push<String?>(
       context,
@@ -883,6 +888,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   // ── Clipboard ─────────────────────────────────────────────────────────────
 
   void _initClipboard({required bool cut}) {
+    if (cut && _isReadOnly) {
+      _setStatus(
+        'This container is mounted read-only — items can\'t be moved from here.',
+        error: true,
+      );
+      return;
+    }
     _signalActivity();
 
     final clipItems = selectedItems.map((rawItem) {
@@ -909,6 +921,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _paste() async {
     if (!_clip.hasItems) return;
+    if (_isReadOnly) {
+      _setStatus(
+        'This container is mounted read-only — items can\'t be pasted here.',
+        error: true,
+      );
+      return;
+    }
     _signalActivity();
 
     final srcVolId = _clip.sourceVolId;
@@ -1021,6 +1040,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   void _batchDelete() {
+    if (_isReadOnly) {
+      _setStatus(
+        'This container is mounted read-only — items can\'t be deleted.',
+        error: true,
+      );
+      return;
+    }
     HapticFeedback.heavyImpact();
     _signalActivity();
     BrowserDialogs.showBatchDelete(
@@ -1089,6 +1115,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   Future<void> _importFilesFromDevice() async {
+    if (_isReadOnly) {
+      _setStatus('This container is mounted read-only.', error: true);
+      return;
+    }
     _signalActivity();
     final op = _opSvc.enqueueImport(
       dest: widget.container,
@@ -1121,6 +1151,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   Future<void> _importFolderFromDevice() async {
+    if (_isReadOnly) {
+      _setStatus('This container is mounted read-only.', error: true);
+      return;
+    }
     _signalActivity();
     final op = _opSvc.enqueueImport(
       dest: widget.container,
@@ -1200,6 +1234,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _extractArchive() async {
     if (_archiveContext == null) return;
+        if (_isReadOnly) {
+      _setStatus('This container is mounted read-only.', error: true);
+      return;
+    }
     
     final archivePath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
     final parentDir = archivePath.contains('/') 
@@ -1245,7 +1283,21 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Widget _buildAddPopupButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    
+
+    if (_isReadOnly) {
+      return IconButton(
+        icon: Icon(
+          Icons.lock_outline_rounded,
+          color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+        ),
+        tooltip: 'Read-only — can\'t add items',
+        onPressed: () => _setStatus(
+          'This container is mounted read-only.',
+          error: true,
+        ),
+      );
+    }
+
     if (_archiveContext != null) {
       return IconButton(
         icon: const Icon(Icons.unarchive_rounded, size: 28),
@@ -1279,6 +1331,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               container: widget.container,
               currentDirPath: _currentDirPath,
               onSuccess: () => _loadDirectoryContents(_currentDirPath),
+              readOnly: _isReadOnly,
             );
           },
         ),
@@ -1291,6 +1344,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               container: widget.container,
               currentDirPath: _currentDirPath,
               onSuccess: () => _loadDirectoryContents(_currentDirPath),
+              readOnly: _isReadOnly,
             );
           },
         ),
@@ -1324,7 +1378,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       ],
     );
   }
-
   Widget _buildViewTogglePopupButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final currentIcon = _layoutMode == BrowserLayoutMode.list
@@ -1637,6 +1690,7 @@ MenuItemButton(
     List<String> files,
   ) {
     final allItems = [...dirs, ...files];
+    final cs = Theme.of(context).colorScheme;
 
     if (isSelectionMode) {
       final single = selectedItems.length == 1;
@@ -1655,11 +1709,12 @@ MenuItemButton(
         selectionLabel: sizeLabel,
         singleSelected: single,
         singleFileSelected: singleFile,
+        readOnly: _isReadOnly,
         onClose: exitSelectionMode,
         onSelectAll: () => setState(() => selectedItems.addAll(allItems)),
         onRename: () {
           final entries = selectedItems.map((raw) => RawEntry.parse(raw)).toList();
-          
+
           for (final entry in entries) {
             final parts = entry.name.split('.');
             final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
@@ -1680,6 +1735,7 @@ MenuItemButton(
             existingNamesInDir: existingNames,
             currentDirPath: _currentDirPath,
             onSuccess: () => _loadDirectoryContents(_currentDirPath),
+            readOnly: _isReadOnly,
           );
           exitSelectionMode();
         },
@@ -1726,10 +1782,45 @@ MenuItemButton(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.container.displayName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  widget.container.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (_isReadOnly) ...[
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Mounted read-only',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.lock_outline_rounded, size: 11, color: cs.onSurfaceVariant),
+                        const SizedBox(width: 3),
+                        Text(
+                          'RO',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           if (_toolbarConfig.showStatsBar)
             _buildAppBarStatsSubtitle(

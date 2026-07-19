@@ -6,12 +6,25 @@ import '../../utils/filename_utils.dart';
 import '../../widgets/common_widgets.dart';
 
 abstract class BrowserDialogs {
+  static void _blockedReadOnly(BuildContext context) {
+    showAppSnackBar(
+      context,
+      message: 'This container is mounted read-only.',
+      tone: AppBannerTone.warning,
+    );
+  }
+
   static void showCreateFolder(
     BuildContext context, {
     required MountedContainer container,
     required String currentDirPath,
     required VoidCallback onSuccess,
+    bool readOnly = false,
   }) {
+    if (readOnly) {
+      _blockedReadOnly(context);
+      return;
+    }
     final ctrl = TextEditingController();
     showDialog(
       context: context,
@@ -61,7 +74,12 @@ abstract class BrowserDialogs {
     required MountedContainer container,
     required String currentDirPath,
     required VoidCallback onSuccess,
+    bool readOnly = false,
   }) {
+    if (readOnly) {
+      _blockedReadOnly(context);
+      return;
+    }
     final ctrl = TextEditingController();
     showDialog(
       context: context,
@@ -110,7 +128,12 @@ abstract class BrowserDialogs {
     required Set<String> existingNamesInDir,
     required String currentDirPath,
     required VoidCallback onSuccess,
+    bool readOnly = false,
   }) {
+    if (readOnly) {
+      _blockedReadOnly(context);
+      return;
+    }
     final ctrl = TextEditingController(text: oldNames.length == 1 ? oldNames.first : '');
     final title = oldNames.length == 1 ? 'Rename' : 'Rename ${oldNames.length} items';
 
@@ -139,7 +162,7 @@ abstract class BrowserDialogs {
               if (oldNames.length == 1) {
                 final oldName = oldNames.first;
                 if (newNameBase == oldName) return;
-                
+
                 final oldFull = currentDirPath.isEmpty
                     ? oldName
                     : '$currentDirPath/$oldName';
@@ -164,11 +187,11 @@ abstract class BrowserDialogs {
                 int successCount = 0;
                 int failCount = 0;
                 final existing = Set<String>.from(existingNamesInDir);
-                
+
                 for (final oldName in oldNames) {
                   final parts = oldName.split('.');
                   final ext = parts.length > 1 ? '.${parts.last}' : '';
-                  
+
                   String desiredName;
                   if (newNameBase.toLowerCase().endsWith(ext.toLowerCase())) {
                     desiredName = newNameBase;
@@ -178,10 +201,10 @@ abstract class BrowserDialogs {
 
                   final uniqueName = FileOperationService.makeUniqueName(desiredName, existing);
                   existing.add(uniqueName.toLowerCase());
-                  
+
                   final oldFull = currentDirPath.isEmpty ? oldName : '$currentDirPath/$oldName';
                   final newFull = currentDirPath.isEmpty ? uniqueName : '$currentDirPath/$uniqueName';
-                  
+
                   final ok = await vaultExplorerApi.renameFile(container, oldFull, newFull);
                   if (ok) {
                     successCount++;
@@ -189,7 +212,7 @@ abstract class BrowserDialogs {
                     failCount++;
                   }
                 }
-                
+
                 if (successCount > 0) onSuccess();
                 if (failCount > 0 && context.mounted) {
                   showAppSnackBar(
@@ -211,7 +234,12 @@ abstract class BrowserDialogs {
     BuildContext context, {
     required List<String> toDelete,
     required void Function(List<String> items) onConfirmed,
+    bool readOnly = false,
   }) async {
+    if (readOnly) {
+      _blockedReadOnly(context);
+      return;
+    }
     final hasDir = toDelete.any((item) => item.startsWith('[DIR] '));
 
     final confirmed = await showAppConfirmDialog(

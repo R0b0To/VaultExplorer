@@ -16,6 +16,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onExport;
   final VoidCallback onDelete;
   final VoidCallback onOpenWithApp;
+  final bool readOnly;
 
   const SelectionAppBar({
     super.key,
@@ -31,6 +32,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onExport,
     required this.onDelete,
     required this.onOpenWithApp,
+    this.readOnly = false,
   });
 
   @override
@@ -42,7 +44,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return AppBar(
-      backgroundColor: cs.surfaceContainer, // Matches contextual CAB styling
+      backgroundColor: cs.surfaceContainer,
       foregroundColor: cs.onSurface,
       elevation: 0,
       shape: Border(bottom: BorderSide(color: cs.outlineVariant)),
@@ -117,9 +119,12 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       actions: [
         IconButton(
-          icon: Icon(Icons.delete_outline_rounded, color: cs.error),
-          tooltip: 'Delete',
-          onPressed: onDelete,
+          icon: Icon(
+            Icons.delete_outline_rounded,
+            color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.error,
+          ),
+          tooltip: readOnly ? 'Read-only container' : 'Delete',
+          onPressed: readOnly ? null : onDelete,
         ),
         IconButton(
           icon: const Icon(Icons.copy_rounded),
@@ -128,13 +133,13 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         IconButton(
           icon: const Icon(Icons.cut_rounded),
-          tooltip: 'Move',
-          onPressed: onCut,
+          tooltip: readOnly ? 'Read-only container' : 'Move',
+          onPressed: readOnly ? null : onCut,
         ),
         IconButton(
           icon: const Icon(Icons.drive_file_rename_outline_rounded),
-          tooltip: 'Rename',
-          onPressed: onRename,
+          tooltip: readOnly ? 'Read-only container' : 'Rename',
+          onPressed: readOnly ? null : onRename,
         ),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert_rounded),

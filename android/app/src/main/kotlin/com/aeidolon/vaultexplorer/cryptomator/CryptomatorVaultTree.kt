@@ -18,8 +18,13 @@ private const val ROOT_DIR_ID = ""
 sealed class VaultNode {
     abstract val cleartextName: String
 
-    /** A regular file. [physicalFile] is the actual ciphertext bytes: either the short `.c9r` file directly, or `contents.c9r` inside a `.c9s` shortened folder. */
-    data class VFile(override val cleartextName: String, val physicalFile: DocumentFile, val cleartextSizeHint: Long?) : VaultNode()
+    /** A regular file. [physicalFile] is the actual ciphertext bytes: either the short `.c9r` file directly, or `contents.c9r` inside a `.c9s` shortened folder. [wrapperFolder] is the `.c9s` directory if shortened, null otherwise. */
+    data class VFile(
+        override val cleartextName: String, 
+        val physicalFile: DocumentFile, 
+        val cleartextSizeHint: Long?,
+        val wrapperFolder: DocumentFile? = null
+    ) : VaultNode()
 
     /** A subdirectory. [dirIdFile] holds this directory's own dirId (its "dir.c9r"), used to resolve where its children physically live. [physicalFolder] is its `.c9r`/`.c9s` folder (parent of dirIdFile), useful for rename/delete of the node itself. */
     data class VDir(override val cleartextName: String, val physicalFolder: DocumentFile, val dirIdFile: DocumentFile) : VaultNode()
@@ -91,7 +96,7 @@ class CryptomatorVaultTree(
                         } else {
                             val contents = findChild(child, LONG_CONTENTS_FILE)
                             if (contents != null) {
-                                results.add(VaultNode.VFile(cleartext, contents, contents.length()))
+                                results.add(VaultNode.VFile(cleartext, contents, contents.length(), wrapperFolder = child))
                             }
                         }
                     }
@@ -102,7 +107,7 @@ class CryptomatorVaultTree(
                             val dirPointer = findChild(child, DIR_FILE_NAME) ?: continue // not yet a valid dir (or a symlink, unsupported)
                             results.add(VaultNode.VDir(cleartext, child, dirPointer))
                         } else {
-                            results.add(VaultNode.VFile(cleartext, child, child.length()))
+                            results.add(VaultNode.VFile(cleartext, child, child.length(), wrapperFolder = null))
                         }
                     }
                     else -> continue // unrelated/foreign file in the physical dir; ignore

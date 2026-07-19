@@ -85,7 +85,7 @@ fun listDirectory(virtualPath: String): Array<String>? {
             val ciphertextName = nameCryptor.encryptFilename(name, parentDirId.toByteArray(Charsets.UTF_8))
             createNodeFolder(parentPhysical, ciphertextName) { nodeFolder ->
                 val dirIdBytes = newDirId.toByteArray(Charsets.UTF_8)
-                val dirFile = nodeFolder.createFile("application/octet-stream", "dir.c9r")
+                val dirFile = createFileSafe(nodeFolder, "application/octet-stream", "dir.c9r")
                     ?: throw VaultIOException("Could not create dir.c9r")
                 writeWhole(dirFile, dirIdBytes)
             }
@@ -99,9 +99,9 @@ fun listDirectory(virtualPath: String): Array<String>? {
             tree.invalidate(parentPath)
             true
         } catch (e: Exception) {
-    android.util.Log.e("CryptomatorSession", "createDirectory failed for $virtualPath", e)
-    false
-}
+            android.util.Log.e("CryptomatorSession", "createDirectory failed for $virtualPath", e)
+            false
+        }
     }
 
     fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
@@ -121,7 +121,7 @@ fun listDirectory(virtualPath: String): Array<String>? {
                 val newCiphertextName = nameCryptor.encryptFilename(newName, parentDirId.toByteArray(Charsets.UTF_8))
                 val physicalNode = when (node) {
                     is VaultNode.VDir -> node.physicalFolder
-                    is VaultNode.VFile -> node.physicalFile.parentFile ?: node.physicalFile
+                    is VaultNode.VFile -> node.wrapperFolder ?: node.physicalFile
                 }
                 val isShortened = physicalNode.name?.endsWith(".c9s") == true
                 if (isShortened) {
@@ -156,9 +156,9 @@ fun listDirectory(virtualPath: String): Array<String>? {
                     node.physicalFolder.delete()
                 }
                 is VaultNode.VFile -> {
-                    val container = node.physicalFile.parentFile
+                    val container = node.wrapperFolder
                     if (container != null && container.name?.endsWith(".c9s") == true) {
-                        container.delete()
+                        deleteRecursively(container)
                     } else {
                         node.physicalFile.delete()
                     }
@@ -343,9 +343,9 @@ fun listDirectory(virtualPath: String): Array<String>? {
             tree.invalidate(parentOf(normalized))
             true
        } catch (e: Exception) {
-    android.util.Log.e("CryptomatorSession", "writeBackFile failed for $virtualPath", e)
-    false
-}
+            android.util.Log.e("CryptomatorSession", "writeBackFile failed for $virtualPath", e)
+            false
+        }
     }
 
     fun extractFile(virtualPath: String, destinationPath: String): Boolean {
@@ -375,28 +375,27 @@ fun listDirectory(virtualPath: String): Array<String>? {
         }
     }
 
-// CryptomatorSession.kt
-fun getSpaceInfo(): LongArray? {
-    return try {
-        val rootUri = android.provider.DocumentsContract.buildRootsUri(vaultRootUri.authority)
-        context.contentResolver.query(
-            rootUri,
-            arrayOf(android.provider.DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, android.provider.DocumentsContract.Root.COLUMN_CAPACITY_BYTES),
-            null, null, null
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val availIdx = cursor.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_AVAILABLE_BYTES)
-                val capIdx = cursor.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_CAPACITY_BYTES)
-                val avail = if (availIdx >= 0) cursor.getLong(availIdx) else -1L
-                val cap = if (capIdx >= 0) cursor.getLong(capIdx) else -1L
-                if (cap > 0 && avail >= 0) return longArrayOf(cap, avail)
+    fun getSpaceInfo(): LongArray? {
+        return try {
+            val rootUri = android.provider.DocumentsContract.buildRootsUri(vaultRootUri.authority)
+            context.contentResolver.query(
+                rootUri,
+                arrayOf(android.provider.DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, android.provider.DocumentsContract.Root.COLUMN_CAPACITY_BYTES),
+                null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val availIdx = cursor.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_AVAILABLE_BYTES)
+                    val capIdx = cursor.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_CAPACITY_BYTES)
+                    val avail = if (availIdx >= 0) cursor.getLong(availIdx) else -1L
+                    val cap = if (capIdx >= 0) cursor.getLong(capIdx) else -1L
+                    if (cap > 0 && avail >= 0) return longArrayOf(cap, avail)
+                }
             }
+            null // unknown — let callers treat this as "don't gate on space", not "zero space"
+        } catch (e: Exception) {
+            null
         }
-        null // unknown — let callers treat this as "don't gate on space", not "zero space"
-    } catch (e: Exception) {
-        null
     }
-}
 
     // ---- write-handle: buffers cleartext, flushes full ciphertext chunks -----
 
@@ -489,44 +488,80 @@ fun getSpaceInfo(): LongArray? {
 
     // ---- physical SAF helpers ----------------------------------------------
 
+    /** Safely list children bypassing SingleDocumentFile's restrictions */
+    private fun listFilesSafe(folder: DocumentFile): List<DocumentFile> {
+        val childrenUri = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(folder.uri, android.provider.DocumentsContract.getDocumentId(folder.uri))
+        val results = mutableListOf<DocumentFile>()
+        val projection = arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+        try {
+            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val idIdx = cursor.getColumnIndexOrThrow(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                while (cursor.moveToNext()) {
+                    val docId = cursor.getString(idIdx)
+                    val childUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(folder.uri, docId)
+                    DocumentFile.fromSingleUri(context, childUri)?.let { results.add(it) }
+                }
+            }
+        } catch (e: Exception) {
+            // Ignored
+        }
+        return results
+    }
+
+    /** Safely create a directory bypassing SingleDocumentFile's restrictions */
+    private fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? {
+        return try {
+            val uri = android.provider.DocumentsContract.createDocument(context.contentResolver, parent.uri, android.provider.DocumentsContract.Document.MIME_TYPE_DIR, name)
+            uri?.let { DocumentFile.fromSingleUri(context, it) }
+        } catch (e: Exception) { null }
+    }
+
+    /** Safely create a file bypassing SingleDocumentFile's restrictions */
+    private fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile? {
+        return try {
+            val uri = android.provider.DocumentsContract.createDocument(context.contentResolver, parent.uri, mimeType, name)
+            uri?.let { DocumentFile.fromSingleUri(context, it) }
+        } catch (e: Exception) { null }
+    }
+
     private fun vaultRoot(): DocumentFile =
         DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw VaultIOException("Cannot open vault root")
 
-    private fun childOf(folder: DocumentFile, name: String): DocumentFile? = folder.listFiles().firstOrNull { it.name == name }
+    private fun childOf(folder: DocumentFile, name: String): DocumentFile? = listFilesSafe(folder).firstOrNull { it.name == name }
 
     private fun findOrCreateChild(folder: DocumentFile, name: String, isDir: Boolean): DocumentFile? {
         childOf(folder, name)?.let { return it }
-        return if (isDir) folder.createDirectory(name) else folder.createFile("application/octet-stream", name)
+        return if (isDir) createDirectorySafe(folder, name) else createFileSafe(folder, "application/octet-stream", name)
     }
 
-    /** Creates a `<ciphertextName>.c9r` folder under [parent] (used for both file-as-folder-wrapper cases and real subdirectories), applying the shortening rule if the name would exceed [shorteningThreshold]. */
+    /** Creates a `<ciphertextName>.c9r` folder under [parent], applying the shortening rule if the name would exceed [shorteningThreshold]. */
     private fun createNodeFolder(parent: DocumentFile, ciphertextName: String, populate: (DocumentFile) -> Unit) {
         val fullName = ciphertextName + ".c9r"
         if (fullName.length <= shorteningThreshold) {
-            val folder = parent.createDirectory(fullName) ?: throw VaultIOException("Could not create $fullName")
+            val folder = createDirectorySafe(parent, fullName) ?: throw VaultIOException("Could not create $fullName")
             populate(folder)
         } else {
             val hash = java.security.MessageDigest.getInstance("SHA-1").digest(fullName.toByteArray(Charsets.UTF_8))
             val shortName = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(hash) + ".c9s"
-            val folder = parent.createDirectory(shortName) ?: throw VaultIOException("Could not create $shortName")
-            val nameFile = folder.createFile("application/octet-stream", "name.c9r") ?: throw VaultIOException("Could not create name.c9r")
+            val folder = createDirectorySafe(parent, shortName) ?: throw VaultIOException("Could not create $shortName")
+            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9r") ?: throw VaultIOException("Could not create name.c9r")
             writeWhole(nameFile, fullName.toByteArray(Charsets.UTF_8))
             populate(folder)
         }
     }
 
-    /** Creates a new file node (short `.c9r` file, or `.c9s`-shortened folder containing `contents.c9r`), returning the DocumentFile that should receive the ciphertext bytes. */
+    /** Creates a new file node, returning the DocumentFile that should receive the ciphertext bytes. */
     private fun createNewFileNode(parent: DocumentFile, ciphertextName: String): DocumentFile {
         val fullName = ciphertextName + ".c9r"
         return if (fullName.length <= shorteningThreshold) {
-            parent.createFile("application/octet-stream", fullName) ?: throw VaultIOException("Could not create $fullName")
+            createFileSafe(parent, "application/octet-stream", fullName) ?: throw VaultIOException("Could not create $fullName")
         } else {
             val hash = java.security.MessageDigest.getInstance("SHA-1").digest(fullName.toByteArray(Charsets.UTF_8))
             val shortName = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(hash) + ".c9s"
-            val folder = parent.createDirectory(shortName) ?: throw VaultIOException("Could not create $shortName")
-            val nameFile = folder.createFile("application/octet-stream", "name.c9r") ?: throw VaultIOException("Could not create name.c9r")
+            val folder = createDirectorySafe(parent, shortName) ?: throw VaultIOException("Could not create $shortName")
+            val nameFile = createFileSafe(folder, "application/octet-stream", "name.c9r") ?: throw VaultIOException("Could not create name.c9r")
             writeWhole(nameFile, fullName.toByteArray(Charsets.UTF_8))
-            folder.createFile("application/octet-stream", "contents.c9r") ?: throw VaultIOException("Could not create contents.c9r")
+            createFileSafe(folder, "application/octet-stream", "contents.c9r") ?: throw VaultIOException("Could not create contents.c9r")
         }
     }
 
@@ -541,7 +576,7 @@ fun getSpaceInfo(): LongArray? {
     }
 
     private fun deleteRecursively(folder: DocumentFile) {
-        for (child in folder.listFiles()) {
+        for (child in listFilesSafe(folder)) {
             if (child.isDirectory) deleteRecursively(child)
             child.delete()
         }

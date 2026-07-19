@@ -179,6 +179,27 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _layoutMode = appSettings.defaultLayoutMode;
       });
     }
+
+    // A read-only mount refuses every write native-side (physicalWrite()'s
+    // hard readOnly check), including the .thumbcache/ writes
+    // ThumbnailCacheService.put() makes for ThumbnailCacheMode.inContainer.
+    // Those writes already fail silently (caught + debugPrint'd) rather
+    // than surfacing anywhere — thumbnails still render fine from native
+    // generation + the in-memory LRU tier, they're just regenerated every
+    // session instead of persisting — but the person chose "inside
+    // container" specifically for that persistence, so say so once up
+    // front instead of letting it fail invisibly.
+    if (mounted &&
+        widget.container.readOnly &&
+        _resolvedThumbnailCacheMode == ThumbnailCacheMode.inContainer) {
+      showAppSnackBar(
+        context,
+        message:
+            'Read-only mount — thumbnails will show but won\'t be saved '
+            'inside the container this session.',
+        tone: AppBannerTone.warning,
+      );
+    }
   } catch (e) {
     debugPrint('Failed to resolve settings: $e');
   }

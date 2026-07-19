@@ -838,7 +838,7 @@ RadioGroup<UsbDeviceInfo>(
 )
                     ],
                   ),
-                  const SizedBox(height: 24),
+                   const SizedBox(height: 24),
 
                   // Auth View Switchers
                   if (_loadingAuth)
@@ -848,79 +848,106 @@ RadioGroup<UsbDeviceInfo>(
                         child: CircularProgressIndicator(strokeWidth: 2),
                       ),
                     )
-                  else if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
-                    Card(
-                      elevation: 0,
+                  else ...[
+                    // Read-only toggle — shown for every unlock method
+                    Material(
                       color: cs.surfaceContainerLow,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                        borderRadius: BorderRadius.circular(16),
                         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: cs.primaryContainer.withValues(alpha: 0.4),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.fingerprint_rounded,
-                                size: 64,
-                                color: cs.primary,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'Biometric Authentication',
-                              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Authenticate to unlock and mount this USB device',
-                              style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 32),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () => setState(() => _showPasswordFallback = true),
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    child: const Text('Use Password'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: _tryBiometric,
-                                    style: FilledButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    child: const Text('Authenticate'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                      clipBehavior: Clip.antiAlias,
+                      child: SwitchListTile(
+                        value: _readOnly,
+                        onChanged: busy ? null : (val) => setState(() => _readOnly = val),
+                        title: Text(
+                          'Read-only mode',
+                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                         ),
+                        subtitle: Text(
+                          'Mount without allowing any changes to this drive',
+                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        secondary: Icon(Icons.visibility_outlined, color: cs.primary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                       ),
                     ),
-                  ]
-                  else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
+                    const SizedBox(height: 16),
+
+                    if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
+                      Card(
+                        elevation: 0,
+                        color: cs.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadius.xl),
+                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: cs.primaryContainer.withValues(alpha: 0.4),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.fingerprint_rounded,
+                                  size: 64,
+                                  color: cs.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                'Biometric Authentication',
+                                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Authenticate to unlock and mount this USB device',
+                                style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 32),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () => setState(() => _showPasswordFallback = true),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                      ),
+                                      child: const Text('Use Password'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: FilledButton(
+                                      onPressed: _tryBiometric,
+                                      style: FilledButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                      ),
+                                      child: const Text('Authenticate'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ]
+                    else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
                     Card(
                       elevation: 0,
                       color: cs.surfaceContainerLow,
@@ -1108,7 +1135,7 @@ RadioGroup<UsbDeviceInfo>(
                               ),
                             ),
                     ),
-                    if (_unlocking && _activeVolId != null) ...[
+              if (_unlocking && _activeVolId != null) ...[
                       const SizedBox(height: 8),
                       Center(
                         child: TextButton(
@@ -1117,6 +1144,7 @@ RadioGroup<UsbDeviceInfo>(
                         ),
                       ),
                     ],
+                  ],
                   ],
                 ],
               ],

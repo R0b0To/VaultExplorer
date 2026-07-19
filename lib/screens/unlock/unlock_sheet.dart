@@ -134,6 +134,9 @@ class _UnlockSheetState extends State<UnlockSheet> {
         return;
       }
 
+
+      _containerFormat = record.containerFormat;
+
       var exists = true;
       try {
         exists = await vaultExplorerApi.documentExists(widget.initialUri!);
@@ -153,7 +156,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
       _unlockMethod = record.unlockMethod;
       _cipherId = record.cipherId;
       _hashId = record.hashId;
-      _containerFormat = record.containerFormat;
       _readOnly = record.readOnly;
 
       if (_unlockMethod == ContainerUnlockMethod.pattern) {
@@ -176,8 +178,26 @@ class _UnlockSheetState extends State<UnlockSheet> {
     final oldUri = widget.initialUri;
     if (oldUri == null) return;
     try {
-      final result = await vaultExplorerApi.pickContainer();
-      if (result == null || !mounted) return;
+      // FIX: Cryptomator vaults are folders, picked via
+      // ACTION_OPEN_DOCUMENT_TREE (pickCryptomatorVault) — the plain
+      // single-file picker can't select a vault folder at all.
+      String newUri;
+      String newDisplayName;
+      if (_containerFormat == 'cryptomator') {
+        final picked = await vaultExplorerApi.pickCryptomatorVault();
+        if (picked == null || !mounted) return;
+        if (!picked.looksLikeVault) {
+          setState(() => _error = 'No masterkey.cryptomator found in that folder.');
+          return;
+        }
+        newUri = picked.uri;
+        newDisplayName = picked.displayName;
+      } else {
+        final picked = await vaultExplorerApi.pickContainer();
+        if (picked == null || !mounted) return;
+        newUri = picked.uri;
+        newDisplayName = picked.displayName;
+      }
 
       setState(() => _loadingAuth = true);
 
@@ -198,7 +218,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
       await ContainerRepository.instance.remove(oldUri);
 
       final migrated = ContainerRecord(
-        uri: result.uri,
+        uri: newUri,
         label: existing.label,
         rememberPassword: existing.rememberPassword,
         unlockMethod: existing.unlockMethod,
@@ -217,7 +237,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
       setState(() {
         _selectedUri = migrated.uri;
-        _selectedName = result.displayName;
+        _selectedName = newDisplayName;
         _unlockMethod = migrated.unlockMethod;
         _cipherId = migrated.cipherId;
         _hashId = migrated.hashId;
@@ -471,6 +491,7 @@ Future<void> _pickFile() async {
             totalSpace: -1,
             freeSpace: -1,
             readOnly: _readOnly,
+            containerFormat: 'cryptomator',
           ),
           record: savedRecord,
         );

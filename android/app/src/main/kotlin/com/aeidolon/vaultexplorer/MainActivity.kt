@@ -1462,9 +1462,20 @@ ChannelMethods.FINISH_WRITE_IF_CRYPTOMATOR -> {
 
                     ioExecutor.execute {
                         val exists = try {
+                            val uri = Uri.parse(filePath)
                             if (filePath.startsWith("content://")) {
-                                DocumentFile.fromSingleUri(this, Uri.parse(filePath))
-                                    ?.exists() == true
+                                // Cryptomator vaults are picked via
+                                // ACTION_OPEN_DOCUMENT_TREE and stored as tree
+                                // Uris (see pickCryptomatorVaultLauncher).
+                                // fromSingleUri() misreads a tree Uri as a
+                                // single-document Uri and its exists() check
+                                // always comes back false, wrongly marking a
+                                // perfectly-reachable vault as "missing".
+                                if (DocumentsContract.isTreeUri(uri)) {
+                                    DocumentFile.fromTreeUri(this, uri)?.exists() == true
+                                } else {
+                                    DocumentFile.fromSingleUri(this, uri)?.exists() == true
+                                }
                             } else {
                                 File(filePath).exists()
                             }

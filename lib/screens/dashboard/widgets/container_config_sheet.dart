@@ -53,6 +53,15 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   late bool _settingsLocked;
   bool _changePassword = false;
 
+  /// Cryptomator vaults have no cipher/hash selection, no derived-key
+  /// caching, and no in-app password-change flow — several sections below
+  /// key off this to hide those VeraCrypt/LUKS-only controls.
+  String get _containerFormat =>
+      widget.existingRecord?.containerFormat ??
+      widget.mountedContainer?.containerFormat ??
+      'veracrypt';
+  bool get _isCryptomator => _containerFormat == 'cryptomator';
+
   bool _saving = false;
   bool _loadingPassword = true;
 
@@ -281,6 +290,11 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
           : null,
       cipherId: _cipherId,
       hashId: _hashId,
+      // FIX: containerFormat was never carried over here, so every save
+      // silently reset it to ContainerRecord's 'veracrypt' default — that
+      // then breaks the unlock path the next time a Cryptomator (or LUKS)
+      // container is opened from the dashboard.
+      containerFormat: _containerFormat,
     );
     await ContainerRepository.instance.save(record);
     if (!_cacheDerivedKey) {
@@ -356,6 +370,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
           hashId: record.hashId,
           documentProvider: _documentProvider,
           cacheDerivedKey: _cacheDerivedKey,
+          containerFormat: record.containerFormat,
         ),
       );
       if (verified != null && mounted) {
@@ -585,32 +600,40 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                       ),
                     ],
 
-                    const SizedBox(height: 16),
-                    SwitchListTile(
-                      title: Text('Cache Derived Key', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-                      subtitle: Text('Reuse key material in Android Keystore securely for quick checks.', style: textTheme.bodySmall),
-                      value: _cacheDerivedKey,
-                      onChanged: (v) => setState(() => _cacheDerivedKey = v),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      tileColor: cs.surfaceContainer,
-                    ),
-                    const SizedBox(height: 16),
-                    AdvancedParamsPanel(
-                      cipherId: _cipherId,
-                      hashId: _hashId,
-                      subtitle: 'Pin the algorithm to skip auto-detection on unlock.',
-                      onCipherChanged: (val) => setState(() => _cipherId = val),
-                      onHashChanged: (val) => setState(() => _hashId = val),
-                    ),
+                    if (!_isCryptomator) ...[
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                        title: Text('Cache Derived Key', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
+                        subtitle: Text('Reuse key material in Android Keystore securely for quick checks.', style: textTheme.bodySmall),
+                        value: _cacheDerivedKey,
+                        onChanged: (v) => setState(() => _cacheDerivedKey = v),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        tileColor: cs.surfaceContainer,
+                      ),
+                      const SizedBox(height: 16),
+                      AdvancedParamsPanel(
+                        cipherId: _cipherId,
+                        hashId: _hashId,
+                        subtitle: 'Pin the algorithm to skip auto-detection on unlock.',
+                        onCipherChanged: (val) => setState(() => _cipherId = val),
+                        onHashChanged: (val) => setState(() => _hashId = val),
+                      ),
+                    ],
                     if (widget.existingRecord != null) ...[
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
                         onPressed: () {
-                          if (widget.existingRecord?.containerFormat == 'luks1' ||
-                              widget.existingRecord?.containerFormat == 'luks2') {
+                          final fmt = widget.existingRecord?.containerFormat;
+                          if (fmt == 'luks1' || fmt == 'luks2') {
                             showAppSnackBar(
                               context,
                               message: 'LUKS password changing is not supported in-app. Use cryptsetup on Linux.',
+                              tone: AppBannerTone.warning,
+                            );
+                          } else if (fmt == 'cryptomator') {
+                            showAppSnackBar(
+                              context,
+                              message: 'Cryptomator vault passwords cannot be changed in-app.',
                               tone: AppBannerTone.warning,
                             );
                           } else {
@@ -1020,12 +1043,14 @@ class _RealPasswordGateDialog extends StatefulWidget {
   final int hashId;
   final bool documentProvider;
   final bool cacheDerivedKey;
+  final String containerFormat;
   const _RealPasswordGateDialog({
     required this.uri,
     required this.cipherId,
     required this.hashId,
     required this.documentProvider,
     required this.cacheDerivedKey,
+    this.containerFormat = 'veracrypt',
   });
 
   @override
@@ -1043,6 +1068,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
 
   bool get _isUsb => widget.uri.startsWith('usb:');
   String get _usbDeviceName => widget.uri.substring(4);
+  bool get _isCryptomator => widget.containerFormat == 'cryptomator';
 
   int? _activeVolId;
   late final void Function(int) _onUnlockStarted;
@@ -1096,6 +1122,42 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
       return;
     }
     setState(() { _loading = true; _error = null; });
+
+    // Cryptomator vaults don't go through the VeraCrypt/LUKS unlock path —
+    // no PIM, keyfiles, or cipher/hash, and a different native handler
+    // (UNLOCK_CRYPTOMATOR_VAULT, not UNLOCK_CONTAINER). Previously this
+    // always fell through to unlockContainer()/unlockUsbContainer() below,
+    // which tried to open the vault's SAF tree Uri as a VeraCrypt file
+    // descriptor and always failed with "Incorrect credentials".
+    if (_isCryptomator) {
+      try {
+        final result = await vaultExplorerApi.unlockCryptomatorVault(
+          widget.uri,
+          _pwCtrl.text,
+          displayName: '',
+          documentProvider: widget.documentProvider,
+        );
+        if (result == null) {
+          if (mounted) setState(() { _loading = false; _error = 'Incorrect password'; });
+          return;
+        }
+        await vaultExplorerApi.lockContainer(widget.uri);
+        if (mounted) {
+          Navigator.pop(context, (
+            password: _pwCtrl.text,
+            cipherId: 255,
+            hashId: 255,
+          ));
+        }
+      } catch (e) {
+        final isCancelled = e is PlatformException && e.code == 'CANCELLED';
+        if (mounted && !isCancelled) {
+          setState(() { _loading = false; _error = 'Verification failed'; });
+        }
+      }
+      return;
+    }
+
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final keyfilePaths = _keyfiles.map((k) => k.uri).toList();
@@ -1189,30 +1251,32 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
               ),
               onSubmitted: (_) => _verify(),
             ),
-            const SizedBox(height: 16),
+            if (!_isCryptomator) ...[
+              const SizedBox(height: 16),
 
-            KeyfilesPicker(
-              keyfiles: _keyfiles,
-              picking: _pickingKeyfiles,
-              onPick: _pickKeyfiles,
-              onRemove: _removeKeyfile,
-            ),
-            const SizedBox(height: 16),
+              KeyfilesPicker(
+                keyfiles: _keyfiles,
+                picking: _pickingKeyfiles,
+                onPick: _pickKeyfiles,
+                onRemove: _removeKeyfile,
+              ),
+              const SizedBox(height: 16),
 
-            TextField(
-              controller: _pimCtrl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: 'PIM (optional)',
-                prefixIcon: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
-                filled: true,
-                fillColor: cs.surfaceContainerLow,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: cs.outlineVariant),
+              TextField(
+                controller: _pimCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'PIM (optional)',
+                  prefixIcon: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
+                  filled: true,
+                  fillColor: cs.surfaceContainerLow,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: cs.outlineVariant),
+                  ),
                 ),
               ),
-            ),
+            ],
             if (_error != null) ...[
               const SizedBox(height: 12),
               Text(

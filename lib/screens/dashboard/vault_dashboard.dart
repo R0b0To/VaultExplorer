@@ -495,6 +495,16 @@ void _showUsbCreateSheet() {
   void _showContainerConfig({required String uri, required String currentLabel}) {
     HapticFeedback.mediumImpact();
     final existing = _records[uri];
+    // So ContainerConfigScreen can tell a Cryptomator vault apart from a
+    // VeraCrypt/LUKS one even the first time its settings are opened,
+    // before any ContainerRecord has been saved for it.
+    MountedContainer? mountedContainer;
+    for (final m in _mounted) {
+      if (m.uri == uri) {
+        mountedContainer = m;
+        break;
+      }
+    }
     Navigator.push(
       context,
       SlideRightRoute(
@@ -503,6 +513,7 @@ void _showUsbCreateSheet() {
           currentLabel: currentLabel,
           existingRecord: existing,
           appSettings: _appSettings,
+          mountedContainer: mountedContainer,
           onSaved: (record) async {
             if (mounted) setState(() => _records[uri] = record);
             final idx = _mounted.indexWhere((m) => m.uri == uri);

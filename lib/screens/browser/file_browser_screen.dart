@@ -1587,7 +1587,7 @@ MenuItemButton(
     final cs = Theme.of(context).colorScheme;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final actionBuilders = _buildActionBuilders();
-    final showActionBar = !isSelectionMode && !_searchActive;
+    final showActionBar = !_searchActive;
 
     return PopScope(
       canPop: false,
@@ -1691,6 +1691,9 @@ MenuItemButton(
   ) {
     final allItems = [...dirs, ...files];
     final cs = Theme.of(context).colorScheme;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final showActionBar = !_searchActive;
+    final actionBuilders = _buildActionBuilders();
 
     if (isSelectionMode) {
       final single = selectedItems.length == 1;
@@ -1704,71 +1707,205 @@ MenuItemButton(
                 : 'calculating…')
           : formatBytes(totalBytes);
 
-      return SelectionAppBar(
-        selectedCount: selectedItems.length,
-        selectionLabel: sizeLabel,
-        singleSelected: single,
-        singleFileSelected: singleFile,
-        readOnly: _isReadOnly,
-        onClose: exitSelectionMode,
-        onSelectAll: () => setState(() => selectedItems.addAll(allItems)),
-        onRename: () {
-          final entries = selectedItems.map((raw) => RawEntry.parse(raw)).toList();
+      void doRename() {
+        final entries = selectedItems.map((raw) => RawEntry.parse(raw)).toList();
 
-          for (final entry in entries) {
-            final parts = entry.name.split('.');
-            final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
-            if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-               _setStatus('Edit secure items to rename them');
-               exitSelectionMode();
-               return;
-            }
-          }
-
-          final oldNames = entries.map((e) => e.name).toList();
-          final existingNames = allItems.map((raw) => RawEntry.parse(raw).name).toSet();
-
-          BrowserDialogs.showRename(
-            context,
-            container: widget.container,
-            oldNames: oldNames,
-            existingNamesInDir: existingNames,
-            currentDirPath: _currentDirPath,
-            onSuccess: () => _loadDirectoryContents(_currentDirPath),
-            readOnly: _isReadOnly,
-          );
-          exitSelectionMode();
-        },
-        onCopy: () => _initClipboard(cut: false),
-        onCut: () => _initClipboard(cut: true),
-        onExport: _exportSelectedToStorage,
-        onDelete: _batchDelete,
-        onOpenWithApp: () async {
-          final raw = selectedItems.first;
-          final entry = RawEntry.parse(raw);
-          final path = _currentDirPath.isEmpty
-              ? entry.name
-              : '$_currentDirPath/${entry.name}';
+        for (final entry in entries) {
           final parts = entry.name.split('.');
           final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
-          exitSelectionMode();
-
           if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-             _setStatus('Vault items cannot be opened in external apps', error: true);
+             _setStatus('Edit secure items to rename them');
+             exitSelectionMode();
              return;
           }
+        }
 
-          final settings = await AppSettingsService.loadSettings();
-          if (mounted) {
-            await _showOpenWithDialog(entry.name, path, ext, settings);
-          }
-        },
+        final oldNames = entries.map((e) => e.name).toList();
+        final existingNames = allItems.map((raw) => RawEntry.parse(raw).name).toSet();
+
+        BrowserDialogs.showRename(
+          context,
+          container: widget.container,
+          oldNames: oldNames,
+          existingNamesInDir: existingNames,
+          currentDirPath: _currentDirPath,
+          onSuccess: () => _loadDirectoryContents(_currentDirPath),
+          readOnly: _isReadOnly,
+        );
+        exitSelectionMode();
+      }
+
+      Future<void> doOpenWithApp() async {
+        final raw = selectedItems.first;
+        final entry = RawEntry.parse(raw);
+        final path = _currentDirPath.isEmpty
+            ? entry.name
+            : '$_currentDirPath/${entry.name}';
+        final parts = entry.name.split('.');
+        final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
+        exitSelectionMode();
+
+        if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
+           _setStatus('Vault items cannot be opened in external apps', error: true);
+           return;
+        }
+
+        final settings = await AppSettingsService.loadSettings();
+        if (mounted) {
+          await _showOpenWithDialog(entry.name, path, ext, settings);
+        }
+      }
+
+      if (!isLandscape) {
+        return SelectionAppBar(
+          selectedCount: selectedItems.length,
+          selectionLabel: sizeLabel,
+          singleSelected: single,
+          singleFileSelected: singleFile,
+          readOnly: _isReadOnly,
+          onClose: exitSelectionMode,
+          onSelectAll: () => setState(() => selectedItems.addAll(allItems)),
+          onRename: doRename,
+          onCopy: () => _initClipboard(cut: false),
+          onCut: () => _initClipboard(cut: true),
+          onExport: _exportSelectedToStorage,
+          onDelete: _batchDelete,
+          onOpenWithApp: doOpenWithApp,
+        );
+      }
+
+      // Landscape: one AppBar split into two zones — selection operations
+      // on the left, the regular toolbar actions on the right — instead of
+      // swapping in a full-width SelectionAppBar that would otherwise
+      // cover/replace the toolbar rail entirely.
+      final textTheme = Theme.of(context).textTheme;
+
+      return AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded),
+          tooltip: 'Clear selection',
+          onPressed: exitSelectionMode,
+        ),
+        titleSpacing: 0,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(AppRadius.full),
+              ),
+              child: Text(
+                '${selectedItems.length}',
+                style: textTheme.labelLarge?.copyWith(
+                  color: cs.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                sizeLabel,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleSmall,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          // ── Left zone: selection operations ──────────────────────────
+          IconButton(
+            icon: Icon(
+              Icons.delete_outline_rounded,
+              color: _isReadOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
+            ),
+            tooltip: _isReadOnly ? 'Read-only — can\'t delete' : 'Delete',
+            onPressed: _batchDelete,
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy_rounded),
+            tooltip: 'Copy',
+            onPressed: () => _initClipboard(cut: false),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.cut_rounded,
+              color: _isReadOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
+            ),
+            tooltip: _isReadOnly ? 'Read-only — can\'t move' : 'Move',
+            onPressed: () => _initClipboard(cut: true),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.drive_file_rename_outline_rounded,
+              color: _isReadOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
+            ),
+            tooltip: _isReadOnly ? 'Read-only — can\'t rename' : 'Rename',
+            onPressed: doRename,
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded),
+            tooltip: 'More options',
+            onSelected: (value) {
+              if (value == 'export') _exportSelectedToStorage();
+              if (value == 'open_with_app') doOpenWithApp();
+              if (value == 'select_all') {
+                setState(() => selectedItems.addAll(allItems));
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem<String>(
+                value: 'select_all',
+                child: Text('Select All'),
+              ),
+              PopupMenuItem<String>(
+                value: 'export',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.drive_folder_upload_rounded,
+                      color: cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('Export to device'),
+                  ],
+                ),
+              ),
+              if (singleFile)
+                PopupMenuItem<String>(
+                  value: 'open_with_app',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.open_in_new_rounded,
+                        color: cs.onSurfaceVariant,
+                        size: AppIconSize.small,
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Open with App'),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+
+          // ── Divider between the two zones ────────────────────────────
+          const SizedBox(width: 8),
+          VerticalDivider(width: 1, indent: 12, endIndent: 12, color: cs.outlineVariant),
+          const SizedBox(width: 4),
+
+          // ── Right zone: regular toolbar actions ──────────────────────
+          if (showActionBar)
+            ..._toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
+
+          const SizedBox(width: 4),
+        ],
       );
     }
 
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final showActionBar = !isSelectionMode && !_searchActive;
-    final actionBuilders = _buildActionBuilders();
     final query = _searchQuery.trim().toLowerCase();
     final isFiltered = query.isNotEmpty || _currentFilter != null;
 

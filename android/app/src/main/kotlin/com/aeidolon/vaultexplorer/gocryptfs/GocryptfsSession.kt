@@ -276,49 +276,53 @@ fun getFolderSize(virtualPath: String): Long {
     // ---- file content read/write ----------------------------------------------
 
     /** Decrypts and returns [length] bytes starting at [offset], or null on error/missing file. */
-    fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
-        val normalized = normalize(virtualPath)
-        return try {
-            val node = tree.resolve(normalized) as? GocryptfsNode.VFile ?: return null
-            readRange(node.physicalFile, offset, length, normalized)
-        } catch (e: Exception) {
-            openReads.remove(normalized)
-            null
+fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
+    val normalized = normalize(virtualPath)
+    return try {
+        val physicalFileProvider = {
+            (tree.resolve(normalized) as? GocryptfsNode.VFile)?.physicalFile
+                ?: throw GocryptfsPathNotFoundException(normalized)
         }
+        readRange(physicalFileProvider, offset, length, normalized)
+    } catch (e: Exception) {
+        openReads.remove(normalized)
+        null
     }
+}
 
-    private fun readRange(physicalFile: DocumentFile, offset: Long, length: Int, normalizedPath: String): ByteArray? {
-        val chunkSize = GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE
-        val cipherChunkSize = GocryptfsContentCryptor.CIPHERTEXT_CHUNK_SIZE
-        val headerSize = GocryptfsContentCryptor.HEADER_LEN
-        
-        var handle = openReads.get(normalizedPath)
-        
-        if (handle == null) {
-            var pfd: android.os.ParcelFileDescriptor? = null
-            var stream: java.io.InputStream? = null
-            try {
-                pfd = context.contentResolver.openFileDescriptor(physicalFile.uri, "r")
-                if (pfd != null) {
-                    stream = java.io.FileInputStream(pfd.fileDescriptor)
-                }
-            } catch (e: Exception) { }
+    private fun readRange(resolvePhysicalFile: () -> DocumentFile, offset: Long, length: Int, normalizedPath: String): ByteArray? {
+    val chunkSize = GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE
+    val cipherChunkSize = GocryptfsContentCryptor.CIPHERTEXT_CHUNK_SIZE
+    val headerSize = GocryptfsContentCryptor.HEADER_LEN
 
-            if (stream == null) {
-                stream = context.contentResolver.openInputStream(physicalFile.uri)
+    var handle = openReads.get(normalizedPath)
+
+    if (handle == null) {
+        val physicalFile = resolvePhysicalFile()
+        var pfd: android.os.ParcelFileDescriptor? = null
+        var stream: java.io.InputStream? = null
+        try {
+            pfd = context.contentResolver.openFileDescriptor(physicalFile.uri, "r")
+            if (pfd != null) {
+                stream = java.io.FileInputStream(pfd.fileDescriptor)
             }
-            if (stream == null) return null
+        } catch (e: Exception) { }
 
-            val headerBytes = ByteArray(headerSize)
-            if (readFully(stream, headerBytes) < headerSize) {
-                try { stream.close() } catch (_: Exception) {}
-                try { pfd?.close() } catch (_: Exception) {}
-                return ByteArray(0)
-            }
-            val header = contentCryptor.decodeHeader(headerBytes)
-            handle = ReadHandle(pfd, stream, header, headerSize.toLong())
-            openReads.put(normalizedPath, handle)
+        if (stream == null) {
+            stream = context.contentResolver.openInputStream(physicalFile.uri)
         }
+        if (stream == null) return null
+
+        val headerBytes = ByteArray(headerSize)
+        if (readFully(stream, headerBytes) < headerSize) {
+            try { stream.close() } catch (_: Exception) {}
+            try { pfd?.close() } catch (_: Exception) {}
+            return ByteArray(0)
+        }
+        val header = contentCryptor.decodeHeader(headerBytes)
+        handle = ReadHandle(pfd, stream, header, headerSize.toLong())
+        openReads.put(normalizedPath, handle)
+    }
 
         val startChunk = offset / chunkSize
         val endOffsetExclusive = offset + length
@@ -350,10 +354,10 @@ fun getFolderSize(virtualPath: String): Long {
                         } catch (e: Exception) {}
                     }
                     if (!positioned) {
-                        if (handle!!.currentPos > desiredPos) {
-                            openReads.remove(normalizedPath)
-                            return readRange(physicalFile, offset, length, normalizedPath)
-                        } else {
+                    if (handle!!.currentPos > desiredPos) {
+                        openReads.remove(normalizedPath)
+                        return readRange(resolvePhysicalFile, offset, length, normalizedPath)  // was: physicalFile
+                    } else {
                             var remaining = desiredPos - handle!!.currentPos
                             val skipBuf = ByteArray(64 * 1024)
                             while (remaining > 0L) {

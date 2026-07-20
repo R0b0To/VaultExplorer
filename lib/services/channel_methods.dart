@@ -26,6 +26,10 @@ abstract final class ChannelMethods {
   /// VeraCrypt/LUKS volIds.
   static const finishWriteIfCryptomator = 'finishWriteIfCryptomator';
 
+  static const pickGocryptfsVault = 'pickGocryptfsVault';
+  static const unlockGocryptfsVault = 'unlockGocryptfsVault';
+  static const createGocryptfsVault = 'createGocryptfsVault';
+
   // ── File I/O ─────────────────────────────────────────────────────────────
   static const decryptFile = 'decryptFile';
   static const exportFileToStorage = 'exportFileToStorage';

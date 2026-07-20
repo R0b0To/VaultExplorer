@@ -502,6 +502,71 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     }
   }
 
+  /// Opens a folder picker (ACTION_OPEN_DOCUMENT_TREE) for selecting a
+  /// Gocryptfs vault — vaults are directory trees (gocryptfs.conf +
+  /// gocryptfs.diriv), not single files, so this is distinct from
+  /// [pickContainer]. [looksLikeVault] is a quick heuristic the caller can
+  /// use to warn the user immediately if they picked an unrelated folder,
+  /// before asking for a password.
+  Future<({String uri, String displayName, bool looksLikeVault})?> pickGocryptfsVault() async {
+    final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+      ChannelMethods.pickGocryptfsVault,
+    );
+    if (raw == null) return null;
+    return (
+      uri: raw['uri'] as String,
+      displayName: raw['displayName'] as String,
+      looksLikeVault: raw['looksLikeVault'] as bool? ?? false,
+    );
+  }
+
+  /// Unlocks a Gocryptfs vault. Result shape matches [unlockContainer]
+  /// exactly (containerFormat: 'gocryptfs') so callers can treat the two
+  /// uniformly once unlocked. matchedCipherId/matchedHashId are always 255
+  /// (not applicable — Gocryptfs's cipher suite is fixed per vault format,
+  /// not user-selectable).
+  Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockGocryptfsVault(
+    String filePath,
+    String password, {
+    String? displayName,
+    bool documentProvider = false,
+    bool readOnly = false,
+  }) async {
+    final raw = await _channel
+        .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockGocryptfsVault, {
+          'filePath': filePath,
+          'password': password,
+          'displayName': displayName,
+          'documentProvider': documentProvider,
+          'readOnly': readOnly,
+        });
+    if (raw == null) return null;
+    final files = (raw['files'] as List<Object?>).cast<String>();
+    return (
+      volId: raw['volId'] as int,
+      files: files,
+      matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
+      matchedHashId: raw['matchedHashId'] as int? ?? 255,
+      containerFormat: raw['containerFormat'] as String? ?? 'gocryptfs',
+    );
+  }
+
+  /// Creates a new Gocryptfs vault in an empty folder the user already
+  /// granted tree access to via [pickGocryptfsVault]. The vault is left
+  /// locked afterward — the caller should unlock it explicitly via
+  /// [unlockGocryptfsVault].
+  Future<bool> createGocryptfsVault(String folderUri, String password) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.createGocryptfsVault,
+        {'filePath': folderUri, 'password': password},
+      );
+      return success ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Must be called once after the final [writeFileChunk] call in a
   /// sequence for a given [fileName], to flush Cryptomator's buffered final
   /// (possibly partial) chunk and materialize the file. Safe to call

@@ -53,6 +53,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
   /// apply to LUKS.
   bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
   bool get _isCryptomator => _containerFormat == 'cryptomator';
+  bool get _isGocryptfs => _containerFormat == 'gocryptfs';
 
   // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
@@ -178,9 +179,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
     final oldUri = widget.initialUri;
     if (oldUri == null) return;
     try {
-      // FIX: Cryptomator vaults are folders, picked via
-      // ACTION_OPEN_DOCUMENT_TREE (pickCryptomatorVault) — the plain
-      // single-file picker can't select a vault folder at all.
       String newUri;
       String newDisplayName;
       if (_containerFormat == 'cryptomator') {
@@ -188,6 +186,15 @@ class _UnlockSheetState extends State<UnlockSheet> {
         if (picked == null || !mounted) return;
         if (!picked.looksLikeVault) {
           setState(() => _error = 'No masterkey.cryptomator found in that folder.');
+          return;
+        }
+        newUri = picked.uri;
+        newDisplayName = picked.displayName;
+      } else if (_containerFormat == 'gocryptfs') {
+        final picked = await vaultExplorerApi.pickGocryptfsVault();
+        if (picked == null || !mounted) return;
+        if (!picked.looksLikeVault) {
+          setState(() => _error = 'No gocryptfs.conf found in that folder.');
           return;
         }
         newUri = picked.uri;
@@ -351,12 +358,12 @@ class _UnlockSheetState extends State<UnlockSheet> {
     }
   }
 
-Future<void> _pickFile() async {
+  Future<void> _pickFile() async {
     if (widget.initialUri != null) return;
     
     try {
-      // 1. --- NEW CRYPTOMATOR LOGIC ---
-      if (_containerFormat == 'cryptomator') {
+      // 1. --- CRYPTOMATOR LOGIC ---
+      if (_isCryptomator) {
         final result = await vaultExplorerApi.pickCryptomatorVault();
         if (result == null) return;
         
@@ -383,10 +390,41 @@ Future<void> _pickFile() async {
           _selectedName = result.displayName; 
           _error = null; 
         });
-        return; // Exit early since we handled Cryptomator
+        return;
       }
 
-      // 2. --- EXISTING CONTAINER LOGIC ---
+      // 2. --- GOCRYPTFS LOGIC ---
+      if (_isGocryptfs) {
+        final result = await vaultExplorerApi.pickGocryptfsVault();
+        if (result == null) return;
+        
+        if (widget.mountedUris.contains(result.uri)) {
+          setState(() {
+            _error = 'This container is already mounted.';
+            _selectedUri = null;
+            _selectedName = null;
+          });
+          return;
+        }
+        
+        if (!result.looksLikeVault) {
+          setState(() {
+            _error = 'No gocryptfs.conf found in that folder.';
+            _selectedUri = null;
+            _selectedName = null;
+          });
+          return;
+        }
+        
+        setState(() { 
+          _selectedUri = result.uri; 
+          _selectedName = result.displayName; 
+          _error = null; 
+        });
+        return;
+      }
+
+      // 3. --- EXISTING VERACRYPT/LUKS CONTAINER LOGIC ---
       final result = await vaultExplorerApi.pickContainer();
       if (result != null) {
         // Prevent selection of already mounted files
@@ -444,8 +482,8 @@ Future<void> _pickFile() async {
       return;
     }
 
-    // 1. --- NEW CRYPTOMATOR LOGIC ---
-    if (_isCryptomator) {
+    // 1. --- CRYPTOMATOR & GOCRYPTFS LOGIC ---
+    if (_isCryptomator || _isGocryptfs) {
       setState(() {
         _loading = true;
         _error = null;
@@ -453,13 +491,21 @@ Future<void> _pickFile() async {
       
       try {
         final name = _selectedName ?? 'Vault';
-        final result = await vaultExplorerApi.unlockCryptomatorVault(
-          _selectedUri!,
-          effectivePassword,
-          displayName: name,
-          documentProvider: widget.documentProvider,
-          readOnly: _readOnly,
-        );
+        final result = _isCryptomator
+            ? await vaultExplorerApi.unlockCryptomatorVault(
+                _selectedUri!,
+                effectivePassword,
+                displayName: name,
+                documentProvider: widget.documentProvider,
+                readOnly: _readOnly,
+              )
+            : await vaultExplorerApi.unlockGocryptfsVault(
+                _selectedUri!,
+                effectivePassword,
+                displayName: name,
+                documentProvider: widget.documentProvider,
+                readOnly: _readOnly,
+              );
         
         if (result == null) {
           setState(() => _error = 'Incorrect password or invalid vault');
@@ -473,7 +519,7 @@ Future<void> _pickFile() async {
             label: name,
             rememberPassword: false, // Added to match your standard ContainerRecord schema
             readOnly: _readOnly,
-            containerFormat: 'cryptomator',
+            containerFormat: result.containerFormat,
           );
           await ContainerRepository.instance.save(savedRecord);
         } else if (widget.initialUri != null) {
@@ -491,7 +537,7 @@ Future<void> _pickFile() async {
             totalSpace: -1,
             freeSpace: -1,
             readOnly: _readOnly,
-            containerFormat: 'cryptomator',
+            containerFormat: result.containerFormat,
           ),
           record: savedRecord,
         );
@@ -507,7 +553,7 @@ Future<void> _pickFile() async {
       } finally {
         if (mounted) setState(() => _loading = false);
       }
-      return; // Exit early since we handled Cryptomator
+      return; // Exit early since we handled Vaults
     }
 
     // 2. --- EXISTING VERACRYPT/LUKS LOGIC ---
@@ -766,8 +812,13 @@ Future<void> _pickFile() async {
                         label: Text('Cryptomator Vault'),
                         icon: Icon(Icons.folder_shared_rounded),
                       ),
+                      ButtonSegment(
+                        value: 'gocryptfs',
+                        label: Text('Gocryptfs Vault'),
+                        icon: Icon(Icons.enhanced_encryption_rounded),
+                      ),
                     ],
-                    selected: {_isCryptomator ? 'cryptomator' : 'veracrypt'},
+                    selected: {_containerFormat},
                     onSelectionChanged: _loading
                         ? null
                         : (sel) => setState(() {
@@ -812,7 +863,9 @@ Future<void> _pickFile() async {
                             child: Icon(
                               _isCryptomator
                                   ? Icons.folder_shared_rounded
-                                  : Icons.folder_zip_rounded,
+                                  : _isGocryptfs
+                                      ? Icons.enhanced_encryption_rounded
+                                      : Icons.folder_zip_rounded,
                               size: 24,
                               color: _selectedUri != null
                                   ? cs.onPrimaryContainer
@@ -830,10 +883,14 @@ Future<void> _pickFile() async {
                                           ? 'LUKS Container'
                                           : _isCryptomator
                                               ? 'Cryptomator Vault'
-                                              : 'Selected Container')
+                                              : _isGocryptfs
+                                                  ? 'Gocryptfs Vault'
+                                                  : 'Selected Container')
                                       : (_isCryptomator
                                           ? 'Cryptomator Vault'
-                                          : 'Encrypted Container'),
+                                          : _isGocryptfs
+                                              ? 'Gocryptfs Vault'
+                                              : 'Encrypted Container'),
                                   style: textTheme.labelLarge?.copyWith(
                                     color: _selectedUri != null
                                         ? cs.primary
@@ -844,7 +901,7 @@ Future<void> _pickFile() async {
                                 const SizedBox(height: 2),
                                 Text(
                                   _selectedName ??
-                                      (_isCryptomator
+                                      (_isCryptomator || _isGocryptfs
                                           ? 'Tap to select vault folder…'
                                           : 'Tap to select container file…'),
                                   style: textTheme.bodyMedium?.copyWith(
@@ -1160,7 +1217,7 @@ Future<void> _pickFile() async {
                           autofillHints: const [AutofillHints.password],
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            hintText: _isCryptomator ? 'Enter vault password' : 'Enter container password',
+                            hintText: (_isCryptomator || _isGocryptfs) ? 'Enter vault password' : 'Enter container password',
                             prefixIcon: Icon(Icons.lock_outline_rounded, size: 22, color: cs.primary),
                             suffixIcon: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1188,8 +1245,8 @@ Future<void> _pickFile() async {
                         ),
                         const SizedBox(height: 16),
 
-                        // 2. Keyfiles Selection Box (Gated: hidden for Cryptomator)
-                        if (!_isCryptomator) ...[
+                        // 2. Keyfiles Selection Box (Gated: hidden for Cryptomator/Gocryptfs)
+                        if (!_isCryptomator && !_isGocryptfs) ...[
                           KeyfilesPicker(
                             keyfiles: _keyfiles,
                             picking: _pickingKeyfiles,
@@ -1209,8 +1266,8 @@ Future<void> _pickFile() async {
                           const SizedBox(height: 16),
                         ],
 
-                        // 3. Collapsible Advanced parameters (Gated: hidden for LUKS & Cryptomator)
-                        if (!_isLuks && !_isCryptomator) ...[
+                        // 3. Collapsible Advanced parameters (Gated: hidden for LUKS & Vaults)
+                        if (!_isLuks && !_isCryptomator && !_isGocryptfs) ...[
                           AdvancedParamsPanel(
                             pimController: _pimCtrl,
                             cipherId: _cipherId,
@@ -1292,7 +1349,7 @@ Future<void> _pickFile() async {
                             ],
                           )
                         : Text(
-                            _isCryptomator ? 'Unlock Vault' : 'Unlock Container',
+                            (_isCryptomator || _isGocryptfs) ? 'Unlock Vault' : 'Unlock Container',
                             style: textTheme.titleMedium?.copyWith(
                               color: cs.onPrimary,
                               fontWeight: FontWeight.bold,

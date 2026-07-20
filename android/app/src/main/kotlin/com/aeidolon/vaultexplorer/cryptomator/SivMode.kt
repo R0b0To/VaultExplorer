@@ -1,11 +1,13 @@
 package com.aeidolon.vaultexplorer.cryptomator
 
+
 import java.security.GeneralSecurityException
 import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.Mac
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import com.aeidolon.vaultexplorer.crypto.gf128Double
 
 /**
  * AES-SIV (RFC 5297) — deterministic authenticated encryption used by
@@ -90,20 +92,7 @@ class SivMode {
     }
 
     /** Doubling in GF(2^128) with the standard reduction polynomial (RFC 5297 §2.3). */
-    private fun dbl(block: ByteArray): ByteArray {
-        require(block.size == 16)
-        val result = ByteArray(16)
-        var carry = 0
-        for (i in 15 downTo 0) {
-            val b = block[i].toInt() and 0xFF
-            result[i] = ((b shl 1) or carry).toByte()
-            carry = (b shr 7) and 1
-        }
-        if ((block[0].toInt() and 0x80) != 0) {
-            result[15] = (result[15].toInt() xor 0x87).toByte()
-        }
-        return result
-    }
+    private fun dbl(block: ByteArray): ByteArray = gf128Double(block)
 
     private fun xor(a: ByteArray, b: ByteArray): ByteArray {
         require(a.size == b.size)

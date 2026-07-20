@@ -595,7 +595,7 @@ override fun onRelease() {
     flushWriteCache()
     if (isWrite) {
         ContainerFileSystem.withLock(volId) {
-            ContainerEngine.finishWriteIfCryptomator(fatPath, volId)
+            ContainerEngine.finishWrite(fatPath, volId)
         }
     }
     ContainerFileSystem.withLock(volId) {

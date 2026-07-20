@@ -53,7 +53,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   late bool _settingsLocked;
   bool _changePassword = false;
 
-  /// Cryptomator vaults have no cipher/hash selection, no derived-key
+  /// Cryptomator & Gocryptfs vaults have no cipher/hash selection, no derived-key
   /// caching, and no in-app password-change flow — several sections below
   /// key off this to hide those VeraCrypt/LUKS-only controls.
   String get _containerFormat =>
@@ -61,6 +61,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
       widget.mountedContainer?.containerFormat ??
       'veracrypt';
   bool get _isCryptomator => _containerFormat == 'cryptomator';
+  bool get _isGocryptfs => _containerFormat == 'gocryptfs';
 
   bool _saving = false;
   bool _loadingPassword = true;
@@ -290,10 +291,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
           : null,
       cipherId: _cipherId,
       hashId: _hashId,
-      // FIX: containerFormat was never carried over here, so every save
-      // silently reset it to ContainerRecord's 'veracrypt' default — that
-      // then breaks the unlock path the next time a Cryptomator (or LUKS)
-      // container is opened from the dashboard.
       containerFormat: _containerFormat,
     );
     await ContainerRepository.instance.save(record);
@@ -600,7 +597,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                       ),
                     ],
 
-                    if (!_isCryptomator) ...[
+                    if (!_isCryptomator && !_isGocryptfs) ...[
                       const SizedBox(height: 16),
                       SwitchListTile(
                         title: Text('Cache Derived Key', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
@@ -636,20 +633,26 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                               message: 'Cryptomator vault passwords cannot be changed in-app.',
                               tone: AppBannerTone.warning,
                             );
+                          } else if (fmt == 'gocryptfs') {
+                            showAppSnackBar(
+                              context,
+                              message: 'Gocryptfs vault passwords cannot be changed in-app.',
+                              tone: AppBannerTone.warning,
+                            );
                           } else {
                             Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ChangePasswordScreen(
-            uri: widget.uri,
-            initialCipherId: widget.existingRecord!.cipherId,
-            initialHashId: widget.existingRecord!.hashId,
-          ),
-        ),
-      );
-    }
-  },
-  icon: const Icon(Icons.password_rounded),
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ChangePasswordScreen(
+                                  uri: widget.uri,
+                                  initialCipherId: widget.existingRecord!.cipherId,
+                                  initialHashId: widget.existingRecord!.hashId,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.password_rounded),
                         label: const Text('Change Container Password'),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 44),
@@ -1069,6 +1072,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
   bool get _isUsb => widget.uri.startsWith('usb:');
   String get _usbDeviceName => widget.uri.substring(4);
   bool get _isCryptomator => widget.containerFormat == 'cryptomator';
+  bool get _isGocryptfs => widget.containerFormat == 'gocryptfs';
 
   int? _activeVolId;
   late final void Function(int) _onUnlockStarted;
@@ -1123,20 +1127,25 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
     }
     setState(() { _loading = true; _error = null; });
 
-    // Cryptomator vaults don't go through the VeraCrypt/LUKS unlock path —
-    // no PIM, keyfiles, or cipher/hash, and a different native handler
-    // (UNLOCK_CRYPTOMATOR_VAULT, not UNLOCK_CONTAINER). Previously this
-    // always fell through to unlockContainer()/unlockUsbContainer() below,
-    // which tried to open the vault's SAF tree Uri as a VeraCrypt file
-    // descriptor and always failed with "Incorrect credentials".
-    if (_isCryptomator) {
+    // Cryptomator and Gocryptfs vaults don't go through the VeraCrypt/LUKS
+    // unlock path — no PIM, keyfiles, or cipher/hash, and a different native
+    // handler (e.g. UNLOCK_CRYPTOMATOR_VAULT, not UNLOCK_CONTAINER).
+    if (_isCryptomator || _isGocryptfs) {
       try {
-        final result = await vaultExplorerApi.unlockCryptomatorVault(
-          widget.uri,
-          _pwCtrl.text,
-          displayName: '',
-          documentProvider: widget.documentProvider,
-        );
+        final result = _isCryptomator
+            ? await vaultExplorerApi.unlockCryptomatorVault(
+                widget.uri,
+                _pwCtrl.text,
+                displayName: '',
+                documentProvider: widget.documentProvider,
+              )
+            : await vaultExplorerApi.unlockGocryptfsVault(
+                widget.uri,
+                _pwCtrl.text,
+                displayName: '',
+                documentProvider: widget.documentProvider,
+              );
+        
         if (result == null) {
           if (mounted) setState(() { _loading = false; _error = 'Incorrect password'; });
           return;
@@ -1251,7 +1260,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
               ),
               onSubmitted: (_) => _verify(),
             ),
-            if (!_isCryptomator) ...[
+            if (!_isCryptomator && !_isGocryptfs) ...[
               const SizedBox(height: 16),
 
               KeyfilesPicker(

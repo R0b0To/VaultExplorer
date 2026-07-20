@@ -91,6 +91,7 @@ private object ChannelMethods {
     const val UNLOCK_GOCRYPTFS_VAULT = "unlockGocryptfsVault"
     const val CREATE_GOCRYPTFS_VAULT = "createGocryptfsVault"
     const val FINISH_WRITE_IF_CRYPTOMATOR = "finishWriteIfCryptomator"
+    const val IS_GOCRYPTFS_VAULT = "isGocryptfsVault"
 }
 
 private const val MAX_CHUNK_BYTES = 64 * 1024 * 1024  // 64 MB
@@ -996,20 +997,12 @@ class MainActivity : FlutterFragmentActivity() {
                 }
 
                 ChannelMethods.PICK_CRYPTOMATOR_VAULT -> {
-                    // Cryptomator vaults are folders (vault.cryptomator +
-                    // masterkey.cryptomator + d/ living side by side), not a
-                    // single file — ACTION_OPEN_DOCUMENT_TREE grants access to
-                    // the whole subtree, same as the existing import/export
-                    // folder pickers use.
                     pendingResultCheck(result)
                     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
                     pickCryptomatorVaultLauncher.launch(intent)
                 }
 
                 ChannelMethods.PICK_GOCRYPTFS_VAULT -> {
-                    // Gocryptfs vaults are folders (gocryptfs.conf + gocryptfs.diriv
-                    // living side by side), not a single file — ACTION_OPEN_DOCUMENT_TREE
-                    // grants access to the whole subtree.
                     pendingResultCheck(result)
                     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
                     pickGocryptfsVaultLauncher.launch(intent)
@@ -1264,9 +1257,6 @@ class MainActivity : FlutterFragmentActivity() {
                                         "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
                                         "containerFormat" to fmt
                                     ))
-                                    // Quick-unlock cache write: Keystore binder calls + a disk
-                                    // write. Not needed to declare the container unlocked --
-                                    // do it after the user already has control, off the UI thread.
                                     if (cacheDerivedKey && preservedKey == null) {
                                         val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
                                         if (derived != null) {
@@ -1446,10 +1436,6 @@ class MainActivity : FlutterFragmentActivity() {
                             runOnUiThread {
                                 when (createResult) {
                                     is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.Success -> {
-                                        // Vault created but intentionally left locked (matching
-                                        // CREATE_CONTAINER's behavior for VeraCrypt/LUKS) —
-                                        // the user unlocks it explicitly afterward via the
-                                        // normal unlock flow.
                                         createResult.session.close()
                                         result.success(true)
                                     }
@@ -1496,6 +1482,23 @@ class MainActivity : FlutterFragmentActivity() {
                         } catch (e: Exception) {
                             runOnUiThread { dispatchNativeError(e, result) }
                         }
+                    }
+                }
+
+                ChannelMethods.IS_GOCRYPTFS_VAULT -> {
+                    val uriString = call.argument<String>("uri")
+                    if (uriString == null) {
+                        result.error("INVALID_ARGS", "uri is required", null)
+                        return@setMethodCallHandler
+                    }
+                    ioExecutor.execute {
+                        val isVault = try {
+                            val uri = Uri.parse(uriString)
+                            com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.looksLikeVault(this@MainActivity, uri)
+                        } catch (_: Exception) {
+                            false
+                        }
+                        runOnUiThread { result.success(isVault) }
                     }
                 }
 
@@ -1604,13 +1607,6 @@ class MainActivity : FlutterFragmentActivity() {
                         val exists = try {
                             val uri = Uri.parse(filePath)
                             if (filePath.startsWith("content://")) {
-                                // Cryptomator vaults are picked via
-                                // ACTION_OPEN_DOCUMENT_TREE and stored as tree
-                                // Uris (see pickCryptomatorVaultLauncher).
-                                // fromSingleUri() misreads a tree Uri as a
-                                // single-document Uri and its exists() check
-                                // always comes back false, wrongly marking a
-                                // perfectly-reachable vault as "missing".
                                 if (DocumentsContract.isTreeUri(uri)) {
                                     DocumentFile.fromTreeUri(this, uri)?.exists() == true
                                 } else {
@@ -1627,11 +1623,6 @@ class MainActivity : FlutterFragmentActivity() {
                 }
 
                 ChannelMethods.WARM_CONTAINER -> {
-                    // Best-effort speculative warm-up: open read-only, read a
-                    // small prefix, close immediately. No fd is retained, so
-                    // there's nothing to clean up if the user cancels.
-                    // Deliberately doesn't wait for the read to finish before
-                    // responding -- this is fire-and-forget from Dart's side.
                     val filePath = call.argument<String>("filePath")
                     if (filePath != null) {
                         ioExecutor.execute {
@@ -1644,8 +1635,6 @@ class MainActivity : FlutterFragmentActivity() {
                                     }
                                 }
                             } catch (_: Exception) {
-                                // Best-effort only -- the real unlockContainer call
-                                // will surface any actual problem.
                             }
                         }
                     }

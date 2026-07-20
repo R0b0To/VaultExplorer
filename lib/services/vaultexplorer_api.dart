@@ -1072,6 +1072,20 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
       return false;
     }
   }
+
+  /// Checks if the folder at [uri] contains a "gocryptfs.conf" file.
+  Future<bool> isGocryptfsVault(String uri) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'isGocryptfsVault',
+        {'uri': uri},
+      );
+      return result ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
 }
 
 final vaultExplorerApi = VaultExplorerApi();

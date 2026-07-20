@@ -54,6 +54,13 @@ class _UnlockSheetState extends State<UnlockSheet> {
   bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
   bool get _isCryptomator => _containerFormat == 'cryptomator';
   bool get _isGocryptfs => _containerFormat == 'gocryptfs';
+  
+  /// True if the user has selected the "Folder Vault" type or if we have
+  /// already determined the selected folder is a Cryptomator or Gocryptfs vault.
+  bool get _isFolderVault =>
+      _containerFormat == 'directory_vault' ||
+      _containerFormat == 'cryptomator' ||
+      _containerFormat == 'gocryptfs';
 
   // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
@@ -105,12 +112,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
   @override
   void dispose() {
-    // If the user backs out while an unlock is still running (there's no
-    // PopScope blocking that — see vault_dashboard.dart's plain
-    // Navigator.push), the native derivation would otherwise keep running
-    // in the background, invisible, and block a subsequent attempt at the
-    // same volId for however long it takes to finish. Cancel it here
-    // instead of leaving it orphaned.
     if (_loading && _activeVolId != null) {
       vaultExplorerApi.cancelUnlock(_activeVolId!);
     }
@@ -134,7 +135,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
         if (mounted) setState(() => _loadingAuth = false);
         return;
       }
-
 
       _containerFormat = record.containerFormat;
 
@@ -181,20 +181,26 @@ class _UnlockSheetState extends State<UnlockSheet> {
     try {
       String newUri;
       String newDisplayName;
-      if (_containerFormat == 'cryptomator') {
+      String detectedFormat = _containerFormat;
+
+      if (_isFolderVault) {
         final picked = await vaultExplorerApi.pickCryptomatorVault();
         if (picked == null || !mounted) return;
-        if (!picked.looksLikeVault) {
-          setState(() => _error = 'No masterkey.cryptomator found in that folder.');
-          return;
+
+        bool isValid = picked.looksLikeVault;
+        if (isValid) {
+          detectedFormat = 'cryptomator';
+        } else {
+          // Fallback to check if it matches gocryptfs instead
+          final isGocryptfs = await vaultExplorerApi.isGocryptfsVault(picked.uri);
+          if (isGocryptfs) {
+            detectedFormat = 'gocryptfs';
+            isValid = true;
+          }
         }
-        newUri = picked.uri;
-        newDisplayName = picked.displayName;
-      } else if (_containerFormat == 'gocryptfs') {
-        final picked = await vaultExplorerApi.pickGocryptfsVault();
-        if (picked == null || !mounted) return;
-        if (!picked.looksLikeVault) {
-          setState(() => _error = 'No gocryptfs.conf found in that folder.');
+
+        if (!isValid) {
+          setState(() => _error = 'No masterkey.cryptomator or gocryptfs.conf found in that folder.');
           return;
         }
         newUri = picked.uri;
@@ -237,7 +243,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
         pendingPatternHash: savedPatternHash,
         cipherId: existing.cipherId,
         hashId: existing.hashId,
-        containerFormat: existing.containerFormat,
+        containerFormat: detectedFormat,
       );
       await ContainerRepository.instance.save(migrated);
       if (!mounted) return;
@@ -362,8 +368,9 @@ class _UnlockSheetState extends State<UnlockSheet> {
     if (widget.initialUri != null) return;
     
     try {
-      // 1. --- CRYPTOMATOR LOGIC ---
-      if (_isCryptomator) {
+      // 1. --- FOLDER VAULT LOGIC (CRYPTOMATOR / GOCRYPTFS) ---
+      if (_isFolderVault) {
+        // Launches the standard platform folder picker.
         final result = await vaultExplorerApi.pickCryptomatorVault();
         if (result == null) return;
         
@@ -375,10 +382,22 @@ class _UnlockSheetState extends State<UnlockSheet> {
           });
           return;
         }
+
+        // Determine the layout format by analyzing the picked directory contents
+        String? detectedFormat;
+        if (result.looksLikeVault) {
+          detectedFormat = 'cryptomator';
+        } else {
+          // If the primary masterkey.cryptomator file isn't detected, check for gocryptfs.conf
+          final isGocryptfs = await vaultExplorerApi.isGocryptfsVault(result.uri);
+          if (isGocryptfs) {
+            detectedFormat = 'gocryptfs';
+          }
+        }
         
-        if (!result.looksLikeVault) {
+        if (detectedFormat == null) {
           setState(() {
-            _error = 'No masterkey.cryptomator found in that folder.';
+            _error = 'No masterkey.cryptomator or gocryptfs.conf found in that folder.';
             _selectedUri = null;
             _selectedName = null;
           });
@@ -388,46 +407,15 @@ class _UnlockSheetState extends State<UnlockSheet> {
         setState(() { 
           _selectedUri = result.uri; 
           _selectedName = result.displayName; 
+          _containerFormat = detectedFormat!;
           _error = null; 
         });
         return;
       }
 
-      // 2. --- GOCRYPTFS LOGIC ---
-      if (_isGocryptfs) {
-        final result = await vaultExplorerApi.pickGocryptfsVault();
-        if (result == null) return;
-        
-        if (widget.mountedUris.contains(result.uri)) {
-          setState(() {
-            _error = 'This container is already mounted.';
-            _selectedUri = null;
-            _selectedName = null;
-          });
-          return;
-        }
-        
-        if (!result.looksLikeVault) {
-          setState(() {
-            _error = 'No gocryptfs.conf found in that folder.';
-            _selectedUri = null;
-            _selectedName = null;
-          });
-          return;
-        }
-        
-        setState(() { 
-          _selectedUri = result.uri; 
-          _selectedName = result.displayName; 
-          _error = null; 
-        });
-        return;
-      }
-
-      // 3. --- EXISTING VERACRYPT/LUKS CONTAINER LOGIC ---
+      // 2. --- CONTAINER FILE LOGIC ---
       final result = await vaultExplorerApi.pickContainer();
       if (result != null) {
-        // Prevent selection of already mounted files
         if (widget.mountedUris.contains(result.uri)) {
           setState(() {
             _error = 'This container is already mounted.';
@@ -517,7 +505,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
           savedRecord = ContainerRecord(
             uri: _selectedUri!,
             label: name,
-            rememberPassword: false, // Added to match your standard ContainerRecord schema
+            rememberPassword: false,
             readOnly: _readOnly,
             containerFormat: result.containerFormat,
           );
@@ -553,7 +541,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
       } finally {
         if (mounted) setState(() => _loading = false);
       }
-      return; // Exit early since we handled Vaults
+      return;
     }
 
     // 2. --- EXISTING VERACRYPT/LUKS LOGIC ---
@@ -569,10 +557,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
       final appSettings = await AppSettingsService.loadSettings();
       final isKnownRecord = record != null;
       
-      // Only cache the derived key for containers we'll actually keep track of
-      // (an existing record, or the user checked "remember"). Otherwise we'd
-      // leave an orphaned cached key in the Keystore for a container the app
-      // has no record of and will never clear.
       final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
           ((isKnownRecord || _remember) &&
               ((record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
@@ -589,12 +573,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
               
       debugPrint('unlock: method=$_unlockMethod shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
 
-      // A stale cached derived key doesn't come back as a null result —
-      // native throws PlatformException(code: 'AUTH_FAIL') instead. Only
-      // swallow that when we're actually trying a cached key, so it falls
-      // into the same "clear cache and retry with the real password"
-      // branch below instead of surfacing as a user-facing error for a
-      // cache problem the user didn't cause and can't fix.
       var result = resolvedPreservedKey == null
           ? await vaultExplorerApi.unlockContainer(
               _selectedUri!,
@@ -647,8 +625,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
       }
 
       if (result != null) {
-        // Tracks the record actually persisted to disk (if any), so we can
-        // hand it to onMounted below rather than have the dashboard guess.
         ContainerRecord? savedRecord;
 
         if (_remember && widget.initialUri == null) {
@@ -686,7 +662,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
           }
         }
 
-
         widget.onMounted(
           MountedContainer(
             uri: _selectedUri!,
@@ -709,8 +684,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
         setState(() => _error = 'Incorrect password or invalid container');
       }
     } on PlatformException catch (e) {
-      // A cancellation the user asked for isn't an error — just quietly
-      // drop back to the form instead of showing an error banner.
       if (e.code != 'CANCELLED') {
         setState(() => _error = e.message ?? 'Unknown error');
       }
@@ -720,6 +693,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
       }
     }
   }
+
   Future<void> _pickKeyfiles() async {
     setState(() => _pickingKeyfiles = true);
     try {
@@ -749,7 +723,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
     return _unlockMethod == ContainerUnlockMethod.password ||
         _unlockMethod == ContainerUnlockMethod.rememberPassword;
   }
-
 
   String get _unlockProgressLabel {
     final p = _progress;
@@ -808,17 +781,14 @@ class _UnlockSheetState extends State<UnlockSheet> {
                         icon: Icon(Icons.folder_zip_rounded),
                       ),
                       ButtonSegment(
-                        value: 'cryptomator',
-                        label: Text('Cryptomator Vault'),
+                        value: 'directory_vault',
+                        label: Text('Folder Vault'),
                         icon: Icon(Icons.folder_shared_rounded),
                       ),
-                      ButtonSegment(
-                        value: 'gocryptfs',
-                        label: Text('Gocryptfs Vault'),
-                        icon: Icon(Icons.enhanced_encryption_rounded),
-                      ),
                     ],
-                    selected: {_containerFormat},
+                    selected: {
+                      _isFolderVault ? 'directory_vault' : 'veracrypt',
+                    },
                     onSelectionChanged: _loading
                         ? null
                         : (sel) => setState(() {
@@ -861,10 +831,10 @@ class _UnlockSheetState extends State<UnlockSheet> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(
-                              _isCryptomator
-                                  ? Icons.folder_shared_rounded
-                                  : _isGocryptfs
-                                      ? Icons.enhanced_encryption_rounded
+                              _isGocryptfs
+                                  ? Icons.enhanced_encryption_rounded
+                                  : _isFolderVault
+                                      ? Icons.folder_shared_rounded
                                       : Icons.folder_zip_rounded,
                               size: 24,
                               color: _selectedUri != null
@@ -886,11 +856,9 @@ class _UnlockSheetState extends State<UnlockSheet> {
                                               : _isGocryptfs
                                                   ? 'Gocryptfs Vault'
                                                   : 'Selected Container')
-                                      : (_isCryptomator
-                                          ? 'Cryptomator Vault'
-                                          : _isGocryptfs
-                                              ? 'Gocryptfs Vault'
-                                              : 'Encrypted Container'),
+                                      : (_isFolderVault
+                                          ? 'Cryptomator | Gocryptfs'
+                                          : 'VeraCrypt | LUKS'),
                                   style: textTheme.labelLarge?.copyWith(
                                     color: _selectedUri != null
                                         ? cs.primary
@@ -901,7 +869,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
                                 const SizedBox(height: 2),
                                 Text(
                                   _selectedName ??
-                                      (_isCryptomator || _isGocryptfs
+                                      (_isFolderVault
                                           ? 'Tap to select vault folder…'
                                           : 'Tap to select container file…'),
                                   style: textTheme.bodyMedium?.copyWith(
@@ -925,6 +893,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
                                   : () => setState(() {
                                         _selectedUri = null;
                                         _selectedName = null;
+                                        _containerFormat = 'directory_vault';
                                       }),
                               style: IconButton.styleFrom(
                                 backgroundColor: cs.surfaceContainerHigh,
@@ -1217,7 +1186,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
                           autofillHints: const [AutofillHints.password],
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            hintText: (_isCryptomator || _isGocryptfs) ? 'Enter vault password' : 'Enter container password',
+                            hintText: _isFolderVault ? 'Enter vault password' : 'Enter container password',
                             prefixIcon: Icon(Icons.lock_outline_rounded, size: 22, color: cs.primary),
                             suffixIcon: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1245,8 +1214,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
                         ),
                         const SizedBox(height: 16),
 
-                        // 2. Keyfiles Selection Box (Gated: hidden for Cryptomator/Gocryptfs)
-                        if (!_isCryptomator && !_isGocryptfs) ...[
+                        // 2. Keyfiles Selection Box (Gated: hidden for Directory Vaults)
+                        if (!_isFolderVault) ...[
                           KeyfilesPicker(
                             keyfiles: _keyfiles,
                             picking: _pickingKeyfiles,
@@ -1267,7 +1236,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
                         ],
 
                         // 3. Collapsible Advanced parameters (Gated: hidden for LUKS & Vaults)
-                        if (!_isLuks && !_isCryptomator && !_isGocryptfs) ...[
+                        if (!_isLuks && !_isFolderVault) ...[
                           AdvancedParamsPanel(
                             pimController: _pimCtrl,
                             cipherId: _cipherId,
@@ -1349,7 +1318,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
                             ],
                           )
                         : Text(
-                            (_isCryptomator || _isGocryptfs) ? 'Unlock Vault' : 'Unlock Container',
+                            _isFolderVault ? 'Unlock Vault' : 'Unlock Container',
                             style: textTheme.titleMedium?.copyWith(
                               color: cs.onPrimary,
                               fontWeight: FontWeight.bold,

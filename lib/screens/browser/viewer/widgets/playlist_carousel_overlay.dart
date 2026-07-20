@@ -8,6 +8,38 @@ import '/../../services/thumbnail_cache_service.dart';
 import '/../../services/vaultexplorer_api.dart';
 import '../media_viewer_constants.dart';
 
+/// Limits concurrent thumbnail tasks so we don't exhaust the native 
+/// ioExecutor thread pool, leaving threads free for the media player.
+class _ThumbnailSemaphore {
+  final int maxConcurrent;
+  int _current = 0;
+  final List<Completer<void>> _queue = [];
+
+  _ThumbnailSemaphore(this.maxConcurrent);
+
+  Future<void> acquire() async {
+    if (_current < maxConcurrent) {
+      _current++;
+      return;
+    }
+    final completer = Completer<void>();
+    _queue.add(completer);
+    return completer.future;
+  }
+
+  void release() {
+    if (_queue.isNotEmpty) {
+      final completer = _queue.removeAt(0);
+      completer.complete();
+    } else {
+      _current--;
+    }
+  }
+}
+
+// Cap to 1 so the Android ioExecutor (size 4) always has 3 threads free for the player.
+final _ThumbnailSemaphore _thumbSemaphore = _ThumbnailSemaphore(1);
+
 /// A bottom-anchored strip of thumbnails for the active playlist. Lets the
 /// user scroll through every item at a glance and tap one to jump straight
 /// to it, instead of stepping through with next/previous.
@@ -292,7 +324,12 @@ class _CarouselThumbState extends State<_CarouselThumb> {
     final target = widget.fileName;
     if (MediaViewerConstants.isAudio(target)) return;
 
+    await _thumbSemaphore.acquire();
     try {
+      // If the user scrolled fast, this widget might have been disposed 
+      // while waiting in the queue. Skip heavy work if so!
+      if (!mounted) return;
+
       Uint8List? data;
 
       if (widget.thumbnailCacheMode != ThumbnailCacheMode.disabled) {
@@ -305,6 +342,8 @@ class _CarouselThumbState extends State<_CarouselThumb> {
           data = cached;
         }
       }
+
+      if (!mounted) return; // double check before API call
 
       if (data == null || data.isEmpty) {
         final scaledTargetSize = widget.thumbnailQuality.scaledSize(
@@ -350,10 +389,11 @@ class _CarouselThumbState extends State<_CarouselThumb> {
       }
     } catch (e) {
       if (mounted) setState(() => _failed = true);
+    } finally {
+      _thumbSemaphore.release();
     }
   }
   
-
   @override
   Widget build(BuildContext context) {
     if (MediaViewerConstants.isAudio(widget.fileName)) {

@@ -37,9 +37,33 @@ class GocryptfsSession(
     /** Open write handles for in-progress sequential writeFileChunk() sequences, keyed by virtual path. */
     private val openWrites = ConcurrentHashMap<String, WriteHandle>()
 
+    private inner class ReadHandle(
+        val pfd: android.os.ParcelFileDescriptor?,
+        val stream: java.io.InputStream,
+        val header: Any,
+        var currentPos: Long
+    ) {
+        var cachedChunkIndex: Long = -1L
+        var cachedChunkCleartext: ByteArray? = null
+
+        fun close() {
+            try { stream.close() } catch (_: Exception) {}
+            try { pfd?.close() } catch (_: Exception) {}
+        }
+        @Suppress("UNCHECKED_CAST")
+        fun <T> typedHeader(): T = header as T
+    }
+
+    private val openReads = object : android.util.LruCache<String, ReadHandle>(8) {
+        override fun entryRemoved(evicted: Boolean, key: String, oldValue: ReadHandle, newValue: ReadHandle?) {
+            oldValue.close()
+        }
+    }
+
     fun close() {
         openWrites.values.forEach { it.abort() }
         openWrites.clear()
+        openReads.evictAll()
     }
 
   
@@ -111,6 +135,8 @@ class GocryptfsSession(
     return try {
         val oldNormalized = normalize(oldVirtualPath)
         val newNormalized = normalize(newVirtualPath)
+        openReads.remove(oldNormalized)
+        openReads.remove(newNormalized)
         val node = tree.resolve(oldNormalized) ?: return false
 
         val oldParentPath = parentOf(oldNormalized)
@@ -198,6 +224,7 @@ class GocryptfsSession(
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
+            openReads.remove(normalized)
             val node = tree.resolve(normalized) ?: return false
             val parentPhysical = runCatching { tree.physicalFolderFor(parentOf(normalized)) }.getOrNull()
 
@@ -250,60 +277,120 @@ fun getFolderSize(virtualPath: String): Long {
 
     /** Decrypts and returns [length] bytes starting at [offset], or null on error/missing file. */
     fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
+        val normalized = normalize(virtualPath)
         return try {
-            val node = tree.resolve(normalize(virtualPath)) as? GocryptfsNode.VFile ?: return null
-            readRange(node.physicalFile, offset, length)
+            val node = tree.resolve(normalized) as? GocryptfsNode.VFile ?: return null
+            readRange(node.physicalFile, offset, length, normalized)
         } catch (e: Exception) {
+            openReads.remove(normalized)
             null
         }
     }
 
-    private fun readRange(physicalFile: DocumentFile, offset: Long, length: Int): ByteArray? {
-        context.contentResolver.openInputStream(physicalFile.uri)?.use { rawStream ->
-            val headerBytes = ByteArray(GocryptfsContentCryptor.HEADER_LEN)
-            if (readFully(rawStream, headerBytes) < GocryptfsContentCryptor.HEADER_LEN) return ByteArray(0)
-            val header = contentCryptor.decodeHeader(headerBytes)
+    private fun readRange(physicalFile: DocumentFile, offset: Long, length: Int, normalizedPath: String): ByteArray? {
+        val chunkSize = GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE
+        val cipherChunkSize = GocryptfsContentCryptor.CIPHERTEXT_CHUNK_SIZE
+        val headerSize = GocryptfsContentCryptor.HEADER_LEN
+        
+        var handle = openReads.get(normalizedPath)
+        
+        if (handle == null) {
+            var pfd: android.os.ParcelFileDescriptor? = null
+            var stream: java.io.InputStream? = null
+            try {
+                pfd = context.contentResolver.openFileDescriptor(physicalFile.uri, "r")
+                if (pfd != null) {
+                    stream = java.io.FileInputStream(pfd.fileDescriptor)
+                }
+            } catch (e: Exception) { }
 
-            val startChunk = offset / GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE
-            val endOffsetExclusive = offset + length
-
-            // Skip to the first needed chunk.
-            var chunkNumber = 0L
-            val skipBytes = startChunk * GocryptfsContentCryptor.CIPHERTEXT_CHUNK_SIZE
-            var remaining = skipBytes
-            val skipBuf = ByteArray(64 * 1024)
-            while (remaining > 0L) {
-                val toSkip = minOf(remaining, skipBuf.size.toLong()).toInt()
-                val actuallyRead = rawStream.read(skipBuf, 0, toSkip)
-                if (actuallyRead <= 0) return ByteArray(0)
-                remaining -= actuallyRead
+            if (stream == null) {
+                stream = context.contentResolver.openInputStream(physicalFile.uri)
             }
-            chunkNumber = startChunk
+            if (stream == null) return null
 
-            val out = java.io.ByteArrayOutputStream(length.coerceAtMost(4 * 1024 * 1024))
-            var producedSoFar = startChunk * GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE
-            val cipherBuf = ByteArray(GocryptfsContentCryptor.CIPHERTEXT_CHUNK_SIZE)
-            while (producedSoFar < endOffsetExclusive) {
-                val n = readFully(rawStream, cipherBuf)
-                if (n <= 0) break
-                val actualCiphertext = if (n == cipherBuf.size) cipherBuf else cipherBuf.copyOf(n)
-                val cleartext = contentCryptor.decryptChunk(actualCiphertext, chunkNumber, header)
+            val headerBytes = ByteArray(headerSize)
+            if (readFully(stream, headerBytes) < headerSize) {
+                try { stream.close() } catch (_: Exception) {}
+                try { pfd?.close() } catch (_: Exception) {}
+                return ByteArray(0)
+            }
+            val header = contentCryptor.decodeHeader(headerBytes)
+            handle = ReadHandle(pfd, stream, header, headerSize.toLong())
+            openReads.put(normalizedPath, handle)
+        }
 
-                val chunkStart = producedSoFar
-                val chunkEnd = chunkStart + cleartext.size
-                val wantStart = maxOf(offset, chunkStart)
-                val wantEnd = minOf(endOffsetExclusive, chunkEnd)
-                if (wantStart < wantEnd) {
-                    out.write(cleartext, (wantStart - chunkStart).toInt(), (wantEnd - wantStart).toInt())
+        val startChunk = offset / chunkSize
+        val endOffsetExclusive = offset + length
+        var chunkNumber = startChunk
+        var producedSoFar = startChunk * chunkSize
+        val out = java.io.ByteArrayOutputStream(length.coerceAtMost(4 * 1024 * 1024))
+        
+        while (producedSoFar < endOffsetExclusive) {
+            val cleartext: ByteArray
+            if (handle!!.cachedChunkIndex == chunkNumber && handle!!.cachedChunkCleartext != null) {
+                cleartext = handle!!.cachedChunkCleartext!!
+            } else {
+                val desiredPos = headerSize.toLong() + chunkNumber * cipherChunkSize
+                
+                if (handle!!.currentPos != desiredPos) {
+                    var positioned = false
+                    if (handle!!.pfd != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                        try {
+                            android.system.Os.lseek(handle!!.pfd!!.fileDescriptor, desiredPos, android.system.OsConstants.SEEK_SET)
+                            handle!!.currentPos = desiredPos
+                            positioned = true
+                        } catch (e: Exception) {}
+                    }
+                    if (!positioned && handle!!.stream is java.io.FileInputStream) {
+                        try {
+                            handle!!.stream.channel.position(desiredPos)
+                            handle!!.currentPos = desiredPos
+                            positioned = true
+                        } catch (e: Exception) {}
+                    }
+                    if (!positioned) {
+                        if (handle!!.currentPos > desiredPos) {
+                            openReads.remove(normalizedPath)
+                            return readRange(physicalFile, offset, length, normalizedPath)
+                        } else {
+                            var remaining = desiredPos - handle!!.currentPos
+                            val skipBuf = ByteArray(64 * 1024)
+                            while (remaining > 0L) {
+                                val toSkip = minOf(remaining, skipBuf.size.toLong()).toInt()
+                                val actuallyRead = handle!!.stream.read(skipBuf, 0, toSkip)
+                                if (actuallyRead <= 0) break
+                                remaining -= actuallyRead
+                                handle!!.currentPos += actuallyRead
+                            }
+                        }
+                    }
                 }
 
-                producedSoFar = chunkEnd
-                chunkNumber += 1
-                if (n < cipherBuf.size) break // last chunk was short -> EOF
+                val cipherBuf = ByteArray(cipherChunkSize)
+                val n = readFully(handle!!.stream, cipherBuf)
+                if (n <= 0) break
+                handle!!.currentPos += n
+                val actualCiphertext = if (n == cipherBuf.size) cipherBuf else cipherBuf.copyOf(n)
+                
+                cleartext = contentCryptor.decryptChunk(actualCiphertext, chunkNumber, handle!!.typedHeader())
+                handle!!.cachedChunkIndex = chunkNumber
+                handle!!.cachedChunkCleartext = cleartext
             }
-            return out.toByteArray()
+
+            val chunkStart = producedSoFar
+            val chunkEnd = chunkStart + cleartext.size
+            val wantStart = maxOf(offset, chunkStart)
+            val wantEnd = minOf(endOffsetExclusive, chunkEnd)
+            if (wantStart < wantEnd) {
+                out.write(cleartext, (wantStart - chunkStart).toInt(), (wantEnd - wantStart).toInt())
+            }
+
+            producedSoFar = chunkEnd
+            chunkNumber += 1
+            if (cleartext.size < chunkSize) break // Short chunk means EOF
         }
-        return null
+        return out.toByteArray()
     }
 
     private fun readFully(stream: java.io.InputStream, buf: ByteArray): Int {
@@ -320,6 +407,7 @@ fun getFolderSize(virtualPath: String): Long {
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
+            openReads.remove(normalized)
             val handle = openWrites.getOrPut(normalized) { beginWrite(normalized) }
             if (offset != handle.bytesWrittenSoFar) {
                 handle.abort()
@@ -336,6 +424,7 @@ fun getFolderSize(virtualPath: String): Long {
 
     fun finishWrite(virtualPath: String): Boolean {
         val normalized = normalize(virtualPath)
+        openReads.remove(normalized)
         val handle = openWrites.remove(normalized) ?: return true
         return try {
             handle.commit()
@@ -351,6 +440,7 @@ fun getFolderSize(virtualPath: String): Long {
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
+            openReads.remove(normalized)
             openWrites.remove(normalized)?.abort()
             val handle = beginWrite(normalized)
             File(sourcePath).inputStream().use { input ->

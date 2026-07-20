@@ -52,14 +52,30 @@ object ContainerFileSystem {
 
     // ── File I/O ──────────────────────────────────────────────────────────
 
-    fun getFileSize(volId: Int, fatPath: String): Long =
-        withLock(volId) { ContainerEngine.getFileSize(fatPath, volId) }
+    fun getFileSize(volId: Int, fatPath: String): Long {
+        val session = requireSession(volId)
+        val name = session.javaClass.simpleName
+        return if (name.contains("Cryptomator") || name.contains("Gocryptfs")) {
+            // Bypass global lock for concurrent non-native reads
+            ContainerEngine.getFileSize(fatPath, volId)
+        } else {
+            withLock(volId) { ContainerEngine.getFileSize(fatPath, volId) }
+        }
+    }
 
     fun getFolderSize(volId: Int, fatPath: String): Long =
         withLock(volId) { ContainerEngine.getFolderSize(fatPath, volId) }
 
-    fun readFileChunk(volId: Int, fatPath: String, offset: Long, length: Int): ByteArray? =
-        withLock(volId) { ContainerEngine.readFileChunk(fatPath, offset, length, volId) }
+    fun readFileChunk(volId: Int, fatPath: String, offset: Long, length: Int): ByteArray? {
+        val session = requireSession(volId)
+        val name = session.javaClass.simpleName
+        return if (name.contains("Cryptomator") || name.contains("Gocryptfs")) {
+            // Bypass global lock for concurrent non-native reads
+            ContainerEngine.readFileChunk(fatPath, offset, length, volId)
+        } else {
+            withLock(volId) { ContainerEngine.readFileChunk(fatPath, offset, length, volId) }
+        }
+    }
 
     fun writeFileChunk(volId: Int, fatPath: String, offset: Long, data: ByteArray): Boolean =
         withLock(volId) { ContainerEngine.writeFileChunk(fatPath, offset, data, volId) }

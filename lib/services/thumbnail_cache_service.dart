@@ -46,33 +46,48 @@ class ThumbnailCacheService {
 
   /// Data above this size is encrypted/decrypted in a background isolate via
   /// [compute()] to avoid blocking the UI thread.
-  static const _computeThresholdBytes = 100 * 1024; // 100 KB
+  static const _computeThresholdBytes = 500 * 1024; // 500 KB
 
   // ── Tier 1: static in-memory LRU ──────────────────────────────────────────
   static final _memoryCache = LruCache<String, Uint8List>(120);
 
   // ── AES key ────────────────────────────────────────────────────────────────
-  static enc.Key? _cachedKey;
-  static Future<enc.Key> getOrFetchKey() async =>
-      _cachedKey ??= await AppCacheEncryption.getEncryptionKey();
+  static Future<enc.Key>? _keyFuture;
+  static Future<enc.Key> getOrFetchKey() =>
+      _keyFuture ??= AppCacheEncryption.getEncryptionKey();
 
   // ── App-cache directory — resolved once ───────────────────────────────────
   //
-  // Keyed by the container's URI (base64-encoded and truncated to 180 chars)
+  // Keyed by the container's URI (MD5 hashed)
   // rather than by volId. Two different container files that happen to occupy
   // the same volume slot at different times therefore never share a disk
   // directory, eliminating stale thumbnail cross-contamination.
-  static String? _appCacheRoot;
+  static Future<String>? _appCacheRootFuture;
+
+  static Future<String> _getAppCacheRoot() {
+    return _appCacheRootFuture ??= getApplicationCacheDirectory().then((d) => d.path);
+  }
 
   static Future<String> _thumbDir(MountedContainer container) async {
-    _appCacheRoot ??= (await getApplicationCacheDirectory()).path;
-    return '$_appCacheRoot/thumbs/${_encodeKey(container.uri)}';
+    final root = await _getAppCacheRoot();
+    return '$root/thumbs/${_encodeKey(container.uri)}';
   }
 
   // ── Filename / key encoding ────────────────────────────────────────────────
+// ── Filename / key encoding ────────────────────────────────────────────────
   static String _encodeKey(String value) {
-    final encoded = base64Url.encode(utf8.encode(value));
-    return encoded.length > 180 ? encoded.substring(0, 180) : encoded;
+    const int fnvPrime = 1099511628211;
+    const int offsetBasis = -2875151525287752661; // 0xcbf29ce484222325 as signed 64-bit int
+    const int mask64 = 0xFFFFFFFFFFFFFFFF;
+
+    int hash = offsetBasis;
+    final bytes = utf8.encode(value);
+    for (final byte in bytes) {
+      hash = (hash ^ byte) & mask64;
+      hash = (hash * fnvPrime) & mask64;
+    }
+    // Returns an extremely safe, unique 16-character hex filename
+    return hash.toRadixString(16);
   }
 
   // ── Memory-tier key ───────────────────────────────────────────────────────
@@ -237,9 +252,13 @@ class ThumbnailCacheService {
 
   /// Clears on-disk local app cache directories using only the container URI.
   static Future<void> clearAppCacheByUri(String uri) async {
+    _ensuredThumbDirs.remove(uri);
     try {
-      _appCacheRoot ??= (await getApplicationCacheDirectory()).path;
-      final dir = Directory('$_appCacheRoot/thumbs/${_encodeKey(uri)}');
+      final root = await _getAppCacheRoot();
+      final dirPath = '$root/thumbs/${_encodeKey(uri)}';
+      _ensuredThumbDirs.remove(dirPath);
+      
+      final dir = Directory(dirPath);
       if (await dir.exists()) {
         await dir.delete(recursive: true);
       }
@@ -250,6 +269,7 @@ class ThumbnailCacheService {
   /// Clears the .thumbcache directory inside the mounted volume by direct channel invocations.
   /// Throws PlatformException if the container is locked (not mounted).
   static Future<void> clearInContainerCacheByUri(String uri) async {
+    _ensuredThumbDirs.remove(uri);
     try {
       final entries = await _channel.invokeMethod<List<Object?>>(
         'listDirectory',
@@ -279,57 +299,72 @@ class ThumbnailCacheService {
     }
   }
 
-  // ── Public: write ─────────────────────────────────────────────────────────
-static final Set<String> _ensuredThumbDirs = {};
-  static Future<void> put({
-    required MountedContainer container,
-    required String filePath,
-    required Uint8List data,
-    required ThumbnailCacheMode mode,
-  }) async {
-    
-    if (mode == ThumbnailCacheMode.disabled || data.isEmpty) return;
+// Use a Map of Futures to prevent race conditions during directory creation
+static final Map<String, Future<void>> _ensuredThumbDirs = {};
 
-    putInMemory(container, filePath, data);
+static Future<void> put({
+  required MountedContainer container,
+  required String filePath,
+  required Uint8List data,
+  required ThumbnailCacheMode mode,
+}) async {
+  if (mode == ThumbnailCacheMode.disabled || data.isEmpty) return;
 
-    try {
-      if (mode == ThumbnailCacheMode.appCache) {
-        final dirPath = await _thumbDir(container);
-        final dir = Directory(dirPath);
-        if (!await dir.exists()) await dir.create(recursive: true);
+  putInMemory(container, filePath, data);
 
-        final file = File('$dirPath/${_encodeKey(filePath)}');
-        final key = await getOrFetchKey();
-        final encrypted = await _encrypt(data, key);
-
-        // Atomic write: temp file → rename.
-        final tmp = File('${file.path}.tmp');
-        await tmp.writeAsBytes(encrypted, flush: true);
-        await tmp.rename(file.path);
-      } else {
-  final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
-  final tmpPath = '$cachePath.tmp';
-  if (_ensuredThumbDirs.add(container.uri)) {
-    await vaultExplorerApi.createDirectory(container, inContainerDir);
-  }
-        await vaultExplorerApi.deleteFile(container, tmpPath);
-        final ok = await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, data);
-        await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
-        if (ok) {
-          await vaultExplorerApi.deleteFile(container, cachePath);
-          await vaultExplorerApi.renameFile(container, tmpPath, cachePath);
-        } else {
-          await vaultExplorerApi.deleteFile(container, tmpPath);
-          debugPrint(
-            'ThumbnailCacheService.put: inContainer write failed for $filePath',
-          );
-        }
+  try {
+    if (mode == ThumbnailCacheMode.appCache) {
+      final dirPath = await _thumbDir(container);
+      
+      if (!_ensuredThumbDirs.containsKey(dirPath)) {
+        _ensuredThumbDirs[dirPath] = Directory(dirPath).create(recursive: true).then((_) {});
       }
-    } catch (e) {
-      debugPrint('ThumbnailCacheService.put: $e');
-    }
-  }
+      await _ensuredThumbDirs[dirPath];
 
+      final file = File('$dirPath/${_encodeKey(filePath)}');
+      final key = await getOrFetchKey();
+      final encrypted = await _encrypt(data, key);
+
+      // Create a UNIQUE temp file to prevent concurrent write collisions
+      final uniqueId = DateTime.now().microsecondsSinceEpoch;
+      final tmp = File('${file.path}.$uniqueId.tmp');
+      
+      await tmp.writeAsBytes(encrypted, flush: true);
+
+      await tmp.rename(file.path);
+    } else {
+      final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
+      
+      // Unique temp path for the vault to prevent write conflicts
+      final uniqueId = DateTime.now().microsecondsSinceEpoch;
+      final tmpPath = '$cachePath.$uniqueId.tmp';
+      
+      final uriStr = container.uri.toString();
+
+      if (!_ensuredThumbDirs.containsKey(uriStr)) {
+        _ensuredThumbDirs[uriStr] = vaultExplorerApi.createDirectory(container, inContainerDir);
+      }
+      await _ensuredThumbDirs[uriStr];
+      
+      final ok = await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, data);
+      await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
+      
+      if (ok) {
+        // You may still need to delete the target file here depending on whether 
+        // vaultExplorerApi.renameFile supports overwriting existing files.
+        await vaultExplorerApi.deleteFile(container, cachePath);
+        await vaultExplorerApi.renameFile(container, tmpPath, cachePath);
+      } else {
+        await vaultExplorerApi.deleteFile(container, tmpPath);
+        debugPrint(
+          'ThumbnailCacheService.put: inContainer write failed for $filePath',
+        );
+      }
+    }
+  } catch (e, stackTrace) {
+    debugPrint('ThumbnailCacheService.put: $e\n$stackTrace');
+  }
+}
   // ── Cache management ───────────────────────────────────────────────────────
 
   static Future<int> appCacheBytesFor(MountedContainer container) async {
@@ -348,8 +383,8 @@ static final Set<String> _ensuredThumbDirs = {};
 
   static Future<int> totalAppCacheBytes() async {
     try {
-      _appCacheRoot ??= (await getApplicationCacheDirectory()).path;
-      final dir = Directory('$_appCacheRoot/thumbs');
+      final root = await _getAppCacheRoot();
+      final dir = Directory('$root/thumbs');
       if (!await dir.exists()) return 0;
       var total = 0;
       await for (final e in dir.list(recursive: true)) {
@@ -362,17 +397,21 @@ static final Set<String> _ensuredThumbDirs = {};
   }
 
   static Future<void> clearAppCacheFor(MountedContainer container) async {
+    _ensuredThumbDirs.remove(container.uri.toString());
     try {
-      final dir = Directory(await _thumbDir(container));
+      final dirPath = await _thumbDir(container);
+      _ensuredThumbDirs.remove(dirPath);
+      final dir = Directory(dirPath);
       if (await dir.exists()) await dir.delete(recursive: true);
     } catch (_) {}
     _memoryCache.clear();
   }
 
   static Future<void> clearAllAppCache() async {
+    _ensuredThumbDirs.clear();
     try {
-      _appCacheRoot ??= (await getApplicationCacheDirectory()).path;
-      final dir = Directory('$_appCacheRoot/thumbs');
+      final root = await _getAppCacheRoot();
+      final dir = Directory('$root/thumbs');
       if (await dir.exists()) await dir.delete(recursive: true);
     } catch (_) {}
     _memoryCache.clear();
@@ -387,14 +426,16 @@ static final Set<String> _ensuredThumbDirs = {};
     Set<String> activeContainerUris,
   ) async {
     try {
-      _appCacheRoot ??= (await getApplicationCacheDirectory()).path;
-      final root = Directory('$_appCacheRoot/thumbs');
+      final rootPath = await _getAppCacheRoot();
+      final root = Directory('$rootPath/thumbs');
       if (!await root.exists()) return;
       final activeKeys = activeContainerUris.map(_encodeKey).toSet();
       await for (final e in root.list()) {
         if (e is! Directory) continue;
         final dirName = e.path.split('/').last;
         if (!activeKeys.contains(dirName)) {
+          // Forget from memory state map so it doesn't fail if revisited later
+          _ensuredThumbDirs.removeWhere((key, _) => key.contains(dirName));
           await e.delete(recursive: true);
         }
       }

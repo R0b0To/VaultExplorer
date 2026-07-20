@@ -46,9 +46,9 @@ Mount, browse, and manage VeraCrypt, LUKS, Cryptomator, and gocryptfs volumes di
 ## Screenshots
 
 <p align="center">
-  <img width="250" alt="Screenshot_1" src="https://github.com/user-attachments/assets/2267accb-aae3-4ce6-8fae-bd09bfebd3c1" />
-  <img width="250" alt="Screenshot_2" src="https://github.com/user-attachments/assets/a7ac12c5-6481-423d-a930-098ef5da3283" /> 
-  <img width="250" alt="Screenshot_3" src="https://github.com/user-attachments/assets/154c1dcf-e448-46ab-ad9d-2d92ad10fbe3" />
+  <img width="250" alt="Screenshot_1" src="https://github.com/user-attachments/assets/be881af4-d607-4522-b389-c1553416c64b" />
+  <img width="250" alt="Screenshot_3" src="https://github.com/user-attachments/assets/4b13dc9c-c1ec-4067-b15b-de1fdbd24e89" />
+  <img width="250" alt="Screenshot_2" src="https://github.com/user-attachments/assets/ed55b96a-5fee-4b65-bc81-f0345e3c208f" /> 
 </p>
 
 ---

@@ -10,6 +10,7 @@ Mount, browse, and manage VeraCrypt and LUKS encrypted volumes directly on your 
 
 ### Encryption
 - **VeraCrypt** (`.hc`) and native **LUKS1 / LUKS2** containers — format is auto-detected, no need to specify which
+- **Cryptomator vaults** (format 7/8) — open vaults fully interoperable with the desktop/mobile Cryptomator apps
 - **AES-256-XTS**, plus Serpent, Twofish, Camellia, and Kuznyechik, including VeraCrypt's cascaded combinations (15 cipher/cascade options total)
 - Key derivation via PBKDF2 (SHA-512, SHA-256, Whirlpool, Streebog, BLAKE2s-256) or the memory-hard **Argon2id**
 - LUKS1/LUKS2 support AES, Serpent, Twofish, Camellia, or Kuznyechik in `xts-plain64` mode, with PBKDF2 or Argon2id/Argon2i keyslots
@@ -95,6 +96,7 @@ Android (Kotlin)
   ├── MainActivity — MethodChannel handler, SAF pickers, import/export
   ├── ContainerSessionRegistry / ContainerFileSystem — session registry & locking
   ├── ContainerEngine — format-neutral façade over the JNI implementation
+  ├── Cryptomator — pure-Kotlin vault backend (masterkey unwrap, AES-SIV names, chunked content crypto)
   ├── UsbMassStorageDevice / UsbBlockBridge — USB Mass Storage client
   ├── UnlockProgressBridge — pushes auto-detect progress to Dart
   └── ContainerDocumentsProvider — Documents Provider (ContentProvider)

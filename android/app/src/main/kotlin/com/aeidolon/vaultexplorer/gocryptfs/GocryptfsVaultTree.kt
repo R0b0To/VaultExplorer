@@ -108,23 +108,39 @@ class GocryptfsVaultTree(
         return current
     }
 
-    /** Creates (or returns, if it already exists) the per-directory tweak file. */
-    fun dirivFor(virtualDirPath: String, physicalFolder: DocumentFile = physicalFolderFor(virtualDirPath)): ByteArray {
-        dirivCache[virtualDirPath]?.let { return it }
-        val existing = findChild(physicalFolder, GocryptfsFileNameCryptor.DIRIV_FILENAME)
-        val bytes = if (existing != null) {
-            readWhole(existing)
-        } else {
-            val fresh = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
-            val f = physicalFolder.createFile("application/octet-stream", GocryptfsFileNameCryptor.DIRIV_FILENAME)
-                ?: throw GocryptfsIOException("Could not create gocryptfs.diriv")
-            writeWhole(f, fresh)
-            fresh
-        }
-        require(bytes.size == 16) { "corrupt gocryptfs.diriv (expected 16 bytes, got ${bytes.size})" }
-        dirivCache[virtualDirPath] = bytes
-        return bytes
+/** Creates (or returns, if it already exists) the per-directory tweak file. */
+fun dirivFor(virtualDirPath: String, physicalFolder: DocumentFile = physicalFolderFor(virtualDirPath)): ByteArray {
+    dirivCache[virtualDirPath]?.let { return it }
+    val existing = findChild(physicalFolder, GocryptfsFileNameCryptor.DIRIV_FILENAME)
+    val bytes = if (existing != null) {
+        readWhole(existing)
+    } else {
+        val fresh = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+        val f = createFileSafe(physicalFolder, "application/octet-stream", GocryptfsFileNameCryptor.DIRIV_FILENAME)
+            ?: throw GocryptfsIOException("Could not create gocryptfs.diriv")
+        writeWhole(f, fresh)
+        fresh
     }
+    require(bytes.size == 16) { "corrupt gocryptfs.diriv (expected 16 bytes, got ${bytes.size})" }
+    dirivCache[virtualDirPath] = bytes
+    return bytes
+}
+
+/** Creates a document via DocumentsContract directly rather than DocumentFile.createFile(),
+ *  since [parent] here may be a SingleDocumentFile wrapper produced by listChildrenFast()
+ *  (via fromSingleUri), whose own createFile() unconditionally throws
+ *  UnsupportedOperationException. DocumentsContract.createDocument() only needs a valid
+ *  document-within-tree URI, so it works regardless of which DocumentFile subclass wraps
+ *  the parent — same pattern GocryptfsSession's own createFileSafe()/createDirectorySafe()
+ *  already use. */
+private fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile? {
+    return try {
+        val uri = DocumentsContract.createDocument(context.contentResolver, parent.uri, mimeType, name)
+        uri?.let { DocumentFile.fromSingleUri(context, it) }
+    } catch (e: Exception) {
+        null
+    }
+}
 
     fun invalidate(virtualDirPath: String) {
         val stale = folderCache.keys.filter { it == virtualDirPath || it.startsWith("$virtualDirPath/") }

@@ -42,6 +42,20 @@ class GocryptfsSession(
         openWrites.clear()
     }
 
+  
+    private fun physicalFolderForDirPath(dirPath: String): DocumentFile? =
+    if (dirPath.isEmpty()) tree.rootPhysicalFolder()
+    else (tree.resolve(dirPath) as? GocryptfsNode.VDir)?.physicalFolder
+
+    /** Physical SAF folder for [path] ("" = vault root). `tree.resolve(path)` can't handle
+     *  the root case -- there's no parent entry whose name it could decrypt -- so every call
+     *  site that needs "the folder I'm about to create/rename/delete something inside" must
+     *  go through this instead of casting `tree.resolve(path)` directly. */
+    private fun physicalFolderFor(path: String): DocumentFile? {
+        if (path.isEmpty()) return DocumentFile.fromTreeUri(context, vaultRootUri)
+        return (tree.resolve(path) as? GocryptfsNode.VDir)?.physicalFolder
+    }
+
     // ---- directory listing ----------------------------------------------------
 
     fun listDirectory(virtualPath: String): Array<String>? {
@@ -55,12 +69,11 @@ class GocryptfsSession(
                         "[DIR] ${node.cleartextName}|0|$mtime"
                     }
                     is GocryptfsNode.VFile -> {
-                        val ciphertextSize = node.physicalFile.length()
-                        val withoutHeader = ciphertextSize - GocryptfsContentCryptor.HEADER_LEN
-                        val cleartextSize = if (withoutHeader < 0L) 0L else contentCryptor.cleartextSize(withoutHeader)
-                        val mtime = node.physicalFile.lastModified() / 1000L
-                        "${node.cleartextName}|$cleartextSize|$mtime"
-                    }
+    val ciphertextSize = node.physicalFile.length()
+    val cleartextSize = contentCryptor.cleartextSize(ciphertextSize)
+    val mtime = node.physicalFile.lastModified() / 1000L
+    "${node.cleartextName}|$cleartextSize|$mtime"
+}
                 }
             }.toTypedArray()
         } catch (e: GocryptfsPathNotFoundException) {
@@ -77,8 +90,7 @@ class GocryptfsSession(
             val parentPath = parentOf(normalized)
             val name = nameOf(normalized)
             val parentDirIv = tree.dirivFor(parentPath)
-            val parentPhysical = (tree.resolve(parentPath) as? GocryptfsNode.VDir)?.physicalFolder
-                ?: throw GocryptfsIOException("Parent directory not found")
+            val parentPhysical = tree.physicalFolderFor(parentPath)
 
             val ciphertextName = nameCryptor.encryptName(name, parentDirIv)
             createNodeFolder(parentPhysical, ciphertextName, name)
@@ -95,62 +107,99 @@ class GocryptfsSession(
     }
 
     fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
-        if (readOnly) return false
-        return try {
-            val oldNormalized = normalize(oldVirtualPath)
-            val newNormalized = normalize(newVirtualPath)
-            val node = tree.resolve(oldNormalized) ?: return false
+    if (readOnly) return false
+    return try {
+        val oldNormalized = normalize(oldVirtualPath)
+        val newNormalized = normalize(newVirtualPath)
+        val node = tree.resolve(oldNormalized) ?: return false
 
-            val oldParentPath = parentOf(oldNormalized)
-            val newParentPath = parentOf(newNormalized)
-            val newName = nameOf(newNormalized)
+        val oldParentPath = parentOf(oldNormalized)
+        val newParentPath = parentOf(newNormalized)
+        val newName = nameOf(newNormalized)
 
-            if (oldParentPath == newParentPath) {
-                // Simple rename within the same directory
-                val parentDirIv = tree.dirivFor(oldParentPath)
-                val newCiphertextName = nameCryptor.encryptName(newName, parentDirIv)
-                val physicalNode = when (node) {
-                    is GocryptfsNode.VDir -> node.physicalFolder
-                    is GocryptfsNode.VFile -> node.physicalFile
-                }
-                
-                val oldPhysicalName = physicalNode.name ?: ""
-                val parentPhysical = (tree.resolve(oldParentPath) as? GocryptfsNode.VDir)?.physicalFolder ?: return false
-
-                // If the old name was long, clean up the side-by-side .name file
-                if (oldPhysicalName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX) && !oldPhysicalName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)) {
-                    childOf(parentPhysical, "$oldPhysicalName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")?.delete()
-                }
-
-                if (newCiphertextName.length <= shorteningThreshold) {
-                    renameDocument(physicalNode, newCiphertextName)
-                } else {
-                    val hashBytes = java.security.MessageDigest.getInstance("SHA-256").digest(newCiphertextName.toByteArray(Charsets.UTF_8))
-                    val hashStr = android.util.Base64.encodeToString(hashBytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
-                    val shortName = GocryptfsFileNameCryptor.LONGNAME_PREFIX + hashStr
-                    renameDocument(physicalNode, shortName)
-                    val nameFile = createFileSafe(parentPhysical, "application/octet-stream", "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")
-                        ?: throw GocryptfsIOException("Could not create .name file")
-                    writeWhole(nameFile, newCiphertextName.toByteArray(Charsets.UTF_8))
-                }
-            } else {
-                // Cross-directory move: not yet supported by this rename path; caller should use move semantics.
-                return false
+        if (oldParentPath == newParentPath) {
+            // Simple rename within the same directory
+            val parentDirIv = tree.dirivFor(oldParentPath)
+            val newCiphertextName = nameCryptor.encryptName(newName, parentDirIv)
+            val physicalNode = when (node) {
+                is GocryptfsNode.VDir -> node.physicalFolder
+                is GocryptfsNode.VFile -> node.physicalFile
             }
-            tree.invalidate(oldParentPath)
-            tree.invalidate(newParentPath)
-            true
-        } catch (e: Exception) {
-            false
+
+            val oldPhysicalName = physicalNode.name ?: ""
+            val parentPhysical = tree.physicalFolderFor(oldParentPath)
+
+            if (oldPhysicalName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX) && !oldPhysicalName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)) {
+                childOf(parentPhysical, "$oldPhysicalName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")?.delete()
+            }
+
+            if (newCiphertextName.length <= shorteningThreshold) {
+                renameDocument(physicalNode, newCiphertextName)
+            } else {
+                val hashBytes = java.security.MessageDigest.getInstance("SHA-256").digest(newCiphertextName.toByteArray(Charsets.UTF_8))
+                val hashStr = android.util.Base64.encodeToString(hashBytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
+                val shortName = GocryptfsFileNameCryptor.LONGNAME_PREFIX + hashStr
+                renameDocument(physicalNode, shortName)
+                val nameFile = createFileSafe(parentPhysical, "application/octet-stream", "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")
+                    ?: throw GocryptfsIOException("Could not create .name file")
+                writeWhole(nameFile, newCiphertextName.toByteArray(Charsets.UTF_8))
+            }
+        } else {
+            // Cross-directory move. A gocryptfs entry's ciphertext name is
+            // encrypted with its PARENT's diriv, so it must be re-derived for
+            // the destination — but the moved node's own contents (a file's
+            // bytes, or a directory's own diriv and children) are untouched.
+            // Only this small pointer entry relocates.
+            val oldParentPhysical = tree.physicalFolderFor(oldParentPath)
+            val newParentPhysical = tree.physicalFolderFor(newParentPath)
+            val newParentDirIv = tree.dirivFor(newParentPath, newParentPhysical)
+
+            val newCiphertextName = nameCryptor.encryptName(newName, newParentDirIv)
+            val physicalNode = when (node) {
+                is GocryptfsNode.VDir -> node.physicalFolder
+                is GocryptfsNode.VFile -> node.physicalFile
+            }
+            val oldPhysicalName = physicalNode.name ?: ""
+            val wasLongName = oldPhysicalName.startsWith(GocryptfsFileNameCryptor.LONGNAME_PREFIX) &&
+                !oldPhysicalName.endsWith(GocryptfsFileNameCryptor.LONGNAME_SUFFIX)
+
+            if (newCiphertextName.length <= shorteningThreshold) {
+                val renamed = renameDocumentAndGet(physicalNode, newCiphertextName)
+                movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
+            } else {
+                val hashBytes = java.security.MessageDigest.getInstance("SHA-256").digest(newCiphertextName.toByteArray(Charsets.UTF_8))
+                val hashStr = android.util.Base64.encodeToString(hashBytes, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
+                val shortName = GocryptfsFileNameCryptor.LONGNAME_PREFIX + hashStr
+
+                val renamed = renameDocumentAndGet(physicalNode, shortName)
+                movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
+
+                val nameFile = createFileSafe(newParentPhysical, "application/octet-stream", "$shortName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")
+                    ?: throw GocryptfsIOException("Could not create .name file")
+                writeWhole(nameFile, newCiphertextName.toByteArray(Charsets.UTF_8))
+            }
+
+            if (wasLongName) {
+                // The old sidecar is a sibling in the OLD parent, not nested
+                // inside the moved node, so it doesn't move automatically.
+                childOf(oldParentPhysical, "$oldPhysicalName${GocryptfsFileNameCryptor.LONGNAME_SUFFIX}")?.delete()
+            }
         }
+        tree.invalidate(oldParentPath)
+        tree.invalidate(newParentPath)
+        if (node is GocryptfsNode.VDir) tree.invalidate(oldNormalized)
+        true
+    } catch (e: Exception) {
+        false
     }
+}
 
     fun deleteFile(virtualPath: String): Boolean {
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
             val node = tree.resolve(normalized) ?: return false
-            val parentPhysical = (tree.resolve(parentOf(normalized)) as? GocryptfsNode.VDir)?.physicalFolder
+            val parentPhysical = runCatching { tree.physicalFolderFor(parentOf(normalized)) }.getOrNull()
 
             val physicalName = when (node) {
                 is GocryptfsNode.VDir -> node.physicalFolder.name
@@ -178,30 +227,24 @@ class GocryptfsSession(
         return tree.resolve(normalize(virtualPath)) != null
     }
 
-    fun getFileSize(virtualPath: String): Long {
-        val node = tree.resolve(normalize(virtualPath)) ?: return -1L
-        val f = node as? GocryptfsNode.VFile ?: return -1L
-        val ciphertextSize = f.physicalFile.length()
-        val withoutHeader = ciphertextSize - GocryptfsContentCryptor.HEADER_LEN
-        if (withoutHeader < 0L) return 0L
-        return contentCryptor.cleartextSize(withoutHeader)
-    }
+fun getFileSize(virtualPath: String): Long {
+    val node = tree.resolve(normalize(virtualPath)) ?: return -1L
+    val f = node as? GocryptfsNode.VFile ?: return -1L
+    return contentCryptor.cleartextSize(f.physicalFile.length())
+}
 
-    fun getFolderSize(virtualPath: String): Long {
-        val normalized = normalize(virtualPath)
-        val nodes = tree.list(normalized)
-        var total = 0L
-        for (node in nodes) {
-            total += when (node) {
-                is GocryptfsNode.VFile -> {
-                    val withoutHeader = node.physicalFile.length() - GocryptfsContentCryptor.HEADER_LEN
-                    if (withoutHeader < 0L) 0L else contentCryptor.cleartextSize(withoutHeader)
-                }
-                is GocryptfsNode.VDir -> getFolderSize(joinPath(normalized, node.cleartextName))
-            }
+fun getFolderSize(virtualPath: String): Long {
+    val normalized = normalize(virtualPath)
+    val nodes = tree.list(normalized)
+    var total = 0L
+    for (node in nodes) {
+        total += when (node) {
+            is GocryptfsNode.VFile -> contentCryptor.cleartextSize(node.physicalFile.length())
+            is GocryptfsNode.VDir -> getFolderSize(joinPath(normalized, node.cleartextName))
         }
-        return total
     }
+    return total
+}
 
     // ---- file content read/write ----------------------------------------------
 
@@ -422,8 +465,7 @@ class GocryptfsSession(
                 val parentPath = parentOf(normalized)
                 val name = nameOf(normalized)
                 val parentDirIv = tree.dirivFor(parentPath)
-                val parentPhysical = (tree.resolve(parentPath) as? GocryptfsNode.VDir)?.physicalFolder 
-                    ?: throw GocryptfsIOException("Parent directory not found")
+                val parentPhysical = tree.physicalFolderFor(parentPath) 
 
                 val existing = tree.resolve(normalized) as? GocryptfsNode.VFile
                 val physicalTarget: DocumentFile = if (existing != null) {
@@ -530,6 +572,45 @@ class GocryptfsSession(
         context.contentResolver.openOutputStream(file.uri, "wt")?.use { it.write(bytes) }
             ?: throw GocryptfsIOException("Could not open ${file.uri} for writing")
     }
+
+    private fun renameDocumentAndGet(doc: DocumentFile, newName: String): DocumentFile {
+    val newUri = android.provider.DocumentsContract.renameDocument(context.contentResolver, doc.uri, newName)
+    return DocumentFile.fromSingleUri(context, newUri ?: doc.uri)
+        ?: throw GocryptfsIOException("renameDocument failed for ${doc.uri}")
+}
+
+private fun movePhysicalDocument(doc: DocumentFile, oldParent: DocumentFile, newParent: DocumentFile) {
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+        try {
+            val movedUri = android.provider.DocumentsContract.moveDocument(
+                context.contentResolver, doc.uri, oldParent.uri, newParent.uri
+            )
+            if (movedUri != null) return
+        } catch (e: Exception) {
+            // Provider doesn't support atomic move for this document — fall through.
+        }
+    }
+    copyDocumentRecursive(doc, newParent)
+    deleteRecursively(doc)
+}
+
+private fun copyDocumentRecursive(source: DocumentFile, targetParent: DocumentFile): DocumentFile {
+    val name = source.name ?: throw GocryptfsIOException("Source document has no name")
+    return if (source.isDirectory) {
+        val newDir = createDirectorySafe(targetParent, name) ?: throw GocryptfsIOException("Could not create $name in target")
+        for (child in listFilesSafe(source)) copyDocumentRecursive(child, newDir)
+        newDir
+    } else {
+        val newFile = createFileSafe(targetParent, "application/octet-stream", name)
+            ?: throw GocryptfsIOException("Could not create $name in target")
+        context.contentResolver.openInputStream(source.uri)?.use { input ->
+            context.contentResolver.openOutputStream(newFile.uri, "wt")?.use { output ->
+                input.copyTo(output)
+            } ?: throw GocryptfsIOException("Could not open ${newFile.uri} for writing")
+        } ?: throw GocryptfsIOException("Could not open ${source.uri} for reading")
+        newFile
+    }
+}
 
     private fun renameDocument(doc: DocumentFile, newName: String) {
         android.provider.DocumentsContract.renameDocument(context.contentResolver, doc.uri, newName)

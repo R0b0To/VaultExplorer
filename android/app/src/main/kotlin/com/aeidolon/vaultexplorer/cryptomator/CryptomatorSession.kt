@@ -105,43 +105,75 @@ fun listDirectory(virtualPath: String): Array<String>? {
     }
 
     fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
-        if (readOnly) return false
-        return try {
-            val oldNormalized = normalize(oldVirtualPath)
-            val newNormalized = normalize(newVirtualPath)
-            val node = tree.resolve(oldNormalized) ?: return false
+    if (readOnly) return false
+    return try {
+        val oldNormalized = normalize(oldVirtualPath)
+        val newNormalized = normalize(newVirtualPath)
+        val node = tree.resolve(oldNormalized) ?: return false
 
-            val oldParentPath = parentOf(oldNormalized)
-            val newParentPath = parentOf(newNormalized)
-            val newName = nameOf(newNormalized)
+        val oldParentPath = parentOf(oldNormalized)
+        val newParentPath = parentOf(newNormalized)
+        val newName = nameOf(newNormalized)
 
-            if (oldParentPath == newParentPath) {
-                // Simple rename within the same directory: re-encrypt the name and rename the physical .c9r/.c9s entry.
-                val parentDirId = tree.resolveDirId(oldParentPath)
-                val newCiphertextName = nameCryptor.encryptFilename(newName, parentDirId.toByteArray(Charsets.UTF_8))
-                val physicalNode = when (node) {
-                    is VaultNode.VDir -> node.physicalFolder
-                    is VaultNode.VFile -> node.wrapperFolder ?: node.physicalFile
-                }
-                val isShortened = physicalNode.name?.endsWith(".c9s") == true
-                if (isShortened) {
-                    // Shortened entries keep their (hash-derived) physical folder name; only name.c9r's contents change.
-                    val nameFile = childOf(physicalNode, "name.c9r") ?: return false
-                    writeWhole(nameFile, (newCiphertextName + ".c9r").toByteArray(Charsets.UTF_8))
-                } else {
-                    renameDocument(physicalNode, newCiphertextName + ".c9r")
-                }
-            } else {
-                // Cross-directory move: not yet supported by this rename path; caller should use move semantics.
-                return false
+        if (oldParentPath == newParentPath) {
+            // Simple rename within the same directory: re-encrypt the name and rename the physical .c9r/.c9s entry.
+            val parentDirId = tree.resolveDirId(oldParentPath)
+            val newCiphertextName = nameCryptor.encryptFilename(newName, parentDirId.toByteArray(Charsets.UTF_8))
+            val physicalNode = when (node) {
+                is VaultNode.VDir -> node.physicalFolder
+                is VaultNode.VFile -> node.wrapperFolder ?: node.physicalFile
             }
-            tree.invalidate(oldParentPath)
-            tree.invalidate(newParentPath)
-            true
-        } catch (e: Exception) {
-            false
+            val isShortened = physicalNode.name?.endsWith(".c9s") == true
+            if (isShortened) {
+                val nameFile = childOf(physicalNode, "name.c9r") ?: return false
+                writeWhole(nameFile, (newCiphertextName + ".c9r").toByteArray(Charsets.UTF_8))
+            } else {
+                renameDocument(physicalNode, newCiphertextName + ".c9r")
+            }
+        } else {
+            // Cross-directory move. Filenames are encrypted with the parent
+            // directory's dirId as associated data, so the ciphertext name
+            // must be re-derived for the destination — but the moved node's
+            // OWN contents (a file's bytes, or a directory's dirId and its
+            // d/xx/yyyy data folder) are untouched. Only this small pointer
+            // entry (the .c9r/.c9s node) relocates.
+            val oldParentDirId = tree.resolveDirId(oldParentPath)
+            val oldParentPhysical = tree.physicalFolderForDirId(oldParentDirId)
+            val newParentDirId = tree.resolveDirId(newParentPath)
+            val newParentPhysical = tree.physicalFolderForDirId(newParentDirId)
+
+            val newCiphertextName = nameCryptor.encryptFilename(newName, newParentDirId.toByteArray(Charsets.UTF_8))
+
+            val physicalNode = when (node) {
+                is VaultNode.VDir -> node.physicalFolder
+                is VaultNode.VFile -> node.wrapperFolder ?: node.physicalFile
+            }
+            val isShortened = physicalNode.name?.endsWith(".c9s") == true
+
+            if (isShortened) {
+                // Shortened entries keep their hash-derived physical folder
+                // name (matching the existing same-directory behavior above) —
+                // only name.c9r's contents change to reflect the new parent.
+                val nameFile = childOf(physicalNode, "name.c9r") ?: return false
+                writeWhole(nameFile, (newCiphertextName + ".c9r").toByteArray(Charsets.UTF_8))
+                movePhysicalDocument(physicalNode, oldParentPhysical, newParentPhysical)
+            } else {
+                val renamed = renameDocumentAndGet(physicalNode, newCiphertextName + ".c9r")
+                movePhysicalDocument(renamed, oldParentPhysical, newParentPhysical)
+            }
         }
+        tree.invalidate(oldParentPath)
+        tree.invalidate(newParentPath)
+        // The moved node's own cached dirId/data-dir lookups (if it's a
+        // directory) are keyed by its OLD virtual path — purge them so a
+        // later walk() doesn't trust a stale cache entry under a path that
+        // no longer physically resolves there.
+        if (node is VaultNode.VDir) tree.invalidate(oldNormalized)
+        true
+    } catch (e: Exception) {
+        false
     }
+}
 
     fun deleteFile(virtualPath: String): Boolean {
         if (readOnly) return false
@@ -569,6 +601,53 @@ fun listDirectory(virtualPath: String): Array<String>? {
         context.contentResolver.openOutputStream(file.uri, "wt")?.use { it.write(bytes) }
             ?: throw VaultIOException("Could not open ${file.uri} for writing")
     }
+
+    /** Like [renameDocument], but returns the (possibly new) [DocumentFile] handle
+ *  for the renamed document — needed when the caller must keep operating on
+ *  it afterward (e.g. moving it to a different parent next). */
+private fun renameDocumentAndGet(doc: DocumentFile, newName: String): DocumentFile {
+    val newUri = android.provider.DocumentsContract.renameDocument(context.contentResolver, doc.uri, newName)
+    return DocumentFile.fromSingleUri(context, newUri ?: doc.uri)
+        ?: throw VaultIOException("renameDocument failed for ${doc.uri}")
+}
+
+/** Physically relocates [doc] (a file, or a small pointer folder like a
+ *  .c9r/.c9s node) from [oldParent] to [newParent]. Prefers the atomic SAF
+ *  move operation; falls back to a manual recursive copy+delete for
+ *  providers that don't implement FLAG_SUPPORTS_MOVE. */
+private fun movePhysicalDocument(doc: DocumentFile, oldParent: DocumentFile, newParent: DocumentFile) {
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+        try {
+            val movedUri = android.provider.DocumentsContract.moveDocument(
+                context.contentResolver, doc.uri, oldParent.uri, newParent.uri
+            )
+            if (movedUri != null) return
+        } catch (e: Exception) {
+            // Provider doesn't support atomic move for this document — fall through.
+        }
+    }
+    copyDocumentRecursive(doc, newParent)
+    deleteRecursively(doc)
+}
+
+private fun copyDocumentRecursive(source: DocumentFile, targetParent: DocumentFile): DocumentFile {
+    val name = source.name ?: throw VaultIOException("Source document has no name")
+    return if (source.isDirectory) {
+        val newDir = createDirectorySafe(targetParent, name) ?: throw VaultIOException("Could not create $name in target")
+        for (child in listFilesSafe(source)) copyDocumentRecursive(child, newDir)
+        newDir
+    } else {
+        val newFile = createFileSafe(targetParent, "application/octet-stream", name)
+            ?: throw VaultIOException("Could not create $name in target")
+        context.contentResolver.openInputStream(source.uri)?.use { input ->
+            context.contentResolver.openOutputStream(newFile.uri, "wt")?.use { output ->
+                input.copyTo(output)
+            } ?: throw VaultIOException("Could not open ${newFile.uri} for writing")
+        } ?: throw VaultIOException("Could not open ${source.uri} for reading")
+        newFile
+    }
+}
+
 
     private fun renameDocument(doc: DocumentFile, newName: String) {
         android.provider.DocumentsContract.renameDocument(context.contentResolver, doc.uri, newName)

@@ -80,7 +80,7 @@ class GocryptfsContentCryptor(private val contentKey: ByteArray) {
 
     fun cleartextSize(ciphertextSize: Long): Long {
         if (ciphertextSize <= HEADER_LEN) return 0L
-        val body = ciphertextSize - HEADER_LEN
+        val body = ciphertextSize - HEADER_LEN 
         val fullChunks = body / CIPHERTEXT_CHUNK_SIZE
         val remainder = body % CIPHERTEXT_CHUNK_SIZE
         var size = fullChunks * CLEARTEXT_CHUNK_SIZE

@@ -280,13 +280,14 @@ class ThumbnailCacheService {
   }
 
   // ── Public: write ─────────────────────────────────────────────────────────
-
+static final Set<String> _ensuredThumbDirs = {};
   static Future<void> put({
     required MountedContainer container,
     required String filePath,
     required Uint8List data,
     required ThumbnailCacheMode mode,
   }) async {
+    
     if (mode == ThumbnailCacheMode.disabled || data.isEmpty) return;
 
     putInMemory(container, filePath, data);
@@ -306,16 +307,18 @@ class ThumbnailCacheService {
         await tmp.writeAsBytes(encrypted, flush: true);
         await tmp.rename(file.path);
       } else {
-        final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
-        final tmpPath = '$cachePath.tmp';
-        await vaultExplorerApi.createDirectory(container, inContainerDir);
+  final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
+  final tmpPath = '$cachePath.tmp';
+  if (_ensuredThumbDirs.add(container.uri)) {
+    await vaultExplorerApi.createDirectory(container, inContainerDir);
+  }
         await vaultExplorerApi.deleteFile(container, tmpPath);
         final ok = await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, data);
-await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
-if (ok) {
-  await vaultExplorerApi.deleteFile(container, cachePath);
-  await vaultExplorerApi.renameFile(container, tmpPath, cachePath);
-} else {
+        await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
+        if (ok) {
+          await vaultExplorerApi.deleteFile(container, cachePath);
+          await vaultExplorerApi.renameFile(container, tmpPath, cachePath);
+        } else {
           await vaultExplorerApi.deleteFile(container, tmpPath);
           debugPrint(
             'ThumbnailCacheService.put: inContainer write failed for $filePath',

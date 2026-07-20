@@ -107,28 +107,37 @@ class GocryptfsSession(
         }
     }
 
-    fun createDirectory(virtualPath: String): Boolean {
-        if (readOnly) return false
-        return try {
-            val normalized = normalize(virtualPath)
-            val parentPath = parentOf(normalized)
-            val name = nameOf(normalized)
-            val parentDirIv = tree.dirivFor(parentPath)
-            val parentPhysical = tree.physicalFolderFor(parentPath)
+fun createDirectory(virtualPath: String): Boolean {
+    if (readOnly) return false
+    return try {
+        val normalized = normalize(virtualPath)
 
-            val ciphertextName = nameCryptor.encryptName(name, parentDirIv)
-            createNodeFolder(parentPhysical, ciphertextName, name)
+        // Idempotent: callers (e.g. ThumbnailCacheService) call this on
+        // every write, not just the first. Since the ciphertext name is
+        // deterministic, creating it again previously asked SAF for a
+        // duplicate display name — Android's local-storage provider
+        // doesn't fail that, it silently appends " (2)", " (3)", etc,
+        // leaving corrupted, undecryptable duplicate folders behind.
+        val existing = tree.resolve(normalized)
+        if (existing is GocryptfsNode.VDir) return true
+        if (existing != null) return false // a file already occupies this path
 
-            // Additionally writes a fresh gocryptfs.diriv for the new directory
-            tree.dirivFor(normalized)
+        val parentPath = parentOf(normalized)
+        val name = nameOf(normalized)
+        val parentDirIv = tree.dirivFor(parentPath)
+        val parentPhysical = tree.physicalFolderFor(parentPath)
 
-            tree.invalidate(parentPath)
-            true
-        } catch (e: Exception) {
-            android.util.Log.e("GocryptfsSession", "createDirectory failed for $virtualPath", e)
-            false
-        }
+        val ciphertextName = nameCryptor.encryptName(name, parentDirIv)
+        createNodeFolder(parentPhysical, ciphertextName, name)
+
+        tree.dirivFor(normalized)
+        tree.invalidate(parentPath)
+        true
+    } catch (e: Exception) {
+        android.util.Log.e("GocryptfsSession", "createDirectory failed for $virtualPath", e)
+        false
     }
+}
 
     fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
     if (readOnly) return false

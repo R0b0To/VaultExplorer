@@ -96,37 +96,40 @@ fun listDirectory(virtualPath: String): Array<String>? {
     }
 }
 
-    fun createDirectory(virtualPath: String): Boolean {
-        if (readOnly) return false
-        return try {
-            val normalized = normalize(virtualPath)
-            val parentPath = parentOf(normalized)
-            val name = nameOf(normalized)
-            val parentDirId = tree.resolveDirId(parentPath)
-            val parentPhysical = tree.physicalFolderForDirId(parentDirId)
+fun createDirectory(virtualPath: String): Boolean {
+    if (readOnly) return false
+    return try {
+        val normalized = normalize(virtualPath)
 
-            val newDirId = UUID.randomUUID().toString()
-            val ciphertextName = nameCryptor.encryptFilename(name, parentDirId.toByteArray(Charsets.UTF_8))
-            createNodeFolder(parentPhysical, ciphertextName) { nodeFolder ->
-                val dirIdBytes = newDirId.toByteArray(Charsets.UTF_8)
-                val dirFile = createFileSafe(nodeFolder, "application/octet-stream", "dir.c9r")
-                    ?: throw VaultIOException("Could not create dir.c9r")
-                writeWhole(dirFile, dirIdBytes)
-            }
+        val existing = tree.resolve(normalized)
+        if (existing is VaultNode.VDir) return true
+        if (existing != null) return false
 
-            // Ensure the physical two-level (d/xx/yyyy) storage folder for the new directory exists.
-            val hash = nameCryptor.hashDirectoryId(newDirId)
-            val dataDir = requireNonNull(findOrCreateChild(vaultRoot(), "d", isDir = true))
-            val lvl1 = requireNonNull(findOrCreateChild(dataDir, hash.substring(0, 2), isDir = true))
-            findOrCreateChild(lvl1, hash.substring(2), isDir = true)
+        val parentPath = parentOf(normalized)
+        val name = nameOf(normalized)
+        val parentDirId = tree.resolveDirId(parentPath)
+        val parentPhysical = tree.physicalFolderForDirId(parentDirId)
 
-            tree.invalidate(parentPath)
-            true
-        } catch (e: Exception) {
-            android.util.Log.e("CryptomatorSession", "createDirectory failed for $virtualPath", e)
-            false
+        val newDirId = UUID.randomUUID().toString()
+        val ciphertextName = nameCryptor.encryptFilename(name, parentDirId.toByteArray(Charsets.UTF_8))
+        createNodeFolder(parentPhysical, ciphertextName) { nodeFolder ->
+            val dirFile = createFileSafe(nodeFolder, "application/octet-stream", "dir.c9r")
+                ?: throw VaultIOException("Could not create dir.c9r")
+            writeWhole(dirFile, newDirId.toByteArray(Charsets.UTF_8))
         }
+
+        val hash = nameCryptor.hashDirectoryId(newDirId)
+        val dataDir = requireNonNull(findOrCreateChild(vaultRoot(), "d", isDir = true))
+        val lvl1 = requireNonNull(findOrCreateChild(dataDir, hash.substring(0, 2), isDir = true))
+        findOrCreateChild(lvl1, hash.substring(2), isDir = true)
+
+        tree.invalidate(parentPath)
+        true
+    } catch (e: Exception) {
+        android.util.Log.e("CryptomatorSession", "createDirectory failed for $virtualPath", e)
+        false
     }
+}
 
     fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
     if (readOnly) return false

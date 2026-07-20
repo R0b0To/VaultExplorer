@@ -577,20 +577,47 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
 
   // ── Recursive delete ──────────────────────────────────────────────────────
 
-  Future<bool> _deleteEntryRecursive(
+Future<bool> _deleteEntryRecursive(
     MountedContainer container,
     String path,
     bool isDir,
   ) async {
-    if (!isDir) return vaultExplorerApi.deleteFile(container, path);
+    if (!isDir) {
+      try {
+        return await vaultExplorerApi.deleteFile(container, path);
+      } catch (_) {
+        return false;
+      }
+    }
 
-    final children =
-        await vaultExplorerApi.listDirectory(container, path) ?? [];
+    List<String> children;
+    try {
+      children = await vaultExplorerApi.listDirectory(container, path) ?? [];
+    } catch (_) {
+      // A corrupted/undecryptable entry inside this folder can make
+      // listing throw instead of returning. Don't let that abort the
+      // whole batch delete — just try to remove this node itself and
+      // report accordingly.
+      try {
+        return await vaultExplorerApi.deleteFile(container, path);
+      } catch (_) {
+        return false;
+      }
+    }
+
+    bool allOk = true;
     for (final entry in children) {
       if (entry.startsWith('System:')) continue;
       final e = RawEntry.parse(entry);
-      await _deleteEntryRecursive(container, '$path/${e.name}', e.isDir);
+      final ok = await _deleteEntryRecursive(container, '$path/${e.name}', e.isDir);
+      if (!ok) allOk = false;
     }
-    return vaultExplorerApi.deleteFile(container, path);
+
+    try {
+      final deletedSelf = await vaultExplorerApi.deleteFile(container, path);
+      return deletedSelf && allOk;
+    } catch (_) {
+      return false;
+    }
   }
 }

@@ -37,6 +37,8 @@ class MediaViewerConstants {
     'mov',
     'avi',
     'mkv',
+    'mpeg',
+    'mpg',
   ];
   static const List<String> audioExtensions = [
     'mp3',

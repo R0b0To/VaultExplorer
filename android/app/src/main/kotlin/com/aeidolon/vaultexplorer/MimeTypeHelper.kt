@@ -11,6 +11,7 @@ object MimeTypeHelper {
         fileName.endsWith(".mkv",  ignoreCase = true)                                         -> "video/x-matroska"
         fileName.endsWith(".mov",  ignoreCase = true)                                         -> "video/quicktime"
         fileName.endsWith(".avi",  ignoreCase = true)                                         -> "video/x-msvideo"
+        fileName.endsWith(".mpeg", ignoreCase = true) || fileName.endsWith(".mpg",   ignoreCase = true) -> "video/mpeg"
         fileName.endsWith(".mp3",  ignoreCase = true)                                         -> "audio/mpeg"
         fileName.endsWith(".m4a",  ignoreCase = true)                                         -> "audio/mp4"
         fileName.endsWith(".wav",  ignoreCase = true)                                         -> "audio/wav"

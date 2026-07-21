@@ -18,6 +18,8 @@ IconData iconForFile(String name) {
     case 'mkv':
     case 'webm':
     case 'm4v':
+    case 'mpeg':
+    case 'mpg':
       return Icons.ondemand_video_outlined;
     case 'mp3':
     case 'flac':
@@ -57,6 +59,8 @@ Color colorForFile(String name) {
     case 'mkv':
     case 'webm':
     case 'm4v':
+    case 'mpeg':
+    case 'mpg':
       return const Color(0xFF7E57C2);
     case 'mp3':
     case 'flac':

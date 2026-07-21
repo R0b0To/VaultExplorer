@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
+import '../../services/app_secure_storage.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/password_hasher.dart';
 import '../dashboard/vault_dashboard.dart';
@@ -16,8 +16,7 @@ class LockGateScreen extends StatefulWidget {
 }
 
 class _LockGateScreenState extends State<LockGateScreen> {
-  static const _secure = FlutterSecureStorage(
-  );
+  static const _secure = AppSecureStorage.instance;
   static const _kFailedAttempts = 'lock_gate_failed_attempts_v1';
   static const _kLockedUntilMs = 'lock_gate_locked_until_ms_v1';
 

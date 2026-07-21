@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/thumbnail_cache_mode.dart';
 import '../models/thumbnail_quality.dart';
+import 'app_secure_storage.dart';
 import 'vaultexplorer_api.dart';
 
 // ── ContainerUnlockMethod ─────────────────────────────────────────────────────
@@ -68,8 +68,7 @@ class ContainerRepository {
 
   // ── Backing stores ────────────────────────────────────────────────────────
 
-  static const _secure = FlutterSecureStorage(
-  );
+  static const _secure = AppSecureStorage.instance;
 
   // In-memory cache — loaded once on first access, written-through on every mutation.
   Map<String, ContainerRecord>? _cache;

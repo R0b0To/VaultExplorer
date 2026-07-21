@@ -286,43 +286,30 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
 
       int hiddenSizeBytes = 0;
       if (_enableHiddenVolume && _format == CreateFormat.veracrypt) {
-        final hiddenSizeVal = double.tryParse(_hiddenSizeCtrl.text);
-        if (hiddenSizeVal == null || hiddenSizeVal <= 0) {
-          setState(() => _error = 'Enter a valid hidden size greater than 0');
+        final outerPimClamped = clampPim(
+          _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0,
+        );
+        final hiddenPimClamped = clampPim(
+          _hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0,
+        );
+
+        final validation = validateHiddenVolume(
+          hiddenSizeText: _hiddenSizeCtrl.text,
+          hiddenSizeUnit: _hiddenSizeUnit,
+          outerSizeBytes: sizeBytes,
+          outerPimClamped: outerPimClamped,
+          hiddenPimClamped: hiddenPimClamped,
+          outerPassword: _passwordCtrl.text,
+          hiddenPassword: _hiddenPasswordCtrl.text,
+          hasHiddenKeyfiles: _hiddenKeyfiles.isNotEmpty,
+          outerKeyfileUris: _keyfiles.map((k) => k.uri).toSet(),
+          hiddenKeyfileUris: _hiddenKeyfiles.map((k) => k.uri).toSet(),
+        );
+        if (!validation.isValid) {
+          setState(() => _error = validation.error);
           return;
         }
-        final hiddenMultiplier = _hiddenSizeUnit == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024;
-        hiddenSizeBytes = (hiddenSizeVal * hiddenMultiplier).round();
-
-        if (hiddenSizeBytes >= sizeBytes) {
-          setState(() => _error = 'Hidden volume size must be less than the outer volume size');
-          return;
-        }
-        const vcDataAreaOffset = 131072;
-        if (sizeBytes <= vcDataAreaOffset + hiddenSizeBytes) {
-          setState(() => _error = 'Hidden volume size is too large for this container size');
-          return;
-        }
-
-        if (_hiddenPasswordCtrl.text.isEmpty && _hiddenKeyfiles.isEmpty) {
-          setState(() => _error = 'A hidden password or keyfile is required when creating a hidden volume');
-          return;
-        }
-
-        final outerPimVal = _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0;
-        final hiddenPimVal = _hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0;
-
-        final outerUris = _keyfiles.map((k) => k.uri).toSet();
-        final hiddenUris = _hiddenKeyfiles.map((k) => k.uri).toSet();
-
-        final samePassword = _passwordCtrl.text == _hiddenPasswordCtrl.text;
-        final samePim = outerPimVal == hiddenPimVal;
-        final sameKeyfiles = outerUris.length == hiddenUris.length && outerUris.difference(hiddenUris).isEmpty;
-
-        if (samePassword && samePim && sameKeyfiles) {
-          setState(() => _error = 'Hidden volume credentials (password, PIM, and keyfiles) cannot be identical to the outer volume credentials.');
-          return;
-        }
+        hiddenSizeBytes = validation.hiddenSizeBytes!;
       }
 
       final pim = clampPim(

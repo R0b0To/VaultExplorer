@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/browser_layout_mode.dart';
 import '../models/thumbnail_cache_mode.dart';
 import '../models/thumbnail_quality.dart';
 import '../models/container_sort_mode.dart';
+import 'app_secure_storage.dart';
 import 'container_repository.dart';
 
 export 'container_repository.dart'
@@ -13,7 +13,7 @@ export 'container_repository.dart'
 
 // ── Secure storage instance ───────────────────────────────────────────────────
 
-const _secure = FlutterSecureStorage(aOptions: AndroidOptions());
+const _secure = AppSecureStorage.instance;
 
 const _kMasterHash = 'vc_master_hash_v2';
 const _kMasterSalt = 'vc_master_salt_v2';

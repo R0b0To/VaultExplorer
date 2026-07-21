@@ -1,9 +1,8 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:encrypt/encrypt.dart' as enc;
+import 'app_secure_storage.dart';
 
 class AppCacheEncryption {
-  static const _secure = FlutterSecureStorage(
-  );
+  static const _secure = AppSecureStorage.instance;
   static const _kCacheKey = 'app_cache_aes_key';
 
   static enc.Key? _cachedKey;

@@ -5,10 +5,11 @@ package com.aeidolon.vaultexplorer.crypto
  * reduction polynomial x^128 + x^7 + x^2 + x + 1 (0x87).
  *
  * Extracted from [com.aeidolon.vaultexplorer.cryptomator.SivMode]'s private
- * `dbl()` — SIV (used by Cryptomator) and EME (used by gocryptfs) both need
- * exactly this operation, so it now has one home instead of two copies.
- * Byte-for-byte identical behavior to the original; SivMode.kt is updated to
- * call this instead of its own copy.
+ * `dbl()`. Note that while SIV and EME both perform GF(2^128) doubling
+ * with the same 0x87 polynomial, they use opposite byte-endianness:
+ * SIV treats blocks as big-endian (this function), while EME treats them
+ * as little-endian (see [com.aeidolon.vaultexplorer.gocryptfs.GocryptfsEme.multByTwo]).
+ * Thus, they cannot share a single doubling implementation.
  */
 fun gf128Double(block: ByteArray): ByteArray {
     require(block.size == 16)

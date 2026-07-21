@@ -57,6 +57,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   /// keyfiles, and cipher/hash pickers which don't apply to LUKS.
   bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
 
+  /// True for BitLocker volumes — hides keyfiles and the PIM/cipher/hash
+  /// picker, same as LUKS (BitLocker has no keyfile concept and its cipher
+  /// comes from the volume metadata, not a user choice).
+  bool get _isBitlocker => _containerFormat == 'bitlocker';
+
   // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
   UnlockProgress? _progress;
@@ -90,6 +95,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       return p.total > 1
           ? 'Trying keyslot ${p.attempted} of ${p.total}…'
           : 'Trying keyslot…';
+    }
+    if (_isBitlocker) {
+      return p.total > 1
+          ? 'Verifying credential ${p.attempted} of ${p.total}…'
+          : 'Verifying credential…';
     }
     final hashName = hashAlgorithmName(p.hashId);
     final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
@@ -1007,7 +1017,9 @@ RadioGroup<UsbDeviceInfo>(
                       enabled: !busy,
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        hintText: 'Enter USB partition password',
+                        hintText: _isBitlocker
+                            ? 'Enter password or recovery key'
+                            : 'Enter USB partition password',
                         prefixIcon: Icon(Icons.lock_outline_rounded, size: 22, color: cs.primary),
                         suffixIcon: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -1035,31 +1047,35 @@ RadioGroup<UsbDeviceInfo>(
                     ),
                     const SizedBox(height: 16),
 
-                    // Keyfiles Card Component. LUKS keyfiles work too —
-                    // cryptsetup treats a keyfile as a *replacement* for the
-                    // typed password, not an additive mix-in.
-                    KeyfilesPicker(
-                      keyfiles: _keyfiles,
-                      picking: _pickingKeyfiles,
-                      onPick: _pickKeyfiles,
-                      onRemove: _removeKeyfile,
-                      enabled: !busy,
-                    ),
-                    if (_isLuks && _keyfiles.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4, left: 4),
-                        child: Text(
-                          'For LUKS containers the keyfile replaces the password.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                        ),
+                    // Keyfiles Card Component (gated: BitLocker has no keyfile
+                    // concept, only password/recovery-key). LUKS keyfiles work
+                    // too — cryptsetup treats a keyfile as a *replacement* for
+                    // the typed password, not an additive mix-in.
+                    if (!_isBitlocker) ...[
+                      KeyfilesPicker(
+                        keyfiles: _keyfiles,
+                        picking: _pickingKeyfiles,
+                        onPick: _pickKeyfiles,
+                        onRemove: _removeKeyfile,
+                        enabled: !busy,
                       ),
-                    const SizedBox(height: 16),
+                      if (_isLuks && _keyfiles.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 4),
+                          child: Text(
+                            'For LUKS containers the keyfile replaces the password.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Collapsible Advanced settings panel
-                    //    LUKS doesn't use PIM or VeraCrypt cipher/hash selection.
-                    if (!_isLuks)
+                    //    LUKS and BitLocker don't use PIM or VeraCrypt
+                    //    cipher/hash selection.
+                    if (!_isLuks && !_isBitlocker)
                       AdvancedParamsPanel(
                         pimController: _pimCtrl,
                         cipherId: _cipherId,

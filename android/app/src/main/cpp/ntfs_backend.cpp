@@ -17,6 +17,7 @@ extern "C" {
 #include "block_io.h"
 #include "crypto/cascade.h"
 #include "volume_state.h"
+#include "bitlocker_backend.h"
 
 namespace {
 
@@ -117,6 +118,16 @@ s64 ntfsPread(ntfs_device* device, void* buffer, s64 count, s64 offset) {
     const uint64_t byteCount = static_cast<uint64_t>(count);
     if (startByte > volume.dataAreaLengthBytes || byteCount > volume.dataAreaLengthBytes - startByte)
         return -1;
+
+    // BitLocker: bitlockerRead's logicalOffset uses the exact same
+    // dataAreaLengthBytes-relative convention as startByte here, so this is
+    // a direct hand-off -- no sector alignment or cascade decrypt needed,
+    // dislocker does both internally via the dis_context_t from unlock time.
+    if (volume.containerFormat == ContainerFormat::kBitLocker) {
+        return bitlockerRead(volumeId, startByte, static_cast<unsigned char*>(buffer), byteCount)
+            ? count : -1;
+    }
+
     const uint64_t startSector = startByte / 512;
     const uint64_t endSector = (startByte + byteCount + 511) / 512;
     const uint32_t sectorCount = static_cast<uint32_t>(endSector - startSector);
@@ -153,6 +164,13 @@ s64 ntfsPwrite(ntfs_device* device, const void* buffer, s64 count, s64 offset) {
     const uint64_t byteCount = static_cast<uint64_t>(count);
     if (startByte > volume.dataAreaLengthBytes || byteCount > volume.dataAreaLengthBytes - startByte)
         return -1;
+
+    // See the matching comment in ntfsPread.
+    if (volume.containerFormat == ContainerFormat::kBitLocker) {
+        return bitlockerWrite(volumeId, startByte, static_cast<const unsigned char*>(buffer), byteCount)
+            ? count : -1;
+    }
+
     const uint64_t startSector = startByte / 512;
     const uint64_t endSector = (startByte + byteCount + 511) / 512;
     const uint32_t sectorCount = static_cast<uint32_t>(endSector - startSector);

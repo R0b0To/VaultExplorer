@@ -221,10 +221,11 @@ object ContainerEngine {
 }
 
 enum class ContainerFormat {
-    VERACRYPT, LUKS1, LUKS2, CRYPTOMATOR, GOCRYPTFS, UNKNOWN;
+    VERACRYPT, LUKS1, LUKS2, CRYPTOMATOR, GOCRYPTFS, BITLOCKER, UNKNOWN;
     val wireName: String get() = when (this) {
         VERACRYPT -> "veracrypt"; LUKS1 -> "luks1"; LUKS2 -> "luks2"
-        CRYPTOMATOR -> "cryptomator"; GOCRYPTFS -> "gocryptfs"; UNKNOWN -> "unknown"
+        CRYPTOMATOR -> "cryptomator"; GOCRYPTFS -> "gocryptfs"
+        BITLOCKER -> "bitlocker"; UNKNOWN -> "unknown"
     }
 
     companion object {
@@ -232,6 +233,7 @@ enum class ContainerFormat {
             0 -> VERACRYPT
             1 -> LUKS1
             2 -> LUKS2
+            3 -> BITLOCKER
             else -> UNKNOWN
         }
     }

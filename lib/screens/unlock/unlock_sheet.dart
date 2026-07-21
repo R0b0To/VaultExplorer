@@ -54,6 +54,11 @@ class _UnlockSheetState extends State<UnlockSheet> {
   bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
   bool get _isCryptomator => _containerFormat == 'cryptomator';
   bool get _isGocryptfs => _containerFormat == 'gocryptfs';
+
+  /// True for BitLocker volumes — like LUKS, these hide PIM, keyfiles, and
+  /// cipher/hash pickers (BitLocker has no keyfile concept and its cipher
+  /// is read from the volume metadata, not chosen by the user).
+  bool get _isBitlocker => _containerFormat == 'bitlocker';
   
   /// True if the user has selected the "Folder Vault" type or if we have
   /// already determined the selected folder is a Cryptomator or Gocryptfs vault.
@@ -732,6 +737,11 @@ class _UnlockSheetState extends State<UnlockSheet> {
           ? 'Trying keyslot ${p.attempted} of ${p.total}…'
           : 'Trying keyslot…';
     }
+    if (_isBitlocker) {
+      return p.total > 1
+          ? 'Verifying credential ${p.attempted} of ${p.total}…'
+          : 'Verifying credential…';
+    }
     final hashName = hashAlgorithmName(p.hashId);
     final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
     final slotName = p.slot == 1 ? 'Hidden Volume' : 'Standard Volume';
@@ -860,10 +870,12 @@ class _UnlockSheetState extends State<UnlockSheet> {
                                               ? 'Cryptomator Vault'
                                               : _isGocryptfs
                                                   ? 'Gocryptfs Vault'
-                                                  : 'Selected Container')
+                                                  : _isBitlocker
+                                                      ? 'BitLocker Drive'
+                                                      : 'Selected Container')
                                       : (_isFolderVault
                                           ? 'Cryptomator | Gocryptfs'
-                                          : 'VeraCrypt | LUKS'),
+                                          : 'VeraCrypt | LUKS | BitLocker'),
                                   style: textTheme.labelLarge?.copyWith(
                                     color: _selectedUri != null
                                         ? cs.primary
@@ -1191,7 +1203,11 @@ class _UnlockSheetState extends State<UnlockSheet> {
                           autofillHints: const [AutofillHints.password],
                           decoration: InputDecoration(
                             labelText: 'Password',
-                            hintText: _isFolderVault ? 'Enter vault password' : 'Enter container password',
+                            hintText: _isFolderVault
+                                ? 'Enter vault password'
+                                : _isBitlocker
+                                    ? 'Enter password or recovery key'
+                                    : 'Enter container password',
                             prefixIcon: Icon(Icons.lock_outline_rounded, size: 22, color: cs.primary),
                             suffixIcon: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1219,8 +1235,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
                         ),
                         const SizedBox(height: 16),
 
-                        // 2. Keyfiles Selection Box (Gated: hidden for Directory Vaults)
-                        if (!_isFolderVault) ...[
+                        // 2. Keyfiles Selection Box (Gated: hidden for Directory Vaults & BitLocker)
+                        if (!_isFolderVault && !_isBitlocker) ...[
                           KeyfilesPicker(
                             keyfiles: _keyfiles,
                             picking: _pickingKeyfiles,
@@ -1240,8 +1256,8 @@ class _UnlockSheetState extends State<UnlockSheet> {
                           const SizedBox(height: 16),
                         ],
 
-                        // 3. Collapsible Advanced parameters (Gated: hidden for LUKS & Vaults)
-                        if (!_isLuks && !_isFolderVault) ...[
+                        // 3. Collapsible Advanced parameters (Gated: hidden for LUKS, Vaults & BitLocker)
+                        if (!_isLuks && !_isFolderVault && !_isBitlocker) ...[
                           AdvancedParamsPanel(
                             pimController: _pimCtrl,
                             cipherId: _cipherId,

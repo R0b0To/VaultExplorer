@@ -58,6 +58,12 @@ FetchContent_GetProperties(e2fsprogs)
 if(NOT e2fsprogs_POPULATED)
     FetchContent_Populate(e2fsprogs)
 endif()
+
+# 3a-bde. BitLocker support (libbde + its libyal dependency chain). Split
+# into its own file since it's a long, mostly-mechanical block of
+# FetchContent + hand-written config.h generation, same rationale as
+# keeping e2fsprogs's own setup readable above.
+include(${CMAKE_CURRENT_SOURCE_DIR}/bitlocker_deps.cmake)
 set(E2FS_SRC_DIR ${e2fsprogs_SOURCE_DIR})
 set(E2FS_EXT2FS_DIR ${E2FS_SRC_DIR}/lib/ext2fs)
 set(E2FS_GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/e2fs-generated)
@@ -323,6 +329,7 @@ add_library(
         SHARED
         vaultexplorer.cpp
         session_prepare.cpp        # VeraCrypt/LUKS session establishment (Tier-1 JNI calls)
+        bitlocker_backend.cpp      # BitLocker session establishment + dislocker-backed I/O
         container_create.cpp       # new-container header/format creation (createContainerNative)
         jni_runtime.cpp
         jni_callbacks.cpp
@@ -402,6 +409,7 @@ target_include_directories(
         ${E2FS_SRC_DIR}/lib
         ${E2FS_EXT2FS_DIR}
         ${cjson_SOURCE_DIR}
+        ${DISLOCKER_INCLUDE_DIRS}
 )
 
 find_library(log-lib log)
@@ -413,7 +421,9 @@ target_link_libraries(
         e2fs_ext2fs
         e2fs_com_err
         e2fs_uuid
-        cjson)                  
+        cjson
+        dislocker_lib)
+
 
 if(NOT ANDROID)
     add_executable(sector_batching_test test/sector_batching_test.cpp)

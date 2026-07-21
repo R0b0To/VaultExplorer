@@ -29,6 +29,7 @@
 #include "crypto/luks_header.h"
 #include "crypto/xts_tweak.h"
 #include "session_prepare.h"
+#include "bitlocker_backend.h"
 #include "container_create.h"
 #include "container_format.h"
 #include "container_header.h"
@@ -246,6 +247,18 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         return RES_NOTRDY;
     if (count == 0) return RES_PARERR;
 
+    // BitLocker: dislocker already owns the real physical I/O (via the virtual_io
+    // callbacks), so the logic is the same: hand it the post-metadata logical
+    // offset and it translates it automatically. -- none of the physicalRead + per-sector
+    // cascade machinery below applies. `sector` here is already relative to
+    // this volume's mounted filesystem (see basePhysical below for why),
+    // which is exactly the convention bitlockerRead's logicalOffset expects.
+    if (volumes[pdrv].containerFormat == ContainerFormat::kBitLocker) {
+        const bool ok = bitlockerRead(pdrv, static_cast<uint64_t>(sector) * 512,
+                                      buff, static_cast<size_t>(count) * 512);
+        return ok ? RES_OK : RES_ERROR;
+    }
+
     const auto callStart = std::chrono::steady_clock::now();
     double physicalMs = 0.0;
 
@@ -360,6 +373,16 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
     if (!volumes[pdrv].isUsbSource && volumes[pdrv].fd < 0)
         return RES_NOTRDY;
     if (count == 0) return RES_PARERR;
+
+    // See the matching comment in disk_read: BitLocker bypasses this
+    // function's physicalRead/cascade machinery entirely and hands off
+    // straight to dislocker, which owns re-encrypting and writing back through
+    // the same fd/USB transport internally.
+    if (volumes[pdrv].containerFormat == ContainerFormat::kBitLocker) {
+        const bool ok = bitlockerWrite(pdrv, static_cast<uint64_t>(sector) * 512,
+                                       buff, static_cast<size_t>(count) * 512);
+        return ok ? RES_OK : RES_ERROR;
+    }
 
     VolumeState& v = volumes[pdrv];
     const uint64_t basePhysical = v.dataOffset / 512;

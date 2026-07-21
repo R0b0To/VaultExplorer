@@ -9,4 +9,5 @@ enum class ContainerFormat : uint8_t {
     kVeraCrypt = 0,
     kLuks1 = 1,
     kLuks2 = 2,
+    kBitLocker = 3,
 };

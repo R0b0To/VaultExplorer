@@ -18,6 +18,7 @@
 #include "mbedtls/aes.h"
 
 #include "container_format.h"
+#include "bitlocker_backend.h"
 #include "container_header.h"
 #include "container_utils.h"
 #include "crypto/cascade.h"
@@ -503,6 +504,24 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
         }
     }
 
+    // BitLocker check comes after the cheap LUKS magic-byte check (a LUKS
+    // container can never also be a BitLocker one, so order between the two
+    // doesn't matter for correctness) but before anything VeraCrypt-specific,
+    // for the same reason isLuksContainer is checked first: it's a hard
+    // format signal, not a key-derivation attempt, so there's no point
+    // falling into PBKDF2 trials first. Unlike the 6-byte LUKS magic check,
+    // this needs the real fd (see bitlockerDetectFile's doc comment for why
+    // a plain OEM-ID peek isn't reliable for Windows 8+ volumes).
+    //
+    // BitLocker has no keyfile/PIM/cipher/hash concept (see
+    // prepareBitLockerSession's signature), so any keyfiles the caller
+    // passed are simply unused here -- close them the same way the LUKS
+    // branch above does when it isn't the one consuming them.
+    if (bitlockerDetectFile(fd)) {
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        return prepareBitLockerSession(fd, password, passwordLen, volId, readOnly);
+    }
+
     struct HeaderSlot { uint64_t fileOffset; };
     static constexpr HeaderSlot kHeaderSlots[] = { { 0 }, { VC_HIDDEN_HEADER_OFFSET } };
 
@@ -879,6 +898,26 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
                                   password, passwordLen, volId,
                                   preservedKey, preservedKeyLen,
                                   attemptKeyfileFds, attemptKeyfileCount,readOnly)) {
+            return true;
+        }
+    }
+
+    // Same per-partition scan for BitLocker, run after the LUKS scan for the
+    // same reason as the file-based path in prepareSession above (hard
+    // format signal, not worth trying VeraCrypt's PBKDF2 first). No keyfile
+    // bookkeeping needed here -- BitLocker never consumes keyfileFds, so
+    // unlike the loop above there's no "did an earlier iteration already
+    // consume it" state to track.
+    for (const auto& part : partitions) {
+        if (part.sectorCount == 0) {
+            continue;
+        }
+        if (!bitlockerDetectUsb(volId, part.startSector)) continue;
+
+        const uint64_t partitionSizeBytes = part.sectorCount * 512ULL;
+        if (prepareUsbBitLockerSession(part.startSector, partitionSizeBytes,
+                                       password, passwordLen, volId, readOnly)) {
+            closeUnusedKeyfileFds(keyfileFds, keyfileCount);
             return true;
         }
     }

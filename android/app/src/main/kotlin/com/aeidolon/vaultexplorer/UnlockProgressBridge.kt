@@ -16,6 +16,7 @@ object UnlockProgressBridge {
         val formatStr = when (format) {
             1 -> "luks1"
             2 -> "luks2"
+            3 -> "bitlocker"
             else -> "veracrypt"
         }
         mainHandler.post {

@@ -65,6 +65,21 @@ struct VolumeState {
     bool luksUsesGenericCipher = false;
     CascadeContext luksGenericCascade;
     CascadeContext cascade;
+    // Opaque dis_context_t (dislocker's own opaque struct _dis_ctx*) for
+    // BitLocker sessions -- void* rather than the real dislocker type so
+    // this widely-included header never has to pull in dislocker's
+    // generated headers. Only bitlocker_backend.cpp casts this back. See
+    // bitlocker_backend.h for the ownership/lifecycle contract; freed in
+    // reset(), not unmountVolume().
+    void* disContext = nullptr;
+    // Real fd bitlocker_backend.cpp hands to dislocker as DIS_OPT_VOLUME_PATH
+    // (via /proc/self/fd/<this>). File-backed sessions alias VolumeState::fd
+    // itself here (nothing extra to close). USB-backed sessions get a
+    // distinct AppFuse-proxied fd obtained from Kotlin's
+    // UsbBlockBridge.openBitlockerProxyFd() -- see bitlocker_backend.cpp's
+    // header comment -- and it's THIS fd (not VolumeState::fd, which stays
+    // -1 for USB sources) that bitlockerCloseVolume() must close.
+    int bitlockerProxyFd = -1;
     FATFS fatfs{};
     ntfs_volume* ntfsVol = nullptr;
     ext2_filsys extFs = nullptr;

@@ -9,6 +9,7 @@ import '../../services/password_hasher.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../theme.dart';
 import '../../widgets/common_widgets.dart';
+import '../../main.dart';
 
 class AppSettingsScreen extends StatefulWidget {
   const AppSettingsScreen({super.key});
@@ -415,6 +416,34 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       onChanged: (v) {
                         setState(() => _settings.hasSeenSwipeTutorial = !v);
                         _persist();
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                const SectionLabel('Appearance'),
+                AppCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  children: [
+                    DropdownButtonFormField<ThemeMode>(
+                      initialValue: _settings.themeMode,
+                      decoration: InputDecoration(
+                        labelText: 'App Theme',
+                        prefixIcon: Icon(Icons.palette_rounded, size: AppIconSize.small),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: ThemeMode.system, child: Text('System Default')),
+                        DropdownMenuItem(value: ThemeMode.light, child: Text('Light Theme')),
+                        DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark Theme')),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) {
+                          setState(() => _settings.themeMode = v);
+                          appThemeModeNotifier.value = v;
+                          _persist();
+                        }
                       },
                     ),
                   ],

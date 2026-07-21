@@ -8,6 +8,8 @@ import '../models/container_sort_mode.dart';
 import 'app_secure_storage.dart';
 import 'container_repository.dart';
 
+import 'package:flutter/material.dart';
+
 export 'container_repository.dart'
     show ContainerRepository, ContainerRecord, ContainerUnlockMethod;
 
@@ -32,6 +34,7 @@ class AppSettings {
   bool hasSeenSwipeTutorial;
   ContainerSortMode containerSortMode;
   bool swapCardActions;
+  ThemeMode themeMode;
 
   /// Default browser layout mode (list, compact, grid).
   BrowserLayoutMode defaultLayoutMode;
@@ -64,6 +67,7 @@ class AppSettings {
     this.defaultThumbnailQuality = ThumbnailQuality.medium,
     this.containerSortMode = ContainerSortMode.manual,   // ADD
     this.swapCardActions = false,
+    this.themeMode = ThemeMode.system,
     Map<String, String>? extensionPreferences,
     this._masterPasswordHash,
     this._masterPasswordSalt,
@@ -99,6 +103,7 @@ class AppSettings {
     bool? hasSeenSwipeTutorial,
     ContainerSortMode? containerSortMode,
     bool? swapCardActions,   
+    ThemeMode? themeMode,
     BrowserLayoutMode? defaultLayoutMode,
     ThumbnailCacheMode? defaultThumbnailCacheMode,
     ThumbnailQuality? defaultThumbnailQuality,
@@ -119,6 +124,7 @@ class AppSettings {
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       containerSortMode: containerSortMode ?? this.containerSortMode,
       swapCardActions: swapCardActions ?? this.swapCardActions, 
+      themeMode: themeMode ?? this.themeMode,
       defaultThumbnailCacheMode: defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
       defaultThumbnailQuality: defaultThumbnailQuality ?? this.defaultThumbnailQuality,
       extensionPreferences: extensionPreferences ?? this.extensionPreferences,
@@ -142,6 +148,7 @@ class AppSettings {
     'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
     'containerSortMode': containerSortMode.toJson(),
     'swapCardActions': swapCardActions,
+    'themeMode': themeMode.index,
     'extensionPreferences': extensionPreferences,
   };
 
@@ -155,6 +162,7 @@ class AppSettings {
     defaultDerivedKeyCacheEnabled: j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
     containerSortMode: ContainerSortMode.fromJson(j['containerSortMode'] as String?),  
     swapCardActions: j['swapCardActions'] as bool? ?? false,   
+    themeMode: j['themeMode'] != null ? ThemeMode.values[j['themeMode'] as int] : ThemeMode.system,
     lockContainersOnScreenLock: j['lockContainersOnScreenLock'] as bool? ?? true,
     autoLockMins: j['autoLockMins'] as int? ?? 0,
 

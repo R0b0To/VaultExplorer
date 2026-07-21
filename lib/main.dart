@@ -12,6 +12,7 @@ import 'package:vaultexplorer/services/vaultexplorer_api.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 
 String appVersion = '0.0.0';
+final ValueNotifier<ThemeMode> appThemeModeNotifier = ValueNotifier(ThemeMode.system);
 void main() async {
   // Ensure bindings are initialised before calling path_provider.
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,7 @@ void main() async {
 
   try {
     final settings = await AppSettingsService.loadSettings();
+    appThemeModeNotifier.value = settings.themeMode;
     if (settings.blockScreenshots) {
       await vaultExplorerApi.setSecureScreen(true);
     }
@@ -88,13 +90,18 @@ class VaultExplorerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'VaultExplorer',
-      debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(),
-      darkTheme: buildDarkTheme(),
-      themeMode: ThemeMode.system,
-      home: const LockGateScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: appThemeModeNotifier,
+      builder: (context, themeMode, child) {
+        return MaterialApp(
+          title: 'VaultExplorer',
+          debugShowCheckedModeBanner: false,
+          theme: buildLightTheme(),
+          darkTheme: buildDarkTheme(),
+          themeMode: themeMode,
+          home: const LockGateScreen(),
+        );
+      },
     );
   }
 }

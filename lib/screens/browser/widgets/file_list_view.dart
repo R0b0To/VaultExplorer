@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../theme.dart';
+import '../../../utils/raw_entry.dart';
 import 'directory_tile.dart';
 import 'file_tile.dart';
 
@@ -7,18 +8,18 @@ import 'file_tile.dart';
 /// to [DirectoryTile] or [FileTile].
 
 class FileListView extends StatefulWidget {
-  final List<String> dirs;
-  final List<String> files;
+  final List<RawEntry> dirs;
+  final List<RawEntry> files;
   final bool isSelectionMode;
   final bool isCompact;
-  final Set<String> selectedItems;
+  final Set<RawEntry> selectedItems;
 
-  final ValueChanged<String> onDirTap;
-  final ValueChanged<String> onFileTap;
-  final ValueChanged<String> onItemLongPress;
+  final ValueChanged<RawEntry> onDirTap;
+  final ValueChanged<RawEntry> onFileTap;
+  final ValueChanged<RawEntry> onItemLongPress;
 
   /// Called when the trailing "⋯" icon on a file tile is tapped.
-  final ValueChanged<String>? onFileLongMenu;
+  final ValueChanged<RawEntry>? onFileLongMenu;
 
   /// Active search query for text highlighting (null or empty = no highlight).
   final String? searchQuery;
@@ -83,32 +84,32 @@ class _FileListViewState extends State<FileListView> {
             itemCount: total,
             itemBuilder: (_, index) {
               final isDir = index < widget.dirs.length;
-              final rawItem = isDir ? widget.dirs[index] : widget.files[index - widget.dirs.length];
-              final isSelected = widget.selectedItems.contains(rawItem);
+              final entry = isDir ? widget.dirs[index] : widget.files[index - widget.dirs.length];
+              final isSelected = widget.selectedItems.contains(entry);
 
               if (isDir) {
                 return DirectoryTile(
-                  key: ValueKey('dir:$rawItem'),
-                  rawItem: rawItem,
+                  key: ValueKey('dir:${entry.raw}'),
+                  entry: entry,
                   isSelectionMode: widget.isSelectionMode,
                   isSelected: isSelected,
                   isCompact: widget.isCompact,
                   zoomLevel: _zoomLevel,
                   searchQuery: widget.searchQuery,
-                  onTap: () => widget.onDirTap(rawItem),
-                  onLongPress: () => widget.onItemLongPress(rawItem),
+                  onTap: () => widget.onDirTap(entry),
+                  onLongPress: () => widget.onItemLongPress(entry),
                 );
               }
               return FileTile(
-                key: ValueKey('file:$rawItem'),
-                rawItem: rawItem,
+                key: ValueKey('file:${entry.raw}'),
+                entry: entry,
                 isSelectionMode: widget.isSelectionMode,
                 isSelected: isSelected,
                 isCompact: widget.isCompact,
                 zoomLevel: _zoomLevel,
                 searchQuery: widget.searchQuery,
-                onTap: () => widget.onFileTap(rawItem),
-                onLongPress: () => widget.onItemLongPress(rawItem),
+                onTap: () => widget.onFileTap(entry),
+                onLongPress: () => widget.onItemLongPress(entry),
                 onLongMenu: widget.onFileLongMenu,
               );
             },

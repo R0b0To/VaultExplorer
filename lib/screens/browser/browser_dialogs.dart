@@ -3,6 +3,7 @@ import '../../models/file_operation.dart';
 import '../../models/mounted_container.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../utils/filename_utils.dart';
+import '../../utils/raw_entry.dart';
 import '../../widgets/common_widgets.dart';
 
 abstract class BrowserDialogs {
@@ -232,15 +233,15 @@ abstract class BrowserDialogs {
 
   static void showBatchDelete(
     BuildContext context, {
-    required List<String> toDelete,
-    required void Function(List<String> items) onConfirmed,
+    required List<RawEntry> toDelete,
+    required void Function(List<RawEntry> items) onConfirmed,
     bool readOnly = false,
   }) async {
     if (readOnly) {
       _blockedReadOnly(context);
       return;
     }
-    final hasDir = toDelete.any((item) => item.startsWith('[DIR] '));
+    final hasDir = toDelete.any((item) => item.isDir);
 
     final confirmed = await showAppConfirmDialog(
       context,

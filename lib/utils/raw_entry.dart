@@ -59,6 +59,25 @@ class RawEntry {
       ? DateTime.fromMillisecondsSinceEpoch(modifiedSecs * 1000)
       : null;
 
+  /// Value equality on the same fields the wire string encodes, so a
+  /// [RawEntry] can be used as a `Set`/`Map` key exactly like the raw
+  /// string it replaces (e.g. [SelectionMixin.selectedItems]). Two entries
+  /// from the *same* directory listing can never legitimately share
+  /// name+isDir+size+timestamp, so this is a safe identity proxy within one
+  /// listing — the same guarantee the original string-based `Set<String>`
+  /// relied on.
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RawEntry &&
+          other.name == name &&
+          other.isDir == isDir &&
+          other.sizeBytes == sizeBytes &&
+          other.modifiedSecs == modifiedSecs;
+
+  @override
+  int get hashCode => Object.hash(name, isDir, sizeBytes, modifiedSecs);
+
   @override
   String toString() =>
       'RawEntry(${isDir ? "DIR" : "FILE"} $name, '

@@ -88,7 +88,7 @@ class FileBrowserScreen extends StatefulWidget {
 class _FileBrowserScreenState extends State<FileBrowserScreen>
     with SelectionMixin<FileBrowserScreen>, SortMixin<FileBrowserScreen> {
   final List<PathSegment> _pathStack = [const PathSegment('Root', '')];
-  List<String> _currentItems = [];
+  List<RawEntry> _currentItems = [];
   bool _isLoading = false;
   int _freeSpace = 0;
   bool _isListingTruncated = false;
@@ -152,59 +152,59 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   // ── Init ──────────────────────────────────────────────────────────────────
 
   Future<void> _initSettingsAndContents() async {
-  setState(() => _isLoading = true);
-  try {
-    final appSettings = await AppSettingsService.loadSettings();
-    
-    if (widget.thumbnailCacheMode != null) {
-      _resolvedThumbnailCacheMode = widget.thumbnailCacheMode!;
-    } else {
-      final records = await ContainerRepository.instance.loadAll();
-      final record = records[widget.container.uri];
+    setState(() => _isLoading = true);
+    try {
+      final appSettings = await AppSettingsService.loadSettings();
+      
+      if (widget.thumbnailCacheMode != null) {
+        _resolvedThumbnailCacheMode = widget.thumbnailCacheMode!;
+      } else {
+        final records = await ContainerRepository.instance.loadAll();
+        final record = records[widget.container.uri];
+        if (mounted) {
+          setState(() {
+            _resolvedThumbnailCacheMode =
+                record?.thumbnailCacheMode ??
+                appSettings.defaultThumbnailCacheMode;
+            _resolvedThumbnailQuality =
+                record?.thumbnailQuality ??
+                appSettings.defaultThumbnailQuality;
+          });
+        }
+      }
+
+      // Load default layout mode here
       if (mounted) {
         setState(() {
-          _resolvedThumbnailCacheMode =
-              record?.thumbnailCacheMode ??
-              appSettings.defaultThumbnailCacheMode;
-          _resolvedThumbnailQuality =
-              record?.thumbnailQuality ??
-              appSettings.defaultThumbnailQuality;
+          _layoutMode = appSettings.defaultLayoutMode;
         });
       }
-    }
 
-    // Load default layout mode here
-    if (mounted) {
-      setState(() {
-        _layoutMode = appSettings.defaultLayoutMode;
-      });
+      // A read-only mount refuses every write native-side (physicalWrite()'s
+      // hard readOnly check), including the .thumbcache/ writes
+      // ThumbnailCacheService.put() makes for ThumbnailCacheMode.inContainer.
+      // Those writes already fail silently (caught + debugPrint'd) rather
+      // than surfacing anywhere — thumbnails still render fine from native
+      // generation + the in-memory LRU tier, they're just regenerated every
+      // session instead of persisting — but the person chose "inside
+      // container" specifically for that persistence, so say so once up
+      // front instead of letting it fail invisibly.
+      if (mounted &&
+          widget.container.readOnly &&
+          _resolvedThumbnailCacheMode == ThumbnailCacheMode.inContainer) {
+        showAppSnackBar(
+          context,
+          message:
+              'Read-only mount — thumbnails will show but won\'t be saved '
+              'inside the container this session.',
+          tone: AppBannerTone.warning,
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to resolve settings: $e');
     }
-
-    // A read-only mount refuses every write native-side (physicalWrite()'s
-    // hard readOnly check), including the .thumbcache/ writes
-    // ThumbnailCacheService.put() makes for ThumbnailCacheMode.inContainer.
-    // Those writes already fail silently (caught + debugPrint'd) rather
-    // than surfacing anywhere — thumbnails still render fine from native
-    // generation + the in-memory LRU tier, they're just regenerated every
-    // session instead of persisting — but the person chose "inside
-    // container" specifically for that persistence, so say so once up
-    // front instead of letting it fail invisibly.
-    if (mounted &&
-        widget.container.readOnly &&
-        _resolvedThumbnailCacheMode == ThumbnailCacheMode.inContainer) {
-      showAppSnackBar(
-        context,
-        message:
-            'Read-only mount — thumbnails will show but won\'t be saved '
-            'inside the container this session.',
-        tone: AppBannerTone.warning,
-      );
-    }
-  } catch (e) {
-    debugPrint('Failed to resolve settings: $e');
+    await _loadDirectoryContents(_currentDirPath);
   }
-  await _loadDirectoryContents(_currentDirPath);
-}
 
   Future<void> _loadToolbarConfig() async {
     final config = await FileManagerToolbarService.instance.load();
@@ -237,40 +237,44 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   // ── Directory loading ─────────────────────────────────────────────────────
 
   Future<void> _loadDirectoryContents(String path) async {
-  setState(() => _isLoading = true);
-  _signalActivity();
+    setState(() => _isLoading = true);
+    _signalActivity();
 
-  if (_archiveContext != null) {
-    _loadArchiveContents(path);
-    return;
-  }
+    if (_archiveContext != null) {
+      _loadArchiveContents(path);
+      return;
+    }
 
-  try {
-    final items = await vaultExplorerApi.listDirectory(widget.container, path);
-
-    List<int>? space;
     try {
-      space = await vaultExplorerApi.getSpaceInfo(widget.container);
-    } catch (_) {
-      space = null; // e.g. Cryptomator vault with no reportable free space
-    }
+      final items = await vaultExplorerApi.listDirectory(widget.container, path);
 
-    if (mounted) {
-      final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
-      setState(() {
-        _currentItems = items?.where((f) => !f.startsWith('System:')).toList() ?? [];
-        _isListingTruncated = isTruncated;
-        if (space != null && space.length > 1 && space[1] >= 0) _freeSpace = space[1];
-        _isLoading = false;
-      });
-    }
-  } catch (e) {
-    if (mounted) {
-      setState(() => _isLoading = false);
-      _setStatus('Failed loading folder: ${e.runtimeType}', error: true);
+      List<int>? space;
+      try {
+        space = await vaultExplorerApi.getSpaceInfo(widget.container);
+      } catch (_) {
+        space = null; // e.g. Cryptomator vault with no reportable free space
+      }
+
+      if (mounted) {
+        final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
+        setState(() {
+          _currentItems = items
+                  ?.where((f) => !f.startsWith('System:'))
+                  .map(RawEntry.parse)
+                  .toList() ??
+              [];
+          _isListingTruncated = isTruncated;
+          if (space != null && space.length > 1 && space[1] >= 0) _freeSpace = space[1];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _setStatus('Failed loading folder: ${e.runtimeType}', error: true);
+      }
     }
   }
-}
 
   void _loadArchiveContents(String path) {
     if (_archiveContext == null) return;
@@ -287,7 +291,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final items = _archiveContext!.listDirectory(subPath);
     if (mounted) {
       setState(() {
-        _currentItems = items;
+        _currentItems = items.map(RawEntry.parse).toList();
         _isListingTruncated = false;
         _isLoading = false;
       });
@@ -335,8 +339,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   // ── Navigation ────────────────────────────────────────────────────────────
 
-  void _enterDirectory(String rawDirEntry) {
-    final entry = RawEntry.parse(rawDirEntry);
+  void _enterDirectory(RawEntry entry) {
     final newPath = _currentDirPath.isEmpty
         ? entry.name
         : '$_currentDirPath/${entry.name}';
@@ -384,7 +387,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   // ── SelectionMixin override ───────────────────────────────────────────────
 
   @override
-  void toggleSelectItem(String item) {
+  void toggleSelectItem(RawEntry item) {
     super.toggleSelectItem(item);
     if (selectedFolderCount > 0) {
       fetchFolderSizes(widget.container, _currentDirPath);
@@ -393,23 +396,22 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   // ── Item interaction ──────────────────────────────────────────────────────
 
-  void _handleDirTap(String rawItem) {
+  void _handleDirTap(RawEntry entry) {
     _signalActivity();
     if (isSelectionMode) {
-      toggleSelectItem(rawItem);
+      toggleSelectItem(entry);
     } else {
-      _enterDirectory(rawItem);
+      _enterDirectory(entry);
     }
   }
 
-  Future<void> _handleFileTap(String rawItem) async {
+  Future<void> _handleFileTap(RawEntry entry) async {
     _signalActivity();
     if (isSelectionMode) {
-      toggleSelectItem(rawItem);
+      toggleSelectItem(entry);
       return;
     }
 
-    final entry = RawEntry.parse(rawItem);
     final fullPath = _currentDirPath.isEmpty
         ? entry.name
         : '$_currentDirPath/${entry.name}';
@@ -740,12 +742,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
-    final sortedItems = _currentItems
-        .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
-        .toList()
+    final sortedItems = _currentItems.where((e) => !e.isDir).toList()
       ..sort(compareItems);
     final localMedia = sortedItems
-        .map((f) => RawEntry.parse(f).name)
+        .map((e) => e.name)
         .where(_isSupportedMedia)
         .toList();
 
@@ -805,19 +805,19 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  void _handleItemLongPress(String rawItem) {
+  void _handleItemLongPress(RawEntry entry) {
     HapticFeedback.selectionClick();
     _signalActivity();
     if (!isSelectionMode) {
       setState(() {
         isSelectionMode = true;
-        selectedItems.add(rawItem);
+        selectedItems.add(entry);
       });
       if (selectedFolderCount > 0) {
         fetchFolderSizes(widget.container, _currentDirPath);
       }
     } else {
-      toggleSelectItem(rawItem);
+      toggleSelectItem(entry);
     }
   }
 
@@ -920,8 +920,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
     _signalActivity();
 
-    final clipItems = selectedItems.map((rawItem) {
-      final entry = RawEntry.parse(rawItem);
+    final clipItems = selectedItems.map((entry) {
       final path = _currentDirPath.isEmpty
           ? entry.name
           : '$_currentDirPath/${entry.name}';
@@ -1074,12 +1073,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _signalActivity();
     BrowserDialogs.showBatchDelete(
       context,
-      toDelete: List<String>.from(selectedItems),
-      onConfirmed: (rawItems) async {
+      toDelete: List<RawEntry>.from(selectedItems),
+      onConfirmed: (entries) async {
         setState(() => _isLoading = true);
 
-        final clipItems = rawItems.map((raw) {
-          final e = RawEntry.parse(raw);
+        final clipItems = entries.map((e) {
           final path = _currentDirPath.isEmpty
               ? e.name
               : '$_currentDirPath/${e.name}';
@@ -1109,8 +1107,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Future<void> _exportSelectedToStorage() async {
     _signalActivity();
 
-    final items = selectedItems.map((raw) {
-      final e = RawEntry.parse(raw);
+    final items = selectedItems.map((e) {
       final path = _currentDirPath.isEmpty
           ? e.name
           : '$_currentDirPath/${e.name}';
@@ -1257,7 +1254,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _extractArchive() async {
     if (_archiveContext == null) return;
-        if (_isReadOnly) {
+    if (_isReadOnly) {
       _setStatus('This container is mounted read-only.', error: true);
       return;
     }
@@ -1401,6 +1398,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       ],
     );
   }
+  
   Widget _buildViewTogglePopupButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final currentIcon = _layoutMode == BrowserLayoutMode.list
@@ -1429,30 +1427,29 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           (BrowserLayoutMode.compact, 'Compact List', Icons.list_rounded),
           (BrowserLayoutMode.grid, 'Gallery Grid', Icons.grid_view_rounded),
         ])
-          // Inside the menuChildren list builder:
-MenuItemButton(
-  leadingIcon: Icon(icon, color: _layoutMode == mode ? cs.primary : cs.onSurfaceVariant),
-  trailingIcon: _layoutMode == mode
-      ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-      : null,
-  onPressed: () async {
-    setState(() => _layoutMode = mode);
-    try {
-      final settings = await AppSettingsService.loadSettings();
-      final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
-      await AppSettingsService.saveSettings(updatedSettings);
-    } catch (e) {
-      debugPrint('Failed to save layout mode: $e');
-    }
-  },
-  child: Text(
-    label,
-    style: TextStyle(
-      fontWeight: _layoutMode == mode ? FontWeight.bold : FontWeight.normal,
-      color: _layoutMode == mode ? cs.primary : null,
-    ),
-  ),
-),
+          MenuItemButton(
+            leadingIcon: Icon(icon, color: _layoutMode == mode ? cs.primary : cs.onSurfaceVariant),
+            trailingIcon: _layoutMode == mode
+                ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                : null,
+            onPressed: () async {
+              setState(() => _layoutMode = mode);
+              try {
+                final settings = await AppSettingsService.loadSettings();
+                final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
+                await AppSettingsService.saveSettings(updatedSettings);
+              } catch (e) {
+                debugPrint('Failed to save layout mode: $e');
+              }
+            },
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: _layoutMode == mode ? FontWeight.bold : FontWeight.normal,
+                color: _layoutMode == mode ? cs.primary : null,
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -1506,10 +1503,10 @@ MenuItemButton(
 
   Map<FileManagerAction, WidgetBuilder> _buildActionBuilders() {
     final hasLocalMedia = _currentItems
-        .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
-        .map((f) => RawEntry.parse(f).name)
+        .where((e) => !e.isDir)
+        .map((e) => e.name)
         .any(_isSupportedMedia);
-    final hasSubfolders = _currentItems.any((f) => f.startsWith('[DIR] '));
+    final hasSubfolders = _currentItems.any((e) => e.isDir);
     final canPlayMedia = hasLocalMedia || hasSubfolders;
 
     return {
@@ -1580,29 +1577,25 @@ MenuItemButton(
 
   @override
   Widget build(BuildContext context) {
-    final dirs = _currentItems.where((f) => f.startsWith('[DIR]')).toList()
+    final dirs = _currentItems.where((e) => e.isDir).toList()
       ..sort(compareItems);
-    final files =
-        _currentItems
-            .where((f) => !f.startsWith('[DIR]') && !f.startsWith('System:'))
-            .toList()
-          ..sort(compareItems);
+    final files = _currentItems.where((e) => !e.isDir).toList()
+      ..sort(compareItems);
 
     final query = _searchQuery.trim().toLowerCase();
 
     final filteredDirs = (query.isEmpty && _currentFilter == null)
         ? dirs
         : (query.isEmpty
-              ? <String>[]
+              ? <RawEntry>[]
               : dirs
                     .where(
-                      (d) =>
-                          RawEntry.parse(d).name.toLowerCase().contains(query),
+                      (d) => d.name.toLowerCase().contains(query),
                     )
                     .toList());
 
     final filteredFiles = files.where((f) {
-      final name = RawEntry.parse(f).name;
+      final name = f.name;
       if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
       return _matchesFilter(name);
     }).toList();
@@ -1709,8 +1702,8 @@ MenuItemButton(
 
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
-    List<String> dirs,
-    List<String> files,
+    List<RawEntry> dirs,
+    List<RawEntry> files,
   ) {
     final allItems = [...dirs, ...files];
     final cs = Theme.of(context).colorScheme;
@@ -1720,7 +1713,7 @@ MenuItemButton(
 
     if (isSelectionMode) {
       final single = selectedItems.length == 1;
-      final singleFile = single && !selectedItems.first.startsWith('[DIR] ');
+      final singleFile = single && !selectedItems.first.isDir;
 
       final totalBytes = selectedTotalBytes;
       final isPending = hasPendingFolderSizes;
@@ -1731,7 +1724,7 @@ MenuItemButton(
           : formatBytes(totalBytes);
 
       void doRename() {
-        final entries = selectedItems.map((raw) => RawEntry.parse(raw)).toList();
+        final entries = selectedItems.toList();
 
         for (final entry in entries) {
           final parts = entry.name.split('.');
@@ -1744,7 +1737,7 @@ MenuItemButton(
         }
 
         final oldNames = entries.map((e) => e.name).toList();
-        final existingNames = allItems.map((raw) => RawEntry.parse(raw).name).toSet();
+        final existingNames = allItems.map((e) => e.name).toSet();
 
         BrowserDialogs.showRename(
           context,
@@ -1759,8 +1752,7 @@ MenuItemButton(
       }
 
       Future<void> doOpenWithApp() async {
-        final raw = selectedItems.first;
-        final entry = RawEntry.parse(raw);
+        final entry = selectedItems.first;
         final path = _currentDirPath.isEmpty
             ? entry.name
             : '$_currentDirPath/${entry.name}';
@@ -2011,12 +2003,12 @@ MenuItemButton(
     final textTheme = Theme.of(context).textTheme;
     final style = textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant);
 
-final parts = <String>[
-  '$dirCount folder${dirCount == 1 ? '' : 's'}',
-  '$fileCount file${fileCount == 1 ? '' : 's'}',
-  if (_freeSpace >= 0) '${formatBytes(_freeSpace)} free',
-  if (isFiltered) 'filtered',
-];
+    final parts = <String>[
+      '$dirCount folder${dirCount == 1 ? '' : 's'}',
+      '$fileCount file${fileCount == 1 ? '' : 's'}',
+      if (_freeSpace >= 0) '${formatBytes(_freeSpace)} free',
+      if (isFiltered) 'filtered',
+    ];
 
     return Text(
       parts.join(' · '),
@@ -2028,7 +2020,7 @@ final parts = <String>[
 
   // ── Body ──────────────────────────────────────────────────────────────────
 
-  Widget _buildBody(List<String> dirs, List<String> files) {
+  Widget _buildBody(List<RawEntry> dirs, List<RawEntry> files) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
     }

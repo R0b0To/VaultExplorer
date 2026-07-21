@@ -10,16 +10,22 @@ import '../../../utils/raw_entry.dart';
 ///
 /// New in this revision:
 ///  • Per-type counts ([selectedFileCount], [selectedFolderCount]).
-///  • Total file-byte sum ([selectedFileBytes]) derived from the wire format.
+///  • Total file-byte sum ([selectedFileBytes]) derived from the selected entries.
 ///  • Lazy async folder-size resolution via [fetchFolderSizes]; resolved sizes
 ///    accumulate in [_resolvedFolderSizes] so a second tap is instant.
 ///  • [selectionSummary] — a ready-to-display label for the app-bar/bottom-bar.
+///
+/// [selectedItems] holds parsed [RawEntry] values rather than raw wire
+/// strings — parsing happens once at the directory-listing boundary
+/// (see [FileBrowserScreen._loadDirectoryContents]) instead of being
+/// re-parsed on every count/size/summary access here. [RawEntry] carries
+/// its own value equality (name+isDir+size+timestamp), so `Set` membership
+/// behaves identically to the old raw-string set within a single directory
+/// listing.
 mixin SelectionMixin<T extends StatefulWidget> on State<T> {
   bool isSelectionMode = false;
 
-  /// Raw wire strings exactly as returned by [listDirectoryNative].
-  /// Format: "name|size|ts"  /  "[DIR] name|0|ts"
-  final Set<String> selectedItems = {};
+  final Set<RawEntry> selectedItems = {};
 
   // ── Folder-size resolution ─────────────────────────────────────────────────
 
@@ -32,7 +38,7 @@ mixin SelectionMixin<T extends StatefulWidget> on State<T> {
 
   // ── Selection mutations ────────────────────────────────────────────────────
 
-  void toggleSelectItem(String item) {
+  void toggleSelectItem(RawEntry item) {
     setState(() {
       if (selectedItems.contains(item)) {
         selectedItems.remove(item);
@@ -54,12 +60,10 @@ mixin SelectionMixin<T extends StatefulWidget> on State<T> {
   // ── Counts ─────────────────────────────────────────────────────────────────
 
   /// Number of selected non-directory items.
-  int get selectedFileCount =>
-      selectedItems.where((r) => !r.startsWith('[DIR] ')).length;
+  int get selectedFileCount => selectedItems.where((e) => !e.isDir).length;
 
   /// Number of selected directory items.
-  int get selectedFolderCount =>
-      selectedItems.where((r) => r.startsWith('[DIR] ')).length;
+  int get selectedFolderCount => selectedItems.where((e) => e.isDir).length;
 
   // ── Size helpers ───────────────────────────────────────────────────────────
 
@@ -68,8 +72,7 @@ mixin SelectionMixin<T extends StatefulWidget> on State<T> {
   /// sizes have been resolved by [fetchFolderSizes].
   int get selectedFileBytes {
     int sum = 0;
-    for (final raw in selectedItems) {
-      final e = RawEntry.parse(raw);
+    for (final e in selectedItems) {
       if (!e.isDir) sum += e.sizeBytes;
     }
     return sum;
@@ -79,8 +82,7 @@ mixin SelectionMixin<T extends StatefulWidget> on State<T> {
   /// Folders that are still pending contribute 0.
   int get selectedTotalBytes {
     int sum = selectedFileBytes;
-    for (final raw in selectedItems) {
-      final e = RawEntry.parse(raw);
+    for (final e in selectedItems) {
       if (e.isDir) sum += _resolvedFolderSizes[e.name] ?? 0;
     }
     return sum;
@@ -88,8 +90,7 @@ mixin SelectionMixin<T extends StatefulWidget> on State<T> {
 
   /// True while at least one selected folder has not yet been sized.
   bool get hasPendingFolderSizes {
-    for (final raw in selectedItems) {
-      final e = RawEntry.parse(raw);
+    for (final e in selectedItems) {
       if (e.isDir && !_resolvedFolderSizes.containsKey(e.name)) return true;
     }
     return false;
@@ -146,7 +147,7 @@ mixin SelectionMixin<T extends StatefulWidget> on State<T> {
   /// [selectedFolderCount] > 0:
   ///
   /// ```dart
-  /// void toggleSelectItem(String item) {
+  /// void toggleSelectItem(RawEntry item) {
   ///   super.toggleSelectItem(item);
   ///   if (selectedFolderCount > 0) {
   ///     fetchFolderSizes(widget.container, currentDirPath);
@@ -170,8 +171,7 @@ mixin SelectionMixin<T extends StatefulWidget> on State<T> {
     try {
       // Collect all directories that still need sizing.
       final pending = selectedItems
-          .where((r) => r.startsWith('[DIR] '))
-          .map(RawEntry.parse)
+          .where((e) => e.isDir)
           .where((e) => !_resolvedFolderSizes.containsKey(e.name))
           .toList(growable: false);
 

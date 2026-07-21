@@ -5,8 +5,10 @@ import 'tile_selection_style.dart';
 
 /// Row renderer for a single directory entry in [FileListView].
 class DirectoryTile extends StatelessWidget {
-  /// Raw wire-format entry, e.g. `"[DIR] Photos|0|1700000000"`.
-  final String rawItem;
+  /// Parsed directory entry. Parsing happens once at the directory-listing
+  /// boundary (see [FileBrowserScreen._loadDirectoryContents]) rather than
+  /// here on every rebuild.
+  final RawEntry entry;
   final bool isSelectionMode;
   final bool isSelected;
   final String? searchQuery;
@@ -17,7 +19,7 @@ class DirectoryTile extends StatelessWidget {
 
   const DirectoryTile({
     super.key,
-    required this.rawItem,
+    required this.entry,
     required this.isSelectionMode,
     required this.isSelected,
     this.searchQuery,
@@ -30,7 +32,6 @@ class DirectoryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final entry = RawEntry.parse(rawItem);
 
     return FileRowShell(
       icon: Icons.folder_rounded,

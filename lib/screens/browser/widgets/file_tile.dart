@@ -6,20 +6,22 @@ import 'tile_selection_style.dart';
 
 /// Row renderer for a single file entry in [FileListView].
 class FileTile extends StatelessWidget {
-  /// Raw wire-format entry, e.g. `"report.pdf|48213|1700000000"`.
-  final String rawItem;
+  /// Parsed file entry. Parsing happens once at the directory-listing
+  /// boundary (see [FileBrowserScreen._loadDirectoryContents]) rather than
+  /// here on every rebuild.
+  final RawEntry entry;
   final bool isSelectionMode;
   final bool isSelected;
   final String? searchQuery;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-  final ValueChanged<String>? onLongMenu;
+  final ValueChanged<RawEntry>? onLongMenu;
   final bool isCompact;
   final double zoomLevel;
 
   const FileTile({
     super.key,
-    required this.rawItem,
+    required this.entry,
     required this.isSelectionMode,
     required this.isSelected,
     this.searchQuery,
@@ -33,7 +35,6 @@ class FileTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final entry = RawEntry.parse(rawItem);
 
     String displayName = entry.name;
     final ext = displayName.split('.').last;
@@ -106,7 +107,7 @@ class FileTile extends StatelessWidget {
               iconSize: 20,
               color: cs.onSurfaceVariant,
               icon: const Icon(Icons.more_horiz_rounded), // Standard MD3 kebab
-              onPressed: () => onLongMenu!(rawItem),
+              onPressed: () => onLongMenu!(entry),
             ),
           ),
         ],

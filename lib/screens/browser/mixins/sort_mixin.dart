@@ -6,8 +6,9 @@ enum SortBy { name, size, extension, date }
 /// Encapsulates sort-field / direction state and the comparator used to order
 /// directory entries.  Mix into any [State] that renders a sortable file list.
 ///
-/// Uses [RawEntry.parse] so it handles the full three-field wire format
-/// ("name|size|unixSecs" / "[DIR] name|0|unixSecs") correctly.
+/// Operates on already-parsed [RawEntry] values (parsed once at the
+/// directory-listing boundary) rather than re-parsing the wire string on
+/// every comparison during a sort.
 mixin SortMixin<T extends StatefulWidget> on State<T> {
   SortBy sortBy = SortBy.name;
   bool sortAscending = true;
@@ -30,10 +31,7 @@ mixin SortMixin<T extends StatefulWidget> on State<T> {
     });
   }
 
-  int compareItems(String a, String b) {
-    final ea = RawEntry.parse(a);
-    final eb = RawEntry.parse(b);
-
+  int compareItems(RawEntry ea, RawEntry eb) {
     int result;
     switch (sortBy) {
       case SortBy.name:

@@ -16,17 +16,17 @@ import 'highlighted_text.dart';
 /// A dynamic gallery grid for the file browser supporting pinch-to-zoom.
 class FileGridView extends StatefulWidget {
   final MountedContainer container;
-  final List<String> dirs;
-  final List<String> files;
+  final List<RawEntry> dirs;
+  final List<RawEntry> files;
   final bool isSelectionMode;
-  final Set<String> selectedItems;
+  final Set<RawEntry> selectedItems;
   final String currentDirPath;
   final ThumbnailCacheMode thumbnailCacheMode;
   final ThumbnailQuality thumbnailQuality;
-  final ValueChanged<String> onDirTap;
-  final ValueChanged<String> onFileTap;
-  final ValueChanged<String> onItemLongPress;
-  final ValueChanged<String>? onFileLongMenu;
+  final ValueChanged<RawEntry> onDirTap;
+  final ValueChanged<RawEntry> onFileTap;
+  final ValueChanged<RawEntry> onItemLongPress;
+  final ValueChanged<RawEntry>? onFileLongMenu;
 
   /// Active search query for text highlighting (null or empty = no highlight).
   final String? searchQuery;
@@ -154,16 +154,15 @@ class _FileGridViewState extends State<FileGridView> {
     );
   }
 
-  Widget _buildDirCell(BuildContext context, String rawItem) {
-    final name = RawEntry.parse(rawItem).name;
-    final isSelected = widget.selectedItems.contains(rawItem);
+  Widget _buildDirCell(BuildContext context, RawEntry entry) {
+    final isSelected = widget.selectedItems.contains(entry);
     final cs = Theme.of(context).colorScheme;
 
     return _GridCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
-      onTap: () => widget.onDirTap(rawItem),
-      onLongPress: () => widget.onItemLongPress(rawItem),
+      onTap: () => widget.onDirTap(entry),
+      onLongPress: () => widget.onItemLongPress(entry),
       preview: Center(
         child: Icon(
           Icons.folder_rounded,
@@ -171,18 +170,17 @@ class _FileGridViewState extends State<FileGridView> {
           color: isSelected ? cs.primary : cs.secondary,
         ),
       ),
-      label: name,
+      label: entry.name,
       searchQuery: widget.searchQuery,
     );
   }
 
-  Widget _buildFileCell(BuildContext context, String rawItem) {
-    final parts = rawItem.split('|');
-    final cleanName = parts.first;
+  Widget _buildFileCell(BuildContext context, RawEntry entry) {
+    final cleanName = entry.name;
     final fullPath = widget.currentDirPath.isEmpty
         ? cleanName
         : '${widget.currentDirPath}/$cleanName';
-    final isSelected = widget.selectedItems.contains(rawItem);
+    final isSelected = widget.selectedItems.contains(entry);
 
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
@@ -239,11 +237,11 @@ class _FileGridViewState extends State<FileGridView> {
     return _GridCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
-      onTap: () => widget.onFileTap(rawItem),
-      onLongPress: () => widget.onItemLongPress(rawItem),
+      onTap: () => widget.onFileTap(entry),
+      onLongPress: () => widget.onItemLongPress(entry),
       onMoreTap: widget.isSelectionMode
           ? null
-          : () => widget.onFileLongMenu?.call(rawItem),
+          : () => widget.onFileLongMenu?.call(entry),
       preview: previewWidget,
       label: displayName,
       searchQuery: widget.searchQuery,

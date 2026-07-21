@@ -2,8 +2,8 @@ package com.aeidolon.vaultexplorer.cryptomator
 
 import android.content.Context
 import android.net.Uri
-import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import java.util.concurrent.ConcurrentHashMap
 
 private const val CLOUD_NODE_EXT = ".c9r"
@@ -57,6 +57,8 @@ class CryptomatorVaultTree(
     /** dirId -> physical folder (d/xx/yyyy) backing that directory's contents */
     private val dataDirCache = ConcurrentHashMap<String, DocumentFile>()
 
+    private val safOps = SafDocumentOps(context)
+
     private val vaultRoot: DocumentFile by lazy {
         DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw VaultIOException("Cannot open vault root: $vaultRootUri")
     }
@@ -76,7 +78,7 @@ class CryptomatorVaultTree(
 
     private fun listByDirId(dirId: String): List<VaultNode> {
         val physicalFolder = physicalFolderForDirId(dirId)
-        val children = listChildrenFast(physicalFolder)
+        val children = safOps.listChildren(physicalFolder)
 
         val results = mutableListOf<VaultNode>()
         for (child in children) {
@@ -204,7 +206,7 @@ class CryptomatorVaultTree(
     }
 
     fun readDirId(dirIdFile: DocumentFile): String {
-        val bytes = readWholeFile(dirIdFile)
+        val bytes = safOps.readWhole(dirIdFile)
         return String(bytes, Charsets.UTF_8)
     }
 
@@ -229,40 +231,14 @@ class CryptomatorVaultTree(
         path.trim('/').split('/').filter { it.isNotEmpty() }
 
     // ---- low-level SAF helpers ------------------------------------------------
+    // (shared implementation lives in SafDocumentOps; kept as same-named
+    // wrappers here so every call site above is unchanged)
 
-    /** Fast child lookup: uses DocumentsContract query instead of DocumentFile.listFiles()'s O(n) per-child stat calls. */
-    private fun listChildrenFast(folder: DocumentFile): List<DocumentFile> {
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folder.uri, DocumentsContract.getDocumentId(folder.uri))
-        val results = mutableListOf<DocumentFile>()
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-        )
-        context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-            val idIdx = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-            while (cursor.moveToNext()) {
-                val docId = cursor.getString(idIdx)
-                val childUri = DocumentsContract.buildDocumentUriUsingTree(folder.uri, docId)
-                DocumentFile.fromSingleUri(context, childUri)?.let { results.add(it) }
-            }
-        }
-        return results
-    }
-
-    private fun findChild(folder: DocumentFile, name: String): DocumentFile? {
-        return listChildrenFast(folder).firstOrNull { it.name == name }
-    }
+    private fun findChild(folder: DocumentFile, name: String): DocumentFile? = safOps.childOf(folder, name)
 
     private fun readSmallFile(folder: DocumentFile, name: String): ByteArray? {
         val file = findChild(folder, name) ?: return null
-        return readWholeFile(file)
-    }
-
-    private fun readWholeFile(file: DocumentFile): ByteArray {
-        context.contentResolver.openInputStream(file.uri)?.use { stream ->
-            return stream.readBytes()
-        } ?: throw VaultIOException("Could not open ${file.uri} for reading")
+        return safOps.readWhole(file)
     }
 
     private fun stripExtension(name: String, ext: String): String = if (name.endsWith(ext)) name.removeSuffix(ext) else name

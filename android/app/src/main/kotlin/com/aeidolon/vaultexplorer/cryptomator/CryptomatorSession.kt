@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.cryptomator
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import java.io.File
 import java.security.SecureRandom
 import java.util.UUID
@@ -30,6 +31,7 @@ class CryptomatorSession(
     val readOnly: Boolean,
 ) {
     private val random = SecureRandom()
+    private val safOps = SafDocumentOps(context)
     val nameCryptor = CryptomatorFileNameCryptor(masterkey)
     val contentCryptor: CryptomatorContentCryptor = CryptomatorContentCryptor.forCipherCombo(cipherCombo)
     val tree = CryptomatorVaultTree(context, vaultRootUri, nameCryptor, shorteningThreshold)
@@ -614,47 +616,23 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
     private fun beginWrite(virtualPath: String): WriteHandle = WriteHandle(virtualPath)
 
     // ---- physical SAF helpers ----------------------------------------------
+    // (shared implementation lives in SafDocumentOps — see the tech-debt
+    // audit; kept as same-named wrappers here so createNodeFolder,
+    // createNewFileNode, findOrCreateChild, renameFile, deleteFile, etc.
+    // below don't need to change)
 
-    /** Safely list children bypassing SingleDocumentFile's restrictions */
-    private fun listFilesSafe(folder: DocumentFile): List<DocumentFile> {
-        val childrenUri = android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(folder.uri, android.provider.DocumentsContract.getDocumentId(folder.uri))
-        val results = mutableListOf<DocumentFile>()
-        val projection = arrayOf(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-        try {
-            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idIdx = cursor.getColumnIndexOrThrow(android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                while (cursor.moveToNext()) {
-                    val docId = cursor.getString(idIdx)
-                    val childUri = android.provider.DocumentsContract.buildDocumentUriUsingTree(folder.uri, docId)
-                    DocumentFile.fromSingleUri(context, childUri)?.let { results.add(it) }
-                }
-            }
-        } catch (e: Exception) {
-            // Ignored
-        }
-        return results
-    }
+    private fun listFilesSafe(folder: DocumentFile): List<DocumentFile> = safOps.listChildren(folder)
 
-    /** Safely create a directory bypassing SingleDocumentFile's restrictions */
-    private fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? {
-        return try {
-            val uri = android.provider.DocumentsContract.createDocument(context.contentResolver, parent.uri, android.provider.DocumentsContract.Document.MIME_TYPE_DIR, name)
-            uri?.let { DocumentFile.fromSingleUri(context, it) }
-        } catch (e: Exception) { null }
-    }
+    private fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? =
+        safOps.createDirectorySafe(parent, name)
 
-    /** Safely create a file bypassing SingleDocumentFile's restrictions */
-    private fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile? {
-        return try {
-            val uri = android.provider.DocumentsContract.createDocument(context.contentResolver, parent.uri, mimeType, name)
-            uri?.let { DocumentFile.fromSingleUri(context, it) }
-        } catch (e: Exception) { null }
-    }
+    private fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile? =
+        safOps.createFileSafe(parent, mimeType, name)
 
     private fun vaultRoot(): DocumentFile =
         DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw VaultIOException("Cannot open vault root")
 
-    private fun childOf(folder: DocumentFile, name: String): DocumentFile? = listFilesSafe(folder).firstOrNull { it.name == name }
+    private fun childOf(folder: DocumentFile, name: String): DocumentFile? = safOps.childOf(folder, name)
 
     private fun findOrCreateChild(folder: DocumentFile, name: String, isDir: Boolean): DocumentFile? {
         childOf(folder, name)?.let { return it }
@@ -692,70 +670,17 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
         }
     }
 
-    private fun writeWhole(file: DocumentFile, bytes: ByteArray) {
-        context.contentResolver.openOutputStream(file.uri, "wt")?.use { it.write(bytes) }
-            ?: throw VaultIOException("Could not open ${file.uri} for writing")
-    }
+    private fun writeWhole(file: DocumentFile, bytes: ByteArray) = safOps.writeWhole(file, bytes)
 
-    /** Like [renameDocument], but returns the (possibly new) [DocumentFile] handle
- *  for the renamed document — needed when the caller must keep operating on
- *  it afterward (e.g. moving it to a different parent next). */
-private fun renameDocumentAndGet(doc: DocumentFile, newName: String): DocumentFile {
-    val newUri = android.provider.DocumentsContract.renameDocument(context.contentResolver, doc.uri, newName)
-    return DocumentFile.fromSingleUri(context, newUri ?: doc.uri)
-        ?: throw VaultIOException("renameDocument failed for ${doc.uri}")
-}
+    private fun renameDocumentAndGet(doc: DocumentFile, newName: String): DocumentFile =
+        safOps.renameDocumentAndGet(doc, newName)
 
-/** Physically relocates [doc] (a file, or a small pointer folder like a
- *  .c9r/.c9s node) from [oldParent] to [newParent]. Prefers the atomic SAF
- *  move operation; falls back to a manual recursive copy+delete for
- *  providers that don't implement FLAG_SUPPORTS_MOVE. */
-private fun movePhysicalDocument(doc: DocumentFile, oldParent: DocumentFile, newParent: DocumentFile) {
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-        try {
-            val movedUri = android.provider.DocumentsContract.moveDocument(
-                context.contentResolver, doc.uri, oldParent.uri, newParent.uri
-            )
-            if (movedUri != null) return
-        } catch (e: Exception) {
-            // Provider doesn't support atomic move for this document — fall through.
-        }
-    }
-    copyDocumentRecursive(doc, newParent)
-    deleteRecursively(doc)
-}
+    private fun movePhysicalDocument(doc: DocumentFile, oldParent: DocumentFile, newParent: DocumentFile) =
+        safOps.movePhysicalDocument(doc, oldParent, newParent)
 
-private fun copyDocumentRecursive(source: DocumentFile, targetParent: DocumentFile): DocumentFile {
-    val name = source.name ?: throw VaultIOException("Source document has no name")
-    return if (source.isDirectory) {
-        val newDir = createDirectorySafe(targetParent, name) ?: throw VaultIOException("Could not create $name in target")
-        for (child in listFilesSafe(source)) copyDocumentRecursive(child, newDir)
-        newDir
-    } else {
-        val newFile = createFileSafe(targetParent, "application/octet-stream", name)
-            ?: throw VaultIOException("Could not create $name in target")
-        context.contentResolver.openInputStream(source.uri)?.use { input ->
-            context.contentResolver.openOutputStream(newFile.uri, "wt")?.use { output ->
-                input.copyTo(output)
-            } ?: throw VaultIOException("Could not open ${newFile.uri} for writing")
-        } ?: throw VaultIOException("Could not open ${source.uri} for reading")
-        newFile
-    }
-}
+    private fun renameDocument(doc: DocumentFile, newName: String) = safOps.renameDocument(doc, newName)
 
-
-    private fun renameDocument(doc: DocumentFile, newName: String) {
-        android.provider.DocumentsContract.renameDocument(context.contentResolver, doc.uri, newName)
-            ?: throw VaultIOException("renameDocument failed for ${doc.uri}")
-    }
-
-    private fun deleteRecursively(folder: DocumentFile) {
-        for (child in listFilesSafe(folder)) {
-            if (child.isDirectory) deleteRecursively(child)
-            child.delete()
-        }
-        folder.delete()
-    }
+    private fun deleteRecursively(folder: DocumentFile) = safOps.deleteRecursively(folder)
 
     private fun requireNonNull(doc: DocumentFile?): DocumentFile = doc ?: throw VaultIOException("Expected SAF document was null")
 

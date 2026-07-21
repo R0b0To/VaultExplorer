@@ -2,8 +2,8 @@ package com.aeidolon.vaultexplorer.gocryptfs
 
 import android.content.Context
 import android.net.Uri
-import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 
 sealed class GocryptfsNode {
     abstract val cleartextName: String
@@ -32,6 +32,7 @@ class GocryptfsVaultTree(
 ) {
     private val folderCache = HashMap<String, DocumentFile>()
     private val dirivCache = HashMap<String, ByteArray>()
+    private val safOps = SafDocumentOps(context)
 
     private val vaultRoot: DocumentFile by lazy {
         DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw GocryptfsIOException("Cannot open vault root")
@@ -46,7 +47,7 @@ class GocryptfsVaultTree(
     fun list(virtualDirPath: String): List<GocryptfsNode> {
         val physical = physicalFolderFor(virtualDirPath)
         val diriv = dirivFor(virtualDirPath, physical)
-        val children = listChildrenFast(physical)
+        val children = safOps.listChildren(physical)
 
         // Long-name files (`gocryptfs.longname.<hash>`) need their sibling
         // `.name` file resolved before we know their cleartext name — index
@@ -96,7 +97,7 @@ class GocryptfsVaultTree(
             folderCache[nextBuilt]?.let { current = it; built = nextBuilt; return@let }
                 ?: run {
                     val diriv = dirivFor(built, current)
-                    val match = listChildrenFast(current).firstOrNull { child ->
+                    val match = safOps.listChildren(current).firstOrNull { child ->
                         val name = child.name ?: return@firstOrNull false
                         resolvedNameMatches(name, current, diriv, segment)
                     } ?: throw GocryptfsPathNotFoundException(virtualDirPath)
@@ -116,7 +117,7 @@ fun dirivFor(virtualDirPath: String, physicalFolder: DocumentFile = physicalFold
         readWhole(existing)
     } else {
         val fresh = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
-        val f = createFileSafe(physicalFolder, "application/octet-stream", GocryptfsFileNameCryptor.DIRIV_FILENAME)
+        val f = safOps.createFileSafe(physicalFolder, "application/octet-stream", GocryptfsFileNameCryptor.DIRIV_FILENAME)
             ?: throw GocryptfsIOException("Could not create gocryptfs.diriv")
         writeWhole(f, fresh)
         fresh
@@ -126,28 +127,12 @@ fun dirivFor(virtualDirPath: String, physicalFolder: DocumentFile = physicalFold
     return bytes
 }
 
-/** Creates a document via DocumentsContract directly rather than DocumentFile.createFile(),
- *  since [parent] here may be a SingleDocumentFile wrapper produced by listChildrenFast()
- *  (via fromSingleUri), whose own createFile() unconditionally throws
- *  UnsupportedOperationException. DocumentsContract.createDocument() only needs a valid
- *  document-within-tree URI, so it works regardless of which DocumentFile subclass wraps
- *  the parent — same pattern GocryptfsSession's own createFileSafe()/createDirectorySafe()
- *  already use. */
-private fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile? {
-    return try {
-        val uri = DocumentsContract.createDocument(context.contentResolver, parent.uri, mimeType, name)
-        uri?.let { DocumentFile.fromSingleUri(context, it) }
-    } catch (e: Exception) {
-        null
-    }
-}
-
     fun invalidate(virtualDirPath: String) {
         val stale = folderCache.keys.filter { it == virtualDirPath || it.startsWith("$virtualDirPath/") }
         stale.forEach { folderCache.remove(it); dirivCache.remove(it) }
     }
 
-    // ---- helpers (identical approach to CryptomatorVaultTree's SAF plumbing) ----
+    // ---- helpers (shared implementation lives in SafDocumentOps; see also CryptomatorVaultTree) ----
 
     private fun nodeFor(physical: DocumentFile, cleartextName: String): GocryptfsNode =
         if (physical.isDirectory) GocryptfsNode.VDir(cleartextName, physical)
@@ -164,32 +149,11 @@ private fun createFileSafe(parent: DocumentFile, mimeType: String, name: String)
         return runCatching { nameCryptor.decryptName(physicalName, diriv) == want }.getOrDefault(false)
     }
 
-    private fun listChildrenFast(folder: DocumentFile): List<DocumentFile> {
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folder.uri, DocumentsContract.getDocumentId(folder.uri))
-        val results = mutableListOf<DocumentFile>()
-        val projection = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-        context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-            val idIdx = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-            while (cursor.moveToNext()) {
-                val docId = cursor.getString(idIdx)
-                val childUri = DocumentsContract.buildDocumentUriUsingTree(folder.uri, docId)
-                DocumentFile.fromSingleUri(context, childUri)?.let { results.add(it) }
-            }
-        }
-        return results
-    }
+    private fun findChild(folder: DocumentFile, name: String): DocumentFile? = safOps.childOf(folder, name)
 
-    private fun findChild(folder: DocumentFile, name: String): DocumentFile? =
-        listChildrenFast(folder).firstOrNull { it.name == name }
+    private fun readWhole(file: DocumentFile): ByteArray = safOps.readWhole(file)
 
-    private fun readWhole(file: DocumentFile): ByteArray =
-        context.contentResolver.openInputStream(file.uri)?.use { it.readBytes() }
-            ?: throw GocryptfsIOException("Could not open ${file.uri}")
-
-    private fun writeWhole(file: DocumentFile, bytes: ByteArray) {
-        context.contentResolver.openOutputStream(file.uri, "wt")?.use { it.write(bytes) }
-            ?: throw GocryptfsIOException("Could not open ${file.uri} for writing")
-    }
+    private fun writeWhole(file: DocumentFile, bytes: ByteArray) = safOps.writeWhole(file, bytes)
 
     private fun normalizedSegments(path: String) = path.trim('/').split('/').filter { it.isNotEmpty() }
 }

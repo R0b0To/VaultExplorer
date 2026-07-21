@@ -14,6 +14,7 @@ class ImagePageItem extends StatefulWidget {
   final bool showUI;
   final ValueChanged<bool> onToggleUI;
   final ValueChanged<bool> onZoomChanged;
+  final VoidCallback? onError;
 
   const ImagePageItem({
     super.key,
@@ -25,6 +26,7 @@ class ImagePageItem extends StatefulWidget {
     required this.showUI,
     required this.onToggleUI,
     required this.onZoomChanged,
+    this.onError,
   });
 
   @override
@@ -66,18 +68,17 @@ class _ImagePageItemState extends State<ImagePageItem> {
     if (oldWidget.prefetchedBytes != widget.prefetchedBytes ||
         oldWidget.fileName != widget.fileName) {
       _imageSize = null;
-      _lastViewportSize = null; // Forces recalculation
+      _lastViewportSize = null; 
       _loadImageSize();
     }
   }
 
-  // Centers the view horizontally or vertically depending on which axis overflows
   void _centerImageInitially(BoxConstraints constraints) {
     if (_imageSize == null) return;
 
     double ar = _imageSize!.width / _imageSize!.height;
     if (widget.rotationQuarterTurns % 2 != 0) {
-      ar = 1 / ar; // Swap aspect ratio for 90 or 270 degree rotation
+      ar = 1 / ar;
     }
 
     double? childWidth;
@@ -152,7 +153,6 @@ class _ImagePageItemState extends State<ImagePageItem> {
             double? canvasHeight;
             bool isConstrained = true;
 
-            // Only calculate custom layout dimensions if the image size has resolved
             if (_imageSize != null) {
               double ar = _imageSize!.width / _imageSize!.height;
               if (widget.rotationQuarterTurns % 2 != 0) {
@@ -170,12 +170,10 @@ class _ImagePageItemState extends State<ImagePageItem> {
               }
 
               if (childWidth != null && childHeight != null) {
-                // Ensure the InteractiveViewer canvas size is always at least the size of the viewport
                 canvasWidth = max(constraints.maxWidth, childWidth);
                 canvasHeight = max(constraints.maxHeight, childHeight);
               }
 
-              // Detect changes to triggers centering recalculation post-frame
               final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
               if (_lastFit != widget.imageFit ||
                   _lastRotation != widget.rotationQuarterTurns ||
@@ -225,6 +223,7 @@ class _ImagePageItemState extends State<ImagePageItem> {
                         fileName: widget.fileName,
                         prefetchedBytes: widget.prefetchedBytes,
                         fit: widget.imageFit,
+                        onError: widget.onError,
                       ),
                     ),
                   ),

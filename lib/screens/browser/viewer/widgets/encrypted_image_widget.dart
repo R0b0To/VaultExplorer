@@ -1,3 +1,4 @@
+// lib/screens/browser/viewer/widgets/encrypted_image_widget.dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '/../../models/mounted_container.dart';
@@ -8,6 +9,7 @@ class EncryptedImageWidget extends StatefulWidget {
   final String fileName;
   final Uint8List? prefetchedBytes;
   final BoxFit fit;
+  final VoidCallback? onError;
 
   const EncryptedImageWidget({
     super.key,
@@ -15,6 +17,7 @@ class EncryptedImageWidget extends StatefulWidget {
     required this.fileName,
     this.prefetchedBytes,
     required this.fit,
+    this.onError,
   });
 
   @override
@@ -80,6 +83,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     } catch (e) {
       if (mounted && _currentlyLoadingFile == targetFile && _bytes == null) {
         setState(() => _error = 'Failed to load encrypted image: $e');
+        widget.onError?.call();
       }
     }
   }
@@ -113,6 +117,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     return Image.memory(
       _bytes!,
       fit: widget.fit,
+      gaplessPlayback: true, // <--- KEEPS THE THUMBNAIL VISIBLE WHILE DECODING HIGH-RES
       errorBuilder: (context, error, stackTrace) => Center(
         child: Text(
           'Invalid or corrupted image format.',

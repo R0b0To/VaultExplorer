@@ -8,9 +8,6 @@ import '/../../services/vaultexplorer_api.dart';
 import '/../../widgets/async_thumbnail.dart';
 import '../media_viewer_constants.dart';
 
-/// A bottom-anchored strip of thumbnails for the active playlist. Lets the
-/// user scroll through every item at a glance and tap one to jump straight
-/// to it, instead of stepping through with next/previous.
 class PlaylistCarouselOverlay extends StatefulWidget {
   final MountedContainer container;
   final List<String> playlist;
@@ -31,7 +28,6 @@ class PlaylistCarouselOverlay extends StatefulWidget {
     required this.onClose,
   });
 
-  // Height adjusted to comfortably fit the thumbnails + the seekbar
   static const double height = 230;
 
   @override
@@ -58,8 +54,10 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   @override
   void didUpdateWidget(covariant PlaylistCarouselOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.currentIndex != widget.currentIndex) {
-      _centerOnCurrent(animate: true);
+    if (oldWidget.currentIndex != widget.currentIndex || oldWidget.playlist.length != widget.playlist.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _centerOnCurrent(animate: true);
+      });
     }
   }
 
@@ -79,8 +77,10 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
     final target = (widget.currentIndex * (_tileWidth + _tileSpacing)) -
         (screenWidth / 2) +
         (_tileWidth / 2);
-    final clamped = target.clamp(0.0, _scrollController.position.maxScrollExtent);
-    if (animate) {
+    final maxExt = _scrollController.position.maxScrollExtent;
+    final clamped = target.clamp(0.0, maxExt > 0 ? maxExt : 0.0);
+    
+    if (animate && maxExt > 0) {
       _scrollController.animateTo(
         clamped,
         duration: MediaViewerConstants.animationDuration,
@@ -156,8 +156,6 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                           width: isSelected ? 2.5 : 1,
                         ),
                       ),
-                      // Wrap child in a ClipRRect with radius calculated to sit exactly 
-                      // inside the outer border (outer radius - border width)
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(isSelected ? 7.5 : 9.0),
                         child: _CarouselThumb(
@@ -173,7 +171,6 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                 },
               ),
             ),
-            // Seekbar with current and total numbers on the extremities
             if (widget.playlist.length > 1)
               Padding(
                 padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12, top: 4),
@@ -190,7 +187,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: SizedBox(
-                        height: 24, // Compact height for slider footprint
+                        height: 24, 
                         child: SliderTheme(
                           data: SliderTheme.of(context).copyWith(
                             trackHeight: 2.0,
@@ -219,7 +216,6 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                                 },
                                 onChangeEnd: (val) {
                                   _isDraggingSlider = false;
-                                  // Ensure the slider is reset visually if items don't stretch enough to scroll
                                   if (_scrollController.hasClients && _scrollController.position.maxScrollExtent <= 0) {
                                     _sliderProportion.value = 0.0;
                                   }
@@ -249,12 +245,6 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   }
 }
 
-/// Renders a single playlist tile's thumbnail via the shared [AsyncThumbnail]
-/// machinery — the same concurrency limiters, in-flight de-duplication, and
-/// debounce that [FileGridView]'s thumbnails already use, and in fact the
-/// *same* limiter/cache instances, so a fetch kicked off from the grid and
-/// one kicked off from here for the same file collapse into a single native
-/// call instead of racing each other.
 class _CarouselThumb extends StatelessWidget {
   final MountedContainer container;
   final String fileName;
@@ -355,8 +345,6 @@ class _CarouselThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Audio has no thumbnail concept — skip the async machinery entirely
-    // rather than kicking off a fetch that immediately no-ops.
     if (MediaViewerConstants.isAudio(fileName)) {
       return Container(
         color: const Color(0xFF161B22),
@@ -375,10 +363,6 @@ class _CarouselThumb extends StatelessWidget {
       key: ValueKey('carousel:$fileName'),
       container: container,
       filePath: fileName,
-      // Shared with FileGridView: same limiter (2 images / 1 video, so a
-      // slow video decode can't block image thumbnails queued behind it)
-      // and same in-flight cache (so grid + carousel de-dupe requests for
-      // the same file instead of each firing their own native call).
       cache: isVideo ? ThumbnailConcurrency.videoCache : ThumbnailConcurrency.imageCache,
       limiter: isVideo ? ThumbnailConcurrency.videoLimiter : ThumbnailConcurrency.imageLimiter,
       fetchFn: (c, p) => isVideo

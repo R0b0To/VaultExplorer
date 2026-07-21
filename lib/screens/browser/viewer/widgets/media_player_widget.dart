@@ -61,22 +61,12 @@ class MediaPlayerWidget extends StatefulWidget {
   final bool subtitlesEnabled;
   final int rotationQuarterTurns;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
-  // Called once the controller has initialized. [onEvicted] should be
-  // stashed and invoked by the caller (via VideoPlaybackManager) if this
-  // controller is later forced out to make room for another page, so this
-  // widget gets a chance to reinitialize instead of freezing on a disposed
-  // controller.
   final void Function(VideoPlayerController controller, VoidCallback onEvicted)
       onVideoControllerInitialized;
   final VoidCallback onVideoControllerDisposed;
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
-  // Whether this page is the one currently on-screen. Up to
-  // maxLiveVideoControllers pages can have an initialized controller at
-  // once (for smooth swiping), but they all share one progressNotifier —
-  // without this guard a neighboring page finishing initialization (or
-  // otherwise ticking) would overwrite the active page's position/duration
-  // and make the seekbar jump/glitch.
   final bool isCurrent;
+  final VoidCallback? onError;
 
   const MediaPlayerWidget({
     super.key,
@@ -96,6 +86,7 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.onVideoControllerDisposed,
     required this.progressNotifier,
     required this.isCurrent,
+    this.onError,
   });
 
   @override
@@ -113,6 +104,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   final GlobalKey _interactiveViewerKey = GlobalKey();
 
   Timer? _indicatorTimer;
+  int _initToken = 0;
 
   final TransformationController _videoTransformationController =
       TransformationController();
@@ -130,54 +122,55 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   }
 
   Future<void> _initPlayer() async {
-    _controller = VideoPlayerController.contentUri(
-      Uri.parse(widget.contentUriString),
-    );
+    final token = ++_initToken;
+    final controller = VideoPlayerController.contentUri(Uri.parse(widget.contentUriString));
+    _controller = controller;
 
-    _controller.addListener(_onControllerTick);
+    controller.addListener(_onControllerTick);
     try {
-      // Kick off subtitle discovery (up to two vault round trips to probe
-      // for .srt/.vtt) alongside controller initialization instead of
-      // serially before it — subtitles are the uncommon case, so most
-      // videos shouldn't pay that extra latency before playback can start.
       final captionsFuture = _loadCaptions(widget.fileName);
-      final initFuture = _controller.initialize();
+      final initFuture = controller.initialize();
 
       final captionFile = await captionsFuture;
-      if (captionFile != null && mounted) {
-        _controller.setClosedCaptionFile(Future.value(captionFile));
+      if (token != _initToken || !mounted) {
+        controller.dispose();
+        return;
+      }
+      if (captionFile != null) {
+        controller.setClosedCaptionFile(Future.value(captionFile));
       }
 
       await initFuture;
-      if (mounted) {
-        setState(() {
-          _initialized = true;
-          _playerError = null;
-        });
-        widget.onVideoControllerInitialized(_controller, _handleEvicted);
-        await _controller.setVolume(1.0);
-        await _controller.setLooping(false);
-        if (widget.autoPlay) {
-          _controller.play();
-        }
+      if (token != _initToken || !mounted) {
+        controller.dispose();
+        return;
+      }
+      
+      setState(() {
+        _initialized = true;
+        _playerError = null;
+      });
+      widget.onVideoControllerInitialized(controller, _handleEvicted);
+      await controller.setVolume(1.0);
+      await controller.setLooping(false);
+      if (widget.autoPlay && widget.isCurrent) {
+        controller.play();
       }
     } catch (e) {
-      if (mounted) {
+      if (token == _initToken && mounted) {
         setState(() => _playerError = 'Media stream initialization failed: $e');
+        widget.onError?.call();
+      } else {
+        controller.dispose();
       }
     }
   }
 
-  /// Invoked by VideoPlaybackManager if this file's controller was forced
-  /// out (see maxLiveVideoControllers) while this widget may still be
-  /// mounted. The manager handles safely pausing/disposing the old
-  /// controller on its own — we just need to drop our reference and
-  /// reinitialize a fresh one so this page recovers automatically instead
-  /// of being left with a frozen video and dead controls until the user
-  /// navigates away and back.
   void _handleEvicted() {
     if (!mounted) return;
-    _controller.removeListener(_onControllerTick);
+    try {
+      _controller.removeListener(_onControllerTick);
+    } catch (_) {}
     setState(() {
       _initialized = false;
     });
@@ -225,22 +218,28 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     return null;
   }
 
-@override
+  @override
   void dispose() {
     _indicatorTimer?.cancel();
-    _controller.removeListener(_onControllerTick);
+    if (_initialized) {
+      try {
+        _controller.removeListener(_onControllerTick);
+      } catch (_) {}
+    }
     widget.onVideoControllerDisposed();
     _videoTransformationController.dispose();
     
-    final ctrl = _controller;
-    try {
-      ctrl.pause();
-      Future.delayed(const Duration(milliseconds: 150), () async {
-        try {
-          await ctrl.dispose();
-        } catch (_) {}
-      });
-    } catch (_) {}
+    if (_initialized) {
+      final ctrl = _controller;
+      try {
+        ctrl.pause();
+        Future.delayed(const Duration(milliseconds: 150), () async {
+          try {
+            await ctrl.dispose();
+          } catch (_) {}
+        });
+      } catch (_) {}
+    }
 
     super.dispose();
   }
@@ -258,7 +257,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     setState(() => _isSpeedHeld = false);
   }
 
-  /// Calculates the zoom matrix given a local position within the viewport and the target scale.
   Matrix4 _calculateZoomMatrix({required Offset localPosition, required double scale}) {
     final x = -localPosition.dx * (scale - 1.0);
     final y = -localPosition.dy * (scale - 1.0);
@@ -309,9 +307,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     });
   }
   
-
-Future<void> _skip({required bool backwards}) async {
-    if (_isSeeking) return; // Prevent overlapping seek commands
+  Future<void> _skip({required bool backwards}) async {
+    if (_isSeeking) return; 
     _isSeeking = true;
     
     HapticFeedback.lightImpact();
@@ -324,7 +321,6 @@ Future<void> _skip({required bool backwards}) async {
         ? Duration.zero
         : (targetPos > duration ? duration : targetPos);
 
-
     setState(() {
       if (backwards) {
         _showLeftIndicator = true;
@@ -335,7 +331,7 @@ Future<void> _skip({required bool backwards}) async {
     
     await _controller.seekTo(clampedPos);
     
-    if (!mounted) return; // Prevent memory leaks if widget disposed during await
+    if (!mounted) return; 
     _isSeeking = false;
 
     _indicatorTimer?.cancel();
@@ -428,7 +424,6 @@ Future<void> _skip({required bool backwards}) async {
                 ),
               ),
             Positioned.fill(
-              // Using a LayoutBuilder ensures we can properly divide skip vs zoom zones
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   return GestureDetector(
@@ -439,7 +434,6 @@ Future<void> _skip({required bool backwards}) async {
                       if (widget.isAudio) return;
                       final width = constraints.maxWidth;
                       final dx = _videoDoubleTapDetails?.localPosition.dx ?? 0;
-                      // Edges to skip, middle to zoom
                       if (dx < width * 0.3) {
                         _skip(backwards: true);
                       } else if (dx > width * 0.7) {

@@ -18,14 +18,6 @@ class PlaylistController extends ChangeNotifier {
   bool _isPlaylistMode;
   String _selectedFolder = 'Current Folder Only';
 
-  // Bumped on every state-mutating call (enablePlaylist, disablePlaylist,
-  // toggleShuffle, removeCurrent). enablePlaylist's directory scan is async
-  // and can take a while on a large "All (incl. subfolders)" vault; if the
-  // user disables playlist mode, re-scopes to a different folder, or
-  // shuffles while that scan is still in flight, the scan's eventual result
-  // must not overwrite the newer state. Each async scan snapshots the
-  // generation it started with and checks it still matches before applying
-  // its result.
   int _generation = 0;
 
   PlaylistController({
@@ -51,7 +43,7 @@ class PlaylistController extends ChangeNotifier {
   String get currentFile => isEmpty ? '' : _currentPlaylist[_currentIndex];
 
   void updateIndex(int index) {
-    if (index >= 0 && index < _currentPlaylist.length) {
+    if (index >= 0 && index < _currentPlaylist.length && index != _currentIndex) {
       _currentIndex = index;
       notifyListeners();
     }
@@ -97,10 +89,6 @@ class PlaylistController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Turns on (or re-scopes) playlist mode for the given folder scope
-  /// ('Current Folder Only' or 'All'). If the viewer was opened as a single
-  /// file, `_originalList` only contains that one file, so the first call
-  /// for a given scope triggers a real directory scan to populate it.
   Future<void> enablePlaylist(String folder) async {
     final anchor = currentFile;
     final needsScan = !_isPlaylistMode || (folder == 'All' && !_allFilesScanned);
@@ -122,11 +110,6 @@ class PlaylistController extends ChangeNotifier {
           ? await _scanDirectoryRecursively(baseDir)
           : await _scanDirectorySingleLevel(baseDir);
 
-      // Another mutation (disablePlaylist, a second enablePlaylist for a
-      // different scope, toggleShuffle, removeCurrent) ran while this scan
-      // was in flight and has already moved state past what this scan
-      // knows about. Applying our (now stale) result here would silently
-      // undo whatever the user did in the meantime, so bail out instead.
       if (myGeneration != _generation) return;
 
       if (scanned.isNotEmpty) {
@@ -137,29 +120,18 @@ class PlaylistController extends ChangeNotifier {
         _allFilesScanned = false;
       }
 
-      // Only publish the new folder scope once the scan and filtering have
-      // fully resolved. MediaViewerScreen keys its PageView off
-      // selectedFolder (among other things) — flipping it earlier, before
-      // _currentPlaylist/_currentIndex below are updated to match, causes a
-      // premature rebuild with stale playlist/index data mid-scan, tearing
-      // down whatever page/video controller was live for the file the user
-      // was actually viewing.
       _selectedFolder = folder;
       _isPlaylistMode = true;
       _applyFolderFiltering(folder, anchor);
     } finally {
-      // Only this generation's scan may clear the scanning indicator —
-      // otherwise a stale scan resolving after a fresh one has already
-      // started would flip "scanning…" off mid-way through the new scan.
       if (myGeneration == _generation) _isScanningSubfolders = false;
       notifyListeners();
     }
   }
 
-  /// Leaves playlist mode and collapses back to viewing just the current file.
   void disablePlaylist() {
     if (!_isPlaylistMode) return;
-    _generation++; // invalidate any in-flight enablePlaylist scan
+    _generation++;
     final anchor = currentFile;
     _isPlaylistMode = false;
     _isShuffled = false;
@@ -246,10 +218,6 @@ class PlaylistController extends ChangeNotifier {
           }
         }
 
-        // Walk subdirectories in bounded-size batches instead of firing off
-        // every nested scan simultaneously — a large "All (incl.
-        // subfolders)" vault can otherwise burst hundreds of concurrent
-        // native channel calls at once.
         for (var i = 0;
             i < subdirNames.length;
             i += MediaViewerConstants.maxDirectoryScanConcurrency) {
@@ -275,15 +243,26 @@ class PlaylistController extends ChangeNotifier {
     return foundFiles;
   }
 
-  void removeCurrent() {
+  void removeFile(String file) {
     if (isEmpty) return;
-    final file = currentFile;
-    _currentPlaylist.removeAt(_currentIndex);
+    final indexToRemove = _currentPlaylist.indexOf(file);
+    if (indexToRemove == -1) return;
+
+    _currentPlaylist.removeAt(indexToRemove);
     _originalList.remove(file);
-    if (_currentIndex >= _currentPlaylist.length &&
-        _currentPlaylist.isNotEmpty) {
+
+    if (_currentPlaylist.isEmpty) {
+      _currentIndex = 0;
+      notifyListeners();
+      return;
+    }
+
+    if (indexToRemove < _currentIndex) {
+      _currentIndex--;
+    } else if (_currentIndex >= _currentPlaylist.length) {
       _currentIndex = _currentPlaylist.length - 1;
     }
+    
     notifyListeners();
   }
 }

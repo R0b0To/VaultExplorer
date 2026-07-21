@@ -49,6 +49,27 @@ typedef ImportProgress = ({
 });
 
 
+/// Logs an exception this method is about to swallow (return a default
+/// value instead of rethrowing) so a real native/channel failure is at
+/// least visible in the debug console instead of silently degrading to
+/// "false"/"null"/"0" — which looks identical to a legitimate empty
+/// result at every call site.
+///
+/// [method] is the channel method name (or a short description) so the
+/// log line identifies *what* failed without needing a stack trace.
+/// [expected] marks a catch that's already documented as intentionally
+/// best-effort (e.g. [VaultExplorerApi.cancelUnlock] racing a call that's
+/// about to resolve on its own) — those still get logged, but tagged
+/// separately so they don't read as equally alarming as a genuine
+/// unexpected failure such as a corrupted container header or a revoked
+/// SAF permission.
+void _logSwallowed(String method, Object error, {bool expected = false}) {
+  debugPrint(
+    '${expected ? '[VaultExplorerApi:expected]' : '[VaultExplorerApi]'} '
+    '$method failed: $error',
+  );
+}
+
 class VaultExplorerApi {
   const VaultExplorerApi();
 
@@ -356,7 +377,8 @@ class VaultExplorerApi {
         'hiddenHashId': hiddenHashId,
       });
       return success ?? false;
-    } catch (_) {
+    } catch (e) {
+      _logSwallowed('createContainer', e);
       return false;
     }
   }
@@ -371,7 +393,8 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
       {'deviceName': deviceName},
     );
     return result;
-  } on PlatformException {
+  } on PlatformException catch (e) {
+    _logSwallowed('getUsbDeviceCapacity', e);
     return null;
   }
 }
@@ -420,7 +443,8 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         'hiddenHashId': hiddenHashId,
       });
       return success ?? false;
-    } catch (_) {
+    } catch (e) {
+      _logSwallowed('createUsbContainer', e);
       return false;
     }
   }
@@ -453,7 +477,8 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         'newKeyfilePaths': newKeyfilePaths ?? [],
       });
       return success ?? false;
-    } catch (_) {
+    } catch (e) {
+      _logSwallowed('changeContainerPassword', e);
       return false;
     }
   }
@@ -549,7 +574,8 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         {'filePath': folderUri, 'password': password},
       );
       return success ?? false;
-    } catch (_) {
+    } catch (e) {
+      _logSwallowed('createCryptomatorVault', e);
       return false;
     }
   }
@@ -614,7 +640,8 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         {'filePath': folderUri, 'password': password},
       );
       return success ?? false;
-    } catch (_) {
+    } catch (e) {
+      _logSwallowed('createGocryptfsVault', e);
       return false;
     }
   }
@@ -633,7 +660,8 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         {'volId': container.volId, 'path': fileName},
       );
       return success ?? true;
-    } catch (_) {
+    } catch (e) {
+      _logSwallowed('finishWriteIfCryptomator', e);
       return true;
     }
   }
@@ -650,8 +678,9 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
   Future<void> cancelUnlock(int volId) async {
     try {
       await _channel.invokeMethod(ChannelMethods.cancelUnlock, {'volId': volId});
-    } catch (_) {
+    } catch (e) {
       // Best-effort — the pending unlock call resolves on its own regardless.
+      _logSwallowed('cancelUnlock', e, expected: true);
     }
   }
 
@@ -709,10 +738,11 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         {'filePath': filePath},
       );
       return result ?? false;
-    } catch (_) {
+    } catch (e) {
       // Treat a failed check as "unknown", not "missing" — let the normal
       // unlock attempt surface the real error rather than blocking access
       // to a container that might actually be fine.
+      _logSwallowed('documentExists', e, expected: true);
       return true;
     }
   }
@@ -727,7 +757,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
   void warmContainer(String filePath) {
     _channel
         .invokeMethod(ChannelMethods.warmContainer, {'filePath': filePath})
-        .catchError((_) {});
+        .catchError((e) => _logSwallowed('warmContainer', e, expected: true));
   }
   Future<List<UsbDeviceInfo>> listUsbDevices() async {
     final raw = await _channel.invokeMethod<List<Object?>>(
@@ -919,7 +949,8 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         },
       );
       return bytes;
-    } catch (_) {
+    } catch (e) {
+      _logSwallowed('getImageThumbnail', e, expected: true);
       return null;
     }
   }
@@ -942,7 +973,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         'targetSize': targetSize,
       });
     } catch (e) {
-      debugPrint('Background thumbnail build request failed: $e');
+      _logSwallowed('generateAndCacheThumbnail', e, expected: true);
     }
   }
 
@@ -1113,8 +1144,9 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
   Future<void> cancelImport(int opId) async {
     try {
       await _channel.invokeMethod(ChannelMethods.cancelImport, {'opId': opId});
-    } catch (_) {
+    } catch (e) {
       // Best-effort — the pending import call resolves on its own regardless.
+      _logSwallowed('cancelImport', e, expected: true);
     }
   }
 
@@ -1137,7 +1169,8 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
       },
     );
     return bytes;
-  } catch (_) {
+  } catch (e) {
+    _logSwallowed('getVideoThumbnail', e, expected: true);
     return null;
   }
 }
@@ -1149,7 +1182,8 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         {'enabled': enabled},
       );
       return success ?? false;
-    } catch (_) {
+    } catch (e) {
+      _logSwallowed('setSecureScreen', e);
       return false;
     }
   }
@@ -1162,7 +1196,8 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         {'uri': uri},
       );
       return result ?? false;
-    } catch (_) {
+    } catch (e) {
+      _logSwallowed('isGocryptfsVault', e);
       return false;
     }
   }

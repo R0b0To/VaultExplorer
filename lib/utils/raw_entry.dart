@@ -48,8 +48,11 @@ class RawEntry {
 
   /// Reconstructs the canonical wire string.
   ///
-  /// Use when the raw form is required, e.g. when adding back to
-  /// [SelectionMixin.selectedItems] or passing to a platform channel.
+  /// Use when the raw form is required — e.g. a stable [ValueKey] for a
+  /// list row, or passing an entry back through a platform channel call
+  /// that still expects the wire format. Most in-app state (like
+  /// [SelectionMixin.selectedItems]) holds [RawEntry] values directly and
+  /// has no need to round-trip through this.
   String get raw => isDir
       ? '[DIR] $name|$sizeBytes|$modifiedSecs'
       : '$name|$sizeBytes|$modifiedSecs';

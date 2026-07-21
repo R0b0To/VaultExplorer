@@ -6,11 +6,6 @@ import androidx.documentfile.provider.DocumentFile
 import java.security.SecureRandom
 import java.util.UUID
 
-sealed class CryptomatorOpenResult {
-    data class Success(val session: CryptomatorSession, val vaultDisplayName: String) : CryptomatorOpenResult()
-    object WrongPassword : CryptomatorOpenResult()
-    data class InvalidVault(val reason: String) : CryptomatorOpenResult()
-}
 
 /**
  * Entry point mirroring VeraCryptEngine.unlockFile/create — opens or creates
@@ -35,40 +30,40 @@ object CryptomatorVault {
         return hasMasterkey
     }
 
-    fun open(context: Context, vaultRootUri: Uri, passphrase: CharArray, readOnly: Boolean): CryptomatorOpenResult {
+    fun open(context: Context, vaultRootUri: Uri, passphrase: CharArray, readOnly: Boolean): com.aeidolon.vaultexplorer.engine.VaultOpenResult<CryptomatorSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
-            ?: return CryptomatorOpenResult.InvalidVault("Cannot access the selected folder.")
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
 
         val masterkeyDoc = root.listFiles().firstOrNull { it.name == MASTERKEY_FILE_NAME }
-            ?: return CryptomatorOpenResult.InvalidVault("No masterkey.cryptomator found — this doesn't look like a Cryptomator vault.")
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("No masterkey.cryptomator found — this doesn't look like a Cryptomator vault.")
         val dataDir = root.listFiles().firstOrNull { it.name == DATA_DIR_NAME && it.isDirectory }
-            ?: return CryptomatorOpenResult.InvalidVault("Vault is missing its 'd' data directory.")
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Vault is missing its 'd' data directory.")
 
         val masterkeyBytes = context.contentResolver.openInputStream(masterkeyDoc.uri)?.use { it.readBytes() }
-            ?: return CryptomatorOpenResult.InvalidVault("Could not read masterkey.cryptomator")
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not read masterkey.cryptomator")
 
         val parsed = try {
             CryptomatorMasterkeyFile.parse(masterkeyBytes)
         } catch (e: MasterkeyFileFormatException) {
-            return CryptomatorOpenResult.InvalidVault(e.message ?: "Malformed masterkey.cryptomator")
+            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(e.message ?: "Malformed masterkey.cryptomator")
         }
 
         val masterkey = try {
             CryptomatorMasterkeyFile.unlock(parsed, passphrase)
         } catch (e: InvalidPassphraseException) {
-            return CryptomatorOpenResult.WrongPassword
+            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword
         }
 
         val vaultConfigDoc = root.listFiles().firstOrNull { it.name == VAULT_FILE_NAME }
         val (vaultFormat, cipherCombo, shorteningThreshold) = if (vaultConfigDoc != null) {
             val jwt = context.contentResolver.openInputStream(vaultConfigDoc.uri)?.use { it.readBytes() }
                 ?.toString(Charsets.UTF_8)
-                ?: return CryptomatorOpenResult.InvalidVault("Could not read vault.cryptomator")
+                ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not read vault.cryptomator")
             val config = try {
                 CryptomatorVaultConfigParser.verify(jwt, masterkey)
             } catch (e: VaultConfigException) {
                 masterkey.destroy()
-                return CryptomatorOpenResult.InvalidVault(e.message ?: "vault.cryptomator verification failed")
+                return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(e.message ?: "vault.cryptomator verification failed")
             }
             Triple(config.vaultFormat, config.cipherCombo, config.shorteningThreshold)
         } else {
@@ -84,7 +79,7 @@ object CryptomatorVault {
 
         if (vaultFormat !in 7..8) {
             masterkey.destroy()
-            return CryptomatorOpenResult.InvalidVault("Vault format $vaultFormat is not supported (only 7 and 8 are).")
+            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Vault format $vaultFormat is not supported (only 7 and 8 are).")
         }
 
         val session = CryptomatorSession(
@@ -97,7 +92,7 @@ object CryptomatorVault {
             readOnly = readOnly,
         )
         val displayName = root.name ?: "Vault"
-        return CryptomatorOpenResult.Success(session, displayName)
+        return com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(session, displayName)
     }
 
     /**
@@ -108,12 +103,12 @@ object CryptomatorVault {
      * per the agreed scope — this app never creates format-7 vaults, only
      * opens them.
      */
-    fun create(context: Context, vaultRootUri: Uri, passphrase: CharArray): CryptomatorOpenResult {
+    fun create(context: Context, vaultRootUri: Uri, passphrase: CharArray): com.aeidolon.vaultexplorer.engine.VaultOpenResult<CryptomatorSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
-            ?: return CryptomatorOpenResult.InvalidVault("Cannot access the selected folder.")
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
 
         if (root.listFiles().isNotEmpty()) {
-            return CryptomatorOpenResult.InvalidVault("Selected folder is not empty.")
+            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Selected folder is not empty.")
         }
 
         val random = SecureRandom()
@@ -121,7 +116,7 @@ object CryptomatorVault {
 
         val masterkeyJson = CryptomatorMasterkeyFile.lock(masterkey, passphrase, random, vaultVersion = 999)
         val masterkeyDoc = root.createFile("application/octet-stream", MASTERKEY_FILE_NAME)
-            ?: return CryptomatorOpenResult.InvalidVault("Could not create masterkey.cryptomator")
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not create masterkey.cryptomator")
         context.contentResolver.openOutputStream(masterkeyDoc.uri, "wt")?.use { it.write(masterkeyJson) }
 
         val vaultId = UUID.randomUUID().toString()
@@ -133,15 +128,15 @@ object CryptomatorVault {
             vaultId = vaultId,
         )
         val vaultConfigDoc = root.createFile("application/octet-stream", VAULT_FILE_NAME)
-            ?: return CryptomatorOpenResult.InvalidVault("Could not create vault.cryptomator")
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not create vault.cryptomator")
         context.contentResolver.openOutputStream(vaultConfigDoc.uri, "wt")?.use { it.write(jwt.toByteArray(Charsets.UTF_8)) }
 
         // Root directory's physical storage: d/<hash("")[0:2]>/<hash("")[2:]>
         val nameCryptor = CryptomatorFileNameCryptor(masterkey)
         val rootHash = nameCryptor.hashDirectoryId(ROOT_DIR_ID)
-        val dataDir = root.createDirectory(DATA_DIR_NAME) ?: return CryptomatorOpenResult.InvalidVault("Could not create 'd' directory")
-        val lvl1 = dataDir.createDirectory(rootHash.substring(0, 2)) ?: return CryptomatorOpenResult.InvalidVault("Could not create data subdirectory")
-        lvl1.createDirectory(rootHash.substring(2)) ?: return CryptomatorOpenResult.InvalidVault("Could not create data subdirectory")
+        val dataDir = root.createDirectory(DATA_DIR_NAME) ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not create 'd' directory")
+        val lvl1 = dataDir.createDirectory(rootHash.substring(0, 2)) ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not create data subdirectory")
+        lvl1.createDirectory(rootHash.substring(2)) ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not create data subdirectory")
 
         val session = CryptomatorSession(
             context = context,
@@ -152,6 +147,6 @@ object CryptomatorVault {
             shorteningThreshold = DEFAULT_SHORTENING_THRESHOLD,
             readOnly = false,
         )
-        return CryptomatorOpenResult.Success(session, root.name ?: "Vault")
+        return com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(session, root.name ?: "Vault")
     }
 }

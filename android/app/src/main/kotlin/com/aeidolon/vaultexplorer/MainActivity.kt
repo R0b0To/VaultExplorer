@@ -1340,7 +1340,7 @@ class MainActivity : FlutterFragmentActivity() {
 
                             runOnUiThread {
                                 when (openResult) {
-                                    is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.Success -> {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
                                         val session = openResult.session
                                         VaultBackendRegistry.put(targetVolId, session)
                                         val files = session.listDirectory("")?.toList() ?: emptyList()
@@ -1365,10 +1365,10 @@ class MainActivity : FlutterFragmentActivity() {
                                             "containerFormat" to "cryptomator",
                                         ))
                                     }
-                                    is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.WrongPassword -> {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword -> {
                                         result.error("AUTH_FAIL", "Incorrect password", null)
                                     }
-                                    is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.InvalidVault -> {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
                                         result.error("INVALID_VAULT", openResult.reason, null)
                                     }
                                 }
@@ -1411,7 +1411,7 @@ class MainActivity : FlutterFragmentActivity() {
 
                             runOnUiThread {
                                 when (openResult) {
-                                    is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsOpenResult.Success -> {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
                                         val session = openResult.session
                                         VaultBackendRegistry.put(targetVolId, session)
                                         val files = session.listDirectory("")?.toList() ?: emptyList()
@@ -1436,10 +1436,10 @@ class MainActivity : FlutterFragmentActivity() {
                                             "containerFormat" to "gocryptfs",
                                         ))
                                     }
-                                    is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsOpenResult.WrongPassword -> {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword -> {
                                         result.error("AUTH_FAIL", "Incorrect password", null)
                                     }
-                                    is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsOpenResult.InvalidVault -> {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
                                         result.error("INVALID_VAULT", openResult.reason, null)
                                     }
                                 }
@@ -1468,11 +1468,11 @@ class MainActivity : FlutterFragmentActivity() {
                             }
                             runOnUiThread {
                                 when (createResult) {
-                                    is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.Success -> {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
                                         createResult.session.close()
                                         result.success(true)
                                     }
-                                    is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.InvalidVault -> {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
                                         result.error("CREATE_FAILED", createResult.reason, null)
                                     }
                                     else -> result.error("CREATE_FAILED", "Unexpected result", null)
@@ -1502,11 +1502,11 @@ class MainActivity : FlutterFragmentActivity() {
                             }
                             runOnUiThread {
                                 when (createResult) {
-                                    is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsOpenResult.Success -> {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
                                         createResult.session.close()
                                         result.success(true)
                                     }
-                                    is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsOpenResult.InvalidVault -> {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
                                         result.error("CREATE_FAILED", createResult.reason, null)
                                     }
                                     else -> result.error("CREATE_FAILED", "Unexpected result", null)

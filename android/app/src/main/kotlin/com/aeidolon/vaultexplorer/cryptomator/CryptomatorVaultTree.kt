@@ -5,6 +5,9 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import java.util.concurrent.ConcurrentHashMap
+import com.aeidolon.vaultexplorer.engine.VaultTreeNode
+import com.aeidolon.vaultexplorer.engine.VaultIOException
+import com.aeidolon.vaultexplorer.engine.VaultPathNotFoundException
 
 private const val CLOUD_NODE_EXT = ".c9r"
 private const val LONG_NODE_EXT = ".c9s"
@@ -14,9 +17,9 @@ private const val LONG_CONTENTS_FILE = "contents$CLOUD_NODE_EXT"
 private const val DATA_DIR_NAME = "d"
 private const val ROOT_DIR_ID = ""
 
+
 /** A resolved child of a virtual (cleartext) directory: either a regular file or a subdirectory, with its physical SAF location. */
-sealed class VaultNode {
-    abstract val cleartextName: String
+sealed class VaultNode : VaultTreeNode {
 
     /** A regular file. [physicalFile] is the actual ciphertext bytes: either the short `.c9r` file directly, or `contents.c9r` inside a `.c9s` shortened folder. [wrapperFolder] is the `.c9s` directory if shortened, null otherwise. */
     data class VFile(
@@ -30,8 +33,7 @@ sealed class VaultNode {
     data class VDir(override val cleartextName: String, val physicalFolder: DocumentFile, val dirIdFile: DocumentFile) : VaultNode()
 }
 
-class VaultPathNotFoundException(path: String) : Exception("Path not found in vault: $path")
-class VaultIOException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
 
 /**
  * Resolves cleartext virtual paths (e.g. "Documents/report.pdf") against a

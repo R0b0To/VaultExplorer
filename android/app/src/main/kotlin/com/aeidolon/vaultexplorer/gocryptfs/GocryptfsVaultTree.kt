@@ -5,14 +5,14 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 
-sealed class GocryptfsNode {
-    abstract val cleartextName: String
+import com.aeidolon.vaultexplorer.engine.VaultTreeNode
+import com.aeidolon.vaultexplorer.engine.VaultIOException
+import com.aeidolon.vaultexplorer.engine.VaultPathNotFoundException
+
+sealed class GocryptfsNode : VaultTreeNode {
     data class VFile(override val cleartextName: String, val physicalFile: DocumentFile) : GocryptfsNode()
     data class VDir(override val cleartextName: String, val physicalFolder: DocumentFile) : GocryptfsNode()
 }
-
-class GocryptfsPathNotFoundException(path: String) : Exception("Path not found in vault: $path")
-class GocryptfsIOException(message: String) : Exception(message)
 
 /**
  * Resolves cleartext paths against the physical SAF tree. Much simpler than
@@ -35,7 +35,7 @@ class GocryptfsVaultTree(
     private val safOps = SafDocumentOps(context)
 
     private val vaultRoot: DocumentFile by lazy {
-        DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw GocryptfsIOException("Cannot open vault root")
+        DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw VaultIOException("Cannot open vault root")
     }
 
     init {
@@ -100,7 +100,7 @@ class GocryptfsVaultTree(
                     val match = safOps.listChildren(current).firstOrNull { child ->
                         val name = child.name ?: return@firstOrNull false
                         resolvedNameMatches(name, current, diriv, segment)
-                    } ?: throw GocryptfsPathNotFoundException(virtualDirPath)
+                    } ?: throw VaultPathNotFoundException(virtualDirPath)
                     current = match
                     built = nextBuilt
                     folderCache[built] = current
@@ -118,7 +118,7 @@ fun dirivFor(virtualDirPath: String, physicalFolder: DocumentFile = physicalFold
     } else {
         val fresh = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
         val f = safOps.createFileSafe(physicalFolder, "application/octet-stream", GocryptfsFileNameCryptor.DIRIV_FILENAME)
-            ?: throw GocryptfsIOException("Could not create gocryptfs.diriv")
+            ?: throw VaultIOException("Could not create gocryptfs.diriv")
         writeWhole(f, fresh)
         fresh
     }

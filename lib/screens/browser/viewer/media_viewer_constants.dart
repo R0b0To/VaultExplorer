@@ -3,6 +3,10 @@ class MediaViewerConstants {
   static const Duration animationDuration = Duration(milliseconds: 250);
   static const Duration pageTransitionDuration = Duration(milliseconds: 300);
   static const Duration doubleTapIndicatorDelay = Duration(milliseconds: 550);
+  // Brief pause after a media item fails to load before Playlist Mode
+  // auto-skips it, so the error state is at least perceptible instead of
+  // flashing past instantly.
+  static const Duration brokenMediaSkipDelay = Duration(milliseconds: 900);
 
   static const double maxImageZoom = 4.0;
   static const double maxVideoZoom = 6.0;

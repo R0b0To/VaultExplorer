@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import '../models/mounted_container.dart';
 import '../models/thumbnail_cache_mode.dart';
 import '../utils/lru_cache.dart';
+import '../utils/raw_entry.dart';
 import 'vaultexplorer_api.dart';
 import 'app_cache_encryption.dart';
 
@@ -286,13 +287,9 @@ class ThumbnailCacheService {
       );
       if (entries != null) {
         final casted = entries.cast<String>();
-        for (final entry in casted) {
-          if (entry.startsWith('System:')) continue;
-          final isDir = entry.startsWith('[DIR] ');
-          String name = entry.split('|').first;
-          if (isDir) {
-            name = name.replaceFirst('[DIR] ', '');
-          }
+        for (final raw in casted) {
+          if (raw.startsWith('System:')) continue;
+          final name = RawEntry.parse(raw).name;
           await _channel.invokeMethod<bool>(
             'deleteFile',
             {'filePath': uri, 'fileName': '$inContainerDir/$name'},

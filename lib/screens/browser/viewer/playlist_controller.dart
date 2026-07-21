@@ -18,6 +18,16 @@ class PlaylistController extends ChangeNotifier {
   bool _isPlaylistMode;
   String _selectedFolder = 'Current Folder Only';
 
+  // Bumped on every state-mutating call (enablePlaylist, disablePlaylist,
+  // toggleShuffle, removeCurrent). enablePlaylist's directory scan is async
+  // and can take a while on a large "All (incl. subfolders)" vault; if the
+  // user disables playlist mode, re-scopes to a different folder, or
+  // shuffles while that scan is still in flight, the scan's eventual result
+  // must not overwrite the newer state. Each async scan snapshots the
+  // generation it started with and checks it still matches before applying
+  // its result.
+  int _generation = 0;
+
   PlaylistController({
     required this.container,
     required List<String> initialMediaFiles,
@@ -94,6 +104,7 @@ class PlaylistController extends ChangeNotifier {
   Future<void> enablePlaylist(String folder) async {
     final anchor = currentFile;
     final needsScan = !_isPlaylistMode || (folder == 'All' && !_allFilesScanned);
+    final myGeneration = ++_generation;
 
     if (!needsScan) {
       _selectedFolder = folder;
@@ -110,6 +121,13 @@ class PlaylistController extends ChangeNotifier {
       final scanned = folder == 'All'
           ? await _scanDirectoryRecursively(baseDir)
           : await _scanDirectorySingleLevel(baseDir);
+
+      // Another mutation (disablePlaylist, a second enablePlaylist for a
+      // different scope, toggleShuffle, removeCurrent) ran while this scan
+      // was in flight and has already moved state past what this scan
+      // knows about. Applying our (now stale) result here would silently
+      // undo whatever the user did in the meantime, so bail out instead.
+      if (myGeneration != _generation) return;
 
       if (scanned.isNotEmpty) {
         _originalList = scanned;
@@ -130,7 +148,10 @@ class PlaylistController extends ChangeNotifier {
       _isPlaylistMode = true;
       _applyFolderFiltering(folder, anchor);
     } finally {
-      _isScanningSubfolders = false;
+      // Only this generation's scan may clear the scanning indicator —
+      // otherwise a stale scan resolving after a fresh one has already
+      // started would flip "scanning…" off mid-way through the new scan.
+      if (myGeneration == _generation) _isScanningSubfolders = false;
       notifyListeners();
     }
   }
@@ -138,10 +159,12 @@ class PlaylistController extends ChangeNotifier {
   /// Leaves playlist mode and collapses back to viewing just the current file.
   void disablePlaylist() {
     if (!_isPlaylistMode) return;
+    _generation++; // invalidate any in-flight enablePlaylist scan
     final anchor = currentFile;
     _isPlaylistMode = false;
     _isShuffled = false;
     _allFilesScanned = false;
+    _isScanningSubfolders = false;
     _selectedFolder = 'Current Folder Only';
     _originalList = [anchor];
     _currentPlaylist = [anchor];

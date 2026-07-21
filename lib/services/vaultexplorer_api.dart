@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/models/usb_device_info.dart';
 import '../models/mounted_container.dart';
+import '../utils/listener_registry.dart';
 import 'channel_methods.dart';
 import '../models/crypto_algorithms.dart';
 
@@ -79,19 +80,19 @@ class VaultExplorerApi {
   static void Function(String ext, String pkg)? onAppSelectedCallback;
 
 
-  static final List<void Function(int volId)> _usbContainerDetachedListeners =
-      [];
+  static final ListenerRegistry<int> _usbContainerDetachedRegistry =
+      ListenerRegistry<int>();
 
   static void addUsbContainerDetachedListener(
     void Function(int volId) listener,
   ) {
-    _usbContainerDetachedListeners.add(listener);
+    _usbContainerDetachedRegistry.add(listener);
   }
 
   static void removeUsbContainerDetachedListener(
     void Function(int volId) listener,
   ) {
-    _usbContainerDetachedListeners.remove(listener);
+    _usbContainerDetachedRegistry.remove(listener);
   }
 
 
@@ -114,28 +115,29 @@ class VaultExplorerApi {
   // should filter on volId themselves if more than one unlock could be in
   // flight (in practice: at most one per UnlockSheet/UsbUnlockSheet instance).
 
-  static final List<void Function(int volId)> _unlockStartedListeners = [];
-  static final List<void Function(UnlockProgress progress)>
-      _unlockProgressListeners = [];
+  static final ListenerRegistry<int> _unlockStartedRegistry =
+      ListenerRegistry<int>();
+  static final ListenerRegistry<UnlockProgress> _unlockProgressRegistry =
+      ListenerRegistry<UnlockProgress>();
 
   static void addUnlockStartedListener(void Function(int volId) listener) {
-    _unlockStartedListeners.add(listener);
+    _unlockStartedRegistry.add(listener);
   }
 
   static void removeUnlockStartedListener(void Function(int volId) listener) {
-    _unlockStartedListeners.remove(listener);
+    _unlockStartedRegistry.remove(listener);
   }
 
   static void addUnlockProgressListener(
     void Function(UnlockProgress progress) listener,
   ) {
-    _unlockProgressListeners.add(listener);
+    _unlockProgressRegistry.add(listener);
   }
 
   static void removeUnlockProgressListener(
     void Function(UnlockProgress progress) listener,
   ) {
-    _unlockProgressListeners.remove(listener);
+    _unlockProgressRegistry.remove(listener);
   }
 
   // ── Import progress ───────────────────────────────────────────────────
@@ -145,19 +147,19 @@ class VaultExplorerApi {
   // more than one import could be in flight (see FileOperationService, the
   // only current subscriber).
 
-  static final List<void Function(ImportProgress progress)>
-      _importProgressListeners = [];
+  static final ListenerRegistry<ImportProgress> _importProgressRegistry =
+      ListenerRegistry<ImportProgress>();
 
   static void addImportProgressListener(
     void Function(ImportProgress progress) listener,
   ) {
-    _importProgressListeners.add(listener);
+    _importProgressRegistry.add(listener);
   }
 
   static void removeImportProgressListener(
     void Function(ImportProgress progress) listener,
   ) {
-    _importProgressListeners.remove(listener);
+    _importProgressRegistry.remove(listener);
   }
 
   static void initMethodCallHandler() {
@@ -171,9 +173,7 @@ class VaultExplorerApi {
       } else if (call.method == 'onUsbContainerDetached') {
         final volId = call.arguments['volId'] as int?;
         if (volId != null) {
-          for (final listener in List.of(_usbContainerDetachedListeners)) {
-            listener(volId);
-          }
+          _usbContainerDetachedRegistry.notify(volId);
         }
       } else if (call.method == 'onScreenOff') {
         for (final listener in List.of(_screenOffListeners)) {
@@ -182,9 +182,7 @@ class VaultExplorerApi {
       } else if (call.method == 'onUnlockStarted') {
         final volId = call.arguments['volId'] as int?;
         if (volId != null) {
-          for (final listener in List.of(_unlockStartedListeners)) {
-            listener(volId);
-          }
+          _unlockStartedRegistry.notify(volId);
         }
       } else if (call.method == 'onUnlockProgress') {
         final args = call.arguments as Map<Object?, Object?>;
@@ -201,9 +199,7 @@ class VaultExplorerApi {
             containerFormat: args['containerFormat'] as String? ?? 'veracrypt',
             slot: args['slot'] as int? ?? 0,
           );
-          for (final listener in List.of(_unlockProgressListeners)) {
-            listener(progress);
-          }
+          _unlockProgressRegistry.notify(progress);
         }
       } else if (call.method == 'onImportProgress') {
         final args = call.arguments as Map<Object?, Object?>;
@@ -217,9 +213,7 @@ class VaultExplorerApi {
             total: total,
             currentName: args['currentName'] as String? ?? '',
           );
-          for (final listener in List.of(_importProgressListeners)) {
-            listener(progress);
-          }
+          _importProgressRegistry.notify(progress);
         }
       }
     });

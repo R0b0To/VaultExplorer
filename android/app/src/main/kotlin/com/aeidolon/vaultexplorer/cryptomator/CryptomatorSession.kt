@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.cryptomator
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.VaultBackend
 import com.aeidolon.vaultexplorer.saf.SafDocumentOps
 import java.io.File
 import java.security.SecureRandom

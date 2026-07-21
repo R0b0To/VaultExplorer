@@ -7,6 +7,16 @@ import '../models/thumbnail_quality.dart';
 import 'app_secure_storage.dart';
 import 'vaultexplorer_api.dart';
 
+/// Logs an exception this class is about to swallow (return/continue with a
+/// default instead of rethrowing) so a real failure — a corrupted data
+/// file, a keystore write that didn't take, a stale native session — is at
+/// least visible in the debug console instead of silently degrading to
+/// "no containers" or "the edit didn't save," which look identical to
+/// legitimate states at every call site.
+void _logSwallowed(String method, Object error) {
+  debugPrint('[ContainerRepository] $method failed: $error');
+}
+
 // ── ContainerUnlockMethod ─────────────────────────────────────────────────────
 
 /// How the user authenticates before a container is unlocked.
@@ -125,7 +135,9 @@ Future<void> remove(String uri) async {
     await _secure.delete(key: _patternHashKey(uri));
     try {
       await vaultExplorerApi.clearDerivedKey(uri);
-    } catch (_) {}
+    } catch (e) {
+      _logSwallowed('remove/clearDerivedKey', e);
+    }
     await _persist();
   }
 
@@ -168,7 +180,12 @@ Future<void> remove(String uri) async {
         final r = ContainerRecord.fromJson(item as Map<String, dynamic>);
         _cache![r.uri] = r;
       }
-    } catch (_) {
+    } catch (e) {
+      // Falling back to an empty cache is deliberate — a corrupted data
+      // file shouldn't crash the app — but doing so with no log line means
+      // a genuinely corrupted file looks identical to "user has never
+      // added a container." At minimum this now leaves a trace.
+      _logSwallowed('_hydrate', e);
       _cache = {};
     }
   }
@@ -178,7 +195,14 @@ Future<void> remove(String uri) async {
       final file = await _dataFile;
       final list = _cache!.values.map((r) => r.toJson()).toList();
       await file.writeAsString(jsonEncode(list));
-    } catch (_) {}
+    } catch (e) {
+      // A failed write here means whatever the caller just did — add,
+      // rename, remove a container — did not actually save, and will
+      // silently revert on next launch. Logging doesn't fix that, but it
+      // makes the failure discoverable instead of indistinguishable from
+      // success.
+      _logSwallowed('_persist', e);
+    }
   }
 }
 

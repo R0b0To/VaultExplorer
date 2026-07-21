@@ -1144,9 +1144,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       dest: widget.container,
       destDirPath: _currentDirPath,
       isFolder: false,
-      performImport: () => vaultExplorerApi.importFiles(
+      performImport: (opId) => vaultExplorerApi.importFiles(
         widget.container,
         _currentDirPath,
+        opId,
       ),
     );
 
@@ -1180,9 +1181,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       dest: widget.container,
       destDirPath: _currentDirPath,
       isFolder: true,
-      performImport: () => vaultExplorerApi.importFolder(
+      performImport: (opId) => vaultExplorerApi.importFolder(
         widget.container,
         _currentDirPath,
+        opId,
       ),
     );
 

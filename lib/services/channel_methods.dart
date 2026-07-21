@@ -36,6 +36,7 @@ abstract final class ChannelMethods {
   static const exportFilesToFolder = 'exportFilesToFolder';
   static const importFile = 'importFile';
   static const importFolder = 'importFolder';
+  static const cancelImport = 'cancelImport';
   static const getFileSize = 'getFileSize';
   static const getFolderSize ='getFolderSize'; // recursive directory byte total
   static const readFileChunk = 'readFileChunk';

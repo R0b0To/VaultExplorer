@@ -34,6 +34,20 @@ typedef UnlockProgress = ({
 String hashAlgorithmName(int hashId) => HashAlgo.nameFor(hashId);
 String cipherAlgorithmName(int cipherId) => CipherAlgo.nameFor(cipherId);
 
+/// One "onImportProgress" push from native while importing files/folders
+/// from device storage (see [VaultExplorerApi.importFiles]/[importFolder]).
+/// [opId] is the [FileOperation.id] passed into that call — listeners
+/// should filter on it themselves if more than one import could be in
+/// flight. [done]/[total] count files written so far vs. the total native
+/// discovered during its pre-count pass; [currentName] is the leaf name of
+/// the file most recently written.
+typedef ImportProgress = ({
+  int opId,
+  int done,
+  int total,
+  String currentName,
+});
+
 
 class VaultExplorerApi {
   const VaultExplorerApi();
@@ -102,6 +116,28 @@ class VaultExplorerApi {
     _unlockProgressListeners.remove(listener);
   }
 
+  // ── Import progress ───────────────────────────────────────────────────
+  //
+  // "onImportProgress" fires repeatedly from native while importFile/
+  // importFolder is running. Listeners should filter on opId themselves if
+  // more than one import could be in flight (see FileOperationService, the
+  // only current subscriber).
+
+  static final List<void Function(ImportProgress progress)>
+      _importProgressListeners = [];
+
+  static void addImportProgressListener(
+    void Function(ImportProgress progress) listener,
+  ) {
+    _importProgressListeners.add(listener);
+  }
+
+  static void removeImportProgressListener(
+    void Function(ImportProgress progress) listener,
+  ) {
+    _importProgressListeners.remove(listener);
+  }
+
   static void initMethodCallHandler() {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onAppSelected') {
@@ -143,6 +179,22 @@ class VaultExplorerApi {
             containerFormat: args['containerFormat'] as String? ?? 'veracrypt',
           );
           for (final listener in List.of(_unlockProgressListeners)) {
+            listener(progress);
+          }
+        }
+      } else if (call.method == 'onImportProgress') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final opId = args['opId'] as int?;
+        final done = args['done'] as int?;
+        final total = args['total'] as int?;
+        if (opId != null && done != null && total != null) {
+          final progress = (
+            opId: opId,
+            done: done,
+            total: total,
+            currentName: args['currentName'] as String? ?? '',
+          );
+          for (final listener in List.of(_importProgressListeners)) {
             listener(progress);
           }
         }
@@ -1007,10 +1059,18 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     return result?.cast<int>();
   }
 
-  Future<int> importFiles(MountedContainer container, String targetPath) async {
+  /// [opId] is the caller's [FileOperation.id] — native echoes it back on
+  /// every "onImportProgress" push and matches it against
+  /// [cancelImport] requests.
+  Future<int> importFiles(
+    MountedContainer container,
+    String targetPath,
+    int opId,
+  ) async {
     final result = await _channel.invokeMethod<int>(ChannelMethods.importFile, {
       'filePath': container.uri,
       'targetPath': targetPath,
+      'opId': opId,
     });
     return result ?? 0;
   }
@@ -1026,15 +1086,36 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     return result ?? 0;
   }
 
+  /// [opId] is the caller's [FileOperation.id] — native echoes it back on
+  /// every "onImportProgress" push and matches it against
+  /// [cancelImport] requests.
   Future<int> importFolder(
     MountedContainer container,
     String targetPath,
+    int opId,
   ) async {
     final result = await _channel.invokeMethod<int>(
       ChannelMethods.importFolder,
-      {'filePath': container.uri, 'targetPath': targetPath},
+      {'filePath': container.uri, 'targetPath': targetPath, 'opId': opId},
     );
     return result ?? 0;
+  }
+
+  /// Asks native to abort the in-flight import identified by [opId] (the
+  /// [FileOperation.id] originally passed into [importFiles]/[importFolder]).
+  ///
+  /// Fire-and-forget and best-effort: this doesn't itself throw or resolve
+  /// the pending import — that call will still complete on its own shortly
+  /// after, but with a `PlatformException(code: 'CANCELLED')` instead of a
+  /// result, once native notices the request between files. Files already
+  /// written before that point stay in place. Safe to call more than once,
+  /// or after the import has already finished.
+  Future<void> cancelImport(int opId) async {
+    try {
+      await _channel.invokeMethod(ChannelMethods.cancelImport, {'opId': opId});
+    } catch (_) {
+      // Best-effort — the pending import call resolves on its own regardless.
+    }
   }
 
   /// Requests a scaled video thumbnail from the native layer.

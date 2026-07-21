@@ -104,11 +104,16 @@ class FileOperationService extends ChangeNotifier {
   }
 
   /// Enqueues and starts a background native import operation.
+  ///
+  /// [performImport] receives the new operation's [FileOperation.id] as
+  /// `opId` — the caller threads it into the native `importFile`/
+  /// `importFolder` call so progress pushes and [VaultExplorerApi.cancelImport]
+  /// can be matched back to this operation.
   FileOperation enqueueImport({
     required MountedContainer dest,
     required String destDirPath,
     required bool isFolder,
-    required Future<int> Function() performImport,
+    required Future<int> Function(int opId) performImport,
   }) {
     final op = FileOperation._internal(
       id: _nextId++,
@@ -212,13 +217,19 @@ class FileOperationService extends ChangeNotifier {
 
   Future<void> _runImport(
     FileOperation op,
-    Future<int> Function() performImport,
+    Future<int> Function(int opId) performImport,
   ) async {
     op._setStatus(FileOperationStatus.running);
     op._setActivity('Importing…');
 
+    void onProgress(ImportProgress p) {
+      if (p.opId != op.id) return;
+      op._setImportProgress(p.done, p.total, p.currentName);
+    }
+
+    VaultExplorerApi.addImportProgressListener(onProgress);
     try {
-      final count = await performImport();
+      final count = await performImport(op.id);
       if (count > 0) {
         op._recordItemResult(0, FileItemResult.success);
         op._setDoneCount(count);
@@ -226,12 +237,22 @@ class FileOperationService extends ChangeNotifier {
       } else {
         op._setStatus(FileOperationStatus.cancelled);
       }
+    } on PlatformException catch (e) {
+      if (e.code == 'CANCELLED') {
+        // Native noticed op.requestCancel()'s cancelImport() call. Files
+        // written before that point stay put — keep whatever _importDone
+        // reached as the final count rather than reporting a fail/blank.
+        op._setDoneCount(op._importDone);
+        op._setStatus(FileOperationStatus.cancelled);
+      } else {
+        op._setError(e.message ?? e.toString());
+        op._setStatus(FileOperationStatus.failed);
+      }
     } catch (e) {
-      final msg =
-          e is PlatformException ? (e.message ?? e.toString()) : e.toString();
-      op._setError(msg);
+      op._setError(e.toString());
       op._setStatus(FileOperationStatus.failed);
     } finally {
+      VaultExplorerApi.removeImportProgressListener(onProgress);
       notifyListeners();
     }
   }

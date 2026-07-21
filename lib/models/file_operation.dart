@@ -104,7 +104,7 @@ class FileOperation extends ChangeNotifier {
   FileOperationStatus get status => _status;
 
   int _doneCount = 0;
-  int get doneCount => _doneCount;
+  int get doneCount => isImport ? _importDone : _doneCount;
 
   int _failCount = 0;
   int get failCount => _failCount;
@@ -112,7 +112,16 @@ class FileOperation extends ChangeNotifier {
   int _skipCount = 0;
   int get skipCount => _skipCount;
 
-  int get totalCount => _itemStatuses.length;
+  int get totalCount => isImport ? _importTotal : _itemStatuses.length;
+
+  // Native imports are a single opaque call rather than a Dart-driven
+  // per-item loop, so they can't be tracked via [_itemStatuses] the way
+  // copy/move can. Instead native pushes "onImportProgress" events (see
+  // [FileOperationService._runImport]) that update these two directly.
+  // [_importTotal] stays 0 until native finishes its pre-count pass, which
+  // [progressFraction] and [totalCount] both treat as "not yet known".
+  int _importDone = 0;
+  int _importTotal = 0;
 
   final List<FileItemStatus> _itemStatuses;
   List<FileItemStatus> get itemStatuses => List.unmodifiable(_itemStatuses);
@@ -133,10 +142,19 @@ class FileOperation extends ChangeNotifier {
   // ── Public API ────────────────────────────────────────────────────────────
 
   /// Anyone may request cancellation; only the service honours it.
+  ///
+  /// For copy/move, setting [_cancelRequested] is enough — the Dart-driven
+  /// loop in [FileOperationService._run] checks it between items. Native
+  /// imports run their own loop on the platform side, so there's nothing
+  /// on this side to check it; instead this fires a best-effort
+  /// [VaultExplorerApi.cancelImport] call so native can notice on its own.
   void requestCancel() {
     if (_status == FileOperationStatus.pending ||
         _status == FileOperationStatus.running) {
       _cancelRequested = true;
+      if (isImport) {
+        vaultExplorerApi.cancelImport(id);
+      }
       notifyListeners();
     }
   }
@@ -144,7 +162,11 @@ class FileOperation extends ChangeNotifier {
   // ── Derived display helpers ───────────────────────────────────────────────
 
   double? get progressFraction {
-    if (_itemStatuses.isEmpty || isImport) return null;
+    if (isImport) {
+      if (_importTotal <= 0) return null; // still counting — indeterminate
+      return (_importDone / _importTotal).clamp(0.0, 1.0);
+    }
+    if (_itemStatuses.isEmpty) return null;
     final done = _doneCount + _failCount + _skipCount;
     return done / _itemStatuses.length;
   }
@@ -216,6 +238,16 @@ class FileOperation extends ChangeNotifier {
 
   void _setDoneCount(int count) {
     _doneCount = count;
+    notifyListeners();
+  }
+
+  /// Applied on each "onImportProgress" push from native (see
+  /// [FileOperationService._runImport]). [currentName] is folded straight
+  /// into [_currentActivity] so the UI doesn't need a separate field.
+  void _setImportProgress(int done, int total, String currentName) {
+    _importDone = done;
+    _importTotal = total;
+    _currentActivity = currentName.isNotEmpty ? 'Importing $currentName…' : 'Importing…';
     notifyListeners();
   }
 

@@ -16,7 +16,7 @@ object GocryptfsStreamRegistry {
     fun read(volId: Int, handle: Long, offset: Long, out: ByteArray, length: Int): Int {
         val (ownerVolId, path) = streams[handle] ?: return -1
         if (ownerVolId != volId) return -1
-        val session = GocryptfsSessionRegistry.get(volId) ?: return -1
+        val session = com.aeidolon.vaultexplorer.VaultBackendRegistry.get(volId) as? GocryptfsSession ?: return -1
         val chunk = session.readFileChunk(path, offset, length) ?: return -1
         if (chunk.isEmpty()) return 0
         System.arraycopy(chunk, 0, out, 0, chunk.size)

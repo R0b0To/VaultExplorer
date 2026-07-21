@@ -1342,7 +1342,7 @@ class MainActivity : FlutterFragmentActivity() {
                                 when (openResult) {
                                     is com.aeidolon.vaultexplorer.cryptomator.CryptomatorOpenResult.Success -> {
                                         val session = openResult.session
-                                        com.aeidolon.vaultexplorer.cryptomator.CryptomatorSessionRegistry.put(targetVolId, session)
+                                        VaultBackendRegistry.put(targetVolId, session)
                                         val files = session.listDirectory("")?.toList() ?: emptyList()
                                         ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                                             uri = uriString,
@@ -1413,7 +1413,7 @@ class MainActivity : FlutterFragmentActivity() {
                                 when (openResult) {
                                     is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsOpenResult.Success -> {
                                         val session = openResult.session
-                                        com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSessionRegistry.put(targetVolId, session)
+                                        VaultBackendRegistry.put(targetVolId, session)
                                         val files = session.listDirectory("")?.toList() ?: emptyList()
                                         ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                                             uri = uriString,

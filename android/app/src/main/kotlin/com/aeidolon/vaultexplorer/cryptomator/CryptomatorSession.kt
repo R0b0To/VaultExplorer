@@ -30,7 +30,8 @@ class CryptomatorSession(
     val cipherCombo: String,
     val shorteningThreshold: Int,
     val readOnly: Boolean,
-) {
+) : com.aeidolon.vaultexplorer.VaultBackend {
+    override val format = com.aeidolon.vaultexplorer.ContainerFormat.CRYPTOMATOR
     private val random = SecureRandom()
     private val safOps = SafDocumentOps(context)
     val nameCryptor = CryptomatorFileNameCryptor(masterkey)
@@ -73,7 +74,7 @@ class CryptomatorSession(
     // ---- directory listing ----------------------------------------------------
 
     /** Mirrors VeraCryptEngine.listDirectory: returns child names (folders end with '/'), or null if the path doesn't exist. */
-fun listDirectory(virtualPath: String): Array<String>? {
+    override fun listDirectory(virtualPath: String): Array<String>? {
     return try {
         val normalized = normalize(virtualPath)
         val nodes = tree.list(normalized)
@@ -99,7 +100,7 @@ fun listDirectory(virtualPath: String): Array<String>? {
     }
 }
 
-fun createDirectory(virtualPath: String): Boolean {
+    override fun createDirectory(virtualPath: String): Boolean {
     if (readOnly) return false
     return try {
         val normalized = normalize(virtualPath)
@@ -134,7 +135,7 @@ fun createDirectory(virtualPath: String): Boolean {
     }
 }
 
-    fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
+        override fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
     if (readOnly) return false
     return try {
         val oldNormalized = normalize(oldVirtualPath)
@@ -207,7 +208,7 @@ fun createDirectory(virtualPath: String): Boolean {
     }
 }
 
-    fun deleteFile(virtualPath: String): Boolean {
+        override fun deleteFile(virtualPath: String): Boolean {
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
@@ -236,7 +237,7 @@ fun createDirectory(virtualPath: String): Boolean {
         }
     }
 
-    fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
+        override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
         // SAF's DocumentFile has no portable "set mtime" — most providers derive
         // mtime from last write. Treat as best-effort no-op success so callers
         // (e.g. copy operations) don't hard-fail; the file's actual mtime will
@@ -247,7 +248,7 @@ fun createDirectory(virtualPath: String): Boolean {
         return tree.resolve(normalize(virtualPath)) != null
     }
 
-    fun getFileSize(virtualPath: String): Long {
+        override fun getFileSize(virtualPath: String): Long {
         val node = tree.resolve(normalize(virtualPath)) ?: return -1L
         val f = node as? VaultNode.VFile ?: return -1L
         val ciphertextSize = f.physicalFile.length()
@@ -256,7 +257,7 @@ fun createDirectory(virtualPath: String): Boolean {
         return contentCryptor.cleartextSize(withoutHeader)
     }
 
-    fun getFolderSize(virtualPath: String): Long {
+        override fun getFolderSize(virtualPath: String): Long {
         val normalized = normalize(virtualPath)
         val nodes = tree.list(normalized)
         var total = 0L
@@ -275,7 +276,7 @@ fun createDirectory(virtualPath: String): Boolean {
     // ---- file content read/write ----------------------------------------------
 
     /** Mirrors VeraCryptEngine.readFileChunk: decrypts and returns [length] bytes starting at [offset], or null on error/missing file. */
-fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
+    override fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
     val normalized = normalize(virtualPath)
     return try {
         val physicalFileProvider = {
@@ -416,7 +417,7 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
      * AEAD schemes can't do cheaply anyway without decrypt-modify-encrypt of
      * the target chunk).
      */
-    fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean {
+        override fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean {
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
@@ -439,7 +440,7 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
     }
 
     /** Finalizes and closes a writeFileChunk() sequence for [virtualPath], flushing any buffered final partial chunk. Callers should invoke this after their last writeFileChunk() call for a given file. */
-    fun finishWrite(virtualPath: String): Boolean {
+        override fun finishWrite(virtualPath: String): Boolean {
         val normalized = normalize(virtualPath)
         openReads.remove(normalized)
         val handle = openWrites.remove(normalized) ?: return true // nothing open; treat as already-finished
@@ -454,7 +455,7 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
     }
 
     /** Mirrors VeraCryptEngine.writeBackFile: whole-file replace from a local plaintext file. */
-    fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
+        override fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
@@ -478,7 +479,7 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
         }
     }
 
-    fun extractFile(virtualPath: String, destinationPath: String): Boolean {
+        override fun extractFile(virtualPath: String, destinationPath: String): Boolean {
         return try {
             val node = tree.resolve(normalize(virtualPath)) as? VaultNode.VFile ?: return false
             File(destinationPath).outputStream().use { out ->
@@ -505,7 +506,7 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
         }
     }
 
-    fun getSpaceInfo(): LongArray? {
+        override fun getSpaceInfo(): LongArray? {
         return try {
             val rootUri = android.provider.DocumentsContract.buildRootsUri(vaultRootUri.authority)
             context.contentResolver.query(
@@ -698,20 +699,4 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
     }
     private fun joinPath(parent: String, name: String): String = if (parent.isEmpty()) name else "$parent/$name"
 }
-
-/** Process-wide registry of unlocked Cryptomator sessions, keyed by the same volId space ContainerSessionRegistry uses. */
-object CryptomatorSessionRegistry {
-    private val sessions = ConcurrentHashMap<Int, CryptomatorSession>()
-
-    fun put(volId: Int, session: CryptomatorSession) {
-        sessions[volId] = session
-    }
-
-    fun get(volId: Int): CryptomatorSession? = sessions[volId]
-
-    fun remove(volId: Int) {
-        sessions.remove(volId)?.close()
-    }
-
-    fun isCryptomator(volId: Int): Boolean = sessions.containsKey(volId)
-}
+

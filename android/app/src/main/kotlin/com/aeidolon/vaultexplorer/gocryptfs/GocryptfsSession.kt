@@ -23,7 +23,8 @@ class GocryptfsSession(
     val contentCryptor: GocryptfsContentCryptor,
     val tree: GocryptfsVaultTree,
     val readOnly: Boolean,
-) {
+) : com.aeidolon.vaultexplorer.VaultBackend {
+    override val format = com.aeidolon.vaultexplorer.ContainerFormat.GOCRYPTFS
     private val random = SecureRandom()
     private val safOps = SafDocumentOps(context)
     private val shorteningThreshold: Int by lazy {
@@ -84,7 +85,7 @@ class GocryptfsSession(
 
     // ---- directory listing ----------------------------------------------------
 
-    fun listDirectory(virtualPath: String): Array<String>? {
+    override fun listDirectory(virtualPath: String): Array<String>? {
         return try {
             val normalized = normalize(virtualPath)
             val nodes = tree.list(normalized)
@@ -109,7 +110,7 @@ class GocryptfsSession(
         }
     }
 
-fun createDirectory(virtualPath: String): Boolean {
+    override fun createDirectory(virtualPath: String): Boolean {
     if (readOnly) return false
     return try {
         val normalized = normalize(virtualPath)
@@ -141,7 +142,7 @@ fun createDirectory(virtualPath: String): Boolean {
     }
 }
 
-    fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
+    override fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
     if (readOnly) return false
     return try {
         val oldNormalized = normalize(oldVirtualPath)
@@ -231,7 +232,7 @@ fun createDirectory(virtualPath: String): Boolean {
     }
 }
 
-    fun deleteFile(virtualPath: String): Boolean {
+    override fun deleteFile(virtualPath: String): Boolean {
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
@@ -261,17 +262,17 @@ fun createDirectory(virtualPath: String): Boolean {
         }
     }
 
-    fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
+    override fun setLastModifiedTime(virtualPath: String, epochSeconds: Long): Boolean {
         return tree.resolve(normalize(virtualPath)) != null
     }
 
-fun getFileSize(virtualPath: String): Long {
+    override fun getFileSize(virtualPath: String): Long {
     val node = tree.resolve(normalize(virtualPath)) ?: return -1L
     val f = node as? GocryptfsNode.VFile ?: return -1L
     return contentCryptor.cleartextSize(f.physicalFile.length())
 }
 
-fun getFolderSize(virtualPath: String): Long {
+    override fun getFolderSize(virtualPath: String): Long {
     val normalized = normalize(virtualPath)
     val nodes = tree.list(normalized)
     var total = 0L
@@ -287,7 +288,7 @@ fun getFolderSize(virtualPath: String): Long {
     // ---- file content read/write ----------------------------------------------
 
     /** Decrypts and returns [length] bytes starting at [offset], or null on error/missing file. */
-fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
+    override fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
     val normalized = normalize(virtualPath)
     return try {
         val physicalFileProvider = {
@@ -418,7 +419,7 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
         return total
     }
 
-    fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean {
+    override fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean {
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
@@ -437,7 +438,7 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
         }
     }
 
-    fun finishWrite(virtualPath: String): Boolean {
+    override fun finishWrite(virtualPath: String): Boolean {
         val normalized = normalize(virtualPath)
         openReads.remove(normalized)
         val handle = openWrites.remove(normalized) ?: return true
@@ -451,7 +452,7 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
         }
     }
 
-    fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
+    override fun writeBackFile(virtualPath: String, sourcePath: String): Boolean {
         if (readOnly) return false
         return try {
             val normalized = normalize(virtualPath)
@@ -475,7 +476,7 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
         }
     }
 
-    fun extractFile(virtualPath: String, destinationPath: String): Boolean {
+    override fun extractFile(virtualPath: String, destinationPath: String): Boolean {
         return try {
             val node = tree.resolve(normalize(virtualPath)) as? GocryptfsNode.VFile ?: return false
             File(destinationPath).outputStream().use { out ->
@@ -502,7 +503,7 @@ fun readFileChunk(virtualPath: String, offset: Long, length: Int): ByteArray? {
         }
     }
 
-    fun getSpaceInfo(): LongArray? {
+    override fun getSpaceInfo(): LongArray? {
         return try {
             val rootUri = android.provider.DocumentsContract.buildRootsUri(vaultRootUri.authority)
             context.contentResolver.query(

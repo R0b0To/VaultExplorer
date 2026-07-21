@@ -48,6 +48,21 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
   final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
 
+  // ── Folder vault (Cryptomator / Gocryptfs) state ──────────────────────────
+  bool _isFolderVault = false;
+
+  /// 'cryptomator' | 'gocryptfs'. Unlike unlock_sheet.dart (which detects
+  /// this from an existing folder's contents), creation has nothing to
+  /// detect from yet, so the user picks explicitly.
+  String _folderVaultFormat = 'cryptomator';
+  String? _folderVaultUri;
+  String? _folderVaultDisplayName;
+  bool _pickingFolderVault = false;
+  final _folderVaultPasswordCtrl = TextEditingController();
+  final _folderVaultConfirmCtrl = TextEditingController();
+  bool _folderVaultObscure = true;
+  bool _folderVaultConfirmObscure = true;
+
   List<String> get _availableFileSystems =>
       _format == CreateFormat.veracrypt ? _veraCryptFileSystems : _luksFileSystems;
 
@@ -80,6 +95,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     _hiddenPasswordCtrl.dispose();
     _hiddenPimCtrl.dispose();
     _hiddenSizeCtrl.dispose();
+    _folderVaultPasswordCtrl.dispose();
+    _folderVaultConfirmCtrl.dispose();
     super.dispose();
   }
 
@@ -100,6 +117,52 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
       // Hidden volumes only apply to VeraCrypt, so 'FAT' is a safe default
       _hiddenFileSystem = 'FAT';
     });
+  }
+
+  // ── Vault-kind (Container File vs Folder Vault) selection ─────────────────
+
+  void _onVaultKindChanged(bool folderVault) {
+    setState(() {
+      _isFolderVault = folderVault;
+      _error = null;
+    });
+  }
+
+  void _onFolderVaultFormatChanged(String format) {
+    setState(() {
+      _folderVaultFormat = format;
+      // A folder already picked under the old format may not make sense
+      // under the new one (or the user may just want to reconsider it).
+      _folderVaultUri = null;
+      _folderVaultDisplayName = null;
+      _error = null;
+    });
+  }
+
+  Future<void> _pickFolderVaultLocation() async {
+    setState(() {
+      _pickingFolderVault = true;
+      _error = null;
+    });
+    try {
+      // Both pickers launch an identical ACTION_OPEN_DOCUMENT_TREE folder
+      // picker — the format-specific one is used purely so a future
+      // divergence (e.g. a format-specific hint dialog) has somewhere to
+      // live without touching call sites.
+      final result = _folderVaultFormat == 'cryptomator'
+          ? await vaultExplorerApi.pickCryptomatorVault()
+          : await vaultExplorerApi.pickGocryptfsVault();
+      if (result != null && mounted) {
+        setState(() {
+          _folderVaultUri = result.uri;
+          _folderVaultDisplayName = result.displayName;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Folder picker failed: $e');
+    } finally {
+      if (mounted) setState(() => _pickingFolderVault = false);
+    }
   }
 
   Future<void> _pickKeyfiles() async {
@@ -146,7 +209,58 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     setState(() => _hiddenKeyfiles.remove(keyfile));
   }
 
-  Future<void> _create() async {
+  // ── Top-level dispatch ─────────────────────────────────────────────────────
+
+  Future<void> _create() {
+    return _isFolderVault ? _createFolderVault() : _createContainerFile();
+  }
+
+  Future<void> _createFolderVault() async {
+    if (_folderVaultUri == null) {
+      setState(() => _error = 'Select an empty destination folder first');
+      return;
+    }
+    final password = _folderVaultPasswordCtrl.text;
+    if (password.isEmpty) {
+      setState(() => _error = 'A password is required');
+      return;
+    }
+    if (password != _folderVaultConfirmCtrl.text) {
+      setState(() => _error = 'Passwords do not match');
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final success = _folderVaultFormat == 'cryptomator'
+          ? await vaultExplorerApi.createCryptomatorVault(_folderVaultUri!, password)
+          : await vaultExplorerApi.createGocryptfsVault(_folderVaultUri!, password);
+
+      if (success) {
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Vault created successfully.'),
+            ),
+          );
+        }
+      } else {
+        setState(() => _error =
+            'Vault creation failed — make sure the selected folder is empty.');
+      }
+    } on PlatformException catch (e) {
+      setState(() => _error = e.message ?? 'Unknown error occurred');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _createContainerFile() async {
     if (_nameCtrl.text.isEmpty) {
       setState(() => _error = 'Container name is required');
       return;
@@ -278,6 +392,29 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide(color: cs.primary, width: 2),
       ),
+    );
+  }
+
+  // ── Vault-kind selector (Container File vs Folder Vault) ──────────────────
+
+  Widget _buildVaultKindSelector() {
+    return SegmentedButton<bool>(
+      segments: const [
+        ButtonSegment(
+          value: false,
+          label: Text('Container File'),
+          icon: Icon(Icons.folder_zip_rounded),
+        ),
+        ButtonSegment(
+          value: true,
+          label: Text('Folder Vault'),
+          icon: Icon(Icons.folder_shared_rounded),
+        ),
+      ],
+      selected: {_isFolderVault},
+      onSelectionChanged: _loading
+          ? null
+          : (sel) => _onVaultKindChanged(sel.first),
     );
   }
 
@@ -557,6 +694,205 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     );
   }
 
+  // ── Folder vault (Cryptomator / Gocryptfs) section ─────────────────────────
+
+  Widget _buildFolderVaultFormatSelector() {
+    return SegmentedButton<String>(
+      segments: const [
+        ButtonSegment(
+          value: 'cryptomator',
+          label: Text('Cryptomator'),
+          icon: Icon(Icons.folder_shared_rounded),
+        ),
+        ButtonSegment(
+          value: 'gocryptfs',
+          label: Text('Gocryptfs'),
+          icon: Icon(Icons.enhanced_encryption_rounded),
+        ),
+      ],
+      selected: {_folderVaultFormat},
+      onSelectionChanged: _loading
+          ? null
+          : (sel) => _onFolderVaultFormatChanged(sel.first),
+    );
+  }
+
+  Widget _buildFolderVaultPickerCard(ColorScheme cs, TextTheme textTheme) {
+    final hasSelection = _folderVaultUri != null;
+    final busy = _loading || _pickingFolderVault;
+
+    return GestureDetector(
+      onTap: busy ? null : _pickFolderVaultLocation,
+      child: Card(
+        elevation: 0,
+        color: hasSelection
+            ? cs.primaryContainer.withValues(alpha: 0.12)
+            : cs.surfaceContainerLow,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: hasSelection ? cs.primary : cs.outlineVariant.withValues(alpha: 0.5),
+            width: hasSelection ? 1.5 : 1,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: hasSelection ? cs.primaryContainer : cs.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  _folderVaultFormat == 'gocryptfs'
+                      ? Icons.enhanced_encryption_rounded
+                      : Icons.folder_shared_rounded,
+                  size: 24,
+                  color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      hasSelection ? 'Destination Folder' : 'Select an empty folder',
+                      style: textTheme.labelLarge?.copyWith(
+                        color: hasSelection ? cs.primary : cs.onSurfaceVariant,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _folderVaultDisplayName ?? 'Tap to choose where the vault will be created…',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: hasSelection ? cs.onSurface : cs.onSurfaceVariant,
+                        fontWeight: hasSelection ? FontWeight.w500 : null,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (_pickingFolderVault)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                )
+              else if (hasSelection)
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  onPressed: _loading
+                      ? null
+                      : () => setState(() {
+                            _folderVaultUri = null;
+                            _folderVaultDisplayName = null;
+                          }),
+                  style: IconButton.styleFrom(
+                    backgroundColor: cs.surfaceContainerHigh,
+                    padding: EdgeInsets.zero,
+                  ),
+                )
+              else
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFolderVaultSection(ColorScheme cs, TextTheme textTheme) {
+    return Material(
+      color: cs.surfaceContainerLow,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          ListTile(
+            leading: Icon(Icons.folder_shared_outlined, color: cs.primary),
+            title: Text('Folder Vault', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
+            subtitle: Text(
+              'A Cryptomator- or gocryptfs-compatible encrypted folder',
+              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          ),
+          Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildFolderVaultFormatSelector(),
+                const SizedBox(height: 16),
+                _buildFolderVaultPickerCard(cs, textTheme),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _folderVaultPasswordCtrl,
+                  obscureText: _folderVaultObscure,
+                  onChanged: (_) => setState(() {}),
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: _getInputDecoration(
+                    cs,
+                    labelText: 'Password',
+                    prefixIcon: Icons.key_rounded,
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _folderVaultObscure,
+                      onToggle: () => setState(() => _folderVaultObscure = !_folderVaultObscure),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _folderVaultConfirmCtrl,
+                  obscureText: _folderVaultConfirmObscure,
+                  onChanged: (_) => setState(() {}),
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: _getInputDecoration(
+                    cs,
+                    labelText: 'Confirm Password',
+                    prefixIcon: Icons.check_circle_outline_rounded,
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _folderVaultConfirmObscure,
+                      onToggle: () => setState(() => _folderVaultConfirmObscure = !_folderVaultConfirmObscure),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 16, color: cs.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Folder vaults don't support keyfiles, PIM, hidden "
+                        'volumes, or the cipher/hash choices used by VeraCrypt/'
+                        'LUKS containers.',
+                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.3),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -587,10 +923,15 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                     valueColor: AlwaysStoppedAnimation(cs.onPrimary),
                   ),
                 )
-              : const Text('Create Container'),
+              : Text(_isFolderVault ? 'Create Vault' : 'Create Container'),
         ),
       ],
     );
+
+    final primarySection = _isFolderVault
+        ? _buildFolderVaultSection(cs, textTheme)
+        : _buildMainVolumeSection(cs, textTheme);
+    final showHiddenVolumeSection = !_isFolderVault && _format == CreateFormat.veracrypt;
 
     return PopScope(
       canPop: !_loading,
@@ -598,14 +939,14 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
         if (!didPop && _loading) {
           showAppSnackBar(
             context,
-            message: 'Container creation in progress. Please wait.',
+            message: '${_isFolderVault ? 'Vault' : 'Container'} creation in progress. Please wait.',
             tone: AppBannerTone.warning,
           );
         }
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Create Encrypted Container'),
+          title: Text(_isFolderVault ? 'Create Encrypted Vault' : 'Create Encrypted Container'),
           bottom: _loading
               ? PreferredSize(
                   preferredSize: const Size.fromHeight(4),
@@ -620,42 +961,49 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: AutofillGroup(
-              child: isLandscape
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Left column (Main Container Settings)
-                        Expanded(
-                          child: _buildMainVolumeSection(cs, textTheme),
-                        ),
-                        const SizedBox(width: 24),
-                        // Right column (Hidden Volume Settings + Create Button)
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (_format == CreateFormat.veracrypt) ...[
-                                _buildHiddenVolumeSection(cs, textTheme),
-                                const SizedBox(height: 24),
-                              ],
-                              errorAndSubmit,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildVaultKindSelector(),
+                  const SizedBox(height: 24),
+                  isLandscape
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Left column (Main Container Settings)
+                            Expanded(
+                              child: primarySection,
+                            ),
+                            const SizedBox(width: 24),
+                            // Right column (Hidden Volume Settings + Create Button)
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (showHiddenVolumeSection) ...[
+                                    _buildHiddenVolumeSection(cs, textTheme),
+                                    const SizedBox(height: 24),
+                                  ],
+                                  errorAndSubmit,
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            primarySection,
+                            const SizedBox(height: 24),
+                            if (showHiddenVolumeSection) ...[
+                              _buildHiddenVolumeSection(cs, textTheme),
+                              const SizedBox(height: 24),
                             ],
-                          ),
+                            errorAndSubmit,
+                          ],
                         ),
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildMainVolumeSection(cs, textTheme),
-                        const SizedBox(height: 24),
-                        if (_format == CreateFormat.veracrypt) ...[
-                          _buildHiddenVolumeSection(cs, textTheme),
-                          const SizedBox(height: 24),
-                        ],
-                        errorAndSubmit,
-                      ],
-                    ),
+                ],
+              ),
             ),
           ),
         ),

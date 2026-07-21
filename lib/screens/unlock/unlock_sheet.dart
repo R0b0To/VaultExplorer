@@ -733,9 +733,14 @@ class _UnlockSheetState extends State<UnlockSheet> {
           : 'Trying keyslot…';
     }
     final hashName = hashAlgorithmName(p.hashId);
+    final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
+    final slotName = p.slot == 1 ? 'Hidden Volume' : 'Standard Volume';
+    
+    final algo = cipherName.isNotEmpty ? '$hashName + $cipherName' : hashName;
+
     return p.total > 1
-        ? 'Trying $hashName (${p.attempted} of ${p.total})…'
-        : 'Trying $hashName…';
+        ? 'Trying $algo ($slotName)…'
+        : 'Trying $algo ($slotName)…';
   }
 
   @override

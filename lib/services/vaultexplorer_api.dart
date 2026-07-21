@@ -29,6 +29,7 @@ typedef UnlockProgress = ({
   int hashId,
   int cipherId,
   String containerFormat,
+  int slot,
 });
 
 String hashAlgorithmName(int hashId) => HashAlgo.nameFor(hashId);
@@ -198,6 +199,7 @@ class VaultExplorerApi {
             hashId: args['hashId'] as int? ?? 255,
             cipherId: args['cipherId'] as int? ?? 255,
             containerFormat: args['containerFormat'] as String? ?? 'veracrypt',
+            slot: args['slot'] as int? ?? 0,
           );
           for (final listener in List.of(_unlockProgressListeners)) {
             listener(progress);

@@ -83,7 +83,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
       widget.prefillPassword?.isNotEmpty == true &&
       _passwordCtrl.text == widget.prefillPassword;
 
-  String get _unlockProgressLabel {
+ String get _unlockProgressLabel {
     final p = _progress;
     if (p == null || p.total <= 0) return 'Decrypting drive...';
     if (_isLuks) {
@@ -92,9 +92,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
           : 'Trying keyslot…';
     }
     final hashName = hashAlgorithmName(p.hashId);
+    final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
+    final slotName = p.slot == 1 ? 'Hidden Volume' : 'Standard Volume';
+    
+    final algo = cipherName.isNotEmpty ? '$hashName + $cipherName' : hashName;
+
     return p.total > 1
-        ? 'Trying $hashName (${p.attempted} of ${p.total})…'
-        : 'Trying $hashName…';
+        ? 'Trying $algo ($slotName)…'
+        : 'Trying $algo ($slotName)…';
   }
 
   @override

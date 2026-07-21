@@ -626,51 +626,98 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                     ),
                   ),
                   const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () => Navigator.of(context).pop('external'),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Ink(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: cs.surfaceContainerLow,
-                        border: Border.all(color: cs.outlineVariant),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.open_in_new_rounded,
-                            color: cs.secondary,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'External App',
-                                  style: textTheme.bodyLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Text(
-                                  'Send file to third-party app',
-                                  style: textTheme.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+const SizedBox(height: 12),
+InkWell(
+  onTap: () => Navigator.of(context).pop('external'),
+  borderRadius: BorderRadius.circular(12),
+  child: Ink(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: cs.surfaceContainerLow,
+      border: Border.all(color: cs.outlineVariant),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          Icons.open_in_new_rounded,
+          color: cs.secondary,
+          size: 28,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'External App',
+                style: textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Send file to third-party app',
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Icon(
+          Icons.chevron_right_rounded,
+          color: cs.onSurfaceVariant,
+        ),
+      ],
+    ),
+  ),
+),
+const SizedBox(height: 12),
+InkWell(
+  onTap: () => Navigator.of(context).pop('open_as'),
+  borderRadius: BorderRadius.circular(12),
+  child: Ink(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: cs.surfaceContainerLow,
+      border: Border.all(color: cs.outlineVariant),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          Icons.app_registration_rounded,
+          color: cs.secondary,
+          size: 28,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Open As...',
+                style: textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Choose file type to open as',
+                style: textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Icon(
+          Icons.chevron_right_rounded,
+          color: cs.onSurfaceVariant,
+        ),
+      ],
+    ),
+  ),
+),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -727,18 +774,72 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       _openMediaViewer(fileName, fullPath);
     } else if (result == 'external') {
-      if (remember) {
-        VaultExplorerApi.onAppSelectedCallback = (selectedExt, pkg) {
-          if (selectedExt.toLowerCase() == ext.toLowerCase()) {
-            settings.extensionPreferences[ext] = 'package:$pkg';
-            AppSettingsService.saveSettings(settings);
-            VaultExplorerApi.onAppSelectedCallback = null;
-          }
-        };
+  if (remember) {
+    VaultExplorerApi.onAppSelectedCallback = (selectedExt, pkg) {
+      if (selectedExt.toLowerCase() == ext.toLowerCase()) {
+        settings.extensionPreferences[ext] = 'package:$pkg';
+        AppSettingsService.saveSettings(settings);
+        VaultExplorerApi.onAppSelectedCallback = null;
       }
-      _openFileWithApp(fileName, fullPath);
-    }
+    };
   }
+  _openFileWithApp(fileName, fullPath);
+} else if (result == 'open_as') {
+  if (!mounted) return;
+
+  final mimeType = await showDialog<String>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Open As'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+  leading: const Icon(Icons.text_fields_rounded),
+  title: const Text('Text'),
+  onTap: () => Navigator.of(context).pop('text/plain'),
+),
+ListTile(
+  leading: const Icon(Icons.image_outlined),
+  title: const Text('Image'),
+  onTap: () => Navigator.of(context).pop('image/*'),
+),
+ListTile(
+  leading: const Icon(Icons.ondemand_video_outlined),
+  title: const Text('Video'),
+  onTap: () => Navigator.of(context).pop('video/*'),
+),
+ListTile(
+  leading: const Icon(Icons.audio_file_outlined),
+  title: const Text('Audio'),
+  onTap: () => Navigator.of(context).pop('audio/*'),
+),
+ListTile(
+  leading: const Icon(Icons.archive_outlined),
+  title: const Text('Archive'),
+  onTap: () => Navigator.of(context).pop('application/zip'),
+),
+ListTile(
+  leading: const Icon(Icons.insert_drive_file_outlined),
+  title: const Text('Other'),
+  onTap: () => Navigator.of(context).pop('*/*'),
+),
+          ],
+        ),
+      );
+    },
+  );
+
+  if (mimeType != null) {
+    _openFileWithApp(
+      fileName,
+      fullPath,
+      mimeType: mimeType,
+    );
+  }
+}
+}
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
@@ -866,25 +967,27 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     return foundFiles;
   }
 
-  Future<void> _openFileWithApp(
-    String cleanName,
-    String fullPath, {
-    String? packageName,
-  }) async {
-    _signalActivity();
-    try {
-      final ok = await vaultExplorerApi.openWithApp(
-        widget.container,
-        fullPath,
-        packageName: packageName,
-      );
-      if (!ok && mounted) {
-        _setStatus('No app found for this file type', error: true);
-      }
-    } catch (_) {
-      if (mounted) _setStatus('Could not open "$cleanName"', error: true);
+Future<void> _openFileWithApp(
+  String cleanName,
+  String fullPath, {
+  String? packageName,
+  String? mimeType,
+}) async {
+  _signalActivity();
+  try {
+    final ok = await vaultExplorerApi.openWithApp(
+      widget.container,
+      fullPath,
+      packageName: packageName,
+      mimeType: mimeType,
+    );
+    if (!ok && mounted) {
+      _setStatus('No app found for this file type', error: true);
     }
+  } catch (_) {
+    if (mounted) _setStatus('Could not open "$cleanName"', error: true);
   }
+}
 
   // ── Vault items ───────────────────────────────────────────────────────────
 

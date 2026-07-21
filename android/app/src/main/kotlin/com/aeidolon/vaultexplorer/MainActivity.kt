@@ -2111,28 +2111,50 @@ class MainActivity : FlutterFragmentActivity() {
                 }
 
                 ChannelMethods.OPEN_WITH_APP -> {
-                    val uriString = call.argument<String>("filePath")
-                    val fileName  = call.argument<String>("fileName")
-                    val packageName = call.argument<String>("packageName")
-                    if (uriString == null || fileName == null) {
-                        result.error("INVALID_ARGS", "filePath and fileName required", null); return@setMethodCallHandler
-                    }
-                    try {
-                        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-                            ?: run {
-                                result.error("NOT_MOUNTED", "Container not mounted", null)
-                                return@setMethodCallHandler
-                            }
-                        val docUri = DocumentsContract.buildDocumentUri(
-                            "com.aeidolon.vaultexplorer.documents", "$volId:file:$fileName")
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(docUri, MimeTypeHelper.getMimeType(fileName))
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                     Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
-                            if (!packageName.isNullOrEmpty()) {
-                                setPackage(packageName)
-                            }
-                        }
+    val uriString = call.argument<String>("filePath")
+    val fileName  = call.argument<String>("fileName")
+    val packageName = call.argument<String>("packageName")
+    val mimeTypeOverride = call.argument<String>("mimeType")
+
+    if (uriString == null || fileName == null) {
+        result.error(
+            "INVALID_ARGS",
+            "filePath and fileName required",
+            null
+        )
+        return@setMethodCallHandler
+    }
+
+    try {
+        val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+            ?: run {
+                result.error("NOT_MOUNTED", "Container not mounted", null)
+                return@setMethodCallHandler
+            }
+
+        var finalDocId = "$volId:file:$fileName"
+        if (mimeTypeOverride != null) {
+            finalDocId += "?mimeType=" + mimeTypeOverride
+        }
+
+        val docUri = DocumentsContract.buildDocumentUri(
+            "com.aeidolon.vaultexplorer.documents",
+            finalDocId
+        )
+
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(
+                docUri,
+                mimeTypeOverride ?: MimeTypeHelper.getMimeType(fileName)
+            )
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            if (!packageName.isNullOrEmpty()) {
+                setPackage(packageName)
+            }
+        }
                         
                         if (!packageName.isNullOrEmpty()) {
                             try {

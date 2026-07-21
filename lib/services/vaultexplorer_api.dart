@@ -854,19 +854,23 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
 
   // ── File I/O ──────────────────────────────────────────────────────────────
 
-  Future<bool> openWithApp(
-    MountedContainer container,
-    String fileName, {
-    String? packageName,
-  }) async {
-    final result = await _channel
-        .invokeMethod<bool>(ChannelMethods.openWithApp, {
-          'filePath': container.uri,
-          'fileName': fileName,
-          'packageName': packageName,
-        });
-    return result ?? false;
-  }
+Future<bool> openWithApp(
+  MountedContainer container,
+  String fileName, {
+  String? packageName,
+  String? mimeType,
+}) async {
+  final result = await _channel.invokeMethod<bool>(
+    ChannelMethods.openWithApp,
+    {
+      'filePath': container.uri,
+      'fileName': fileName,
+      'packageName': packageName,
+      'mimeType': mimeType,
+    },
+  );
+  return result ?? false;
+}
 
   Future<bool> decryptFile(
     MountedContainer container,

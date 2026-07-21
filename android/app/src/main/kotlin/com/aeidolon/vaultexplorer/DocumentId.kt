@@ -7,11 +7,19 @@ data class DocumentId(
     val volId: Int,
     val type: String,     // "dir" or "file"
     val fatPath: String,  // empty = volume root
+    val mimeTypeOverride: String? = null,
 ) {
     val isDir: Boolean get() = type == "dir"
 
     /** Reconstructs the canonical wire string. */
-    override fun toString(): String = "$volId:$type:$fatPath"
+    override fun toString(): String {
+        val base = "$volId:$type:$fatPath"
+        return if (mimeTypeOverride != null) {
+            "$base?mimeType=$mimeTypeOverride"
+        } else {
+            base
+        }
+    }
 
     companion object {
         /**
@@ -25,7 +33,15 @@ data class DocumentId(
         @Throws(FileNotFoundException::class)
         fun parse(raw: String?, label: String = "document"): DocumentId {
             val id = raw ?: throw FileNotFoundException("Missing $label ID")
-            val parts = id.split(":")
+
+            val actualId = id.substringBefore("?mimeType=")
+            val mimeTypeOverride = if (id.contains("?mimeType=")) {
+                id.substringAfter("?mimeType=")
+            } else {
+                null
+            }
+
+            val parts = actualId.split(":")
             if (parts.size < 2) {
                 throw FileNotFoundException("Malformed $label ID (expected <volId>:<type>[:<path>]): $id")
             }
@@ -36,11 +52,12 @@ data class DocumentId(
                     "Volume ID $volIdInt is out of range [0, ${ContainerSessionRegistry.MAX_VOLUMES}) in $label ID: $id"
                 )
             }
-            return DocumentId(
-                volId   = volIdInt,
-                type    = parts[1],
-                fatPath = parts.drop(2).joinToString(":"),
-            )
+return DocumentId(
+    volId = volIdInt,
+    type = parts[1],
+    fatPath = parts.drop(2).joinToString(":"),
+    mimeTypeOverride = mimeTypeOverride,
+)
         }
     }
 }

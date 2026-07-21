@@ -210,13 +210,18 @@ class ContainerDocumentsProvider : DocumentsProvider() {
         }
 
         val displayName = if (fatPath.isEmpty()) "Root $volId" else fatPath.substringAfterLast("/")
-        val mimeType = if (actualIsDir) DocumentsContract.Document.MIME_TYPE_DIR 
-                       else (MimeTypeHelper.getMimeType(displayName) ?: "application/octet-stream")
+val mimeType = doc.mimeTypeOverride ?: (
+    if (actualIsDir) {
+        DocumentsContract.Document.MIME_TYPE_DIR
+    } else {
+        MimeTypeHelper.getMimeType(displayName) ?: "application/octet-stream"
+    }
+)
 
-        addDocumentRow(
-            cursor, resolvedProjection, doc.toString(), displayName,
-            mimeType, actualSize, actualIsDir, fatPath.isEmpty(), readOnly
-        )
+addDocumentRow(
+    cursor, resolvedProjection, doc.toString(), displayName,
+    mimeType, actualSize, actualIsDir, fatPath.isEmpty(), readOnly
+)
         return cursor
     }
 

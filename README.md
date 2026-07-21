@@ -1,65 +1,54 @@
+***
+
 # VaultExplorer [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K2ND3Y8)
 
-**A native Android file manager for encrypted containers — no PC required.**
+**An Android file manager for encrypted containers and vaults — no PC required.**
 
-Mount, browse, and manage VeraCrypt and LUKS encrypted volumes directly on your Android device. Built with Flutter and a custom C++ crypto engine (mbedTLS + FatFs + NTFS-3G + libext2fs) — everything is decrypted and re-encrypted on-device, with zero plaintext temp files written to disk.
+Mount, browse, and manage VeraCrypt, LUKS, Cryptomator, and gocryptfs volumes directly on your Android device. Built with Flutter and a custom cryptographic engine (mbedTLS + FatFs + NTFS-3G + libext2fs), everything is decrypted and re-encrypted on-device with no plaintext temporary files written to disk.
 
 ---
 
 ## Features
 
-### Encryption
-- **VeraCrypt** (`.hc`) and native **LUKS1 / LUKS2** containers — format is auto-detected, no need to specify which
-- **Cryptomator vaults** (format 7/8) — open vaults fully interoperable with the desktop/mobile Cryptomator apps
-- **AES-256-XTS**, plus Serpent, Twofish, Camellia, and Kuznyechik, including VeraCrypt's cascaded combinations (15 cipher/cascade options total)
-- Key derivation via PBKDF2 (SHA-512, SHA-256, Whirlpool, Streebog, BLAKE2s-256) or the memory-hard **Argon2id**
-- LUKS1/LUKS2 support AES, Serpent, Twofish, Camellia, or Kuznyechik in `xts-plain64` mode, with PBKDF2 or Argon2id/Argon2i keyslots
-- **Auto-detect** tries every cipher/hash combo in parallel with a live progress indicator, and remembers the match for faster future unlocks
-- **Keyfiles** — additive password mixing (VeraCrypt) or direct passphrase replacement (LUKS), matching `cryptsetup --key-file`
-- **Hidden volumes** are detected automatically at unlock, no extra step needed
-- Configurable **PIM**
-- Mount up to **8 containers** at once, from files, `content://` documents, or USB drives
+### Supported Formats & Encryption
+- **Block-Level Containers**: VeraCrypt (`.hc`) and native LUKS1 / LUKS2 containers with format auto-detection.
+- **Directory-Based Vaults**: Cryptomator (format 7/8) and gocryptfs directories. Compatible with desktop and official mobile clients.
+- **Robust Cipher Support**: AES-256-XTS, Serpent, Twofish, Camellia, and Kuznyechik, including VeraCrypt's cascaded options (15 total combinations).
+- **Key Derivation (KDF)**: PBKDF2 (SHA-512, SHA-256, Whirlpool, Streebog, BLAKE2s-256) or memory-hard Argon2id.
+- **LUKS Flexibility**: Works with AES, Serpent, Twofish, Camellia, or Kuznyechik in `xts-plain64` mode using PBKDF2 or Argon2id/Argon2i keyslots.
+- **Parallel Auto-Detect**: Tests cipher/hash combinations in parallel with a live progress indicator, caching successful matches for faster subsequent unlocks.
+- **Keyfiles & Hidden Volumes**: Supports password mixing (VeraCrypt) or keyfile-only/passphrase options matching `cryptsetup`. Hidden volumes are resolved during unlock.
+- **Multi-Mount**: Open up to 8 containers or directories simultaneously from storage, `content://` providers, or USB OTG.
 
-### Filesystems
-- Read/write **FAT32, exFAT, NTFS, ext2/ext3/ext4** — auto-detected on mount
-- Create new containers in any of the above
+### Filesystems & Storage
+- **Broad File Systems**: Read/write support for FAT32, exFAT, NTFS, and ext2/ext3/ext4 (auto-detected on mount).
+- **USB OTG Mounting**: Mount containers directly from external drives without root. Includes partition scanning (MBR/GPT) and instant lock-on-disconnect.
+- **Container Creation**: Create new encrypted containers formatted to any supported filesystem.
 
-### USB Drives
-- Mount VeraCrypt/LUKS volumes on a USB OTG drive, no root or PC needed
-- Automatic MBR/GPT partition scanning; remembers the matched partition for faster reconnects
-- Detects disconnects instantly and locks the container
+### File & Password Management
+- **Intuitive File Browser**: Breadcrumb navigation, list/grid views, search, filter, and multiple sort orders.
+- **Clipboard & Batch Actions**: Batch copy, move, rename, delete, or export with progress tracking and conflict resolution.
+- **Built-in Password Manager**: Store and manage encrypted items (passwords, cards, notes, identities). Includes field reveal, secure copy, and favorites.
 
-### File Management
-- Breadcrumb navigation, list and grid views with live thumbnails
-- Batch copy/move/delete/rename/export with progress tracking and conflict resolution
-- Cross-container clipboard, device import/export, search & filter, multiple sort orders
+### Media Viewer & Android Integration
+- **Media Playback**: Built-in player for video/audio (supporting `.srt`/`.vtt` subtitles, loop, and speed control) and images (zoom, rotate, slideshows).
+- **Android SAF Integration**: Mounted volumes integrate into the system Documents Provider, letting you open files directly in external apps.
+- **On-The-Fly Streaming**: Streams data through a proxy file descriptor without writing plaintext files to physical storage.
 
-### Password Manager
-- Encrypted vault items: passwords, cards, identities, notes, bank accounts, software licenses
-- Field-level reveal/hide, copy-to-clipboard, favourites
+### Security & Privacy
+- **Master Password**: Optional master password with exponential lockout backoff that persists across app force-kills.
+- **Biometric & Pattern Unlock**: Secure individual containers using biometrics or patterns, with optional Keystore-backed key storage.
+- **Timers**: App-wide and per-container customizable auto-lock timers.
+- **Leak Protection**: Screenshot blocking and secure thumbnail caching options (app cache, in-container, or disabled).
 
-### Media Viewer
-- Images (zoom, rotate) and video/audio (`.srt`/`.vtt` subtitles)
-- Slideshow, shuffle, folder filtering, playback speed, seek, loop/advance
+---
 
-### Android Integration
-- Mounted containers appear in the system **Documents Provider**
-- Proxy file streaming — no plaintext intermediary on disk
-- Open files in external apps, with remembered per-extension preferences
-
-### Security
-- Optional **master password** with exponential lockout backoff (persists across force-kills)
-- **Biometric** or **pattern** unlock per container, plus optional Keystore-cached derived keys
-- App-wide and per-container auto-lock timers
-- Configurable thumbnail caching (app cache, in-container, or disabled)
-- Screenshot blocking
-
-### Screenshots
+## Screenshots
 
 <p align="center">
-  <img width="250" alt="Screenshot_1783428063" src="https://github.com/user-attachments/assets/2267accb-aae3-4ce6-8fae-bd09bfebd3c1" />
-  <img width="250" alt="Screenshot_1783428136" src="https://github.com/user-attachments/assets/a7ac12c5-6481-423d-a930-098ef5da3283" /> 
-   <img width="250" alt="Screenshot_1783428136" src="https://github.com/user-attachments/assets/154c1dcf-e448-46ab-ad9d-2d92ad10fbe3" />
+  <img width="250" alt="Screenshot_1" src="https://github.com/user-attachments/assets/be881af4-d607-4522-b389-c1553416c64b" />
+  <img width="250" alt="Screenshot_3" src="https://github.com/user-attachments/assets/4b13dc9c-c1ec-4067-b15b-de1fdbd24e89" />
+  <img width="250" alt="Screenshot_2" src="https://github.com/user-attachments/assets/ed55b96a-5fee-4b65-bc81-f0345e3c208f" /> 
 </p>
 
 ---
@@ -67,8 +56,8 @@ Mount, browse, and manage VeraCrypt and LUKS encrypted volumes directly on your 
 ## Requirements
 
 - Android 8.0+ (API 26)
-- USB OTG support for USB drive mounting
-- NDK / CMake (for building)
+- USB OTG support (for USB drive mounting)
+- NDK / CMake (for compiling the C++ engine)
 
 ---
 
@@ -81,7 +70,7 @@ flutter pub get
 flutter build apk --release
 ```
 
-Requires Flutter SDK `^3.12.0`, the Android NDK version pinned in `flutter.ndkVersion`, and CMake 3.18+. The C++ engine builds automatically via CMake; mbedTLS, FatFs, NTFS-3G, libext2fs, cJSON, and the VeraCrypt crypto primitives are fetched at build time — no manual setup needed.
+Requires Flutter SDK `^3.12.0`, the Android NDK version pinned in `flutter.ndkVersion`, and CMake 3.18+. The C++ engine builds automatically via CMake; mbedTLS, FatFs, NTFS-3G, libext2fs, cJSON, and the VeraCrypt crypto primitives are fetched at build time.
 
 ---
 
@@ -96,7 +85,7 @@ Android (Kotlin)
   ├── MainActivity — MethodChannel handler, SAF pickers, import/export
   ├── ContainerSessionRegistry / ContainerFileSystem — session registry & locking
   ├── ContainerEngine — format-neutral façade over the JNI implementation
-  ├── Cryptomator — pure-Kotlin vault backend (masterkey unwrap, AES-SIV names, chunked content crypto)
+  ├── Cryptomator & gocryptfs — directory-based vault backends (metadata/filename decryption)
   ├── UsbMassStorageDevice / UsbBlockBridge — USB Mass Storage client
   ├── UnlockProgressBridge — pushes auto-detect progress to Dart
   └── ContainerDocumentsProvider — Documents Provider (ContentProvider)
@@ -139,16 +128,18 @@ VeraCrypt crypto primitives (Serpent, Twofish, Camellia, Kuznyechik, Whirlpool, 
 
 ## How It Works
 
-1. **Unlock** — Read the header, derive the key (PBKDF2/Argon2id, auto-detecting cipher/hash if unspecified), decrypt to recover the master key. LUKS containers instead parse keyslot metadata, derive and AF-merge each keyslot, and verify against the stored digest.
-2. **Mount** — FatFs, NTFS-3G, or libext2fs runs over custom disk I/O hooks that transparently decrypt/encrypt every sector using the recovered key.
-3. **Browse** — File operations go through the matching filesystem driver; plaintext never touches device storage.
-4. **Stream** — External apps read/write via a `ProxyFileDescriptor` straight through the JNI engine.
+1. **Unlock** — Reads metadata/headers, derives the key (using PBKDF2/Argon2id, auto-detecting parameters if unspecified), and verifies it. For LUKS containers, keyslot metadata is parsed and derived before verifying against the digest.
+2. **Mount** — 
+   - *Block-Level (VeraCrypt/LUKS)*: FatFs, NTFS-3G, or libext2fs runs over custom disk I/O hooks to decrypt/encrypt individual sectors.
+   - *Directory-Level (Cryptomator/gocryptfs)*: Translates and decrypts filenames and file payloads on-the-fly.
+3. **Browse** — File operations pass through the virtual file system; plaintext data never touches physical storage.
+4. **Stream** — External apps access files via a `ProxyFileDescriptor` connected to the JNI engine.
 
 ---
 
 ## Limitations
 
-- Android only (uses Android JNI / NDK APIs)
+- Android only (utilizes Android JNI and NDK APIs)
 
 ---
 
@@ -160,5 +151,5 @@ GPL-3.0 — see [LICENSE](LICENSE).
 
 ## Acknowledgements
 
-- [VeraCrypt](https://veracrypt.fr), [LUKS / cryptsetup](https://gitlab.com/cryptsetup/cryptsetup) — the encryption standards this app is compatible with
+- [VeraCrypt](https://veracrypt.fr), [LUKS / cryptsetup](https://gitlab.com/cryptsetup/cryptsetup), [gocryptfs](https://nuetzlich.net/gocryptfs/) — the encryption standards this app is compatible with
 - [Mbed TLS](https://github.com/Mbed-TLS/mbedtls), [ChaN FatFs](http://elm-chan.org/fsw/ff/), [NTFS-3G](https://github.com/tuxera/ntfs-3g), [e2fsprogs / libext2fs](https://github.com/tytso/e2fsprogs), [cJSON](https://github.com/DaveGamble/cJSON) — libraries this app is built on

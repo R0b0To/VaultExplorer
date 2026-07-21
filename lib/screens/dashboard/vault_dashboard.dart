@@ -744,12 +744,10 @@ void _handleReorder(int oldIndex, int newIndex) {
       return EmptyState(onAdd: _showAddOptionsSheet);
     }
 
-    return RefreshIndicator(
-      onRefresh: _handleRefresh,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: ReorderableListView.builder(
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: ReorderableListView.builder(
             buildDefaultDragHandles: false,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
             itemCount: displayItems.length,
@@ -784,8 +782,8 @@ void _handleReorder(int oldIndex, int newIndex) {
             },
           ),
         ),
-      ),
-    );
+      );
+    
   }
 
   @override

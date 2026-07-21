@@ -2179,12 +2179,17 @@ Future<void> _openFileWithApp(
             searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
           );
 
-    if (!_isListingTruncated) return content;
+    final refreshable = RefreshIndicator(
+      onRefresh: () => _loadDirectoryContents(_currentDirPath),
+      child: content,
+    );
+
+    if (!_isListingTruncated) return refreshable;
 
     return Column(
       children: [
         const TruncatedBanner(),
-        Expanded(child: content),
+        Expanded(child: refreshable),
       ],
     );
   }

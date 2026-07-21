@@ -14,82 +14,94 @@ import java.io.FileNotFoundException
  */
 object ContainerFileSystem {
 
-    /**
-     * Runs [block] under the per-volume JVM monitor.
-     * Use directly when batching multiple native calls under one lock
-     * acquisition (e.g. VeraCryptProxyCallback.init).
-     */
-    fun <T> withLock(volId: Int, block: () -> T): T =
-        synchronized(ContainerSessionRegistry.locks[volId], block)
+    inline fun <T> withReadLock(volId: Int, block: () -> T): T {
+        val lock = ContainerSessionRegistry.locks[volId].readLock()
+        lock.lock()
+        try {
+            return block()
+        } finally {
+            lock.unlock()
+        }
+    }
 
-    /**
-     * Returns the active session for [volId] or throws [FileNotFoundException].
-     * Called at the top of every Provider override so the error surfaces
-     * cleanly through the DocumentsProvider contract.
-     */
+    inline fun <T> withWriteLock(volId: Int, block: () -> T): T {
+        val lock = ContainerSessionRegistry.locks[volId].writeLock()
+        lock.lock()
+        try {
+            return block()
+        } finally {
+            lock.unlock()
+        }
+    }
+
+    @Deprecated("Use withReadLock or withWriteLock instead")
+    fun <T> withLock(volId: Int, block: () -> T): T = withWriteLock(volId, block)
+
     fun requireSession(volId: Int): ContainerSession =
         ContainerSessionRegistry.activeSessions[volId]
             ?: throw FileNotFoundException(
                 "No active session for volume $volId — container not unlocked"
             )
 
-    // ── Directory operations ───────────────────────────────────────────────
+    // ── Directory operations (Read-Only) ───────────────────────────────────
 
     fun listDirectory(volId: Int, dirPath: String): Array<String>? =
-        withLock(volId) { ContainerEngine.listDirectory(dirPath, volId) }
+        withReadLock(volId) { ContainerEngine.listDirectory(dirPath, volId) }
+
+    // ── Directory operations (Write) ───────────────────────────────────────
 
     fun createDirectory(volId: Int, dirPath: String): Boolean =
-        withLock(volId) { ContainerEngine.createDirectory(dirPath, volId) }
+        withWriteLock(volId) { ContainerEngine.createDirectory(dirPath, volId) }
 
     fun renameFile(volId: Int, oldPath: String, newPath: String): Boolean =
-        withLock(volId) { ContainerEngine.renameFile(oldPath, newPath, volId) }
+        withWriteLock(volId) { ContainerEngine.renameFile(oldPath, newPath, volId) }
 
     fun setLastModifiedTime(volId: Int, fatPath: String, epochSeconds: Long): Boolean =
-        withLock(volId) { ContainerEngine.setLastModifiedTime(fatPath, epochSeconds, volId) }
+        withWriteLock(volId) { ContainerEngine.setLastModifiedTime(fatPath, epochSeconds, volId) }
 
     fun deleteFile(volId: Int, fatPath: String): Boolean =
-        withLock(volId) { ContainerEngine.deleteFile(fatPath, volId) }
+        withWriteLock(volId) { ContainerEngine.deleteFile(fatPath, volId) }
 
-    // ── File I/O ──────────────────────────────────────────────────────────
+    // ── File I/O (Read-Only) ───────────────────────────────────────────────
 
     fun getFileSize(volId: Int, fatPath: String): Long {
         val session = requireSession(volId)
         val name = session.javaClass.simpleName
         return if (name.contains("Cryptomator") || name.contains("Gocryptfs")) {
-            // Bypass global lock for concurrent non-native reads
             ContainerEngine.getFileSize(fatPath, volId)
         } else {
-            withLock(volId) { ContainerEngine.getFileSize(fatPath, volId) }
+            withReadLock(volId) { ContainerEngine.getFileSize(fatPath, volId) }
         }
     }
 
     fun getFolderSize(volId: Int, fatPath: String): Long =
-        withLock(volId) { ContainerEngine.getFolderSize(fatPath, volId) }
+        withReadLock(volId) { ContainerEngine.getFolderSize(fatPath, volId) }
 
     fun readFileChunk(volId: Int, fatPath: String, offset: Long, length: Int): ByteArray? {
         val session = requireSession(volId)
         val name = session.javaClass.simpleName
         return if (name.contains("Cryptomator") || name.contains("Gocryptfs")) {
-            // Bypass global lock for concurrent non-native reads
             ContainerEngine.readFileChunk(fatPath, offset, length, volId)
         } else {
-            withLock(volId) { ContainerEngine.readFileChunk(fatPath, offset, length, volId) }
+            withReadLock(volId) { ContainerEngine.readFileChunk(fatPath, offset, length, volId) }
         }
     }
 
+    fun extractToFile(volId: Int, fatPath: String, destPath: String): Boolean =
+        withReadLock(volId) { ContainerEngine.extractFile(fatPath, destPath, volId) }
+
+    // ── File I/O (Write) ───────────────────────────────────────────────────
+
     fun writeFileChunk(volId: Int, fatPath: String, offset: Long, data: ByteArray): Boolean =
-        withLock(volId) { ContainerEngine.writeFileChunk(fatPath, offset, data, volId) }
+        withWriteLock(volId) { ContainerEngine.writeFileChunk(fatPath, offset, data, volId) }
 
     fun writeBackFile(volId: Int, fatPath: String, sourcePath: String): Boolean =
-        withLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId) }
+        withWriteLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId) }
 
-    fun extractToFile(volId: Int, fatPath: String, destPath: String): Boolean =
-        withLock(volId) { ContainerEngine.extractFile(fatPath, destPath, volId) }
-
-    // ── Space info ────────────────────────────────────────────────────────
+    // ── Space info (Read-Only) ─────────────────────────────────────────────
 
     fun getSpaceInfo(volId: Int): LongArray? =
-        withLock(volId) { ContainerEngine.getSpaceInfo(volId) }
+        withReadLock(volId) { ContainerEngine.getSpaceInfo(volId) }
 
     fun getSpacePair(volId: Int): Pair<Long, Long> = try {
         val space = getSpaceInfo(volId)
@@ -100,11 +112,11 @@ object ContainerFileSystem {
     // ── Proxy-file stream lifecycle ───────────────────────────────────────
 
     fun openStream(volId: Int, fatPath: String): Long =
-        withLock(volId) { ContainerEngine.openStream(fatPath, volId) }
+        withReadLock(volId) { ContainerEngine.openStream(fatPath, volId) }
 
     fun readStream(volId: Int, streamPtr: Long, offset: Long, out: ByteArray, length: Int): Int =
-        withLock(volId) { ContainerEngine.readStream(streamPtr, offset, out, length, volId) }
+        withReadLock(volId) { ContainerEngine.readStream(streamPtr, offset, out, length, volId) }
 
     fun closeStream(volId: Int, streamPtr: Long) =
-        withLock(volId) { ContainerEngine.closeStream(streamPtr, volId) }
+        withReadLock(volId) { ContainerEngine.closeStream(streamPtr, volId) }
 }

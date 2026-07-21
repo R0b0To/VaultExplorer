@@ -14,7 +14,9 @@ object ContainerSessionRegistry {
 
     val MAX_VOLUMES: Int by lazy { ContainerEngine.maxVolumes() }
 
-    val locks: Array<Any> by lazy { Array(MAX_VOLUMES) { Any() } }
+    val locks: Array<java.util.concurrent.locks.ReentrantReadWriteLock> by lazy { 
+        Array(MAX_VOLUMES) { java.util.concurrent.locks.ReentrantReadWriteLock(true) } 
+    }
     val activeSessions = mutableMapOf<Int, ContainerSession>()
 
     fun isUnlocked(volId: Int) = activeSessions.containsKey(volId)

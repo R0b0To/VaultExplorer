@@ -11,7 +11,13 @@ package com.aeidolon.vaultexplorer
  * MainActivity: native code never opens or closes the USB connection.
  */
 object UsbBlockBridge {
-    private val devices = mutableMapOf<Int, UsbMassStorageDevice>()
+    // ConcurrentHashMap, not a plain map: register()/unregister() run on the
+    // lock/unlock flow's thread while readSectors()/writeSectors() are
+    // called from whichever JNI/ioExecutor thread is doing native I/O for
+    // one of potentially several concurrently-mounted USB volumes. A plain
+    // mutableMapOf() has no safety guarantee under that kind of concurrent
+    // get/put from different threads.
+    private val devices = java.util.concurrent.ConcurrentHashMap<Int, UsbMassStorageDevice>()
 
     fun register(volId: Int, device: UsbMassStorageDevice) {
         devices[volId] = device

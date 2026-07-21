@@ -73,6 +73,15 @@ struct ExtStream {
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
+// Debug-level, separately-tagged timing logs for disk_read/disk_write —
+// covers both USB and normal (file-backed) containers, and breaks each call
+// down into physical I/O time (pread/pwrite or USB transfer, logged again
+// at finer grain under "VaultExplorer_IO" in block_io.cpp) vs. everything
+// else in the call (crypto + buffer copies), so a slow container read can
+// be attributed to "the storage is slow" vs "the cipher is slow" instead of
+// guessing. Filter with `adb logcat -s VaultExplorer_Timing`.
+#define LOGD_TIMING(...) __android_log_print(ANDROID_LOG_DEBUG, "VaultExplorer_Timing", __VA_ARGS__)
+
 #define MAX_VOLUMES FF_VOLUMES
 
 
@@ -237,6 +246,9 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         return RES_NOTRDY;
     if (count == 0) return RES_PARERR;
 
+    const auto callStart = std::chrono::steady_clock::now();
+    double physicalMs = 0.0;
+
     VolumeState& v = volumes[pdrv];
     const uint64_t basePhysical = v.dataOffset / 512;
     static constexpr uint32_t MAX_SECTORS_PER_BATCH = 8192; // 4 MB/batch
@@ -282,7 +294,17 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             encBuf = stackBuf;
         }
 
-        if (!physicalRead(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
+        const auto physStart = std::chrono::steady_clock::now();
+        const bool physOk = physicalRead(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes);
+        physicalMs += std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - physStart).count();
+        if (!physOk) {
+            const double totalMs = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - callStart).count();
+            LOGD_TIMING("disk_read: vol=%d sector=%llu count=%u FAILED physical=%.2fms total=%.2fms",
+                        pdrv, static_cast<unsigned long long>(sector), count, physicalMs, totalMs);
+            return RES_ERROR;
+        }
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
             for (UINT i = 0; i < batch.count; i++) {
@@ -322,6 +344,13 @@ for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
             std::memcpy(curBuf, decBuf.data() + copyOffset, copyBytes);
         }
     }
+    const double totalMs = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - callStart).count();
+    LOGD_TIMING("disk_read: vol=%d sector=%llu count=%u bytes=%u src=%s batches=%zu "
+                "physical=%.2fms crypto=%.2fms total=%.2fms",
+                pdrv, static_cast<unsigned long long>(sector), count, count * 512,
+                v.isUsbSource ? "usb" : "file", batches.size(),
+                physicalMs, totalMs - physicalMs, totalMs);
     return RES_OK;
 }
 

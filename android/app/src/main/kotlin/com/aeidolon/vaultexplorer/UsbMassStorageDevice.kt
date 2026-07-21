@@ -29,6 +29,29 @@ class UsbMassStorageDevice private constructor(
 
     private var tag: Int = 1
 
+    // Bulk-Only Transport is strictly sequential: one CBW, its data phase,
+    // then its CSW — the device's own state machine has no concept of
+    // interleaving two commands on the same pair of endpoints. Callers above
+    // us (native disk_read/disk_write, readFileChunk's shared read-lock,
+    // per-feature concurrency caps in Dart for thumbnails/copies/etc.) are
+    // intentionally allowed to overlap, because that's fine and desirable
+    // for a regular file descriptor. It is NOT fine here: two threads
+    // issuing bulkTransfer() concurrently interleave CBW/data/CSW phases,
+    // the device echoes back a CSW that doesn't match what the caller
+    // expects, and executeCommand() reacts by calling resetRecovery() — a
+    // full Bulk-Only Mass Storage Reset. Under real concurrent access this
+    // can repeatedly collide and reset, which is what shows up to the user
+    // as "extremely slow" transfers and UI hangs. ioLock makes the actual
+    // wire protocol single-threaded regardless of how many callers overlap
+    // above it, so higher layers can keep their own concurrency without
+    // corrupting the transport.
+    private val ioLock = Any()
+
+    // Per-instance (not per-class): each physical device backs off
+    // independently, so one drive with a flaky controller doesn't throttle
+    // an unrelated drive mounted at the same time.
+    private var maxSectorsPerCommand: Int = INITIAL_MAX_SECTORS_PER_COMMAND
+
     companion object {
         private const val CBW_SIGNATURE = 0x43425355 // "USBC"
         private const val CSW_SIGNATURE = 0x53425355 // "USBS"
@@ -38,8 +61,6 @@ class UsbMassStorageDevice private constructor(
         private const val INITIAL_MAX_SECTORS_PER_COMMAND = 1024 // 512 KB @ 512B — slightly more conservative starting guess
         private const val MIN_SECTORS_PER_COMMAND = 8             // 4 KB floor
 
-        @Volatile private var maxSectorsPerCommand: Int = INITIAL_MAX_SECTORS_PER_COMMAND
-        
 
         fun open(usbManager: UsbManager, device: UsbDevice): UsbMassStorageDevice? {
 
@@ -93,6 +114,7 @@ class UsbMassStorageDevice private constructor(
  *  BOT state machine stays desynced and every subsequent command fails,
  *  even ones that would otherwise succeed at a smaller size. */
 private fun resetRecovery() {
+    val start = System.nanoTime()
     try {
         connection.controlTransfer(
             0x21, // host-to-device, class, interface
@@ -103,6 +125,14 @@ private fun resetRecovery() {
         clearHalt(epOut)
     } catch (e: Exception) {
         Log.w(TAG, "resetRecovery: failed: ${e.message}")
+    } finally {
+        val ms = (System.nanoTime() - start) / 1_000_000.0
+        // Logged unconditionally (not just on failure): a reset is always a
+        // stall from the caller's perspective, and this is the number to
+        // watch for when transfers feel like they "hang" — frequent resets
+        // taking tens to hundreds of ms each, back to back, is what a
+        // concurrency collision on the BOT pipe looks like in the logs.
+        Log.d(TAG, "resetRecovery: took ${"%.2f".format(ms)}ms")
     }
 }
 
@@ -165,11 +195,14 @@ private fun clearHalt(endpoint: UsbEndpoint) {
     dataLen: Int, 
     dirIn: Boolean
 ): Boolean {
+    val cmdStart = System.nanoTime()
+    fun elapsedMs() = (System.nanoTime() - cmdStart) / 1_000_000.0
+
     tag++
     val cbw = buildCbw(cdb, dataLen, dirIn)
     val cbwSent = connection.bulkTransfer(epOut, cbw, cbw.size, TIMEOUT_MS)
     if (cbwSent != cbw.size) {
-        Log.w(TAG, "executeCommand: CBW send failed (sent=$cbwSent, expected=${cbw.size})")
+        Log.w(TAG, "executeCommand: CBW send failed (sent=$cbwSent, expected=${cbw.size}) after ${"%.2f".format(elapsedMs())}ms")
         resetRecovery()
         return false
     }
@@ -191,7 +224,7 @@ private fun clearHalt(endpoint: UsbEndpoint) {
             )
             
             if (result <= 0) {
-                Log.w(TAG, "executeCommand: bulk transfer failed at offset=$totalTransferred chunkSize=$chunkSize (result=$result)")
+                Log.w(TAG, "executeCommand: bulk transfer failed at offset=$totalTransferred chunkSize=$chunkSize (result=$result) after ${"%.2f".format(elapsedMs())}ms")
                 resetRecovery()
                 return false
             }
@@ -206,20 +239,25 @@ private fun clearHalt(endpoint: UsbEndpoint) {
     val csw = ByteArray(13)
     val cswLen = connection.bulkTransfer(epIn, csw, 13, TIMEOUT_MS)
     if (cswLen != 13) {
-        Log.w(TAG, "executeCommand: CSW read failed (got=$cswLen)")
+        Log.w(TAG, "executeCommand: CSW read failed (got=$cswLen) after ${"%.2f".format(elapsedMs())}ms")
         resetRecovery()
         return false
     }
     val sig = ByteBuffer.wrap(csw, 0, 4).order(ByteOrder.LITTLE_ENDIAN).int
     val status = csw[12].toInt()
     if (sig != CSW_SIGNATURE) {
-        Log.w(TAG, "executeCommand: CSW signature mismatch")
+        Log.w(TAG, "executeCommand: CSW signature mismatch after ${"%.2f".format(elapsedMs())}ms")
         resetRecovery()
         return false
     }
     if (status != 0) {
         if (status == 1) requestSense() else resetRecovery()
     }
+    // DEBUG: per-SCSI-command timing. dataLen here is one command's payload
+    // (bounded by maxSectorsPerCommand), not the whole logical read/write —
+    // compare against the readSectors/writeSectors totals below to see how
+    // much of the overall time is command overhead vs. raw transfer time.
+    Log.d(TAG, "executeCommand: dirIn=$dirIn bytes=$dataLen status=$status took=${"%.2f".format(elapsedMs())}ms")
     return status == 0
 }
     // ── SCSI commands ────────────────────────────────────────────────────
@@ -268,6 +306,14 @@ private fun readCapacity16(): Boolean {
 }
 
  fun readSectors(startSector: Long, count: Int, out: ByteArray): Boolean {
+    val callStart = System.nanoTime()
+    return synchronized(ioLock) {
+        // Time spent queued behind another thread's command on this same
+        // device before we even got to send anything. If this is
+        // consistently large, something is still piling concurrent I/O
+        // onto one USB volume (expected occasionally under load — e.g. a
+        // batch copy plus a thumbnail — but shouldn't dominate normal use).
+        val lockWaitMs = (System.nanoTime() - callStart) / 1_000_000.0
     val totalLen = count * sectorSize
     require(out.size >= totalLen)
     var done = 0
@@ -301,6 +347,7 @@ private fun readCapacity16(): Boolean {
         
         if (!succeeded) {
             Log.e(TAG, "readSectors: failed even at minimum chunk size at sector ${startSector + done}")
+            Log.d(TAG, "readSectors: sector=$startSector count=$count bytes=$totalLen ok=false waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms")
             return false
         }
         
@@ -311,10 +358,15 @@ private fun readCapacity16(): Boolean {
         
         done += chunk
     }
-    return true
+    Log.d(TAG, "readSectors: sector=$startSector count=$count bytes=$totalLen ok=true waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms")
+    true
+    }
 }
 
 fun writeSectors(startSector: Long, count: Int, data: ByteArray): Boolean {
+    val callStart = System.nanoTime()
+    return synchronized(ioLock) {
+        val lockWaitMs = (System.nanoTime() - callStart) / 1_000_000.0
     val totalLen = count * sectorSize
     require(data.size >= totalLen)
     var done = 0
@@ -350,6 +402,7 @@ fun writeSectors(startSector: Long, count: Int, data: ByteArray): Boolean {
         
         if (!succeeded) {
             Log.e(TAG, "writeSectors: failed even at minimum chunk size at sector ${startSector + done}")
+            Log.d(TAG, "writeSectors: sector=$startSector count=$count bytes=$totalLen ok=false waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms")
             return false
         }
         
@@ -360,7 +413,9 @@ fun writeSectors(startSector: Long, count: Int, data: ByteArray): Boolean {
         
         done += chunk
     }
-    return true
+    Log.d(TAG, "writeSectors: sector=$startSector count=$count bytes=$totalLen ok=true waited=${"%.2f".format(lockWaitMs)}ms work=${"%.2f".format((System.nanoTime() - callStart) / 1_000_000.0 - lockWaitMs)}ms")
+    true
+    }
 }
 
     // READ(10) opcode 0x28 / WRITE(10) opcode 0x2A — 10-byte CDB, 32-bit

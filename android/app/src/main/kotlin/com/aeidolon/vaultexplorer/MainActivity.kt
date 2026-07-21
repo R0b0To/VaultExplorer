@@ -41,6 +41,8 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import kotlin.concurrent.withLock
+import java.io.BufferedInputStream
 
 private object ChannelMethods {
     const val PICK_CONTAINER      = "pickContainer"
@@ -464,7 +466,8 @@ class MainActivity : FlutterFragmentActivity() {
         }
         ioExecutor.execute {
             try {
-                val value = synchronized(ContainerSessionRegistry.locks[volId]) { block(volId) }
+                // Lock acquisition is now handled entirely inside ContainerFileSystem
+                val value = block(volId)
                 runOnUiThread { result.success(value) }
             } catch (e: Exception) {
                 runOnUiThread { dispatchNativeError(e, result) }
@@ -706,7 +709,7 @@ class MainActivity : FlutterFragmentActivity() {
         ioExecutor.execute {
             UsbBlockBridge.unregister(volId)
             try {
-                synchronized(ContainerSessionRegistry.locks[volId]) {
+                ContainerSessionRegistry.locks[volId].writeLock().withLock {
                     ContainerEngine.lock(volId)
                 }
             } catch (e: Exception) {
@@ -937,7 +940,7 @@ class MainActivity : FlutterFragmentActivity() {
                                 Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
                             }
 
-                            val files = synchronized(ContainerSessionRegistry.locks[targetVolId]) {
+                           val files = ContainerSessionRegistry.locks[targetVolId].writeLock().withLock {
                                 ContainerEngine.unlockUsb(
                                     password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
                                     keyfileFds = keyfileFds, readOnly = readOnly
@@ -1230,7 +1233,7 @@ class MainActivity : FlutterFragmentActivity() {
                                 Log.i("VaultExplorer_C++", "File unlock using ${keyfileFds.size} keyfile(s)")
                             }
 
-                            val files = synchronized(ContainerSessionRegistry.locks[targetVolId]) {
+                           val files = ContainerSessionRegistry.locks[targetVolId].writeLock().withLock {
                                 ContainerEngine.unlockFile(fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds, readOnly)
                             }
 
@@ -1510,7 +1513,7 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                     ioExecutor.execute {
                         try {
-                            val success = synchronized(ContainerSessionRegistry.locks[volId]) {
+                           val success = ContainerSessionRegistry.locks[volId].writeLock().withLock {
                                 ContainerEngine.finishWrite(path, volId)
                             }
                             runOnUiThread { result.success(success) }
@@ -1778,13 +1781,14 @@ class MainActivity : FlutterFragmentActivity() {
                                     return@execute
                                 }
 
-                            val inputStream = VeraCryptInputStream(this, uriString, fileName, volId)
+                            // Use BufferedInputStream to drastically reduce JNI read calls during decoding.
+                            var inputStream = BufferedInputStream(VeraCryptInputStream(this, uriString, fileName, volId), 65536)
                             
                             val options = BitmapFactory.Options().apply {
                                 inJustDecodeBounds = true
                             }
                             BitmapFactory.decodeStream(inputStream, null, options)
-                            inputStream.reset()
+                            inputStream.close()
 
                             val width = options.outWidth
                             val height = options.outHeight
@@ -1794,6 +1798,9 @@ class MainActivity : FlutterFragmentActivity() {
                             val decodeOptions = BitmapFactory.Options().apply {
                                 this.inSampleSize = inSampleSize
                             }
+                            
+                            // Re-open fresh stream for full decode to prevent OutOfMemory on huge images
+                            inputStream = BufferedInputStream(VeraCryptInputStream(this, uriString, fileName, volId), 65536)
                             val rawBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
                             inputStream.close()
 
@@ -1904,7 +1911,7 @@ class MainActivity : FlutterFragmentActivity() {
                         val session = ContainerSessionRegistry.activeSessions[volId]
                         ioExecutor.execute {
                             try {
-                                synchronized(ContainerSessionRegistry.locks[volId]) {
+                                ContainerSessionRegistry.locks[volId].writeLock().withLock {
                                     ContainerEngine.lock(volId)
                                 }
                                 if (session?.isUsbSource == true) {

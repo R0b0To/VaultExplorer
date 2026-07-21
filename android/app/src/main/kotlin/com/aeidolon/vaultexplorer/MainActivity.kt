@@ -122,6 +122,16 @@ class MainActivity : FlutterFragmentActivity() {
     // Warm Thread Pool to process I/O tasks dynamically without thread-spawning latency
     private val ioExecutor = Executors.newFixedThreadPool(4)
 
+    // Dedicated pool for thumbnail generation (image decode, video frame
+    // extraction, AES-GCM encrypt of the result), kept separate from
+    // ioExecutor so bursts of thumbnail work (grid scroll, playlist
+    // carousel) can't queue up mounts, directory listing, or file
+    // read/write behind them. Sized at 3 to match the Dart-side thumbnail
+    // concurrency budget (2 images + 1 video, see ThumbnailConcurrency in
+    // async_thumbnail.dart) so requests that clear the Dart-side limiter
+    // don't then queue again here.
+    private val thumbnailExecutor = Executors.newFixedThreadPool(3)
+
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
 
@@ -1707,7 +1717,7 @@ class MainActivity : FlutterFragmentActivity() {
                         return@setMethodCallHandler
                     }
 
-                    ioExecutor.execute {
+                    thumbnailExecutor.execute {
                         var retriever: MediaMetadataRetriever? = null
                         try {
                             val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
@@ -1773,7 +1783,7 @@ class MainActivity : FlutterFragmentActivity() {
                         return@setMethodCallHandler
                     }
 
-                    ioExecutor.execute {
+                    thumbnailExecutor.execute {
                         try {
                             val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                                 ?: run {

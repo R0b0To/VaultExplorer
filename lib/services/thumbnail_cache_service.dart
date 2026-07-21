@@ -48,6 +48,14 @@ class ThumbnailCacheService {
   /// [compute()] to avoid blocking the UI thread.
   static const _computeThresholdBytes = 500 * 1024; // 500 KB
 
+  /// Read length used for in-container cache lookups. Thumbnails are always
+  /// small JPEGs (a few KB to a few hundred KB), so this is deliberately
+  /// generous headroom, not an expected size — native clamps to however many
+  /// bytes the file actually contains (or returns null/empty on a miss), so
+  /// this lets [get] skip a separate getFileSize() round trip entirely
+  /// without risking a truncated read.
+  static const _inContainerReadCap = 8 * 1024 * 1024; // 8 MB
+
   // ── Tier 1: static in-memory LRU ──────────────────────────────────────────
   static final _memoryCache = LruCache<String, Uint8List>(120);
 
@@ -231,13 +239,14 @@ class ThumbnailCacheService {
         return decrypted;
       } else {
         final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
-        final size = await vaultExplorerApi.getFileSize(container, cachePath);
-        if (size <= 0) return null;
+        // Single round trip instead of getFileSize() + readFileChunk(): a
+        // miss (file doesn't exist) comes back null/empty either way, and a
+        // hit is always far smaller than _inContainerReadCap.
         final bytes = await vaultExplorerApi.readFileChunk(
           container,
           cachePath,
           0,
-          size,
+          _inContainerReadCap,
         );
         if (bytes != null && bytes.isNotEmpty) {
           putInMemory(container, filePath, bytes);
@@ -347,8 +356,14 @@ static Future<void> put({
       await _ensuredThumbDirs[uriStr];
       
       final ok = await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, data);
-      await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
-      
+      // finishWriteIfCryptomator() is a documented no-op for every format
+      // except Cryptomator (which needs it to flush the buffered final
+      // chunk) — skip the round trip for gocryptfs/VeraCrypt/LUKS, which is
+      // the common case, instead of paying for a call that just no-ops.
+      if (container.containerFormat == 'cryptomator') {
+        await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
+      }
+
       if (ok) {
         // You may still need to delete the target file here depending on whether 
         // vaultExplorerApi.renameFile supports overwriting existing files.

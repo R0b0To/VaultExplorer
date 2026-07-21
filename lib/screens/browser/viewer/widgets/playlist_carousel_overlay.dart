@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '/../../models/mounted_container.dart';
@@ -6,39 +5,8 @@ import '/../../models/thumbnail_cache_mode.dart';
 import '/../../models/thumbnail_quality.dart';
 import '/../../services/thumbnail_cache_service.dart';
 import '/../../services/vaultexplorer_api.dart';
+import '/../../widgets/async_thumbnail.dart';
 import '../media_viewer_constants.dart';
-
-/// Limits concurrent thumbnail tasks so we don't exhaust the native 
-/// ioExecutor thread pool, leaving threads free for the media player.
-class _ThumbnailSemaphore {
-  final int maxConcurrent;
-  int _current = 0;
-  final List<Completer<void>> _queue = [];
-
-  _ThumbnailSemaphore(this.maxConcurrent);
-
-  Future<void> acquire() async {
-    if (_current < maxConcurrent) {
-      _current++;
-      return;
-    }
-    final completer = Completer<void>();
-    _queue.add(completer);
-    return completer.future;
-  }
-
-  void release() {
-    if (_queue.isNotEmpty) {
-      final completer = _queue.removeAt(0);
-      completer.complete();
-    } else {
-      _current--;
-    }
-  }
-}
-
-// Cap to 1 so the Android ioExecutor (size 4) always has 3 threads free for the player.
-final _ThumbnailSemaphore _thumbSemaphore = _ThumbnailSemaphore(1);
 
 /// A bottom-anchored strip of thumbnails for the active playlist. Lets the
 /// user scroll through every item at a glance and tap one to jump straight
@@ -281,7 +249,13 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   }
 }
 
-class _CarouselThumb extends StatefulWidget {
+/// Renders a single playlist tile's thumbnail via the shared [AsyncThumbnail]
+/// machinery — the same concurrency limiters, in-flight de-duplication, and
+/// debounce that [FileGridView]'s thumbnails already use, and in fact the
+/// *same* limiter/cache instances, so a fetch kicked off from the grid and
+/// one kicked off from here for the same file collapse into a single native
+/// call instead of racing each other.
+class _CarouselThumb extends StatelessWidget {
   final MountedContainer container;
   final String fileName;
   final ThumbnailQuality thumbnailQuality;
@@ -295,108 +269,95 @@ class _CarouselThumb extends StatefulWidget {
     required this.thumbnailCacheMode,
   });
 
-  @override
-  State<_CarouselThumb> createState() => _CarouselThumbState();
-}
+  static Future<Uint8List> _fetchImage(
+    MountedContainer container,
+    String path,
+    ThumbnailQuality quality,
+    ThumbnailCacheMode mode,
+  ) async {
+    if (mode != ThumbnailCacheMode.disabled) {
+      final cached = await ThumbnailCacheService.get(
+        container: container,
+        filePath: path,
+        mode: mode,
+      );
+      if (cached != null && cached.isNotEmpty) return cached;
+    }
 
-class _CarouselThumbState extends State<_CarouselThumb> {
-  Uint8List? _bytes;
-  bool _failed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Same in-memory cache the file grid populates — if the grid (or an
-    // earlier carousel pass) already fetched this thumbnail, show it
-    // immediately instead of kicking off a fresh fetch/generation.
-    final cached = ThumbnailCacheService.getFromMemory(
-      widget.container,
-      widget.fileName,
+    final scaledTargetSize = quality.scaledSize(
+      MediaViewerConstants.carouselThumbnailTargetSize,
     );
-    if (cached != null && cached.isNotEmpty) {
-      _bytes = cached;
-    } else {
-      _load();
+    final data = await vaultExplorerApi.getImageThumbnail(
+      container,
+      path,
+      targetSize: scaledTargetSize,
+      quality: quality.jpegQuality,
+    );
+    if (data == null || data.isEmpty) {
+      throw Exception('Empty image thumbnail: $path');
     }
+
+    ThumbnailCacheService.putInMemory(container, path, data);
+    if (mode != ThumbnailCacheMode.disabled) {
+      unawaited(
+        ThumbnailCacheService.put(
+          container: container,
+          filePath: path,
+          data: data,
+          mode: mode,
+        ),
+      );
+    }
+    return data;
   }
 
-  Future<void> _load() async {
-    final target = widget.fileName;
-    if (MediaViewerConstants.isAudio(target)) return;
-
-    await _thumbSemaphore.acquire();
-    try {
-      // If the user scrolled fast, this widget might have been disposed 
-      // while waiting in the queue. Skip heavy work if so!
-      if (!mounted) return;
-
-      Uint8List? data;
-
-      if (widget.thumbnailCacheMode != ThumbnailCacheMode.disabled) {
-        final cached = await ThumbnailCacheService.get(
-          container: widget.container,
-          filePath: target,
-          mode: widget.thumbnailCacheMode,
-        );
-        if (cached != null && cached.isNotEmpty) {
-          data = cached;
-        }
-      }
-
-      if (!mounted) return; // double check before API call
-
-      if (data == null || data.isEmpty) {
-        final scaledTargetSize = widget.thumbnailQuality.scaledSize(
-          MediaViewerConstants.carouselThumbnailTargetSize,
-        );
-
-        if (MediaViewerConstants.isImage(target)) {
-          data = await vaultExplorerApi.getImageThumbnail(
-            widget.container,
-            target,
-            targetSize: scaledTargetSize, // Scaled size
-            quality: widget.thumbnailQuality.jpegQuality,
-          );
-        } else if (MediaViewerConstants.isVideo(target)) {
-          data = await vaultExplorerApi.getVideoThumbnail(
-            widget.container,
-            target,
-            quality: widget.thumbnailQuality.jpegQuality,
-            targetSize: scaledTargetSize, // Scaled size
-          );
-        }
-
-        if (data != null && data.isNotEmpty) {
-          ThumbnailCacheService.putInMemory(widget.container, target, data);
-          if (widget.thumbnailCacheMode != ThumbnailCacheMode.disabled) {
-            unawaited(
-              ThumbnailCacheService.put(
-                container: widget.container,
-                filePath: target,
-                data: data,
-                mode: widget.thumbnailCacheMode,
-              ),
-            );
-          }
-        }
-      }
-
-      if (!mounted) return;
-      if (data != null && data.isNotEmpty) {
-        setState(() => _bytes = data);
-      } else {
-        setState(() => _failed = true);
-      }
-    } catch (e) {
-      if (mounted) setState(() => _failed = true);
-    } finally {
-      _thumbSemaphore.release();
+  static Future<Uint8List> _fetchVideo(
+    MountedContainer container,
+    String path,
+    ThumbnailQuality quality,
+    ThumbnailCacheMode mode,
+  ) async {
+    if (mode != ThumbnailCacheMode.disabled) {
+      final cached = await ThumbnailCacheService.get(
+        container: container,
+        filePath: path,
+        mode: mode,
+      );
+      if (cached != null && cached.isNotEmpty) return cached;
     }
+
+    final scaledTargetSize = quality.scaledSize(
+      MediaViewerConstants.carouselThumbnailTargetSize,
+    );
+    final data = await vaultExplorerApi.getVideoThumbnail(
+      container,
+      path,
+      quality: quality.jpegQuality,
+      targetSize: scaledTargetSize,
+    );
+    if (data == null || data.isEmpty) {
+      throw Exception('Empty video thumbnail: $path');
+    }
+
+    ThumbnailCacheService.putInMemory(container, path, data);
+    if (mode != ThumbnailCacheMode.disabled) {
+      unawaited(
+        ThumbnailCacheService.put(
+          container: container,
+          filePath: path,
+          data: data,
+          mode: mode,
+        ),
+      );
+    }
+    return data;
   }
-  
+
   @override
   Widget build(BuildContext context) {
-    if (MediaViewerConstants.isAudio(widget.fileName)) {
+    // Audio has no thumbnail concept — skip the async machinery entirely
+    // rather than kicking off a fetch that immediately no-ops.
+    if (MediaViewerConstants.isAudio(fileName)) {
       return Container(
         color: const Color(0xFF161B22),
         child: const Center(
@@ -405,12 +366,34 @@ class _CarouselThumbState extends State<_CarouselThumb> {
       );
     }
 
-    if (_bytes != null) {
-      return Stack(
+    final isVideo = MediaViewerConstants.isVideo(fileName);
+    final scaledSize = thumbnailQuality.scaledSize(
+      MediaViewerConstants.carouselThumbnailTargetSize,
+    );
+
+    return AsyncThumbnail(
+      key: ValueKey('carousel:$fileName'),
+      container: container,
+      filePath: fileName,
+      // Shared with FileGridView: same limiter (2 images / 1 video, so a
+      // slow video decode can't block image thumbnails queued behind it)
+      // and same in-flight cache (so grid + carousel de-dupe requests for
+      // the same file instead of each firing their own native call).
+      cache: isVideo ? ThumbnailConcurrency.videoCache : ThumbnailConcurrency.imageCache,
+      limiter: isVideo ? ThumbnailConcurrency.videoLimiter : ThumbnailConcurrency.imageLimiter,
+      fetchFn: (c, p) => isVideo
+          ? _fetchVideo(c, p, thumbnailQuality, thumbnailCacheMode)
+          : _fetchImage(c, p, thumbnailQuality, thumbnailCacheMode),
+      debounce: isVideo
+          ? const Duration(milliseconds: 150)
+          : const Duration(milliseconds: 100),
+      syncLookup: () => ThumbnailCacheService.getFromMemory(container, fileName),
+      cacheHeight: scaledSize,
+      imageBuilder: (context, bytes, cacheHeight) => Stack(
         fit: StackFit.expand,
         children: [
-          Image.memory(_bytes!, fit: BoxFit.cover),
-          if (MediaViewerConstants.isVideo(widget.fileName))
+          Image.memory(bytes, fit: BoxFit.cover, cacheHeight: cacheHeight),
+          if (isVideo)
             const Positioned(
               right: 4,
               bottom: 4,
@@ -421,31 +404,25 @@ class _CarouselThumbState extends State<_CarouselThumb> {
               ),
             ),
         ],
-      );
-    }
-
-    if (_failed) {
-      return Container(
+      ),
+      loadingBuilder: (context) => Container(
+        color: const Color(0xFF161B22),
+        child: const Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white38),
+          ),
+        ),
+      ),
+      errorBuilder: (context) => Container(
         color: const Color(0xFF161B22),
         child: Center(
           child: Icon(
-            MediaViewerConstants.isVideo(widget.fileName)
-                ? Icons.videocam_off_rounded
-                : Icons.broken_image_rounded,
+            isVideo ? Icons.videocam_off_rounded : Icons.broken_image_rounded,
             color: Colors.white38,
             size: 20,
           ),
-        ),
-      );
-    }
-
-    return Container(
-      color: const Color(0xFF161B22),
-      child: const Center(
-        child: SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white38),
         ),
       ),
     );

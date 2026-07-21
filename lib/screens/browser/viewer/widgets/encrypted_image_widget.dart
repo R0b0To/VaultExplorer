@@ -56,34 +56,48 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     final targetFile = widget.fileName;
     _currentlyLoadingFile = targetFile;
 
-    try {
-      final size = await vaultExplorerApi.getFileSize(
-        widget.container,
-        targetFile,
-      );
-      if (size <= 0) throw Exception('File size is empty');
+    int attempts = 0;
+    const maxAttempts = 3;
 
-      final data = await vaultExplorerApi.readFileChunk(
-        widget.container,
-        targetFile,
-        0,
-        size,
-      );
+    while (attempts < maxAttempts) {
+      try {
+        if (!mounted || _currentlyLoadingFile != targetFile) return;
 
-      if (!mounted || _currentlyLoadingFile != targetFile) return;
+        final size = await vaultExplorerApi.getFileSize(
+          widget.container,
+          targetFile,
+        );
+        if (size <= 0) throw Exception('File size is empty');
 
-      if (data == null || data.isEmpty) {
-        throw Exception('File returned no content bytes');
-      }
+        final data = await vaultExplorerApi.readFileChunk(
+          widget.container,
+          targetFile,
+          0,
+          size,
+        );
 
-      setState(() {
-        _bytes = data;
-        _isFullResLoaded = true;
-      });
-    } catch (e) {
-      if (mounted && _currentlyLoadingFile == targetFile && _bytes == null) {
-        setState(() => _error = 'Failed to load encrypted image: $e');
-        widget.onError?.call();
+        if (!mounted || _currentlyLoadingFile != targetFile) return;
+
+        if (data == null || data.isEmpty) {
+          throw Exception('File returned no content bytes');
+        }
+
+        setState(() {
+          _error = null;
+          _bytes = data;
+          _isFullResLoaded = true;
+        });
+        return; // Success
+      } catch (e) {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          if (mounted && _currentlyLoadingFile == targetFile && _bytes == null) {
+            setState(() => _error = 'Failed to load encrypted image: $e');
+            // Deliberately not calling widget.onError to prevent auto-advancing
+          }
+          return;
+        }
+        await Future.delayed(const Duration(milliseconds: 500));
       }
     }
   }
@@ -96,10 +110,30 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: Text(
-            _error!,
-            style: TextStyle(color: cs.error, fontSize: 13),
-            textAlign: TextAlign.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _error!,
+                style: TextStyle(color: cs.error, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _error = null;
+                  });
+                  _loadImage();
+                },
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: cs.errorContainer,
+                  foregroundColor: cs.onErrorContainer,
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -117,6 +151,8 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     return Image.memory(
       _bytes!,
       fit: widget.fit,
+      width: double.infinity,
+      height: double.infinity,
       gaplessPlayback: true, // <--- KEEPS THE THUMBNAIL VISIBLE WHILE DECODING HIGH-RES
       errorBuilder: (context, error, stackTrace) => Center(
         child: Text(

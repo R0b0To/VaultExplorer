@@ -1875,7 +1875,8 @@ class MainActivity : FlutterFragmentActivity() {
                         return@setMethodCallHandler
                     }
 
-                    ioExecutor.execute {
+
+                    thumbnailExecutor.execute {
                         try {
                             val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return@execute
                             val inputStream = VeraCryptInputStream(this, uriString, fileName, volId)

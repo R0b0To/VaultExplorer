@@ -7,6 +7,7 @@ import '/../../models/thumbnail_cache_mode.dart';
 import '/../../models/thumbnail_quality.dart';
 import '/../../services/vaultexplorer_api.dart';
 import '../../../widgets/common_widgets.dart';
+import '../../../services/file_manager_toolbar_service.dart';
 import 'media_viewer_constants.dart';
 import 'playlist_controller.dart';
 import 'video_playback_manager.dart';
@@ -56,6 +57,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _showUI = false;
   int _activeMenuCount = 0;
   bool _isCarouselVisible = false;
+  bool _enableCarousel = true;
 
   late bool _wasEmpty;
 
@@ -108,10 +110,24 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _onActiveVideoControllerChanged,
     );
 
+    _loadConfig();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startSlideshowTimerIfNeeded();
       _prefetchSurroundingItems();
     });
+  }
+
+  Future<void> _loadConfig() async {
+    final config = await FileManagerToolbarService.instance.load();
+    if (mounted) {
+      setState(() {
+        _enableCarousel = config.showMediaCarousel;
+        if (!_enableCarousel) {
+          _isCarouselVisible = false;
+        }
+      });
+    }
   }
 
   GlobalKey _getMediaKey(String fileName) {
@@ -840,30 +856,31 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   onStartHideTimer: _startHideTimer,
                   onShowUIChanged: _setUIVisibility,
                   isCarouselVisible: _isCarouselVisible,
-                  onToggleCarousel: _playlistController.isPlaylistMode ? _toggleCarousel : null,
+                  onToggleCarousel: (_enableCarousel && _playlistController.isPlaylistMode) ? _toggleCarousel : null,
                 );
               },
             ),
           ),
 
-          AnimatedPositioned(
-            duration: MediaViewerConstants.animationDuration,
-            curve: Curves.easeOut,
-            left: 0,
-            right: 0,
-            bottom: (_isCarouselVisible && _showUI)
-                ? 0
-                : -PlaylistCarouselOverlay.height,
-            child: PlaylistCarouselOverlay(
-              container: widget.container,
-              playlist: _playlistController.playlist,
-              currentIndex: _playlistController.currentIndex,
-              thumbnailQuality: widget.thumbnailQuality,
-              thumbnailCacheMode: widget.thumbnailCacheMode,
-              onSelect: _selectFromCarousel,
-              onClose: _toggleCarousel,
+          if (_enableCarousel)
+            AnimatedPositioned(
+              duration: MediaViewerConstants.animationDuration,
+              curve: Curves.easeOut,
+              left: 0,
+              right: 0,
+              bottom: (_isCarouselVisible && _showUI)
+                  ? 0
+                  : -PlaylistCarouselOverlay.height,
+              child: PlaylistCarouselOverlay(
+                container: widget.container,
+                playlist: _playlistController.playlist,
+                currentIndex: _playlistController.currentIndex,
+                thumbnailQuality: widget.thumbnailQuality,
+                thumbnailCacheMode: widget.thumbnailCacheMode,
+                onSelect: _selectFromCarousel,
+                onClose: _toggleCarousel,
+              ),
             ),
-          ),
         ],
       ),
     );

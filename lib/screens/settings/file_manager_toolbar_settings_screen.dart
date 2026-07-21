@@ -187,6 +187,30 @@ class _FileManagerToolbarSettingsScreenState
                     ],
                   ),
                 ),
+                const SizedBox(height: 24),
+                Text(
+                  'Media Viewer',
+                  style: textTheme.titleSmall?.copyWith(color: cs.primary),
+                ),
+                const SizedBox(height: 8),
+                Card(
+                  color: cs.surfaceContainerLow,
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        value: _config.showMediaCarousel,
+                        onChanged: (v) {
+                          setState(() => _config = _config.copyWith(showMediaCarousel: v));
+                          _persist();
+                        },
+                        title: const Text('Show Playlist Carousel'),
+                        subtitle: const Text('Show the thumbnail carousel button in the media viewer when playing multiple files.'),
+                        secondary: Icon(Icons.view_carousel_rounded, color: cs.primary),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
     );

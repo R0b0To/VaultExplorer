@@ -13,12 +13,14 @@ class FileManagerToolbarConfig {
   final Set<FileManagerAction> hidden;
   final bool showBreadcrumbBar;
   final bool showStatsBar;
+  final bool showMediaCarousel;
 
   const FileManagerToolbarConfig({
     required this.order,
     required this.hidden,
     this.showBreadcrumbBar = true,
     this.showStatsBar = true,
+    this.showMediaCarousel = true,
   });
 
   /// Default toolbar: every action visible, in a sensible default order.
@@ -33,6 +35,7 @@ class FileManagerToolbarConfig {
         hidden: {},
         showBreadcrumbBar: true,
         showStatsBar: true,
+        showMediaCarousel: true,
       );
 
   /// Actions to actually render, in display order, with hidden ones removed.
@@ -44,12 +47,14 @@ class FileManagerToolbarConfig {
     Set<FileManagerAction>? hidden,
     bool? showBreadcrumbBar,
     bool? showStatsBar,
+    bool? showMediaCarousel,
   }) =>
       FileManagerToolbarConfig(
         order: order ?? this.order,
         hidden: hidden ?? this.hidden,
         showBreadcrumbBar: showBreadcrumbBar ?? this.showBreadcrumbBar,
         showStatsBar: showStatsBar ?? this.showStatsBar,
+        showMediaCarousel: showMediaCarousel ?? this.showMediaCarousel,
       );
 
   Map<String, dynamic> toJson() => {
@@ -57,6 +62,7 @@ class FileManagerToolbarConfig {
         'hidden': hidden.map((a) => a.toJson()).toList(),
         'showBreadcrumbBar': showBreadcrumbBar,
         'showStatsBar': showStatsBar,
+        'showMediaCarousel': showMediaCarousel,
       };
 
   factory FileManagerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -85,6 +91,7 @@ class FileManagerToolbarConfig {
       hidden: hidden,
       showBreadcrumbBar: j['showBreadcrumbBar'] as bool? ?? true,
       showStatsBar: j['showStatsBar'] as bool? ?? true,
+      showMediaCarousel: j['showMediaCarousel'] as bool? ?? true,
     );
   }
 }

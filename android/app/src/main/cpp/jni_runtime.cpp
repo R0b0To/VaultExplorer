@@ -41,8 +41,10 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     }
     g_progressBridgeClass = static_cast<jclass>(env->NewGlobalRef(progressLocal));
     env->DeleteLocalRef(progressLocal);
+    
+    // Updated signature to take 7 integers (including slotId)
     g_progressReportMethod = env->GetStaticMethodID(
-        g_progressBridgeClass, "reportProgress", "(IIIIII)V");
+        g_progressBridgeClass, "reportProgress", "(IIIIIII)V");
     if (!g_progressReportMethod) {
         LOGI("JNI_OnLoad: UnlockProgressBridge.reportProgress not found");
         return JNI_ERR;
@@ -64,12 +66,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     g_unlockCancelledExceptionClass = static_cast<jclass>(env->NewGlobalRef(uceLocal));
     env->DeleteLocalRef(uceLocal);
 
-    // Pre-warm the shared KDF worker pool now, during library load, instead
-    // of paying OS thread-spawn cost (roughly 5-30 ms across
-    // hardware_concurrency() threads, depending on device) during the
-    // user's first unlock attempt. This runs well before the user can
-    // possibly reach the unlock screen, so it's effectively free from
-    // their perspective.
     ThreadPool::getInstance();
 
     return JNI_VERSION_1_6;

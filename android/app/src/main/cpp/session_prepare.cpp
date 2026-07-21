@@ -10,7 +10,6 @@
 #include <memory>
 #include <mutex>
 #include <sys/stat.h>
-#include <thread>
 #include <unistd.h>
 #include <vector>
 
@@ -30,8 +29,6 @@
 #include "jni_callbacks.h"
 #include "volume_state.h"
 
-// volume_state.h pulls in NTFS-3G's headers, which #define raw min/max
-// macros (support.h) that clobber every std::min/std::max call below.
 #undef min
 #undef max
 
@@ -48,8 +45,6 @@ struct PartitionCandidate {
     uint64_t startSector;
     uint64_t sectorCount;
 };
-
-// ── Per-volume unlock cancellation ──────────────────────────────────────
 
 static std::atomic<bool> cancelRequested[MAX_VOLUMES];
 
@@ -100,14 +95,6 @@ static bool tryDecryptHeader(
             blockCipherDecryptBlock(layer.dataKeyDec, tmp, tmp);
             for (int j = 0; j < 16; j++) blockPtr[j] = tmp[j] ^ T[j];
 
-            // Only the FINAL cascade layer (i == spec.layerCount - 1) ever
-            // produces the real header plaintext at block 0 — for
-            // single-layer ciphers (AES/Serpent/... alone) that's every
-            // call, so bail here instead of decrypting the remaining 27
-            // blocks of a combination we already know is wrong. Earlier
-            // layers (i < layerCount - 1) must always run to completion:
-            // their block 0 is only an intermediate cascade state, not
-            // plaintext, so checking it here would be meaningless.
             if (block == 0 && i == spec.layerCount - 1 &&
                 (blockPtr[0] != 'V' || blockPtr[1] != 'E' || blockPtr[2] != 'R' || blockPtr[3] != 'A')) {
                 return false;
@@ -145,14 +132,11 @@ static bool tryDecryptHeader(
     return true;
 }
 
-// VeraCrypt's Argon2id header KDF always emits 192 bytes.  Argon2 output is
-// length-sensitive, so deriving only a cascade's first 64/128 bytes would not
-// match an official VeraCrypt volume.
 bool deriveHeaderKey(HashId hash,
-                            const unsigned char* password, size_t passwordLen,
-                            const unsigned char* salt, int clampedPim,
-                            unsigned char* out, size_t outLen,
-                            const std::atomic<bool>* abortFlag) {
+                     const unsigned char* password, size_t passwordLen,
+                     const unsigned char* salt, int clampedPim,
+                     unsigned char* out, size_t outLen,
+                     std::function<bool()> cancelCheck) {
     if (hash == HashId::kArgon2id) {
         if (outLen != 192) return false;
         uint32_t memoryKiB = 0;
@@ -163,22 +147,23 @@ bool deriveHeaderKey(HashId hash,
                                  memoryKiB, timeCost, parallelism, out, outLen);
     }
     return pbkdf2Hmac(hash, password, passwordLen, salt, VC_SALT_SIZE,
-                       iterationsForHash(hash, clampedPim), out, outLen, abortFlag);
+                       iterationsForHash(hash, clampedPim), out, outLen, cancelCheck);
 }
 
 std::mutex derivationMutexes[MAX_VOLUMES];
+
 bool deriveAndValidateHeader(
     const unsigned char headerSector[VC_FULL_HEADER_SIZE],
     const unsigned char* password, size_t passwordLen, int pim,
     int cipherIdParam, int hashIdParam,
     unsigned char outKeyMaterial[192],
-    unsigned char outDecryptedHeader[VC_HEADER_BODY_SIZE], // Out parameter filled with the decrypted header body on success.
+    unsigned char outDecryptedHeader[VC_HEADER_BODY_SIZE], 
     CascadeId& outMatchedCipher,
     HashId& outMatchedHash,
     ParsedHeaderFields& outFields,
     int volId,
-    const std::atomic<bool>* externalAbort
-
+    std::atomic<bool>* externalAbort,
+    int slotId
 ) {
     const auto timingStart = std::chrono::steady_clock::now();
     const unsigned char* salt = headerSector;
@@ -219,11 +204,13 @@ bool deriveAndValidateHeader(
 
     if (isUnlockCancelled(volId)) return false;
 
-    reportUnlockProgress(volId, 0, totalHashSteps,
-                          static_cast<int>(hashesToTry.front()),
-                          static_cast<int>(ciphersToTry.front()));
-
-    if (isUnlockCancelled(volId)) return false;
+    // Split hashes into Fast (PBKDF2) and Slow (Argon2id).
+    std::vector<HashId> fastHashes;
+    std::vector<HashId> slowHashes;
+    for (HashId h : hashesToTry) {
+        if (h == HashId::kArgon2id) slowHashes.push_back(h);
+        else fastHashes.push_back(h);
+    }
 
     std::atomic<bool> found{false};
     std::atomic<int> combinationsAttempted{0};
@@ -239,35 +226,40 @@ bool deriveAndValidateHeader(
     }
     const size_t neededKeyBytes = static_cast<size_t>(maxLayersToTry) * 64;
 
-    auto externallyAborted = [externalAbort]() {
-        return externalAbort != nullptr && externalAbort->load(std::memory_order_acquire);
-    };
-
     auto worker = [&](HashId h) {
-        if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId) || externallyAborted()) return;
+        auto cancelCheck = [&found, volId, externalAbort]() -> bool {
+            return found.load(std::memory_order_relaxed) || 
+                   isUnlockCancelled(volId) || 
+                   (externalAbort != nullptr && externalAbort->load(std::memory_order_relaxed));
+        };
+
+        if (cancelCheck()) return;
 
         unsigned char derivedKeyMaterial[192] = {0};
 
-        // Argon2id's 192-byte header key is intentionally derived in full;
-        // PBKDF2 only needs the longest selected cascade's key material.
+        reportUnlockProgress(volId, combinationsAttempted.load(), totalHashSteps,
+                             static_cast<int>(h), 255, 0, slotId);
+
         const size_t outputBytes = h == HashId::kArgon2id ? 192 : neededKeyBytes;
         if (!deriveHeaderKey(h, password, passwordLen, salt, safePim,
-                             derivedKeyMaterial, outputBytes, &found)) {
-            reportUnlockProgress(volId, combinationsAttempted.fetch_add(1) + 1, totalHashSteps,
-                                 static_cast<int>(h), -1);
+                             derivedKeyMaterial, outputBytes, cancelCheck)) {
+            combinationsAttempted.fetch_add(1);
             return;
         }
 
-        if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId) || externallyAborted()) {
+        if (cancelCheck()) {
             mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
             return;
         }
 
         unsigned char decH[VC_HEADER_BODY_SIZE];
-        int lastCipherTried = -1;
         for (CascadeId c : ciphersToTry) {
-            if (found.load(std::memory_order_acquire) || isUnlockCancelled(volId) || externallyAborted()) break;
-            lastCipherTried = static_cast<int>(c);
+            if (cancelCheck()) break;
+            
+            // Push granular UI updates per-cipher tested.
+            reportUnlockProgress(volId, combinationsAttempted.load(), totalHashSteps,
+                                 static_cast<int>(h), static_cast<int>(c), 0, slotId);
+                                 
             ParsedHeaderFields candidateFields;
             if (tryDecryptHeader(encH, c, derivedKeyMaterial, decH, &candidateFields)) {
                 bool expected = false;
@@ -278,28 +270,34 @@ bool deriveAndValidateHeader(
                     resultCipher = c;
                     resultHash = h;
                     resultFields = candidateFields;
+                    if (externalAbort) externalAbort->store(true, std::memory_order_release);
                 }
                 mbedtls_platform_zeroize(decH, sizeof(decH));
                 mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
-                reportUnlockProgress(volId, combinationsAttempted.fetch_add(1) + 1, totalHashSteps,
-                                     static_cast<int>(h), lastCipherTried);
+                combinationsAttempted.fetch_add(1);
                 return;
             }
         }
         mbedtls_platform_zeroize(derivedKeyMaterial, sizeof(derivedKeyMaterial));
-        reportUnlockProgress(volId, combinationsAttempted.fetch_add(1) + 1, totalHashSteps,
-                             static_cast<int>(h), lastCipherTried);
+        combinationsAttempted.fetch_add(1);
     };
 
-    if (hashesToTry.size() <= 1) {
-        worker(hashesToTry[0]);
-    } else {
-        std::vector<std::future<void>> futures;
-        futures.reserve(hashesToTry.size());
-        for (HashId h : hashesToTry) {
-            futures.push_back(ThreadPool::getInstance().enqueue(worker, h));
+    if (!fastHashes.empty()) {
+        std::vector<std::future<void>> fastFutures;
+        fastFutures.reserve(fastHashes.size());
+        for (HashId h : fastHashes) {
+            fastFutures.push_back(ThreadPool::getInstance().enqueue(worker, h));
         }
-        for (auto& f : futures) f.get();
+        for (auto& f : fastFutures) f.get();
+    }
+
+    if (!found.load(std::memory_order_acquire) && !slowHashes.empty() && !isUnlockCancelled(volId) && !(externalAbort && externalAbort->load())) {
+        std::vector<std::future<void>> slowFutures;
+        slowFutures.reserve(slowHashes.size());
+        for (HashId h : slowHashes) {
+            slowFutures.push_back(ThreadPool::getInstance().enqueue(worker, h));
+        }
+        for (auto& f : slowFutures) f.get();
     }
 
     if (!found.load(std::memory_order_acquire)) {
@@ -332,13 +330,6 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
 
     VolumeState& v = volumes[volId];
 
-    // ── Passphrase resolution. Real LUKS (cryptsetup) treats a keyfile as a
-    // *replacement* for the typed passphrase, not an additive mix-in the way
-    // VeraCrypt's keyfile pool works here — a keyslot is unlocked by EITHER
-    // a password OR a keyfile, never both combined. If a keyfile is
-    // attached, its raw bytes become the passphrase and the typed password
-    // is ignored, matching `cryptsetup --key-file`. Only the first attached
-    // keyfile is used. ──
     std::vector<unsigned char> keyfileBuf;
     const unsigned char* effectivePassword = password;
     size_t effectivePasswordLen = passwordLen;
@@ -374,8 +365,8 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         return isUnlockCancelled(volId);
     };
     auto progressCb = [volId](int step, int total, int hashId, int cipherId) {
-        int format = (cipherId == 1) ? 2 : 1; // 1 = FMT_LUKS1, 2 = FMT_LUKS2
-        reportUnlockProgress(volId, step, total, hashId, 0, format);
+        int format = (cipherId == 1) ? 2 : 1; 
+        reportUnlockProgress(volId, step, total, hashId, 255, format, 0);
     };
 
     const bool usingPreservedKey = (preservedKey != nullptr && preservedKeyLen > 0);
@@ -390,8 +381,6 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         return false;
     }
 
-    // Only xts-plain64 is implemented on the sector-crypto side below —
-    // refuse rather than silently mounting something we'd decrypt wrong.
     if (luksInfo.cipherMode.rfind("xts-plain64", 0) != 0) {
         LOGI("prepareLuksSession(vol=%d): unsupported cipher mode '%s'", volId, luksInfo.cipherMode.c_str());
         mbedtls_platform_zeroize(luksInfo.masterKey.data(), luksInfo.masterKey.size());
@@ -400,14 +389,6 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         return false;
     }
 
-    // Maps the LUKS header's plain-text cipher name to this app's CascadeId
-    // — the same canonical numbering Dart's CipherAlgo/crypto_algorithms.dart
-    // uses, so matchedCipherId reports consistently whether the session
-    // came from VeraCrypt or LUKS. Only single-layer ciphers make sense
-    // here: dm-crypt/LUKS has no concept of a cascade (one segment maps to
-    // exactly one dm-crypt cipher spec), unlike VeraCrypt's
-    // AES-Twofish-Serpent-style stacks — cryptsetup itself has no way to
-    // express those, so they were never real LUKS options to begin with.
     CascadeId dataCipher;
     if (luksInfo.cipherName == "aes") dataCipher = CascadeId::kAes;
     else if (luksInfo.cipherName == "serpent") dataCipher = CascadeId::kSerpent;
@@ -423,11 +404,6 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
     }
     int mappedHash = 0; // kSha512, display-only for LUKS
 
-    // Cipher dispatch: AES gets mbedTLS's accelerated XTS directly (as
-    // before); every other single-layer cipher cryptsetup commonly pairs
-    // with xts-plain64 — Serpent/Twofish/Camellia/Kuznyechik — goes through
-    // the same single-layer CascadeContext machinery the VeraCrypt cascade
-    // path already uses, via cascadeSetKeys(..., dataCipher, ...).
     const bool isGenericCipher = (dataCipher != CascadeId::kAes);
     CascadeContext genericCascade;
 
@@ -468,12 +444,6 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         v.luksUsesGenericCipher = isGenericCipher;
         v.readOnly = readOnly;
         
-        // Both LUKS1 and LUKS2 use segment-relative tweak counters on Linux (iv_offset == 0).
-        // The segment's "iv_tweak" (always 0 for LUKS1) is added to a counter that starts at 0
-        // at the FIRST sector of the payload. Folding both the payload offset and iv_tweak
-        // into partitionStartSector lets disk_read/disk_write's existing
-        // "physSector - partitionStartSector" arithmetic land on the correct dm-crypt sector value:
-        //   (physSector - segmentStartSector) / sectorsPerUnit + ivTweak
         const uint64_t segmentStartSector = luksInfo.dataOffsetBytes / 512;
         const uint64_t sectorsPerUnit = v.luksSectorSize / 512;
         v.partitionStartSector = segmentStartSector - (luksInfo.ivTweak * sectorsPerUnit);
@@ -489,10 +459,6 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         }
         v.dataCtxInitialized = true;
 
-        // Cache the recovered master key for quick-unlock — same
-        // preservedDerivedKey slot VeraCrypt uses, read by
-        // getLastDerivedKeyMaterialNative() and reused via
-        // luksRecoverMasterKey's candidateMasterKey fast path above.
         if (v.preservedDerivedKey) delete[] v.preservedDerivedKey;
         v.preservedDerivedKey = new unsigned char[luksInfo.masterKey.size()];
         memcpy(v.preservedDerivedKey, luksInfo.masterKey.data(), luksInfo.masterKey.size());
@@ -528,7 +494,6 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     struct stat st;
     if (fstat(fd, &st) == 0) fileSize = static_cast<uint64_t>(st.st_size);
 
-    // ── LUKS detection ────────────────────────────────────────────────────
     {
         unsigned char magicBuf[6];
         if (pread(fd, magicBuf, 6, 0) == 6 && isLuksContainer(magicBuf, 6)) {
@@ -565,9 +530,6 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     }
 
     if (usingPreservedKey) {
-        // Quick-unlock candidate check is a single decrypt attempt per
-        // slot (no PBKDF2/Argon2) -- sub-millisecond, not worth
-        // parallelizing.
         for (const auto& slot : kHeaderSlots) {
             unsigned char headerSector[VC_FULL_HEADER_SIZE];
             if (pread(fd, headerSector, VC_FULL_HEADER_SIZE, static_cast<off_t>(slot.fileOffset)) != VC_FULL_HEADER_SIZE) continue;
@@ -586,15 +548,6 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
             }
         }
     } else {
-        // Full auto-detect sweep is expensive (PBKDF2/Argon2 x every hash
-        // x every cipher). Previously this ran against slot 0 to
-        // exhaustion before EVER trying slot 1 -- doubling worst-case
-        // latency for hidden-volume owners and any first-time unlock with
-        // an unknown cipher/hash. Both slots are read up front and
-        // searched concurrently here (plain pread, trivially safe to
-        // parallelize -- unlike USB reads, no shared-connection protocol
-        // to corrupt), sharing `slotAbort` so whichever slot's password
-        // matches first tells the other to stop starting new combinations.
         struct SlotReadResult { bool ok = false; unsigned char sector[VC_FULL_HEADER_SIZE]; };
         SlotReadResult reads[2];
         for (size_t i = 0; i < 2; i++) {
@@ -602,7 +555,6 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
                                  static_cast<off_t>(kHeaderSlots[i].fileOffset)) == VC_FULL_HEADER_SIZE;
         }
 
-        std::atomic<bool> slotAbort{false};
         struct SlotResult {
             bool matched = false;
             unsigned char dKey[192];
@@ -611,33 +563,29 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
             HashId matchedHash{};
             ParsedHeaderFields fields;
         };
-        SlotResult results[2];
 
-        auto trySlot = [&](size_t i) {
-            if (!reads[i].ok) return;
-            results[i].matched = deriveAndValidateHeader(
+        // Sequential, standard-volume-first: deriveAndValidateHeader already fans the
+        // hash/cipher combinations for a single slot out across the shared ThreadPool.
+        // Running slot 0 (standard) and slot 1 (hidden) concurrently on separate threads
+        // made both calls submit to that same pool at once, so worker threads were handed
+        // out in whatever order the scheduler happened to pick -- the hidden-volume header
+        // could (and often did) get validated before the standard one. Trying the slots one
+        // at a time, standard first, matches VeraCrypt's own mount order and avoids splitting
+        // the pool's threads across two simultaneous derivations.
+        for (size_t i = 0; i < 2 && !matched; i++) {
+            if (!reads[i].ok) continue;
+            SlotResult result;
+            result.matched = deriveAndValidateHeader(
                 reads[i].sector, mixedPassword, mixedPasswordLen, pim, cipherId, hashId,
-                results[i].dKey, results[i].decH, results[i].matchedCipher,
-                results[i].matchedHash, results[i].fields, volId, &slotAbort);
-            if (results[i].matched) {
-                slotAbort.store(true, std::memory_order_release);
-            }
-        };
-
-        std::thread t1(trySlot, size_t(1));
-        trySlot(0); // slot 0 runs on the calling thread
-        t1.join();
-
-        // Slot 0 wins ties, matching the original slot-order preference.
-        for (size_t i = 0; i < 2; i++) {
-            if (results[i].matched) {
-                memcpy(dKey, results[i].dKey, 192);
-                memcpy(decH, results[i].decH, VC_HEADER_BODY_SIZE);
-                matchedCipher = results[i].matchedCipher;
-                matchedHash = results[i].matchedHash;
-                fields = results[i].fields;
+                result.dKey, result.decH, result.matchedCipher,
+                result.matchedHash, result.fields, volId, nullptr, i);
+            if (result.matched) {
+                memcpy(dKey, result.dKey, 192);
+                memcpy(decH, result.decH, VC_HEADER_BODY_SIZE);
+                matchedCipher = result.matchedCipher;
+                matchedHash = result.matchedHash;
+                fields = result.fields;
                 matched = true;
-                break;
             }
         }
     }
@@ -658,7 +606,7 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
         std::lock_guard<std::mutex> lock(v.mutex);
         if (v.preservedDerivedKey) delete[] v.preservedDerivedKey;
         v.preservedDerivedKey = new unsigned char[192];
-        memcpy(v.preservedDerivedKey, dKey, 192); // Store PBKDF2 for future "preserved" unlocks
+        memcpy(v.preservedDerivedKey, dKey, 192); 
         v.preservedDerivedKeyLen = 192;
 
         v.cascade = candidateCascade;
@@ -670,17 +618,12 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
         v.fileSize = fileSize;
         v.matchedCipherId = (int)matchedCipher;
         v.matchedHashId = (int)matchedHash;
-        v.partitionStartSector = 0; // For files, absolute tweak = physical sector
+        v.partitionStartSector = 0; 
         v.readOnly = readOnly;
     }
     return true;
 }
 
-// Turns an arbitrary (possibly unaligned) byte range into one or more whole
-// 512-byte usbReadSectors() calls, trimming the result to [byteOffset, len).
-// LUKS header/JSON/AF-material reads aren't always sector-aligned (e.g. the
-// LUKS magic/version check at byte offset 6), unlike VeraCrypt's own header
-// reads which are always a single full sector.
 static bool usbReadBytes(int volId, uint64_t byteOffset, void* outData, size_t len) {
     if (len == 0) return true;
     const uint64_t startSector = byteOffset / 512;
@@ -694,13 +637,6 @@ static bool usbReadBytes(int volId, uint64_t byteOffset, void* outData, size_t l
 }
 
 
-// [partitionStartSector] is the absolute physical sector where this LUKS
-// container begins (already resolved by the caller from the partition
-// table). [partitionSizeBytes] is that partition's total size — LUKS2's
-// "dynamic" segment size has no stored container length the way VeraCrypt's
-// header does, so it's derived from here instead of from device capacity,
-// matching the exact size this app's own createUsbLuksContainer() wrote into
-// the MBR partition entry at creation time.
 static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partitionSizeBytes,
                                    const unsigned char* password, size_t passwordLen, int volId,
                                    const unsigned char* preservedKey, size_t preservedKeyLen,
@@ -708,7 +644,6 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
                                    bool readOnly) {
     VolumeState& v = volumes[volId];
 
-    // Keyfile-replaces-password semantics — identical to prepareLuksSession.
     std::vector<unsigned char> keyfileBuf;
     const unsigned char* effectivePassword = password;
     size_t effectivePasswordLen = passwordLen;
@@ -736,11 +671,6 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
     const uint64_t baseOffset = partitionStartSector * 512;
     auto readMutex = std::make_shared<std::mutex>();
     LuksByteReader reader = [volId, baseOffset, readMutex](uint64_t offset, void* outData, size_t len) -> bool {
-        // usbReadSectors serializes a single mass-storage BOT transaction on
-        // the shared USB connection — unlike pread on a real fd, concurrent
-        // calls from the per-keyslot worker threads inside
-        // luksRecoverMasterKey would interleave CBW/data/CSW phases and
-        // corrupt the protocol, so this reader must serialize itself.
         std::lock_guard<std::mutex> lock(*readMutex);
         return usbReadBytes(volId, baseOffset + offset, outData, len);
     };
@@ -749,7 +679,7 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
     auto cancelCheck = [volId](int) -> bool { return isUnlockCancelled(volId); };
     auto progressCb = [volId](int step, int total, int hashId, int cipherId) {
         int format = (cipherId == 1) ? 2 : 1;
-        reportUnlockProgress(volId, step, total, hashId, 0, format);
+        reportUnlockProgress(volId, step, total, hashId, 255, format, 0);
     };
 
     const bool usingPreservedKey = (preservedKey != nullptr && preservedKeyLen > 0);
@@ -884,11 +814,6 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
                     }
                 }
 
-                // Every container this app creates (writeMbrPartitionTable)
-                // is a plain MBR single partition -- no 0xEE protective-MBR
-                // entry, ever. Only fetch the 32-sector GPT entry array
-                // (an extra full USB BOT transaction) when a drive actually
-                // signals GPT, instead of unconditionally on every unlock.
                 if (isGpt) {
                     std::unique_ptr<unsigned char[]> gptBuf(new unsigned char[33 * 512]);
                     if (usbReadSectors(volId, 1, 33, gptBuf.get())) {
@@ -936,19 +861,9 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
         }
     }
 
-    // ── LUKS detection ────────────────────────────────────────────────────
-    // Checked BEFORE any VeraCrypt-style additive keyfile mixing below —
-    // LUKS keyfile semantics are keyfile-REPLACES-password (handled inside
-    // prepareUsbLuksSession, mirroring prepareLuksSession for file-backed
-    // containers), which the mixing below would otherwise apply wrongly.
     bool keyfilesConsumedByLuks = false;
     for (const auto& part : partitions) {
         if (part.sectorCount == 0) {
-            // Whole-disk fallback / hint-only candidate — no reliable
-            // container size to derive LUKS2's "dynamic" segment length
-            // from. Every LUKS container this app creates always goes
-            // through writeMbrPartitionTable() first, so a real candidate
-            // for this app's own containers always has sectorCount > 0.
             continue;
         }
         unsigned char firstSector[512];
@@ -957,7 +872,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
 
         const int* attemptKeyfileFds = keyfilesConsumedByLuks ? nullptr : keyfileFds;
         const int attemptKeyfileCount = keyfilesConsumedByLuks ? 0 : keyfileCount;
-        keyfilesConsumedByLuks = true; // prepareUsbLuksSession always consumes/closes whatever it's given
+        keyfilesConsumedByLuks = true; 
 
         const uint64_t partitionSizeBytes = part.sectorCount * 512ULL;
         if (prepareUsbLuksSession(part.startSector, partitionSizeBytes,
@@ -968,7 +883,6 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
         }
     }
 
-    // ── VeraCrypt path ──────────────────────────────────────────────────────
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
     size_t mixedPasswordLen = 0;
@@ -1030,7 +944,7 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
                 if (!usbReadSectors(volId, headerSector, 1, headerBuf)) continue;
 
                 derivedSuccessfully = deriveAndValidateHeader(headerBuf, mixedPassword, mixedPasswordLen, pim, cipherId, hashId,
-                                         dKey, decH, matchedCipher, matchedHash, fields, volId);
+                                         dKey, decH, matchedCipher, matchedHash, fields, volId, nullptr, slot.sectorOffset > 0 ? 1 : 0);
             }
 
             if (!derivedSuccessfully) {
@@ -1038,7 +952,6 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
                 continue;
             }
 
-            // Extract Master Key from decH
             CascadeSpec spec = cascadeSpecFor(matchedCipher);
             const unsigned char* masterKeyPtr = &decH[VC_KEY_OFFSET_MASTER];
 

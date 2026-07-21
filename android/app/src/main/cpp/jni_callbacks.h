@@ -15,7 +15,7 @@ extern jclass g_illegalStateExceptionClass;
 extern jclass g_unlockCancelledExceptionClass;
 
 void reportUnlockProgress(int volId, int attempted, int total, int hashId,
-                          int cipherId, int format = 0);
+                          int cipherId, int format = 0, int slot = 0);
 bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount,
                     unsigned char* outBuf);
 bool usbWriteSectors(int volId, uint64_t startSector, uint32_t sectorCount,

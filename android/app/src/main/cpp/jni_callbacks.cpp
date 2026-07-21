@@ -31,14 +31,14 @@ thread_local ThreadJniEnv g_threadJniEnv;
 } // namespace
 
 void reportUnlockProgress(int volId, int attempted, int total, int hashId,
-                          int cipherId, int format) {
+                          int cipherId, int format, int slot) {
     if (volId < 0) return;
     JNIEnv* env = g_threadJniEnv.get();
     if (!env) return;
     env->CallStaticVoidMethod(
         g_progressBridgeClass, g_progressReportMethod,
         static_cast<jint>(volId), static_cast<jint>(attempted), static_cast<jint>(total),
-        static_cast<jint>(hashId), static_cast<jint>(cipherId), static_cast<jint>(format));
+        static_cast<jint>(hashId), static_cast<jint>(cipherId), static_cast<jint>(format), static_cast<jint>(slot));
     if (env->ExceptionCheck()) env->ExceptionClear();
 }
 

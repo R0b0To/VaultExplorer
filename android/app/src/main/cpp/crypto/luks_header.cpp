@@ -308,7 +308,8 @@ static bool luksDeriveKdfKey(const DigestSpec& spec,
                              const uint8_t* password, size_t passwordLen,
                              const uint8_t* salt, size_t saltLen,
                              uint32_t iterations,
-                             uint8_t* outKey, size_t outKeyLen) {
+                             uint8_t* outKey, size_t outKeyLen,
+                             std::function<bool()> cancelCheck = nullptr) {
     if (spec.backend == HashBackend::kMbedtls) {
         const mbedtls_md_info_t* mdInfo = mbedtls_md_info_from_type(spec.mbedtlsType);
         if (!mdInfo) return false;
@@ -325,20 +326,19 @@ static bool luksDeriveKdfKey(const DigestSpec& spec,
         return ret == 0;
     }
     if (spec.backend == HashBackend::kCustom) {
-        return pbkdf2Hmac(spec.customId, password, passwordLen, salt, saltLen, iterations, outKey, outKeyLen);
+        return pbkdf2Hmac(spec.customId, password, passwordLen, salt, saltLen, iterations, outKey, outKeyLen, cancelCheck);
     }
     return false;
 }
-
-// ── Master Key Verification PBKDF2 Helper ──────────────────────────────────
 
 static bool luksVerifyMasterKey(const DigestSpec& spec,
                                 const uint8_t* candidateKey, size_t keyLen,
                                 const uint8_t* salt, size_t saltLen,
                                 uint32_t iterations,
-                                const uint8_t* expectedDigest, size_t expectedDigestLen) {
+                                const uint8_t* expectedDigest, size_t expectedDigestLen,
+                                std::function<bool()> cancelCheck = nullptr) {
     std::vector<uint8_t> derived(expectedDigestLen);
-    if (!luksDeriveKdfKey(spec, candidateKey, keyLen, salt, saltLen, iterations, derived.data(), derived.size())) {
+    if (!luksDeriveKdfKey(spec, candidateKey, keyLen, salt, saltLen, iterations, derived.data(), derived.size(), cancelCheck)) {
         return false;
     }
     bool match = (std::memcmp(derived.data(), expectedDigest, expectedDigestLen) == 0);

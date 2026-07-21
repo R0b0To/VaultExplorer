@@ -28,9 +28,6 @@
 #include "session_prepare.h"
 #include "volume_state.h"
 
-// volume_state.h pulls in NTFS-3G's headers, which #define raw min/max
-// macros (support.h) that clobber every std::min/std::max call below —
-// same issue documented on this exact include in session_prepare.cpp.
 #undef min
 #undef max
 
@@ -40,13 +37,8 @@
 
 static constexpr int MAX_VOLUMES = FF_VOLUMES;
 
-// mkntfs formatter, embedded under a renamed entry point (see
-// MKNTFS_EMBEDDED_SOURCE in CMakeLists.txt) and routed through
-// vExplorer_ntfs_ops for its device I/O.
 extern "C" int vaultexplorer_mkntfs_main(int argc, char* argv[]);
 
-// Only used while filling a freshly-created container's data area with
-// zero-encrypted sectors, in CREATE_FILL_BATCH-sized batches.
 static constexpr uint64_t CREATE_FILL_BATCH = 4096;
 static constexpr int MKFS_WORK_BUF_SIZE = 4096;
 
@@ -55,11 +47,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
                      const int* keyfileFds, int keyfileCount) {
     bool success = false;
 
-    // ── Passphrase resolution: keyfiles mix ADDITIVELY into the typed
-    // password (same as VeraCrypt's unlock-side behavior in
-    // prepareSession/session_prepare.cpp), including allowing an empty
-    // typed password when keyfiles alone are supplied — matching real
-    // VeraCrypt, which also permits a keyfile-only volume. ──
     unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
     ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
     size_t mixedPasswordLen = std::min(strlen(password), sizeof(mixedPassword));
@@ -114,8 +101,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         }
 
         const int safePim = clampPim(pim);
-        // Derive the complete 192-byte header key. This is mandatory for
-        // Argon2id compatibility and harmless for PBKDF2-based headers.
         unsigned char headerKey[192] = {0};
         if (!deriveHeaderKey(createHash, mixedPassword, mixedPasswordLen,
                              salt, safePim, headerKey, sizeof(headerKey))) {
@@ -123,11 +108,8 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             break;
         }
 
-
-        // Align to 4096 bytes
         const uint64_t VOLUME_SIZE = (static_cast<uint64_t>(sizeBytes) / 4096) * 4096;
 
-        // Truncate file to exact aligned size
         if (static_cast<uint64_t>(sizeBytes) != VOLUME_SIZE) {
             if (ftruncate(fd, VOLUME_SIZE) != 0) {
                 LOGI("DEBUG-Ext: ftruncate failed! errno=%d (%s)", errno, strerror(errno));
@@ -136,7 +118,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             }
         }
 
-        // Verify physical file size matches using fstat
         struct stat st;
         if (fstat(fd, &st) == 0) {
             LOGI("DEBUG-Ext: Physical file size on disk: %lld", (long long)st.st_size);
@@ -160,9 +141,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         body[4] = 0x00; body[5] = 0x02;
         body[6] = 0x01; body[7] = 0x0b;
 
-        // Note: For standard (non-hidden) volumes, the official VeraCrypt spec 
-        // dictates that VC_HDR_OFF_VOLUME_SIZE holds the size of the decrypted 
-        // payload area (DATA_SIZE), NOT the total physical container file size.
         for (int i = 7; i >= 0; --i)
             body[VC_HDR_OFF_VOLUME_SIZE + (7 - i)] = (DATA_SIZE >> (i * 8)) & 0xFF;
             
@@ -176,7 +154,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         body[VC_HDR_OFF_SECTOR_SIZE + 1] = 0x00;
         body[VC_HDR_OFF_SECTOR_SIZE + 2] = 0x02;
         body[VC_HDR_OFF_SECTOR_SIZE + 3] = 0x00;
-
 
         memcpy(&body[VC_KEY_OFFSET_MASTER], combinedMasterKey, masterKeyLen);
 
@@ -199,8 +176,6 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
                 LOGI("createContainer: cascadeSetKeys failed for header");
                 break;
             }
-            // Header is encrypted as a single "sector 0" with zero tweak
-            // We need to handle the 448-byte body (28 blocks of 16 bytes)
             std::memcpy(encBody, body, VC_HEADER_BODY_SIZE);
             for (int layer = cSpec.layerCount - 1; layer >= 0; layer--) {
                 const XtsLayerKey& lk = hdrCtx.layers[layer];
@@ -236,18 +211,12 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
             LOGI("createContainer: backup header write failed"); break;
         }
 
-        // --- NEW FIX START ---
-        // Android SAF ignores ftruncate(). Because the backup header is only 512 bytes, 
-        // there is a 130,560 byte gap at the end of the file that never gets written to.
-        // We MUST force the OS to expand the file to the exact requested VOLUME_SIZE 
-        // by writing a single byte at the very end of the file (VOLUME_SIZE - 1).
         unsigned char eofByte = 0;
         if (pwrite(fd, &eofByte, 1, static_cast<off_t>(VOLUME_SIZE - 1)) != 1) {
             LOGI("createContainer: failed to expand file to full VOLUME_SIZE");
         } else {
             LOGI("DEBUG-Ext: Successfully forced physical file size to %llu", (unsigned long long)VOLUME_SIZE);
         }
-        // --- NEW FIX END ---
 
         {
             CascadeContext dataCtx;
@@ -304,18 +273,13 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
                                 strncasecmp(fileSystem, "ext3", 4) == 0 ||
                                 strncasecmp(fileSystem, "ext4", 4) == 0;
             if (useExt) {
-                // Prepare encryption context state
                 v.partitionStartSector = 0;
                 v.dataOffset = VC_DATA_AREA_OFFSET;
                 v.dataAreaLengthBytes = DATA_SIZE;
                 v.isUsbSource = false;
                 
-                // The keys were already set via cascadeSetKeys(v.cascade...) 
-                // in the previous block.
-                
                 const bool formatted = formatExtVolume(volId, fileSystem);
                 
-                // Post-format cleanup
                 v.fsMounted = false;
                 v.fd = -1;
                 v.dataCtxInitialized = false;
@@ -393,7 +357,7 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
     mbedtls_platform_zeroize(salt, sizeof(salt));
 
     if (success) {
-        fsync(fd); // Final physical sync
+        fsync(fd);
         LOGI("createContainer: SUCCESS.");
     }
     close(fd);
@@ -406,10 +370,6 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
                          const int* keyfileFds, int keyfileCount) {
     bool success = false;
 
-    // ── Passphrase resolution: a keyfile REPLACES the typed password for
-    // LUKS (real `cryptsetup --key-file` semantics), matching how
-    // prepareLuksSession resolves it on unlock — see that function's doc
-    // comment in session_prepare.cpp. Only the first keyfile is used. ──
     std::vector<unsigned char> keyfileBuf;
     const unsigned char* effectivePassword = reinterpret_cast<const unsigned char*>(password);
     size_t effectivePasswordLen = strlen(password);
@@ -443,9 +403,6 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
 
     do {
         if (sizeBytes < static_cast<int64_t>(2 * 1024 * 1024)) {
-            // LUKS2's own header+keyslot overhead alone is over 1 MiB;
-            // keep more headroom than VeraCrypt's 300 KiB floor so
-            // there's still room left for an actual ext2/3/4 filesystem.
             LOGI("createLuksContainer: sizeBytes too small (%lld)", (long long)sizeBytes);
             break;
         }
@@ -473,12 +430,6 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             LOGI("createLuksContainer: unsupported cipherId %d", cipherId);
             break;
         }
-        // No AES-only restriction for LUKS1 here: luks1CreateHeader()
-        // encrypts the keyslot AF area with this same [cipherName] (see
-        // its keyslotAreaCrypt() call), and luks1Unlock() decrypts it by
-        // resolving the cipher straight out of the on-disk header rather
-        // than assuming AES — so LUKS1 supports the identical single-layer
-        // cipher set as LUKS2 (aes/serpent/twofish/camellia/kuznyechik).
 
         HashId createHash = static_cast<HashId>(hashId);
         LuksCreateParams params;
@@ -492,7 +443,7 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
                 break;
             }
             params.useArgon2id = true;
-            params.hashName = "sha256"; // digest hash; keyslot itself uses Argon2id regardless
+            params.hashName = "sha256"; 
             argon2ParamsForPim(safePim, params.argon2MemoryKiB, params.argon2TimeCost, params.argon2Parallelism);
         } else if (createHash == HashId::kSha256) {
             params.hashName = "sha256";
@@ -524,8 +475,6 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             break;
         }
 
-        // Force the file to its full physical size — same Android SAF
-        // ftruncate limitation documented in createContainer() above.
         {
             unsigned char eofByte = 0;
             if (pwrite(fd, &eofByte, 1, static_cast<off_t>(sizeBytes - 1)) != 1) {
@@ -533,20 +482,11 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             }
         }
 
-        // Matches prepareLuksSession's convention exactly (session_prepare.cpp),
-        // so a subsequent unlock computes the identical tweak base: LUKS
-        // segment-relative convention (partitionStartSector=dataOffsetBytes/512,
-        // since ivTweak==0 and sectorSize==512 for a fresh format).
         const uint64_t partitionStartSector = info.dataOffsetBytes / 512;
         const uint64_t dataAreaLengthBytes = static_cast<uint64_t>(sizeBytes) - info.dataOffsetBytes;
 
         bool fillOk = true;
         {
-            // Zero-fill the data area with encrypted zero sectors —
-            // mirrors createContainer()'s VeraCrypt fill loop above (same
-            // batching), using a throwaway local CascadeContext directly
-            // rather than disk_write(), since VolumeState isn't wired up
-            // as a live session yet at this point.
             CascadeContext fillCtx;
             if (!cascadeSetKeys(fillCtx, dataCipher, info.masterKey.data(), info.masterKey.size())) {
                 LOGI("createLuksContainer: cascadeSetKeys failed for zero-fill");
@@ -583,10 +523,6 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
 
         fsync(fd);
 
-        // Set up VolumeState exactly as prepareLuksSession would after a
-        // real unlock, so ext2 mkfs's disk_read/disk_write calls (which
-        // dispatch purely off VolumeState) decrypt/encrypt consistently
-        // with how this container will actually be read back later.
         bool keySetupOk;
         {
             std::lock_guard<std::mutex> vlock(v.mutex);
@@ -670,7 +606,6 @@ bool createContainerWithHidden(int fd,
         return false;
     }
     
-    // Outer format consumes fdOuter and outerKeyfileFds
     bool outerSuccess = createContainer(fdOuter, outerPassword, outerPim, sizeBytes, outerFileSystem,
                                         outerCipherId, outerHashId, outerKeyfileFds, outerKeyfileCount);
     if (!outerSuccess) {
@@ -977,8 +912,8 @@ bool changeContainerPassword(int fd,
         
         unsigned char recoveredKeyMaterial[192] = {0};
         unsigned char decryptedBody[VC_HEADER_BODY_SIZE] = {0};
-        CascadeId matchedCipher;
-        HashId matchedHash;
+        CascadeId matchedCipher{};
+        HashId matchedHash{};
         ParsedHeaderFields fields;
 
         struct HeaderSlot { uint64_t fileOffset; };
@@ -992,7 +927,7 @@ bool changeContainerPassword(int fd,
             if (deriveAndValidateHeader(primaryHeaderSector, oldMixedPassword, oldMixedPasswordLen, oldPim,
                                         cipherId, hashId,
                                         recoveredKeyMaterial, decryptedBody,
-                                        matchedCipher, matchedHash, fields)) {
+                                        matchedCipher, matchedHash, fields, -1, nullptr, slot.fileOffset > 0 ? 1 : 0)) {
                 foundMatch = true;
                 targetOffset = slot.fileOffset;
                 break;
@@ -1004,7 +939,7 @@ bool changeContainerPassword(int fd,
             break;
         }
         
-        mbedtls_platform_zeroize(recoveredKeyMaterial, sizeof(recoveredKeyMaterial)); // Unused for re-encryption
+        mbedtls_platform_zeroize(recoveredKeyMaterial, sizeof(recoveredKeyMaterial));
 
         FILE* urandom = fopen("/dev/urandom", "rb");
         if (!urandom) break;

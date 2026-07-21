@@ -13,8 +13,6 @@
 #include <cstring>
 #include <algorithm>
 #include <atomic>
-#include <thread>
-#include <vector>
 
 
 struct AesCtxPair {
@@ -198,7 +196,6 @@ static void hashHmacFast(HashId hash, const HmacPrecomputed& pre,
     hashFinal(hash, &outerCtx, out);
 }
 
-
 static void hashHmac(HashId hash, const unsigned char* key, size_t keyLen,
                      const unsigned char* data, size_t dataLen, unsigned char* out) {
     HmacPrecomputed pre;
@@ -206,16 +203,12 @@ static void hashHmac(HashId hash, const unsigned char* key, size_t keyLen,
     hashHmacFast(hash, pre, data, dataLen, out);
 }
 
-// Computes one PBKDF2 output block (RFC 8018 5.2's F(P,S,c,i)) into
-// [outBlock, outBlock+copyLen). Safe to call concurrently for different
-// [block] values against the same [pre] -- hashHmacFast() only ever reads
-// [pre] and copies it into thread-local HashCtx state before mutating.
 static bool pbkdf2SingleBlockCustom(HashId hash, const HmacPrecomputed& pre,
                                      const unsigned char* salt, size_t saltLen,
                                      unsigned int block, unsigned int iterations,
                                      size_t digestSize,
                                      unsigned char* outBlock, size_t copyLen,
-                                     const std::atomic<bool>* abortFlag,
+                                     const std::function<bool()>& cancelCheck,
                                      std::atomic<bool>* localFailed) {
     unsigned char saltWithIndex[256];
     std::memcpy(saltWithIndex, salt, saltLen);
@@ -231,9 +224,9 @@ static bool pbkdf2SingleBlockCustom(HashId hash, const HmacPrecomputed& pre,
 
     for (unsigned int iter = 1; iter < iterations; iter++) {
         if ((iter & 0x3FF) == 0) {
-            if ((abortFlag && abortFlag->load(std::memory_order_relaxed)) ||
+            if ((cancelCheck && cancelCheck()) ||
                 localFailed->load(std::memory_order_relaxed)) {
-                return false; // another thread/block already found the answer, or failed
+                return false; 
             }
         }
         hashHmacFast(hash, pre, U, digestSize, U);
@@ -248,7 +241,7 @@ static bool pbkdf2HmacCustom(HashId hash,
                             const unsigned char* salt, size_t saltLen,
                             unsigned int iterations,
                             unsigned char* out, size_t outLen,
-                            const std::atomic<bool>* abortFlag = nullptr) {
+                            std::function<bool()> cancelCheck = nullptr) {
     size_t digestSize = hashDigestSize(hash);
     if (digestSize == 0) return false;
     if (saltLen + 4 > 256) return false;
@@ -264,38 +257,18 @@ static bool pbkdf2HmacCustom(HashId hash,
         size_t copyLen = std::min(digestSize, outLen - outOffset);
         return pbkdf2SingleBlockCustom(hash, pre, salt, saltLen, block, iterations,
                                        digestSize, out + outOffset, copyLen,
-                                       abortFlag, &localFailed);
+                                       cancelCheck, &localFailed);
     };
 
-    if (blockCount <= 1) {
-        return runBlock(1);
+    // Computes blocks sequentially to avoid thread oversubscription. 
+    // Parallelism is already handled at the hash level inside ThreadPool.
+    for (unsigned int block = 1; block <= blockCount; block++) {
+        if (!runBlock(block)) {
+            localFailed.store(true, std::memory_order_relaxed);
+            return false;
+        }
     }
-
-    // blockCount>1 only happens when a multi-layer cascade is among the
-    // candidates during a full auto-detect scan (needs >1 digest worth of
-    // key material) -- bounded to <=6 blocks even in the worst case
-    // (Blake2s-256's 32-byte digest, 192-byte output). Deliberately raw
-    // std::thread, not the shared ThreadPool -- see doc comment above.
-    std::vector<std::thread> workers;
-    std::vector<char> results(blockCount, 0); // char, not vector<bool>: avoids bit-packed-word data race across threads
-    workers.reserve(blockCount - 1);
-    for (unsigned int block = 2; block <= blockCount; block++) {
-        workers.emplace_back([&, block]() {
-            const bool ok = runBlock(block);
-            results[block - 1] = ok ? 1 : 0;
-            if (!ok) localFailed.store(true, std::memory_order_relaxed);
-        });
-    }
-
-    const bool firstOk = runBlock(1); // block 1 runs on the calling thread
-    results[0] = firstOk ? 1 : 0;
-    if (!firstOk) localFailed.store(true, std::memory_order_relaxed);
-
-    for (auto& t : workers) t.join();
-
-    for (unsigned int i = 0; i < blockCount; i++) {
-        if (!results[i]) return false;
-    }
+    
     return true;
 }
 
@@ -304,14 +277,8 @@ bool pbkdf2Hmac(HashId hash,
                  const unsigned char* salt, size_t saltLen,
                  unsigned int iterations,
                  unsigned char* out, size_t outLen,
-                 const std::atomic<bool>* abortFlag) {
+                 std::function<bool()> cancelCheck) {
     if (hash == HashId::kSha512 || hash == HashId::kSha256) {
-        // mbedtls_pkcs5_pbkdf2_hmac runs to completion in a single call —
-        // no hook to check abortFlag mid-derivation without reimplementing
-        // it. Not a practical loss: these are the two fastest hashes here
-        // (hardware-accelerated), so they're rarely the straggler thread
-        // another hash's worker is waiting on. abortFlag is deliberately
-        // unused on this path.
         mbedtls_md_type_t mdType = (hash == HashId::kSha512) ? MBEDTLS_MD_SHA512 : MBEDTLS_MD_SHA256;
         const mbedtls_md_info_t* mdInfo = mbedtls_md_info_from_type(mdType);
         if (!mdInfo) return false;
@@ -326,7 +293,7 @@ bool pbkdf2Hmac(HashId hash,
         return ret == 0;
     }
 
-    return pbkdf2HmacCustom(hash, password, passwordLen, salt, saltLen, iterations, out, outLen, abortFlag);
+    return pbkdf2HmacCustom(hash, password, passwordLen, salt, saltLen, iterations, out, outLen, cancelCheck);
 }
 
 size_t genericHashOneShot(HashId hash,

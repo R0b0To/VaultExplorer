@@ -43,6 +43,18 @@ abstract final class ChannelMethods {
   static const writeBackFile = 'writeBackFile';
   static const getSpaceInfo = 'getSpaceInfo';
 
+  // Same native operation as getFileSize/readFileChunk above, but routed
+  // to their own native thread pool (see MainActivity's fullResExecutor)
+  // instead of the general-purpose ioExecutor. Use these specifically for
+  // Media Viewer full-resolution reads (EncryptedImageWidget,
+  // FullResImageCache) so a burst of swipe-driven reads can't queue up
+  // behind -- or get queued up behind -- unrelated ioExecutor work like
+  // bulk file copy/export, which shares getFileSize/readFileChunk and
+  // already runs its own multi-file concurrency. Do not use these for
+  // anything other than the Media Viewer's full-res image path.
+  static const getMediaFileSize = 'getMediaFileSize';
+  static const readMediaFileChunk = 'readMediaFileChunk';
+
   // ── Directory operations ─────────────────────────────────────────────────
   static const listDirectory = 'listDirectory';
   static const createDirectory = 'createDirectory';

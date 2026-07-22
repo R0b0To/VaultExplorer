@@ -68,6 +68,13 @@ class MediaPlayerWidget extends StatefulWidget {
   final bool isCurrent;
   final VoidCallback? onError;
 
+  /// A controller already constructed and initialized ahead of time (see
+  /// [VideoPlaybackManager.prewarm]). When provided and still valid, this
+  /// is adopted directly instead of constructing + initializing a new
+  /// [VideoPlayerController], skipping the MediaCodec/content-URI startup
+  /// latency on the swipe that lands on this widget.
+  final VideoPlayerController? existingController;
+
   const MediaPlayerWidget({
     super.key,
     required this.container,
@@ -86,6 +93,7 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.onVideoControllerDisposed,
     required this.progressNotifier,
     required this.isCurrent,
+    this.existingController,
     this.onError,
   });
 
@@ -123,6 +131,41 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   Future<void> _initPlayer() async {
     final token = ++_initToken;
+
+    final prewarmed = widget.existingController;
+    if (prewarmed != null) {
+      // Adopt the already-initialized controller from VideoPlaybackManager
+      // instead of constructing + initializing a new one — this is the
+      // whole point of prewarm(): the expensive work already happened
+      // while the user was still looking at the previous item.
+      _controller = prewarmed;
+      _controller.addListener(_onControllerTick);
+      try {
+        final captionFile = await _loadCaptions(widget.fileName);
+        if (token != _initToken || !mounted) return;
+        if (captionFile != null) {
+          _controller.setClosedCaptionFile(Future.value(captionFile));
+        }
+
+        setState(() {
+          _initialized = true;
+          _playerError = null;
+        });
+        widget.onVideoControllerInitialized(_controller, _handleEvicted);
+        await _controller.setVolume(1.0);
+        await _controller.setLooping(false);
+        if (widget.autoPlay && widget.isCurrent) {
+          _controller.play();
+        }
+      } catch (e) {
+        if (token == _initToken && mounted) {
+          setState(() => _playerError = 'Media stream initialization failed: $e');
+          widget.onError?.call();
+        }
+      }
+      return;
+    }
+
     final controller = VideoPlayerController.contentUri(Uri.parse(widget.contentUriString));
     _controller = controller;
 

@@ -897,6 +897,19 @@ Future<bool> openWithApp(
     return result ?? 0;
   }
 
+  /// Same native call as [getFileSize], routed to a dedicated native thread
+  /// pool reserved for the Media Viewer's full-resolution reads (see
+  /// [ChannelMethods.getMediaFileSize]). Use only from
+  /// [FullResImageCache]'s fetch path -- everything else should keep using
+  /// [getFileSize].
+  Future<int> getMediaFileSize(MountedContainer container, String fileName) async {
+    final result = await _channel.invokeMethod<int>(
+      ChannelMethods.getMediaFileSize,
+      {'filePath': container.uri, 'fileName': fileName},
+    );
+    return result ?? 0;
+  }
+
   /// Returns the recursive byte total of all files inside [dirPath].
   ///
   /// This is a potentially slow operation for large directory trees; callers
@@ -920,6 +933,29 @@ Future<bool> openWithApp(
   ) async {
     final result = await _channel.invokeMethod<Uint8List>(
       ChannelMethods.readFileChunk,
+      {
+        'filePath': container.uri,
+        'fileName': fileName,
+        'offset': offset,
+        'length': length,
+      },
+    );
+    return result;
+  }
+
+  /// Same native call as [readFileChunk], routed to a dedicated native
+  /// thread pool reserved for the Media Viewer's full-resolution reads
+  /// (see [ChannelMethods.readMediaFileChunk]). Use only from
+  /// [FullResImageCache]'s fetch path -- everything else should keep using
+  /// [readFileChunk].
+  Future<Uint8List?> readMediaFileChunk(
+    MountedContainer container,
+    String fileName,
+    int offset,
+    int length,
+  ) async {
+    final result = await _channel.invokeMethod<Uint8List>(
+      ChannelMethods.readMediaFileChunk,
       {
         'filePath': container.uri,
         'fileName': fileName,

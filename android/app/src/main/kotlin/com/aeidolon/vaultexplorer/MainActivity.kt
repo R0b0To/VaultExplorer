@@ -35,6 +35,7 @@ import android.util.Log
 import android.security.keystore.KeyProperties
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -60,6 +61,11 @@ private object ChannelMethods {
     const val CANCEL_IMPORT       = "cancelImport"
     const val GET_FILE_SIZE       = "getFileSize"
     const val READ_FILE_CHUNK     = "readFileChunk"
+    // Same native operation as GET_FILE_SIZE/READ_FILE_CHUNK, routed to
+    // fullResExecutor instead of ioExecutor -- see the call sites below and
+    // the fullResExecutor declaration for why.
+    const val GET_MEDIA_FILE_SIZE   = "getMediaFileSize"
+    const val READ_MEDIA_FILE_CHUNK = "readMediaFileChunk"
     const val WRITE_BACK_FILE     = "writeBackFile"
     const val GET_SPACE_INFO      = "getSpaceInfo"
     const val LIST_DIRECTORY      = "listDirectory"
@@ -132,6 +138,17 @@ class MainActivity : FlutterFragmentActivity() {
     // async_thumbnail.dart) so requests that clear the Dart-side limiter
     // don't then queue again here.
     private val thumbnailExecutor = Executors.newFixedThreadPool(3)
+
+    // Dedicated pool for getFileSize/readFileChunk full-resolution media
+    // reads, kept separate from ioExecutor for the same reason
+    // thumbnailExecutor is: without it, a burst of full-res reads from fast
+    // swiping in the Media Viewer (each one a whole decrypted file, not a
+    // thumbnail) queues up behind -- and blocks -- unrelated ioExecutor
+    // work like directory listings or container mounts, and vice versa.
+    // Sized at 2 to match FullResImageCache.limiter (see
+    // full_res_image_cache.dart), so requests that clear the Dart-side
+    // limiter don't then queue again here.
+    private val fullResExecutor = Executors.newFixedThreadPool(2)
 
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
@@ -482,6 +499,7 @@ class MainActivity : FlutterFragmentActivity() {
     private fun <T> runNativeOp(
         uriString: String?,
         result: MethodChannel.Result,
+        executor: ExecutorService = ioExecutor,
         block: (volId: Int) -> T,
     ) {
         if (uriString == null) {
@@ -493,7 +511,7 @@ class MainActivity : FlutterFragmentActivity() {
             result.error("NOT_MOUNTED", "Container not mounted", null)
             return
         }
-        ioExecutor.execute {
+        executor.execute {
             try {
                 // Lock acquisition is now handled entirely inside ContainerFileSystem
                 val value = block(volId)
@@ -2041,6 +2059,40 @@ class MainActivity : FlutterFragmentActivity() {
                         return@setMethodCallHandler
                     }
                     runNativeOp(call.argument<String>("filePath"), result) { volId ->
+                        ContainerFileSystem.readFileChunk(volId, fileName, offset, length)
+                    }
+                }
+
+                // Identical bodies to GET_FILE_SIZE/READ_FILE_CHUNK above, just
+                // dispatched onto fullResExecutor instead of ioExecutor. Kept as
+                // separate channel methods (rather than an extra argument on the
+                // existing ones) so bulk file-copy/export -- which shares
+                // GET_FILE_SIZE/READ_FILE_CHUNK and already runs its own
+                // multi-file concurrency on ioExecutor -- can never end up
+                // sharing a thread pool with Media Viewer swipe-driven reads in
+                // either direction.
+                ChannelMethods.GET_MEDIA_FILE_SIZE -> {
+                    val fileName = call.argument<String>("fileName")
+                    if (fileName == null) {
+                        result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result, executor = fullResExecutor) { volId ->
+                        ContainerFileSystem.getFileSize(volId, fileName)
+                    }
+                }
+
+                ChannelMethods.READ_MEDIA_FILE_CHUNK -> {
+                    val fileName = call.argument<String>("fileName")
+                    val offset    = call.argument<Number>("offset")?.toLong() ?: 0L
+                    val length    = call.argument<Number>("length")?.toInt() ?: 0
+                    if (fileName == null) {
+                        result.error("INVALID_ARGS", "fileName required", null); return@setMethodCallHandler
+                    }
+                    if (length <= 0 || length > MAX_CHUNK_BYTES) {
+                        result.error("INVALID_ARGS", "length must be between 1 and $MAX_CHUNK_BYTES bytes", null)
+                        return@setMethodCallHandler
+                    }
+                    runNativeOp(call.argument<String>("filePath"), result, executor = fullResExecutor) { volId ->
                         ContainerFileSystem.readFileChunk(volId, fileName, offset, length)
                     }
                 }

@@ -13,6 +13,7 @@
 #include "mbedtls/platform_util.h"
 #include "container_format.h"
 #include "crypto/cascade.h"
+#include "io/decrypted_block_cache.h"
 
 extern "C" {
 #include "volume.h"
@@ -101,6 +102,17 @@ struct VolumeState {
     size_t ioBufSize = 0;
     std::mutex ioBufMutex;
     std::vector<FIL*> openStreams;
+
+    // Decrypted-block cache for disk_read/disk_write (see
+    // io/decrypted_block_cache.h). Guarded by its own mutex rather than the
+    // top-level `mutex` above: the cache is only ever touched from within
+    // disk_read/disk_write's own per-batch buffer handling, which already
+    // has narrower locking (ioBufMutex) for the same reason -- avoid
+    // serializing unrelated volume operations (directory listings, other
+    // files' metadata lookups) behind whatever a single read/write happens
+    // to be doing.
+    DecryptedBlockCache decryptedBlockCache;
+    std::mutex decryptedBlockCacheMutex;
 
     VolumeState() = default;
     ~VolumeState() = default;

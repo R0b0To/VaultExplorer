@@ -155,6 +155,14 @@ void unmountVolume(int volId) {
     std::lock_guard<std::mutex> bufLock(v.ioBufMutex);
     v.ioBuf.reset();
     v.ioBufSize = 0;
+
+    // The cache is keyed by physical block index only -- if a different
+    // container/hidden-volume gets unlocked into this same slot on a later
+    // mount, physical offsets can mean something entirely different. Drop
+    // everything now rather than risk serving stale plaintext under a new
+    // mount.
+    std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
+    v.decryptedBlockCache.clear();
 }
 
 // ----------------------------------------------------------------====
@@ -238,6 +246,21 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         const size_t   copyOffset      = static_cast<size_t>(relStart - alignedRelStart) * 512;
         const size_t   copyBytes       = static_cast<size_t>(batch.count) * 512;
 
+        // Decrypted-range cache: a hit here skips both the physical USB read
+        // AND the XTS/cascade decryption below entirely, since what's cached
+        // is the fully-decrypted output for exactly this aligned physical
+        // range. See io/decrypted_block_cache.h for why this is keyed by
+        // exact (offset, length) match rather than sub-range splitting.
+        const uint64_t cacheKeyOffset = alignedFirstPhysical * 512;
+        {
+            std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
+            std::vector<unsigned char> cached(totalBytes);
+            if (v.decryptedBlockCache.get(cacheKeyOffset, totalBytes, cached.data())) {
+                std::memcpy(curBuf, cached.data() + copyOffset, copyBytes);
+                continue;
+            }
+        }
+
         unsigned char* encBuf;
         bool usedPersistent = (totalBytes > sizeof(stackBuf));
 
@@ -253,12 +276,22 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             return RES_ERROR;
         }
 
+        // Decrypted output for the whole aligned range is assembled into
+        // decryptedOut regardless of which branch below runs, so it can be
+        // cached once at the end rather than duplicating the cache-populate
+        // call three times (and risking one branch forgetting it).
+        std::vector<unsigned char> decryptedOut(totalBytes);
+
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
             for (UINT i = 0; i < batch.count; i++) {
                 const uint64_t physSector = firstPhysical + i;
                 const uint64_t tweak = physSector - v.partitionStartSector;
-                cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512), curBuf + (i*512));
+                cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512),
+                                     decryptedOut.data() + copyOffset + (i * 512));
             }
+            // VeraCrypt never needs multi-sector alignment (sectorsPerUnit
+            // is always 1), so copyOffset is always 0 and decryptedOut is
+            // fully populated by the loop above -- no gap to worry about.
         } else if (sectorsPerUnit <= 1) {
             for (UINT i = 0; i < batch.count; i++) {
                 const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
@@ -266,29 +299,36 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
                 if (v.luksUsesGenericCipher) {
                     genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, 512, tweakBuf,
-                                         encBuf + (i * 512), curBuf + (i * 512));
+                                         encBuf + (i * 512), decryptedOut.data() + copyOffset + (i * 512));
                 } else {
                     mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, 512, tweakBuf,
-                                           encBuf + (i * 512), curBuf + (i * 512));
+                                           encBuf + (i * 512), decryptedOut.data() + copyOffset + (i * 512));
                 }
             }
         } else {
-            // Decrypt every full aligned unit, then copy out only the sectors
-            // that were actually requested.
-            std::vector<unsigned char> decBuf(totalBytes);
+            // Decrypt every full aligned unit directly into decryptedOut --
+            // this branch already computes the full aligned range (that's
+            // what alignedCount covers), so decryptedOut is fully populated
+            // here without a separate copyOffset-relative write.
             for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
                 const uint64_t sectorTweak = alignedRelStart + u;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
                 if (v.luksUsesGenericCipher) {
                     genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                         encBuf + (u * 512), decBuf.data() + (u * 512));
+                                         encBuf + (u * 512), decryptedOut.data() + (u * 512));
                 } else {
                     mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
-                                           encBuf + (u * 512), decBuf.data() + (u * 512));
+                                           encBuf + (u * 512), decryptedOut.data() + (u * 512));
                 }
             }
-            std::memcpy(curBuf, decBuf.data() + copyOffset, copyBytes);
+        }
+
+        std::memcpy(curBuf, decryptedOut.data() + copyOffset, copyBytes);
+
+        {
+            std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
+            v.decryptedBlockCache.put(cacheKeyOffset, totalBytes, decryptedOut.data());
         }
     }
         

@@ -5,6 +5,7 @@ import '../../models/mounted_container.dart';
 import '../../models/vault_list_item.dart';
 import '../../services/app_settings_service.dart';
 import '../../services/cross_container_clipboard.dart';
+import '../../services/full_res_image_cache.dart';
 import '../../services/session_lock_controller.dart';
 import '../../services/vaultexplorer_api.dart';
 import '../../theme.dart';
@@ -281,6 +282,13 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (clip.hasItems && clip.sourceVolId == volId) {
       clip.clear();
     }
+
+    // Full-resolution image bytes cached for the Media Viewer are
+    // memory-only and keyed per mount session, so a stale entry from this
+    // volId can never be served to a future session — but there's no
+    // reason to keep potentially tens of MB of decrypted bytes around once
+    // the container they came from is no longer mounted.
+    FullResImageCache.clear();
 
     if (mounted) {
       setState(() => _mounted.removeWhere((c) => c.volId == volId));

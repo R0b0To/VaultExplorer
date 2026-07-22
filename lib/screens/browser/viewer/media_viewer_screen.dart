@@ -5,6 +5,7 @@ import 'package:video_player/video_player.dart';
 import '/../../models/mounted_container.dart';
 import '/../../models/thumbnail_cache_mode.dart';
 import '/../../models/thumbnail_quality.dart';
+import '/../../services/full_res_image_cache.dart';
 import '/../../services/vaultexplorer_api.dart';
 import '../../../widgets/common_widgets.dart';
 import '../../../services/file_manager_toolbar_service.dart';
@@ -78,6 +79,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   final Map<String, Uint8List> _prefetchedImages = {};
   final Set<String> _prefetchingActive = {};
+  final Set<String> _prefetchingFullRes = {};
   final Map<String, int> _rotations = {};
   
   final Map<String, GlobalKey> _mediaKeys = {};
@@ -219,21 +221,55 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
+  String _contentUriFor(String fileName) {
+    final volId = widget.container.volId;
+    final escapedPath = Uri.encodeComponent(fileName);
+    return 'content://com.aeidolon.vaultexplorer.documents/document/'
+        '$volId%3Afile%3A$escapedPath';
+  }
+
   void _prefetchSurroundingItems() {
     final index = _playlistController.currentIndex;
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty) return;
 
-    final currentFile = _playlistController.currentFile;
-    if (MediaViewerConstants.isVideo(currentFile) ||
-        MediaViewerConstants.isAudio(currentFile)) {
-      return;
-    }
-
     final next = index + 1;
     final prev = index - 1;
-    if (next < playlist.length) _prefetchThumbnail(playlist[next]);
-    if (prev >= 0) _prefetchThumbnail(playlist[prev]);
+    final nextFile = next < playlist.length ? playlist[next] : null;
+    final prevFile = prev >= 0 ? playlist[prev] : null;
+
+    final currentFile = _playlistController.currentFile;
+    final currentIsMedia = MediaViewerConstants.isVideo(currentFile) ||
+        MediaViewerConstants.isAudio(currentFile);
+
+    if (!currentIsMedia) {
+      if (nextFile != null) _prefetchThumbnail(nextFile);
+      if (prevFile != null) _prefetchThumbnail(prevFile);
+
+      // Warm full-resolution bytes for the very next image only (not prev —
+      // swiping back re-hits the native ChunkedFileEngine's own decrypted-
+      // chunk cache and open-handle LRU cheaply, and isn't worth doubling
+      // the concurrent background transfer load). This hides the decrypt +
+      // platform-channel cost behind however long the user spends looking
+      // at the current image, instead of paying it synchronously on swipe.
+      if (nextFile != null) _prefetchFullRes(nextFile);
+    }
+
+    // Pre-warm the next video/audio controller regardless of what the
+    // current item's type is, so leaving an image and entering a video
+    // doesn't pay full MediaCodec/content-URI startup latency synchronously
+    // on that swipe either. Only the immediate next item is warmed, capped
+    // by maxLiveVideoControllers via VideoPlaybackManager's own eviction.
+    if (nextFile != null &&
+        (MediaViewerConstants.isVideo(nextFile) ||
+            MediaViewerConstants.isAudio(nextFile))) {
+      _playbackManager.prewarm(
+        fileName: nextFile,
+        contentUriString: _contentUriFor(nextFile),
+        playlist: playlist,
+        currentIndex: index,
+      );
+    }
   }
 
   Future<void> _prefetchThumbnail(String fileName) async {
@@ -264,6 +300,51 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       debugPrint('Failed to prefetch image content: $e');
     } finally {
       _prefetchingActive.remove(fileName);
+    }
+  }
+
+  /// Background-warms the full-resolution decrypted bytes for [fileName]
+  /// into [FullResImageCache], so that when the user actually swipes there,
+  /// [EncryptedImageWidget] finds it already cached instead of decrypting
+  /// and transferring the whole file synchronously on the swipe.
+  ///
+  /// Deliberately low-priority: skipped entirely if the file isn't an
+  /// image, is already cached, or is already being prefetched, and the
+  /// result is discarded (without erroring) if the user has swiped away
+  /// from being adjacent to [fileName] by the time the read completes —
+  /// no point holding a large buffer for a target the user already passed.
+  Future<void> _prefetchFullRes(String fileName) async {
+    if (!MediaViewerConstants.isImage(fileName)) return;
+    if (FullResImageCache.contains(widget.container, fileName)) return;
+    if (_prefetchingFullRes.contains(fileName)) return;
+
+    _prefetchingFullRes.add(fileName);
+    final completer = Completer<void>();
+    try {
+      // Goes through the same shared limiter + in-flight de-dup that
+      // EncryptedImageWidget's own load uses (see full_res_image_cache.dart)
+      // rather than calling vaultExplorerApi directly: if the widget for
+      // this page is *also* loading it (e.g. the user already swiped there
+      // before this prefetch got a turn), the two collapse into one native
+      // call instead of racing each other. isStillWanted re-checks that
+      // fileName is still adjacent to the current index once a turn is
+      // granted, so a prefetch that waited through the queue doesn't pay
+      // for the native round trip for a page the user has since moved
+      // well past.
+      await FullResImageCache.fetch(
+        widget.container,
+        fileName,
+        completer,
+        isStillWanted: () {
+          if (!mounted) return false;
+          final idx = _playlistController.playlist.indexOf(fileName);
+          return idx != -1 && (idx - _playlistController.currentIndex).abs() <= 1;
+        },
+      );
+    } catch (e) {
+      debugPrint('Failed to prefetch full-resolution image: $e');
+    } finally {
+      _prefetchingFullRes.remove(fileName);
     }
   }
 
@@ -679,13 +760,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     }
                   },
                   itemBuilder: (context, index) {
-                    final volId = widget.container.volId;
-                    final escapedPath = Uri.encodeComponent(
-                      _playlistController.playlist[index],
-                    );
-                    final contentUriString =
-                        'content://com.aeidolon.vaultexplorer.documents/document/$volId%3Afile%3A$escapedPath';
                     final fileName = _playlistController.playlist[index];
+                    final contentUriString = _contentUriFor(fileName);
                     final prefetchedBytes = _prefetchedBytesFor(fileName);
 
                     final isImg = MediaViewerConstants.isImage(fileName);
@@ -715,6 +791,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                               container: widget.container,
                               fileName: fileName,
                               contentUriString: contentUriString,
+                              existingController:
+                                  _playbackManager.getController(fileName),
                               showUI: _showUI,
                               onToggleUI: _setUIVisibility,
                               skipSeconds: _doubleTapSkipSeconds,

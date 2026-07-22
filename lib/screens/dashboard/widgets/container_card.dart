@@ -5,13 +5,13 @@ import '../../../services/vaultexplorer_api.dart';
 import '../../../utils/format_utils.dart';
 import '../../../theme.dart';
 import '../../../widgets/common_widgets.dart';
+import '../../../widgets/container_format_icon.dart';
 
 // ── Base Container Card (Internal Expressive Layout) ───────────────────────
 
 class _BaseContainerCard extends StatelessWidget {
   final VoidCallback onTap;
-  final IconData icon;
-  final Color iconColor;
+  final Widget icon;
   final Color iconBackgroundColor;
   final String title;
   final Widget subtitle;
@@ -23,7 +23,6 @@ class _BaseContainerCard extends StatelessWidget {
   const _BaseContainerCard({
     required this.onTap,
     required this.icon,
-    required this.iconColor,
     required this.iconBackgroundColor,
     required this.title,
     required this.subtitle,
@@ -68,7 +67,7 @@ class _BaseContainerCard extends StatelessWidget {
                       color: iconBackgroundColor,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Icon(icon, size: 26, color: iconColor),
+                    child: Center(child: icon),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -181,10 +180,17 @@ class ContainerCard extends StatelessWidget {
       );
     }
 
+    final iconWidget = isUsb
+        ? Icon(Icons.usb_rounded, size: 26, color: cs.onPrimaryContainer)
+        : ContainerFormatIcon(
+            format: container.containerFormat,
+            size: 26,
+            color: cs.onPrimaryContainer,
+          );
+
     return _BaseContainerCard(
       onTap: onBrowse,
-      icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_rounded,
-      iconColor: cs.onPrimaryContainer,
+      icon: iconWidget,
       iconBackgroundColor: cs.primaryContainer,
       title: container.displayName,
       subtitle: subtitleWidget,
@@ -200,6 +206,7 @@ class ContainerCard extends StatelessWidget {
 class SavedContainerCard extends StatelessWidget {
   final String name;
   final String uri;
+  final String containerFormat;
   final VoidCallback onUnlock;
   final BorderRadiusGeometry? borderRadius;
 
@@ -207,6 +214,7 @@ class SavedContainerCard extends StatelessWidget {
     super.key,
     required this.name,
     required this.uri,
+    required this.containerFormat,
     required this.onUnlock,
     this.borderRadius,
   });
@@ -217,10 +225,17 @@ class SavedContainerCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final isUsb = uri.startsWith('usb:');
 
+    final iconWidget = isUsb
+        ? Icon(Icons.usb_rounded, size: 26, color: cs.onSurfaceVariant)
+        : ContainerFormatIcon(
+            format: containerFormat,
+            size: 26,
+            color: cs.onSurfaceVariant,
+          );
+
     return _BaseContainerCard(
       onTap: onUnlock,
-      icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_rounded,
-      iconColor: cs.onSurfaceVariant,
+      icon: iconWidget,
       iconBackgroundColor: cs.surfaceContainerHigh,
       title: name,
       subtitle: Text(

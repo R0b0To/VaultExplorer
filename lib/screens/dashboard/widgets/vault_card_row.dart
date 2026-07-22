@@ -344,10 +344,11 @@ class _VaultCardRowState extends State<VaultCardRow>
           onBrowse: _handleTap,
           borderRadius: dynamicRadius,
         ),
-      LockedVaultItem() => SavedContainerCard(
+      LockedVaultItem(:final record) => SavedContainerCard(
           key: ValueKey('locked_${widget.item.uri}'),
           name: widget.item.name,
           uri: widget.item.uri,
+          containerFormat: record.containerFormat,
           onUnlock: _handleTap,
           borderRadius: dynamicRadius,
         ),

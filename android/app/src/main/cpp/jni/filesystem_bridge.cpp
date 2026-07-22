@@ -27,6 +27,7 @@
 #include <memory>
 #include <algorithm>
 #include <fcntl.h>
+#include <ctime>
 
 #include "ff.h"
 #include "diskio.h"
@@ -512,6 +513,49 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_extractFile(
     return success ? JNI_TRUE : JNI_FALSE;
 }
 
+namespace {
+
+// ext2fs_unlink() only removes the directory entry -- it never touches the
+// block/inode bitmaps or the superblock's free counters, which is what
+// getSpaceInfo() reads for FS_EXT. If we stop at unlink() (and a manual
+// i_links_count--), the inode's data blocks stay marked "in use" forever:
+// free space never grows back after a delete, or after a move that
+// overwrites an existing destination file. Writes look fine only because
+// block *allocation* does update the bitmaps correctly -- deletion just
+// never released anything to begin with.
+//
+// This mirrors what e2fsprogs's own debugfs "rm" (kill_file_by_inode) does:
+// walk the inode's blocks and free each one, then free the inode itself.
+int extReleaseBlockCallback(ext2_filsys fs, blk64_t* blocknr, e2_blkcnt_t,
+                             blk64_t, int, void*) {
+    ext2fs_block_alloc_stats2(fs, *blocknr, -1);
+    return 0;
+}
+
+// Drops one link to `ino`. If that was the last link, reclaims its data
+// blocks and frees the inode so free-space counters reflect the deletion.
+// Safe to call after ext2fs_unlink() has already removed the directory
+// entry. Returns false only on an inode read/write error.
+bool extReleaseInodeIfUnlinked(ext2_filsys fs, ext2_ino_t ino, bool isDir) {
+    struct ext2_inode inode{};
+    if (ext2fs_read_inode(fs, ino, &inode) != 0) return false;
+    if (inode.i_links_count) --inode.i_links_count;
+    if (inode.i_links_count > 0) {
+        // Other hard links still reference this inode -- nothing to free.
+        return ext2fs_write_inode(fs, ino, &inode) == 0;
+    }
+    inode.i_dtime = static_cast<__u32>(time(nullptr));
+    if (ext2fs_write_inode(fs, ino, &inode) != 0) return false;
+    if (ext2fs_inode_has_valid_blocks2(fs, &inode)) {
+        ext2fs_block_iterate3(fs, ino, BLOCK_FLAG_READ_ONLY, nullptr,
+                               extReleaseBlockCallback, nullptr);
+    }
+    ext2fs_inode_alloc_stats2(fs, ino, -1, isDir ? 1 : 0);
+    return true;
+}
+
+} // namespace
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
         JNIEnv* env, jobject, jstring targetFileName, jint volId) {
@@ -558,21 +602,21 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
     if (dir_ni) ntfs_inode_close(dir_ni);
 }
             else if (v.fsType == VolumeState::FS_EXT) {
+                ensureExtBitmapsLoaded(volId);
                 const std::string path(targetName);
                 const size_t slash = path.find_last_of('/');
                 const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
                 const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
                 ext2_ino_t parent = 0, ino = 0;
                 if (!name.empty() && extResolvePath(v.extFs, parentPath, &parent) &&
-                    extResolvePath(v.extFs, path, &ino) &&
-                    ext2fs_unlink(v.extFs, parent, name.c_str(), ino, 0) == 0) {
+                    extResolvePath(v.extFs, path, &ino)) {
                     struct ext2_inode inode{};
-                    if (ext2fs_read_inode(v.extFs, ino, &inode) == 0 && inode.i_links_count) {
-                        --inode.i_links_count;
-                        ext2fs_write_inode(v.extFs, ino, &inode);
+                    const bool isDir = ext2fs_read_inode(v.extFs, ino, &inode) == 0 &&
+                                        LINUX_S_ISDIR(inode.i_mode);
+                    if (ext2fs_unlink(v.extFs, parent, name.c_str(), ino, 0) == 0) {
+                        success = extReleaseInodeIfUnlinked(v.extFs, ino, isDir);
+                        ext2fs_flush(v.extFs);
                     }
-                    ext2fs_flush(v.extFs);
-                    success = true;
                 }
             }
         }
@@ -760,12 +804,11 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
 
                     ext2_ino_t destIno = 0;
                     if (extResolvePath(v.extFs, newFull, &destIno) && destIno != srcIno) {
+                        struct ext2_inode destInode{};
+                        const bool destIsDir = ext2fs_read_inode(v.extFs, destIno, &destInode) == 0 &&
+                                                LINUX_S_ISDIR(destInode.i_mode);
                         if (ext2fs_unlink(v.extFs, newParentIno, newName.c_str(), destIno, 0) == 0) {
-                            struct ext2_inode destInode{};
-                            if (ext2fs_read_inode(v.extFs, destIno, &destInode) == 0 && destInode.i_links_count) {
-                                --destInode.i_links_count;
-                                ext2fs_write_inode(v.extFs, destIno, &destInode);
-                            }
+                            extReleaseInodeIfUnlinked(v.extFs, destIno, destIsDir);
                         }
                     }
 

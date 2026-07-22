@@ -264,20 +264,13 @@ bool deriveAndValidateHeader(
     const unsigned char* encH = headerSector + VC_SALT_SIZE;
     const int safePim = clampPim(pim);
 
-    std::vector<HashId> hashesToTry;
-    if (hashIdParam != 255) {
-        hashesToTry.push_back(static_cast<HashId>(hashIdParam));
-    } else {
-        hashesToTry = { HashId::kSha512, HashId::kSha256, HashId::kWhirlpool,
-                        HashId::kStreebog, HashId::kBlake2s256, HashId::kArgon2id };
-    }
-
+    // ── 1. Cipher search order (AES is tested FIRST) ──────────────────────────
     std::vector<CascadeId> ciphersToTry;
     if (cipherIdParam != 255) {
         ciphersToTry.push_back(static_cast<CascadeId>(cipherIdParam));
     } else {
         ciphersToTry = {
-            CascadeId::kAes,
+            CascadeId::kAes,                  // 1st: AES-256 (512-bit XTS key)
             CascadeId::kSerpent,
             CascadeId::kTwofish,
             CascadeId::kAesTwofish,
@@ -294,17 +287,25 @@ bool deriveAndValidateHeader(
             CascadeId::kKuznyechikTwofish,
         };
     }
-    const int totalHashSteps = static_cast<int>(hashesToTry.size());
+
+    // ── 2. Categorize hashes into tiers ──────────────────────────────────────
+    std::vector<HashId> tier1Hashes; // Tier 1: Most Common (SHA-512, SHA-256)
+    std::vector<HashId> tier2Hashes; // Tier 2: Secondary (Whirlpool, Streebog, BLAKE2s)
+    std::vector<HashId> tier3Hashes; // Tier 3: Argon2id
+
+    if (hashIdParam != 255) {
+        tier1Hashes.push_back(static_cast<HashId>(hashIdParam));
+    } else {
+        tier1Hashes = { HashId::kSha512, HashId::kSha256 };
+        tier2Hashes = { HashId::kWhirlpool, HashId::kStreebog, HashId::kBlake2s256 };
+        tier3Hashes = { HashId::kArgon2id };
+    }
+
+    const int totalHashSteps = static_cast<int>(
+        tier1Hashes.size() + tier2Hashes.size() + tier3Hashes.size()
+    );
 
     if (isUnlockCancelled(volId)) return false;
-
-    // Split hashes into Fast (PBKDF2) and Slow (Argon2id).
-    std::vector<HashId> fastHashes;
-    std::vector<HashId> slowHashes;
-    for (HashId h : hashesToTry) {
-        if (h == HashId::kArgon2id) slowHashes.push_back(h);
-        else fastHashes.push_back(h);
-    }
 
     std::atomic<bool> found{false};
     std::atomic<int> combinationsAttempted{0};
@@ -350,7 +351,6 @@ bool deriveAndValidateHeader(
         for (CascadeId c : ciphersToTry) {
             if (cancelCheck()) break;
             
-            // Push granular UI updates per-cipher tested.
             reportUnlockProgress(volId, combinationsAttempted.load(), totalHashSteps,
                                  static_cast<int>(h), static_cast<int>(c), 0, slotId);
                                  
@@ -376,23 +376,23 @@ bool deriveAndValidateHeader(
         combinationsAttempted.fetch_add(1);
     };
 
-    if (!fastHashes.empty()) {
-        std::vector<std::future<void>> fastFutures;
-        fastFutures.reserve(fastHashes.size());
-        for (HashId h : fastHashes) {
-            fastFutures.push_back(ThreadPool::getInstance().enqueue(worker, h));
+    auto runBatch = [&](const std::vector<HashId>& batch) {
+        if (batch.empty() || found.load(std::memory_order_acquire) ||
+            isUnlockCancelled(volId) || (externalAbort && externalAbort->load())) {
+            return;
         }
-        for (auto& f : fastFutures) f.get();
-    }
+        std::vector<std::future<void>> futures;
+        futures.reserve(batch.size());
+        for (HashId h : batch) {
+            futures.push_back(ThreadPool::getInstance().enqueue(worker, h));
+        }
+        for (auto& f : futures) f.get();
+    };
 
-    if (!found.load(std::memory_order_acquire) && !slowHashes.empty() && !isUnlockCancelled(volId) && !(externalAbort && externalAbort->load())) {
-        std::vector<std::future<void>> slowFutures;
-        slowFutures.reserve(slowHashes.size());
-        for (HashId h : slowHashes) {
-            slowFutures.push_back(ThreadPool::getInstance().enqueue(worker, h));
-        }
-        for (auto& f : slowFutures) f.get();
-    }
+    // ── Execute in order of popularity ────────────────────────────────────────
+    runBatch(tier1Hashes); // 1st: SHA-512 & SHA-256 with AES
+    runBatch(tier2Hashes); // 2nd: Whirlpool, Streebog, BLAKE2s
+    runBatch(tier3Hashes); // 3rd: Argon2id
 
     if (!found.load(std::memory_order_acquire)) {
         if (isUnlockCancelled(volId)) {

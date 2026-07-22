@@ -28,6 +28,8 @@
 
 #include "jni_bridge_common.h"
 #include "crypto/scrypt.h"
+#include "crypto/eme.h"
+#include "crypto/siv.h"
 
 #undef min
 #undef max
@@ -194,6 +196,145 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getHashIdCount(JNIEnv*, jobject)
 
 
 extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_gocryptfsEmeNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jbyteArray tweak, jbyteArray data, jboolean encrypt) {
+    if (!key || !tweak || !data) return nullptr;
+
+    jsize keyLen = env->GetArrayLength(key);
+    jsize tweakLen = env->GetArrayLength(tweak);
+    jsize dataLen = env->GetArrayLength(data);
+
+    if (tweakLen != 16 || dataLen == 0 || dataLen % 16 != 0) return nullptr;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* tweakData = env->GetByteArrayElements(tweak, nullptr);
+    jbyte* inData = env->GetByteArrayElements(data, nullptr);
+
+    std::vector<uint8_t> out(dataLen);
+
+    bool ok = eme_transform(
+        reinterpret_cast<const uint8_t*>(keyData), static_cast<size_t>(keyLen),
+        reinterpret_cast<const uint8_t*>(tweakData),
+        reinterpret_cast<const uint8_t*>(inData),
+        out.data(), static_cast<size_t>(dataLen),
+        encrypt == JNI_TRUE
+    );
+
+    env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+    env->ReleaseByteArrayElements(tweak, tweakData, JNI_ABORT);
+    env->ReleaseByteArrayElements(data, inData, JNI_ABORT);
+
+    if (!ok) return nullptr;
+
+    jbyteArray result = env->NewByteArray(dataLen);
+    env->SetByteArrayRegion(result, 0, dataLen, reinterpret_cast<const jbyte*>(out.data()));
+    return result;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_sivEncryptNative(
+        JNIEnv* env, jobject,
+        jbyteArray encKey, jbyteArray macKey, jbyteArray plaintext, jobjectArray adArray) {
+    if (!encKey || !macKey || !plaintext) return nullptr;
+
+    jsize encKeyLen = env->GetArrayLength(encKey);
+    jsize macKeyLen = env->GetArrayLength(macKey);
+    jsize ptLen = env->GetArrayLength(plaintext);
+
+    jbyte* encKeyData = env->GetByteArrayElements(encKey, nullptr);
+    jbyte* macKeyData = env->GetByteArrayElements(macKey, nullptr);
+    jbyte* ptData = env->GetByteArrayElements(plaintext, nullptr);
+
+    std::vector<std::vector<uint8_t>> adList;
+    if (adArray) {
+        jsize adCount = env->GetArrayLength(adArray);
+        for (jsize i = 0; i < adCount; i++) {
+            jbyteArray adElem = static_cast<jbyteArray>(env->GetObjectArrayElement(adArray, i));
+            if (adElem) {
+                jsize len = env->GetArrayLength(adElem);
+                jbyte* bytes = env->GetByteArrayElements(adElem, nullptr);
+                adList.push_back(std::vector<uint8_t>(bytes, bytes + len));
+                env->ReleaseByteArrayElements(adElem, bytes, JNI_ABORT);
+                env->DeleteLocalRef(adElem);
+            }
+        }
+    }
+
+    std::vector<uint8_t> out(16 + ptLen);
+
+    bool ok = siv_encrypt(
+        reinterpret_cast<const uint8_t*>(encKeyData), static_cast<size_t>(encKeyLen),
+        reinterpret_cast<const uint8_t*>(macKeyData), static_cast<size_t>(macKeyLen),
+        reinterpret_cast<const uint8_t*>(ptData), static_cast<size_t>(ptLen),
+        adList, out.data(), out.size()
+    );
+
+    env->ReleaseByteArrayElements(encKey, encKeyData, JNI_ABORT);
+    env->ReleaseByteArrayElements(macKey, macKeyData, JNI_ABORT);
+    env->ReleaseByteArrayElements(plaintext, ptData, JNI_ABORT);
+
+    if (!ok) return nullptr;
+
+    jbyteArray result = env->NewByteArray(out.size());
+    env->SetByteArrayRegion(result, 0, out.size(), reinterpret_cast<const jbyte*>(out.data()));
+    return result;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_sivDecryptNative(
+        JNIEnv* env, jobject,
+        jbyteArray encKey, jbyteArray macKey, jbyteArray ciphertext, jobjectArray adArray) {
+    if (!encKey || !macKey || !ciphertext) return nullptr;
+
+    jsize encKeyLen = env->GetArrayLength(encKey);
+    jsize macKeyLen = env->GetArrayLength(macKey);
+    jsize ctLen = env->GetArrayLength(ciphertext);
+
+    if (ctLen < 16) return nullptr;
+
+    jbyte* encKeyData = env->GetByteArrayElements(encKey, nullptr);
+    jbyte* macKeyData = env->GetByteArrayElements(macKey, nullptr);
+    jbyte* ctData = env->GetByteArrayElements(ciphertext, nullptr);
+
+    std::vector<std::vector<uint8_t>> adList;
+    if (adArray) {
+        jsize adCount = env->GetArrayLength(adArray);
+        for (jsize i = 0; i < adCount; i++) {
+            jbyteArray adElem = static_cast<jbyteArray>(env->GetObjectArrayElement(adArray, i));
+            if (adElem) {
+                jsize len = env->GetArrayLength(adElem);
+                jbyte* bytes = env->GetByteArrayElements(adElem, nullptr);
+                adList.push_back(std::vector<uint8_t>(bytes, bytes + len));
+                env->ReleaseByteArrayElements(adElem, bytes, JNI_ABORT);
+                env->DeleteLocalRef(adElem);
+            }
+        }
+    }
+
+    std::vector<uint8_t> out(ctLen - 16);
+
+    bool ok = siv_decrypt(
+        reinterpret_cast<const uint8_t*>(encKeyData), static_cast<size_t>(encKeyLen),
+        reinterpret_cast<const uint8_t*>(macKeyData), static_cast<size_t>(macKeyLen),
+        reinterpret_cast<const uint8_t*>(ctData), static_cast<size_t>(ctLen),
+        adList, out.data(), out.size()
+    );
+
+    env->ReleaseByteArrayElements(encKey, encKeyData, JNI_ABORT);
+    env->ReleaseByteArrayElements(macKey, macKeyData, JNI_ABORT);
+    env->ReleaseByteArrayElements(ciphertext, ctData, JNI_ABORT);
+
+    if (!ok) return nullptr;
+
+    jbyteArray result = env->NewByteArray(out.size());
+    env->SetByteArrayRegion(result, 0, out.size(), reinterpret_cast<const jbyte*>(out.data()));
+    return result;
+}
+
+
+
+extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_scryptNative(
         JNIEnv* env, jobject,
         jbyteArray passphrase, jbyteArray salt, jint N, jint r, jint p, jint dkLen) {
@@ -226,3 +367,5 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_scryptNative(
 
     return result;
 }
+
+

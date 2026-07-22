@@ -358,6 +358,8 @@ add_library(
         crypto/kdf_table.cpp       # per-hash iteration-count table + hash dispatch + PIM clamping
         crypto/luks_header.cpp     # LUKS header parsing & key recovery
         crypto/scrypt.cpp  
+        crypto/eme.cpp             # EME filename encryption
+        crypto/siv.cpp             # SIV filename encryption
         ${fatfs_SOURCE_DIR}/src/ff.c
         ${fatfs_SOURCE_DIR}/src/ffunicode.c
         # ── VeraCrypt primitives (pinned FetchContent source) ──

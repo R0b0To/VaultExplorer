@@ -170,6 +170,22 @@ external fun createUsbContainerNative(
         passphrase: ByteArray, salt: ByteArray, N: Int, r: Int, p: Int, dkLen: Int
     ): ByteArray?
 
+
+@JvmStatic
+    external fun gocryptfsEmeNative(
+        key: ByteArray, tweak: ByteArray, data: ByteArray, encrypt: Boolean
+    ): ByteArray?
+
+    @JvmStatic
+    external fun sivEncryptNative(
+        encKey: ByteArray, macKey: ByteArray, plaintext: ByteArray, adList: Array<ByteArray>?
+    ): ByteArray?
+
+    @JvmStatic
+    external fun sivDecryptNative(
+        encKey: ByteArray, macKey: ByteArray, ciphertext: ByteArray, adList: Array<ByteArray>?
+    ): ByteArray?
+
 @JvmStatic
     external fun createUsbContainerWithHiddenNative(
         volId: Int, partitionScheme: String,

@@ -339,6 +339,7 @@ add_library(
         session/bitlocker_backend.cpp  # BitLocker session establishment + dislocker-backed I/O
         containers/container_create.cpp     # new-container header/format creation (createContainerNative)
         containers/vhdx_image.cpp      # VHDX (Hyper-V disk image) BAT-indexed read/write for fixed/dynamic disks
+        containers/vhd_image.cpp       # legacy VHD BAT-indexed read/write for dynamic (expandable) disks
         jni/jni_runtime.cpp
         jni/jni_callbacks.cpp
         io/block_io.cpp

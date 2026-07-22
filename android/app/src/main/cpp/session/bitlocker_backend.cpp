@@ -24,6 +24,7 @@ extern "C" {
 #include "volume_state.h"
 #include "session_prepare.h"
 #include "vhdx_image.h"
+#include "vhd_image.h"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_BDE", __VA_ARGS__)
 
@@ -47,7 +48,12 @@ namespace {
 // excluded region, but NOT true for VHDX, where every byte of the volume
 // is indirected through the BAT (see vhdx_image.h). kVhdx routes through
 // VhdxImage::pread/pwrite instead, which do that translation.
-enum class IoKind { kFile, kUsb, kVhdx };
+//
+// kVhd is the same idea for a legacy *dynamic* VHD (see vhd_image.h) --
+// distinct from kVhdx only in which translator (VhdImage vs. VhdxImage) it
+// routes through; a fixed-format VHD still goes through kFile, same as
+// today, since it needs no translation at all.
+enum class IoKind { kFile, kUsb, kVhdx, kVhd };
 
 struct IoContext {
     IoKind kind;
@@ -72,6 +78,12 @@ struct IoContext {
     // IoContext -- freed alongside it in bitlockerCloseVolume().
     VhdxImage* vhdx = nullptr;
     uint64_t vhdxPartitionStartByte = 0;
+
+    // Legacy dynamic-VHD-backed (kVhd only): same idea as the VHDX fields
+    // above, just routed through VhdImage instead. Owned by this IoContext
+    // -- freed alongside it in bitlockerCloseVolume().
+    VhdImage* vhd = nullptr;
+    uint64_t vhdPartitionStartByte = 0;
 
     // Tracked current position (lseek-shaped contract).
     int64_t position = 0;
@@ -122,6 +134,12 @@ ssize_t vioRead(void* user_data, uint8_t* buffer, size_t size) {
         ctx->position += static_cast<int64_t>(size);
         return static_cast<ssize_t>(size);
     }
+    if (ctx->kind == IoKind::kVhd) {
+        const uint64_t virtualOffset = ctx->vhdPartitionStartByte + static_cast<uint64_t>(ctx->position);
+        if (!ctx->vhd->pread(virtualOffset, buffer, size)) return -1;
+        ctx->position += static_cast<int64_t>(size);
+        return static_cast<ssize_t>(size);
+    }
     // USB path
     const uint64_t absOffset = ctx->partitionStartSector * 512ULL + static_cast<uint64_t>(ctx->position);
     if (!usbReadBytes(ctx->volId, absOffset, buffer, size)) return -1;
@@ -140,6 +158,12 @@ ssize_t vioWrite(void* user_data, const uint8_t* buffer, size_t size) {
     if (ctx->kind == IoKind::kVhdx) {
         const uint64_t virtualOffset = ctx->vhdxPartitionStartByte + static_cast<uint64_t>(ctx->position);
         if (!ctx->vhdx->pwrite(virtualOffset, buffer, size)) return -1;
+        ctx->position += static_cast<int64_t>(size);
+        return static_cast<ssize_t>(size);
+    }
+    if (ctx->kind == IoKind::kVhd) {
+        const uint64_t virtualOffset = ctx->vhdPartitionStartByte + static_cast<uint64_t>(ctx->position);
+        if (!ctx->vhd->pwrite(virtualOffset, buffer, size)) return -1;
         ctx->position += static_cast<int64_t>(size);
         return static_cast<ssize_t>(size);
     }
@@ -459,6 +483,75 @@ bool prepareBitLockerSessionVhdx(int fd, const unsigned char* password, size_t p
     return true;
 }
 
+bool prepareBitLockerSessionVhd(int fd, const unsigned char* password, size_t passwordLen,
+                                int volId, bool readOnly,
+                                uint64_t partitionStartByte, uint64_t partitionSizeBytes) {
+    if (volId < 0 || volId >= FF_VOLUMES) { if (fd >= 0) close(fd); return false; }
+    if (fd < 0) return false;
+
+    VolumeState& v = volumes[volId];
+
+    uint64_t fileSize = 0;
+    struct stat st{};
+    if (fstat(fd, &st) == 0) fileSize = static_cast<uint64_t>(st.st_size);
+
+    auto* vhd = new VhdImage();
+    if (!vhd->open(fd, fileSize, /*requestReadWrite=*/!readOnly)) {
+        LOGI("prepareBitLockerSessionVhd(vol=%d): VhdImage::open failed: %s", volId, vhd->lastError());
+        delete vhd;
+        close(fd);
+        return false;
+    }
+    // Unlike VhdxImage, VhdImage has no "pending log replay" concept that
+    // can silently force read-only -- whatever the caller asked for is
+    // exactly what they get.
+
+    const uint64_t volumeSizeBytes = partitionSizeBytes != 0
+        ? partitionSizeBytes
+        : (vhd->virtualDiskSize() > partitionStartByte ? vhd->virtualDiskSize() - partitionStartByte : 0);
+
+    auto* ioCtx = new IoContext();
+    ioCtx->kind = IoKind::kVhd;
+    ioCtx->fd = fd; // kept only so bitlockerCloseVolume-adjacent bookkeeping
+                     // has it available if ever needed; vioRead/vioWrite for
+                     // kVhd go through ioCtx->vhd, not ioCtx->fd directly.
+    ioCtx->vhd = vhd;
+    ioCtx->vhdPartitionStartByte = partitionStartByte;
+    ioCtx->totalSize = volumeSizeBytes;
+
+    dis_context_t disCtx = nullptr;
+    if (!unlockWithBestCredentialGuess(ioCtx, password, passwordLen, volId, readOnly, &disCtx)) {
+        delete ioCtx->vhd;
+        delete ioCtx;
+        close(fd);
+        LOGI("prepareBitLockerSessionVhd(vol=%d): unlock failed (wrong password/recovery key)", volId);
+        return false;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(v.mutex);
+        v.fd = fd;
+        v.dataOffset = 0;
+        v.dataAreaLengthBytes = volumeSizeBytes;
+        v.isHiddenVolume = false;
+        v.fileSize = fileSize;
+        v.isUsbSource = false;
+        v.readOnly = readOnly;
+        v.partitionStartSector = partitionStartByte / 512;
+        v.matchedCipherId = -1;
+        v.matchedHashId = -1;
+        v.containerFormat = ContainerFormat::kBitLocker;
+        v.dataCtxInitialized = true;
+        v.disContext = static_cast<void*>(disCtx);
+        v.bitlockerProxyFd = -1;
+        v.bitlockerIoCtx = static_cast<void*>(ioCtx);
+    }
+
+    LOGI("prepareBitLockerSessionVhd(vol=%d): unlocked, partitionStartByte=%llu, volumeSize=%llu, readOnly=%d",
+         volId, (unsigned long long)partitionStartByte, (unsigned long long)volumeSizeBytes, readOnly ? 1 : 0);
+    return true;
+}
+
 bool prepareUsbBitLockerSession(uint64_t partitionStartSector, uint64_t partitionSizeBytes,
                                 const unsigned char* password, size_t passwordLen,
                                 int volId, bool readOnly) {
@@ -539,12 +632,13 @@ void bitlockerCloseVolume(VolumeState& v) {
     }
     // dis_destroy() calls vioClose (which deliberately doesn't free
     // anything -- see its doc comment) before returning, so it's safe to
-    // free the IoContext ourselves right after. For a kVhdx session this
-    // also frees the VhdxImage it owns (BAT array and all), since nothing
-    // else holds a reference to it.
+    // free the IoContext ourselves right after. For a kVhdx/kVhd session
+    // this also frees the VhdxImage/VhdImage it owns (BAT array and all),
+    // since nothing else holds a reference to it.
     if (v.bitlockerIoCtx) {
         auto* ctx = static_cast<IoContext*>(v.bitlockerIoCtx);
         delete ctx->vhdx; // no-op if null (non-VHDX sessions)
+        delete ctx->vhd;  // no-op if null (non-VHD sessions)
         delete ctx;
         v.bitlockerIoCtx = nullptr;
     }

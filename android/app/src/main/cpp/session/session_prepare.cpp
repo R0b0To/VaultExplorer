@@ -20,6 +20,7 @@
 #include "container_format.h"
 #include "bitlocker_backend.h"
 #include "vhdx_image.h"
+#include "vhd_image.h"
 #include "container_header.h"
 #include "container_utils.h"
 #include "crypto/cascade.h"
@@ -133,7 +134,8 @@ static std::vector<PartitionCandidate> scanPartitionTable(
 // supported here, where sector N of the file really is sector N of the
 // disk. Dynamic/differencing VHDs (sparse, block-allocation-table-indexed
 // images) use a completely different on-disk layout and are not handled by
-// this scan.
+// this scan -- see the probeVhdDiskKind()/VhdImage block in prepareSession,
+// which intercepts those before this function is ever called.
 static uint64_t usableFileBytesExcludingVhdFooter(int fd, uint64_t fileSize) {
     if (fileSize < 512) return fileSize;
     unsigned char footer[512];
@@ -695,6 +697,82 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
         // allow given the code path already exists below).
     }
 
+    // Legacy (pre-Hyper-V) VHD whole-disk images, *dynamic* (a.k.a.
+    // "expandable") sub-type. Mirrors the VHDX block above -- and
+    // vhd_image.h, which mirrors vhdx_image.h -- for the same underlying
+    // reason: a dynamic VHD's "byte N of the file" is never "byte N of the
+    // disk" (every byte is indirected through a Block Allocation Table),
+    // so it can't share usableFileBytesExcludingVhdFooter's flat-pread
+    // scan below, which only ever claimed to support the FIXED-format
+    // case (see that function's own doc comment).
+    //
+    // probeVhdDiskKind() is a cheap footer-only peek (no BAT/bitmap
+    // parsing) telling us, before doing anything else, which of the three
+    // legacy-VHD shapes (if any) this file is:
+    //   kFixed        -- byte-for-byte flat; fall through unchanged to the
+    //                     existing scan below, same as today.
+    //   kDynamic      -- BAT-indexed; handle here via VhdImage.
+    //   kDifferencing -- BAT-indexed AND needs a parent disk; out of scope,
+    //                     same stance as VHDX's differencing rejection.
+    //                     VhdImage::open() itself refuses these with a
+    //                     clear lastError() -- we still route it in here
+    //                     rather than the flat scan below, because a
+    //                     differencing VHD's sparse layout would otherwise
+    //                     be silently misread as flat bytes there.
+    // Either way, kDynamic/kDifferencing must NOT fall into the flat scan
+    // below -- handledAsExpandableVhd gates that.
+    bool handledAsExpandableVhd = false;
+    const VhdDiskKind vhdKind = probeVhdDiskKind(fd, fileSize);
+    if (vhdKind == VhdDiskKind::kDynamic || vhdKind == VhdDiskKind::kDifferencing) {
+        handledAsExpandableVhd = true;
+        VhdImage probeImg;
+        if (probeImg.open(fd, fileSize, /*requestReadWrite=*/false)) {
+            auto vhdReadSectors = [&probeImg](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
+                return probeImg.pread(startSector * 512ULL, out, static_cast<size_t>(count) * 512ULL);
+            };
+
+            auto vhdDetectBitlockerAt = [&probeImg](uint64_t byteOffset) -> bool {
+                // Mirrors bitlockerDetectFile's signature check (kFveSig/
+                // kBtgSig at offset 3, 11 bytes total) but reads through
+                // the VHD's BAT translation instead of a flat pread.
+                unsigned char header[11];
+                if (!probeImg.pread(byteOffset, header, sizeof(header))) return false;
+                static const unsigned char kFve[] = { '-','F','V','E','-','F','S','-' };
+                static const unsigned char kBtg[] = { 'M','S','W','I','N','4','.','1' };
+                return std::memcmp(header + 3, kFve, 8) == 0 || std::memcmp(header + 3, kBtg, 8) == 0;
+            };
+
+            // Whole-VHD-as-one-volume case (no partition table -- rare but
+            // possible), mirroring bitlockerDetectFile(fd) above.
+            if (vhdDetectBitlockerAt(0)) {
+                closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+                return prepareBitLockerSessionVhd(fd, password, passwordLen, volId, readOnly,
+                                                   0, probeImg.virtualDiskSize());
+            }
+
+            std::vector<PartitionCandidate> vhdPartitions = scanPartitionTable(vhdReadSectors);
+            for (const auto& part : vhdPartitions) {
+                if (part.sectorCount == 0) continue; // {0,0} sentinel
+                const uint64_t partStartByte = part.startSector * 512ULL;
+                const uint64_t partSizeBytes = part.sectorCount * 512ULL;
+                if (partStartByte + partSizeBytes > probeImg.virtualDiskSize()) continue;
+                if (!vhdDetectBitlockerAt(partStartByte)) continue;
+
+                closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+                return prepareBitLockerSessionVhd(fd, password, passwordLen, volId, readOnly,
+                                                   partStartByte, partSizeBytes);
+            }
+        } else {
+            LOGI("prepareSession(vol=%d): dynamic/differencing VHD signature matched but open failed: %s",
+                 volId, probeImg.lastError());
+        }
+        // Not BitLocker (or a differencing VHD we can't open): same stance
+        // as the VHDX block above -- VeraCrypt/LUKS are never
+        // dynamic-VHD-shaped in practice, so let it continue on to the
+        // generic VeraCrypt header-slot matching below, just skipping the
+        // (inapplicable) flat scan that follows.
+    }
+
     // Whole-disk container files -- most commonly a fixed-format VHD
     // exported from Windows with BitLocker already turned on -- don't have
     // the FVE signature at byte 0 of the file: byte 0 is the disk's own
@@ -703,7 +781,11 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     // matching scan below). Parse that partition table and retry the
     // signature probe at each partition's byte offset before falling
     // through to VeraCrypt's header-slot matching.
-    {
+    //
+    // Skipped entirely for a dynamic/differencing VHD (handledAsExpandableVhd)
+    // -- see the block above for why this flat, byte-N-of-file-is-byte-N-of-
+    // disk scan would silently misread one of those.
+    if (!handledAsExpandableVhd) {
         const uint64_t usableBytes = usableFileBytesExcludingVhdFooter(fd, fileSize);
         auto fileReadSectors = [fd, usableBytes](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
             const uint64_t byteOffset = startSector * 512ULL;

@@ -112,6 +112,25 @@ bool prepareBitLockerSessionVhdx(int fd, const unsigned char* password, size_t p
                                  int volId, bool readOnly,
                                  uint64_t partitionStartByte, uint64_t partitionSizeBytes);
 
+// Legacy (pre-Hyper-V) dynamic-VHD variant of prepareBitLockerSession,
+// mirroring prepareBitLockerSessionVhdx above for the same reason: a
+// dynamic VHD's "byte N of file" is never "byte N of the disk" either (see
+// vhd_image.h), so it needs the same kind of dedicated entry point rather
+// than reusing prepareBitLockerSession's flat fileBaseOffset addressing.
+// `fd` is the already-open VHD file descriptor; `partitionStartByte`/
+// `partitionSizeBytes` locate the BitLocker volume within the VHD's
+// *virtual* disk address space, exactly like prepareBitLockerSessionVhdx's
+// parameters of the same name.
+//
+// Takes ownership of `fd` on the same terms as prepareBitLockerSessionVhdx.
+// Fails outright (without attempting unlock) if the file isn't actually a
+// dynamic VHD (fixed and differencing are both out of scope for VhdImage --
+// see VhdImage::open's lastError() semantics, logged but not returned to
+// the caller here).
+bool prepareBitLockerSessionVhd(int fd, const unsigned char* password, size_t passwordLen,
+                                int volId, bool readOnly,
+                                uint64_t partitionStartByte, uint64_t partitionSizeBytes);
+
 // Post-unlock decrypted I/O against volumes[volumeId]'s dis_context_t.
 // `logicalOffset`/byteCount are relative to the start of the BitLocker
 // volume (same convention as VolumeState::dataOffset-relative reads
@@ -122,7 +141,8 @@ bool bitlockerRead(int volumeId, uint64_t logicalOffset, unsigned char* outBuf, 
 bool bitlockerWrite(int volumeId, uint64_t logicalOffset, const unsigned char* inBuf, size_t byteCount);
 
 // Releases the dis_context_t owned by this slot (and, for USB sessions, the
-// AppFuse proxy fd), if any. Safe to call unconditionally (no-op for
+// AppFuse proxy fd; for VHDX/VHD sessions, the VhdxImage/VhdImage and its
+// in-memory BAT), if any. Safe to call unconditionally (no-op for
 // non-BitLocker or already-closed slots).
 //
 // Called from VolumeState::reset() specifically -- NOT from

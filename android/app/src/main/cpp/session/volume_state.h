@@ -84,10 +84,11 @@ struct VolumeState {
     // user_data struct) for BitLocker sessions -- void* for the same reason
     // disContext is, above. Previously this was allocated with `new` in
     // prepare*BitLockerSession and never freed anywhere (a small per-unlock
-    // leak, harmless for a plain file/USB fd but not for a VHDX-backed
-    // session, whose IoContext also owns a VhdxImage holding the whole
-    // Block Allocation Table in memory -- see vhdx_image.h). Freed in
-    // bitlockerCloseVolume(), same lifecycle spot as disContext.
+    // leak, harmless for a plain file/USB fd but not for a VHDX- or
+    // VHD-backed session, whose IoContext also owns a VhdxImage/VhdImage
+    // holding the whole Block Allocation Table in memory -- see
+    // vhdx_image.h / vhd_image.h). Freed in bitlockerCloseVolume(), same
+    // lifecycle spot as disContext.
     void* bitlockerIoCtx = nullptr;
     FATFS fatfs{};
     ntfs_volume* ntfsVol = nullptr;

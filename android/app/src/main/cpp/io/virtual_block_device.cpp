@@ -8,12 +8,13 @@
 // through here regardless of which JNI entry point (jni/*_bridge.cpp)
 // triggered it. Split out of the former vaultexplorer.cpp god-file because
 // this is a distinct, self-contained concern (block-device transport +
-// crypto) from JNI marshalling.#include <cstring>
+// crypto) from JNI marshalling.
+
+#include <cstring>
 #include <cstdlib>
 #include <memory>
 #include <mutex>
 #include <atomic>
-#include <chrono>
 #include <ctime>
 #include <android/log.h>
 
@@ -55,8 +56,6 @@ extern "C" {
 #undef max
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
-
-#define LOGD_TIMING(...) __android_log_print(ANDROID_LOG_DEBUG, "VaultExplorer_Timing", __VA_ARGS__)
 
 #define MAX_VOLUMES FF_VOLUMES
 
@@ -205,9 +204,6 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         return ok ? RES_OK : RES_ERROR;
     }
 
-    const auto callStart = std::chrono::steady_clock::now();
-    double physicalMs = 0.0;
-
     VolumeState& v = volumes[pdrv];
     const uint64_t basePhysical = v.dataOffset / 512;
     static constexpr uint32_t MAX_SECTORS_PER_BATCH = 8192; // 4 MB/batch
@@ -253,15 +249,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             encBuf = stackBuf;
         }
 
-        const auto physStart = std::chrono::steady_clock::now();
-        const bool physOk = physicalRead(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes);
-        physicalMs += std::chrono::duration<double, std::milli>(
-            std::chrono::steady_clock::now() - physStart).count();
-        if (!physOk) {
-            const double totalMs = std::chrono::duration<double, std::milli>(
-                std::chrono::steady_clock::now() - callStart).count();
-            LOGD_TIMING("disk_read: vol=%d sector=%llu count=%u FAILED physical=%.2fms total=%.2fms",
-                        pdrv, static_cast<unsigned long long>(sector), count, physicalMs, totalMs);
+        if (!physicalRead(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) {
             return RES_ERROR;
         }
 
@@ -290,8 +278,8 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
             std::vector<unsigned char> decBuf(totalBytes);
             for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
                 const uint64_t sectorTweak = alignedRelStart + u;
-unsigned char tweakBuf[16] = {0};
-for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
+                unsigned char tweakBuf[16] = {0};
+                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
                 if (v.luksUsesGenericCipher) {
                     genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
                                          encBuf + (u * 512), decBuf.data() + (u * 512));
@@ -303,13 +291,7 @@ for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
             std::memcpy(curBuf, decBuf.data() + copyOffset, copyBytes);
         }
     }
-    const double totalMs = std::chrono::duration<double, std::milli>(
-        std::chrono::steady_clock::now() - callStart).count();
-    LOGD_TIMING("disk_read: vol=%d sector=%llu count=%u bytes=%u src=%s batches=%zu "
-                "physical=%.2fms crypto=%.2fms total=%.2fms",
-                pdrv, static_cast<unsigned long long>(sector), count, count * 512,
-                v.isUsbSource ? "usb" : "file", batches.size(),
-                physicalMs, totalMs - physicalMs, totalMs);
+        
     return RES_OK;
 }
 
@@ -398,8 +380,8 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                     return RES_ERROR;
                 for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
                     const uint64_t sectorTweak = alignedRelStart + u;
-unsigned char tweakBuf[16] = {0};
-for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
+                    unsigned char tweakBuf[16] = {0};
+                    for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
                     if (v.luksUsesGenericCipher) {
                         genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
                                              existingEnc.data() + (u * 512), plain.data() + (u * 512));
@@ -414,8 +396,8 @@ for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
 
             for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
                 const uint64_t sectorTweak = alignedRelStart + u;
-unsigned char tweakBuf[16] = {0};
-for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;;
+                unsigned char tweakBuf[16] = {0};
+                for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
                 if (v.luksUsesGenericCipher) {
                     genericLuksXtsCrypt(v.luksGenericCascade.layers[0], true, luksUnit, tweakBuf,
                                          plain.data() + (u * 512), encBuf + (u * 512));

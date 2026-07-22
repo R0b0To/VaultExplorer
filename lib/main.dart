@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -24,25 +25,6 @@ void main() async {
   }
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-  try {
-    final settings = await AppSettingsService.loadSettings();
-    appThemeModeNotifier.value = settings.themeMode;
-    if (settings.blockScreenshots) {
-      await vaultExplorerApi.setSecureScreen(true);
-    }
-  } catch (_) {}
-
-  try {
-    final packageInfo = await PackageInfo.fromPlatform();
-    appVersion = packageInfo.version; // e.g., "0.8.10"
-  } catch (e) {
-    // Fallback if platform retrieval fails
-    appVersion = 'unknown';
-  }
-  // clean up any decrypted temp files left behind by a
-  // previous crash or force-kill before the copy/paste finally{} block ran.
-  await _cleanupOrphanedTempFiles();
-
   PlatformDispatcher.instance.onError = (error, stack) {
     final errStr = error.toString();
     if (errStr.contains('Cannot add event after closing') ||
@@ -58,7 +40,40 @@ void main() async {
     },
   );
 
+  // Get the first frame on screen immediately. Everything below is deferred
+  // until after that, so app launch is no longer gated on disk/Keystore/
+  // platform-channel I/O (settings load, secure storage, package info,
+  // orphaned temp-file cleanup).
   runApp(const VaultExplorerApp());
+
+  unawaited(_runDeferredStartupWork());
+}
+
+/// Settings load, secure-screen setup, package info, and temp-file cleanup —
+/// none of this needs to finish before the first frame, so it happens after
+/// [runApp] instead of blocking it. [LockGateScreen] independently loads
+/// settings itself to build its UI, so this pass mainly handles the
+/// side effects (theme notifier, secure screen, version string, cleanup).
+Future<void> _runDeferredStartupWork() async {
+  try {
+    final settings = await AppSettingsService.loadSettings();
+    appThemeModeNotifier.value = settings.themeMode;
+    if (settings.blockScreenshots) {
+      await vaultExplorerApi.setSecureScreen(true);
+    }
+  } catch (_) {}
+
+  try {
+    final packageInfo = await PackageInfo.fromPlatform();
+    appVersion = packageInfo.version; // e.g., "0.8.10"
+  } catch (e) {
+    // Fallback if platform retrieval fails
+    appVersion = 'unknown';
+  }
+
+  // clean up any decrypted temp files left behind by a
+  // previous crash or force-kill before the copy/paste finally{} block ran.
+  await _cleanupOrphanedTempFiles();
 }
 
 /// Deletes any temp files written during copy/paste or export that were not
@@ -67,7 +82,10 @@ void main() async {
 Future<void> _cleanupOrphanedTempFiles() async {
   try {
     final tmpDir = await getTemporaryDirectory();
-    for (final entity in tmpDir.listSync()) {
+    // Async listing instead of listSync(): this walks the whole temp
+    // directory, and listSync() would block the isolate's event loop
+    // for the entire scan instead of yielding between entries.
+    await for (final entity in tmpDir.list()) {
       if (entity is! File) continue;
       final name = entity.path.split('/').last;
       // Matches the prefixes used by TempFileUtils.uniquePath and

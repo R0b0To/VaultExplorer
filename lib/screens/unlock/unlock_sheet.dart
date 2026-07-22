@@ -48,20 +48,12 @@ class _UnlockSheetState extends State<UnlockSheet> {
   final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
 
-  /// True when the saved record (or post-unlock result) indicates a LUKS
-  /// container — hides PIM, keyfiles, and cipher/hash pickers which don't
-  /// apply to LUKS.
+  /// Format getters for format-specific UI branching
   bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
   bool get _isCryptomator => _containerFormat == 'cryptomator';
   bool get _isGocryptfs => _containerFormat == 'gocryptfs';
-
-  /// True for BitLocker volumes — like LUKS, these hide PIM, keyfiles, and
-  /// cipher/hash pickers (BitLocker has no keyfile concept and its cipher
-  /// is read from the volume metadata, not chosen by the user).
   bool get _isBitlocker => _containerFormat == 'bitlocker';
   
-  /// True if the user has selected the "Folder Vault" type or if we have
-  /// already determined the selected folder is a Cryptomator or Gocryptfs vault.
   bool get _isFolderVault =>
       _containerFormat == 'directory_vault' ||
       _containerFormat == 'cryptomator' ||
@@ -196,7 +188,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
         if (isValid) {
           detectedFormat = 'cryptomator';
         } else {
-          // Fallback to check if it matches gocryptfs instead
           final isGocryptfs = await vaultExplorerApi.isGocryptfsVault(picked.uri);
           if (isGocryptfs) {
             detectedFormat = 'gocryptfs';
@@ -373,9 +364,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
     if (widget.initialUri != null) return;
     
     try {
-      // 1. --- FOLDER VAULT LOGIC (CRYPTOMATOR / GOCRYPTFS) ---
       if (_isFolderVault) {
-        // Launches the standard platform folder picker.
         final result = await vaultExplorerApi.pickCryptomatorVault();
         if (result == null) return;
         
@@ -388,12 +377,10 @@ class _UnlockSheetState extends State<UnlockSheet> {
           return;
         }
 
-        // Determine the layout format by analyzing the picked directory contents
         String? detectedFormat;
         if (result.looksLikeVault) {
           detectedFormat = 'cryptomator';
         } else {
-          // If the primary masterkey.cryptomator file isn't detected, check for gocryptfs.conf
           final isGocryptfs = await vaultExplorerApi.isGocryptfsVault(result.uri);
           if (isGocryptfs) {
             detectedFormat = 'gocryptfs';
@@ -418,7 +405,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
         return;
       }
 
-      // 2. --- CONTAINER FILE LOGIC ---
       final result = await vaultExplorerApi.pickContainer();
       if (result != null) {
         if (widget.mountedUris.contains(result.uri)) {
@@ -442,9 +428,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
     }
   }
 
-  // Treats a stale-cached-key auth failure the same as a null result, so
-  // the caller's existing "clear cache and retry with the real password"
-  // logic actually runs instead of this exception bypassing it entirely.
   Future<T?> _unlockSwallowingStaleAuthFail<T>(Future<T> Function() attempt) async {
     try {
       return await attempt();
@@ -475,7 +458,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
       return;
     }
 
-    // 1. --- CRYPTOMATOR & GOCRYPTFS LOGIC ---
     if (_isCryptomator || _isGocryptfs) {
       setState(() {
         _loading = true;
@@ -549,7 +531,6 @@ class _UnlockSheetState extends State<UnlockSheet> {
       return;
     }
 
-    // 2. --- EXISTING VERACRYPT/LUKS LOGIC ---
     setState(() { _loading = true; _error = null; _activeVolId = null; _progress = null; });
 
     try {
@@ -758,6 +739,24 @@ class _UnlockSheetState extends State<UnlockSheet> {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
+    final inputDecorationTheme = InputDecorationTheme(
+      filled: true,
+      fillColor: cs.surfaceContainerHigh,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: cs.primary, width: 2),
+      ),
+    );
+
     return PopScope(
       canPop: !_loading,
       onPopInvokedWithResult: (didPop, result) {
@@ -769,6 +768,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
         appBar: AppBar(
           title: Text(
             widget.initialUri != null ? 'Unlock Container' : 'Mount Container',
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           bottom: _loading
               ? PreferredSize(
@@ -780,356 +780,270 @@ class _UnlockSheetState extends State<UnlockSheet> {
                 )
               : null,
         ),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── Format Segment Selector (New Container only) ───────────
-                if (widget.initialUri == null) ...[
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(
-                        value: 'veracrypt',
-                        label: Text('Container File'),
-                        icon: Icon(Icons.folder_zip_rounded),
-                      ),
-                      ButtonSegment(
-                        value: 'directory_vault',
-                        label: Text('Folder Vault'),
-                        icon: Icon(Icons.folder_shared_rounded),
-                      ),
-                    ],
-                    selected: {
-                      _isFolderVault ? 'directory_vault' : 'veracrypt',
-                    },
-                    onSelectionChanged: _loading
-                        ? null
-                        : (sel) => setState(() {
-                              _containerFormat = sel.first;
-                              _selectedUri = null;
-                              _selectedName = null;
-                              _error = null;
-                            }),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                // ── Modernized File Picker Card ───────────────────────────
-                GestureDetector(
-                  onTap: _loading ? null : _pickFile,
-                  child: Card(
-                    elevation: 0,
-                    color: _selectedUri != null
-                        ? cs.primaryContainer.withValues(alpha: 0.12)
-                        : cs.surfaceContainerLow,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: _selectedUri != null
-                            ? cs.primary
-                            : cs.outlineVariant.withValues(alpha: 0.5),
-                        width: _selectedUri != null ? 1.5 : 1,
-                      ),
+        body: Theme(
+          data: Theme.of(context).copyWith(
+            inputDecorationTheme: inputDecorationTheme,
+          ),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Format Segment Selector (New Container only) ───────────
+                  if (widget.initialUri == null) ...[
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(
+                          value: 'veracrypt',
+                          label: Text('Container File'),
+                          icon: Icon(Icons.folder_zip_rounded),
+                        ),
+                        ButtonSegment(
+                          value: 'directory_vault',
+                          label: Text('Folder Vault'),
+                          icon: Icon(Icons.folder_shared_rounded),
+                        ),
+                      ],
+                      selected: {
+                        _isFolderVault ? 'directory_vault' : 'veracrypt',
+                      },
+                      onSelectionChanged: _loading
+                          ? null
+                          : (sel) => setState(() {
+                                _containerFormat = sel.first;
+                                _selectedUri = null;
+                                _selectedName = null;
+                                _error = null;
+                              }),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: _selectedUri != null
-                                  ? cs.primaryContainer
-                                  : cs.surfaceContainerHigh,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              _isGocryptfs
-                                  ? Icons.enhanced_encryption_rounded
-                                  : _isFolderVault
-                                      ? Icons.folder_shared_rounded
-                                      : Icons.folder_zip_rounded,
-                              size: 24,
-                              color: _selectedUri != null
-                                  ? cs.onPrimaryContainer
-                                  : cs.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _selectedUri != null
-                                      ? (_isLuks
-                                          ? 'LUKS Container'
-                                          : _isCryptomator
-                                              ? 'Cryptomator Vault'
-                                              : _isGocryptfs
-                                                  ? 'Gocryptfs Vault'
-                                                  : _isBitlocker
-                                                      ? 'BitLocker Drive'
-                                                      : 'Selected Container')
-                                      : (_isFolderVault
-                                          ? 'Cryptomator | Gocryptfs'
-                                          : 'VeraCrypt | LUKS | BitLocker'),
-                                  style: textTheme.labelLarge?.copyWith(
-                                    color: _selectedUri != null
-                                        ? cs.primary
-                                        : cs.onSurfaceVariant,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _selectedName ??
-                                      (_isFolderVault
-                                          ? 'Tap to select vault folder…'
-                                          : 'Tap to select container file…'),
-                                  style: textTheme.bodyMedium?.copyWith(
-                                    color: _selectedUri != null
-                                        ? cs.onSurface
-                                        : cs.onSurfaceVariant,
-                                    fontWeight: _selectedUri != null
-                                        ? FontWeight.w500
-                                        : null,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (_selectedUri != null && widget.initialUri == null) ...[
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 20),
-                              onPressed: _loading
-                                  ? null
-                                  : () => setState(() {
-                                        _selectedUri = null;
-                                        _selectedName = null;
-                                        _containerFormat = 'directory_vault';
-                                      }),
-                              style: IconButton.styleFrom(
-                                backgroundColor: cs.surfaceContainerHigh,
-                                padding: EdgeInsets.zero,
+                    const SizedBox(height: 16),
+                  ],
+
+                  // ── Expressive File Picker Container Card ───────────────────
+                  GestureDetector(
+                    onTap: _loading ? null : _pickFile,
+                    child: Card(
+                      elevation: 0,
+                      color: _selectedUri != null
+                          ? cs.primaryContainer.withValues(alpha: 0.15)
+                          : cs.surfaceContainerLow,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        side: BorderSide(
+                          color: _selectedUri != null
+                              ? cs.primary
+                              : cs.outlineVariant.withValues(alpha: 0.35),
+                          width: _selectedUri != null ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(18),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                color: _selectedUri != null
+                                    ? cs.primaryContainer
+                                    : cs.surfaceContainerHigh,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Icon(
+                                _isGocryptfs
+                                    ? Icons.enhanced_encryption_rounded
+                                    : _isFolderVault
+                                        ? Icons.folder_shared_rounded
+                                        : Icons.folder_zip_rounded,
+                                size: 26,
+                                color: _selectedUri != null
+                                    ? cs.onPrimaryContainer
+                                    : cs.onSurfaceVariant,
                               ),
                             ),
-                          ] else if (_selectedUri != null && widget.initialUri != null) ...[
-                          ] else ...[
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _selectedUri != null
+                                        ? (_isLuks
+                                            ? 'LUKS Container'
+                                            : _isCryptomator
+                                                ? 'Cryptomator Vault'
+                                                : _isGocryptfs
+                                                    ? 'Gocryptfs Vault'
+                                                    : _isBitlocker
+                                                        ? 'BitLocker Drive'
+                                                        : 'Selected Container')
+                                        : (_isFolderVault
+                                            ? 'Cryptomator | Gocryptfs'
+                                            : 'VeraCrypt | LUKS | BitLocker'),
+                                    style: textTheme.labelMedium?.copyWith(
+                                      color: _selectedUri != null
+                                          ? cs.primary
+                                          : cs.onSurfaceVariant,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _selectedName ??
+                                        (_isFolderVault
+                                            ? 'Tap to select vault folder…'
+                                            : 'Tap to select container file…'),
+                                    style: textTheme.bodyLarge?.copyWith(
+                                      color: _selectedUri != null
+                                          ? cs.onSurface
+                                          : cs.onSurfaceVariant,
+                                      fontWeight: _selectedUri != null
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // ── Auth-specific UI ──────────────────────────────────────────
-                if (_loadingAuth)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 40),
-                      child: CircularProgressIndicator(strokeWidth: 3),
-                    ),
-                  )
-                // ── Container file unreachable Card ────────────────────────
-                else if (_containerMissing) ...[
-                  Card(
-                    elevation: 0,
-                    color: cs.errorContainer.withValues(alpha: 0.15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.xl),
-                      side: BorderSide(color: cs.error.withValues(alpha: 0.25)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
+                            if (_selectedUri != null && widget.initialUri == null) ...[
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 20),
+                                onPressed: _loading
+                                    ? null
+                                    : () => setState(() {
+                                          _selectedUri = null;
+                                          _selectedName = null;
+                                          _containerFormat = 'directory_vault';
+                                        }),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: cs.surfaceContainerHigh,
+                                  padding: EdgeInsets.zero,
+                                ),
+                              ),
+                            ] else if (_selectedUri == null) ...[
                               Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
-                                  color: cs.errorContainer,
+                                  color: cs.surfaceContainerHigh,
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
-                                  Icons.find_in_page_outlined,
-                                  color: cs.error,
-                                  size: 28,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Container missing',
-                                      style: textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: cs.onErrorContainer,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'File path could not be resolved',
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: cs.onErrorContainer.withValues(alpha: 0.8),
-                                      ),
-                                    ),
-                                  ],
+                                  Icons.chevron_right_rounded,
+                                  color: cs.onSurfaceVariant,
+                                  size: 18,
                                 ),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'The container file may have been moved, deleted, or its host storage is currently disconnected.',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _loadingAuth = true;
-                                      _containerMissing = false;
-                                    });
-                                    _initUnlockMethod();
-                                  },
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                  ),
-                                  child: const Text('Retry'),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: FilledButton(
-                                  onPressed: _relocateContainer,
-                                  style: FilledButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                  ),
-                                  child: const Text('Locate file'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ] else ...[
-                  // Read-only toggle — shown regardless of unlock method.
-                  Material(
-                    color: cs.surfaceContainerLow,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: SwitchListTile(
-                      value: _readOnly,
-                      onChanged: _loading ? null : (val) => setState(() => _readOnly = val),
-                      title: Text(
-                        'Read-only mode',
-                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                      ),
-                      subtitle: Text(
-                        'Mount without allowing any changes to this container',
-                        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                      ),
-                      secondary: Icon(Icons.visibility_outlined, color: cs.primary),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
-                  // ── Biometric Card ─────────────────────────────────────────
-                  if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
+                  // ── Auth-specific UI ──────────────────────────────────────────
+                  if (_loadingAuth)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: CircularProgressIndicator(strokeWidth: 3),
+                      ),
+                    )
+                  // ── Container File Unreachable Card ────────────────────────
+                  else if (_containerMissing) ...[
                     Card(
                       elevation: 0,
-                      color: cs.surfaceContainerLow,
+                      color: cs.errorContainer.withValues(alpha: 0.15),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.xl),
-                        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+                        borderRadius: BorderRadius.circular(24),
+                        side: BorderSide(color: cs.error.withValues(alpha: 0.3)),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(32),
+                        padding: const EdgeInsets.all(22),
                         child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(24),
-                              decoration: BoxDecoration(
-                                color: cs.primaryContainer.withValues(alpha: 0.4),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.fingerprint_rounded,
-                                size: 64,
-                                color: cs.primary,
-                              ),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: cs.errorContainer,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.find_in_page_outlined,
+                                    color: cs.error,
+                                    size: 26,
+                                  ),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Container Missing',
+                                        style: textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: cs.onErrorContainer,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'File path could not be resolved',
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: cs.onErrorContainer.withValues(alpha: 0.8),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 14),
                             Text(
-                              'Biometric Unlock',
-                              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.center,
+                              'The container file may have been moved, deleted, or its host storage is currently disconnected.',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                height: 1.4,
+                              ),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Authenticate to securely mount the container',
-                              style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 20),
                             Row(
                               children: [
                                 Expanded(
                                   child: OutlinedButton(
-                                    onPressed: () => setState(() => _showPasswordFallback = true),
+                                    onPressed: () {
+                                      setState(() {
+                                        _loadingAuth = true;
+                                        _containerMissing = false;
+                                      });
+                                      _initUnlockMethod();
+                                    },
                                     style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                     ),
-                                    child: const Text('Use Password'),
+                                    child: const Text('Retry'),
                                   ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: FilledButton(
-                                    onPressed: _tryBiometric,
+                                    onPressed: _relocateContainer,
                                     style: FilledButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                     ),
-                                    child: const Text('Authenticate'),
+                                    child: const Text('Locate File'),
                                   ),
                                 ),
                               ],
@@ -1138,229 +1052,321 @@ class _UnlockSheetState extends State<UnlockSheet> {
                         ),
                       ),
                     ),
-                  ]
-                  // ── Pattern Card ───────────────────────────────────────────
-                  else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
-                  Card(
-                    elevation: 0,
-                    color: cs.surfaceContainerLow,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadius.xl),
-                      side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Draw Unlock Pattern',
-                            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _patternError ? 'Wrong pattern — try again' : 'Connect your pattern sequence',
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: _patternError ? cs.error : cs.onSurfaceVariant,
-                              fontWeight: _patternError ? FontWeight.bold : null,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          PatternLockView(
-                            key: ValueKey(_patternResetKey),
-                            onPatternComplete: _onPatternComplete,
-                            showError: _patternError,
-                          ),
-                          const SizedBox(height: 24),
-                          OutlinedButton(
-                            onPressed: () => setState(() => _showPasswordFallback = true),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            child: const Text('Use Password instead'),
-                          ),
-                        ],
+                  ] else ...[
+                    // Read-only mode toggle
+                    Material(
+                      color: cs.surfaceContainerHigh,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: SwitchListTile(
+                        value: _readOnly,
+                        onChanged: _loading ? null : (val) => setState(() => _readOnly = val),
+                        title: Text(
+                          'Read-only mode',
+                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          'Mount without allowing changes to this container',
+                          style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        secondary: Icon(Icons.visibility_outlined, color: cs.primary),
                       ),
                     ),
-                  ),
-                ]
-                // ── Standard password fields ───────────────────────────────
-                else if (_showPasswordUI) ...[
-                  AutofillGroup(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // 1. Password Field
-                        TextField(
-                          controller: _passwordCtrl,
-                          obscureText: _obscure,
-                          autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
-                          onChanged: (_) => setState(() {}),
-                          keyboardType: TextInputType.visiblePassword,
-                          autofillHints: const [AutofillHints.password],
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            hintText: _isFolderVault
-                                ? 'Enter vault password'
-                                : _isBitlocker
-                                    ? 'Enter password or recovery key'
-                                    : 'Enter container password',
-                            prefixIcon: Icon(Icons.lock_outline_rounded, size: 22, color: cs.primary),
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_passwordPrefilled)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 4),
-                                    child: Tooltip(
-                                      message: 'Using saved password',
-                                      child: Icon(
-                                        Icons.bookmark_rounded,
-                                        size: 20,
-                                        color: cs.primary,
+                    const SizedBox(height: 16),
+
+                    // ── Biometric Unlock Card ──────────────────────────────────
+                    if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
+                      Card(
+                        elevation: 0,
+                        color: cs.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: cs.primaryContainer.withValues(alpha: 0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.fingerprint_rounded,
+                                  size: 56,
+                                  color: cs.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                'Biometric Unlock',
+                                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Authenticate to securely mount the container',
+                                style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 28),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () => setState(() => _showPasswordFallback = true),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
                                       ),
+                                      child: const Text('Use Password'),
                                     ),
                                   ),
-                                PasswordVisibilityToggle(
-                                  obscured: _obscure,
-                                  onToggle: () => setState(() => _obscure = !_obscure),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                            ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: FilledButton(
+                                      onPressed: _tryBiometric,
+                                      style: FilledButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                      ),
+                                      child: const Text('Authenticate'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 16),
-
-                        // 2. Keyfiles Selection Box (Gated: hidden for Directory Vaults & BitLocker)
-                        if (!_isFolderVault && !_isBitlocker) ...[
-                          KeyfilesPicker(
-                            keyfiles: _keyfiles,
-                            picking: _pickingKeyfiles,
-                            onPick: _pickKeyfiles,
-                            onRemove: _removeKeyfile,
-                          ),
-                          if (_isLuks && _keyfiles.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4, left: 4),
-                              child: Text(
-                                'For LUKS containers the keyfile replaces the password.',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                            ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // 3. Collapsible Advanced parameters (Gated: hidden for LUKS, Vaults & BitLocker)
-                        if (!_isLuks && !_isFolderVault && !_isBitlocker) ...[
-                          AdvancedParamsPanel(
-                            pimController: _pimCtrl,
-                            cipherId: _cipherId,
-                            hashId: _hashId,
-                            enabled: !_loading,
-                            onCipherChanged: (val) => setState(() => _cipherId = val),
-                            onHashChanged: (val) => setState(() => _hashId = val),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // 4. Remember container Toggle
-                        if (widget.initialUri == null) ...[
-                          Material(
-                            color: cs.surfaceContainerLow,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(
-                                color: cs.outlineVariant.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: SwitchListTile(
-                              value: _remember,
-                              onChanged: (val) => setState(() => _remember = val),
-                              title: Text(
-                                'Remember container',
-                                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                              ),
-                              subtitle: Text(
-                                'Pin container on dashboard for quick access',
-                                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                              ),
-                              secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 16),
-                    InlineErrorBanner(_error!),
-                  ],
-                  const SizedBox(height: 32),
-
-                  // Primary Unlock Action Button
-                  FilledButton(
-                    onPressed: _loading ? null : _unlock,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(56),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: _loading
-                        ? Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                      ),
+                    ]
+                    // ── Pattern Unlock Card ───────────────────────────────────
+                    else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
+                      Card(
+                        elevation: 0,
+                        color: cs.surfaceContainerLow,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.5,
-                                  color: cs.onPrimary,
+                              Text(
+                                'Draw Unlock Pattern',
+                                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _patternError ? 'Wrong pattern — try again' : 'Connect your pattern sequence',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: _patternError ? cs.error : cs.onSurfaceVariant,
+                                  fontWeight: _patternError ? FontWeight.bold : null,
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Flexible(
-                                child: Text(
-                                  _unlockProgressLabel,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: textTheme.titleMedium?.copyWith(
-                                    color: cs.primary,
-                                    fontWeight: FontWeight.bold,
+                              const SizedBox(height: 20),
+                              PatternLockView(
+                                key: ValueKey(_patternResetKey),
+                                onPatternComplete: _onPatternComplete,
+                                showError: _patternError,
+                              ),
+                              const SizedBox(height: 20),
+                              OutlinedButton(
+                                onPressed: () => setState(() => _showPasswordFallback = true),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(48),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
                                   ),
+                                ),
+                                child: const Text('Use Password instead'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ]
+                    // ── Standard Password UI ───────────────────────────────
+                    else if (_showPasswordUI) ...[
+                      AutofillGroup(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 1. Password Field
+                            TextField(
+                              controller: _passwordCtrl,
+                              obscureText: _obscure,
+                              autofocus: widget.initialUri != null && widget.prefillPassword?.isEmpty != false,
+                              onChanged: (_) => setState(() {}),
+                              keyboardType: TextInputType.visiblePassword,
+                              autofillHints: const [AutofillHints.password],
+                              decoration: InputDecoration(
+                                labelText: 'Password',
+                                hintText: _isFolderVault
+                                    ? 'Enter vault password'
+                                    : _isBitlocker
+                                        ? 'Enter password or recovery key'
+                                        : 'Enter container password',
+                                prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+                                suffixIcon: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_passwordPrefilled)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 4),
+                                        child: Tooltip(
+                                          message: 'Using saved password',
+                                          child: Icon(
+                                            Icons.bookmark_rounded,
+                                            size: 20,
+                                            color: cs.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    PasswordVisibilityToggle(
+                                      obscured: _obscure,
+                                      onToggle: () => setState(() => _obscure = !_obscure),
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // 2. Keyfiles Selection Box
+                            if (!_isFolderVault && !_isBitlocker) ...[
+                              KeyfilesPicker(
+                                keyfiles: _keyfiles,
+                                picking: _pickingKeyfiles,
+                                onPick: _pickKeyfiles,
+                                onRemove: _removeKeyfile,
+                              ),
+                              if (_isLuks && _keyfiles.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 6, left: 4),
+                                  child: Text(
+                                    'For LUKS containers the keyfile replaces the password.',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(height: 16),
+                            ],
+
+                            // 3. Collapsible Advanced Parameters
+                            if (!_isLuks && !_isFolderVault && !_isBitlocker) ...[
+                              AdvancedParamsPanel(
+                                pimController: _pimCtrl,
+                                cipherId: _cipherId,
+                                hashId: _hashId,
+                                enabled: !_loading,
+                                onCipherChanged: (val) => setState(() => _cipherId = val),
+                                onHashChanged: (val) => setState(() => _hashId = val),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+
+                            // 4. Remember Container Toggle
+                            if (widget.initialUri == null) ...[
+                              Material(
+                                color: cs.surfaceContainerHigh,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: SwitchListTile(
+                                  value: _remember,
+                                  onChanged: (val) => setState(() => _remember = val),
+                                  title: Text(
+                                    'Remember container',
+                                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Text(
+                                    'Pin container on dashboard for quick access',
+                                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                  ),
+                                  secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
                                 ),
                               ),
                             ],
-                          )
-                        : Text(
-                            _isFolderVault ? 'Unlock Vault' : 'Unlock Container',
-                            style: textTheme.titleMedium?.copyWith(
-                              color: cs.onPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
-                   if (_loading && _activeVolId != null) ...[
-                    const SizedBox(height: 8),
-                    Center(
-                      child: TextButton(
-                        onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
-                        child: const Text('Cancel'),
+                          ],
+                        ),
                       ),
-                    ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 16),
+                        InlineErrorBanner(_error!),
+                      ],
+                      const SizedBox(height: 28),
+
+                      // Primary Unlock Button
+                      FilledButton(
+                        onPressed: _loading ? null : _unlock,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                          shape: const StadiumBorder(),
+                        ),
+                        child: _loading
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: cs.onPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Flexible(
+                                    child: Text(
+                                      _unlockProgressLabel,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: textTheme.titleMedium?.copyWith(
+                                        color: cs.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                _isFolderVault ? 'Unlock Vault' : 'Unlock Container',
+                                style: textTheme.titleMedium?.copyWith(
+                                  color: cs.onPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                      if (_loading && _activeVolId != null) ...[
+                        const SizedBox(height: 8),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
+                            child: const Text('Cancel Unlock'),
+                          ),
+                        ),
+                      ],
+                    ] else if (_error != null) ...[
+                      const SizedBox(height: 16),
+                      InlineErrorBanner(_error!),
+                    ],
                   ],
-                ] else if (_error != null) ...[
-                  const SizedBox(height: 16),
-                  InlineErrorBanner(_error!),
                 ],
-                ],
-              ],
+              ),
             ),
           ),
         ),

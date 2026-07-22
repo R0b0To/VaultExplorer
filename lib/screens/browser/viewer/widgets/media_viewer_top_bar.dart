@@ -27,12 +27,14 @@ class MediaViewerTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 8,
+        top: MediaQuery.paddingOf(context).top + 8,
         bottom: 24,
-        left: 8,
-        right: 8,
+        left: 12,
+        right: 12,
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -46,12 +48,14 @@ class MediaViewerTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+          // M3 Tactile Back Button
+          _TopBarCircleButton(
+            icon: Icons.arrow_back_rounded,
+            tooltip: 'Back',
             onPressed: onBackPressed,
-            iconSize: 24,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
+          // Title & Subtitle Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,10 +63,10 @@ class MediaViewerTopBar extends StatelessWidget {
               children: [
                 Text(
                   currentFileName.split('/').last,
-                  style: const TextStyle(
+                  style: textTheme.titleMedium?.copyWith(
                     color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.1,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -73,15 +77,16 @@ class MediaViewerTopBar extends StatelessWidget {
                     playlistController.isPlaylistMode
                         ? '${playlistController.currentIndex + 1} of $totalCount${playlistController.isScanningSubfolders ? '  ·  scanning…' : ''}'
                         : 'Scanning…',
-                    style: TextStyle(
+                    style: textTheme.bodySmall?.copyWith(
                       color: Colors.white.withValues(alpha: 0.7),
-                      fontSize: 12,
                     ),
                   ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           _buildPlaylistMenu(context, cs),
+          const SizedBox(width: 8),
           _buildMoreMenu(context, cs),
         ],
       ),
@@ -95,19 +100,28 @@ class MediaViewerTopBar extends StatelessWidget {
     final isThisFolderSelected = isPlaylist && folderScope == 'Current Folder Only';
     final isAllSelected = isPlaylist && folderScope == 'All';
 
+    final menuStyle = MenuStyle(
+      elevation: const WidgetStatePropertyAll(4),
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(vertical: 8),
+      ),
+    );
+
     return MenuAnchor(
-      builder: (ctx, controller, child) => IconButton(
+      style: menuStyle,
+      builder: (ctx, controller, child) => _TopBarCircleButton(
+        icon: isPlaylist ? Icons.playlist_play_rounded : Icons.playlist_add_rounded,
+        iconColor: isPlaylist ? cs.primary : Colors.white,
+        tooltip: isPlaylist ? 'Playlist Options' : 'Enable Playlist',
         onPressed: () {
           HapticFeedback.lightImpact();
           controller.isOpen ? controller.close() : controller.open();
         },
-        icon: Icon(
-          playlistController.isPlaylistMode
-              ? Icons.playlist_play_rounded
-              : Icons.playlist_add_rounded,
-          color: playlistController.isPlaylistMode ? cs.primary : Colors.white,
-        ),
-        tooltip: playlistController.isPlaylistMode ? 'Playlist Options' : 'Enable Playlist',
       ),
       menuChildren: [
         MenuItemButton(
@@ -115,7 +129,6 @@ class MediaViewerTopBar extends StatelessWidget {
             foregroundColor: isThisFolderSelected ? cs.primary : null,
           ),
           onPressed: () async {
-            // 1. Capture the currently viewed file before altering the playlist
             final targetFile = playlistController.currentFile;
 
             if (isThisFolderSelected) {
@@ -124,7 +137,6 @@ class MediaViewerTopBar extends StatelessWidget {
               await playlistController.enablePlaylist('Current Folder Only');
             }
 
-            // 2. Find where the file ended up in the new playlist and update the index
             final newIndex = playlistController.playlist.indexOf(targetFile);
             if (newIndex != -1) {
               playlistController.updateIndex(newIndex);
@@ -133,8 +145,8 @@ class MediaViewerTopBar extends StatelessWidget {
             onPlaylistChanged();
           },
           leadingIcon: isThisFolderSelected
-              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-              : const SizedBox(width: 16),
+              ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+              : const SizedBox(width: 18),
           child: const Text('This Folder'),
         ),
         MenuItemButton(
@@ -142,7 +154,6 @@ class MediaViewerTopBar extends StatelessWidget {
             foregroundColor: isAllSelected ? cs.primary : null,
           ),
           onPressed: () async {
-            // 1. Capture the currently viewed file before altering the playlist
             final targetFile = playlistController.currentFile;
 
             if (isAllSelected) {
@@ -151,7 +162,6 @@ class MediaViewerTopBar extends StatelessWidget {
               await playlistController.enablePlaylist('All');
             }
 
-            // 2. Find where the file ended up in the new playlist and update the index
             final newIndex = playlistController.playlist.indexOf(targetFile);
             if (newIndex != -1) {
               playlistController.updateIndex(newIndex);
@@ -160,8 +170,8 @@ class MediaViewerTopBar extends StatelessWidget {
             onPlaylistChanged();
           },
           leadingIcon: isAllSelected
-              ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-              : const SizedBox(width: 16),
+              ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+              : const SizedBox(width: 18),
           child: const Text('All (Incl. Subfolders)'),
         ),
         if (playlistController.isPlaylistMode) ...[
@@ -171,12 +181,10 @@ class MediaViewerTopBar extends StatelessWidget {
               foregroundColor: playlistController.isShuffled ? cs.primary : null,
             ),
             onPressed: () {
-              // 1. Capture current file
               final targetFile = playlistController.currentFile;
               
               playlistController.toggleShuffle();
 
-              // 2. Restore index so we don't jump when shuffling/unshuffling
               final newIndex = playlistController.playlist.indexOf(targetFile);
               if (newIndex != -1) {
                 playlistController.updateIndex(newIndex);
@@ -186,7 +194,7 @@ class MediaViewerTopBar extends StatelessWidget {
             },
             leadingIcon: Icon(
               Icons.shuffle_rounded,
-              size: 16,
+              size: 18,
               color: playlistController.isShuffled ? cs.primary : cs.onSurfaceVariant,
             ),
             child: Text(
@@ -201,14 +209,27 @@ class MediaViewerTopBar extends StatelessWidget {
   }
 
   Widget _buildMoreMenu(BuildContext context, ColorScheme cs) {
+    final menuStyle = MenuStyle(
+      elevation: const WidgetStatePropertyAll(4),
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+      ),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(vertical: 8),
+      ),
+    );
+
     return MenuAnchor(
-      builder: (ctx, controller, child) => IconButton(
+      style: menuStyle,
+      builder: (ctx, controller, child) => _TopBarCircleButton(
+        icon: Icons.more_vert_rounded,
+        tooltip: 'More Actions',
         onPressed: () {
           HapticFeedback.lightImpact();
           controller.isOpen ? controller.close() : controller.open();
         },
-        icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
-        tooltip: 'More Actions',
       ),
       menuChildren: [
         MenuItemButton(
@@ -286,6 +307,45 @@ class MediaViewerTopBar extends StatelessWidget {
           child: const Text('Delete File'),
         ),
       ],
+    );
+  }
+}
+
+// ── Translucent M3 Top-Bar Action Button ─────────────────────────────────────
+
+class _TopBarCircleButton extends StatelessWidget {
+  final IconData icon;
+  final Color? iconColor;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _TopBarCircleButton({
+    required this.icon,
+    this.iconColor,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.14),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Icon(
+              icon,
+              size: 20,
+              color: iconColor ?? Colors.white,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -6,11 +6,9 @@ import '../../../utils/format_utils.dart';
 import '../../../theme.dart';
 import '../../../widgets/common_widgets.dart';
 
-// ── Base Container Card (Internal) ──────────────────────────────────────────
+// ── Base Container Card (Internal Expressive Layout) ───────────────────────
 
 class _BaseContainerCard extends StatelessWidget {
-  static const double _bottomAreaHeight = 14.0;
-
   final VoidCallback onTap;
   final IconData icon;
   final Color iconColor;
@@ -18,7 +16,7 @@ class _BaseContainerCard extends StatelessWidget {
   final String title;
   final Widget subtitle;
   final Widget? trailingAction;
-  final Widget? bottomContent; // optional progress bar row
+  final Widget? bottomContent;
   final Color? backgroundColor;
   final BorderRadiusGeometry? borderRadius;
 
@@ -39,8 +37,8 @@ class _BaseContainerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    
-    final effectiveRadius = borderRadius ?? BorderRadius.circular(AppRadius.xl);
+
+    final effectiveRadius = borderRadius ?? BorderRadius.circular(24);
 
     return Card(
       elevation: 0,
@@ -48,12 +46,14 @@ class _BaseContainerCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: effectiveRadius,
-        side: BorderSide.none,
+        side: BorderSide(
+          color: cs.outlineVariant.withValues(alpha: 0.35),
+        ),
       ),
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -62,15 +62,15 @@ class _BaseContainerCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    width: 56,
-                    height: 56,
+                    width: 52,
+                    height: 52,
                     decoration: BoxDecoration(
                       color: iconBackgroundColor,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: Icon(icon, size: 28, color: iconColor),
+                    child: Icon(icon, size: 26, color: iconColor),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,27 +79,27 @@ class _BaseContainerCard extends StatelessWidget {
                         Text(
                           title,
                           style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.1,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.1,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         subtitle,
                       ],
                     ),
                   ),
                   if (trailingAction != null) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     trailingAction!,
                   ],
                 ],
               ),
-              // Fixed-height bottom area – same size in locked & unlocked cards
-              SizedBox(
-                height: _bottomAreaHeight,
-                child: bottomContent ?? const SizedBox.shrink(),
-              ),
+              // Dynamic bottom area for storage progress bar
+              if (bottomContent != null) ...[
+                const SizedBox(height: 14),
+                bottomContent!,
+              ],
             ],
           ),
         ),
@@ -140,12 +140,12 @@ class ContainerCard extends StatelessWidget {
     final hasSpace = container.totalSpace > 0;
     final isUsb = container.uri.startsWith('usb:');
 
-    // Subtitle without the bar – bar goes in the bottom area
+    // Subtitle with storage metrics
     Widget subtitleWidget;
     if (hasSpace) {
       subtitleWidget = Text(
         '${formatBytes(container.freeSpace)} free · ${formatBytes(container.totalSpace)} total',
-        style: textTheme.bodyMedium?.copyWith(
+        style: textTheme.bodySmall?.copyWith(
           color: cs.onSurfaceVariant,
         ),
         overflow: TextOverflow.ellipsis,
@@ -153,31 +153,28 @@ class ContainerCard extends StatelessWidget {
     } else {
       subtitleWidget = Text(
         'Vol ${container.volId} · Mounted',
-        style: textTheme.bodyMedium?.copyWith(
+        style: textTheme.bodySmall?.copyWith(
           color: cs.onSurfaceVariant,
         ),
         overflow: TextOverflow.ellipsis,
       );
     }
 
-    // Bottom content: mini progress bar row (only if space info is available)
+    // Bottom content: mini progress bar
     Widget? bottomContent;
     if (hasSpace) {
-      bottomContent = Padding(
-        padding: const EdgeInsets.only(top: 8.0), // space above the bar
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.full),
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: usedFraction),
-            duration: AppMotion.long1,
-            curve: AppMotion.standard,
-            builder: (context, animatedFraction, _) => LinearProgressIndicator(
-              value: animatedFraction,
-              minHeight: 6,
-              backgroundColor: cs.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                _barColor(usedFraction, cs),
-              ),
+      bottomContent = ClipRRect(
+        borderRadius: BorderRadius.circular(100),
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: usedFraction),
+          duration: AppMotion.long1,
+          curve: AppMotion.standard,
+          builder: (context, animatedFraction, _) => LinearProgressIndicator(
+            value: animatedFraction,
+            minHeight: 6,
+            backgroundColor: cs.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              _barColor(usedFraction, cs),
             ),
           ),
         ),
@@ -193,6 +190,7 @@ class ContainerCard extends StatelessWidget {
       subtitle: subtitleWidget,
       trailingAction: _LockButton(container: container, onLocked: onLocked),
       bottomContent: bottomContent,
+      backgroundColor: cs.surfaceContainer,
       borderRadius: borderRadius,
     );
   }
@@ -223,11 +221,11 @@ class SavedContainerCard extends StatelessWidget {
       onTap: onUnlock,
       icon: isUsb ? Icons.usb_rounded : Icons.folder_zip_rounded,
       iconColor: cs.onSurfaceVariant,
-      iconBackgroundColor: cs.surfaceContainerHighest,
+      iconBackgroundColor: cs.surfaceContainerHigh,
       title: name,
       subtitle: Text(
-        isUsb ? 'USB drive' : 'Locked container',
-        style: textTheme.bodyMedium?.copyWith(
+        isUsb ? 'USB Drive · Locked' : 'Locked container',
+        style: textTheme.bodySmall?.copyWith(
           color: cs.onSurfaceVariant,
         ),
         overflow: TextOverflow.ellipsis,
@@ -238,12 +236,11 @@ class SavedContainerCard extends StatelessWidget {
       ),
       backgroundColor: cs.surfaceContainerLow,
       borderRadius: borderRadius,
-      // bottomContent is omitted → the fixed 28dp area remains empty
     );
   }
 }
 
-// ── Compact Icon‑Only Action Button (Android 16+ pill shape) ──────────────
+// ── Compact Icon-Only Action Button (Android 16+ M3 Pill Shape) ──────────────
 class _CompactIconButton extends StatelessWidget {
   final IconData icon;
   final bool isLoading;

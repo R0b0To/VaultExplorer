@@ -28,7 +28,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   final List<KeyfileRef> _oldKeyfiles = [];
   bool _pickingOldKeyfiles = false;
-  
+
   final List<KeyfileRef> _newKeyfiles = [];
   bool _pickingNewKeyfiles = false;
 
@@ -143,172 +143,104 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     }
   }
 
-  InputDecoration _getInputDecoration(
-    ColorScheme cs, {
-    required String labelText,
-    IconData? prefixIcon,
-    Widget? suffixIcon,
-  }) {
-    return InputDecoration(
-      labelText: labelText,
-      prefixIcon: prefixIcon != null ? Icon(prefixIcon, size: 22, color: cs.primary) : null,
-      suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: cs.surfaceContainerLow,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: cs.outlineVariant),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: cs.outlineVariant),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: cs.primary, width: 2),
-      ),
-    );
-  }
-
   Widget _buildCurrentCredentials(ColorScheme cs, TextTheme textTheme) {
-    return Material(
-      color: cs.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ListTile(
-            leading: Icon(Icons.lock_clock_rounded, color: cs.primary),
-            title: Text('Current Credentials', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
-            subtitle: Text('Enter existing container credentials', style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          ),
-          Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _oldPasswordCtrl,
-                  obscureText: _oldObscure,
-                  onChanged: (_) => setState(() {}),
-                  autofillHints: const [AutofillHints.password],
-                  decoration: _getInputDecoration(
-                    cs,
-                    labelText: 'Old Password',
-                    prefixIcon: Icons.lock_outline_rounded,
-                    suffixIcon: PasswordVisibilityToggle(
-                      obscured: _oldObscure,
-                      onToggle: () => setState(() => _oldObscure = !_oldObscure),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _oldPimCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: _getInputDecoration(
-                    cs,
-                    labelText: 'Old PIM (Optional)',
-                    prefixIcon: Icons.pin_rounded,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                KeyfilesPicker(
-                  keyfiles: _oldKeyfiles,
-                  picking: _pickingOldKeyfiles,
-                  onPick: _pickOldKeyfiles,
-                  onRemove: _removeOldKeyfile,
-                  enabled: !_isProcessing,
-                ),
-              ],
+    return _ExpressiveCard(
+      children: [
+        const _ExpressiveSectionHeader(
+          title: 'Current Credentials',
+          subtitle: 'Enter existing container password and keyfiles',
+          icon: Icons.lock_clock_rounded,
+        ),
+        TextField(
+          controller: _oldPasswordCtrl,
+          obscureText: _oldObscure,
+          onChanged: (_) => setState(() {}),
+          autofillHints: const [AutofillHints.password],
+          decoration: InputDecoration(
+            labelText: 'Old Password',
+            prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+            suffixIcon: PasswordVisibilityToggle(
+              obscured: _oldObscure,
+              onToggle: () => setState(() => _oldObscure = !_oldObscure),
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _oldPimCtrl,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: 'Old PIM (Optional)',
+            prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+          ),
+        ),
+        const SizedBox(height: 16),
+        KeyfilesPicker(
+          keyfiles: _oldKeyfiles,
+          picking: _pickingOldKeyfiles,
+          onPick: _pickOldKeyfiles,
+          onRemove: _removeOldKeyfile,
+          enabled: !_isProcessing,
+        ),
+      ],
     );
   }
 
   Widget _buildNewCredentials(ColorScheme cs, TextTheme textTheme) {
-    return Material(
-      color: cs.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ListTile(
-            leading: Icon(Icons.lock_reset_rounded, color: cs.primary),
-            title: Text('New Credentials', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500)),
-            subtitle: Text('Set new container credentials', style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          ),
-          Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.5)),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _newPasswordCtrl,
-                  obscureText: _newObscure,
-                  onChanged: (_) => setState(() {}),
-                  autofillHints: const [AutofillHints.newPassword],
-                  decoration: _getInputDecoration(
-                    cs,
-                    labelText: 'New Password',
-                    prefixIcon: Icons.lock_outline_rounded,
-                    suffixIcon: PasswordVisibilityToggle(
-                      obscured: _newObscure,
-                      onToggle: () => setState(() => _newObscure = !_newObscure),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _confirmPasswordCtrl,
-                  obscureText: _confirmObscure,
-                  onChanged: (_) => setState(() {}),
-                  autofillHints: const [AutofillHints.newPassword],
-                  decoration: _getInputDecoration(
-                    cs,
-                    labelText: 'Confirm New Password',
-                    prefixIcon: Icons.check_circle_outline_rounded,
-                    suffixIcon: PasswordVisibilityToggle(
-                      obscured: _confirmObscure,
-                      onToggle: () => setState(() => _confirmObscure = !_confirmObscure),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _newPimCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: _getInputDecoration(
-                    cs,
-                    labelText: 'New PIM (Optional)',
-                    prefixIcon: Icons.pin_rounded,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                KeyfilesPicker(
-                  keyfiles: _newKeyfiles,
-                  picking: _pickingNewKeyfiles,
-                  onPick: _pickNewKeyfiles,
-                  onRemove: _removeNewKeyfile,
-                  enabled: !_isProcessing,
-                ),
-              ],
+    return _ExpressiveCard(
+      children: [
+        const _ExpressiveSectionHeader(
+          title: 'New Credentials',
+          subtitle: 'Set new container password, PIM and keyfiles',
+          icon: Icons.lock_reset_rounded,
+        ),
+        TextField(
+          controller: _newPasswordCtrl,
+          obscureText: _newObscure,
+          onChanged: (_) => setState(() {}),
+          autofillHints: const [AutofillHints.newPassword],
+          decoration: InputDecoration(
+            labelText: 'New Password',
+            prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+            suffixIcon: PasswordVisibilityToggle(
+              obscured: _newObscure,
+              onToggle: () => setState(() => _newObscure = !_newObscure),
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _confirmPasswordCtrl,
+          obscureText: _confirmObscure,
+          onChanged: (_) => setState(() {}),
+          autofillHints: const [AutofillHints.newPassword],
+          decoration: InputDecoration(
+            labelText: 'Confirm New Password',
+            prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
+            suffixIcon: PasswordVisibilityToggle(
+              obscured: _confirmObscure,
+              onToggle: () => setState(() => _confirmObscure = !_confirmObscure),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _newPimCtrl,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: 'New PIM (Optional)',
+            prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+          ),
+        ),
+        const SizedBox(height: 16),
+        KeyfilesPicker(
+          keyfiles: _newKeyfiles,
+          picking: _pickingNewKeyfiles,
+          onPick: _pickNewKeyfiles,
+          onRemove: _removeNewKeyfile,
+          enabled: !_isProcessing,
+        ),
+      ],
     );
   }
 
@@ -317,6 +249,24 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    final inputDecorationTheme = InputDecorationTheme(
+      filled: true,
+      fillColor: cs.surfaceContainerHigh,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(color: cs.primary, width: 2),
+      ),
+    );
 
     final actionArea = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -329,9 +279,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           onPressed: _isProcessing ? null : _submit,
           style: FilledButton.styleFrom(
             minimumSize: const Size.fromHeight(56),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(28),
-            ),
+            shape: const StadiumBorder(),
           ),
           child: _isProcessing
               ? SizedBox(
@@ -342,7 +290,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     valueColor: AlwaysStoppedAnimation(cs.onPrimary),
                   ),
                 )
-              : const Text('Change Password'),
+              : const Text(
+                  'Change Password',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
         ),
       ],
     );
@@ -358,40 +309,130 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: isLandscape
-              ? Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: _buildCurrentCredentials(cs, textTheme),
-                    ),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _buildNewCredentials(cs, textTheme),
-                          const SizedBox(height: 24),
-                          actionArea,
-                        ],
-                      ),
-                    ),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildCurrentCredentials(cs, textTheme),
-                    const SizedBox(height: 20),
-                    _buildNewCredentials(cs, textTheme),
-                    const SizedBox(height: 24),
-                    actionArea,
-                  ],
-                ),
+      body: Theme(
+        data: Theme.of(context).copyWith(
+          inputDecorationTheme: inputDecorationTheme,
         ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: isLandscape
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildCurrentCredentials(cs, textTheme),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildNewCredentials(cs, textTheme),
+                            const SizedBox(height: 20),
+                            actionArea,
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildCurrentCredentials(cs, textTheme),
+                      const SizedBox(height: 16),
+                      _buildNewCredentials(cs, textTheme),
+                      const SizedBox(height: 20),
+                      actionArea,
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Android 16/17 Expressive Card Wrapper ──────────────────────────────────────
+
+class _ExpressiveCard extends StatelessWidget {
+  final List<Widget> children;
+  const _ExpressiveCard({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      color: cs.surfaceContainerLow,
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Expressive Section Header ────────────────────────────────────────────────
+
+class _ExpressiveSectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  const _ExpressiveSectionHeader({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, size: 20, color: cs.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

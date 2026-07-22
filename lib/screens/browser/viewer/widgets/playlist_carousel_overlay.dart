@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '/../../models/mounted_container.dart';
@@ -79,7 +80,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
         (_tileWidth / 2);
     final maxExt = _scrollController.position.maxScrollExtent;
     final clamped = target.clamp(0.0, maxExt > 0 ? maxExt : 0.0);
-    
+
     if (animate && maxExt > 0) {
       _scrollController.animateTo(
         clamped,
@@ -102,6 +103,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
     return Container(
       height: PlaylistCarouselOverlay.height,
       decoration: BoxDecoration(
@@ -120,21 +122,33 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Close Carousel Top Action
             Padding(
-              padding: const EdgeInsets.only(right: 8, top: 8),
+              padding: const EdgeInsets.only(right: 12, top: 8),
               child: Align(
                 alignment: Alignment.centerRight,
-                child: IconButton(
-                  iconSize: 22,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white70,
+                child: Tooltip(
+                  message: 'Close Carousel',
+                  child: Material(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    shape: const CircleBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: widget.onClose,
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
                   ),
-                  tooltip: 'Close carousel',
-                  onPressed: widget.onClose,
                 ),
               ),
             ),
+            // Horizontal Expressive Thumbnail List
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
@@ -150,14 +164,14 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                       width: _tileWidth,
                       margin: const EdgeInsets.only(right: _tileSpacing),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isSelected ? cs.primary : Colors.white24,
-                          width: isSelected ? 2.5 : 1,
+                          width: isSelected ? 3 : 1,
                         ),
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(isSelected ? 7.5 : 9.0),
+                        borderRadius: BorderRadius.circular(isSelected ? 13 : 15),
                         child: _CarouselThumb(
                           key: ValueKey(fileName),
                           container: widget.container,
@@ -171,6 +185,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                 },
               ),
             ),
+            // Position Scrubber Row
             if (widget.playlist.length > 1)
               Padding(
                 padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12, top: 4),
@@ -179,18 +194,18 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                     Text(
                       '${widget.currentIndex + 1}',
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: Colors.white,
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: SizedBox(
-                        height: 24, 
+                        height: 24,
                         child: SliderTheme(
                           data: SliderTheme.of(context).copyWith(
-                            trackHeight: 2.0,
+                            trackHeight: 3.0,
                             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
                             overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0),
                             activeTrackColor: cs.primary,
@@ -216,7 +231,8 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                                 },
                                 onChangeEnd: (val) {
                                   _isDraggingSlider = false;
-                                  if (_scrollController.hasClients && _scrollController.position.maxScrollExtent <= 0) {
+                                  if (_scrollController.hasClients &&
+                                      _scrollController.position.maxScrollExtent <= 0) {
                                     _sliderProportion.value = 0.0;
                                   }
                                 },
@@ -230,9 +246,9 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
                     Text(
                       '${widget.playlist.length}',
                       style: const TextStyle(
-                        color: Colors.white70,
+                        color: Colors.white,
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
@@ -347,9 +363,9 @@ class _CarouselThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     if (MediaViewerConstants.isAudio(fileName)) {
       return Container(
-        color: const Color(0xFF161B22),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: const Center(
-          child: Icon(Icons.music_note_rounded, color: Colors.white54, size: 26),
+          child: Icon(Icons.music_note_rounded, color: Colors.white70, size: 28),
         ),
       );
     }
@@ -378,34 +394,41 @@ class _CarouselThumb extends StatelessWidget {
         children: [
           Image.memory(bytes, fit: BoxFit.cover, cacheHeight: cacheHeight),
           if (isVideo)
-            const Positioned(
-              right: 4,
-              bottom: 4,
-              child: Icon(
-                Icons.play_circle_fill_rounded,
-                color: Colors.white70,
-                size: 18,
+            Positioned(
+              right: 6,
+              bottom: 6,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 14,
+                ),
               ),
             ),
         ],
       ),
       loadingBuilder: (context) => Container(
-        color: const Color(0xFF161B22),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: const Center(
           child: SizedBox(
             width: 16,
             height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white38),
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
           ),
         ),
       ),
       errorBuilder: (context) => Container(
-        color: const Color(0xFF161B22),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         child: Center(
           child: Icon(
             isVideo ? Icons.videocam_off_rounded : Icons.broken_image_rounded,
-            color: Colors.white38,
-            size: 20,
+            color: Colors.white54,
+            size: 22,
           ),
         ),
       ),

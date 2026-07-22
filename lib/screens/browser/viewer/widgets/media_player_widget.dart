@@ -108,10 +108,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   final TransformationController _videoTransformationController =
       TransformationController();
-  
+
   static const double _minZoomScale = 1.0;
   static const double _maxZoomScale = 2.2;
-  
+
   double _videoScale = _minZoomScale;
   TapDownDetails? _videoDoubleTapDetails;
 
@@ -145,7 +145,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         controller.dispose();
         return;
       }
-      
+
       setState(() {
         _initialized = true;
         _playerError = null;
@@ -228,7 +228,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     }
     widget.onVideoControllerDisposed();
     _videoTransformationController.dispose();
-    
+
     if (_initialized) {
       final ctrl = _controller;
       try {
@@ -306,11 +306,11 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       widget.onZoomChanged(!zoomIn);
     });
   }
-  
+
   Future<void> _skip({required bool backwards}) async {
-    if (_isSeeking) return; 
+    if (_isSeeking) return;
     _isSeeking = true;
-    
+
     HapticFeedback.lightImpact();
     final currentPos = _controller.value.position;
     final duration = _controller.value.duration;
@@ -328,10 +328,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         _showRightIndicator = true;
       }
     });
-    
+
     await _controller.seekTo(clampedPos);
-    
-    if (!mounted) return; 
+
+    if (!mounted) return;
     _isSeeking = false;
 
     _indicatorTimer?.cancel();
@@ -351,16 +351,29 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
     if (_playerError != null) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+        child: Container(
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: cs.errorContainer.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: cs.error.withValues(alpha: 0.3)),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.error_outline_rounded, color: cs.error, size: 36),
-              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: cs.errorContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.error_outline_rounded, color: cs.error, size: 28),
+              ),
+              const SizedBox(height: 14),
               Text(
                 _playerError!,
-                style: TextStyle(color: cs.error, fontSize: 13),
+                style: TextStyle(color: cs.onErrorContainer, fontSize: 13, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -495,19 +508,19 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             ),
           if (_isSpeedHeld)
             Positioned(
-              top: 100,
+              top: 96,
               child: IgnorePointer(
                 child: Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
+                    horizontal: 16,
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.65),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.black.withValues(alpha: 0.75),
+                    borderRadius: BorderRadius.circular(100),
                     border: Border.all(
-                      color: cs.primary.withValues(alpha: 0.6),
-                      width: 1,
+                      color: cs.primary.withValues(alpha: 0.5),
+                      width: 1.5,
                     ),
                   ),
                   child: Row(
@@ -516,16 +529,16 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                       Icon(
                         Icons.fast_forward_rounded,
                         color: cs.primary,
-                        size: 16,
+                        size: 18,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       Text(
-                        '2× speed',
+                        '2× Speed',
                         style: TextStyle(
                           color: cs.primary,
                           fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.2,
                         ),
                       ),
                     ],
@@ -540,20 +553,20 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   Widget _buildIndicator(IconData icon, String text, bool isLeft) {
     return Positioned(
-      left: isLeft ? 45 : null,
-      right: isLeft ? null : 45,
+      left: isLeft ? 40 : null,
+      right: isLeft ? null : 40,
       child: IgnorePointer(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(30),
+            color: Colors.black.withValues(alpha: 0.65),
+            shape: BoxShape.circle,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon, color: Colors.white, size: 28),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 text,
                 style: const TextStyle(
@@ -579,10 +592,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
           width: 130,
           height: 130,
           decoration: BoxDecoration(
-            color: const Color(0xFF161B22),
-            shape: BoxShape.circle,
+            color: cs.primaryContainer.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(32),
             border: Border.all(
-              color: cs.primary.withValues(alpha: 0.25),
+              color: cs.primary.withValues(alpha: 0.3),
               width: 2,
             ),
           ),
@@ -597,8 +610,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             fileTitle,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
             maxLines: 2,
@@ -676,7 +689,7 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
               height: 40 * factor * _heights[index],
               decoration: BoxDecoration(
                 color: cs.primary,
-                borderRadius: BorderRadius.circular(3),
+                borderRadius: BorderRadius.circular(100),
               ),
             );
           }),

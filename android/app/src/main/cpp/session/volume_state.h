@@ -80,6 +80,15 @@ struct VolumeState {
     // header comment -- and it's THIS fd (not VolumeState::fd, which stays
     // -1 for USB sources) that bitlockerCloseVolume() must close.
     int bitlockerProxyFd = -1;
+    // Opaque IoContext* (bitlocker_backend.cpp's internal dis_virtual_io_t
+    // user_data struct) for BitLocker sessions -- void* for the same reason
+    // disContext is, above. Previously this was allocated with `new` in
+    // prepare*BitLockerSession and never freed anywhere (a small per-unlock
+    // leak, harmless for a plain file/USB fd but not for a VHDX-backed
+    // session, whose IoContext also owns a VhdxImage holding the whole
+    // Block Allocation Table in memory -- see vhdx_image.h). Freed in
+    // bitlockerCloseVolume(), same lifecycle spot as disContext.
+    void* bitlockerIoCtx = nullptr;
     FATFS fatfs{};
     ntfs_volume* ntfsVol = nullptr;
     ext2_filsys extFs = nullptr;

@@ -19,6 +19,7 @@
 
 #include "container_format.h"
 #include "bitlocker_backend.h"
+#include "vhdx_image.h"
 #include "container_header.h"
 #include "container_utils.h"
 #include "crypto/cascade.h"
@@ -617,6 +618,81 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
     if (bitlockerDetectFile(fd)) {
         closeUnusedKeyfileFds(keyfileFds, keyfileCount);
         return prepareBitLockerSession(fd, password, passwordLen, volId, readOnly);
+    }
+
+    // VHDX whole-disk images (Hyper-V's successor to VHD -- the default
+    // export shape since Windows 8/Server 2012, and typically *dynamic*
+    // rather than fixed, unlike most VHD exports). Unlike a fixed-format
+    // VHD, "byte N of the file" is never "byte N of the disk" for VHDX --
+    // every byte is indirected through a Block Allocation Table (see
+    // vhdx_image.h) -- so this can't share the raw-pread partition scan
+    // below. Detected via VhdxImage::detect() (8-byte "vhdxfile" signature
+    // at byte 0) before falling through to that raw-file scan, since a
+    // VHDX's own byte 0 is its own header, not an MBR/GPT the raw scan
+    // could otherwise misinterpret.
+    //
+    // We open the VhdxImage once here (read-only, just for the partition
+    // scan + signature probe) and let it go if this isn't a BitLocker-
+    // holding VHDX; prepareBitLockerSessionVhdx() below does its own
+    // fresh VhdxImage::open() with the real readOnly the caller asked for.
+    // That's a second parse of the header/BAT, but it keeps this dispatch
+    // block symmetric with the raw-VHD case above (which also just peeks
+    // via pread without keeping any state alive across the two steps) and
+    // avoids plumbing a VhdxImage instance through prepareBitLockerSession's
+    // ownership contract for the common case where the file isn't even a
+    // BitLocker-holding VHDX.
+    if (isVhdxContainer(fd)) {
+        VhdxImage probeImg;
+        if (probeImg.open(fd, /*requestReadWrite=*/false)) {
+            auto vhdxReadSectors = [&probeImg](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
+                return probeImg.pread(startSector * 512ULL, out, static_cast<size_t>(count) * 512ULL);
+            };
+
+            auto vhdxDetectBitlockerAt = [&probeImg](uint64_t byteOffset) -> bool {
+                // Mirrors bitlockerDetectFile's signature check (kFveSig/
+                // kBtgSig at offset 3, 11 bytes total) but reads through
+                // the VHDX's BAT translation instead of a flat pread.
+                unsigned char header[11];
+                if (!probeImg.pread(byteOffset, header, sizeof(header))) return false;
+                static const unsigned char kFve[] = { '-','F','V','E','-','F','S','-' };
+                static const unsigned char kBtg[] = { 'M','S','W','I','N','4','.','1' };
+                return std::memcmp(header + 3, kFve, 8) == 0 || std::memcmp(header + 3, kBtg, 8) == 0;
+            };
+
+            // Whole-VHDX-as-one-volume case (no partition table -- rare but
+            // possible if BitLocker encrypted the raw disk with no
+            // partitions on top, mirroring bitlockerDetectFile(fd) above).
+            if (vhdxDetectBitlockerAt(0)) {
+                closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+                return prepareBitLockerSessionVhdx(fd, password, passwordLen, volId, readOnly,
+                                                    0, probeImg.virtualDiskSize());
+            }
+
+            std::vector<PartitionCandidate> vhdxPartitions = scanPartitionTable(vhdxReadSectors);
+            for (const auto& part : vhdxPartitions) {
+                if (part.sectorCount == 0) continue; // {0,0} sentinel
+                const uint64_t partStartByte = part.startSector * 512ULL;
+                const uint64_t partSizeBytes = part.sectorCount * 512ULL;
+                if (partStartByte + partSizeBytes > probeImg.virtualDiskSize()) continue;
+                if (!vhdxDetectBitlockerAt(partStartByte)) continue;
+
+                closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+                return prepareBitLockerSessionVhdx(fd, password, passwordLen, volId, readOnly,
+                                                    partStartByte, partSizeBytes);
+            }
+        } else {
+            LOGI("prepareSession(vol=%d): VHDX signature matched but open failed: %s",
+                 volId, probeImg.lastError());
+        }
+        // A VHDX file that isn't BitLocker-protected (or that we can't open
+        // -- e.g. differencing/log-pending) falls through to here. VeraCrypt
+        // and LUKS containers are never VHDX-shaped in practice, so unlike
+        // the raw-VHD case below there's no further fallback worth
+        // attempting -- but we still let it fall through to the generic
+        // VeraCrypt header-slot matching rather than failing outright, in
+        // case this is actually just a coincidental "vhdxfile"-prefixed
+        // raw/VeraCrypt container (astronomically unlikely, but free to
+        // allow given the code path already exists below).
     }
 
     // Whole-disk container files -- most commonly a fixed-format VHD

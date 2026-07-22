@@ -94,6 +94,24 @@ bool prepareUsbBitLockerSession(uint64_t partitionStartSector, uint64_t partitio
                                 const unsigned char* password, size_t passwordLen,
                                 int volId, bool readOnly);
 
+// VHDX variant of prepareBitLockerSession. `fd` is the already-open VHDX
+// file descriptor; `partitionStartByte`/`partitionSizeBytes` locate the
+// BitLocker volume within the VHDX's *virtual* disk address space (i.e.
+// they're offsets a caller would pass to VhdxImage::pread/pwrite, NOT raw
+// file offsets -- every byte in between still goes through the VHDX's
+// Block Allocation Table). See vhdx_image.h for why this needs its own
+// entry point rather than reusing prepareBitLockerSession's fileBaseOffset
+// parameter, which assumes flat file-offset addressing.
+//
+// Takes ownership of `fd` on the same terms as prepareBitLockerSession
+// (closed on failure, owned by the session on success). Fails outright
+// (without attempting unlock) if the VHDX is a differencing disk, or if
+// it's structurally invalid -- see VhdxImage::open's lastError() semantics,
+// logged but not returned to the caller here.
+bool prepareBitLockerSessionVhdx(int fd, const unsigned char* password, size_t passwordLen,
+                                 int volId, bool readOnly,
+                                 uint64_t partitionStartByte, uint64_t partitionSizeBytes);
+
 // Post-unlock decrypted I/O against volumes[volumeId]'s dis_context_t.
 // `logicalOffset`/byteCount are relative to the start of the BitLocker
 // volume (same convention as VolumeState::dataOffset-relative reads

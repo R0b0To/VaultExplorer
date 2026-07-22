@@ -338,6 +338,7 @@ add_library(
         session/session_prepare.cpp    # VeraCrypt/LUKS session establishment (Tier-1 JNI calls)
         session/bitlocker_backend.cpp  # BitLocker session establishment + dislocker-backed I/O
         containers/container_create.cpp     # new-container header/format creation (createContainerNative)
+        containers/vhdx_image.cpp      # VHDX (Hyper-V disk image) BAT-indexed read/write for fixed/dynamic disks
         jni/jni_runtime.cpp
         jni/jni_callbacks.cpp
         io/block_io.cpp

@@ -408,3 +408,12 @@ ntfs_inode* createNtfsFile(ntfs_volume* volume, const std::string& path) {
     ntfs_inode_close(parent);
     return created;
 }
+
+// Version string NTFS-3G's own code queries at a couple of internal
+// call sites (we link its sources directly rather than the shared library,
+// so this symbol has to come from somewhere in our binary). Relocated here
+// from the former vaultexplorer.cpp god-file since it's NTFS-3G glue, not
+// JNI or session logic.
+extern "C" const char *ntfs_libntfs_version(void) {
+    return "vaultexplorer-ntfs3g-edge";
+}

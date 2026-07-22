@@ -318,7 +318,7 @@ set(NTFS_3G_SOURCES
 )
 
 # Embed mkntfs with a renamed entry point and route its device I/O through the
-# encrypted virtual device exported by vaultexplorer.cpp.
+# encrypted virtual device exported by io/virtual_block_device.cpp.
 set(MKNTFS_EMBEDDED_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/mkntfs_embedded.c)
 file(WRITE ${MKNTFS_EMBEDDED_SOURCE}
 "#include <ntfs-3g/device.h>\nextern struct ntfs_device_operations vExplorer_ntfs_ops;\n#undef ntfs_device_default_io_ops\n#define ntfs_device_default_io_ops vExplorer_ntfs_ops\n#define VERSION \"embedded\"\n#define main vaultexplorer_mkntfs_main\n#include \"${ntfs3g_SOURCE_DIR}/ntfsprogs/mkntfs.c\"\n")
@@ -327,23 +327,30 @@ file(WRITE ${MKNTFS_EMBEDDED_SOURCE}
 add_library(
         vaultexplorer
         SHARED
-        vaultexplorer.cpp
-        session_prepare.cpp        # VeraCrypt/LUKS session establishment (Tier-1 JNI calls)
-        bitlocker_backend.cpp      # BitLocker session establishment + dislocker-backed I/O
-        container_create.cpp       # new-container header/format creation (createContainerNative)
-        jni_runtime.cpp
-        jni_callbacks.cpp
-        block_io.cpp
-        partition_writer.cpp
-        container_create_usb.cpp
-        volume_state.cpp
-        ext_backend.cpp
-        fat_backend.cpp
-        filesystem_paths.cpp
-        ntfs_backend.cpp
-        session_guard.cpp
-        container_header.cpp
-        container_utils.cpp
+        # ── native library entry points + JNI bridge (formerly the single
+        # vaultexplorer.cpp god-file; split by domain, see jni/jni_bridge_common.h) ──
+        io/virtual_block_device.cpp    # FatFs diskio hooks, per-sector crypto dispatch, mount cache
+        jni/jni_bridge_common.cpp      # shared helper(s) used by more than one bridge file below
+        jni/crypto_bridge.cpp          # key derivation, password hashing, cipher/hash/cascade metadata
+        jni/session_bridge.cpp         # unlock/lock session lifecycle (incl. USB variants)
+        jni/container_lifecycle_bridge.cpp  # container creation + password change
+        jni/filesystem_bridge.cpp      # directory listing, file CRUD, streaming reads
+        session/session_prepare.cpp    # VeraCrypt/LUKS session establishment (Tier-1 JNI calls)
+        session/bitlocker_backend.cpp  # BitLocker session establishment + dislocker-backed I/O
+        containers/container_create.cpp     # new-container header/format creation (createContainerNative)
+        jni/jni_runtime.cpp
+        jni/jni_callbacks.cpp
+        io/block_io.cpp
+        io/partition_writer.cpp
+        containers/container_create_usb.cpp
+        session/volume_state.cpp
+        filesystems/ext_backend.cpp
+        filesystems/fat_backend.cpp
+        filesystems/filesystem_paths.cpp
+        filesystems/ntfs_backend.cpp
+        session/session_guard.cpp
+        containers/container_header.cpp
+        containers/container_utils.cpp
         crypto/cipher_shim.cpp     # adapter
         crypto/cascade.cpp         # cipher-agnostic XTS + cascade chaining
         crypto/kdf_table.cpp       # per-hash iteration-count table + hash dispatch + PIM clamping
@@ -395,6 +402,11 @@ target_include_directories(
         vaultexplorer PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/crypto
+        ${CMAKE_CURRENT_SOURCE_DIR}/jni
+        ${CMAKE_CURRENT_SOURCE_DIR}/io
+        ${CMAKE_CURRENT_SOURCE_DIR}/containers
+        ${CMAKE_CURRENT_SOURCE_DIR}/filesystems
+        ${CMAKE_CURRENT_SOURCE_DIR}/session
         ${mbedtls_SOURCE_DIR}/include
         ${fatfs_SOURCE_DIR}/src
         ${ntfs3g_SOURCE_DIR}/include
@@ -426,19 +438,23 @@ target_link_libraries(
 
 
 if(NOT ANDROID)
-    add_executable(sector_batching_test test/sector_batching_test.cpp)
+    add_executable(sector_batching_test io/test/sector_batching_test.cpp)
     add_executable(fs_scan_test test/fs_scan_test.cpp)
-    add_executable(cascade_test test/cascade_test.cpp crypto/cascade.cpp crypto/cipher_shim.cpp
-                    ${VC_CRYPTO_DIR}/Twofish.c ${VC_CRYPTO_DIR}/Serpent.c
-                    ${VC_CRYPTO_DIR}/Camellia.c ${VC_CRYPTO_DIR}/kuznyechik.c
-                    ${VC_CRYPTO_DIR}/cpu.c ${VC_COMMON_DIR}/Endian.c
-                    ${VC_ARGON2_DIR}/src/argon2.c ${VC_ARGON2_DIR}/src/core.c
-                    ${VC_ARGON2_DIR}/src/ref.c ${VC_ARGON2_DIR}/src/opt_sse2.c
-                    ${VC_ARGON2_DIR}/src/opt_avx2.c ${VC_ARGON2_DIR}/src/blake2/blake2b.c)
+    # NOTE: cascade_test.cpp is referenced here but does not exist anywhere in
+    # this source tree (nor did it before this reorganization) -- this target
+    # has been failing to configure. Restore the missing test file, or remove
+    # this block, once that's resolved.
+    # add_executable(cascade_test test/cascade_test.cpp crypto/cascade.cpp crypto/cipher_shim.cpp
+    #                 ${VC_CRYPTO_DIR}/Twofish.c ${VC_CRYPTO_DIR}/Serpent.c
+    #                 ${VC_CRYPTO_DIR}/Camellia.c ${VC_CRYPTO_DIR}/kuznyechik.c
+    #                 ${VC_CRYPTO_DIR}/cpu.c ${VC_COMMON_DIR}/Endian.c
+    #                 ${VC_ARGON2_DIR}/src/argon2.c ${VC_ARGON2_DIR}/src/core.c
+    #                 ${VC_ARGON2_DIR}/src/ref.c ${VC_ARGON2_DIR}/src/opt_sse2.c
+    #                 ${VC_ARGON2_DIR}/src/opt_avx2.c ${VC_ARGON2_DIR}/src/blake2/blake2b.c)
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)
     add_test(NAME fs_scan_test COMMAND fs_scan_test)
-    add_test(NAME cascade_test COMMAND cascade_test)
+    # add_test(NAME cascade_test COMMAND cascade_test)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
 endif()

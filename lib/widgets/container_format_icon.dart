@@ -46,7 +46,7 @@ class ContainerFormatIcon extends StatelessWidget {
           initials,
           style: TextStyle(
             color: color,
-            fontSize: size * 0.46,
+            fontSize: size * 0.66,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.3,
             height: 1,

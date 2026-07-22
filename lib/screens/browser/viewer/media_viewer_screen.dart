@@ -63,6 +63,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   Timer? _slideshowTimer;
   Timer? _hideTimer;
+  Timer? _prefetchDebounceTimer;
 
   final bool _autoPlay = true;
   bool _autoAdvance = false;
@@ -600,6 +601,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _onActiveVideoControllerChanged,
     );
     _updateWakelock(false);
+    _prefetchDebounceTimer?.cancel();
     _cancelSlideshowTimer();
     _hideTimer?.cancel();
     _pageController.dispose();
@@ -670,7 +672,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   onPageChanged: (index) {
                     if (!_transitionInProgress) {
                       _playlistController.updateIndex(index);
-                      _prefetchSurroundingItems();
+                      _prefetchDebounceTimer?.cancel();
+                      _prefetchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+                        if (mounted) _prefetchSurroundingItems();
+                      });
                     }
                   },
                   itemBuilder: (context, index) {
@@ -687,18 +692,18 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     final isAudio = MediaViewerConstants.isAudio(fileName);
 
                     return Container(
-                      color: Colors.black,
-                      child: isImg
-                          ? ImagePageItem(
-                              key: _getMediaKey(fileName),
-                              fileName: fileName,
-                              prefetchedBytes: prefetchedBytes,
-                              container: widget.container,
-                              imageFit: _imageFit,
-                              rotationQuarterTurns: _rotations[fileName] ?? 0,
-                              showUI: _showUI,
-                              onToggleUI: _setUIVisibility,
-                              onZoomChanged: (allowSwipe) {
+                        color: Colors.black,
+                        child: isImg
+                            ? ImagePageItem(
+                                key: _getMediaKey(fileName),
+                                fileName: fileName,
+                                prefetchedBytes: prefetchedBytes,
+                                container: widget.container,
+                                imageFit: _imageFit,
+                                rotationQuarterTurns: _rotations[fileName] ?? 0,
+                                showUI: _showUI,
+                                onToggleUI: _setUIVisibility,
+                                onZoomChanged: (allowSwipe) {
                                 _swipePhysicsNotifier.value = allowSwipe
                                     ? const BouncingScrollPhysics()
                                     : const NeverScrollableScrollPhysics();

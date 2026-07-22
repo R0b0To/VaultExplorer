@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '/../../models/mounted_container.dart';
+import '/../../services/thumbnail_cache_service.dart';
 import '/../../services/vaultexplorer_api.dart';
 
 class EncryptedImageWidget extends StatefulWidget {
@@ -33,7 +34,9 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
   @override
   void initState() {
     super.initState();
-    _bytes = widget.prefetchedBytes;
+    _bytes = widget.prefetchedBytes ??
+        ThumbnailCacheService.getFromMemory(
+            widget.container, widget.fileName);
     _loadImage();
   }
 
@@ -42,8 +45,13 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     super.didUpdateWidget(oldWidget);
     if (widget.fileName != oldWidget.fileName) {
       _isFullResLoaded = false;
-      _bytes = widget.prefetchedBytes;
+      _currentlyLoadingFile = null;
+      _bytes = widget.prefetchedBytes ??
+          ThumbnailCacheService.getFromMemory(
+              widget.container, widget.fileName);
       _error = null;
+      _loadImage();
+    } else if (!_isFullResLoaded && _currentlyLoadingFile == null) {
       _loadImage();
     } else if (!_isFullResLoaded &&
         widget.prefetchedBytes != null &&
@@ -52,52 +60,61 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     }
   }
 
-  Future<void> _loadImage() async {
+ Future<void> _loadImage() async {
     final targetFile = widget.fileName;
+    if (_isFullResLoaded && _currentlyLoadingFile == targetFile) return;
+    if (_currentlyLoadingFile == targetFile) return;
     _currentlyLoadingFile = targetFile;
 
     int attempts = 0;
     const maxAttempts = 3;
 
-    while (attempts < maxAttempts) {
-      try {
-        if (!mounted || _currentlyLoadingFile != targetFile) return;
+    try {
+      while (attempts < maxAttempts) {
+        try {
+          if (!mounted || _currentlyLoadingFile != targetFile) return;
 
-        final size = await vaultExplorerApi.getFileSize(
-          widget.container,
-          targetFile,
-        );
-        if (size <= 0) throw Exception('File size is empty');
+          final size = await vaultExplorerApi.getFileSize(
+            widget.container,
+            targetFile,
+          );
+          if (size <= 0) throw Exception('File size is empty');
 
-        final data = await vaultExplorerApi.readFileChunk(
-          widget.container,
-          targetFile,
-          0,
-          size,
-        );
+          if (!mounted || _currentlyLoadingFile != targetFile) return;
 
-        if (!mounted || _currentlyLoadingFile != targetFile) return;
+          final data = await vaultExplorerApi.readFileChunk(
+            widget.container,
+            targetFile,
+            0,
+            size,
+          );
 
-        if (data == null || data.isEmpty) {
-          throw Exception('File returned no content bytes');
-        }
+          if (!mounted || _currentlyLoadingFile != targetFile) return;
 
-        setState(() {
-          _error = null;
-          _bytes = data;
-          _isFullResLoaded = true;
-        });
-        return; // Success
-      } catch (e) {
-        attempts++;
-        if (attempts >= maxAttempts) {
-          if (mounted && _currentlyLoadingFile == targetFile && _bytes == null) {
-            setState(() => _error = 'Failed to load encrypted image: $e');
-            // Deliberately not calling widget.onError to prevent auto-advancing
+          if (data == null || data.isEmpty) {
+            throw Exception('File returned no content bytes');
           }
+
+          setState(() {
+            _error = null;
+            _bytes = data;
+            _isFullResLoaded = true;
+          });
           return;
+        } catch (e) {
+          attempts++;
+          if (attempts >= maxAttempts) {
+            if (mounted && _currentlyLoadingFile == targetFile && _bytes == null) {
+              setState(() => _error = 'Failed to load encrypted image: $e');
+            }
+            return;
+          }
+          await Future.delayed(const Duration(milliseconds: 300));
         }
-        await Future.delayed(const Duration(milliseconds: 500));
+      }
+    } finally {
+      if (!_isFullResLoaded && _currentlyLoadingFile == targetFile) {
+        _currentlyLoadingFile = null;
       }
     }
   }

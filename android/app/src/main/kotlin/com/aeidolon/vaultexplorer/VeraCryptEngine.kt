@@ -166,6 +166,11 @@ external fun createUsbContainerNative(
 ): Boolean
 
 @JvmStatic
+    external fun scryptNative(
+        passphrase: ByteArray, salt: ByteArray, N: Int, r: Int, p: Int, dkLen: Int
+    ): ByteArray?
+
+@JvmStatic
     external fun createUsbContainerWithHiddenNative(
         volId: Int, partitionScheme: String,
         outerPassword: String, hiddenPassword: String,

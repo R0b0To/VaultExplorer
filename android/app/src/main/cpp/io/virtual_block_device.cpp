@@ -450,6 +450,17 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
 
         if (!physicalWrite(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;
 
+        // Must run after every write that reaches physical storage: a cached
+        // decrypted range from before this write would otherwise be served
+        // back to any later disk_read for the same physical bytes (see the
+        // invalidateRange contract in io/decrypted_block_cache.h). Done after
+        // the write succeeds so a failed write leaves the still-accurate
+        // cache entry alone instead of evicting it for no reason.
+        {
+            std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
+            v.decryptedBlockCache.invalidateRange(alignedFirstPhysical * 512, totalBytes);
+        }
+
     }
     return RES_OK;
 }

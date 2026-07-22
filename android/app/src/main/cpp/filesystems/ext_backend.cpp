@@ -13,6 +13,7 @@
 
 #include "diskio.h"
 #include "volume_state.h"
+#include "filesystems/stream_handles.h"
 
 namespace { constexpr size_t kIoBufferSize = 262144; }
 
@@ -363,4 +364,317 @@ bool mountExtVolume(int volumeId) {
              static_cast<unsigned long long>(ext2fs_free_blocks_count(superblock)),
              hasJournal ? 1 : 0, needsRecovery ? 1 : 0);
     return true;
+}
+
+// ----------------------------------------------------------------====
+// EXT2/3/4 rename support. ext2fs_link()/ext2fs_unlink() don't update a
+// moved directory's own ".." entry, so extRenameFile below repoints it
+// via this callback when a directory changes parent. Moved here from
+// jni/filesystem_bridge.cpp alongside the rest of the ext rename logic.
+// ----------------------------------------------------------------====
+int extDotDotFixupCallback(ext2_ino_t, int, struct ext2_dir_entry* dirent,
+                            int, int, char*, void* priv) {
+    auto* ctx = static_cast<ExtDotDotFixupContext*>(priv);
+    if (ext2fs_dirent_name_len(dirent) == 2 &&
+        dirent->name[0] == '.' && dirent->name[1] == '.') {
+        dirent->inode = ctx->newParentIno;
+        return DIRENT_CHANGED;
+    }
+    return 0;
+}
+
+// ----------------------------------------------------------------====
+// The functions below implement filesystems/fs_ops.h's fsXxx() contract
+// for ext2/3/4. Several are thin wrappers around extOpenFile/extResolvePath/
+// extWriteFromHostFile/extExtractToHostFile above; the rest were extracted
+// verbatim (same libext2fs call sequences, same error-handling conditions)
+// from what used to be inline `else if (v.fsType == FS_EXT) { ... }`
+// branches in jni/filesystem_bridge.cpp.
+// ----------------------------------------------------------------====
+
+void extListDirectory(int volumeId, const std::string& pathSuffix, std::vector<std::string>& results) {
+    auto& v = volumes[volumeId];
+    ext2_ino_t dirInode = 0;
+    if (extResolvePath(v.extFs, pathSuffix, &dirInode)) {
+        struct ext2_inode dirNodeInfo{};
+        const errcode_t readInodeErr = ext2fs_read_inode(v.extFs, dirInode, &dirNodeInfo);
+        EXT_LOGI("extListDirectory: ext dir inode=%u readInodeErr=%lu i_size=%u i_blocks=%u i_links_count=%u",
+             dirInode, (unsigned long)readInodeErr, dirNodeInfo.i_size,
+             dirNodeInfo.i_blocks, dirNodeInfo.i_links_count);
+        ExtDirContext context{v.extFs, &results};
+        const errcode_t iterErr = ext2fs_dir_iterate2(v.extFs, dirInode, 0, nullptr, extDirectoryEntry, &context);
+        EXT_LOGI("extListDirectory: ext2fs_dir_iterate2 return=%lu (%s) entries=%zu",
+             (unsigned long)iterErr, iterErr ? error_message(iterErr) : "OK", results.size());
+        if (results.size() >= EXT_DIRECTORY_MAX_ENTRIES) results.push_back("System:TRUNCATED");
+    }
+}
+
+uint64_t extGetFileSize(int volumeId, const std::string& path) {
+    auto& v = volumes[volumeId];
+    uint64_t size = 0;
+    ext2_ino_t ino = 0;
+    struct ext2_inode inode{};
+    if (extResolvePath(v.extFs, path, &ino) &&
+        ext2fs_read_inode(v.extFs, ino, &inode) == 0)
+        size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
+    return size;
+}
+
+bool extReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    ext2_file_t file = nullptr;
+    if (extOpenFile(v.extFs, path, false, false, &file)) {
+        __u64 position = 0;
+        std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
+        unsigned int got = 0;
+        if (ext2fs_file_llseek(file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position) == 0 &&
+            ext2fs_file_read(file, buffer.get(), static_cast<unsigned int>(length), &got) == 0 && got > 0) {
+            outBuffer.assign(buffer.get(), buffer.get() + got);
+            success = true;
+        }
+        ext2fs_file_close(file);
+    }
+    return success;
+}
+
+bool extWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    ensureExtBitmapsLoaded(volumeId);
+    ext2_file_t file = nullptr;
+    if (extOpenFile(v.extFs, path, true, true, &file)) {
+        __u64 position = 0;
+        if (offset == 0) ext2fs_file_set_size2(file, 0);
+        unsigned int written = 0;
+        if (ext2fs_file_llseek(file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position) == 0 &&
+            ext2fs_file_write(file, data, static_cast<unsigned int>(length), &written) == 0 &&
+            written == static_cast<unsigned int>(length) && ext2fs_file_flush(file) == 0) {
+            ext2fs_flush(v.extFs);
+            success = true;
+        }
+        ext2fs_file_close(file);
+    }
+    return success;
+}
+
+bool extWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath) {
+    auto& v = volumes[volumeId];
+    ensureExtBitmapsLoaded(volumeId);
+    bool success = extWriteFromHostFile(v.extFs, targetPath, sourceHostPath.c_str());
+    if (success) success = ext2fs_flush(v.extFs) == 0;
+    return success;
+}
+
+bool extExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath) {
+    auto& v = volumes[volumeId];
+    return extExtractToHostFile(v.extFs, targetPath, destHostPath.c_str());
+}
+
+namespace {
+
+// ext2fs_unlink() only removes the directory entry -- it never touches the
+// block/inode bitmaps or the superblock's free counters, which is what
+// getSpaceInfo() reads for FS_EXT. If we stop at unlink() (and a manual
+// i_links_count--), the inode's data blocks stay marked "in use" forever:
+// free space never grows back after a delete, or after a move that
+// overwrites an existing destination file. Writes look fine only because
+// block *allocation* does update the bitmaps correctly -- deletion just
+// never released anything to begin with.
+//
+// This mirrors what e2fsprogs's own debugfs "rm" (kill_file_by_inode) does:
+// walk the inode's blocks and free each one, then free the inode itself.
+int extReleaseBlockCallback(ext2_filsys fs, blk64_t* blocknr, e2_blkcnt_t,
+                             blk64_t, int, void*) {
+    ext2fs_block_alloc_stats2(fs, *blocknr, -1);
+    return 0;
+}
+
+// Drops one link to `ino`. If that was the last link, reclaims its data
+// blocks and frees the inode so free-space counters reflect the deletion.
+// Safe to call after ext2fs_unlink() has already removed the directory
+// entry. Returns false only on an inode read/write error.
+bool extReleaseInodeIfUnlinked(ext2_filsys fs, ext2_ino_t ino, bool isDir) {
+    struct ext2_inode inode{};
+    if (ext2fs_read_inode(fs, ino, &inode) != 0) return false;
+    if (inode.i_links_count) --inode.i_links_count;
+    if (inode.i_links_count > 0) {
+        // Other hard links still reference this inode -- nothing to free.
+        return ext2fs_write_inode(fs, ino, &inode) == 0;
+    }
+    inode.i_dtime = static_cast<__u32>(time(nullptr));
+    if (ext2fs_write_inode(fs, ino, &inode) != 0) return false;
+    if (ext2fs_inode_has_valid_blocks2(fs, &inode)) {
+        ext2fs_block_iterate3(fs, ino, BLOCK_FLAG_READ_ONLY, nullptr,
+                               extReleaseBlockCallback, nullptr);
+    }
+    ext2fs_inode_alloc_stats2(fs, ino, -1, isDir ? 1 : 0);
+    return true;
+}
+
+} // namespace
+
+bool extDeleteFile(int volumeId, const std::string& path) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    ensureExtBitmapsLoaded(volumeId);
+    const size_t slash = path.find_last_of('/');
+    const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
+    const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+    ext2_ino_t parent = 0, ino = 0;
+    if (!name.empty() && extResolvePath(v.extFs, parentPath, &parent) &&
+        extResolvePath(v.extFs, path, &ino)) {
+        struct ext2_inode inode{};
+        const bool isDir = ext2fs_read_inode(v.extFs, ino, &inode) == 0 &&
+                            LINUX_S_ISDIR(inode.i_mode);
+        if (ext2fs_unlink(v.extFs, parent, name.c_str(), ino, 0) == 0) {
+            success = extReleaseInodeIfUnlinked(v.extFs, ino, isDir);
+            ext2fs_flush(v.extFs);
+        }
+    }
+    return success;
+}
+
+bool extCreateDirectory(int volumeId, const std::string& path) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    ensureExtBitmapsLoaded(volumeId);
+    const size_t slash = path.find_last_of('/');
+    const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
+    const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
+    ext2_ino_t parent = 0;
+    if (!name.empty() && extResolvePath(v.extFs, parentPath, &parent) &&
+        ext2fs_mkdir(v.extFs, parent, 0, name.c_str()) == 0) {
+        ext2fs_flush(v.extFs);
+        success = true;
+    }
+    return success;
+}
+
+bool extRenameFile(int volumeId, const std::string& oldPath, const std::string& newPath) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    ensureExtBitmapsLoaded(volumeId);
+    const std::string& oldFull = oldPath;
+    const std::string& newFull = newPath;
+    const size_t oldSlash = oldFull.find_last_of('/');
+    const std::string oldParentPath = oldSlash == std::string::npos ? "" : oldFull.substr(0, oldSlash);
+    const std::string oldName = oldSlash == std::string::npos ? oldFull : oldFull.substr(oldSlash + 1);
+    const size_t newSlash = newFull.find_last_of('/');
+    const std::string newParentPath = newSlash == std::string::npos ? "" : newFull.substr(0, newSlash);
+    const std::string newName = newSlash == std::string::npos ? newFull : newFull.substr(newSlash + 1);
+
+    ext2_ino_t oldParentIno = 0, newParentIno = 0, srcIno = 0;
+    if (!oldName.empty() && !newName.empty() &&
+        extResolvePath(v.extFs, oldParentPath, &oldParentIno) &&
+        extResolvePath(v.extFs, newParentPath, &newParentIno) &&
+        extResolvePath(v.extFs, oldFull, &srcIno)) {
+
+        struct ext2_inode srcInode{};
+        const bool isDir = ext2fs_read_inode(v.extFs, srcIno, &srcInode) == 0 &&
+                            LINUX_S_ISDIR(srcInode.i_mode);
+        const int fileType = isDir ? EXT2_FT_DIR : EXT2_FT_REG_FILE;
+
+        ext2_ino_t destIno = 0;
+        if (extResolvePath(v.extFs, newFull, &destIno) && destIno != srcIno) {
+            struct ext2_inode destInode{};
+            const bool destIsDir = ext2fs_read_inode(v.extFs, destIno, &destInode) == 0 &&
+                                    LINUX_S_ISDIR(destInode.i_mode);
+            if (ext2fs_unlink(v.extFs, newParentIno, newName.c_str(), destIno, 0) == 0) {
+                extReleaseInodeIfUnlinked(v.extFs, destIno, destIsDir);
+            }
+        }
+
+        errcode_t linkErr = ext2fs_link(v.extFs, newParentIno, newName.c_str(), srcIno, fileType);
+        if (linkErr == EXT2_ET_DIR_NO_SPACE) {
+            if (ext2fs_expand_dir(v.extFs, newParentIno) == 0) {
+                linkErr = ext2fs_link(v.extFs, newParentIno, newName.c_str(), srcIno, fileType);
+            }
+        }
+
+        if (linkErr == 0) {
+            if (ext2fs_unlink(v.extFs, oldParentIno, oldName.c_str(), srcIno, 0) == 0) {
+                success = true;
+                if (isDir && oldParentIno != newParentIno) {
+                    ExtDotDotFixupContext ctx{newParentIno};
+                    ext2fs_dir_iterate2(v.extFs, srcIno, 0, nullptr, extDotDotFixupCallback, &ctx);
+
+                    struct ext2_inode oldParentInode{};
+                    if (ext2fs_read_inode(v.extFs, oldParentIno, &oldParentInode) == 0 &&
+                        oldParentInode.i_links_count) {
+                        --oldParentInode.i_links_count;
+                        ext2fs_write_inode(v.extFs, oldParentIno, &oldParentInode);
+                    }
+                    struct ext2_inode newParentInode{};
+                    if (ext2fs_read_inode(v.extFs, newParentIno, &newParentInode) == 0) {
+                        ++newParentInode.i_links_count;
+                        ext2fs_write_inode(v.extFs, newParentIno, &newParentInode);
+                    }
+                }
+            } else {
+                ext2fs_unlink(v.extFs, newParentIno, newName.c_str(), srcIno, 0);
+            }
+        }
+
+        if (success) ext2fs_flush(v.extFs);
+    }
+    return success;
+}
+
+bool extSetLastModifiedTime(int volumeId, const std::string& path, uint64_t epochSeconds) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    ext2_ino_t ino = 0;
+    if (extResolvePath(v.extFs, path, &ino)) {
+        struct ext2_inode inode = {};
+        if (ext2fs_read_inode(v.extFs, ino, &inode) == 0) {
+            inode.i_mtime = static_cast<__u32>(epochSeconds);
+            inode.i_atime = static_cast<__u32>(epochSeconds);
+            inode.i_ctime = static_cast<__u32>(epochSeconds);
+            if (ext2fs_write_inode(v.extFs, ino, &inode) == 0) {
+                ext2fs_flush(v.extFs);
+                success = true;
+            }
+        }
+    }
+    return success;
+}
+
+void extGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeBytes) {
+    auto& v = volumes[volumeId];
+    outTotalBytes = static_cast<uint64_t>(ext2fs_blocks_count(v.extFs->super)) * v.extFs->blocksize;
+    outFreeBytes = static_cast<uint64_t>(ext2fs_free_blocks_count(v.extFs->super)) * v.extFs->blocksize;
+}
+
+void* extOpenStream(int volumeId, const std::string& path) {
+    auto& v = volumes[volumeId];
+    ext2_file_t file = nullptr;
+    if (extOpenFile(v.extFs, path, false, false, &file)) {
+        auto* stream = new ExtStream{file};
+        v.openExtStreams.push_back(stream);
+        return stream;
+    }
+    return nullptr;
+}
+
+int32_t extReadStream(int volumeId, void* handle, uint64_t offset, uint8_t* dest, size_t length) {
+    auto& v = volumes[volumeId];
+    ExtStream* stream = reinterpret_cast<ExtStream*>(handle);
+    if (std::find(v.openExtStreams.begin(), v.openExtStreams.end(), stream) == v.openExtStreams.end()) return -1;
+    __u64 position = 0;
+    unsigned int got = 0;
+    if (ext2fs_file_llseek(stream->file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position) == 0 &&
+        ext2fs_file_read(stream->file, dest, static_cast<unsigned int>(length), &got) == 0)
+        return static_cast<int32_t>(got);
+    return -1;
+}
+
+void extCloseStream(int volumeId, void* handle) {
+    auto& v = volumes[volumeId];
+    ExtStream* stream = reinterpret_cast<ExtStream*>(handle);
+    auto it = std::find(v.openExtStreams.begin(), v.openExtStreams.end(), stream);
+    if (it == v.openExtStreams.end()) return;
+    v.openExtStreams.erase(it);
+    ext2fs_file_close(stream->file);
+    delete stream;
 }

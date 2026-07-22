@@ -1,9 +1,11 @@
 #include "ntfs_backend.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cerrno>
 #include <cstring>
 #include <cstdlib>
+#include <fstream>
 #include <memory>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -12,12 +14,15 @@ extern "C" {
 #include "device.h"
 #include "inode.h"
 #include "dir.h"
+#include "attrib.h"
+#include "layout.h"
 }
 
 #include "block_io.h"
 #include "crypto/cascade.h"
 #include "volume_state.h"
 #include "bitlocker_backend.h"
+#include "filesystems/stream_handles.h"
 
 namespace {
 
@@ -288,8 +293,8 @@ int recursiveSizeEntry(void* directory, const ntfschar* name, const int nameLeng
 // Non-recursive directory-listing counterpart to recursiveSizeEntry above:
 // same metadata-filtering rules, but reports the immediate children of one
 // directory as "name|size|mtime" strings instead of summing file sizes.
-// Backs listNtfsDirectory() below, which is buildDirectoryListing()'s only
-// NTFS entry point (moved out of vaultexplorer.cpp).
+// Backs listNtfsDirectory() below, which is fsListDirectory()'s (see
+// filesystems/fs_ops.h) only NTFS entry point.
 struct NtfsFilldirContext {
     std::vector<std::string>* results;
     ntfs_volume* vol;
@@ -416,4 +421,338 @@ ntfs_inode* createNtfsFile(ntfs_volume* volume, const std::string& path) {
 // JNI or session logic.
 extern "C" const char *ntfs_libntfs_version(void) {
     return "vaultexplorer-ntfs3g-edge";
+}
+
+// ----------------------------------------------------------------====
+// The functions below implement filesystems/fs_ops.h's fsXxx() contract
+// for NTFS. Extracted verbatim (same NTFS-3G call sequences, same
+// error-handling conditions -- including the ntfs_delete() double-close
+// footgun noted inline in ntfsDeleteFile, which was a real crash fixed
+// before this split and is preserved exactly as-is) from what used to be
+// inline `else if (v.fsType == VolumeState::FS_NTFS) { ... }` branches in
+// jni/filesystem_bridge.cpp.
+// ----------------------------------------------------------------====
+
+uint64_t ntfsGetFileSize(int volumeId, const std::string& path) {
+    auto& v = volumes[volumeId];
+    uint64_t size = 0;
+    std::string fullPath = "/" + path;
+    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    if (ni) {
+        size = static_cast<uint64_t>(ni->data_size);
+        ntfs_inode_close(ni);
+    }
+    return size;
+}
+
+bool ntfsReadFileChunk(int volumeId, const std::string& path, uint64_t offset, size_t length, std::vector<uint8_t>& outBuffer) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    std::string fullPath = "/" + path;
+    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    if (ni) {
+        ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        if (na) {
+            std::unique_ptr<unsigned char[]> buffer(new unsigned char[length]);
+            s64 br = ntfs_attr_pread(na, offset, length, buffer.get());
+            if (br > 0) {
+                outBuffer.assign(buffer.get(), buffer.get() + br);
+                success = true;
+            }
+            ntfs_attr_close(na);
+        }
+        ntfs_inode_close(ni);
+    }
+    return success;
+}
+
+bool ntfsWriteFileChunk(int volumeId, const std::string& path, uint64_t offset, const uint8_t* data, size_t length) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    std::string fullPath = "/" + path;
+    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+
+    if (!ni) { // Create file
+        ni = createNtfsFile(v.ntfsVol, fullPath);
+    }
+
+    if (ni) {
+        ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        if (!na) {
+            ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL, 0);
+            na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        }
+        if (na) {
+            if (offset == 0) {
+                ntfs_attr_truncate(na, 0);
+            }
+            s64 bw = ntfs_attr_pwrite(na, offset, length, data);
+            if (bw == static_cast<s64>(length)) success = true;
+            ntfs_attr_close(na);
+        }
+        ntfs_inode_close(ni);
+    }
+    return success;
+}
+
+bool ntfsWriteBackFile(int volumeId, const std::string& targetPath, const std::string& sourceHostPath) {
+    constexpr size_t kIoBufferSize = 262144;
+    auto& v = volumes[volumeId];
+    bool success = false;
+    std::string fullPath = "/" + targetPath;
+    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    if (!ni) {
+        ni = createNtfsFile(v.ntfsVol, fullPath);
+    }
+
+    if (ni) {
+        ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        if (!na) {
+            ntfs_attr_add(ni, AT_DATA, AT_UNNAMED, 0, NULL, 0);
+            na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        }
+        if (na) {
+            ntfs_attr_truncate(na, 0);
+            std::ifstream inFile(sourceHostPath, std::ios::binary);
+            if (inFile.is_open()) {
+                std::unique_ptr<char[]> buf(new char[kIoBufferSize]);
+                s64 offset = 0;
+                bool writeError = false;
+                while (inFile && !writeError) {
+                    inFile.read(buf.get(), kIoBufferSize);
+                    std::streamsize n = inFile.gcount();
+                    if (n > 0) {
+                        s64 bw = ntfs_attr_pwrite(na, offset, n, buf.get());
+                        if (bw != n) {
+                            writeError = true;
+                        } else {
+                            offset += bw;
+                        }
+                    }
+                }
+                if (!writeError) {
+                    success = true;
+                }
+            }
+            ntfs_attr_close(na);
+        }
+        ntfs_inode_close(ni);
+    }
+    return success;
+}
+
+bool ntfsExtractFile(int volumeId, const std::string& targetPath, const std::string& destHostPath) {
+    constexpr size_t kIoBufferSize = 262144;
+    auto& v = volumes[volumeId];
+    bool success = false;
+    std::string fullPath = "/" + targetPath;
+    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    if (ni) {
+        ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        if (na) {
+            std::ofstream outFile(destHostPath, std::ios::binary);
+            if (outFile.is_open()) {
+                std::unique_ptr<unsigned char[]> buf(new unsigned char[kIoBufferSize]);
+                s64 offset = 0;
+                while (true) {
+                    s64 br = ntfs_attr_pread(na, offset, kIoBufferSize, buf.get());
+                    if (br <= 0) break;
+                    outFile.write(reinterpret_cast<char*>(buf.get()), br);
+                    offset += br;
+                }
+                success = true;
+            }
+            ntfs_attr_close(na);
+        }
+        ntfs_inode_close(ni);
+    }
+    return success;
+}
+
+bool ntfsDeleteFile(int volumeId, const std::string& path) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    std::string fullPath = "/" + path;
+    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    size_t slashPos = fullPath.find_last_of('/');
+    std::string parentPath = fullPath.substr(0, slashPos);
+    std::string childName = fullPath.substr(slashPos + 1);
+    if (parentPath.empty()) parentPath = "/";
+
+    ntfs_inode* dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentPath.c_str());
+    if (dir_ni && ni) {
+        ntfschar* uname = nullptr;
+        int uname_len = ntfs_mbstoucs(childName.c_str(), &uname);
+        if (uname_len >= 0) {
+            // ntfs_delete() unconditionally closes BOTH ni and dir_ni before
+            // returning (success or failure) — closing them again below was
+            // a double-free of already-released MFT-record state, which is
+            // what corrupted the heap and crashed the app right after delete.
+            success = (ntfs_delete(v.ntfsVol, fullPath.c_str(), ni, dir_ni,
+                                    uname, static_cast<u8>(uname_len)) == 0);
+            free(uname);
+            ni = nullptr;
+            dir_ni = nullptr;
+        }
+    }
+    if (ni) ntfs_inode_close(ni);
+    if (dir_ni) ntfs_inode_close(dir_ni);
+    return success;
+}
+
+bool ntfsCreateDirectory(int volumeId, const std::string& path) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    std::string fullPath = "/" + path;
+    size_t slashPos = fullPath.find_last_of('/');
+    std::string parentPath = fullPath.substr(0, slashPos);
+    std::string childName = fullPath.substr(slashPos + 1);
+    if (parentPath.empty()) parentPath = "/";
+
+    ntfs_inode* parentNi = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentPath.c_str());
+    if (parentNi) {
+        ntfschar* uChild = nullptr;
+        int uChildLen = ntfs_mbstoucs(childName.c_str(), &uChild);
+        if (uChildLen >= 0) {
+            ntfs_inode* ni = ntfs_create(parentNi, 0, uChild, uChildLen, S_IFDIR);
+            if (ni) {
+                success = true;
+                ntfs_inode_close(ni);
+            }
+            free(uChild);
+        }
+        ntfs_inode_close(parentNi);
+    }
+    return success;
+}
+
+bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string& newPath) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    std::string oldFullPath = "/" + oldPath;
+    std::string newFullPath = "/" + newPath;
+
+    size_t slashPosOld = oldFullPath.find_last_of('/');
+    std::string parentOldPath = oldFullPath.substr(0, slashPosOld);
+    std::string oldChildName = oldFullPath.substr(slashPosOld + 1);
+    if (parentOldPath.empty()) parentOldPath = "/";
+
+    size_t slashPosNew = newFullPath.find_last_of('/');
+    std::string parentNewPath = newFullPath.substr(0, slashPosNew);
+    std::string newChildName = newFullPath.substr(slashPosNew + 1);
+    if (parentNewPath.empty()) parentNewPath = "/";
+
+    ntfschar* uOld = nullptr;
+    int uOldLen = ntfs_mbstoucs(oldChildName.c_str(), &uOld);
+    ntfschar* uNew = nullptr;
+    int uNewLen = ntfs_mbstoucs(newChildName.c_str(), &uNew);
+
+    if (uOldLen >= 0 && uNewLen >= 0) {
+        // Step 1: if something already exists at the destination, overwrite it
+        ntfs_inode* dest_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, newFullPath.c_str());
+        if (dest_ni) {
+            ntfs_inode* dest_dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentNewPath.c_str());
+            if (dest_dir_ni) {
+                ntfs_delete(v.ntfsVol, newFullPath.c_str(), dest_ni, dest_dir_ni,
+                            uNew, static_cast<u8>(uNewLen));
+            } else {
+                ntfs_inode_close(dest_ni);
+            }
+        }
+
+        // Step 2: pre-open all necessary inodes
+        ntfs_inode* old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, oldFullPath.c_str());
+        ntfs_inode* dir_new_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentNewPath.c_str());
+        ntfs_inode* dir_old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentOldPath.c_str());
+
+        if (old_ni && dir_new_ni && dir_old_ni) {
+            // Link source under the new name
+            if (ntfs_link(old_ni, dir_new_ni, uNew, static_cast<u8>(uNewLen)) == 0) {
+                // Unlink the old name
+                success = (ntfs_delete(v.ntfsVol, oldFullPath.c_str(), old_ni, dir_old_ni,
+                                        uOld, static_cast<u8>(uOldLen)) == 0);
+                old_ni = nullptr; // pointer consumed by ntfs_delete
+                dir_old_ni = nullptr; // pointer consumed by ntfs_delete
+            }
+
+            // Close whatever didn't get consumed
+            if (old_ni) ntfs_inode_close(old_ni);
+            if (dir_old_ni) ntfs_inode_close(dir_old_ni);
+            ntfs_inode_close(dir_new_ni);
+        } else {
+            if (old_ni) ntfs_inode_close(old_ni);
+            if (dir_new_ni) ntfs_inode_close(dir_new_ni);
+            if (dir_old_ni) ntfs_inode_close(dir_old_ni);
+        }
+    }
+    if (uOld) free(uOld);
+    if (uNew) free(uNew);
+    return success;
+}
+
+bool ntfsSetLastModifiedTime(int volumeId, const std::string& path, uint64_t epochSeconds) {
+    auto& v = volumes[volumeId];
+    bool success = false;
+    std::string fullPath = "/" + path;
+    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    if (ni) {
+        uint64_t ntfsTime = (epochSeconds * 10000000ULL) + 116444736000000000ULL;
+        ni->last_data_change_time = ntfsTime;
+        ni->last_access_time = ntfsTime;
+        ni->last_mft_change_time = ntfsTime;
+        NInoSetDirty(ni);
+        success = (ntfs_inode_close(ni) == 0);
+    }
+    return success;
+}
+
+void ntfsGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeBytes) {
+    auto& v = volumes[volumeId];
+    ntfs_volume* vol = v.ntfsVol;
+    s64 total_clusters = vol->nr_clusters;
+    s64 free_cl = ntfs_attr_get_free_bits(vol->lcnbmp_na);
+    outTotalBytes = static_cast<uint64_t>(total_clusters * vol->cluster_size);
+    outFreeBytes  = static_cast<uint64_t>(free_cl * vol->cluster_size);
+}
+
+void* ntfsOpenStream(int volumeId, const std::string& path) {
+    auto& v = volumes[volumeId];
+    std::string fullPath = "/" + path;
+    ntfs_inode* ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, fullPath.c_str());
+    if (ni) {
+        ntfs_attr* na = ntfs_attr_open(ni, AT_DATA, NULL, 0);
+        if (na) {
+            NtfsStream* ns = new NtfsStream();
+            ns->inode = ni;
+            ns->attr = na;
+            v.openNtfsStreams.push_back(ns);
+            return ns;
+        } else {
+            ntfs_inode_close(ni);
+        }
+    }
+    return nullptr;
+}
+
+int32_t ntfsReadStream(int volumeId, void* handle, uint64_t offset, uint8_t* dest, size_t length) {
+    auto& v = volumes[volumeId];
+    NtfsStream* ns = reinterpret_cast<NtfsStream*>(handle);
+    auto& streams = v.openNtfsStreams;
+    if (std::find(streams.begin(), streams.end(), ns) == streams.end()) return -1;
+
+    s64 br = ntfs_attr_pread(ns->attr, offset, length, dest);
+    if (br >= 0) return static_cast<int32_t>(br);
+    return -1;
+}
+
+void ntfsCloseStream(int volumeId, void* handle) {
+    auto& v = volumes[volumeId];
+    NtfsStream* ns = reinterpret_cast<NtfsStream*>(handle);
+    auto& streams = v.openNtfsStreams;
+    auto it = std::find(streams.begin(), streams.end(), ns);
+    if (it == streams.end()) return;
+    streams.erase(it);
+    ntfs_attr_close(ns->attr);
+    ntfs_inode_close(ns->inode);
+    delete ns;
 }

@@ -350,6 +350,7 @@ add_library(
         filesystems/fat_backend.cpp
         filesystems/filesystem_paths.cpp
         filesystems/ntfs_backend.cpp
+        filesystems/fs_ops.cpp
         session/session_guard.cpp
         containers/container_header.cpp
         containers/container_utils.cpp

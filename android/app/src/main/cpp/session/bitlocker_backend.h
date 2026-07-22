@@ -56,7 +56,12 @@ struct VolumeState;
 // since dis_initialize() doesn't expose a cheap signature-only probe
 // separate from a full (credentialed) unlock attempt the way libbde's
 // libbde_check_volume_signature_file_io_handle() did.
-bool bitlockerDetectFile(int fd);
+// [byteOffset] lets the caller probe at an arbitrary offset within the
+// file, not just byte 0 -- needed when the container file is a whole-disk
+// image (e.g. a fixed-format VHD) whose BitLocker volume lives inside a
+// partition rather than starting at the top of the file. Defaults to 0,
+// preserving the original "raw single-volume file" behavior.
+bool bitlockerDetectFile(int fd, uint64_t byteOffset = 0);
 bool bitlockerDetectUsb(int volId, uint64_t partitionStartSector);
 
 // Full unlock. Mirrors prepareLuksSession/prepareUsbLuksSession's ownership
@@ -76,8 +81,15 @@ bool bitlockerDetectUsb(int volId, uint64_t partitionStartSector);
 // `readOnly` is now honored for real (dislocker supports write) -- unlike
 // the old libbde backend, which force-set VolumeState::readOnly = true
 // regardless of what the caller asked for.
+// [partitionStartByte]/[partitionSizeBytes] let the caller unlock a
+// BitLocker volume that lives inside a partition of a whole-disk container
+// file (e.g. a fixed-format VHD) rather than occupying the entire file.
+// partitionSizeBytes == 0 means "the whole file is the volume" (the
+// original raw-container behavior) -- whatever's left of the file past
+// partitionStartByte is used as the volume size.
 bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passwordLen,
-                             int volId, bool readOnly);
+                             int volId, bool readOnly,
+                             uint64_t partitionStartByte = 0, uint64_t partitionSizeBytes = 0);
 bool prepareUsbBitLockerSession(uint64_t partitionStartSector, uint64_t partitionSizeBytes,
                                 const unsigned char* password, size_t passwordLen,
                                 int volId, bool readOnly);

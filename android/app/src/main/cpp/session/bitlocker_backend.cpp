@@ -46,6 +46,11 @@ struct IoContext {
 
     // File-backed:
     int fd = -1;
+    // Byte offset within the file where the BitLocker volume actually
+    // starts -- 0 for a raw single-volume container file, or a partition's
+    // start offset when the file is a whole-disk image (e.g. a
+    // fixed-format VHD) that dislocker sees as if it were its own file.
+    uint64_t fileBaseOffset = 0;
 
     // USB-backed:
     int volId = -1;
@@ -90,7 +95,7 @@ bool usbWriteBytes(int volId, uint64_t byteOffset, const void* inData, size_t le
 ssize_t vioRead(void* user_data, uint8_t* buffer, size_t size) {
     auto* ctx = static_cast<IoContext*>(user_data);
     if (ctx->kind == IoKind::kFile) {
-        const ssize_t n = pread(ctx->fd, buffer, size, static_cast<off_t>(ctx->position));
+        const ssize_t n = pread(ctx->fd, buffer, size, static_cast<off_t>(ctx->fileBaseOffset + ctx->position));
         if (n < 0) return -1;
         ctx->position += n;
         return n;
@@ -105,7 +110,7 @@ ssize_t vioRead(void* user_data, uint8_t* buffer, size_t size) {
 ssize_t vioWrite(void* user_data, const uint8_t* buffer, size_t size) {
     auto* ctx = static_cast<IoContext*>(user_data);
     if (ctx->kind == IoKind::kFile) {
-        const ssize_t n = pwrite(ctx->fd, buffer, size, static_cast<off_t>(ctx->position));
+        const ssize_t n = pwrite(ctx->fd, buffer, size, static_cast<off_t>(ctx->fileBaseOffset + ctx->position));
         if (n < 0) return -1;
         ctx->position += n;
         return n;
@@ -275,10 +280,10 @@ bool unlockWithBestCredentialGuess(IoContext* ioCtx,
 // Public API (declared in bitlocker_backend.h)
 // ────────────────────────────────────────────────────────────────────────
 
-bool bitlockerDetectFile(int fd) {
+bool bitlockerDetectFile(int fd, uint64_t byteOffset) {
     if (fd < 0) return false;
     uint8_t header[kProbeReadLen];
-    const ssize_t n = pread(fd, header, sizeof(header), 0);
+    const ssize_t n = pread(fd, header, sizeof(header), static_cast<off_t>(byteOffset));
     if (n < static_cast<ssize_t>(sizeof(header))) return false;
     return checkFveSignature(header);
 }
@@ -290,7 +295,8 @@ bool bitlockerDetectUsb(int volId, uint64_t partitionStartSector) {
 }
 
 bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passwordLen,
-                             int volId, bool readOnly) {
+                             int volId, bool readOnly,
+                             uint64_t partitionStartByte, uint64_t partitionSizeBytes) {
     if (volId < 0 || volId >= FF_VOLUMES) { if (fd >= 0) close(fd); return false; }
     if (fd < 0) return false;
 
@@ -300,11 +306,21 @@ bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passw
     struct stat st{};
     if (fstat(fd, &st) == 0) fileSize = static_cast<uint64_t>(st.st_size);
 
-    // Create the virtual I/O context for this file fd.
+    // partitionSizeBytes == 0 means "the whole file is the volume" (the
+    // original, pre-VHD-support behavior for a raw single-volume container
+    // file) -- use whatever's left of the file past partitionStartByte.
+    const uint64_t volumeSizeBytes = partitionSizeBytes != 0
+        ? partitionSizeBytes
+        : (fileSize > partitionStartByte ? fileSize - partitionStartByte : 0);
+
+    // Create the virtual I/O context for this file fd, anchored at the
+    // partition's start offset so dislocker's own 0-based positions map to
+    // the right absolute bytes in the file (see vioRead/vioWrite).
     auto* ioCtx = new IoContext();
     ioCtx->kind = IoKind::kFile;
     ioCtx->fd = fd;
-    ioCtx->totalSize = fileSize;
+    ioCtx->fileBaseOffset = partitionStartByte;
+    ioCtx->totalSize = volumeSizeBytes;
 
     dis_context_t disCtx = nullptr;
     if (!unlockWithBestCredentialGuess(ioCtx, password, passwordLen, volId, readOnly, &disCtx)) {
@@ -316,9 +332,9 @@ bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passw
 
     // Determine plaintext volume size. dislocker exposes this through
     // the volume header metadata; we can probe by seeking to end.
-    // For now, use the file size as an upper bound -- dislock() handles
-    // the actual encrypted-region bounds internally.
-    const uint64_t plainSize = fileSize;
+    // For now, use the partition/file size as an upper bound -- dislock()
+    // handles the actual encrypted-region bounds internally.
+    const uint64_t plainSize = volumeSizeBytes;
 
     {
         std::lock_guard<std::mutex> lock(v.mutex);
@@ -329,7 +345,7 @@ bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passw
         v.fileSize = fileSize;
         v.isUsbSource = false;
         v.readOnly = readOnly;
-        v.partitionStartSector = 0;
+        v.partitionStartSector = partitionStartByte / 512;
         v.matchedCipherId = -1;
         v.matchedHashId = -1;
         v.containerFormat = ContainerFormat::kBitLocker;
@@ -338,8 +354,8 @@ bool prepareBitLockerSession(int fd, const unsigned char* password, size_t passw
         v.bitlockerProxyFd = -1; // no separate proxy fd needed for file-backed
     }
 
-    LOGI("prepareBitLockerSession(vol=%d): unlocked, fileSize=%llu, readOnly=%d",
-         volId, (unsigned long long)fileSize, readOnly ? 1 : 0);
+    LOGI("prepareBitLockerSession(vol=%d): unlocked, partitionStartByte=%llu, volumeSize=%llu, readOnly=%d",
+         volId, (unsigned long long)partitionStartByte, (unsigned long long)volumeSizeBytes, readOnly ? 1 : 0);
     return true;
 }
 

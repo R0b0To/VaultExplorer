@@ -47,6 +47,103 @@ struct PartitionCandidate {
     uint64_t sectorCount;
 };
 
+// Parses an MBR (and, if present, GPT) partition table from any
+// sector-addressable block source via the readSectors callback. Shared by
+// prepareUsbSession (backed by usbReadSectors) and prepareSession's
+// file-backed partition scan below (backed by pread on the container's fd)
+// so a "container file" can also be a whole-disk image -- e.g. a
+// fixed-format VHD exported from Windows with BitLocker already enabled --
+// with the encrypted volume living inside a partition rather than starting
+// at byte 0 of the file, the same way a raw USB disk already works.
+//
+// Always appends a trailing {0, 0} sentinel so callers that also want to
+// try "the whole device/file as one unpartitioned volume" (VeraCrypt/raw
+// LUKS/raw BitLocker containers) can loop over the result uniformly.
+static std::vector<PartitionCandidate> scanPartitionTable(
+    const std::function<bool(uint64_t startSector, uint32_t count, unsigned char* out)>& readSectors) {
+    std::vector<PartitionCandidate> partitions;
+
+    unsigned char sector0[512];
+    if (readSectors(0, 1, sector0)) {
+        if (sector0[510] == 0x55 && sector0[511] == 0xAA) {
+            bool isGpt = false;
+
+            for (int i = 0; i < 4; i++) {
+                const unsigned char* entry = &sector0[446 + i * 16];
+                uint8_t type = entry[4];
+                if (type == 0xEE) {
+                    isGpt = true;
+                    break;
+                }
+                uint32_t startLba = readUint32LE(&entry[8]);
+                uint32_t numSectors = readUint32LE(&entry[12]);
+                if (startLba > 0 && numSectors > 0) {
+                    partitions.push_back({startLba, numSectors});
+                }
+            }
+
+            if (isGpt) {
+                std::unique_ptr<unsigned char[]> gptBuf(new unsigned char[33 * 512]);
+                if (readSectors(1, 33, gptBuf.get())) {
+                    const unsigned char* sector1 = gptBuf.get();
+                    const unsigned char* gptEntries = gptBuf.get() + 512;
+
+                    if (memcmp(sector1, "EFI PART", 8) == 0) {
+                        uint32_t numEntries = readUint32LE(&sector1[80]);
+                        uint32_t entrySize = readUint32LE(&sector1[84]);
+
+                        if (entrySize >= 128 && numEntries <= 128) {
+                            for (uint32_t i = 0; i < numEntries; i++) {
+                                const unsigned char* entry = gptEntries + (i * entrySize);
+
+                                bool unused = true;
+                                for (int g = 0; g < 16; g++) {
+                                    if (entry[g] != 0) { unused = false; break; }
+                                }
+                                if (unused) continue;
+
+                                uint64_t startLba = readUint64LE(&entry[32]);
+                                uint64_t endLba = readUint64LE(&entry[40]);
+                                if (startLba > 0 && endLba >= startLba) {
+                                    partitions.push_back({startLba, endLba - startLba + 1});
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    partitions.push_back({0, 0});
+    return partitions;
+}
+
+// Fixed-format VHD files (a common export shape for a whole-disk BitLocker
+// image -- e.g. via `Convert-VHD -VHDType Fixed`, or many disk-backup
+// tools) are just the raw disk bytes followed by a 512-byte "footer" sector
+// whose first 8 bytes are the "conectix" cookie. Excluding it keeps the
+// partition-table scan from treating those trailing 512 bytes as part of
+// the disk, and stops partition bounds-checking from rejecting a last
+// partition that legitimately runs right up to the pre-footer end of the
+// disk.
+//
+// NOTE: only fixed-format (or plain raw/.img) whole-disk files are
+// supported here, where sector N of the file really is sector N of the
+// disk. Dynamic/differencing VHDs (sparse, block-allocation-table-indexed
+// images) use a completely different on-disk layout and are not handled by
+// this scan.
+static uint64_t usableFileBytesExcludingVhdFooter(int fd, uint64_t fileSize) {
+    if (fileSize < 512) return fileSize;
+    unsigned char footer[512];
+    if (pread(fd, footer, sizeof(footer), static_cast<off_t>(fileSize - 512)) != 512) return fileSize;
+    static const unsigned char kVhdCookie[8] = { 'c', 'o', 'n', 'e', 'c', 't', 'i', 'x' };
+    if (std::memcmp(footer, kVhdCookie, sizeof(kVhdCookie)) == 0) {
+        return fileSize - 512;
+    }
+    return fileSize;
+}
+
 static std::atomic<bool> cancelRequested[MAX_VOLUMES];
 
 static bool _cancelInit = [](){
@@ -522,6 +619,37 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
         return prepareBitLockerSession(fd, password, passwordLen, volId, readOnly);
     }
 
+    // Whole-disk container files -- most commonly a fixed-format VHD
+    // exported from Windows with BitLocker already turned on -- don't have
+    // the FVE signature at byte 0 of the file: byte 0 is the disk's own
+    // MBR/GPT, and the BitLocker volume lives inside one of its partitions
+    // instead, exactly like a raw USB disk (see prepareUsbSession's
+    // matching scan below). Parse that partition table and retry the
+    // signature probe at each partition's byte offset before falling
+    // through to VeraCrypt's header-slot matching.
+    {
+        const uint64_t usableBytes = usableFileBytesExcludingVhdFooter(fd, fileSize);
+        auto fileReadSectors = [fd, usableBytes](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
+            const uint64_t byteOffset = startSector * 512ULL;
+            const uint64_t byteLen = static_cast<uint64_t>(count) * 512ULL;
+            if (byteOffset + byteLen > usableBytes) return false;
+            return pread(fd, out, byteLen, static_cast<off_t>(byteOffset)) == static_cast<ssize_t>(byteLen);
+        };
+
+        std::vector<PartitionCandidate> filePartitions = scanPartitionTable(fileReadSectors);
+        for (const auto& part : filePartitions) {
+            if (part.sectorCount == 0) continue; // {0,0} sentinel -- whole-file case already tried above
+            const uint64_t partStartByte = part.startSector * 512ULL;
+            const uint64_t partSizeBytes = part.sectorCount * 512ULL;
+            if (partStartByte + partSizeBytes > usableBytes) continue;
+            if (!bitlockerDetectFile(fd, partStartByte)) continue;
+
+            closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+            return prepareBitLockerSession(fd, password, passwordLen, volId, readOnly,
+                                            partStartByte, partSizeBytes);
+        }
+    }
+
     struct HeaderSlot { uint64_t fileOffset; };
     static constexpr HeaderSlot kHeaderSlots[] = { { 0 }, { VC_HIDDEN_HEADER_OFFSET } };
 
@@ -811,63 +939,10 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
         }
     }
 
-    std::vector<PartitionCandidate> partitions;
-
-    {
-        unsigned char sector0[512];
-        if (usbReadSectors(volId, 0, 1, sector0)) {
-            if (sector0[510] == 0x55 && sector0[511] == 0xAA) {
-                bool isGpt = false;
-
-                for (int i = 0; i < 4; i++) {
-                    const unsigned char* entry = &sector0[446 + i * 16];
-                    uint8_t type = entry[4];
-                    if (type == 0xEE) {
-                        isGpt = true;
-                        break;
-                    }
-                    uint32_t startLba = readUint32LE(&entry[8]);
-                    uint32_t numSectors = readUint32LE(&entry[12]);
-                    if (startLba > 0 && numSectors > 0) {
-                        partitions.push_back({startLba, numSectors});
-                    }
-                }
-
-                if (isGpt) {
-                    std::unique_ptr<unsigned char[]> gptBuf(new unsigned char[33 * 512]);
-                    if (usbReadSectors(volId, 1, 33, gptBuf.get())) {
-                        const unsigned char* sector1 = gptBuf.get();
-                        const unsigned char* gptEntries = gptBuf.get() + 512;
-
-                        if (memcmp(sector1, "EFI PART", 8) == 0) {
-                            uint32_t numEntries = readUint32LE(&sector1[80]);
-                            uint32_t entrySize = readUint32LE(&sector1[84]);
-
-                            if (entrySize >= 128 && numEntries <= 128) {
-                                for (uint32_t i = 0; i < numEntries; i++) {
-                                    const unsigned char* entry = gptEntries + (i * entrySize);
-
-                                    bool unused = true;
-                                    for (int g = 0; g < 16; g++) {
-                                        if (entry[g] != 0) { unused = false; break; }
-                                    }
-                                    if (unused) continue;
-
-                                    uint64_t startLba = readUint64LE(&entry[32]);
-                                    uint64_t endLba = readUint64LE(&entry[40]);
-                                    if (startLba > 0 && endLba >= startLba) {
-                                        partitions.push_back({startLba, endLba - startLba + 1});
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    partitions.push_back({0, 0});
+    std::vector<PartitionCandidate> partitions = scanPartitionTable(
+        [volId](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
+            return usbReadSectors(volId, startSector, count, out);
+        });
 
     if (partitionOffsetHint >= 0) {
         const uint64_t hint = static_cast<uint64_t>(partitionOffsetHint);

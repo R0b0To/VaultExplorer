@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <cstring>
 #include <fcntl.h>
 #include <functional>
@@ -38,11 +37,6 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 static constexpr int MAX_VOLUMES = FF_VOLUMES;
-
-static inline long long elapsedMs(const std::chrono::steady_clock::time_point& start) {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - start).count();
-}
 
 struct PartitionCandidate {
     uint64_t startSector;
@@ -266,7 +260,6 @@ bool deriveAndValidateHeader(
     std::atomic<bool>* externalAbort,
     int slotId
 ) {
-    const auto timingStart = std::chrono::steady_clock::now();
     const unsigned char* salt = headerSector;
     const unsigned char* encH = headerSector + VC_SALT_SIZE;
     const int safePim = clampPim(pim);
@@ -403,10 +396,10 @@ bool deriveAndValidateHeader(
 
     if (!found.load(std::memory_order_acquire)) {
         if (isUnlockCancelled(volId)) {
-            LOGI("deriveAndValidateHeader: cancelled after %lld ms (vol=%d)", elapsedMs(timingStart), volId);
+            LOGI("deriveAndValidateHeader: cancelled (vol=%d)", volId);
         } else {
-            LOGI("deriveAndValidateHeader: failed after %lld ms (cipher=%d hash=%d)",
-                 elapsedMs(timingStart), cipherIdParam, hashIdParam);
+            LOGI("deriveAndValidateHeader: failed (cipher=%d hash=%d)",
+                 cipherIdParam, hashIdParam);
         }
         return false;
     }
@@ -416,8 +409,8 @@ bool deriveAndValidateHeader(
     outMatchedHash = resultHash;
     outFields = resultFields;
     mbedtls_platform_zeroize(resultKeyMaterial, sizeof(resultKeyMaterial));
-    LOGI("deriveAndValidateHeader: success in %lld ms (cipher=%d hash=%d hidden=%d)",
-         elapsedMs(timingStart), static_cast<int>(resultCipher), static_cast<int>(resultHash),
+    LOGI("deriveAndValidateHeader: success (cipher=%d hash=%d hidden=%d)",
+         static_cast<int>(resultCipher), static_cast<int>(resultHash),
          resultFields.isHiddenVolume() ? 1 : 0);
     return true;
 }
@@ -579,7 +572,6 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
 }
 
 bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, int pim, int volId, bool forceDerive, int cipherId, int hashId, const unsigned char* preservedKey, size_t preservedKeyLen, const int* keyfileFds, int keyfileCount, bool readOnly) {
-    const auto opStart = std::chrono::steady_clock::now();
     if (volId < 0 || volId >= MAX_VOLUMES) { if (fd >= 0) close(fd); closeUnusedKeyfileFds(keyfileFds, keyfileCount); return false; }
     VolumeState& v = volumes[volId];
 

@@ -22,7 +22,7 @@ class GocryptfsFileNameCryptor(nameKey: ByteArray, private val longNameMax: Int)
         private const val DEFAULT_LONGNAME_MAX = 255
     }
 
-    private val effectiveLongNameMax get() = if (longNameMax > 0) longNameMax else DEFAULT_LONGNAME_MAX
+    val effectiveLongNameMax: Int get() = if (longNameMax > 0) longNameMax else DEFAULT_LONGNAME_MAX
 
     /** Returns the raw (unshortened) ciphertext name — caller decides whether
      *  to apply long-name shortening based on [effectiveLongNameMax]. */
@@ -54,11 +54,6 @@ class GocryptfsFileNameCryptor(nameKey: ByteArray, private val longNameMax: Int)
 
     // PKCS#7 padding to a 16-byte boundary (nametransform/pad16.go).
     private fun pad16(data: ByteArray): ByteArray {
-        val padLen = 16 - (data.size % 16).let { if (it == 0) 16 else it }.let { 16 - it }
-            .let { 16 - (data.size % 16) }.let { if (it == 0) 16 else it }
-        // (kept intentionally explicit/verbose to match pad16.go 1:1 rather
-        // than a "clever" one-liner, since off-by-one padding bugs here are
-        // exactly as unforgiving as in EME.)
         val realPadLen = 16 - (data.size % 16)
         val out = ByteArray(data.size + realPadLen)
         System.arraycopy(data, 0, out, 0, data.size)

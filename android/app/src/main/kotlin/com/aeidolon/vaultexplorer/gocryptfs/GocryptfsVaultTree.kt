@@ -127,9 +127,17 @@ fun dirivFor(virtualDirPath: String, physicalFolder: DocumentFile = physicalFold
     return bytes
 }
 
-    fun invalidate(virtualDirPath: String) {
+fun invalidate(virtualDirPath: String) {
+        safOps.invalidateAll()
         val stale = folderCache.keys.filter { it == virtualDirPath || it.startsWith("$virtualDirPath/") }
         stale.forEach { folderCache.remove(it); dirivCache.remove(it) }
+    }
+
+    fun invalidateAll() {
+        safOps.invalidateAll()
+        folderCache.clear()
+        dirivCache.clear()
+        folderCache[""] = vaultRoot
     }
 
     // ---- helpers (shared implementation lives in SafDocumentOps; see also CryptomatorVaultTree) ----

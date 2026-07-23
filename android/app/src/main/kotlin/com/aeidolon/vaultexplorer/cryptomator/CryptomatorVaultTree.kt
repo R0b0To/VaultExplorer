@@ -212,8 +212,8 @@ class CryptomatorVaultTree(
         return String(bytes, Charsets.UTF_8)
     }
 
-    /** Invalidate cached dirId/physical-folder entries under [virtualDirPath] after a rename/move/delete. */
-    fun invalidate(virtualDirPath: String) {
+fun invalidate(virtualDirPath: String) {
+        safOps.invalidateAll()
         val staleDirIds = mutableListOf<String>()
         dirIdCache.entries.removeIf { (path, dirId) ->
             val stale = path == virtualDirPath || path.startsWith("$virtualDirPath/")
@@ -224,6 +224,7 @@ class CryptomatorVaultTree(
     }
 
     fun invalidateAll() {
+        safOps.invalidateAll()
         dirIdCache.clear()
         dirIdCache[""] = ROOT_DIR_ID
         dataDirCache.clear()

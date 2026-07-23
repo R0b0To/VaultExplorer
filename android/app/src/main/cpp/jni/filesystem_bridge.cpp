@@ -43,6 +43,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectory(
         std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
         if (ensureMounted(volId)) {
             std::vector<std::string> results;
+            results.reserve(256);
             fsListDirectory(volId, nativePath, results);
 
             jclass strClass = env->FindClass("java/lang/String");

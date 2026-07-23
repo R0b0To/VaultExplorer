@@ -222,9 +222,15 @@ class FileOperationService extends ChangeNotifier {
     op._setStatus(FileOperationStatus.running);
     op._setActivity('Importing…');
 
-    void onProgress(ImportProgress p) {
+void onProgress(ImportProgress p) {
       if (p.opId != op.id) return;
-      op._setImportProgress(p.done, p.total, p.currentName);
+      op._setImportProgress(
+        done: p.done,
+        total: p.total,
+        currentName: p.currentName,
+        transferredBytes: p.transferredBytes,
+        totalBytes: p.totalBytes,
+      );
     }
 
     VaultExplorerApi.addImportProgressListener(onProgress);
@@ -274,12 +280,13 @@ class FileOperationService extends ChangeNotifier {
       op._setActivity('Checking available space…');
 
       int requiredBytes = 0;
-      if (!(op.isCut && src.volId == dest.volId)) {
+if (!(op.isCut && src.volId == dest.volId)) {
         for (final item in op.items) {
           requiredBytes += await measureItemBytes(src, item);
           if (op.cancelRequested) throw const _CancelledException();
         }
       }
+      op._setTotalBytes(requiredBytes);
 
 
 final spaceInfo = await vaultExplorerApi.getSpaceInfo(dest);
@@ -565,17 +572,17 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
       }
 
       int offset = 0;
-      while (offset < size) {
-        if (op.cancelRequested) throw const _CancelledException();
-        final chunkLen = min(size - offset, _chunkSize);
-        final chunk = await vaultExplorerApi.readFileChunk(
-          src,
-          srcPath,
-          offset,
-          chunkLen,
-        );
-        if (chunk == null || chunk.isEmpty) return false;
-        final ok = await vaultExplorerApi.writeFileChunk(
+while (offset < size) {
+  if (op.cancelRequested) throw const _CancelledException();
+  final chunkLen = min(size - offset, _chunkSize);
+  final chunk = await vaultExplorerApi.readFileChunk(
+    src,
+    srcPath,
+    offset,
+    chunkLen,
+  );
+  if (chunk == null || chunk.isEmpty) return false;
+final ok = await vaultExplorerApi.writeFileChunk(
           dest,
           destPath,
           offset,
@@ -583,6 +590,7 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
         );
         if (!ok) throw const _DiskFullException();
         offset += chunk.length;
+        op._addTransferredBytes(chunk.length);
       }
       await vaultExplorerApi.finishWriteIfCryptomator(dest, destPath);
       createdDestPaths.add(destPath);

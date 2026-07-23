@@ -1147,20 +1147,21 @@ Future<void> _openFileWithApp(
 
     _clip.clear();
 
-    void listener() {
+void listener() {
       if (!mounted) {
         op.removeListener(listener);
         return;
       }
       final done =
-          op.status != FileOperationStatus.pending &&
-          op.status != FileOperationStatus.running;
+          op.status != FileOperationStatus.running &&
+          op.status != FileOperationStatus.pending;
       if (done) {
         op.removeListener(listener);
-        _loadDirectoryContents(_currentDirPath);
+        if (op.destDirPath == _currentDirPath) {
+          _loadDirectoryContents(_currentDirPath);
+        }
       }
     }
-
     op.addListener(listener);
   }
 

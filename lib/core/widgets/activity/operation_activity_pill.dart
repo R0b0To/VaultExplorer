@@ -5,6 +5,8 @@ import 'package:vaultexplorer/features/browser/widgets/file_operations_sheet.dar
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_pill.dart';
 
+import '../../utils/format_utils.dart';
+
 /// Live file-operation progress indicator.
 ///
 /// Auto-dismisses [_kLingerDuration] after a clean (no-error) completion.
@@ -99,6 +101,10 @@ class _OperationPillContent extends StatelessWidget {
   });
 
   String _progressText(FileOperation op) {
+    if (op.totalBytes > 0) {
+      final pct = ((op.transferredBytes / op.totalBytes) * 100).clamp(0, 100).round();
+      return '${formatBytes(op.transferredBytes)} / ${formatBytes(op.totalBytes)}  ($pct%)';
+    }
     final done = op.doneCount + op.skipCount + op.failCount;
     final total = op.totalCount;
     if (total == 0) return '';

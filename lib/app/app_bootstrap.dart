@@ -12,6 +12,7 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 /// One-time platform/video-backend wiring that must happen before [runApp]
 /// — system UI mode, a filter for a couple of known-benign platform errors,
 /// and registering the `fvp` video backend.
+
 void configurePlatformIntegrations() {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
@@ -27,6 +28,11 @@ void configurePlatformIntegrations() {
   fvp.registerWith(
     options: {
       'platforms': ['android'],
+      'video.decoders': [
+        'AMediaCodec',
+        'FFmpeg',      
+      ],
+      'fastSeek': true,
     },
   );
 }

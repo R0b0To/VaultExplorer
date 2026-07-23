@@ -123,6 +123,15 @@ class FileOperation extends ChangeNotifier {
   int _importDone = 0;
   int _importTotal = 0;
 
+  int _transferredBytes = 0;
+  int get transferredBytes => isImport ? _importTransferredBytes : _transferredBytes;
+
+  int _totalBytes = 0;
+  int get totalBytes => isImport ? _importTotalBytes : _totalBytes;
+
+  int _importTransferredBytes = 0;
+  int _importTotalBytes = 0;
+
   final List<FileItemStatus> _itemStatuses;
   List<FileItemStatus> get itemStatuses => List.unmodifiable(_itemStatuses);
 
@@ -161,14 +170,35 @@ class FileOperation extends ChangeNotifier {
 
   // ── Derived display helpers ───────────────────────────────────────────────
 
+
   double? get progressFraction {
     if (isImport) {
-      if (_importTotal <= 0) return null; // still counting — indeterminate
-      return (_importDone / _importTotal).clamp(0.0, 1.0);
+      if (_importTotalBytes > 0) {
+        return (_importTransferredBytes / _importTotalBytes).clamp(0.0, 1.0);
+      }
+      if (_importTotal > 0) {
+        return (_importDone / _importTotal).clamp(0.0, 1.0);
+      }
+      return null;
     }
-    if (_itemStatuses.isEmpty) return null;
-    final done = _doneCount + _failCount + _skipCount;
-    return done / _itemStatuses.length;
+    if (_totalBytes > 0) {
+      return (_transferredBytes / _totalBytes).clamp(0.0, 1.0);
+    }
+    if (_itemStatuses.isNotEmpty) {
+      final done = _doneCount + _failCount + _skipCount;
+      return done / _itemStatuses.length;
+    }
+    return null;
+  }
+
+  void _setTotalBytes(int bytes) {
+    _totalBytes = bytes;
+    notifyListeners();
+  }
+
+  void _addTransferredBytes(int bytes) {
+    _transferredBytes += bytes;
+    notifyListeners();
   }
 
   bool get isCrossContainer => !isImport && sourceVolId != destVolId;
@@ -221,6 +251,32 @@ class FileOperation extends ChangeNotifier {
 
   // ── Mutation API — library-private ────────────────────────────────────────
 
+  void _setImportProgress({
+    required int done,
+    required int total,
+    required String currentName,
+    int transferredBytes = 0,
+    int totalBytes = 0,
+  }) {
+    _importDone = done;
+    _importTotal = total;
+    _importTransferredBytes = transferredBytes;
+    _importTotalBytes = totalBytes;
+
+    if (totalBytes > 0) {
+      final pct = ((transferredBytes / totalBytes) * 100).clamp(0, 100).round();
+      _currentActivity = currentName.isNotEmpty
+          ? 'Importing $currentName (${formatBytes(transferredBytes)} / ${formatBytes(totalBytes)} · $pct%)'
+          : 'Importing… ($pct%)';
+    } else if (currentName.isNotEmpty) {
+      _currentActivity = 'Importing $currentName…';
+    } else {
+      _currentActivity = 'Importing…';
+    }
+    notifyListeners();
+  }
+
+
   void _setStatus(FileOperationStatus s) {
     _status = s;
     notifyListeners();
@@ -244,13 +300,6 @@ class FileOperation extends ChangeNotifier {
   /// Applied on each "onImportProgress" push from native (see
   /// [FileOperationService._runImport]). [currentName] is folded straight
   /// into [_currentActivity] so the UI doesn't need a separate field.
-  void _setImportProgress(int done, int total, String currentName) {
-    _importDone = done;
-    _importTotal = total;
-    _currentActivity = currentName.isNotEmpty ? 'Importing $currentName…' : 'Importing…';
-    notifyListeners();
-  }
-
   void _recordItemResult(
     int index,
     FileItemResult result, {

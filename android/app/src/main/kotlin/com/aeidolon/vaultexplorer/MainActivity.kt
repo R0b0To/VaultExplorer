@@ -376,14 +376,16 @@ class MainActivity : FlutterFragmentActivity() {
                         // single opaque "importing" state.
                         val srcDocs = uris.mapNotNull { DocumentFile.fromSingleUri(this, it) }
                         val total = srcDocs.sumOf { countEntriesRecursive(it) }
+                        val totalBytes = srcDocs.sumOf { countBytesRecursive(it) }
                         val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
+                        val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                         var successCount = 0
                         for (srcDoc in srcDocs) {
                             val name = FatFileNameSanitizer.sanitize(srcDoc.name ?: "imported_file")
                             val targetFatPath = if (pending.targetDir.isEmpty()) name else "${pending.targetDir}/$name"
                             successCount += importEntryRecursive(
                                 srcDoc, pending.containerUri, targetFatPath, pending.volId,
-                                pending.opId, total, doneCounter,
+                                pending.opId, total, doneCounter, totalBytes, transferredCounter,
                             )
                         }
                         runOnUiThread { res.success(successCount) }
@@ -465,10 +467,12 @@ class MainActivity : FlutterFragmentActivity() {
                 ioExecutor.execute {
                     try {
                         val total = countEntriesRecursive(srcRoot)
+                        val totalBytes = countBytesRecursive(srcRoot)
                         val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
+                        val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                         val count = importEntryRecursive(
                             srcRoot, pending.containerUri, targetFatPath, pending.volId,
-                            pending.opId, total, doneCounter,
+                            pending.opId, total, doneCounter, totalBytes, transferredCounter,
                         )
                         runOnUiThread { res.success(count) }
                     } catch (e: Exception) {
@@ -2544,13 +2548,6 @@ class MainActivity : FlutterFragmentActivity() {
         return count
     }
 
-    /**
-     * Pre-count pass so the caller knows a total before starting the real
-     * import — lets ImportProgressBridge report "N of total" instead of
-     * leaving the UI stuck on a single opaque "importing" state. Counts
-     * leaf files only (matching what importEntryRecursive's return value
-     * counts), not the directories themselves.
-     */
     private fun countEntriesRecursive(srcDoc: DocumentFile): Int {
         if (!srcDoc.isDirectory) return 1
         var count = 0
@@ -2560,28 +2557,65 @@ class MainActivity : FlutterFragmentActivity() {
         return count
     }
 
-    /**
-     * Copies [input] to [output] in 256 KB chunks — the same chunk size
-     * Dart's own copy/move path uses (see FileOperationService._chunkSize)
-     * — checking ImportCancellation between chunks so a cancel lands
-     * promptly even mid-way through one large file, not just between
-     * whole files.
-     */
-    private fun copyStreamCancellable(input: InputStream, output: java.io.OutputStream, opId: Int) {
-        val buffer = ByteArray(256 * 1024)
-        while (true) {
+    private fun countBytesRecursive(srcDoc: DocumentFile): Long {
+        if (!srcDoc.isDirectory) return srcDoc.length()
+        var bytes = 0L
+        for (child in srcDoc.listFiles()) {
+            bytes += countBytesRecursive(child)
+        }
+        return bytes
+    }
+
+    private class ProgressInputStream(
+        private val delegate: InputStream,
+        private val opId: Int,
+        private val doneCounter: java.util.concurrent.atomic.AtomicInteger,
+        private val totalFiles: Int,
+        private val currentName: String,
+        private val transferredCounter: java.util.concurrent.atomic.AtomicLong,
+        private val totalBytes: Long,
+    ) : InputStream() {
+
+        override fun read(): Int {
             if (ImportCancellation.isCancelled(opId)) {
                 throw ImportCancelledException("Import cancelled")
             }
-            val read = input.read(buffer)
-            if (read < 0) break
-            output.write(buffer, 0, read)
+            val b = delegate.read()
+            if (b != -1) {
+                val transferred = transferredCounter.incrementAndGet()
+                ImportProgressBridge.reportProgress(
+                    opId, doneCounter.get(), totalFiles, currentName, transferred, totalBytes
+                )
+            }
+            return b
         }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (ImportCancellation.isCancelled(opId)) {
+                throw ImportCancelledException("Import cancelled")
+            }
+            val n = delegate.read(b, off, len)
+            if (n > 0) {
+                val transferred = transferredCounter.addAndGet(n.toLong())
+                ImportProgressBridge.reportProgress(
+                    opId, doneCounter.get(), totalFiles, currentName, transferred, totalBytes
+                )
+            }
+            return n
+        }
+
+        override fun close() = delegate.close()
+        override fun available(): Int = delegate.available()
+        override fun skip(n: Long): Long = delegate.skip(n)
+        override fun markSupported(): Boolean = delegate.markSupported()
+        override fun mark(readlimit: Int) = delegate.mark(readlimit)
+        override fun reset() = delegate.reset()
     }
 
     private fun importEntryRecursive(
         srcDoc: DocumentFile, containerUri: String, targetFatPath: String, volId: Int,
         opId: Int, total: Int, doneCounter: java.util.concurrent.atomic.AtomicInteger,
+        totalBytes: Long = 0L, transferredCounter: java.util.concurrent.atomic.AtomicLong? = null,
     ): Int {
         if (ImportCancellation.isCancelled(opId)) {
             throw ImportCancelledException("Import cancelled")
@@ -2600,15 +2634,23 @@ class MainActivity : FlutterFragmentActivity() {
                 val childName = FatFileNameSanitizer.sanitize(child.name ?: continue)
                 count += importEntryRecursive(
                     child, containerUri, "$targetFatPath/$childName", volId,
-                    opId, total, doneCounter,
+                    opId, total, doneCounter, totalBytes, transferredCounter,
                 )
             }
             return count
         }
         
-        val stream = contentResolver.openInputStream(srcDoc.uri)
+        val rawStream = contentResolver.openInputStream(srcDoc.uri)
             ?: throw java.io.IOException("Failed to open input stream for: ${srcDoc.name}")
-        val ok = stream.use { inp ->
+        val progressStream = if (transferredCounter != null) {
+            ProgressInputStream(
+                rawStream, opId, doneCounter, total, srcDoc.name ?: "",
+                transferredCounter, totalBytes
+            )
+        } else {
+            rawStream
+        }
+        val ok = progressStream.use { inp ->
             ContainerFileSystem.importStream(volId, targetFatPath, inp)
         }
         if (!ok) {
@@ -2619,7 +2661,10 @@ class MainActivity : FlutterFragmentActivity() {
             ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
         }
         val done = doneCounter.incrementAndGet()
-        ImportProgressBridge.reportProgress(opId, done, total, srcDoc.name ?: "")
+        ImportProgressBridge.reportProgress(
+            opId, done, total, srcDoc.name ?: "",
+            transferredCounter?.get() ?: 0L, totalBytes
+        )
         return 1
     }
     

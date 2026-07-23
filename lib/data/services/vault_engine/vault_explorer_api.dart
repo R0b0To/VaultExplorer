@@ -52,6 +52,8 @@ typedef ImportProgress = ({
   int done,
   int total,
   String currentName,
+  int transferredBytes,
+  int totalBytes,
 });
 
 
@@ -214,7 +216,7 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
           );
           _unlockProgressRegistry.notify(progress);
         }
-      } else if (call.method == 'onImportProgress') {
+} else if (call.method == 'onImportProgress') {
         final args = call.arguments as Map<Object?, Object?>;
         final opId = args['opId'] as int?;
         final done = args['done'] as int?;
@@ -225,6 +227,8 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
             done: done,
             total: total,
             currentName: args['currentName'] as String? ?? '',
+            transferredBytes: (args['transferredBytes'] as num?)?.toInt() ?? 0,
+            totalBytes: (args['totalBytes'] as num?)?.toInt() ?? 0,
           );
           _importProgressRegistry.notify(progress);
         }

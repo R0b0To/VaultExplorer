@@ -1,6 +1,7 @@
 package com.aeidolon.vaultexplorer.saf
 
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.provider.DocumentsContract
 import androidx.documentfile.provider.CachedDocumentFile
@@ -28,10 +29,11 @@ class SafDocumentOps(private val context: Context) {
     }
 
     private fun queryChildrenRaw(folder: DocumentFile): MutableMap<String, DocumentFile> {
-        // --- DIRECT FILE SPEEDUP FOR CRYPTOMATOR, GOCRYPTFS & CRYFS ---
+        val results = LinkedHashMap<String, DocumentFile>()
+
+        // 1. Direct POSIX Access (Active only if All Files Access is granted)
         val rawDir = getRawFile(folder)
         if (rawDir != null && rawDir.exists() && rawDir.isDirectory) {
-            val results = LinkedHashMap<String, DocumentFile>()
             val files = rawDir.listFiles() ?: emptyArray()
             for (f in files) {
                 val baseFile = DocumentFile.fromFile(f)
@@ -47,47 +49,79 @@ class SafDocumentOps(private val context: Context) {
             return results
         }
 
-        // --- SAF FALLBACK ---
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-            folder.uri,
-            DocumentsContract.getDocumentId(folder.uri)
-        )
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-            DocumentsContract.Document.COLUMN_SIZE,
-            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
-        )
-        val results = LinkedHashMap<String, DocumentFile>()
-        try {
-            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
-                val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
-                val modIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-                while (cursor.moveToNext()) {
-                    val docId = if (idIdx >= 0) cursor.getString(idIdx) else null ?: continue
-                    val docName = if (nameIdx >= 0) cursor.getString(nameIdx) else null ?: continue
-                    val mimeType = if (mimeIdx >= 0) cursor.getString(mimeIdx) else null
-                    val size = if (sizeIdx >= 0 && !cursor.isNull(sizeIdx)) cursor.getLong(sizeIdx) else 0L
-                    val lastModified = if (modIdx >= 0 && !cursor.isNull(modIdx)) cursor.getLong(modIdx) else 0L
-                    val childUri = DocumentsContract.buildDocumentUriUsingTree(folder.uri, docId)
-                    val baseFile = DocumentFile.fromSingleUri(context, childUri) ?: continue
-                    val isDir = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
-                    val cachedFile = CachedDocumentFile(
-                        delegate = baseFile,
-                        cachedName = docName,
-                        cachedIsDirectory = isDir,
-                        cachedLength = size,
-                        cachedLastModified = lastModified,
-                    )
-                    results[docName.lowercase()] = cachedFile
+        // 2. SAF ContentResolver Query (Tree-Aware Fallback)
+        val uri = folder.uri
+        if (DocumentsContract.isTreeUri(uri)) {
+            try {
+                val authority = uri.authority ?: "com.android.externalstorage.documents"
+                val treeDocId = DocumentsContract.getTreeDocumentId(uri)
+                val rootTreeUri = DocumentsContract.buildTreeDocumentUri(authority, treeDocId)
+
+                val parentDocId = try {
+                    DocumentsContract.getDocumentId(uri)
+                } catch (_: Exception) {
+                    treeDocId
                 }
+
+                val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootTreeUri, parentDocId)
+                val projection = arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+                    DocumentsContract.Document.COLUMN_SIZE,
+                    DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+                )
+
+                context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                    val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                    val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                    val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                    val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                    val modIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+
+                    while (cursor.moveToNext()) {
+                        val childDocId = if (idIdx >= 0) cursor.getString(idIdx) else null ?: continue
+                        val docName = if (nameIdx >= 0) cursor.getString(nameIdx) else null ?: continue
+                        val mimeType = if (mimeIdx >= 0) cursor.getString(mimeIdx) else null
+                        val size = if (sizeIdx >= 0 && !cursor.isNull(sizeIdx)) cursor.getLong(sizeIdx) else 0L
+                        val lastModified = if (modIdx >= 0 && !cursor.isNull(modIdx)) cursor.getLong(modIdx) else 0L
+
+                        val childDocUri = DocumentsContract.buildDocumentUriUsingTree(rootTreeUri, childDocId)
+                        val isDir = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
+
+                        val baseFile = if (isDir) {
+                            DocumentFile.fromTreeUri(context, childDocUri)
+                        } else {
+                            DocumentFile.fromSingleUri(context, childDocUri)
+                        } ?: continue
+
+                        val cachedFile = CachedDocumentFile(
+                            delegate = baseFile,
+                            cachedName = docName,
+                            cachedIsDirectory = isDir,
+                            cachedLength = size,
+                            cachedLastModified = lastModified,
+                        )
+                        results[docName.lowercase()] = cachedFile
+                    }
+                    return results
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("SafDocumentOps", "SAF tree query failed for $uri", e)
             }
-        } catch (e: Exception) {
-            android.util.Log.e("SafDocumentOps", "queryChildrenRaw failed for ${folder.uri}", e)
+        }
+
+        // 3. DocumentFile.listFiles Fallback
+        val children = try { folder.listFiles() } catch (_: Exception) { emptyArray() }
+        for (child in children) {
+            val name = child.name ?: continue
+            results[name.lowercase()] = CachedDocumentFile(
+                delegate = child,
+                cachedName = name,
+                cachedIsDirectory = child.isDirectory,
+                cachedLength = if (child.isDirectory) 0L else child.length(),
+                cachedLastModified = child.lastModified(),
+            )
         }
         return results
     }
@@ -117,7 +151,7 @@ class SafDocumentOps(private val context: Context) {
                 DocumentsContract.Document.MIME_TYPE_DIR,
                 name
             )
-            val created = uri?.let { DocumentFile.fromSingleUri(context, it) }
+            val created = uri?.let { DocumentFile.fromTreeUri(context, it) ?: DocumentFile.fromSingleUri(context, it) }
             invalidate(parent)
             created?.let { CachedDocumentFile(it, name, cachedIsDirectory = true) }
         }

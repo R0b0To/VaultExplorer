@@ -1,7 +1,3 @@
-Here is the updated README.md incorporating CryFS support, Fast Direct Storage
-Access (POSIX file acceleration), new ciphers, and updated native architecture
-details.
-
 # VaultExplorer
 
 [![Flutter](https://img.shields.io/badge/Flutter-%5E3.12.0-02569B?style=flat&logo=flutter)](https://flutter.dev)

@@ -305,6 +305,7 @@ int ntfsFilldir(void* dirent, const ntfschar* name, const int nameLength,
                 const unsigned) {
     auto* context = static_cast<NtfsFilldirContext*>(dirent);
     if (nameType == FILE_NAME_DOS) return 0;
+    if (context->results->size() >= NTFS_DIRECTORY_MAX_ENTRIES) return 0;
 
     char* utf8Name = nullptr;
     const int utf8Length = ntfs_ucstombs(name, nameLength, &utf8Name, 0);
@@ -392,6 +393,7 @@ bool listNtfsDirectory(int volumeId, const std::string& pathSuffix,
     NtfsFilldirContext context{&results, volume};
     ntfs_readdir(dirInode, &position, &context, ntfsFilldir);
     ntfs_inode_close(dirInode);
+    if (results.size() >= NTFS_DIRECTORY_MAX_ENTRIES) results.push_back("System:TRUNCATED");
     return true;
 }
 

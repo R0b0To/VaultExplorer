@@ -72,6 +72,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   String? _storedPatternHash;
   bool _loadingAuth = true;
   bool _reconnectTargetMissing = false;
+  bool _isAuthenticating = false;
 
   String? get _expectedDeviceName {
     final uri = widget.existingRecord?.uri;
@@ -159,6 +160,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         if (_loadDevicesFuture != null) {
           await _loadDevicesFuture;
         }
+        // Small delay allows route & device scan animations to settle before prompting biometrics
+        await Future<void>.delayed(const Duration(milliseconds: 300));
         if (mounted && _selected != null && !_reconnectTargetMissing) {
           _tryBiometric();
         }
@@ -169,16 +172,35 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   }
 
   Future<void> _tryBiometric() async {
+    if (_isAuthenticating) return;
+    _isAuthenticating = true;
+
     final record = widget.existingRecord;
-    if (record == null) return;
+    if (record == null) {
+      _isAuthenticating = false;
+      return;
+    }
     
     if (_selected == null) {
-      setState(() => _error = 'Select a USB drive first');
+      if (mounted) setState(() => _error = 'Select a USB drive first');
+      _isAuthenticating = false;
       return;
     }
 
     try {
       final localAuth = LocalAuthentication();
+      final canCheck = await localAuth.canCheckBiometrics;
+      final isSupported = await localAuth.isDeviceSupported();
+      if (!canCheck || !isSupported) {
+        if (mounted) {
+          setState(() {
+            _error = 'Biometrics not available on this device';
+            _showPasswordFallback = true;
+          });
+        }
+        return;
+      }
+
       final ok = await localAuth.authenticate(
         localizedReason: 'Authenticate to unlock USB drive',
         options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
@@ -208,12 +230,20 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         }
       }
     } on PlatformException catch (e) {
+      if (e.code == 'auth_in_progress' ||
+          e.code == 'AuthenticationInProgress' ||
+          (e.message?.contains('Authentication in progress') ?? false)) {
+        // Silently swallow race condition error on startup/transitions
+        return;
+      }
       if (mounted) {
         setState(() {
           _error = 'Biometric error: ${e.message}';
           _showPasswordFallback = true;
         });
       }
+    } finally {
+      _isAuthenticating = false;
     }
   }
 

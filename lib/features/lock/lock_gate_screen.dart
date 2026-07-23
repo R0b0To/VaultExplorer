@@ -27,6 +27,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
   bool _obscure = true;
   String? _error;
   bool _checking = false;
+  bool _isAuthenticating = false;
 
   int _failedAttempts = 0;
   DateTime? _lockedUntil;
@@ -62,7 +63,10 @@ class _LockGateScreenState extends State<LockGateScreen> {
     });
 
     if (s.masterPasswordIsFingerprint) {
-      _tryBiometric();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      if (mounted) {
+        _tryBiometric();
+      }
     }
   }
 
@@ -91,6 +95,9 @@ class _LockGateScreenState extends State<LockGateScreen> {
   }
 
   Future<void> _tryBiometric() async {
+    if (_isAuthenticating) return;
+    _isAuthenticating = true;
+
     try {
       final canCheck = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
@@ -109,7 +116,15 @@ class _LockGateScreenState extends State<LockGateScreen> {
       );
       if (ok && mounted) _goToDashboard();
     } on PlatformException catch (e) {
+      if (e.code == 'auth_in_progress' ||
+          e.code == 'AuthenticationInProgress' ||
+          (e.message?.contains('Authentication in progress') ?? false)) {
+        // Silently ignore race condition errors on startup/transitions
+        return;
+      }
       if (mounted) setState(() => _error = 'Biometric error: ${e.message}');
+    } finally {
+      _isAuthenticating = false;
     }
   }
 

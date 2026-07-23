@@ -78,6 +78,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
   String? _storedPatternHash;
   bool _loadingAuth = true;
   bool _containerMissing = false;
+  bool _isAuthenticating = false;
 
   bool get _passwordPrefilled =>
       widget.prefillPassword?.isNotEmpty == true &&
@@ -145,7 +146,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
     }
   }
 
-Future<void> _toggleStoragePermission(bool enable) async {
+  Future<void> _toggleStoragePermission(bool enable) async {
     const api = VaultExplorerApi();
     
     if (enable) {
@@ -217,7 +218,10 @@ Future<void> _toggleStoragePermission(bool enable) async {
       if (mounted) setState(() => _loadingAuth = false);
 
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
-        _tryBiometric();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          _tryBiometric();
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _loadingAuth = false);
@@ -315,7 +319,10 @@ Future<void> _toggleStoragePermission(bool enable) async {
       });
 
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
-        _tryBiometric();
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          _tryBiometric();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -328,8 +335,23 @@ Future<void> _toggleStoragePermission(bool enable) async {
   }
 
   Future<void> _tryBiometric() async {
+    if (_isAuthenticating) return;
+    _isAuthenticating = true;
+
     try {
       final localAuth = LocalAuthentication();
+      final canCheck = await localAuth.canCheckBiometrics;
+      final isSupported = await localAuth.isDeviceSupported();
+      if (!canCheck || !isSupported) {
+        if (mounted) {
+          setState(() {
+            _error = 'Biometrics not available on this device';
+            _showPasswordFallback = true;
+          });
+        }
+        return;
+      }
+
       final ok = await localAuth.authenticate(
         localizedReason: 'Authenticate to unlock container',
         options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
@@ -365,12 +387,20 @@ Future<void> _toggleStoragePermission(bool enable) async {
         }
       }
     } on PlatformException catch (e) {
+      if (e.code == 'auth_in_progress' ||
+          e.code == 'AuthenticationInProgress' ||
+          (e.message?.contains('Authentication in progress') ?? false)) {
+        // Silently swallow race condition error on startup/transitions
+        return;
+      }
       if (mounted) {
         setState(() {
           _error = 'Biometric error: ${e.message}';
           _showPasswordFallback = true;
         });
       }
+    } finally {
+      _isAuthenticating = false;
     }
   }
 

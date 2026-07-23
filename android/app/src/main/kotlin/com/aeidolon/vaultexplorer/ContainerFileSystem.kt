@@ -45,6 +45,9 @@ object ContainerFileSystem {
 
     // ── Directory operations (Read-Only) ───────────────────────────────────
 
+    fun importStream(volId: Int, fatPath: String, inputStream: java.io.InputStream): Boolean =
+        withWriteLock(volId) { ContainerEngine.importStream(fatPath, inputStream, volId) }
+        
     fun listDirectory(volId: Int, dirPath: String): Array<String>? =
         withReadLock(volId) { ContainerEngine.listDirectory(dirPath, volId) }
 

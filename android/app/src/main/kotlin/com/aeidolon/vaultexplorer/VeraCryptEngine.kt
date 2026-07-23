@@ -210,5 +210,13 @@ external fun createUsbContainerNative(
     @JvmStatic external fun getCascadeFingerprint(cascadeId: Int): Int
     @JvmStatic external fun getCascadeIdCount(): Int
     @JvmStatic external fun getHashIdCount(): Int
-    
+
+    // ── CryFS block cipher (see cpp/crypto/cryfs_block_cipher.h) ───────────
+    // Kotlin-side wrapper: cryfs/CryfsBlockCipher.kt. Only the AES-GCM/CFB
+    // cipher family is implemented natively; cryfsCipherIdNative returns -1
+    // for any other cipher name found in a vault's cryfs.config.
+    @JvmStatic external fun cryfsCipherIdNative(cipherName: String): Int
+    @JvmStatic external fun cryfsEncryptBlockNative(cipherId: Int, key: ByteArray, plaintext: ByteArray): ByteArray?
+    @JvmStatic external fun cryfsDecryptBlockNative(cipherId: Int, key: ByteArray, ciphertext: ByteArray): ByteArray?
+
 }

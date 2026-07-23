@@ -101,6 +101,10 @@ private object ChannelMethods {
     const val CREATE_GOCRYPTFS_VAULT = "createGocryptfsVault"
     const val FINISH_WRITE_IF_CRYPTOMATOR = "finishWriteIfCryptomator"
     const val IS_GOCRYPTFS_VAULT = "isGocryptfsVault"
+    const val PICK_CRYFS_VAULT = "pickCryfsVault"
+    const val UNLOCK_CRYFS_VAULT = "unlockCryfsVault"
+    const val CREATE_CRYFS_VAULT = "createCryfsVault"
+    const val IS_CRYFS_VAULT = "isCryfsVault"
 }
 
 private const val MAX_CHUNK_BYTES = 64 * 1024 * 1024  // 64 MB
@@ -220,6 +224,29 @@ class MainActivity : FlutterFragmentActivity() {
                 Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
             )
             val looksValid = com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.looksLikeVault(this, uri)
+            res.success(mapOf(
+                "uri" to uri.toString(),
+                "displayName" to UriNameResolver.resolve(contentResolver, uri),
+                "looksLikeVault" to looksValid,
+            ))
+        } else {
+            res.success(null)
+        }
+    }
+
+    private val pickCryfsVaultLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingFlutterResult ?: return@registerForActivityResult
+        pendingFlutterResult = null
+        val data = activityResult.data
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
+            val uri = data.data!!
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+            val looksValid = com.aeidolon.vaultexplorer.cryfs.CryfsVault.looksLikeVault(this, uri)
             res.success(mapOf(
                 "uri" to uri.toString(),
                 "displayName" to UriNameResolver.resolve(contentResolver, uri),
@@ -1059,6 +1086,12 @@ class MainActivity : FlutterFragmentActivity() {
                     pickGocryptfsVaultLauncher.launch(intent)
                 }
 
+                ChannelMethods.PICK_CRYFS_VAULT -> {
+                    pendingResultCheck(result)
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                    pickCryfsVaultLauncher.launch(intent)
+                }
+
                 ChannelMethods.PICK_KEYFILES -> {
                     pendingResultCheck(result)
                     val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -1468,6 +1501,77 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                 }
 
+                ChannelMethods.UNLOCK_CRYFS_VAULT -> {
+                    val uriString = call.argument<String>("filePath")
+                    val password = call.argument<String>("password")
+                    val displayName = call.argument<String>("displayName")
+                    val docProvider = call.argument<Boolean>("documentProvider") ?: false
+                    val readOnly = call.argument<Boolean>("readOnly") ?: false
+
+                    if (uriString == null || password == null) {
+                        result.error("INVALID_ARGS", "filePath and password required", null)
+                        return@setMethodCallHandler
+                    }
+
+                    val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
+                        ?: ContainerSessionRegistry.getFreeVolumeId()
+                    if (targetVolId == null) {
+                        result.error("MAX_CONTAINERS", "Maximum containers already mounted", null)
+                        return@setMethodCallHandler
+                    }
+                    methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
+
+                    ioExecutor.execute {
+                        try {
+                            val uri = Uri.parse(uriString)
+                            val passwordChars = password.toCharArray()
+                            val openResult = try {
+                                com.aeidolon.vaultexplorer.cryfs.CryfsVault.open(this, uri, passwordChars, readOnly)
+                            } finally {
+                                passwordChars.fill('\u0000')
+                            }
+
+                            runOnUiThread {
+                                when (openResult) {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
+                                        val session = openResult.session
+                                        VaultBackendRegistry.put(targetVolId, session)
+                                        val files = session.listDirectory("")?.toList() ?: emptyList()
+                                        ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
+                                            uri = uriString,
+                                            volId = targetVolId,
+                                            cachedFilesList = files,
+                                            displayName = displayName ?: openResult.vaultDisplayName,
+                                            documentProvider = docProvider,
+                                            readOnly = readOnly,
+                                        )
+                                        if (docProvider) {
+                                            contentResolver.notifyChange(
+                                                DocumentsContract.buildRootsUri(
+                                                    "com.aeidolon.vaultexplorer.documents"), null)
+                                        }
+                                        result.success(mapOf(
+                                            "volId" to targetVolId,
+                                            "files" to files,
+                                            "matchedCipherId" to 255,
+                                            "matchedHashId" to 255,
+                                            "containerFormat" to "cryfs",
+                                        ))
+                                    }
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword -> {
+                                        result.error("AUTH_FAIL", "Incorrect password", null)
+                                    }
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
+                                        result.error("INVALID_VAULT", openResult.reason, null)
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { dispatchNativeError(e, result) }
+                        }
+                    }
+                }
+
                 ChannelMethods.CREATE_CRYPTOMATOR_VAULT -> {
                     val uriString = call.argument<String>("filePath")
                     val password = call.argument<String>("password") ?: ""
@@ -1546,6 +1650,57 @@ class MainActivity : FlutterFragmentActivity() {
                         val isVault = try {
                             val uri = Uri.parse(uriString)
                             com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.looksLikeVault(this@MainActivity, uri)
+                        } catch (_: Exception) {
+                            false
+                        }
+                        runOnUiThread { result.success(isVault) }
+                    }
+                }
+
+                ChannelMethods.CREATE_CRYFS_VAULT -> {
+                    val uriString = call.argument<String>("filePath")
+                    val password = call.argument<String>("password") ?: ""
+                    if (uriString == null || password.isEmpty()) {
+                        result.error("INVALID_ARGS", "filePath and password required", null)
+                        return@setMethodCallHandler
+                    }
+                    ioExecutor.execute {
+                        try {
+                            val uri = Uri.parse(uriString)
+                            val passwordChars = password.toCharArray()
+                            val createResult = try {
+                                com.aeidolon.vaultexplorer.cryfs.CryfsVault.create(this, uri, passwordChars)
+                            } finally {
+                                passwordChars.fill('\u0000')
+                            }
+                            runOnUiThread {
+                                when (createResult) {
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
+                                        createResult.session.close()
+                                        result.success(true)
+                                    }
+                                    is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
+                                        result.error("CREATE_FAILED", createResult.reason, null)
+                                    }
+                                    else -> result.error("CREATE_FAILED", "Unexpected result", null)
+                                }
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { dispatchNativeError(e, result) }
+                        }
+                    }
+                }
+
+                ChannelMethods.IS_CRYFS_VAULT -> {
+                    val uriString = call.argument<String>("uri")
+                    if (uriString == null) {
+                        result.error("INVALID_ARGS", "uri is required", null)
+                        return@setMethodCallHandler
+                    }
+                    ioExecutor.execute {
+                        val isVault = try {
+                            val uri = Uri.parse(uriString)
+                            com.aeidolon.vaultexplorer.cryfs.CryfsVault.looksLikeVault(this@MainActivity, uri)
                         } catch (_: Exception) {
                             false
                         }
@@ -2450,27 +2605,22 @@ class MainActivity : FlutterFragmentActivity() {
             }
             return count
         }
-        val tempFile = File(cacheDir, "import_${System.nanoTime()}")
-        try {
-            val stream = contentResolver.openInputStream(srcDoc.uri)
-                ?: throw java.io.IOException("Failed to open input stream for: ${srcDoc.name}")
-            stream.use { inp ->
-                tempFile.outputStream().use { out -> copyStreamCancellable(inp, out, opId) }
-            }
-            val ok = ContainerFileSystem.writeBackFile(volId, targetFatPath, tempFile.absolutePath)
-            if (!ok) {
-                throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
-            }
-            val lastModified = srcDoc.lastModified() / 1000L
-            if (lastModified > 0) {
-                ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
-            }
-            val done = doneCounter.incrementAndGet()
-            ImportProgressBridge.reportProgress(opId, done, total, srcDoc.name ?: "")
-            return 1
-        } finally {
-            tempFile.delete()
+        
+        val stream = contentResolver.openInputStream(srcDoc.uri)
+            ?: throw java.io.IOException("Failed to open input stream for: ${srcDoc.name}")
+        val ok = stream.use { inp ->
+            ContainerFileSystem.importStream(volId, targetFatPath, inp)
         }
+        if (!ok) {
+            throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
+        }
+        val lastModified = srcDoc.lastModified() / 1000L
+        if (lastModified > 0) {
+            ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
+        }
+        val done = doneCounter.incrementAndGet()
+        ImportProgressBridge.reportProgress(opId, done, total, srcDoc.name ?: "")
+        return 1
     }
     
     private fun Intent.putPathExtra(name: String, value: String) {

@@ -142,7 +142,9 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     try {
       final result = _folderVaultFormat == 'cryptomator'
           ? await vaultExplorerApi.pickCryptomatorVault()
-          : await vaultExplorerApi.pickGocryptfsVault();
+          : _folderVaultFormat == 'gocryptfs'
+              ? await vaultExplorerApi.pickGocryptfsVault()
+              : await vaultExplorerApi.pickCryfsVault();
       if (result != null && mounted) {
         setState(() {
           _folderVaultUri = result.uri;
@@ -229,7 +231,9 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     try {
       final success = _folderVaultFormat == 'cryptomator'
           ? await vaultExplorerApi.createCryptomatorVault(_folderVaultUri!, password)
-          : await vaultExplorerApi.createGocryptfsVault(_folderVaultUri!, password);
+          : _folderVaultFormat == 'gocryptfs'
+              ? await vaultExplorerApi.createGocryptfsVault(_folderVaultUri!, password)
+              : await vaultExplorerApi.createCryfsVault(_folderVaultUri!, password);
 
       if (success) {
         if (mounted) {
@@ -674,6 +678,11 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
           label: Text('Gocryptfs'),
           icon: Icon(Icons.enhanced_encryption_rounded),
         ),
+        ButtonSegment(
+          value: 'cryfs',
+          label: Text('CryFS'),
+          icon: Icon(Icons.enhanced_encryption_rounded),
+        ),
       ],
       selected: {_folderVaultFormat},
       onSelectionChanged: _loading
@@ -712,7 +721,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
-                  _folderVaultFormat == 'gocryptfs'
+                  _folderVaultFormat == 'gocryptfs' || _folderVaultFormat == 'cryfs'
                       ? Icons.enhanced_encryption_rounded
                       : Icons.folder_shared_rounded,
                   size: 26,
@@ -789,7 +798,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
       children: [
         const ExpressiveSectionHeader(
           title: 'Folder Vault',
-          subtitle: 'Cryptomator or Gocryptfs compatible directory structure',
+          subtitle: 'Cryptomator, Gocryptfs, or CryFS compatible directory structure',
           icon: Icons.folder_shared_rounded,
         ),
         _buildFolderVaultFormatSelector(),

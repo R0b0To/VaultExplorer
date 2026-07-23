@@ -2,6 +2,7 @@ package com.aeidolon.vaultexplorer
 
 import com.aeidolon.vaultexplorer.cryptomator.CryptomatorStreamRegistry
 import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsStreamRegistry
+import com.aeidolon.vaultexplorer.cryfs.CryfsStreamRegistry
 
 /**
  * Format-neutral native engine boundary.
@@ -197,7 +198,21 @@ object ContainerEngine {
         return when (session?.format) {
             ContainerFormat.CRYPTOMATOR -> CryptomatorStreamRegistry.open(volId, path)
             ContainerFormat.GOCRYPTFS -> GocryptfsStreamRegistry.open(volId, path)
+            ContainerFormat.CRYFS -> CryfsStreamRegistry.open(volId, path)
             else -> VeraCryptEngine.openStream(path, volId)
+        }
+    }
+
+    fun importStream(path: String, inputStream: java.io.InputStream, volId: Int): Boolean {
+        VaultBackendRegistry.get(volId)?.let { session ->
+            return session.importStream(path, inputStream)
+        }
+        val tempFile = java.io.File.createTempFile("vc_import_", ".tmp")
+        return try {
+            tempFile.outputStream().use { out -> inputStream.copyTo(out) }
+            VeraCryptEngine.writeBackFile(path, tempFile.absolutePath, volId)
+        } finally {
+            tempFile.delete()
         }
     }
 
@@ -206,6 +221,7 @@ object ContainerEngine {
         return when (session?.format) {
             ContainerFormat.CRYPTOMATOR -> CryptomatorStreamRegistry.read(volId, stream, offset, out, length)
             ContainerFormat.GOCRYPTFS -> GocryptfsStreamRegistry.read(volId, stream, offset, out, length)
+            ContainerFormat.CRYFS -> CryfsStreamRegistry.read(volId, stream, offset, out, length)
             else -> VeraCryptEngine.readStream(stream, offset, out, length, volId)
         }
     }
@@ -215,16 +231,17 @@ object ContainerEngine {
         when (session?.format) {
             ContainerFormat.CRYPTOMATOR -> CryptomatorStreamRegistry.close(volId, stream)
             ContainerFormat.GOCRYPTFS -> GocryptfsStreamRegistry.close(volId, stream)
+            ContainerFormat.CRYFS -> CryfsStreamRegistry.close(volId, stream)
             else -> VeraCryptEngine.closeStream(stream, volId)
         }
     }
 }
 
 enum class ContainerFormat {
-    VERACRYPT, LUKS1, LUKS2, CRYPTOMATOR, GOCRYPTFS, BITLOCKER, UNKNOWN;
+    VERACRYPT, LUKS1, LUKS2, CRYPTOMATOR, GOCRYPTFS, CRYFS, BITLOCKER, UNKNOWN;
     val wireName: String get() = when (this) {
         VERACRYPT -> "veracrypt"; LUKS1 -> "luks1"; LUKS2 -> "luks2"
-        CRYPTOMATOR -> "cryptomator"; GOCRYPTFS -> "gocryptfs"
+        CRYPTOMATOR -> "cryptomator"; GOCRYPTFS -> "gocryptfs"; CRYFS -> "cryfs"
         BITLOCKER -> "bitlocker"; UNKNOWN -> "unknown"
     }
 

@@ -7,28 +7,15 @@ import androidx.documentfile.provider.DocumentFile
 
 class SafIOException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-/**
- * Shared low-level SAF (DocumentFile / DocumentsContract) plumbing used by
- * both the Cryptomator and Gocryptfs vault backends.
- *
- * Extracted from four near-identical private copies that had accumulated
- * in CryptomatorSession, GocryptfsSession, CryptomatorVaultTree, and
- * GocryptfsVaultTree (see the tech-debt audit). Every method here is
- * format-agnostic — it only ever deals with DocumentFile/Uri, never with
- * ciphertext/cleartext names or vault-specific concepts — so it has no
- * business knowing about Cryptomator or Gocryptfs at all.
- *
- * Callers keep their own thin, same-named wrapper methods (readWhole,
- * writeWhole, etc.) delegating to an instance of this class, so call sites
- * elsewhere in each file don't need to change.
- */
 class SafDocumentOps(private val context: Context) {
 
-    /** Fast child lookup: DocumentsContract query instead of DocumentFile.listFiles()'s O(n) per-child stat calls. */
     fun listChildren(folder: DocumentFile): List<DocumentFile> {
         val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folder.uri, DocumentsContract.getDocumentId(folder.uri))
         val results = mutableListOf<DocumentFile>()
-        val projection = arrayOf(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        )
         try {
             context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
                 val idIdx = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
@@ -39,20 +26,37 @@ class SafDocumentOps(private val context: Context) {
                 }
             }
         } catch (e: Exception) {
-            // Ignored — matches the original callers' best-effort behavior.
+            // Ignored
         }
         return results
     }
 
-    fun childOf(folder: DocumentFile, name: String): DocumentFile? =
-        listChildren(folder).firstOrNull { it.name == name }
+    /** Fast case-insensitive child matching in a single ContentResolver query. */
+    fun childOf(folder: DocumentFile, name: String): DocumentFile? {
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(folder.uri, DocumentsContract.getDocumentId(folder.uri))
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+        )
+        try {
+            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val idIdx = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                while (cursor.moveToNext()) {
+                    val docName = if (nameIdx >= 0) cursor.getString(nameIdx) else null
+                    if (docName?.equals(name, ignoreCase = true) == true) {
+                        val docId = cursor.getString(idIdx)
+                        val childUri = DocumentsContract.buildDocumentUriUsingTree(folder.uri, docId)
+                        return DocumentFile.fromSingleUri(context, childUri)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Fallback
+        }
+        return null
+    }
 
-    /** Creates a subdirectory via DocumentsContract directly (not DocumentFile.createDirectory()),
-     *  since [parent] may be a SingleDocumentFile wrapper produced by [listChildren] (via
-     *  fromSingleUri), whose own createDirectory() unconditionally throws
-     *  UnsupportedOperationException. DocumentsContract.createDocument() only needs a valid
-     *  document-within-tree URI, so it works regardless of which DocumentFile subclass wraps
-     *  the parent. */
     fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? = try {
         val uri = DocumentsContract.createDocument(context.contentResolver, parent.uri, DocumentsContract.Document.MIME_TYPE_DIR, name)
         uri?.let { DocumentFile.fromSingleUri(context, it) }
@@ -60,7 +64,6 @@ class SafDocumentOps(private val context: Context) {
         null
     }
 
-    /** Same rationale as [createDirectorySafe]. */
     fun createFileSafe(parent: DocumentFile, mimeType: String, name: String): DocumentFile? = try {
         val uri = DocumentsContract.createDocument(context.contentResolver, parent.uri, mimeType, name)
         uri?.let { DocumentFile.fromSingleUri(context, it) }
@@ -77,9 +80,6 @@ class SafDocumentOps(private val context: Context) {
             ?: throw SafIOException("Could not open ${file.uri} for writing")
     }
 
-    /** Like DocumentsContract.renameDocument, but returns the (possibly new) DocumentFile handle —
-     *  needed when the caller must keep operating on it afterward (e.g. moving it to a different
-     *  parent next). */
     fun renameDocumentAndGet(doc: DocumentFile, newName: String): DocumentFile {
         val newUri = DocumentsContract.renameDocument(context.contentResolver, doc.uri, newName)
         return DocumentFile.fromSingleUri(context, newUri ?: doc.uri)
@@ -91,10 +91,6 @@ class SafDocumentOps(private val context: Context) {
             ?: throw SafIOException("renameDocument failed for ${doc.uri}")
     }
 
-    /** Physically relocates [doc] (a file, or a small pointer folder like a Cryptomator .c9r/.c9s
-     *  node or a gocryptfs long-name pair) from [oldParent] to [newParent]. Prefers the atomic SAF
-     *  move operation; falls back to a manual recursive copy+delete for providers that don't
-     *  implement FLAG_SUPPORTS_MOVE. */
     fun movePhysicalDocument(doc: DocumentFile, oldParent: DocumentFile, newParent: DocumentFile) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             try {
@@ -103,7 +99,7 @@ class SafDocumentOps(private val context: Context) {
                 )
                 if (movedUri != null) return
             } catch (e: Exception) {
-                // Provider doesn't support atomic move for this document — fall through.
+                // Fallback
             }
         }
         copyDocumentRecursive(doc, newParent)

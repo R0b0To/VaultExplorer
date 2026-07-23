@@ -51,7 +51,7 @@ class AboutScreen extends StatelessWidget {
     const text =
         'VaultExplorer — a free, open-source, offline vault for Android.\n\n'
         'Store passwords, notes, and files inside an encrypted container '
-        '(VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs).\n\n$_kGithubUrl';
+        '(VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n$_kGithubUrl';
     await Clipboard.setData(const ClipboardData(text: text));
     if (context.mounted) {
       _showSnack(
@@ -151,7 +151,7 @@ class AboutScreen extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'Open-source · Offline · VeraCrypt, LUKS, BitLocker, Cryptomator & Gocryptfs',
+                      'Open-source · Offline · VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs & CryFS',
                       textAlign: TextAlign.center,
                       style: textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,

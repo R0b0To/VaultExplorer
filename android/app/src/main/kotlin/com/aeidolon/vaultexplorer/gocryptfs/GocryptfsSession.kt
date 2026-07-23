@@ -100,6 +100,11 @@ class GocryptfsSession(
         return (tree.resolve(path) as? GocryptfsNode.VDir)?.physicalFolder
     }
 
+    override fun importStream(virtualPath: String, inputStream: java.io.InputStream): Boolean {
+        if (readOnly) return false
+        return engine.writeBackStream(virtualPath, inputStream)
+    }
+
     // ---- directory listing ----------------------------------------------------
 
     override fun listDirectory(virtualPath: String): Array<String>? {

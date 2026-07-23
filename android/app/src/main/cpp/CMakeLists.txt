@@ -358,7 +358,8 @@ add_library(
         crypto/cascade.cpp         # cipher-agnostic XTS + cascade chaining
         crypto/kdf_table.cpp       # per-hash iteration-count table + hash dispatch + PIM clamping
         crypto/luks_header.cpp     # LUKS header parsing & key recovery
-        crypto/scrypt.cpp  
+        crypto/scrypt.cpp
+        crypto/cryfs_block_cipher.cpp  
         crypto/eme.cpp             # EME filename encryption
         crypto/siv.cpp             # SIV filename encryption
         ${fatfs_SOURCE_DIR}/src/ff.c

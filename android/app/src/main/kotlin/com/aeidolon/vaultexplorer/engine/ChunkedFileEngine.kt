@@ -184,6 +184,8 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
         return out.toByteArray()
     }
 
+
+
     private fun readFully(stream: java.io.InputStream, buf: ByteArray): Int {
         var total = 0
         while (total < buf.size) {
@@ -192,6 +194,59 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             total += n
         }
         return total
+    }
+
+    fun writeBackStream(virtualPath: String, input: java.io.InputStream): Boolean {
+        if (delegate.readOnly) return false
+        val normalized = normalize(virtualPath)
+        openReads.remove(normalized)
+        openWrites.remove(normalized)?.abort()
+
+        return try {
+            val physicalTarget = delegate.getOrCreatePhysicalFileForWrite(normalized)
+            val cryptor = delegate.cryptor
+            val header = cryptor.createHeader()
+            var nextChunkNumber = 0L
+
+            val rawOut = if (physicalTarget.uri.scheme == "content") {
+                delegate.context.contentResolver.openOutputStream(physicalTarget.uri, "w")
+            } else {
+                java.io.FileOutputStream(File(physicalTarget.uri.path!!))
+            } ?: throw Exception("Could not open ${physicalTarget.uri} for writing")
+
+            java.io.BufferedOutputStream(rawOut, 256 * 1024).use { out ->
+                out.write(cryptor.encodeHeader(header))
+
+                val chunkSize = cryptor.cleartextChunkSize
+                val buf = ByteArray(chunkSize)
+                var bytesInBuf = 0
+
+                while (true) {
+                    val read = input.read(buf, bytesInBuf, chunkSize - bytesInBuf)
+                    if (read <= 0) break
+                    bytesInBuf += read
+
+                    if (bytesInBuf == chunkSize) {
+                        val encrypted = cryptor.encryptChunk(buf, nextChunkNumber, header)
+                        out.write(encrypted)
+                        nextChunkNumber++
+                        bytesInBuf = 0
+                    }
+                }
+
+                if (bytesInBuf > 0) {
+                    val partial = buf.copyOf(bytesInBuf)
+                    val encrypted = cryptor.encryptChunk(partial, nextChunkNumber, header)
+                    out.write(encrypted)
+                }
+                out.flush()
+            }
+            delegate.invalidateCacheAfterWrite(normalized)
+            true
+        } catch (e: Exception) {
+            android.util.Log.e("ChunkedFileEngine", "writeBackStream failed for $virtualPath", e)
+            false
+        }
     }
 
     fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean {

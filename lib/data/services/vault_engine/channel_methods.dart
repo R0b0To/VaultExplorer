@@ -30,6 +30,11 @@ abstract final class ChannelMethods {
   static const unlockGocryptfsVault = 'unlockGocryptfsVault';
   static const createGocryptfsVault = 'createGocryptfsVault';
 
+  static const pickCryfsVault = 'pickCryfsVault';
+  static const unlockCryfsVault = 'unlockCryfsVault';
+  static const createCryfsVault = 'createCryfsVault';
+  static const isCryfsVault = 'isCryfsVault';
+
   // ── File I/O ─────────────────────────────────────────────────────────────
   static const decryptFile = 'decryptFile';
   static const exportFileToStorage = 'exportFileToStorage';

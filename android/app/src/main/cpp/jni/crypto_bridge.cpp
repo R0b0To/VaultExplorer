@@ -30,6 +30,7 @@
 #include "crypto/scrypt.h"
 #include "crypto/eme.h"
 #include "crypto/siv.h"
+#include "crypto/cryfs_block_cipher.h"
 
 #undef min
 #undef max
@@ -369,3 +370,82 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_scryptNative(
 }
 
 
+
+// ── CryFS block cipher ──────────────────────────────────────────────────
+// See crypto/cryfs_block_cipher.h for the on-disk format this implements
+// (matches the reference `cryfs` project's EncryptedBlockStore2). Kotlin
+// side: kotlin/.../cryfs/CryfsBlockCipher.kt.
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsCipherIdNative(
+        JNIEnv* env, jobject, jstring cipherName) {
+    if (!cipherName) return -1;
+    const char* name = env->GetStringUTFChars(cipherName, nullptr);
+    CryfsCipherId id = cryfsCipherIdFromName(name);
+    env->ReleaseStringUTFChars(cipherName, name);
+    if (id == CryfsCipherId::kUnknown) return -1;
+    return static_cast<jint>(id);
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsEncryptBlockNative(
+        JNIEnv* env, jobject,
+        jint cipherId, jbyteArray key, jbyteArray plaintext) {
+    if (!key || !plaintext || cipherId < 0) return nullptr;
+
+    jsize keyLen = env->GetArrayLength(key);
+    jsize ptLen = env->GetArrayLength(plaintext);
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* ptData = ptLen > 0 ? env->GetByteArrayElements(plaintext, nullptr) : nullptr;
+
+    std::vector<uint8_t> out = cryfsBlockEncrypt(
+        static_cast<CryfsCipherId>(cipherId),
+        reinterpret_cast<const uint8_t*>(keyData), static_cast<size_t>(keyLen),
+        reinterpret_cast<const uint8_t*>(ptData), static_cast<size_t>(ptLen)
+    );
+
+    env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+    if (ptData) env->ReleaseByteArrayElements(plaintext, ptData, JNI_ABORT);
+
+    if (out.empty() && ptLen != 0) return nullptr;
+
+    jbyteArray result = env->NewByteArray(out.size());
+    if (!out.empty()) {
+        env->SetByteArrayRegion(result, 0, out.size(), reinterpret_cast<const jbyte*>(out.data()));
+    }
+    return result;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsDecryptBlockNative(
+        JNIEnv* env, jobject,
+        jint cipherId, jbyteArray key, jbyteArray ciphertext) {
+    if (!key || !ciphertext || cipherId < 0) return nullptr;
+
+    jsize keyLen = env->GetArrayLength(key);
+    jsize ctLen = env->GetArrayLength(ciphertext);
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* ctData = env->GetByteArrayElements(ciphertext, nullptr);
+
+    std::vector<uint8_t> out;
+    bool ok = cryfsBlockDecrypt(
+        static_cast<CryfsCipherId>(cipherId),
+        reinterpret_cast<const uint8_t*>(keyData), static_cast<size_t>(keyLen),
+        reinterpret_cast<const uint8_t*>(ctData), static_cast<size_t>(ctLen),
+        out
+    );
+
+    env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+    env->ReleaseByteArrayElements(ciphertext, ctData, JNI_ABORT);
+
+    if (!ok) return nullptr;
+
+    jbyteArray result = env->NewByteArray(out.size());
+    if (!out.empty()) {
+        env->SetByteArrayRegion(result, 0, out.size(), reinterpret_cast<const jbyte*>(out.data()));
+    }
+    mbedtls_platform_zeroize(out.data(), out.size());
+    return result;
+}

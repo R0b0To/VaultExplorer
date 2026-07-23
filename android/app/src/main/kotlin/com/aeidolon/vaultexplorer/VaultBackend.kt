@@ -28,6 +28,7 @@ interface VaultBackend {
     fun writeFileChunk(virtualPath: String, offset: Long, data: ByteArray): Boolean
     fun finishWrite(virtualPath: String): Boolean
     fun writeBackFile(virtualPath: String, sourcePath: String): Boolean
+    fun importStream(virtualPath: String, inputStream: java.io.InputStream): Boolean
     fun extractFile(virtualPath: String, destinationPath: String): Boolean
     fun getSpaceInfo(): LongArray?
 }
@@ -49,6 +50,8 @@ object VaultBackendRegistry {
         if (session is com.aeidolon.vaultexplorer.cryptomator.CryptomatorSession) {
             session.close()
         } else if (session is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSession) {
+            session.close()
+        } else if (session is com.aeidolon.vaultexplorer.cryfs.CryfsSession) {
             session.close()
         }
     }

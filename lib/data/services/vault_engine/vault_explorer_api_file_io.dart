@@ -396,4 +396,18 @@ Future<bool> openWithApp(
     }
   }
 
+  /// Checks if the folder at [uri] contains a "cryfs.config" file.
+  Future<bool> isCryfsVault(String uri) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        'isCryfsVault',
+        {'uri': uri},
+      );
+      return result ?? false;
+    } catch (e) {
+      _logSwallowed('isCryfsVault', e);
+      return false;
+    }
+  }
+
 }

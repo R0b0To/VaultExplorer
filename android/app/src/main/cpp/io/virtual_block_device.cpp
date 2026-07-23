@@ -16,6 +16,8 @@
 #include <mutex>
 #include <atomic>
 #include <ctime>
+#include <thread>
+#include <future>
 #include <android/log.h>
 
 #include "ff.h"
@@ -25,6 +27,7 @@
 #include "crypto/cascade.h"
 #include "crypto/vc_header_layout.h"
 #include "crypto/xts_tweak.h"
+#include "crypto/thread_pool.h"
 #include "container_format.h"
 #include "container_utils.h"
 #include "sector_batching.h"
@@ -193,6 +196,55 @@ static void genericLuksXtsCrypt(const XtsLayerKey& layer, bool encrypt, size_t d
                                  const unsigned char tweakSeed[16],
                                  const unsigned char* in, unsigned char* out);
 
+// Runs workFn(i) for every i in [0, count), either serially on the calling
+// thread or split across the shared ThreadPool (crypto/thread_pool.h),
+// depending on count. Used below to parallelize the per-sector (or
+// per-LUKS-data-unit) cascade/XTS encrypt-decrypt loops in disk_read/
+// disk_write: each call operates on a disjoint 512-byte-or-larger slice of
+// the batch's input/output buffers and reads only a shared, read-only
+// per-volume cipher context (see the `const CascadeContext&` /
+// `const XtsLayerKey&` signatures in crypto/cascade.cpp and
+// crypto/cipher_shim.cpp -- no shared mutable state, so concurrent calls
+// with different (sectorNumber, in, out) against the same context are
+// safe). mbedTLS's mbedtls_aes_crypt_xts is the one call site that takes a
+// non-const context pointer (a C-API artifact -- see cascade.cpp's own
+// const_cast for the equivalent case), but it doesn't mutate round-key
+// state during a crypt call either, which is the standard assumption
+// mbedTLS is used under in any multi-threaded caller.
+//
+// kMinUnitsForParallel and kMaxChunks are conservative starting points,
+// not benchmarked against a real device -- worth tuning once this can
+// actually be profiled on-device; see the performance-notes writeup for
+// why that couldn't happen in this environment.
+template <typename WorkFn>
+static void parallelCryptoLoop(uint32_t count, WorkFn&& workFn) {
+    constexpr uint32_t kMinUnitsForParallel = 256;
+    constexpr uint32_t kMaxChunks = 8;
+    if (count < kMinUnitsForParallel) {
+        for (uint32_t i = 0; i < count; i++) workFn(i);
+        return;
+    }
+
+    const unsigned hwThreads = std::max(1u, std::thread::hardware_concurrency());
+    const uint32_t numChunks = std::min({static_cast<uint32_t>(hwThreads), kMaxChunks,
+                                          (count + kMinUnitsForParallel - 1) / kMinUnitsForParallel});
+    const uint32_t chunkSize = (count + numChunks - 1) / numChunks;
+
+    std::vector<std::future<void>> futures;
+    futures.reserve(numChunks);
+    for (uint32_t start = 0; start < count; start += chunkSize) {
+        const uint32_t end = std::min(count, start + chunkSize);
+        futures.push_back(ThreadPool::getInstance().enqueue([&workFn, start, end]() {
+            for (uint32_t i = start; i < end; i++) workFn(i);
+        }));
+    }
+    // Propagates (via get(), not wait()) any exception a worker threw --
+    // none of workFn's actual bodies below throw today, but silently
+    // swallowing one in the future would turn a real bug into corrupted
+    // plaintext instead of a crash, which is worse.
+    for (auto& f : futures) f.get();
+}
+
 extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
     if (pdrv >= MAX_VOLUMES || !volumes[pdrv].dataCtxInitialized)
         return RES_NOTRDY;
@@ -283,17 +335,17 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         std::vector<unsigned char> decryptedOut(totalBytes);
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
-            for (UINT i = 0; i < batch.count; i++) {
+            parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t physSector = firstPhysical + i;
                 const uint64_t tweak = physSector - v.partitionStartSector;
                 cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512),
                                      decryptedOut.data() + copyOffset + (i * 512));
-            }
+            });
             // VeraCrypt never needs multi-sector alignment (sectorsPerUnit
             // is always 1), so copyOffset is always 0 and decryptedOut is
             // fully populated by the loop above -- no gap to worry about.
         } else if (sectorsPerUnit <= 1) {
-            for (UINT i = 0; i < batch.count; i++) {
+            parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
@@ -304,13 +356,15 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                     mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, 512, tweakBuf,
                                            encBuf + (i * 512), decryptedOut.data() + copyOffset + (i * 512));
                 }
-            }
+            });
         } else {
             // Decrypt every full aligned unit directly into decryptedOut --
             // this branch already computes the full aligned range (that's
             // what alignedCount covers), so decryptedOut is fully populated
             // here without a separate copyOffset-relative write.
-            for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
+            const uint32_t unitCount = static_cast<uint32_t>(alignedCount / sectorsPerUnit);
+            parallelCryptoLoop(unitCount, [&](uint32_t unitIdx) {
+                const uint64_t u = static_cast<uint64_t>(unitIdx) * sectorsPerUnit;
                 const uint64_t sectorTweak = alignedRelStart + u;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
@@ -321,7 +375,7 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                     mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
                                            encBuf + (u * 512), decryptedOut.data() + (u * 512));
                 }
-            }
+            });
         }
 
         std::memcpy(curBuf, decryptedOut.data() + copyOffset, copyBytes);
@@ -394,13 +448,13 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
         }
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
-            for (UINT i = 0; i < batch.count; i++) {
+            parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t physSector = firstPhysical + i;
                 const uint64_t tweak = physSector - v.partitionStartSector;
                 cascadeEncryptSector(v.cascade, tweak, curBuf + (i * 512), encBuf + (i * 512));
-            }
+            });
         } else if (sectorsPerUnit <= 1) {
-            for (UINT i = 0; i < batch.count; i++) {
+            parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t sectorNum = (firstPhysical + i) - v.partitionStartSector;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
@@ -411,14 +465,16 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                     mbedtls_aes_crypt_xts(&v.luksXts.enc, MBEDTLS_AES_ENCRYPT, 512, tweakBuf,
                                            curBuf + (i * 512), encBuf + (i * 512));
                 }
-            }
+            });
         } else {
             std::vector<unsigned char> plain(totalBytes);
+            const uint32_t unitCount = static_cast<uint32_t>(alignedCount / sectorsPerUnit);
             if (needsSplice) {
                 std::vector<unsigned char> existingEnc(totalBytes);
                 if (!physicalRead(pdrv, alignedFirstPhysical * 512, existingEnc.data(), totalBytes))
                     return RES_ERROR;
-                for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
+                parallelCryptoLoop(unitCount, [&](uint32_t unitIdx) {
+                    const uint64_t u = static_cast<uint64_t>(unitIdx) * sectorsPerUnit;
                     const uint64_t sectorTweak = alignedRelStart + u;
                     unsigned char tweakBuf[16] = {0};
                     for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
@@ -429,12 +485,13 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                         mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
                                                existingEnc.data() + (u * 512), plain.data() + (u * 512));
                     }
-                }
+                });
             }
             const size_t copyOffset = static_cast<size_t>(relStart - alignedRelStart) * 512;
             std::memcpy(plain.data() + copyOffset, curBuf, static_cast<size_t>(batch.count) * 512);
 
-            for (uint64_t u = 0; u < alignedCount; u += sectorsPerUnit) {
+            parallelCryptoLoop(unitCount, [&](uint32_t unitIdx) {
+                const uint64_t u = static_cast<uint64_t>(unitIdx) * sectorsPerUnit;
                 const uint64_t sectorTweak = alignedRelStart + u;
                 unsigned char tweakBuf[16] = {0};
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
@@ -445,7 +502,7 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
                     mbedtls_aes_crypt_xts(&v.luksXts.enc, MBEDTLS_AES_ENCRYPT, luksUnit, tweakBuf,
                                            plain.data() + (u * 512), encBuf + (u * 512));
                 }
-            }
+            });
         }
 
         if (!physicalWrite(pdrv, alignedFirstPhysical * 512, encBuf, totalBytes)) return RES_ERROR;

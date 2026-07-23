@@ -52,12 +52,14 @@ class _UnlockSheetState extends State<UnlockSheet> {
   bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
   bool get _isCryptomator => _containerFormat == 'cryptomator';
   bool get _isGocryptfs => _containerFormat == 'gocryptfs';
+  bool get _isCryfs => _containerFormat == 'cryfs';
   bool get _isBitlocker => _containerFormat == 'bitlocker';
   
   bool get _isFolderVault =>
       _containerFormat == 'directory_vault' ||
       _containerFormat == 'cryptomator' ||
-      _containerFormat == 'gocryptfs';
+      _containerFormat == 'gocryptfs' ||
+      _containerFormat == 'cryfs';
 
   // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
@@ -192,11 +194,17 @@ class _UnlockSheetState extends State<UnlockSheet> {
           if (isGocryptfs) {
             detectedFormat = 'gocryptfs';
             isValid = true;
+          } else {
+            final isCryfs = await vaultExplorerApi.isCryfsVault(picked.uri);
+            if (isCryfs) {
+              detectedFormat = 'cryfs';
+              isValid = true;
+            }
           }
         }
 
         if (!isValid) {
-          setState(() => _error = 'No masterkey.cryptomator or gocryptfs.conf found in that folder.');
+          setState(() => _error = 'No masterkey.cryptomator, gocryptfs.conf, or cryfs.config found in that folder.');
           return;
         }
         newUri = picked.uri;
@@ -384,12 +392,17 @@ class _UnlockSheetState extends State<UnlockSheet> {
           final isGocryptfs = await vaultExplorerApi.isGocryptfsVault(result.uri);
           if (isGocryptfs) {
             detectedFormat = 'gocryptfs';
+          } else {
+            final isCryfs = await vaultExplorerApi.isCryfsVault(result.uri);
+            if (isCryfs) {
+              detectedFormat = 'cryfs';
+            }
           }
         }
         
         if (detectedFormat == null) {
           setState(() {
-            _error = 'No masterkey.cryptomator or gocryptfs.conf found in that folder.';
+            _error = 'No masterkey.cryptomator, gocryptfs.conf, or cryfs.config found in that folder.';
             _selectedUri = null;
             _selectedName = null;
           });
@@ -458,7 +471,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
       return;
     }
 
-    if (_isCryptomator || _isGocryptfs) {
+    if (_isCryptomator || _isGocryptfs || _isCryfs) {
       setState(() {
         _loading = true;
         _error = null;
@@ -474,13 +487,21 @@ class _UnlockSheetState extends State<UnlockSheet> {
                 documentProvider: widget.documentProvider,
                 readOnly: _readOnly,
               )
-            : await vaultExplorerApi.unlockGocryptfsVault(
-                _selectedUri!,
-                effectivePassword,
-                displayName: name,
-                documentProvider: widget.documentProvider,
-                readOnly: _readOnly,
-              );
+            : _isGocryptfs
+                ? await vaultExplorerApi.unlockGocryptfsVault(
+                    _selectedUri!,
+                    effectivePassword,
+                    displayName: name,
+                    documentProvider: widget.documentProvider,
+                    readOnly: _readOnly,
+                  )
+                : await vaultExplorerApi.unlockCryfsVault(
+                    _selectedUri!,
+                    effectivePassword,
+                    displayName: name,
+                    documentProvider: widget.documentProvider,
+                    readOnly: _readOnly,
+                  );
         
         if (result == null) {
           setState(() => _error = 'Incorrect password or invalid vault');
@@ -851,7 +872,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Icon(
-                                _isGocryptfs
+                                _isGocryptfs || _isCryfs
                                     ? Icons.enhanced_encryption_rounded
                                     : _isFolderVault
                                         ? Icons.folder_shared_rounded
@@ -875,11 +896,13 @@ class _UnlockSheetState extends State<UnlockSheet> {
                                                 ? 'Cryptomator Vault'
                                                 : _isGocryptfs
                                                     ? 'Gocryptfs Vault'
-                                                    : _isBitlocker
-                                                        ? 'BitLocker Drive'
-                                                        : 'Selected Container')
+                                                    : _isCryfs
+                                                        ? 'CryFS Vault'
+                                                        : _isBitlocker
+                                                            ? 'BitLocker Drive'
+                                                            : 'Selected Container')
                                         : (_isFolderVault
-                                            ? 'Cryptomator | Gocryptfs'
+                                            ? 'Cryptomator | Gocryptfs | CryFS'
                                             : 'VeraCrypt | LUKS | BitLocker'),
                                     style: textTheme.labelMedium?.copyWith(
                                       color: _selectedUri != null

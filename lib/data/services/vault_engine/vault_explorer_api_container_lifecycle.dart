@@ -327,6 +327,72 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     }
   }
 
+  /// Opens a folder picker (ACTION_OPEN_DOCUMENT_TREE) for selecting a
+  /// CryFS vault — vaults are directory trees (cryfs.config plus a flat,
+  /// sharded pool of block files), not single files, so this is distinct
+  /// from [pickContainer]. [looksLikeVault] is a quick heuristic the caller
+  /// can use to warn the user immediately if they picked an unrelated
+  /// folder, before asking for a password.
+  Future<({String uri, String displayName, bool looksLikeVault})?> pickCryfsVault() async {
+    final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+      ChannelMethods.pickCryfsVault,
+    );
+    if (raw == null) return null;
+    return (
+      uri: raw['uri'] as String,
+      displayName: raw['displayName'] as String,
+      looksLikeVault: raw['looksLikeVault'] as bool? ?? false,
+    );
+  }
+
+  /// Unlocks a CryFS vault. Result shape matches [unlockContainer] exactly
+  /// (containerFormat: 'cryfs') so callers can treat the two uniformly
+  /// once unlocked. matchedCipherId/matchedHashId are always 255 (not
+  /// applicable — CryFS's cipher suite is fixed per vault config, not
+  /// user-selectable here).
+  Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockCryfsVault(
+    String filePath,
+    String password, {
+    String? displayName,
+    bool documentProvider = false,
+    bool readOnly = false,
+  }) async {
+    final raw = await _channel
+        .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockCryfsVault, {
+          'filePath': filePath,
+          'password': password,
+          'displayName': displayName,
+          'documentProvider': documentProvider,
+          'readOnly': readOnly,
+        });
+    if (raw == null) return null;
+    final files = (raw['files'] as List<Object?>).cast<String>();
+    return (
+      volId: raw['volId'] as int,
+      files: files,
+      matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
+      matchedHashId: raw['matchedHashId'] as int? ?? 255,
+      containerFormat: raw['containerFormat'] as String? ?? 'cryfs',
+    );
+  }
+
+  /// Creates a new CryFS vault in an empty folder the user already granted
+  /// tree access to via [pickCryfsVault]. The vault is left locked
+  /// afterward — the caller should unlock it explicitly via
+  /// [unlockCryfsVault].
+  Future<bool> createCryfsVault(String folderUri, String password) async {
+    try {
+      final success = await _channel.invokeMethod<bool>(
+        ChannelMethods.createCryfsVault,
+        {'filePath': folderUri, 'password': password},
+      );
+      return success ?? false;
+    } catch (e) {
+      _logSwallowed('createCryfsVault', e);
+      return false;
+    }
+  }
+
   /// Must be called once after the final [writeFileChunk] call in a
   /// sequence for a given [fileName], to flush Cryptomator's buffered final
   /// (possibly partial) chunk and materialize the file. Safe to call

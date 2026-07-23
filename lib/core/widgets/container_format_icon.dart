@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 class ContainerFormatIcon extends StatelessWidget {
   /// Wire-format string, e.g. from [MountedContainer.containerFormat] or
   /// [ContainerRecord.containerFormat] ('veracrypt', 'luks1', 'luks2',
-  /// 'cryptomator', 'gocryptfs', 'bitlocker', 'directory_vault').
+  /// 'cryptomator', 'gocryptfs', 'cryfs', 'bitlocker', 'directory_vault').
   final String format;
   final Color color;
   final double size;
@@ -19,6 +19,7 @@ class ContainerFormatIcon extends StatelessWidget {
     'luks2': 'L2',
     'cryptomator': 'CM',
     'gocryptfs': 'GC',
+    'cryfs': 'CF',
     'bitlocker': 'BL',
   };
 

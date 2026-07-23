@@ -61,6 +61,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
       'veracrypt';
   bool get _isCryptomator => _containerFormat == 'cryptomator';
   bool get _isGocryptfs => _containerFormat == 'gocryptfs';
+  bool get _isCryfs => _containerFormat == 'cryfs';
   bool get _isBitlocker => _containerFormat == 'bitlocker';
 
   bool _saving = false;
@@ -625,7 +626,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                         ),
                       ],
 
-                      if (!_isCryptomator && !_isGocryptfs && !_isBitlocker) ...[
+                      if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
                         const Divider(height: 32),
                         Material(
                           color: cs.surfaceContainerHigh,
@@ -671,6 +672,12 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                               showAppSnackBar(
                                 context,
                                 message: 'Gocryptfs vault passwords cannot be changed in-app.',
+                                tone: AppBannerTone.warning,
+                              );
+                            } else if (fmt == 'cryfs') {
+                              showAppSnackBar(
+                                context,
+                                message: 'CryFS vault passwords cannot be changed in-app.',
                                 tone: AppBannerTone.warning,
                               );
                             } else if (fmt == 'bitlocker') {
@@ -1102,6 +1109,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
   String get _usbDeviceName => widget.uri.substring(4);
   bool get _isCryptomator => widget.containerFormat == 'cryptomator';
   bool get _isGocryptfs => widget.containerFormat == 'gocryptfs';
+  bool get _isCryfs => widget.containerFormat == 'cryfs';
   bool get _isBitlocker => widget.containerFormat == 'bitlocker';
 
   int? _activeVolId;
@@ -1157,7 +1165,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
     }
     setState(() { _loading = true; _error = null; });
 
-    if (_isCryptomator || _isGocryptfs) {
+    if (_isCryptomator || _isGocryptfs || _isCryfs) {
       try {
         final result = _isCryptomator
             ? await vaultExplorerApi.unlockCryptomatorVault(
@@ -1166,12 +1174,19 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
                 displayName: '',
                 documentProvider: widget.documentProvider,
               )
-            : await vaultExplorerApi.unlockGocryptfsVault(
-                widget.uri,
-                _pwCtrl.text,
-                displayName: '',
-                documentProvider: widget.documentProvider,
-              );
+            : _isGocryptfs
+                ? await vaultExplorerApi.unlockGocryptfsVault(
+                    widget.uri,
+                    _pwCtrl.text,
+                    displayName: '',
+                    documentProvider: widget.documentProvider,
+                  )
+                : await vaultExplorerApi.unlockCryfsVault(
+                    widget.uri,
+                    _pwCtrl.text,
+                    displayName: '',
+                    documentProvider: widget.documentProvider,
+                  );
         
         if (result == null) {
           if (mounted) setState(() { _loading = false; _error = 'Incorrect password'; });
@@ -1287,7 +1302,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
               ),
               onSubmitted: (_) => _verify(),
             ),
-            if (!_isCryptomator && !_isGocryptfs && !_isBitlocker) ...[
+            if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
               const SizedBox(height: 16),
 
               KeyfilesPicker(

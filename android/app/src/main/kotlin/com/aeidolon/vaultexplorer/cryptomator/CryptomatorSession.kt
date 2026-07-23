@@ -164,6 +164,11 @@ class CryptomatorSession(
         }
     }
 
+    override fun importStream(virtualPath: String, inputStream: java.io.InputStream): Boolean {
+        if (readOnly) return false
+        return engine.writeBackStream(virtualPath, inputStream)
+    }
+
     override fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean {
         if (readOnly) return false
         return try {

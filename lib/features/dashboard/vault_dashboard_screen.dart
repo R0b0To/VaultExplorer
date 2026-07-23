@@ -78,6 +78,7 @@ class _VaultDashboardState extends State<VaultDashboard>
   @override
   void initState() {
     super.initState();
+
     _lockController = SessionLockController(
       settings: () => _appSettings,
       lockAllMountedContainers: _lockAllMountedContainers,
@@ -139,6 +140,7 @@ class _VaultDashboardState extends State<VaultDashboard>
       }
     }
   }
+
 
   Future<void> _loadAll() async {
     final settings = await AppSettingsService.loadSettings();
@@ -283,11 +285,6 @@ class _VaultDashboardState extends State<VaultDashboard>
       clip.clear();
     }
 
-    // Full-resolution image bytes cached for the Media Viewer are
-    // memory-only and keyed per mount session, so a stale entry from this
-    // volId can never be served to a future session — but there's no
-    // reason to keep potentially tens of MB of decrypted bytes around once
-    // the container they came from is no longer mounted.
     FullResImageCache.clear();
 
     if (mounted) {
@@ -301,7 +298,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     final container = _mounted[idx];
     try {
       final space = await vaultExplorerApi.getSpaceInfo(container);
-if (space != null && space.length > 1 && space[0] >= 0 && space[1] >= 0 && mounted) {
+      if (space != null && space.length > 1 && space[0] >= 0 && space[1] >= 0 && mounted) {
         setState(() {
           final currentIdx = _mounted.indexWhere((c) => c.volId == volId);
           if (currentIdx != -1) {
@@ -322,6 +319,7 @@ if (space != null && space.length > 1 && space[0] >= 0 && space[1] >= 0 && mount
       showAppSnackBar(context, message: 'This container is already mounted.');
       return;
     }
+
 
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
@@ -387,7 +385,7 @@ if (space != null && space.length > 1 && space[0] >= 0 && space[1] >= 0 && mount
     }
   }
 
-void _showUsbCreateSheet() {
+  void _showUsbCreateSheet() {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
     Navigator.push(
@@ -397,7 +395,8 @@ void _showUsbCreateSheet() {
       if (mounted) setState(() => _actionInFlight = false);
     });
   }
-  void _showCreateSheet() {
+
+  void _showCreateSheet() async {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
     Navigator.push(
@@ -411,7 +410,6 @@ void _showUsbCreateSheet() {
   Future<void> _showAddOptionsSheet() async {
     if (_actionInFlight) return;
     
-    // Briefly lock the UI to prevent double-taps while we query the USB manager
     setState(() => _actionInFlight = true);
     
     bool hasUsb = false;
@@ -460,8 +458,6 @@ void _showUsbCreateSheet() {
                 _showUnlockSheet();
               },
             ),
-            
-            // Only show USB options if an OTG flash drive is actually plugged in
             if (hasUsb) ...[
               SheetOptionTile(
                 icon: Icons.usb_rounded,
@@ -484,7 +480,6 @@ void _showUsbCreateSheet() {
                 },
               ),
             ],
-            
             SheetOptionTile(
               icon: Icons.add_box_rounded,
               iconColor: cs.secondary,
@@ -500,12 +495,10 @@ void _showUsbCreateSheet() {
       ),
     );
   }
+
   void _showContainerConfig({required String uri, required String currentLabel}) {
     HapticFeedback.mediumImpact();
     final existing = _records[uri];
-    // So ContainerConfigScreen can tell a Cryptomator vault apart from a
-    // VeraCrypt/LUKS one even the first time its settings are opened,
-    // before any ContainerRecord has been saved for it.
     MountedContainer? mountedContainer;
     for (final m in _mounted) {
       if (m.uri == uri) {
@@ -556,7 +549,6 @@ void _showUsbCreateSheet() {
       _dismissUndo();
     });
 
-    // We delay the final data deletion until the exit animation finishes
     Future.delayed(const Duration(milliseconds: 300), () async {
       await ContainerRepository.instance.remove(uri);
       if (mounted) {
@@ -686,7 +678,7 @@ void _showUsbCreateSheet() {
     return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
-List<VaultListItem> _buildDisplayItems() {
+  List<VaultListItem> _buildDisplayItems() {
     final byUri = <String, VaultListItem>{
       for (final c in _mounted) c.uri: MountedVaultItem(c, sortDate: _dateAddedProxy(c.uri)),
       for (final entry in _records.entries)
@@ -704,10 +696,6 @@ List<VaultListItem> _buildDisplayItems() {
     return _applySortMode(ordered);
   }
 
-  /// Applies [_appSettings.containerSortMode] on top of the manually-tracked
-  /// [_recordsOrder]. [ContainerSortMode.manual] returns [items] untouched
-  /// (drag order); every other mode derives a fresh order every build, so
-  /// [_handleReorder] is a no-op while one of them is active — see there.
   List<VaultListItem> _applySortMode(List<VaultListItem> items) {
     final sorted = List<VaultListItem>.from(items);
     switch (_appSettings.containerSortMode) {
@@ -733,7 +721,7 @@ List<VaultListItem> _buildDisplayItems() {
     }
   }
 
-void _handleReorder(int oldIndex, int newIndex) {
+  void _handleReorder(int oldIndex, int newIndex) {
     if (_appSettings.containerSortMode != ContainerSortMode.manual) return;
     if (newIndex > oldIndex) newIndex -= 1;
     final items = _buildDisplayItems();
@@ -756,42 +744,41 @@ void _handleReorder(int oldIndex, int newIndex) {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
         child: ReorderableListView.builder(
-            buildDefaultDragHandles: false,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
-            itemCount: displayItems.length,
-            onReorderItem: _handleReorder,
-            itemBuilder: (context, i) {
-              final item = displayItems[i];
-               final bool triggerNudge = i == 0 && !_appSettings.hasSeenSwipeTutorial;
-              return VaultCardRow(
-                key: ValueKey(item.uri),
-                index: i,
-                item: item,
-                group: _swipeGroup,
-                onOpen: () => _openItem(item),
-                onEdit: () => _requestEdit(item),
-                onDelete: () => _requestDelete(item),
-                onLocked: _onContainerLocked,
-                isRemoving: _animatingOutUris.contains(item.uri),
-                isInserting: _animatingInUris.contains(item.uri),
-                triggerNudge: triggerNudge,
-                swapActions: _appSettings.swapCardActions,                                   
-                dragEnabled: _appSettings.containerSortMode == ContainerSortMode.manual,  
-                onNudgeComplete: () async {
-                  final updated = _appSettings.copyWith(hasSeenSwipeTutorial: true);
-                  await AppSettingsService.saveSettings(updated);
-                  if (mounted) {
-                    setState(() {
-                      _appSettings = updated;
-                    });
-                  }
-                },
-              );
-            },
-          ),
+          buildDefaultDragHandles: false,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+          itemCount: displayItems.length,
+          onReorderItem: _handleReorder,
+          itemBuilder: (context, i) {
+            final item = displayItems[i];
+            final bool triggerNudge = i == 0 && !_appSettings.hasSeenSwipeTutorial;
+            return VaultCardRow(
+              key: ValueKey(item.uri),
+              index: i,
+              item: item,
+              group: _swipeGroup,
+              onOpen: () => _openItem(item),
+              onEdit: () => _requestEdit(item),
+              onDelete: () => _requestDelete(item),
+              onLocked: _onContainerLocked,
+              isRemoving: _animatingOutUris.contains(item.uri),
+              isInserting: _animatingInUris.contains(item.uri),
+              triggerNudge: triggerNudge,
+              swapActions: _appSettings.swapCardActions,                                   
+              dragEnabled: _appSettings.containerSortMode == ContainerSortMode.manual,  
+              onNudgeComplete: () async {
+                final updated = _appSettings.copyWith(hasSeenSwipeTutorial: true);
+                await AppSettingsService.saveSettings(updated);
+                if (mounted) {
+                  setState(() {
+                    _appSettings = updated;
+                  });
+                }
+              },
+            );
+          },
         ),
-      );
-    
+      ),
+    );
   }
 
   @override

@@ -32,7 +32,7 @@ class CryfsSession(
         config.encryptionKey.fill(0)
     }
 
-    override fun listDirectory(virtualPath: String): Array<String>? {
+override fun listDirectory(virtualPath: String): Array<String>? {
         return try {
             tree.listDirectory(normalize(virtualPath)).map { node ->
                 val entry = node.entry!!
@@ -42,9 +42,8 @@ class CryfsSession(
                     "${entry.name}|${CryfsFsBlob.payloadSize(dataTree, entry.blobId)}|${entry.mtimeEpochSec}"
                 }
             }.toTypedArray()
-        } catch (e: VaultPathNotFoundException) {
-            null
-        } catch (e: VaultIOException) {
+        } catch (e: Exception) {
+            android.util.Log.e("CryfsSession", "listDirectory failed for path: \"$virtualPath\"", e)
             null
         }
     }

@@ -14,6 +14,9 @@ abstract final class ChannelMethods {
   static const cancelUnlock = 'cancelUnlock';
   static const changeContainerPassword = 'changeContainerPassword';
 
+  static const String HAS_ALL_FILES_ACCESS = 'hasAllFilesAccess';
+  static const String REQUEST_ALL_FILES_ACCESS = 'requestAllFilesAccess';
+
   // ── Cryptomator vaults ───────────────────────────────────────────────────
   /// Opens ACTION_OPEN_DOCUMENT_TREE (a folder picker, not a file picker —
   /// Cryptomator vaults are directory trees) and checks for

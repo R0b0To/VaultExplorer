@@ -190,28 +190,28 @@ class CryfsDataTree(
     }
 
     private fun writeLeaf(payload: ByteArray): CryfsBlockId {
-        val id = CryfsBlockId.random(random)
-        val raw = ByteArray(nodeBlockSize)
-        writeU16LE(raw, 0, NODE_FORMAT_VERSION_HEADER)
-        raw[2] = 0
-        raw[3] = 0
-        writeU32LE(raw, 4, payload.size)
-        System.arraycopy(payload, 0, raw, NODE_HEADER_SIZE, payload.size)
-        blockStore.store(id, raw)
-        return id
-    }
+    val id = CryfsBlockId.random(random)
+    val raw = ByteArray(nodeBlockSize)
+    writeU16LE(raw, 0, NODE_FORMAT_VERSION_HEADER)
+    raw[2] = 0
+    raw[3] = 0
+    writeU32LE(raw, 4, payload.size)
+    System.arraycopy(payload, 0, raw, NODE_HEADER_SIZE, payload.size)
+    blockStore.store(id, raw, isNewBlock = true) // <--- Fast path
+    return id
+}
 
-    private fun writeInner(depth: Int, children: List<CryfsBlockId>): CryfsBlockId {
-        val id = CryfsBlockId.random(random)
-        val raw = ByteArray(nodeBlockSize)
-        writeU16LE(raw, 0, NODE_FORMAT_VERSION_HEADER)
-        raw[2] = 0
-        raw[3] = depth.toByte()
-        writeU32LE(raw, 4, children.size)
-        children.forEachIndexed { i, child -> System.arraycopy(child.bytes, 0, raw, NODE_HEADER_SIZE + i * 16, 16) }
-        blockStore.store(id, raw)
-        return id
-    }
+private fun writeInner(depth: Int, children: List<CryfsBlockId>): CryfsBlockId {
+    val id = CryfsBlockId.random(random)
+    val raw = ByteArray(nodeBlockSize)
+    writeU16LE(raw, 0, NODE_FORMAT_VERSION_HEADER)
+    raw[2] = 0
+    raw[3] = depth.toByte()
+    writeU32LE(raw, 4, children.size)
+    children.forEachIndexed { i, child -> System.arraycopy(child.bytes, 0, raw, NODE_HEADER_SIZE + i * 16, 16) }
+    blockStore.store(id, raw, isNewBlock = true) // <--- Fast path
+    return id
+}
 
     companion object {
         private const val NODE_HEADER_SIZE = 8

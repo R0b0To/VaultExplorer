@@ -159,44 +159,42 @@ object CryfsConfigFile {
         }
 
         val migrations = json.optJSONObject("migrations")
-            ?: throw CryfsConfigException("cryfs.config is missing the required \"migrations\" block.")
-
-        val hasVersionNumbers = migrations.optString("hasVersionNumbers") == "true" || migrations.optBoolean("hasVersionNumbers", false)
-        val hasParentPointers = migrations.optString("hasParentPointers") == "true" || migrations.optBoolean("hasParentPointers", false)
-
-        if (!hasVersionNumbers || !hasParentPointers) {
-            throw CryfsConfigException(
-                "cryfs.config has unexpected \"migrations\" flags; this app only supports current-format vaults."
-            )
+        if (migrations != null) {
+            val hasVersionNumbers = migrations.optString("hasVersionNumbers") == "true" || migrations.optBoolean("hasVersionNumbers", false)
+            val hasParentPointers = migrations.optString("hasParentPointers") == "true" || migrations.optBoolean("hasParentPointers", false)
+            if (!hasVersionNumbers || !hasParentPointers) {
+                throw CryfsConfigException(
+                    "cryfs.config has unexpected \"migrations\" flags; this app only supports current-format vaults."
+                )
+            }
         }
 
-        val formatVersion = json.optString("version", "")
-        if (formatVersion.isEmpty()) {
-            throw CryfsConfigException("cryfs.config is missing the required \"version\" field.")
-        }
-        val createdWithVersion = json.optString("createdWithVersion", "")
-        if (createdWithVersion.isEmpty()) {
-            throw CryfsConfigException("cryfs.config is missing the required \"createdWithVersion\" field.")
-        }
-        val lastOpenedWithVersion = json.optString("lastOpenedWithVersion", "")
-        if (lastOpenedWithVersion.isEmpty()) {
-            throw CryfsConfigException("cryfs.config is missing the required \"lastOpenedWithVersion\" field.")
-        }
+        val formatVersion = json.optString("version", json.optString("formatVersion", "0.10"))
+        val createdWithVersion = json.optString("createdWithVersion", json.optString("created_with_version", "0.10"))
+        val lastOpenedWithVersion = json.optString("lastOpenedWithVersion", json.optString("last_opened_with_version", "0.10"))
 
-        val blocksizeBytes = parseFlexibleLong(json, "blocksizeBytes")
-            ?: throw CryfsConfigException("cryfs.config is missing the required \"blocksizeBytes\" field.")
-        val exclusiveClientId = parseFlexibleLong(json, "exclusiveClientId")
+        val blocksizeBytes = parseFlexibleLong(json, "blocksizeBytes") 
+            ?: parseFlexibleLong(json, "blocksize")
+            ?: throw CryfsConfigException("cryfs.config is missing blocksize field.")
 
-        if (!json.has("rootblob")) throw CryfsConfigException("cryfs.config is missing the required \"rootblob\" field.")
-        if (!json.has("key")) throw CryfsConfigException("cryfs.config is missing the required \"key\" field.")
-        if (!json.has("filesystemId")) throw CryfsConfigException("cryfs.config is missing the required \"filesystemId\" field.")
+        val exclusiveClientId = parseFlexibleLong(json, "exclusiveClientId") 
+            ?: parseFlexibleLong(json, "exclusive_client_id")
+
+        val rootBlobStr = json.optString("rootblob", json.optString("root_blob", json.optString("rootBlob", "")))
+        if (rootBlobStr.isEmpty()) throw CryfsConfigException("cryfs.config is missing the required root blob ID field.")
+
+        val keyStr = json.optString("key", json.optString("enc_key", json.optString("encKey", "")))
+        if (keyStr.isEmpty()) throw CryfsConfigException("cryfs.config is missing the required encryption key field.")
+
+        val fsIdStr = json.optString("filesystemId", json.optString("filesystem_id", ""))
+        if (fsIdStr.isEmpty()) throw CryfsConfigException("cryfs.config is missing the required filesystem ID field.")
 
         return CryfsConfig(
             blockCipherName = cipher,
-            encryptionKey = hexToBytes(json.getString("key")),
+            encryptionKey = hexToBytes(keyStr),
             blocksizeBytes = blocksizeBytes.toInt(),
-            rootBlobId = CryfsBlockId.fromHex(json.getString("rootblob")),
-            filesystemId = hexToBytes(json.getString("filesystemId")),
+            rootBlobId = CryfsBlockId.fromHex(rootBlobStr),
+            filesystemId = hexToBytes(fsIdStr),
             exclusiveClientId = exclusiveClientId,
             formatVersion = formatVersion,
             createdWithVersion = createdWithVersion,

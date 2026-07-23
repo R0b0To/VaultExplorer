@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
@@ -7,7 +8,8 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
+
+import '../lock/widgets/pattern_lock_view.dart';
 
 class UnlockSheet extends StatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
@@ -31,7 +33,7 @@ class UnlockSheet extends StatefulWidget {
   State<UnlockSheet> createState() => _UnlockSheetState();
 }
 
-class _UnlockSheetState extends State<UnlockSheet> {
+class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
   late TextEditingController _passwordCtrl;
   final _pimCtrl = TextEditingController();
   String? _selectedUri;
@@ -40,6 +42,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
   bool _loading = false;
   bool _remember = false;
   bool _readOnly = false;
+  bool _hasAllStorageAccess = false;
   String? _error;
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
@@ -83,6 +86,9 @@ class _UnlockSheetState extends State<UnlockSheet> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkStoragePermission();
+
     _passwordCtrl = TextEditingController(text: widget.prefillPassword ?? '');
     if (widget.initialUri != null) {
       _selectedUri = widget.initialUri;
@@ -111,6 +117,7 @@ class _UnlockSheetState extends State<UnlockSheet> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_loading && _activeVolId != null) {
       vaultExplorerApi.cancelUnlock(_activeVolId!);
     }
@@ -119,6 +126,49 @@ class _UnlockSheetState extends State<UnlockSheet> {
     _passwordCtrl.dispose();
     _pimCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkStoragePermission();
+    }
+  }
+
+  Future<void> _checkStoragePermission() async {
+    const api = VaultExplorerApi();
+    final hasAccess = await api.hasAllFilesAccess();
+    if (mounted) {
+      setState(() {
+        _hasAllStorageAccess = hasAccess;
+      });
+    }
+  }
+
+Future<void> _toggleStoragePermission(bool enable) async {
+    const api = VaultExplorerApi();
+    
+    if (enable) {
+      final grant = await showAppConfirmDialog(
+        context,
+        title: 'Enable Fast Storage Access',
+        message: 'Granting "All Files Access" allows Vault Explorer to perform direct POSIX file operations, speeding up folder vault performance by up to 1000x.',
+        confirmLabel: 'Open Settings',
+      );
+      if (grant) {
+        await api.requestAllFilesAccess();
+      }
+    } else {
+      final revoke = await showAppConfirmDialog(
+        context,
+        title: 'Revoke Storage Access',
+        message: 'Android requires "All Files Access" to be turned off inside System Settings. Would you like to open Settings to turn it off?',
+        confirmLabel: 'Open Settings',
+      );
+      if (revoke) {
+        await api.requestAllFilesAccess();
+      }
+    }
   }
 
   Future<void> _initUnlockMethod() async {
@@ -1098,6 +1148,38 @@ class _UnlockSheetState extends State<UnlockSheet> {
                       ),
                     ),
                     const SizedBox(height: 16),
+
+                    // ── Fast Direct Storage Access Toggle (Folder Vaults) ──────
+                    if (_isFolderVault) ...[
+                      Material(
+                        color: cs.surfaceContainerHigh,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: SwitchListTile(
+                          value: _hasAllStorageAccess,
+                          onChanged: _loading ? null : (val) => _toggleStoragePermission(val),
+                          title: Text(
+                            'Fast Direct Storage Access',
+                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            _hasAllStorageAccess
+                                ? 'All Files Access granted (maximum speed)'
+                                : 'Grant All Files Access to prevent slow SAF transfers',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: _hasAllStorageAccess ? cs.onSurfaceVariant : cs.error,
+                            ),
+                          ),
+                          secondary: Icon(
+                            _hasAllStorageAccess ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                            color: _hasAllStorageAccess ? cs.primary : cs.error,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     // ── Biometric Unlock Card ──────────────────────────────────
                     if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[

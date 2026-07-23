@@ -22,7 +22,6 @@ data class CryfsDirEntry(
 )
 
 object CryfsDirBlob {
-
     private val blockIdComparator = Comparator<CryfsDirEntry> { a, b ->
         var cmp = 0
         for (i in 0 until CryfsBlockId.SIZE_BYTES) {
@@ -47,15 +46,15 @@ object CryfsDirBlob {
             val mode = readU32(bytes, pos); pos += 4
             val uid = readU32(bytes, pos); pos += 4
             val gid = readU32(bytes, pos); pos += 4
-            val atime = readU64(bytes, pos); pos += 8; pos += 4 // seconds, then skip nanoseconds
-            val mtime = readU64(bytes, pos); pos += 8; pos += 4
-            val ctime = readU64(bytes, pos); pos += 8; pos += 4
+            val atime = readU64(bytes, pos); pos += 8; pos += 4 // 12-byte TimeSpec (sec + nsec)
+            val mtime = readU64(bytes, pos); pos += 8; pos += 4 // 12-byte TimeSpec
+            val ctime = readU64(bytes, pos); pos += 8; pos += 4 // 12-byte TimeSpec
 
             val nameStart = pos
             while (pos < bytes.size && bytes[pos] != 0.toByte()) pos++
             if (pos >= bytes.size) throw CryfsConfigException("Truncated directory entry (unterminated name)")
             val name = String(bytes, nameStart, pos - nameStart, Charsets.UTF_8)
-            pos += 1 // NUL terminator
+            pos += 1
 
             if (pos + 16 > bytes.size) throw CryfsConfigException("Truncated directory entry (missing blob id)")
             val blobId = CryfsBlockId(bytes.copyOfRange(pos, pos + 16)); pos += 16
@@ -73,12 +72,12 @@ object CryfsDirBlob {
             out.write(u32(e.mode))
             out.write(u32(e.uid))
             out.write(u32(e.gid))
-            out.write(u64(e.atimeEpochSec)); out.write(u32(0)) // nanoseconds
+            out.write(u64(e.atimeEpochSec)); out.write(u32(0))
             out.write(u64(e.mtimeEpochSec)); out.write(u32(0))
             out.write(u64(e.ctimeEpochSec)); out.write(u32(0))
             val nameBytes = e.name.toByteArray(Charsets.UTF_8)
             out.write(nameBytes)
-            out.write(0) // NUL terminator
+            out.write(0)
             out.write(e.blobId.bytes)
         }
         return out.toByteArray()
@@ -89,9 +88,7 @@ object CryfsDirBlob {
         mode: Int, nowEpochSec: Long, uid: Int = 0, gid: Int = 0,
     ) = CryfsDirEntry(type, name, blobId, mode, uid, gid, nowEpochSec, nowEpochSec, nowEpochSec)
 
-    // entry_type(1) + mode(4) + uid(4) + gid(4) + 3 timespecs(12 each) = 49 bytes before name+blobId
     private const val FIXED_FIELDS_SIZE = 1 + 4 + 4 + 4 + 12 + 12 + 12
-
     private fun u32(v: Int) = ByteArray(4).also { writeU32(it, 0, v) }
     private fun u64(v: Long) = ByteArray(8).also { writeU64(it, 0, v) }
 

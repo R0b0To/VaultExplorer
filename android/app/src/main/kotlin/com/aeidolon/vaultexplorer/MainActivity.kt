@@ -18,6 +18,8 @@ import android.content.IntentFilter
 import android.content.ComponentName
 import android.app.PendingIntent
 import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import android.os.ParcelFileDescriptor
 import android.annotation.TargetApi
 import android.graphics.Bitmap
@@ -65,6 +67,8 @@ private object ChannelMethods {
     // fullResExecutor instead of ioExecutor -- see the call sites below and
     // the fullResExecutor declaration for why.
     const val GET_MEDIA_FILE_SIZE   = "getMediaFileSize"
+    const val HAS_ALL_FILES_ACCESS     = "hasAllFilesAccess"
+    const val REQUEST_ALL_FILES_ACCESS = "requestAllFilesAccess"
     const val READ_MEDIA_FILE_CHUNK = "readMediaFileChunk"
     const val WRITE_BACK_FILE     = "writeBackFile"
     const val GET_SPACE_INFO      = "getSpaceInfo"
@@ -256,6 +260,8 @@ class MainActivity : FlutterFragmentActivity() {
             res.success(null)
         }
     }
+
+    
 
     private val pickKeyfilesLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -911,6 +917,40 @@ class MainActivity : FlutterFragmentActivity() {
                         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
                     } else {
                         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                    }
+                    result.success(true)
+                }
+
+ChannelMethods.HAS_ALL_FILES_ACCESS -> {
+                    val hasAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        Environment.isExternalStorageManager()
+                    } else {
+                        true
+                    }
+                    result.success(hasAccess)
+                }
+
+                ChannelMethods.REQUEST_ALL_FILES_ACCESS -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        try {
+                            // Try direct app-specific All Files Access page
+                            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                data = Uri.parse("package:$packageName")
+                            }
+                            startActivity(intent)
+                        } catch (e: Exception) {
+                            try {
+                                // Fallback 1: General All Files Access list
+                                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                                startActivity(intent)
+                            } catch (e2: Exception) {
+                                // Fallback 2: General App Details Settings
+                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                    data = Uri.parse("package:$packageName")
+                                }
+                                startActivity(intent)
+                            }
+                        }
                     }
                     result.success(true)
                 }
@@ -2052,23 +2092,24 @@ class MainActivity : FlutterFragmentActivity() {
                         return@setMethodCallHandler
                     }
 
-
                     thumbnailExecutor.execute {
                         try {
                             val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return@execute
-                            val inputStream = VeraCryptInputStream(this, uriString, fileName, volId)
-                            
+
+                            // Pass 1: Decode image dimensions with buffering
+                            var inputStream = BufferedInputStream(VeraCryptInputStream(this, uriString, fileName, volId), 65536)
                             val options = BitmapFactory.Options().apply {
                                 inJustDecodeBounds = true
                             }
                             BitmapFactory.decodeStream(inputStream, null, options)
-                            inputStream.reset()
+                            inputStream.close()
 
                             val width = options.outWidth
                             val height = options.outHeight
-
                             val inSampleSize = calculateInSampleSize(width, height, targetSize)
 
+                            // Pass 2: Re-open stream for actual scaled decoding
+                            inputStream = BufferedInputStream(VeraCryptInputStream(this, uriString, fileName, volId), 65536)
                             val decodeOptions = BitmapFactory.Options().apply {
                                 this.inSampleSize = inSampleSize
                             }
@@ -2507,10 +2548,9 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
     private fun pendingResultCheck(result: MethodChannel.Result) {
-        pendingFlutterResult?.error("PICK_CANCELLED", "Another pick operation started", null)
+        pendingFlutterResult?.error("CANCELLED", "Operation superseded by a new request", null)
         pendingFlutterResult = result
     }
-
     private fun exportEntryRecursive(
         destParent: DocumentFile, fatPath: String, isDir: Boolean,
         containerUri: String, volId: Int
@@ -2611,6 +2651,31 @@ class MainActivity : FlutterFragmentActivity() {
         override fun mark(readlimit: Int) = delegate.mark(readlimit)
         override fun reset() = delegate.reset()
     }
+
+    private fun hasAllFilesAccess(): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        Environment.isExternalStorageManager()
+    } else {
+        true // Android 10 and below use standard READ/WRITE permissions
+    }
+}
+
+private fun requestAllFilesAccess() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (!Environment.isExternalStorageManager()) {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                // Fallback for devices without package-specific settings intent
+                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                startActivity(intent)
+            }
+        }
+    }
+}
 
     private fun importEntryRecursive(
         srcDoc: DocumentFile, containerUri: String, targetFatPath: String, volId: Int,

@@ -64,6 +64,29 @@ mixin _ContainerLifecycleOps {
     }
   }
 
+Future<bool> hasAllFilesAccess() async {
+    try {
+      final bool? result = await _channel.invokeMethod<bool>(
+        ChannelMethods.HAS_ALL_FILES_ACCESS,
+      );
+      return result ?? true;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  Future<bool> requestAllFilesAccess() async {
+    try {
+      final bool? result = await _channel.invokeMethod<bool>(
+        ChannelMethods.REQUEST_ALL_FILES_ACCESS,
+      );
+      return result ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+
 /// Returns usable capacity in bytes (device capacity minus the MBR
 /// partition offset), or null on failure. Requires [deviceName] to
 /// already have USB permission granted.

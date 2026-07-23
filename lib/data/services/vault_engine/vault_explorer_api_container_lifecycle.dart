@@ -64,10 +64,10 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-Future<bool> hasAllFilesAccess() async {
+  Future<bool> hasAllFilesAccess() async {
     try {
       final bool? result = await _channel.invokeMethod<bool>(
-        ChannelMethods.HAS_ALL_FILES_ACCESS,
+        ChannelMethods.hasAllFilesAccess,
       );
       return result ?? true;
     } catch (e) {
@@ -78,7 +78,7 @@ Future<bool> hasAllFilesAccess() async {
   Future<bool> requestAllFilesAccess() async {
     try {
       final bool? result = await _channel.invokeMethod<bool>(
-        ChannelMethods.REQUEST_ALL_FILES_ACCESS,
+        ChannelMethods.requestAllFilesAccess,
       );
       return result ?? false;
     } catch (e) {
@@ -86,22 +86,22 @@ Future<bool> hasAllFilesAccess() async {
     }
   }
 
-
-/// Returns usable capacity in bytes (device capacity minus the MBR
-/// partition offset), or null on failure. Requires [deviceName] to
-/// already have USB permission granted.
-Future<int?> getUsbDeviceCapacity(String deviceName) async {
-  try {
-    final result = await _channel.invokeMethod<int>(
-      ChannelMethods.getUsbDeviceCapacity,
-      {'deviceName': deviceName},
-    );
-    return result;
-  } on PlatformException catch (e) {
-    _logSwallowed('getUsbDeviceCapacity', e);
-    return null;
+  /// Returns usable capacity in bytes (device capacity minus the MBR
+  /// partition offset), or null on failure. Requires [deviceName] to
+  /// already have USB permission granted.
+  Future<int?> getUsbDeviceCapacity(String deviceName) async {
+    try {
+      final result = await _channel.invokeMethod<int>(
+        ChannelMethods.getUsbDeviceCapacity,
+        {'deviceName': deviceName},
+      );
+      return result;
+    } on PlatformException catch (e) {
+      _logSwallowed('getUsbDeviceCapacity', e);
+      return null;
+    }
   }
-}
+
   Future<bool> createUsbContainer({
     required String deviceName,
     required int sizeBytes,
@@ -199,10 +199,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
   }
 
   /// Opens a multi-select document picker for keyfiles. Returns an empty
-  /// list if the user cancels. Any file type is a valid keyfile (VeraCrypt
-  /// keyfile mixing just hashes the raw bytes — a photo, an mp3, a random
-  /// binary blob are all equally valid), so this doesn't filter by
-  /// extension or mime type.
+  /// list if the user cancels.
   Future<List<KeyfileRef>> pickKeyfiles() async {
     final raw = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.pickKeyfiles,
@@ -218,28 +215,24 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
   }
 
   /// Opens a folder picker (ACTION_OPEN_DOCUMENT_TREE) for selecting a
-  /// Cryptomator vault — vaults are directory trees (vault.cryptomator +
-  /// masterkey.cryptomator + d/), not single files, so this is distinct from
-  /// [pickContainer]. [looksLikeVault] is a quick heuristic (checks for
-  /// masterkey.cryptomator) the caller can use to warn the user immediately
-  /// if they picked an unrelated folder, before asking for a password.
-  Future<({String uri, String displayName, bool looksLikeVault})?> pickCryptomatorVault() async {
-    final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
-      ChannelMethods.pickCryptomatorVault,
-    );
-    if (raw == null) return null;
-    return (
-      uri: raw['uri'] as String,
-      displayName: raw['displayName'] as String,
-      looksLikeVault: raw['looksLikeVault'] as bool? ?? false,
-    );
+  /// Cryptomator vault or directory vault.
+  Future<({String uri, String displayName, bool looksLikeVault, String? format})?> pickCryptomatorVault() async {
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>(ChannelMethods.pickCryptomatorVault);
+      if (res == null) return null;
+      return (
+        uri: res['uri'] as String,
+        displayName: res['displayName'] as String,
+        looksLikeVault: res['looksLikeVault'] as bool? ?? false,
+        format: res['format'] as String?,
+      );
+    } catch (e) {
+      _logSwallowed('pickCryptomatorVault', e);
+      return null;
+    }
   }
 
-  /// Unlocks a Cryptomator vault. Result shape matches [unlockContainer]
-  /// exactly (containerFormat: 'cryptomator') so callers can treat the two
-  /// uniformly once unlocked. matchedCipherId/matchedHashId are always 255
-  /// (not applicable — Cryptomator's cipher suite is fixed per vault format,
-  /// not user-selectable).
+  /// Unlocks a Cryptomator vault.
   Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockCryptomatorVault(
     String filePath,
     String password, {
@@ -266,11 +259,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     );
   }
 
-  /// Creates a new Cryptomator vault (always vault format 8 / SIV_GCM) in
-  /// an empty folder the user already granted tree access to via
-  /// [pickCryptomatorVault]. The vault is left locked afterward — the
-  /// caller should unlock it explicitly via [unlockCryptomatorVault], same
-  /// as [createContainer] leaves VeraCrypt/LUKS containers locked.
+  /// Creates a new Cryptomator vault in an empty folder.
   Future<bool> createCryptomatorVault(String folderUri, String password) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -284,29 +273,37 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     }
   }
 
-  /// Opens a folder picker (ACTION_OPEN_DOCUMENT_TREE) for selecting a
-  /// Gocryptfs vault — vaults are directory trees (gocryptfs.conf +
-  /// gocryptfs.diriv), not single files, so this is distinct from
-  /// [pickContainer]. [looksLikeVault] is a quick heuristic the caller can
-  /// use to warn the user immediately if they picked an unrelated folder,
-  /// before asking for a password.
-  Future<({String uri, String displayName, bool looksLikeVault})?> pickGocryptfsVault() async {
-    final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
-      ChannelMethods.pickGocryptfsVault,
-    );
-    if (raw == null) return null;
-    return (
-      uri: raw['uri'] as String,
-      displayName: raw['displayName'] as String,
-      looksLikeVault: raw['looksLikeVault'] as bool? ?? false,
-    );
+  /// Opens a folder picker for selecting a Gocryptfs vault.
+  Future<({String uri, String displayName, bool looksLikeVault, String? format})?> pickGocryptfsVault() async {
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>(ChannelMethods.pickGocryptfsVault);
+      if (res == null) return null;
+      return (
+        uri: res['uri'] as String,
+        displayName: res['displayName'] as String,
+        looksLikeVault: res['looksLikeVault'] as bool? ?? false,
+        format: res['format'] as String?,
+      );
+    } catch (e) {
+      _logSwallowed('pickGocryptfsVault', e);
+      return null;
+    }
   }
 
-  /// Unlocks a Gocryptfs vault. Result shape matches [unlockContainer]
-  /// exactly (containerFormat: 'gocryptfs') so callers can treat the two
-  /// uniformly once unlocked. matchedCipherId/matchedHashId are always 255
-  /// (not applicable — Gocryptfs's cipher suite is fixed per vault format,
-  /// not user-selectable).
+  Future<bool> isGocryptfsVault(String uri) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.isGocryptfsVault,
+        {'uri': uri},
+      );
+      return result ?? false;
+    } catch (e) {
+      _logSwallowed('isGocryptfsVault', e);
+      return false;
+    }
+  }
+
+  /// Unlocks a Gocryptfs vault.
   Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockGocryptfsVault(
     String filePath,
     String password, {
@@ -333,10 +330,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     );
   }
 
-  /// Creates a new Gocryptfs vault in an empty folder the user already
-  /// granted tree access to via [pickGocryptfsVault]. The vault is left
-  /// locked afterward — the caller should unlock it explicitly via
-  /// [unlockGocryptfsVault].
+  /// Creates a new Gocryptfs vault in an empty folder.
   Future<bool> createGocryptfsVault(String folderUri, String password) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -350,29 +344,37 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     }
   }
 
-  /// Opens a folder picker (ACTION_OPEN_DOCUMENT_TREE) for selecting a
-  /// CryFS vault — vaults are directory trees (cryfs.config plus a flat,
-  /// sharded pool of block files), not single files, so this is distinct
-  /// from [pickContainer]. [looksLikeVault] is a quick heuristic the caller
-  /// can use to warn the user immediately if they picked an unrelated
-  /// folder, before asking for a password.
-  Future<({String uri, String displayName, bool looksLikeVault})?> pickCryfsVault() async {
-    final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
-      ChannelMethods.pickCryfsVault,
-    );
-    if (raw == null) return null;
-    return (
-      uri: raw['uri'] as String,
-      displayName: raw['displayName'] as String,
-      looksLikeVault: raw['looksLikeVault'] as bool? ?? false,
-    );
+  /// Opens a folder picker for selecting a CryFS vault.
+  Future<({String uri, String displayName, bool looksLikeVault, String? format})?> pickCryfsVault() async {
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>(ChannelMethods.pickCryfsVault);
+      if (res == null) return null;
+      return (
+        uri: res['uri'] as String,
+        displayName: res['displayName'] as String,
+        looksLikeVault: res['looksLikeVault'] as bool? ?? false,
+        format: res['format'] as String?,
+      );
+    } catch (e) {
+      _logSwallowed('pickCryfsVault', e);
+      return null;
+    }
   }
 
-  /// Unlocks a CryFS vault. Result shape matches [unlockContainer] exactly
-  /// (containerFormat: 'cryfs') so callers can treat the two uniformly
-  /// once unlocked. matchedCipherId/matchedHashId are always 255 (not
-  /// applicable — CryFS's cipher suite is fixed per vault config, not
-  /// user-selectable here).
+  Future<bool> isCryfsVault(String uri) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.isCryfsVault,
+        {'uri': uri},
+      );
+      return result ?? false;
+    } catch (e) {
+      _logSwallowed('isCryfsVault', e);
+      return false;
+    }
+  }
+
+  /// Unlocks a CryFS vault.
   Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockCryfsVault(
     String filePath,
     String password, {
@@ -399,10 +401,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     );
   }
 
-  /// Creates a new CryFS vault in an empty folder the user already granted
-  /// tree access to via [pickCryfsVault]. The vault is left locked
-  /// afterward — the caller should unlock it explicitly via
-  /// [unlockCryfsVault].
+  /// Creates a new CryFS vault in an empty folder.
   Future<bool> createCryfsVault(String folderUri, String password) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -417,9 +416,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
   }
 
   /// Must be called once after the final [writeFileChunk] call in a
-  /// sequence for a given [fileName], to flush Cryptomator's buffered final
-  /// (possibly partial) chunk and materialize the file. Safe to call
-  /// unconditionally for any container — it's a no-op for VeraCrypt/LUKS.
+  /// sequence for a given [fileName] on Cryptomator/gocryptfs/CryFS vaults.
   Future<bool> finishWriteIfCryptomator(
     MountedContainer container,
     String fileName,
@@ -436,25 +433,16 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     }
   }
 
-  /// Asks native to abort the in-flight unlock for [volId] (see
-  /// [addUnlockStartedListener] for how the caller learns [volId] before the
-  /// original [unlockContainer]/[unlockUsbContainer] call has resolved).
-  ///
-  /// Fire-and-forget and best-effort: this doesn't itself throw or resolve
-  /// the pending unlock — that call will still complete on its own shortly
-  /// after, but with a `PlatformException(code: 'CANCELLED')` instead of a
-  /// result, once native notices the request. Safe to call more than once,
-  /// or after the unlock has already finished.
+  /// Asks native to abort the in-flight unlock for [volId].
   Future<void> cancelUnlock(int volId) async {
     try {
       await _channel.invokeMethod(ChannelMethods.cancelUnlock, {'volId': volId});
     } catch (e) {
-      // Best-effort — the pending unlock call resolves on its own regardless.
       _logSwallowed('cancelUnlock', e, expected: true);
     }
   }
 
- Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockContainer(
+  Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockContainer(
     String filePath,
     String password,
     int pim, {
@@ -480,7 +468,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
           'cacheDerivedKey': cacheDerivedKey,
           if (keyfilePaths != null && keyfilePaths.isNotEmpty)
             'keyfilePaths': keyfilePaths,
-            'readOnly': readOnly,
+          'readOnly': readOnly,
         });
     if (raw == null) return null;
     final volId = raw['volId'] as int;
@@ -494,13 +482,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     );
   }
 
-  /// Checks whether the document/file at [filePath] (a content:// SAF uri
-  /// or a plain file:// path) can currently be resolved — without
-  /// attempting to unlock it. Returns false for a container living on
-  /// removable storage that's been disconnected or a file that was moved
-  /// or deleted, and also false if a previously-granted content:// SAF
-  /// permission was revoked (e.g. after removing and re-inserting an SD
-  /// card resets the grant).
+  /// Checks whether the document/file at [filePath] can currently be resolved.
   Future<bool> documentExists(String filePath) async {
     try {
       final result = await _channel.invokeMethod<bool>(
@@ -509,26 +491,18 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
       );
       return result ?? false;
     } catch (e) {
-      // Treat a failed check as "unknown", not "missing" — let the normal
-      // unlock attempt surface the real error rather than blocking access
-      // to a container that might actually be fine.
       _logSwallowed('documentExists', e, expected: true);
       return true;
     }
   }
 
-  /// Speculatively warms [filePath] for a subsequent [unlockContainer]
-  /// call: opens it read-only, reads a small prefix, closes it again.
-  /// Fire-and-forget — no fd is held open, so there's nothing to cancel or
-  /// clean up if the user backs out. Purely a latency optimization; on SAF
-  /// providers this overlaps the binder round trip (and, for cloud-backed
-  /// providers, the network fetch) with the time the user spends typing
-  /// their password instead of paying it after they tap "Unlock."
+  /// Speculatively warms [filePath] for a subsequent [unlockContainer] call.
   void warmContainer(String filePath) {
     _channel
         .invokeMethod(ChannelMethods.warmContainer, {'filePath': filePath})
         .catchError((e) => _logSwallowed('warmContainer', e, expected: true));
   }
+
   Future<List<UsbDeviceInfo>> listUsbDevices() async {
     final raw = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.listUsbDevices,
@@ -556,7 +530,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
     }
   }
 
- Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockUsbContainer(
+  Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockUsbContainer(
     String deviceName,
     String password,
     int pim, {
@@ -583,7 +557,7 @@ Future<int?> getUsbDeviceCapacity(String deviceName) async {
         'cacheDerivedKey': cacheDerivedKey,
         if (keyfilePaths != null && keyfilePaths.isNotEmpty)
           'keyfilePaths': keyfilePaths,
-          'readOnly': readOnly,
+        'readOnly': readOnly,
       },
     );
     if (raw == null) return null;

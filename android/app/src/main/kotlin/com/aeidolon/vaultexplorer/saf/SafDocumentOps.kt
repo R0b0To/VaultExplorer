@@ -29,11 +29,9 @@ class SafDocumentOps(private val context: Context) {
     }
 
     private fun queryChildrenRaw(folder: DocumentFile): MutableMap<String, DocumentFile> {
-        val results = LinkedHashMap<String, DocumentFile>()
-
-        // 1. Direct POSIX Access (Active only if All Files Access is granted)
         val rawDir = getRawFile(folder)
         if (rawDir != null && rawDir.exists() && rawDir.isDirectory) {
+            val results = LinkedHashMap<String, DocumentFile>()
             val files = rawDir.listFiles() ?: emptyArray()
             for (f in files) {
                 val baseFile = DocumentFile.fromFile(f)
@@ -49,79 +47,47 @@ class SafDocumentOps(private val context: Context) {
             return results
         }
 
-        // 2. SAF ContentResolver Query (Tree-Aware Fallback)
-        val uri = folder.uri
-        if (DocumentsContract.isTreeUri(uri)) {
-            try {
-                val authority = uri.authority ?: "com.android.externalstorage.documents"
-                val treeDocId = DocumentsContract.getTreeDocumentId(uri)
-                val rootTreeUri = DocumentsContract.buildTreeDocumentUri(authority, treeDocId)
-
-                val parentDocId = try {
-                    DocumentsContract.getDocumentId(uri)
-                } catch (_: Exception) {
-                    treeDocId
+        val docId = DocumentsContract.getDocumentId(folder.uri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+            folder.uri,
+            docId
+        )
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+        )
+        val results = LinkedHashMap<String, DocumentFile>()
+        try {
+            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                val modIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                while (cursor.moveToNext()) {
+                    val childDocId = if (idIdx >= 0) cursor.getString(idIdx) else null ?: continue
+                    val docName = if (nameIdx >= 0) cursor.getString(nameIdx) else null ?: continue
+                    val mimeType = if (mimeIdx >= 0) cursor.getString(mimeIdx) else null
+                    val size = if (sizeIdx >= 0 && !cursor.isNull(sizeIdx)) cursor.getLong(sizeIdx) else 0L
+                    val lastModified = if (modIdx >= 0 && !cursor.isNull(modIdx)) cursor.getLong(modIdx) else 0L
+                    val childUri = DocumentsContract.buildDocumentUriUsingTree(folder.uri, childDocId)
+                    val baseFile = DocumentFile.fromSingleUri(context, childUri) ?: continue
+                    val isDir = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
+                    val cachedFile = CachedDocumentFile(
+                        delegate = baseFile,
+                        cachedName = docName,
+                        cachedIsDirectory = isDir,
+                        cachedLength = size,
+                        cachedLastModified = lastModified,
+                    )
+                    results[docName.lowercase()] = cachedFile
                 }
-
-                val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(rootTreeUri, parentDocId)
-                val projection = arrayOf(
-                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                    DocumentsContract.Document.COLUMN_MIME_TYPE,
-                    DocumentsContract.Document.COLUMN_SIZE,
-                    DocumentsContract.Document.COLUMN_LAST_MODIFIED,
-                )
-
-                context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                    val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                    val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                    val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
-                    val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
-                    val modIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-
-                    while (cursor.moveToNext()) {
-                        val childDocId = if (idIdx >= 0) cursor.getString(idIdx) else null ?: continue
-                        val docName = if (nameIdx >= 0) cursor.getString(nameIdx) else null ?: continue
-                        val mimeType = if (mimeIdx >= 0) cursor.getString(mimeIdx) else null
-                        val size = if (sizeIdx >= 0 && !cursor.isNull(sizeIdx)) cursor.getLong(sizeIdx) else 0L
-                        val lastModified = if (modIdx >= 0 && !cursor.isNull(modIdx)) cursor.getLong(modIdx) else 0L
-
-                        val childDocUri = DocumentsContract.buildDocumentUriUsingTree(rootTreeUri, childDocId)
-                        val isDir = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
-
-                        val baseFile = if (isDir) {
-                            DocumentFile.fromTreeUri(context, childDocUri)
-                        } else {
-                            DocumentFile.fromSingleUri(context, childDocUri)
-                        } ?: continue
-
-                        val cachedFile = CachedDocumentFile(
-                            delegate = baseFile,
-                            cachedName = docName,
-                            cachedIsDirectory = isDir,
-                            cachedLength = size,
-                            cachedLastModified = lastModified,
-                        )
-                        results[docName.lowercase()] = cachedFile
-                    }
-                    return results
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("SafDocumentOps", "SAF tree query failed for $uri", e)
             }
-        }
-
-        // 3. DocumentFile.listFiles Fallback
-        val children = try { folder.listFiles() } catch (_: Exception) { emptyArray() }
-        for (child in children) {
-            val name = child.name ?: continue
-            results[name.lowercase()] = CachedDocumentFile(
-                delegate = child,
-                cachedName = name,
-                cachedIsDirectory = child.isDirectory,
-                cachedLength = if (child.isDirectory) 0L else child.length(),
-                cachedLastModified = child.lastModified(),
-            )
+        } catch (e: Exception) {
+            android.util.Log.e("SafDocumentOps", "queryChildrenRaw failed for ${folder.uri}", e)
         }
         return results
     }
@@ -132,8 +98,81 @@ class SafDocumentOps(private val context: Context) {
     fun listChildren(folder: DocumentFile): List<DocumentFile> =
         listingFor(folder).values.toList()
 
-    fun childOf(folder: DocumentFile, name: String): DocumentFile? =
-        listingFor(folder)[name.lowercase()]
+    fun childOf(folder: DocumentFile, name: String): DocumentFile? {
+        // 1. Check in-memory listing cache first
+        val cached = dirListingCache[cacheKey(folder)]
+        if (cached != null) {
+            return cached[name.lowercase()]
+        }
+
+        // 2. Direct raw file check (O(1) filesystem stat)
+        val rawDir = getRawFile(folder)
+        if (rawDir != null && rawDir.exists() && rawDir.isDirectory) {
+            val childFile = File(rawDir, name)
+            if (childFile.exists()) {
+                val baseFile = DocumentFile.fromFile(childFile)
+                return CachedDocumentFile(
+                    delegate = baseFile,
+                    cachedName = childFile.name,
+                    cachedIsDirectory = childFile.isDirectory,
+                    cachedLength = if (childFile.isDirectory) 0L else childFile.length(),
+                    cachedLastModified = childFile.lastModified(),
+                )
+            }
+            return null
+        }
+
+        // 3. Streaming cursor search over SAF folder children
+        val parentDocId = try {
+            DocumentsContract.getDocumentId(folder.uri)
+        } catch (_: Exception) {
+            return listingFor(folder)[name.lowercase()]
+        }
+
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+            folder.uri,
+            parentDocId
+        )
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+        )
+        try {
+            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                val modIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                while (cursor.moveToNext()) {
+                    val docName = if (nameIdx >= 0) cursor.getString(nameIdx) else null ?: continue
+                    if (docName.equals(name, ignoreCase = true)) {
+                        val childDocId = if (idIdx >= 0) cursor.getString(idIdx) else null ?: break
+                        val mimeType = if (mimeIdx >= 0) cursor.getString(mimeIdx) else null
+                        val size = if (sizeIdx >= 0 && !cursor.isNull(sizeIdx)) cursor.getLong(sizeIdx) else 0L
+                        val lastModified = if (modIdx >= 0 && !cursor.isNull(modIdx)) cursor.getLong(modIdx) else 0L
+                        val childUri = DocumentsContract.buildDocumentUriUsingTree(folder.uri, childDocId)
+                        val baseFile = DocumentFile.fromSingleUri(context, childUri) ?: break
+                        val isDir = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
+                        return CachedDocumentFile(
+                            delegate = baseFile,
+                            cachedName = docName,
+                            cachedIsDirectory = isDir,
+                            cachedLength = size,
+                            cachedLastModified = lastModified,
+                        )
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SafDocumentOps", "childOf streaming query failed for ${folder.uri}", e)
+        }
+
+        return null
+    }
 
     fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? = try {
         val rawParent = getRawFile(parent)
@@ -151,7 +190,7 @@ class SafDocumentOps(private val context: Context) {
                 DocumentsContract.Document.MIME_TYPE_DIR,
                 name
             )
-            val created = uri?.let { DocumentFile.fromTreeUri(context, it) ?: DocumentFile.fromSingleUri(context, it) }
+            val created = uri?.let { DocumentFile.fromSingleUri(context, it) }
             invalidate(parent)
             created?.let { CachedDocumentFile(it, name, cachedIsDirectory = true) }
         }
@@ -234,7 +273,6 @@ class SafDocumentOps(private val context: Context) {
                 return
             }
         }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             try {
                 val movedUri = DocumentsContract.moveDocument(
@@ -257,7 +295,6 @@ class SafDocumentOps(private val context: Context) {
         val name = source.name ?: throw SafIOException("Source document has no name")
         val rawSource = getRawFile(source)
         val rawTargetParent = getRawFile(targetParent)
-
         if (rawSource != null && rawTargetParent != null && rawSource.exists() && rawTargetParent.exists()) {
             val target = File(rawTargetParent, name)
             if (rawSource.isDirectory) {
@@ -268,7 +305,6 @@ class SafDocumentOps(private val context: Context) {
             val baseFile = DocumentFile.fromFile(target)
             return CachedDocumentFile(baseFile, name, cachedIsDirectory = rawSource.isDirectory)
         }
-
         return if (source.isDirectory) {
             val newDir = createDirectorySafe(targetParent, name) ?: throw SafIOException("Could not create $name in target")
             for (child in listChildren(source)) copyDocumentRecursive(child, newDir)
@@ -292,7 +328,6 @@ class SafDocumentOps(private val context: Context) {
             invalidate(folder)
             return
         }
-
         for (child in listChildren(folder)) {
             if (child.isDirectory) deleteRecursively(child)
             child.delete()

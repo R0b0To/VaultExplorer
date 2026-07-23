@@ -7,7 +7,7 @@ import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 
 import '../lock/widgets/pattern_lock_view.dart';
 
@@ -46,7 +46,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
   String? _error;
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
-  String _containerFormat = 'veracrypt';
+  String _containerFormat = 'container'; // Set to 'container' (generic) until selected or matched
   
   final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
@@ -106,7 +106,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
       if (mounted && progress.volId == _activeVolId) {
         setState(() {
           _progress = progress;
-          if (progress.containerFormat != 'veracrypt') {
+          if (progress.containerFormat.isNotEmpty && progress.containerFormat != 'unknown') {
             _containerFormat = progress.containerFormat;
           }
         });
@@ -240,27 +240,12 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
         final picked = await vaultExplorerApi.pickCryptomatorVault();
         if (picked == null || !mounted) return;
 
-        bool isValid = picked.looksLikeVault;
-        if (isValid) {
-          detectedFormat = 'cryptomator';
-        } else {
-          final isGocryptfs = await vaultExplorerApi.isGocryptfsVault(picked.uri);
-          if (isGocryptfs) {
-            detectedFormat = 'gocryptfs';
-            isValid = true;
-          } else {
-            final isCryfs = await vaultExplorerApi.isCryfsVault(picked.uri);
-            if (isCryfs) {
-              detectedFormat = 'cryfs';
-              isValid = true;
-            }
-          }
-        }
-
-        if (!isValid) {
+        final format = picked.format;
+        if (format == null) {
           setState(() => _error = 'No masterkey.cryptomator, gocryptfs.conf, or cryfs.config found in that folder.');
           return;
         }
+        detectedFormat = format;
         newUri = picked.uri;
         newDisplayName = picked.displayName;
       } else {
@@ -390,7 +375,6 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
       if (e.code == 'auth_in_progress' ||
           e.code == 'AuthenticationInProgress' ||
           (e.message?.contains('Authentication in progress') ?? false)) {
-        // Silently swallow race condition error on startup/transitions
         return;
       }
       if (mounted) {
@@ -465,20 +449,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
           return;
         }
 
-        String? detectedFormat;
-        if (result.looksLikeVault) {
-          detectedFormat = 'cryptomator';
-        } else {
-          final isGocryptfs = await vaultExplorerApi.isGocryptfsVault(result.uri);
-          if (isGocryptfs) {
-            detectedFormat = 'gocryptfs';
-          } else {
-            final isCryfs = await vaultExplorerApi.isCryfsVault(result.uri);
-            if (isCryfs) {
-              detectedFormat = 'cryfs';
-            }
-          }
-        }
+        final detectedFormat = result.format;
         
         if (detectedFormat == null) {
           setState(() {
@@ -492,7 +463,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
         setState(() { 
           _selectedUri = result.uri; 
           _selectedName = result.displayName; 
-          _containerFormat = detectedFormat!;
+          _containerFormat = detectedFormat;
           _error = null; 
         });
         return;
@@ -512,6 +483,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
         setState(() {
           _selectedUri = result.uri;
           _selectedName = result.displayName;
+          _containerFormat = 'container'; // Generic container icon until format is determined during unlock
           _error = null;
         });
         vaultExplorerApi.warmContainer(result.uri);
@@ -759,6 +731,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
             totalSpace: 0,
             freeSpace: 0,
             readOnly: _readOnly,
+            containerFormat: result.containerFormat,
           ),
           record: savedRecord,
         );
@@ -896,7 +869,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
                     SegmentedButton<String>(
                       segments: const [
                         ButtonSegment(
-                          value: 'veracrypt',
+                          value: 'container',
                           label: Text('Container File'),
                           icon: Icon(Icons.folder_zip_rounded),
                         ),
@@ -907,7 +880,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
                         ),
                       ],
                       selected: {
-                        _isFolderVault ? 'directory_vault' : 'veracrypt',
+                        _isFolderVault ? 'directory_vault' : 'container',
                       },
                       onSelectionChanged: _loading
                           ? null
@@ -951,16 +924,15 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
                                     : cs.surfaceContainerHigh,
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              child: Icon(
-                                _isGocryptfs || _isCryfs
-                                    ? Icons.enhanced_encryption_rounded
-                                    : _isFolderVault
-                                        ? Icons.folder_shared_rounded
-                                        : Icons.folder_zip_rounded,
-                                size: 26,
+                              alignment: Alignment.center,
+                              child: ContainerFormatIcon(
+                                format: _selectedUri != null
+                                    ? _containerFormat
+                                    : (_isFolderVault ? 'directory_vault' : 'container'),
                                 color: _selectedUri != null
                                     ? cs.onPrimaryContainer
                                     : cs.onSurfaceVariant,
+                                size: 26,
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -980,7 +952,9 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
                                                         ? 'CryFS Vault'
                                                         : _isBitlocker
                                                             ? 'BitLocker Drive'
-                                                            : 'Selected Container')
+                                                            : _containerFormat == 'veracrypt'
+                                                                ? 'VeraCrypt Container'
+                                                                : 'Encrypted Container')
                                         : (_isFolderVault
                                             ? 'Cryptomator | Gocryptfs | CryFS'
                                             : 'VeraCrypt | LUKS | BitLocker'),
@@ -1019,7 +993,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
                                     : () => setState(() {
                                           _selectedUri = null;
                                           _selectedName = null;
-                                          _containerFormat = 'directory_vault';
+                                          _containerFormat = _isFolderVault ? 'directory_vault' : 'container';
                                         }),
                                 style: IconButton.styleFrom(
                                   backgroundColor: cs.surfaceContainerHigh,

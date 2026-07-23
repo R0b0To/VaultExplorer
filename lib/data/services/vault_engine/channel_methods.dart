@@ -1,7 +1,7 @@
 /// Single source of truth for every MethodChannel method name.
 ///
 /// Both [VaultExplorerApi] call-sites and [MainActivity]'s `when` block must
-/// use these constants.  The Kotlin side mirrors them in the local
+/// use these constants. The Kotlin side mirrors them in the local
 /// [ChannelMethods] object inside [MainActivity].
 abstract final class ChannelMethods {
   // ── Container lifecycle ──────────────────────────────────────────────────
@@ -14,24 +14,21 @@ abstract final class ChannelMethods {
   static const cancelUnlock = 'cancelUnlock';
   static const changeContainerPassword = 'changeContainerPassword';
 
-  static const String HAS_ALL_FILES_ACCESS = 'hasAllFilesAccess';
-  static const String REQUEST_ALL_FILES_ACCESS = 'requestAllFilesAccess';
-
-  // ── Cryptomator vaults ───────────────────────────────────────────────────
-  /// Opens ACTION_OPEN_DOCUMENT_TREE (a folder picker, not a file picker —
-  /// Cryptomator vaults are directory trees) and checks for
-  /// masterkey.cryptomator before returning.
+  static const hasAllFilesAccess = 'hasAllFilesAccess';
+  static const requestAllFilesAccess = 'requestAllFilesAccess';
+  
+  // ── Cryptomator / Folder Vaults ──────────────────────────────────────────
+  /// Opens ACTION_OPEN_DOCUMENT_TREE (a folder picker, not a file picker)
+  /// and checks for masterkey.cryptomator, gocryptfs.conf, or cryfs.config.
   static const pickCryptomatorVault = 'pickCryptomatorVault';
   static const unlockCryptomatorVault = 'unlockCryptomatorVault';
   static const createCryptomatorVault = 'createCryptomatorVault';
-  /// Must be called once after the last writeFileChunk() in a sequence for
-  /// a given path, to flush Cryptomator's buffered final chunk. No-op for
-  /// VeraCrypt/LUKS volIds.
   static const finishWriteIfCryptomator = 'finishWriteIfCryptomator';
 
   static const pickGocryptfsVault = 'pickGocryptfsVault';
   static const unlockGocryptfsVault = 'unlockGocryptfsVault';
   static const createGocryptfsVault = 'createGocryptfsVault';
+  static const isGocryptfsVault = 'isGocryptfsVault';
 
   static const pickCryfsVault = 'pickCryfsVault';
   static const unlockCryfsVault = 'unlockCryfsVault';
@@ -46,20 +43,13 @@ abstract final class ChannelMethods {
   static const importFolder = 'importFolder';
   static const cancelImport = 'cancelImport';
   static const getFileSize = 'getFileSize';
-  static const getFolderSize ='getFolderSize'; // recursive directory byte total
+  static const getFolderSize = 'getFolderSize'; // recursive directory byte total
   static const readFileChunk = 'readFileChunk';
+  static const writeFileChunk = 'writeFileChunk';
   static const writeBackFile = 'writeBackFile';
   static const getSpaceInfo = 'getSpaceInfo';
 
-  // Same native operation as getFileSize/readFileChunk above, but routed
-  // to their own native thread pool (see MainActivity's fullResExecutor)
-  // instead of the general-purpose ioExecutor. Use these specifically for
-  // Media Viewer full-resolution reads (EncryptedImageWidget,
-  // FullResImageCache) so a burst of swipe-driven reads can't queue up
-  // behind -- or get queued up behind -- unrelated ioExecutor work like
-  // bulk file copy/export, which shares getFileSize/readFileChunk and
-  // already runs its own multi-file concurrency. Do not use these for
-  // anything other than the Media Viewer's full-res image path.
+  // Routed to fullResExecutor on native side for Media Viewer image reads
   static const getMediaFileSize = 'getMediaFileSize';
   static const readMediaFileChunk = 'readMediaFileChunk';
 
@@ -70,12 +60,13 @@ abstract final class ChannelMethods {
   static const deleteFile = 'deleteFile';
   static const setLastModifiedTime = 'setLastModifiedTime';
 
-  // ── Media ────────────────────────────────────────────────────────────────
+  // ── Media & Thumbnails ───────────────────────────────────────────────────
   static const openWithApp = 'openWithApp';
   static const getVideoThumbnail = 'getVideoThumbnail';
+  static const getImageThumbnail = 'getImageThumbnail';
+  static const generateAndCacheThumbnail = 'generateAndCacheThumbnail';
 
   // ── Crypto ───────────────────────────────────────────────────────────────
-  /// PBKDF2-SHA512 via the C++ mbedTLS layer.
   static const hashPassword = 'hashPassword';
   static const deriveDerivedKey = 'deriveDerivedKey';
   static const storeDerivedKey = 'storeDerivedKey';
@@ -85,11 +76,14 @@ abstract final class ChannelMethods {
   // ── Security & Privacy ───────────────────────────────────────────────────
   static const setSecureScreen = 'setSecureScreen';
 
+  // ── USB Drive Support ────────────────────────────────────────────────────
   static const listUsbDevices = 'listUsbDevices';
   static const requestUsbPermission = 'requestUsbPermission';
   static const unlockUsbContainer = 'unlockUsbContainer';
   static const createUsbContainer = 'createUsbContainer';
   static const getUsbDeviceCapacity = 'getUsbDeviceCapacity';
+
+  // ── System Utilities ─────────────────────────────────────────────────────
   static const documentExists = 'documentExists';
   static const warmContainer = 'warmContainer';
 }

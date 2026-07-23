@@ -63,9 +63,6 @@ private object ChannelMethods {
     const val CANCEL_IMPORT       = "cancelImport"
     const val GET_FILE_SIZE       = "getFileSize"
     const val READ_FILE_CHUNK     = "readFileChunk"
-    // Same native operation as GET_FILE_SIZE/READ_FILE_CHUNK, routed to
-    // fullResExecutor instead of ioExecutor -- see the call sites below and
-    // the fullResExecutor declaration for why.
     const val GET_MEDIA_FILE_SIZE   = "getMediaFileSize"
     const val HAS_ALL_FILES_ACCESS     = "hasAllFilesAccess"
     const val REQUEST_ALL_FILES_ACCESS = "requestAllFilesAccess"
@@ -179,17 +176,31 @@ class MainActivity : FlutterFragmentActivity() {
         val data = activityResult.data
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
             val uri = data.data!!
-            contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-            res.success(mapOf(
-                "uri" to uri.toString(),
-                "displayName" to UriNameResolver.resolve(contentResolver, uri)
-            ))
+            ioExecutor.execute {
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                } catch (_: SecurityException) {}
+                val name = UriNameResolver.resolve(contentResolver, uri)
+                runOnUiThread {
+                    res.success(mapOf(
+                        "uri" to uri.toString(),
+                        "displayName" to name
+                    ))
+                }
+            }
         } else {
             res.success(null)
         }
+    }
+
+    private fun detectVaultFormatInFolder(uri: Uri): String? {
+        if (com.aeidolon.vaultexplorer.cryfs.CryfsVault.looksLikeVault(this, uri)) return "cryfs"
+        if (com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.looksLikeVault(this, uri)) return "cryptomator"
+        if (com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.looksLikeVault(this, uri)) return "gocryptfs"
+        return null
     }
 
     private val pickCryptomatorVaultLauncher = registerForActivityResult(
@@ -200,16 +211,24 @@ class MainActivity : FlutterFragmentActivity() {
         val data = activityResult.data
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
             val uri = data.data!!
-            contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-            val looksValid = com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.looksLikeVault(this, uri)
-            res.success(mapOf(
-                "uri" to uri.toString(),
-                "displayName" to UriNameResolver.resolve(contentResolver, uri),
-                "looksLikeVault" to looksValid,
-            ))
+            ioExecutor.execute {
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                } catch (_: SecurityException) {}
+                val format = detectVaultFormatInFolder(uri)
+                val name = UriNameResolver.resolve(contentResolver, uri)
+                runOnUiThread {
+                    res.success(mapOf(
+                        "uri" to uri.toString(),
+                        "displayName" to name,
+                        "looksLikeVault" to (format != null),
+                        "format" to format,
+                    ))
+                }
+            }
         } else {
             res.success(null)
         }
@@ -223,16 +242,24 @@ class MainActivity : FlutterFragmentActivity() {
         val data = activityResult.data
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
             val uri = data.data!!
-            contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-            val looksValid = com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.looksLikeVault(this, uri)
-            res.success(mapOf(
-                "uri" to uri.toString(),
-                "displayName" to UriNameResolver.resolve(contentResolver, uri),
-                "looksLikeVault" to looksValid,
-            ))
+            ioExecutor.execute {
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                } catch (_: SecurityException) {}
+                val format = detectVaultFormatInFolder(uri)
+                val name = UriNameResolver.resolve(contentResolver, uri)
+                runOnUiThread {
+                    res.success(mapOf(
+                        "uri" to uri.toString(),
+                        "displayName" to name,
+                        "looksLikeVault" to (format != null),
+                        "format" to format,
+                    ))
+                }
+            }
         } else {
             res.success(null)
         }
@@ -246,16 +273,24 @@ class MainActivity : FlutterFragmentActivity() {
         val data = activityResult.data
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
             val uri = data.data!!
-            contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            )
-            val looksValid = com.aeidolon.vaultexplorer.cryfs.CryfsVault.looksLikeVault(this, uri)
-            res.success(mapOf(
-                "uri" to uri.toString(),
-                "displayName" to UriNameResolver.resolve(contentResolver, uri),
-                "looksLikeVault" to looksValid,
-            ))
+            ioExecutor.execute {
+                try {
+                    contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                } catch (_: SecurityException) {}
+                val format = detectVaultFormatInFolder(uri)
+                val name = UriNameResolver.resolve(contentResolver, uri)
+                runOnUiThread {
+                    res.success(mapOf(
+                        "uri" to uri.toString(),
+                        "displayName" to name,
+                        "looksLikeVault" to (format != null),
+                        "format" to format,
+                    ))
+                }
+            }
         } else {
             res.success(null)
         }
@@ -1409,12 +1444,10 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                     val displayName = call.argument<String>("displayName")
                     val docProvider = call.argument<Boolean>("documentProvider") ?: false
                     val readOnly = call.argument<Boolean>("readOnly") ?: false
-
                     if (uriString == null || password == null) {
                         result.error("INVALID_ARGS", "filePath and password required", null)
                         return@setMethodCallHandler
                     }
-
                     val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                         ?: ContainerSessionRegistry.getFreeVolumeId()
                     if (targetVolId == null) {
@@ -1422,7 +1455,6 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                         return@setMethodCallHandler
                     }
                     methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
-
                     ioExecutor.execute {
                         try {
                             val uri = Uri.parse(uriString)
@@ -1433,16 +1465,20 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                                 passwordChars.fill('\u0000')
                             }
 
+                            // FIX: Fetch directory listing on background thread BEFORE switching to UI thread
+                            val files = if (openResult is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success) {
+                                openResult.session.listDirectory("")?.toList() ?: emptyList()
+                            } else null
+
                             runOnUiThread {
                                 when (openResult) {
                                     is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
                                         val session = openResult.session
                                         VaultBackendRegistry.put(targetVolId, session)
-                                        val files = session.listDirectory("")?.toList() ?: emptyList()
                                         ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                                             uri = uriString,
                                             volId = targetVolId,
-                                            cachedFilesList = files,
+                                            cachedFilesList = files ?: emptyList(),
                                             displayName = displayName ?: openResult.vaultDisplayName,
                                             documentProvider = docProvider,
                                             readOnly = readOnly,
@@ -1454,7 +1490,7 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                                         }
                                         result.success(mapOf(
                                             "volId" to targetVolId,
-                                            "files" to files,
+                                            "files" to (files ?: emptyList<String>()),
                                             "matchedCipherId" to 255,
                                             "matchedHashId" to 255,
                                             "containerFormat" to "cryptomator",
@@ -1480,12 +1516,10 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                     val displayName = call.argument<String>("displayName")
                     val docProvider = call.argument<Boolean>("documentProvider") ?: false
                     val readOnly = call.argument<Boolean>("readOnly") ?: false
-
                     if (uriString == null || password == null) {
                         result.error("INVALID_ARGS", "filePath and password required", null)
                         return@setMethodCallHandler
                     }
-
                     val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                         ?: ContainerSessionRegistry.getFreeVolumeId()
                     if (targetVolId == null) {
@@ -1493,7 +1527,6 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                         return@setMethodCallHandler
                     }
                     methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
-
                     ioExecutor.execute {
                         try {
                             val uri = Uri.parse(uriString)
@@ -1504,16 +1537,20 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                                 passwordChars.fill('\u0000')
                             }
 
+                            // FIX: Fetch directory listing on background thread BEFORE switching to UI thread
+                            val files = if (openResult is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success) {
+                                openResult.session.listDirectory("")?.toList() ?: emptyList()
+                            } else null
+
                             runOnUiThread {
                                 when (openResult) {
                                     is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
                                         val session = openResult.session
                                         VaultBackendRegistry.put(targetVolId, session)
-                                        val files = session.listDirectory("")?.toList() ?: emptyList()
                                         ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                                             uri = uriString,
                                             volId = targetVolId,
-                                            cachedFilesList = files,
+                                            cachedFilesList = files ?: emptyList(),
                                             displayName = displayName ?: openResult.vaultDisplayName,
                                             documentProvider = docProvider,
                                             readOnly = readOnly,
@@ -1525,7 +1562,7 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                                         }
                                         result.success(mapOf(
                                             "volId" to targetVolId,
-                                            "files" to files,
+                                            "files" to (files ?: emptyList<String>()),
                                             "matchedCipherId" to 255,
                                             "matchedHashId" to 255,
                                             "containerFormat" to "gocryptfs",
@@ -1551,12 +1588,10 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                     val displayName = call.argument<String>("displayName")
                     val docProvider = call.argument<Boolean>("documentProvider") ?: false
                     val readOnly = call.argument<Boolean>("readOnly") ?: false
-
                     if (uriString == null || password == null) {
                         result.error("INVALID_ARGS", "filePath and password required", null)
                         return@setMethodCallHandler
                     }
-
                     val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                         ?: ContainerSessionRegistry.getFreeVolumeId()
                     if (targetVolId == null) {
@@ -1564,7 +1599,6 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                         return@setMethodCallHandler
                     }
                     methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
-
                     ioExecutor.execute {
                         try {
                             val uri = Uri.parse(uriString)
@@ -1575,16 +1609,20 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                                 passwordChars.fill('\u0000')
                             }
 
+                            // FIX: Fetch directory listing on background thread BEFORE switching to UI thread
+                            val files = if (openResult is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success) {
+                                openResult.session.listDirectory("")?.toList() ?: emptyList()
+                            } else null
+
                             runOnUiThread {
                                 when (openResult) {
                                     is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> {
                                         val session = openResult.session
                                         VaultBackendRegistry.put(targetVolId, session)
-                                        val files = session.listDirectory("")?.toList() ?: emptyList()
                                         ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                                             uri = uriString,
                                             volId = targetVolId,
-                                            cachedFilesList = files,
+                                            cachedFilesList = files ?: emptyList(),
                                             displayName = displayName ?: openResult.vaultDisplayName,
                                             documentProvider = docProvider,
                                             readOnly = readOnly,
@@ -1596,7 +1634,7 @@ ChannelMethods.HAS_ALL_FILES_ACCESS -> {
                                         }
                                         result.success(mapOf(
                                             "volId" to targetVolId,
-                                            "files" to files,
+                                            "files" to (files ?: emptyList<String>()),
                                             "matchedCipherId" to 255,
                                             "matchedHashId" to 255,
                                             "containerFormat" to "cryfs",

@@ -12,34 +12,31 @@ object UriToPath {
         val path = getRawPath(context, uri) ?: return null
         val file = File(path)
 
-        // 1. App-private internal/external storage paths are ALWAYS accessible directly
-        val isAppPrivateStorage = path.startsWith(context.filesDir.absolutePath) ||
-                path.startsWith(context.cacheDir.absolutePath) ||
-                context.getExternalFilesDirs(null).any { it != null && path.startsWith(it.absolutePath) }
-
-        if (isAppPrivateStorage) {
-            return if (file.exists() || file.parentFile?.exists() == true) file else null
+        if (!file.exists() && file.parentFile?.exists() != true) {
+            return null
         }
 
-        // 2. Shared external storage (/storage/emulated/0/...) REQUIRES All Files Access on Android 11+
-        val hasDirectAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager()
-        } else {
-            file.canRead() || file.parentFile?.canRead() == true
+        // On Android 11+ (API 30+), Scoped Storage blocks java.io.File access for SAF URIs
+        // unless MANAGE_EXTERNAL_STORAGE ("All Files Access") is granted OR the file is in app-private storage.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val isAppPrivate = path.startsWith(context.filesDir.absolutePath) ||
+                    context.getExternalFilesDirs(null).any { it != null && path.startsWith(it.absolutePath) }
+
+            if (!isAppPrivate && !Environment.isExternalStorageManager()) {
+                // Without All Files Access, java.io.File operations will fail under Scoped Storage.
+                // Safely return null to force clean fallback to standard SAF (ContentResolver).
+                return null
+            }
         }
 
-        if (!hasDirectAccess) {
-            return null // Force fallback to SAF (ContentResolver / DocumentFile)
-        }
-
-        return if (file.exists() || file.parentFile?.exists() == true) file else null
+        // Verify that the path can actually be read via POSIX
+        return if (file.canRead()) file else null
     }
 
     fun getRawPath(context: Context, uri: Uri): String? {
         if (uri.scheme == "file") return uri.path
-
         if (DocumentsContract.isTreeUri(uri) || uri.scheme == "content") {
-            val docId = try {
+            val docIdRaw = try {
                 if (DocumentsContract.isTreeUri(uri)) {
                     DocumentsContract.getTreeDocumentId(uri)
                 } else {
@@ -49,12 +46,13 @@ object UriToPath {
                 uri.path
             } ?: return null
 
+            // Decode URL-encoded path components like %2F -> /
+            val docId = Uri.decode(docIdRaw) ?: docIdRaw
             val parts = docId.split(":")
             if (parts.size >= 2) {
                 val type = parts[0]
-                val relativePath = parts[1]
-
-                val basePath = if ("primary".equals(type, ignoreCase = true)) {
+                val relativePath = parts.drop(1).joinToString(":")
+                val basePath = if ("primary".equalsIgnoreCase(type)) {
                     Environment.getExternalStorageDirectory().absolutePath
                 } else {
                     "/storage/$type"
@@ -64,4 +62,7 @@ object UriToPath {
         }
         return null
     }
+
+    private fun String.equalsIgnoreCase(other: String): Boolean =
+        this.equals(other, ignoreCase = true)
 }

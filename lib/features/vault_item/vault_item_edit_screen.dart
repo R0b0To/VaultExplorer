@@ -147,7 +147,6 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
           ? oldPath.substring(oldPath.lastIndexOf('/') + 1)
           : oldPath;
 
-
       final namesExcludingSelf = existingNames.difference({oldName.toLowerCase()});
 
       final desiredName = '$safeTitle.${widget.type.name}';
@@ -186,7 +185,6 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
       isDestructive: true,
     );
   }
-
 
   void _showSnack(String msg) {
     showAppSnackBar(context, message: msg, tone: AppBannerTone.error);
@@ -293,15 +291,14 @@ class _FieldInput extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: obscure,
-      maxLines: isMultiline ? 5 : 1,
-      minLines: isMultiline ? 3 : 1,
+      maxLines: isMultiline ? null : 1,
+      minLines: isMultiline ? 12 : 1,
       keyboardType: _keyboardType(field.type),
       textCapitalization: field.type == FieldType.multiline
           ? TextCapitalization.sentences
           : TextCapitalization.none,
       decoration: InputDecoration(
         labelText: field.label,
-        prefixIcon: Icon(_prefixIcon(field.type), size: AppIconSize.small, color: cs.onSurfaceVariant),
         suffixIcon: isSecret
             ? Row(
                 mainAxisSize: MainAxisSize.min,

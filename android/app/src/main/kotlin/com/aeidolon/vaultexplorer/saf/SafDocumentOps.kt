@@ -99,13 +99,13 @@ class SafDocumentOps(private val context: Context) {
         listingFor(folder).values.toList()
 
     fun childOf(folder: DocumentFile, name: String): DocumentFile? {
-        // 1. Check in-memory listing cache first
+        // 1. Check in-memory listing cache (O(1) instant lookup)
         val cached = dirListingCache[cacheKey(folder)]
         if (cached != null) {
             return cached[name.lowercase()]
         }
 
-        // 2. Direct raw file check (O(1) filesystem stat)
+        // 2. Direct raw file check (O(1) direct filesystem stat if permitted)
         val rawDir = getRawFile(folder)
         if (rawDir != null && rawDir.exists() && rawDir.isDirectory) {
             val childFile = File(rawDir, name)
@@ -122,56 +122,8 @@ class SafDocumentOps(private val context: Context) {
             return null
         }
 
-        // 3. Streaming cursor search over SAF folder children
-        val parentDocId = try {
-            DocumentsContract.getDocumentId(folder.uri)
-        } catch (_: Exception) {
-            return listingFor(folder)[name.lowercase()]
-        }
-
-        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-            folder.uri,
-            parentDocId
-        )
-        val projection = arrayOf(
-            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-            DocumentsContract.Document.COLUMN_MIME_TYPE,
-            DocumentsContract.Document.COLUMN_SIZE,
-            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
-        )
-        try {
-            context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
-                val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
-                val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
-                val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
-                val modIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
-                while (cursor.moveToNext()) {
-                    val docName = if (nameIdx >= 0) cursor.getString(nameIdx) else null ?: continue
-                    if (docName.equals(name, ignoreCase = true)) {
-                        val childDocId = if (idIdx >= 0) cursor.getString(idIdx) else null ?: break
-                        val mimeType = if (mimeIdx >= 0) cursor.getString(mimeIdx) else null
-                        val size = if (sizeIdx >= 0 && !cursor.isNull(sizeIdx)) cursor.getLong(sizeIdx) else 0L
-                        val lastModified = if (modIdx >= 0 && !cursor.isNull(modIdx)) cursor.getLong(modIdx) else 0L
-                        val childUri = DocumentsContract.buildDocumentUriUsingTree(folder.uri, childDocId)
-                        val baseFile = DocumentFile.fromSingleUri(context, childUri) ?: break
-                        val isDir = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
-                        return CachedDocumentFile(
-                            delegate = baseFile,
-                            cachedName = docName,
-                            cachedIsDirectory = isDir,
-                            cachedLength = size,
-                            cachedLastModified = lastModified,
-                        )
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("SafDocumentOps", "childOf streaming query failed for ${folder.uri}", e)
-        }
-
-        return null
+        // 3. SAF Fallback: Query and populate dirListingCache ONCE, then return child from memory
+        return listingFor(folder)[name.lowercase()]
     }
 
     fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? = try {

@@ -46,7 +46,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
   String? _error;
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
-  String _containerFormat = 'container'; // Set to 'container' (generic) until selected or matched
+  String _containerFormat = 'container';
   
   final List<KeyfileRef> _keyfiles = [];
   bool _pickingKeyfiles = false;
@@ -146,30 +146,10 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _toggleStoragePermission(bool enable) async {
+  Future<void> _requestStoragePermission() async {
     const api = VaultExplorerApi();
-    
-    if (enable) {
-      final grant = await showAppConfirmDialog(
-        context,
-        title: 'Enable Fast Storage Access',
-        message: 'Granting "All Files Access" allows Vault Explorer to perform direct POSIX file operations, speeding up folder vault performance by up to 1000x.',
-        confirmLabel: 'Open Settings',
-      );
-      if (grant) {
-        await api.requestAllFilesAccess();
-      }
-    } else {
-      final revoke = await showAppConfirmDialog(
-        context,
-        title: 'Revoke Storage Access',
-        message: 'Android requires "All Files Access" to be turned off inside System Settings. Would you like to open Settings to turn it off?',
-        confirmLabel: 'Open Settings',
-      );
-      if (revoke) {
-        await api.requestAllFilesAccess();
-      }
-    }
+    await api.requestAllFilesAccess();
+    await _checkStoragePermission();
   }
 
   Future<void> _initUnlockMethod() async {
@@ -483,7 +463,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
         setState(() {
           _selectedUri = result.uri;
           _selectedName = result.displayName;
-          _containerFormat = 'container'; // Generic container icon until format is determined during unlock
+          _containerFormat = 'container';
           _error = null;
         });
         vaultExplorerApi.warmContainer(result.uri);
@@ -521,6 +501,21 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
     if (effectivePassword.isEmpty && preservedKey == null && _keyfiles.isEmpty) {
       setState(() => _error = 'Password or keyfiles required');
       return;
+    }
+
+    // CryFS Performance Warning Check on Unlock
+    if (_isCryfs && !_hasAllStorageAccess) {
+      final grant = await showAppConfirmDialog(
+        context,
+        title: 'Slow Performance Warning',
+        message: 'Direct Storage Access is currently disabled.\n\nCryFS stores files across thousands of small blocks. Opening non-empty CryFS vaults via Android SAF will be very slow.\n\nWould you like to open Settings to grant "All Files Access" for fast speed?',
+        confirmLabel: 'Open Settings',
+        cancelLabel: 'Unlock Anyway',
+      );
+      if (grant) {
+        await _requestStoragePermission();
+        return;
+      }
     }
 
     if (_isCryptomator || _isGocryptfs || _isCryfs) {
@@ -731,7 +726,6 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
             totalSpace: 0,
             freeSpace: 0,
             readOnly: _readOnly,
-            containerFormat: result.containerFormat,
           ),
           record: savedRecord,
         );
@@ -1153,33 +1147,17 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Fast Direct Storage Access Toggle (Folder Vaults) ──────
-                    if (_isFolderVault) ...[
-                      Material(
-                        color: cs.surfaceContainerHigh,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: SwitchListTile(
-                          value: _hasAllStorageAccess,
-                          onChanged: _loading ? null : (val) => _toggleStoragePermission(val),
-                          title: Text(
-                            'Fast Direct Storage Access',
-                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            _hasAllStorageAccess
-                                ? 'All Files Access granted (maximum speed)'
-                                : 'Grant All Files Access to prevent slow SAF transfers',
-                            style: textTheme.bodySmall?.copyWith(
-                              color: _hasAllStorageAccess ? cs.onSurfaceVariant : cs.error,
-                            ),
-                          ),
-                          secondary: Icon(
-                            _hasAllStorageAccess ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                            color: _hasAllStorageAccess ? cs.primary : cs.error,
-                          ),
+                    // ── Direct Storage Access Performance Warning Banner (Folder Vaults Only) ──
+                    if (_isFolderVault && !_hasAllStorageAccess) ...[
+                      InlineBanner(
+                        _isCryfs
+                            ? 'CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.'
+                            : 'Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.',
+                        tone: AppBannerTone.warning,
+                        icon: Icons.speed_rounded,
+                        trailing: TextButton(
+                          onPressed: _requestStoragePermission,
+                          child: const Text('Enable'),
                         ),
                       ),
                       const SizedBox(height: 16),

@@ -20,10 +20,11 @@ class AppSettingsScreen extends StatefulWidget {
   State<AppSettingsScreen> createState() => _AppSettingsScreenState();
 }
 
-class _AppSettingsScreenState extends State<AppSettingsScreen> {
+class _AppSettingsScreenState extends State<AppSettingsScreen> with WidgetsBindingObserver {
   AppSettings _settings = AppSettings();
   bool _loading = true;
   bool _saving = false;
+  bool _hasAllStorageAccess = false;
 
   bool _showPwFields = false;
   final _pwCtrl = TextEditingController();
@@ -52,14 +53,59 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pwCtrl.dispose();
     _pwConfirmCtrl.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkStoragePermission();
+    }
+  }
+
+  Future<void> _checkStoragePermission() async {
+    const api = VaultExplorerApi();
+    final hasAccess = await api.hasAllFilesAccess();
+    if (mounted) {
+      setState(() {
+        _hasAllStorageAccess = hasAccess;
+      });
+    }
+  }
+
+  Future<void> _toggleStoragePermission(bool enable) async {
+    const api = VaultExplorerApi();
+    
+    if (enable) {
+      final grant = await showAppConfirmDialog(
+        context,
+        title: 'Enable Fast Storage Access',
+        message: 'Granting "All Files Access" allows Vault Explorer to perform direct POSIX file operations, speeding up folder vault performance by up to 1000x.',
+        confirmLabel: 'Open Settings',
+      );
+      if (grant) {
+        await api.requestAllFilesAccess();
+      }
+    } else {
+      final revoke = await showAppConfirmDialog(
+        context,
+        title: 'Disable Storage Access',
+        message: 'Android requires "All Files Access" to be turned off inside System Settings. Would you like to open Settings to turn it off?',
+        confirmLabel: 'Open Settings',
+      );
+      if (revoke) {
+        await api.requestAllFilesAccess();
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -70,10 +116,15 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
           await _localAuth.canCheckBiometrics &&
           await _localAuth.isDeviceSupported();
     } catch (_) {}
+
+    const api = VaultExplorerApi();
+    final hasAccess = await api.hasAllFilesAccess();
+
     if (mounted) {
       setState(() {
         _settings = s;
         _biometricAvailable = bioAvail;
+        _hasAllStorageAccess = hasAccess;
         _loading = false;
       });
     }
@@ -544,9 +595,21 @@ class _AppSettingsScreenState extends State<AppSettingsScreen> {
                       children: [
                         const ExpressiveSectionHeader(
                           title: 'Vault & File Handling',
-                          subtitle: 'Document provider, thumbnails & file defaults',
+                          subtitle: 'Direct access, document provider & thumbnails',
                           icon: Icons.folder_shared_rounded,
                         ),
+                        SettingsToggleRow(
+                          icon: Icons.flash_on_rounded,
+                          title: 'Fast Direct Storage Access',
+                          subtitle: _hasAllStorageAccess
+                              ? 'All Files Access granted (maximum speed)'
+                              : 'Grant All Files Access in System Settings for optimal speed',
+                          value: _hasAllStorageAccess,
+                          onChanged: (v) => _toggleStoragePermission(v),
+                        ),
+
+                        const Divider(height: 28),
+
                         SettingsToggleRow(
                           icon: Icons.folder_shared_rounded,
                           title: 'Document Provider (default)',

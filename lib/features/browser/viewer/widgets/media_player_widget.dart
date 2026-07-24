@@ -15,14 +15,12 @@ class VideoPlaybackProgress {
   final Duration duration;
   final double sliderValue;
   final bool isDragging;
-
   const VideoPlaybackProgress({
     this.position = Duration.zero,
     this.duration = Duration.zero,
     this.sliderValue = 0.0,
     this.isDragging = false,
   });
-
   VideoPlaybackProgress copyWith({
     Duration? position,
     Duration? duration,
@@ -32,7 +30,6 @@ class VideoPlaybackProgress {
     final currentDragging = isDragging ?? this.isDragging;
     final currentDuration = duration ?? this.duration;
     final currentPosition = position ?? this.position;
-
     double computedSlider = 0.0;
     if (currentDragging) {
       computedSlider = sliderValue ?? this.sliderValue;
@@ -40,7 +37,6 @@ class VideoPlaybackProgress {
       computedSlider =
           currentPosition.inMilliseconds / currentDuration.inMilliseconds;
     }
-
     return VideoPlaybackProgress(
       position: currentPosition,
       duration: currentDuration,
@@ -61,6 +57,7 @@ class MediaPlayerWidget extends StatefulWidget {
   final bool autoPlay;
   final bool isAudio;
   final bool subtitlesEnabled;
+  final double playbackSpeed;
   final int rotationQuarterTurns;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
   final void Function(NativeVlcController controller, VoidCallback onEvicted)
@@ -69,12 +66,6 @@ class MediaPlayerWidget extends StatefulWidget {
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
   final bool isCurrent;
   final VoidCallback? onError;
-
-  /// A controller already constructed and initialized ahead of time (see
-  /// [VideoPlaybackManager.prewarm]). When provided and still valid, this
-  /// is adopted directly instead of constructing + initializing a new
-  /// [NativeVlcController], skipping the libVLC open/decode-start latency
-  /// on the swipe that lands on this widget.
   final NativeVlcController? existingController;
 
   const MediaPlayerWidget({
@@ -89,6 +80,7 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.autoPlay,
     required this.isAudio,
     required this.subtitlesEnabled,
+    required this.playbackSpeed,
     required this.rotationQuarterTurns,
     required this.onSubtitlesAvailableChanged,
     required this.onVideoControllerInitialized,
@@ -113,18 +105,15 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   bool _showRightIndicator = false;
   bool _isSpeedHeld = false;
   final GlobalKey _interactiveViewerKey = GlobalKey();
-
   Timer? _indicatorTimer;
   int _initToken = 0;
-
   final TransformationController _videoTransformationController =
       TransformationController();
-
   static const double _minZoomScale = 1.0;
   static const double _maxZoomScale = 2.2;
-
   double _videoScale = _minZoomScale;
   TapDownDetails? _videoDoubleTapDetails;
+  Size _lastKnownVideoSize = Size.zero;
 
   @override
   void initState() {
@@ -132,22 +121,24 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     _initPlayer();
   }
 
+  @override
+  void didUpdateWidget(covariant MediaPlayerWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_initialized && oldWidget.playbackSpeed != widget.playbackSpeed) {
+      _controller.setPlaybackSpeed(widget.playbackSpeed);
+    }
+  }
+
   Future<void> _initPlayer() async {
     final token = ++_initToken;
-
     final prewarmed = widget.existingController;
     if (prewarmed != null) {
-      // Adopt the already-initialized controller from VideoPlaybackManager
-      // instead of constructing + initializing a new one — this is the
-      // whole point of prewarm(): the expensive work already happened
-      // while the user was still looking at the previous item.
       _controller = prewarmed;
       _controller.addListener(_onControllerTick);
       try {
         final captionFile = await _loadCaptions(widget.fileName);
         if (token != _initToken || !mounted) return;
         _captionFile = captionFile;
-
         setState(() {
           _initialized = true;
           _playerError = null;
@@ -155,6 +146,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         widget.onVideoControllerInitialized(_controller, _handleEvicted);
         await _controller.setVolume(100);
         await _controller.setLooping(false);
+        await _controller.setPlaybackSpeed(widget.playbackSpeed);
         if (widget.autoPlay && widget.isCurrent) {
           _controller.play();
         }
@@ -172,19 +164,16 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       autoPlay: false,
     );
     _controller = controller;
-
     controller.addListener(_onControllerTick);
     try {
       final captionsFuture = _loadCaptions(widget.fileName);
       final initFuture = controller.initialize();
-
       final captionFile = await captionsFuture;
       if (token != _initToken || !mounted) {
         controller.dispose();
         return;
       }
       _captionFile = captionFile;
-
       await initFuture;
       if (token != _initToken || !mounted) {
         controller.dispose();
@@ -193,7 +182,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       if (controller.value.hasError) {
         throw Exception(controller.value.errorDescription);
       }
-
       setState(() {
         _initialized = true;
         _playerError = null;
@@ -201,6 +189,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       widget.onVideoControllerInitialized(controller, _handleEvicted);
       await controller.setVolume(100);
       await controller.setLooping(false);
+      await controller.setPlaybackSpeed(widget.playbackSpeed);
       if (widget.autoPlay && widget.isCurrent) {
         controller.play();
       }
@@ -227,7 +216,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   void _onControllerTick() {
     if (!mounted) return;
-
     if (_controller.value.hasError && _playerError == null) {
       setState(() {
         _playerError = _controller.value.errorDescription.isNotEmpty
@@ -237,8 +225,11 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       widget.onError?.call();
       return;
     }
-
     if (!_initialized || !widget.isCurrent) return;
+    if (_controller.value.size != _lastKnownVideoSize) {
+      _lastKnownVideoSize = _controller.value.size;
+      setState(() {});
+    }
     widget.progressNotifier.value = widget.progressNotifier.value.copyWith(
       position: _controller.value.position,
       duration: _controller.value.duration,
@@ -249,7 +240,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     final dotIndex = videoPath.lastIndexOf('.');
     if (dotIndex == -1) return null;
     final basePath = videoPath.substring(0, dotIndex);
-
     for (final ext in ['srt', 'vtt']) {
       final subPath = '$basePath.$ext';
       try {
@@ -278,11 +268,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     return null;
   }
 
-  /// Linear scan for the caption active at [position] — replicates the
-  /// lookup `video_player`'s `VideoPlayerValue.caption` used to do for us
-  /// internally. libVLC drives playback natively here, so there's no
-  /// controller-side caption plumbing to hook into; we track position
-  /// ourselves via [_onControllerTick] instead.
   String _captionTextAt(Duration position) {
     final file = _captionFile;
     if (file == null) return '';
@@ -304,7 +289,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     }
     widget.onVideoControllerDisposed();
     _videoTransformationController.dispose();
-
     if (_initialized) {
       final ctrl = _controller;
       try {
@@ -316,7 +300,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         });
       } catch (_) {}
     }
-
     super.dispose();
   }
 
@@ -329,7 +312,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   void _onSpeedHoldEnd(LongPressEndDetails _) {
     if (!_initialized) return;
-    _controller.setPlaybackSpeed(1.0);
+    _controller.setPlaybackSpeed(widget.playbackSpeed);
     setState(() => _isSpeedHeld = false);
   }
 
@@ -345,17 +328,13 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     if (widget.isAudio) return;
     final doubleTapDetails = _videoDoubleTapDetails;
     if (doubleTapDetails == null) return;
-
     final context = _interactiveViewerKey.currentContext;
     if (context == null || !context.mounted) return;
-
     final box = context.findRenderObject();
     if (box is! RenderBox) return;
-
     final double targetScale;
     final Matrix4 targetMatrix;
     final bool zoomIn = _videoScale == _minZoomScale;
-
     if (zoomIn) {
       targetScale = _maxZoomScale;
       if (box.hasSize) {
@@ -375,7 +354,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       targetScale = _minZoomScale;
       targetMatrix = Matrix4.identity();
     }
-
     setState(() {
       _videoScale = targetScale;
       _videoTransformationController.value = targetMatrix;
@@ -386,7 +364,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   Future<void> _skip({required bool backwards}) async {
     if (_isSeeking) return;
     _isSeeking = true;
-
     HapticFeedback.lightImpact();
     final currentPos = _controller.value.position;
     final duration = _controller.value.duration;
@@ -396,7 +373,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     final clampedPos = targetPos < Duration.zero
         ? Duration.zero
         : (targetPos > duration ? duration : targetPos);
-
     setState(() {
       if (backwards) {
         _showLeftIndicator = true;
@@ -404,12 +380,9 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         _showRightIndicator = true;
       }
     });
-
     await _controller.seekTo(clampedPos);
-
     if (!mounted) return;
     _isSeeking = false;
-
     _indicatorTimer?.cancel();
     _indicatorTimer = Timer(MediaViewerConstants.doubleTapIndicatorDelay, () {
       if (mounted) {
@@ -424,7 +397,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     if (_playerError != null) {
       return Center(
         child: Container(
@@ -458,7 +430,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       );
     }
 
-    if (!_initialized) {
+    final bool isVideoReady = widget.isAudio ||
+        (_controller.value.size.width > 0 && _controller.value.size.height > 0);
+
+    if (!_initialized || !isVideoReady) {
       return Center(
         child: CircularProgressIndicator(
           strokeWidth: 2.5,
@@ -704,7 +679,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 class _AudioVisualizer extends StatefulWidget {
   final bool isPlaying;
   const _AudioVisualizer({required this.isPlaying});
-
   @override
   State<_AudioVisualizer> createState() => _AudioVisualizerState();
 }

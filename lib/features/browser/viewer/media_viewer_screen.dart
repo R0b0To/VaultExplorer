@@ -173,27 +173,26 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _lastListenedController!.removeListener(_onControllerTickUpdate);
       } catch (_) {}
     }
-
     final controller = _playbackManager.activeController;
     _lastListenedController = controller;
-
     if (controller == null) {
       _videoProgressNotifier.value = const VideoPlaybackProgress();
+      _updateWakelock(false);
       return;
     }
-
     _videoProgressNotifier.value = const VideoPlaybackProgress();
     _playbackManager.pauseAllExcept(controller);
     controller.addListener(_onControllerTickUpdate);
+    controller.setPlaybackSpeed(_playbackSpeed);
+    _updateWakelock(controller.value.isPlaying);
   }
 
   void _onControllerTickUpdate() {
     final controller = _playbackManager.activeController;
     if (controller == null || controller.value.hasError) return;
-
+    _updateWakelock(controller.value.isPlaying);
     final isInitialized = controller.value.isInitialized;
     final progress = _videoProgressNotifier.value;
-
     if (isInitialized &&
         _videoPlaybackMode == VideoPlaybackMode.loop &&
         progress.duration > Duration.zero &&
@@ -786,7 +785,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                               },
                               onError: () => _handleMediaError(fileName),
                             )
-                          : MediaPlayerWidget(
+                          :MediaPlayerWidget(
                               key: _getMediaKey(fileName),
                               container: widget.container,
                               fileName: fileName,
@@ -799,6 +798,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                               autoPlay: false,
                               isAudio: isAudio,
                               subtitlesEnabled: _subtitlesEnabled,
+                              playbackSpeed: _playbackSpeed,
                               rotationQuarterTurns: _rotations[fileName] ?? 0,
                               progressNotifier: _videoProgressNotifier,
                               isCurrent: fileName == _playlistController.currentFile,
@@ -833,6 +833,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                               },
                               onError: () => _handleMediaError(fileName),
                             ),
+
                     );
                   },
                 ),
@@ -909,8 +910,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   videoPlaybackMode: _videoPlaybackMode,
                   onNavigateToPrev: _navigateToPrev,
                   onNavigateToNext: _navigateToNext,
-                  onTogglePlayPause: (wasPlaying) {
-                    _startHideTimer(); 
+                   onTogglePlayPause: (wasPlaying) {
+                    _startHideTimer();
                     if (isImg) {
                       _updatePlaybackMode(
                         wasPlaying ? VideoPlaybackMode.playOnce : VideoPlaybackMode.playAndAdvance,
@@ -918,13 +919,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     } else {
                       final controller = _playbackManager.activeController;
                       if (controller != null) {
-                        setState(() {
-                          if (controller.value.isPlaying) {
-                            controller.pause();
-                          } else {
-                            controller.play();
-                          }
-                        });
+                        if (controller.value.isPlaying) {
+                          controller.pause();
+                        } else {
+                          controller.play();
+                        }
                       }
                     }
                   },

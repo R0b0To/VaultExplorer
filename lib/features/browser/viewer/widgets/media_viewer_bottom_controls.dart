@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/native_vlc_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
 
-/// A sleek bottom controls overlay for the media viewer built with
-/// Android 16/17 (Material 3 Expressive) native design guidelines.
 class MediaViewerBottomControls extends StatelessWidget {
   final PlaylistController playlistController;
   final VideoPlaybackManager playbackManager;
@@ -54,13 +53,11 @@ class MediaViewerBottomControls extends StatelessWidget {
     this.onToggleCarousel,
   });
 
-  /// Formats the given duration safely to a string representation (e.g., 'hh:mm:ss' or 'mm:ss').
   String _formatDuration(Duration d) {
     final Duration absoluteDuration = d.isNegative ? -d : d;
     final String minutes = absoluteDuration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final String seconds = absoluteDuration.inSeconds.remainder(60).toString().padLeft(2, '0');
     final String sign = d.isNegative ? '-' : '';
-
     if (absoluteDuration.inHours > 0) {
       final String hours = absoluteDuration.inHours.toString().padLeft(2, '0');
       return '$sign$hours:$minutes:$seconds';
@@ -73,7 +70,6 @@ class MediaViewerBottomControls extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
-
     return Container(
       padding: EdgeInsets.only(
         left: 16,
@@ -124,7 +120,6 @@ class MediaViewerBottomControls extends StatelessWidget {
     );
   }
 
-  /// Builds the M3 Expressive video progress bar
   Widget _buildProgressBar(BuildContext context, ColorScheme cs) {
     return SizedBox(
       height: 36,
@@ -134,12 +129,8 @@ class MediaViewerBottomControls extends StatelessWidget {
           inactiveTrackColor: Colors.white24,
           trackHeight: 3,
           thumbColor: cs.primary,
-          thumbShape: const RoundSliderThumbShape(
-            enabledThumbRadius: 7,
-          ),
-          overlayShape: const RoundSliderOverlayShape(
-            overlayRadius: 14,
-          ),
+          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+          overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
           trackShape: const RectangularSliderTrackShape(),
         ),
         child: ValueListenableBuilder<VideoPlaybackProgress>(
@@ -147,7 +138,6 @@ class MediaViewerBottomControls extends StatelessWidget {
           builder: (context, progress, child) {
             final positionStr = _formatDuration(progress.position);
             final durationStr = _formatDuration(progress.duration);
-
             return Row(
               children: [
                 Text(
@@ -186,7 +176,6 @@ class MediaViewerBottomControls extends StatelessWidget {
                           final targetMs = durationMs > 0
                               ? (value * durationMs).toInt().clamp(0, durationMs)
                               : 0;
-
                           controller.seekTo(Duration(milliseconds: targetMs)).then((_) {
                             videoProgressNotifier.value =
                                 videoProgressNotifier.value.copyWith(isDragging: false);
@@ -295,7 +284,6 @@ class MediaViewerBottomControls extends StatelessWidget {
       IconData modeIcon;
       String modeTooltip;
       Color modeColor;
-
       switch (videoPlaybackMode) {
         case VideoPlaybackMode.playOnce:
           modeIcon = Icons.repeat_rounded;
@@ -313,7 +301,6 @@ class MediaViewerBottomControls extends StatelessWidget {
           modeColor = cs.primary;
           break;
       }
-
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -366,16 +353,45 @@ class MediaViewerBottomControls extends StatelessWidget {
 
   Widget _buildBottomTransportControls(ColorScheme cs) {
     if (isImage && !isPlaylistMode) return const SizedBox.shrink();
-
     final bool isFirst = playlistController.currentIndex == 0;
     final bool isLast =
         playlistController.currentIndex == playlistController.playlist.length - 1;
-    bool isPlayingState = autoAdvance;
 
-    if (!isImage) {
-      isPlayingState = playbackManager.activeController?.value.isPlaying ?? false;
-    }
+    return ValueListenableBuilder<NativeVlcController?>(
+      valueListenable: playbackManager.activeControllerNotifier,
+      builder: (context, activeCtrl, _) {
+        if (isImage || activeCtrl == null) {
+          final bool isPlayingState = isImage ? autoAdvance : false;
+          return _buildTransportRow(
+            cs: cs,
+            isFirst: isFirst,
+            isLast: isLast,
+            isPlayingState: isPlayingState,
+          );
+        }
 
+        return ValueListenableBuilder<NativeVlcValue>(
+          valueListenable: activeCtrl,
+          builder: (context, vlcValue, _) {
+            final bool isPlayingState = vlcValue.isPlaying;
+            return _buildTransportRow(
+              cs: cs,
+              isFirst: isFirst,
+              isLast: isLast,
+              isPlayingState: isPlayingState,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildTransportRow({
+    required ColorScheme cs,
+    required bool isFirst,
+    required bool isLast,
+    required bool isPlayingState,
+  }) {
     return IgnorePointer(
       ignoring: !showUI,
       child: AnimatedOpacity(
@@ -404,7 +420,6 @@ class MediaViewerBottomControls extends StatelessWidget {
               ),
               const SizedBox(width: 12),
             ],
-            // Hero Play / Pause Pill
             Semantics(
               label: isPlayingState ? 'Pause' : 'Play',
               button: true,
@@ -458,8 +473,6 @@ class MediaViewerBottomControls extends StatelessWidget {
   }
 }
 
-// ── Translucent M3 Media Overlay Button ──────────────────────────────────────
-
 class _CircleOverlayButton extends StatelessWidget {
   final IconData icon;
   final Color? iconColor;
@@ -467,7 +480,6 @@ class _CircleOverlayButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final double iconSize;
   final double containerSize;
-
   const _CircleOverlayButton({
     required this.icon,
     this.iconColor,
@@ -476,11 +488,9 @@ class _CircleOverlayButton extends StatelessWidget {
     this.iconSize = 20,
     this.containerSize = 40,
   });
-
   @override
   Widget build(BuildContext context) {
     final enabled = onPressed != null;
-
     return Tooltip(
       message: tooltip,
       child: SizedBox(

@@ -154,21 +154,24 @@ class VlcPlayerEngine(
         when (event.type) {
             MediaPlayer.Event.Opening -> post(mapOf("event" to "opening"))
 
-            MediaPlayer.Event.Playing -> {
-                val track = mediaPlayer.getCurrentVideoTrack()
-                Log.d(
-                    "VlcPlayerEngine",
-                    "Playing: codec=${track?.codec} originalCodec=${track?.originalCodec}",
-                )
-                post(
-                    mapOf(
-                        "event" to "playing",
-                        "width" to (track?.width ?: 0),
-                        "height" to (track?.height ?: 0),
-                        "durationMs" to mediaPlayer.getLength(),
-                    )
-                )
-            }
+MediaPlayer.Event.Playing -> {
+    val track = mediaPlayer.getCurrentVideoTrack()
+    Log.d(
+        "VlcPlayerEngine",
+        "Playing: codec=${track?.codec} originalCodec=${track?.originalCodec} size=${track?.width}x${track?.height}",
+    )
+    if (track != null && track.width > 0 && track.height > 0) {
+        applyVideoSize(track.width, track.height)
+    }
+    post(
+        mapOf(
+            "event" to "playing",
+            "width" to (track?.width ?: 0),
+            "height" to (track?.height ?: 0),
+            "durationMs" to mediaPlayer.getLength(),
+        )
+    )
+}
 
             MediaPlayer.Event.Paused -> post(mapOf("event" to "paused"))
             MediaPlayer.Event.Stopped -> post(mapOf("event" to "stopped"))

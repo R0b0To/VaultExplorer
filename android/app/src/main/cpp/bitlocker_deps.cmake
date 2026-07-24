@@ -12,7 +12,7 @@
 FetchContent_Declare(
     dislocker_upstream
     GIT_REPOSITORY https://github.com/Aorimn/dislocker.git
-    GIT_TAG        master
+    GIT_TAG        38dab03175cb5798d625375154e716665201bae1
 )
 FetchContent_GetProperties(dislocker_upstream)
 if(NOT dislocker_upstream_POPULATED)

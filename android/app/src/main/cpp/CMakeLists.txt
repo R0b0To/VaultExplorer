@@ -36,10 +36,11 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fatfs)
 
 # 3. Download Tuxera NTFS-3G (NTFS Filesystem Engine)
+
 FetchContent_Declare(
         ntfs3g
         GIT_REPOSITORY https://github.com/tuxera/ntfs-3g.git
-        GIT_TAG        edge
+        GIT_TAG        d327833ec1d5eb1358b6f2c37139f10a3460944d
 )
 FetchContent_MakeAvailable(ntfs3g)
 
@@ -447,21 +448,17 @@ target_link_libraries(
 if(NOT ANDROID)
     add_executable(sector_batching_test io/test/sector_batching_test.cpp)
     add_executable(fs_scan_test test/fs_scan_test.cpp)
-    # NOTE: cascade_test.cpp is referenced here but does not exist anywhere in
-    # this source tree (nor did it before this reorganization) -- this target
-    # has been failing to configure. Restore the missing test file, or remove
-    # this block, once that's resolved.
-    # add_executable(cascade_test test/cascade_test.cpp crypto/cascade.cpp crypto/cipher_shim.cpp
-    #                 ${VC_CRYPTO_DIR}/Twofish.c ${VC_CRYPTO_DIR}/Serpent.c
-    #                 ${VC_CRYPTO_DIR}/Camellia.c ${VC_CRYPTO_DIR}/kuznyechik.c
-    #                 ${VC_CRYPTO_DIR}/cpu.c ${VC_COMMON_DIR}/Endian.c
-    #                 ${VC_ARGON2_DIR}/src/argon2.c ${VC_ARGON2_DIR}/src/core.c
-    #                 ${VC_ARGON2_DIR}/src/ref.c ${VC_ARGON2_DIR}/src/opt_sse2.c
-    #                 ${VC_ARGON2_DIR}/src/opt_avx2.c ${VC_ARGON2_DIR}/src/blake2/blake2b.c)
+    # TODO(tech-debt): crypto/cascade.cpp + crypto/cipher_shim.cpp (the
+    # cipher-agnostic XTS + cascade chaining logic) has no test coverage.
+    # A prior cascade_test target referenced test/cascade_test.cpp, which
+    # didn't exist anywhere in this tree and was removed here rather than
+    # left as a permanently-broken commented-out block. Writing real
+    # coverage for cascade.cpp -- known-answer vectors per cipher, at
+    # minimum -- is tracked as follow-up work; don't re-add this target
+    # until that source file actually exists.
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)
     add_test(NAME fs_scan_test COMMAND fs_scan_test)
-    # add_test(NAME cascade_test COMMAND cascade_test)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
 endif()

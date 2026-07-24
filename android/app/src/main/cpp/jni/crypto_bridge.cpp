@@ -46,13 +46,19 @@ struct MdContextGuard {
 };
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMaxVolumesNative(JNIEnv*, jobject) {
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMaxVolumesNative(JNIEnv* env, jobject) {
+    JNI_TRY
+
     return static_cast<jint>(MAX_VOLUMES);
+
+    JNI_CATCH_RETURN(-1)
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getLastDerivedKeyMaterialNative(
         JNIEnv* env, jobject, jint volId) {
+    JNI_TRY
+
     if (volId < 0 || volId >= MAX_VOLUMES) return nullptr;
 
     VolumeState& v = volumes[volId];
@@ -63,12 +69,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getLastDerivedKeyMaterialNative(
     env->SetByteArrayRegion(result, 0, static_cast<jsize>(v.preservedDerivedKeyLen),
                             reinterpret_cast<const jbyte*>(v.preservedDerivedKey));
     return result;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jint cipherId, jint hashId, jintArray keyfileFds) {
+    JNI_TRY
+
     if (fd < 0 || password == nullptr) return nullptr;
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
@@ -117,6 +127,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
     env->SetByteArrayRegion(result, 0, 192, reinterpret_cast<jbyte*>(dKey));
     mbedtls_platform_zeroize(dKey, sizeof(dKey));
     return result;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 
@@ -128,6 +140,8 @@ extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_hashPasswordNative(
         JNIEnv* env, jobject,
         jstring password, jbyteArray salt, jint iterations) {
+    JNI_TRY
+
 
     if (password == nullptr || salt == nullptr) return nullptr;
 
@@ -166,6 +180,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_hashPasswordNative(
     env->ReleaseByteArrayElements(salt, saltData, JNI_ABORT);
 
     return result;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 
@@ -173,7 +189,9 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_hashPasswordNative(
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeFingerprint(
-        JNIEnv*, jobject, jint cascadeId) {
+        JNIEnv* env, jobject, jint cascadeId) {
+    JNI_TRY
+
     if (cascadeId < 0 || cascadeId >= 15) return -1;
     CascadeSpec spec = cascadeSpecFor(static_cast<CascadeId>(cascadeId));
     int packed = spec.layerCount * 1000;
@@ -182,16 +200,26 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeFingerprint(
         packed += layerVal * (i == 0 ? 100 : (i == 1 ? 10 : 1));
     }
     return packed;
+
+    JNI_CATCH_RETURN(-1)
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeIdCount(JNIEnv*, jobject) {
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeIdCount(JNIEnv* env, jobject) {
+    JNI_TRY
+
     return 15; // the eight legacy IDs plus the seven VeraCrypt 1.26.29 additions
+
+    JNI_CATCH_RETURN(-1)
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getHashIdCount(JNIEnv*, jobject) {
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getHashIdCount(JNIEnv* env, jobject) {
+    JNI_TRY
+
     return 6; // kSha512, kSha256, kWhirlpool, kStreebog, kBlake2s256, kArgon2id
+
+    JNI_CATCH_RETURN(-1)
 }
 
 
@@ -200,6 +228,8 @@ extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_gocryptfsEmeNative(
         JNIEnv* env, jobject,
         jbyteArray key, jbyteArray tweak, jbyteArray data, jboolean encrypt) {
+    JNI_TRY
+
     if (!key || !tweak || !data) return nullptr;
 
     jsize keyLen = env->GetArrayLength(key);
@@ -231,12 +261,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_gocryptfsEmeNative(
     jbyteArray result = env->NewByteArray(dataLen);
     env->SetByteArrayRegion(result, 0, dataLen, reinterpret_cast<const jbyte*>(out.data()));
     return result;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_sivEncryptNative(
         JNIEnv* env, jobject,
         jbyteArray encKey, jbyteArray macKey, jbyteArray plaintext, jobjectArray adArray) {
+    JNI_TRY
+
     if (!encKey || !macKey || !plaintext) return nullptr;
 
     jsize encKeyLen = env->GetArrayLength(encKey);
@@ -280,12 +314,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_sivEncryptNative(
     jbyteArray result = env->NewByteArray(out.size());
     env->SetByteArrayRegion(result, 0, out.size(), reinterpret_cast<const jbyte*>(out.data()));
     return result;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_sivDecryptNative(
         JNIEnv* env, jobject,
         jbyteArray encKey, jbyteArray macKey, jbyteArray ciphertext, jobjectArray adArray) {
+    JNI_TRY
+
     if (!encKey || !macKey || !ciphertext) return nullptr;
 
     jsize encKeyLen = env->GetArrayLength(encKey);
@@ -331,6 +369,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_sivDecryptNative(
     jbyteArray result = env->NewByteArray(out.size());
     env->SetByteArrayRegion(result, 0, out.size(), reinterpret_cast<const jbyte*>(out.data()));
     return result;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 
@@ -339,6 +379,8 @@ extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_scryptNative(
         JNIEnv* env, jobject,
         jbyteArray passphrase, jbyteArray salt, jint N, jint r, jint p, jint dkLen) {
+    JNI_TRY
+
 
     if (passphrase == nullptr || salt == nullptr || dkLen <= 0) return nullptr;
 
@@ -367,6 +409,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_scryptNative(
     mbedtls_platform_zeroize(out.data(), out.size());
 
     return result;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 
@@ -379,18 +423,24 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_scryptNative(
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsCipherIdNative(
         JNIEnv* env, jobject, jstring cipherName) {
+    JNI_TRY
+
     if (!cipherName) return -1;
     const char* name = env->GetStringUTFChars(cipherName, nullptr);
     CryfsCipherId id = cryfsCipherIdFromName(name);
     env->ReleaseStringUTFChars(cipherName, name);
     if (id == CryfsCipherId::kUnknown) return -1;
     return static_cast<jint>(id);
+
+    JNI_CATCH_RETURN(-1)
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsEncryptBlockNative(
         JNIEnv* env, jobject,
         jint cipherId, jbyteArray key, jbyteArray plaintext) {
+    JNI_TRY
+
     if (!key || !plaintext || cipherId < 0) return nullptr;
 
     jsize keyLen = env->GetArrayLength(key);
@@ -415,12 +465,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsEncryptBlockNative(
         env->SetByteArrayRegion(result, 0, out.size(), reinterpret_cast<const jbyte*>(out.data()));
     }
     return result;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsDecryptBlockNative(
         JNIEnv* env, jobject,
         jint cipherId, jbyteArray key, jbyteArray ciphertext) {
+    JNI_TRY
+
     if (!key || !ciphertext || cipherId < 0) return nullptr;
 
     jsize keyLen = env->GetArrayLength(key);
@@ -448,4 +502,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsDecryptBlockNative(
     }
     mbedtls_platform_zeroize(out.data(), out.size());
     return result;
+
+    JNI_CATCH_RETURN(nullptr)
 }

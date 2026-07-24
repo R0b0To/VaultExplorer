@@ -553,7 +553,10 @@ static bool prepareLuksSession(int fd, const unsigned char* password, size_t pas
         }
         v.dataCtxInitialized = true;
 
-        if (v.preservedDerivedKey) delete[] v.preservedDerivedKey;
+        if (v.preservedDerivedKey) {
+            mbedtls_platform_zeroize(v.preservedDerivedKey, v.preservedDerivedKeyLen);
+            delete[] v.preservedDerivedKey;
+        }
         v.preservedDerivedKey = new unsigned char[luksInfo.masterKey.size()];
         memcpy(v.preservedDerivedKey, luksInfo.masterKey.data(), luksInfo.masterKey.size());
         v.preservedDerivedKeyLen = luksInfo.masterKey.size();
@@ -901,7 +904,10 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
 
     {
         std::lock_guard<std::mutex> lock(v.mutex);
-        if (v.preservedDerivedKey) delete[] v.preservedDerivedKey;
+        if (v.preservedDerivedKey) {
+            mbedtls_platform_zeroize(v.preservedDerivedKey, v.preservedDerivedKeyLen);
+            delete[] v.preservedDerivedKey;
+        }
         v.preservedDerivedKey = new unsigned char[192];
         memcpy(v.preservedDerivedKey, dKey, 192); 
         v.preservedDerivedKeyLen = 192;
@@ -1061,7 +1067,10 @@ static bool prepareUsbLuksSession(uint64_t partitionStartSector, uint64_t partit
         }
         v.dataCtxInitialized = true;
 
-        if (v.preservedDerivedKey) delete[] v.preservedDerivedKey;
+        if (v.preservedDerivedKey) {
+            mbedtls_platform_zeroize(v.preservedDerivedKey, v.preservedDerivedKeyLen);
+            delete[] v.preservedDerivedKey;
+        }
         v.preservedDerivedKey = new unsigned char[luksInfo.masterKey.size()];
         memcpy(v.preservedDerivedKey, luksInfo.masterKey.data(), luksInfo.masterKey.size());
         v.preservedDerivedKeyLen = luksInfo.masterKey.size();

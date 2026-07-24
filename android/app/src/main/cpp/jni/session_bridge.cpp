@@ -26,6 +26,8 @@ static void throwUnlockCancelledException(JNIEnv* env) {
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
         JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds, jboolean readOnly) {
+    JNI_TRY
+
 
     clearUnlockCancellation(volId);
 
@@ -70,16 +72,24 @@ if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strl
     // Empty (non-null) array — preserves the existing "null == AUTH_FAIL"
     jclass strClass = env->FindClass("java/lang/String");
     return env->NewObjectArray(0, strClass, nullptr);
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_requestCancelUnlockNative(
-        JNIEnv*, jobject, jint volId) {
+        JNIEnv* env, jobject, jint volId) {
+    JNI_TRY
+
     requestUnlockCancellation(volId);
+
+    JNI_CATCH_VOID
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jint volId) {
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv* env, jobject, jint volId) {
+    JNI_TRY
+
     if (volId < 0 || volId >= MAX_VOLUMES) return;
 
     VolumeState& v = volumes[volId];
@@ -103,36 +113,54 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv*, jobject, jin
     v.reset();
 
     unmountVolume(volId);  
+
+    JNI_CATCH_VOID
 }
 
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedCipherId(JNIEnv*, jobject, jint volId) {
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedCipherId(JNIEnv* env, jobject, jint volId) {
+    JNI_TRY
+
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
     std::lock_guard<std::mutex> lock(volumes[volId].mutex);
     return volumes[volId].matchedCipherId;
+
+    JNI_CATCH_RETURN(-1)
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedHashId(JNIEnv*, jobject, jint volId) {
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedHashId(JNIEnv* env, jobject, jint volId) {
+    JNI_TRY
+
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
     std::lock_guard<std::mutex> lock(volumes[volId].mutex);
     return volumes[volId].matchedHashId;
+
+    JNI_CATCH_RETURN(-1)
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getContainerFormat(JNIEnv*, jobject, jint volId) {
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getContainerFormat(JNIEnv* env, jobject, jint volId) {
+    JNI_TRY
+
     if (volId < 0 || volId >= MAX_VOLUMES) return 0;
     std::lock_guard<std::mutex> lock(volumes[volId].mutex);
     return static_cast<jint>(volumes[volId].containerFormat);
+
+    JNI_CATCH_RETURN(-1)
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedPartitionOffset(JNIEnv*, jobject, jint volId) {
+Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedPartitionOffset(JNIEnv* env, jobject, jint volId) {
+    JNI_TRY
+
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
     std::lock_guard<std::mutex> lock(volumes[volId].mutex);
     if (!volumes[volId].isUsbSource) return -1;
     return static_cast<jlong>(volumes[volId].partitionStartSector);
+
+    JNI_CATCH_RETURN(-1)
 }
 
 
@@ -140,6 +168,8 @@ extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
         jlong partitionOffsetHint, jintArray keyfileFds, jboolean readOnly) {
+    JNI_TRY
+
 
     clearUnlockCancellation(volId);
 
@@ -187,4 +217,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
 
     jclass strClass = env->FindClass("java/lang/String");
     return env->NewObjectArray(0, strClass, nullptr);
+
+    JNI_CATCH_RETURN(nullptr)
 }

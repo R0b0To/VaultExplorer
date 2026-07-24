@@ -34,6 +34,8 @@ static constexpr size_t MAX_CHUNK_SIZE = 64 * 1024 * 1024;  // 64 MB per JNI rea
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectory(
         JNIEnv* env, jobject, jstring dirPath, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "listDirectory")) {
         throwNotUnlocked(env, volId, "listDirectory"); return nullptr;
     }
@@ -58,11 +60,15 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectory(
     }
     env->ReleaseStringUTFChars(dirPath, nativePath);
     return result;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSize(
         JNIEnv* env, jobject, jstring fileName, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "getFileSize")) {
         throwNotUnlocked(env, volId, "getFileSize"); return 0L;
     }
@@ -76,11 +82,15 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSize(
     }
     env->ReleaseStringUTFChars(fileName, targetName);
     return size;
+
+    JNI_CATCH_RETURN(-1)
 }
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSize(
         JNIEnv* env, jobject, jstring dirPath, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "getFolderSize")) {
         throwNotUnlocked(env, volId, "getFolderSize"); return 0L;
     }
@@ -94,12 +104,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSize(
     }
     env->ReleaseStringUTFChars(dirPath, nativePath);
     return total;
+
+    JNI_CATCH_RETURN(-1)
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunk(
         JNIEnv* env, jobject,
         jstring fileName, jlong offset, jint length, jint volId) {
+    JNI_TRY
+
     if (length <= 0 || static_cast<size_t>(length) > MAX_CHUNK_SIZE) return nullptr;
     if (!requireActiveSession(volId, "readFileChunk")) {
         throwNotUnlocked(env, volId, "readFileChunk"); return nullptr;
@@ -120,12 +134,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunk(
     }
     env->ReleaseStringUTFChars(fileName, targetName);
     return retArray;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
         JNIEnv* env, jobject,
         jstring fileName, jlong offset, jbyteArray data, jint volId) {
+    JNI_TRY
+
     jsize len = env->GetArrayLength(data);
     if (len <= 0 || static_cast<size_t>(len) > MAX_CHUNK_SIZE) return JNI_FALSE;
     if (!requireActiveSession(volId, "writeFileChunk")) {
@@ -147,12 +165,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
     env->ReleaseByteArrayElements(data, body, JNI_ABORT);
     env->ReleaseStringUTFChars(fileName, targetName);
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
         JNIEnv* env, jobject,
         jstring targetFileName, jstring sourcePath, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "writeBackFile")) {
         throwNotUnlocked(env, volId, "writeBackFile"); return JNI_FALSE;
     }
@@ -171,12 +193,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
     env->ReleaseStringUTFChars(targetFileName, targetName);
     env->ReleaseStringUTFChars(sourcePath, source);
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_extractFile(
         JNIEnv* env, jobject,
         jstring targetFileName, jstring destPath, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "extractFile")) {
         throwNotUnlocked(env, volId, "extractFile"); return JNI_FALSE;
     }
@@ -192,11 +218,15 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_extractFile(
     env->ReleaseStringUTFChars(targetFileName, targetName);
     env->ReleaseStringUTFChars(destPath, destination);
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
         JNIEnv* env, jobject, jstring targetFileName, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "deleteFile")) {
         throwNotUnlocked(env, volId, "deleteFile"); return JNI_FALSE;
     }
@@ -213,11 +243,15 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
         JNIEnv* env, jobject, jstring dirPath, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "createDirectory")) {
         throwNotUnlocked(env, volId, "createDirectory"); return JNI_FALSE;
     }
@@ -234,12 +268,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
     }
     env->ReleaseStringUTFChars(dirPath, nativePath);
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
         JNIEnv* env, jobject,
         jstring oldPath, jstring newPath, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "renameFile")) {
         throwNotUnlocked(env, volId, "renameFile"); return JNI_FALSE;
     }
@@ -258,12 +296,16 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
     env->ReleaseStringUTFChars(oldPath, nativeOld);
     env->ReleaseStringUTFChars(newPath, nativeNew);
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_setLastModifiedTime(
         JNIEnv* env, jobject,
         jstring path, jlong epochSeconds, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "setLastModifiedTime")) {
         throwNotUnlocked(env, volId, "setLastModifiedTime"); return JNI_FALSE;
     }
@@ -280,11 +322,15 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_setLastModifiedTime(
     }
     env->ReleaseStringUTFChars(path, nativePath);
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
         JNIEnv* env, jobject, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "getSpaceInfo")) {
         throwNotUnlocked(env, volId, "getSpaceInfo"); return nullptr;
     }
@@ -300,11 +346,15 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
     const jlong tmp[2] = {static_cast<jlong>(totalBytes), static_cast<jlong>(freeBytes)};
     env->SetLongArrayRegion(ret, 0, 2, tmp);
     return ret;
+
+    JNI_CATCH_RETURN(nullptr)
 }
 
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_openStream(
         JNIEnv* env, jobject, jstring targetFileName, jint volId) {
+    JNI_TRY
+
     if (!requireActiveSession(volId, "openStream")) {
         throwNotUnlocked(env, volId, "openStream"); return 0L;
     }
@@ -318,6 +368,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_openStream(
     }
     env->ReleaseStringUTFChars(targetFileName, targetName);
     return streamPtr;
+
+    JNI_CATCH_RETURN(-1)
 }
 
 // Note: unlike every other function above, this doesn't call ensureMounted()
@@ -329,6 +381,8 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStream(
         JNIEnv* env, jobject,
         jlong streamPtr, jlong offset, jbyteArray outBuffer, jint length, jint volId) {
+    JNI_TRY
+
     if (streamPtr == 0 || length <= 0) return -1;
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
 
@@ -341,14 +395,20 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStream(
                                                      static_cast<size_t>(length)));
     env->ReleaseByteArrayElements(outBuffer, destBuf, 0);
     return bytesRead;
+
+    JNI_CATCH_RETURN(-1)
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
         JNIEnv* env, jobject, jlong streamPtr, jint volId) {
+    JNI_TRY
+
     if (streamPtr == 0) return;
     if (volId < 0 || volId >= MAX_VOLUMES) return;
 
     std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
     fsCloseStream(volId, reinterpret_cast<void*>(streamPtr));
+
+    JNI_CATCH_VOID
 }

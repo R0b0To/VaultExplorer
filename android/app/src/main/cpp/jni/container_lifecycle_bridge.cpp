@@ -17,6 +17,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
         jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds) {
+    JNI_TRY
+
 
     std::vector<int> kfFds = extractKeyfileFds(env, keyfileFds);
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
@@ -40,6 +42,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
     env->ReleaseStringUTFChars(fileSystem, nativeFS);
 
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -51,6 +55,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerWithHiddenNative(
         jint outerCipherId, jint outerHashId,
         jint hiddenCipherId, jint hiddenHashId,
         jintArray outerKeyfileFds, jintArray hiddenKeyfileFds) {
+    JNI_TRY
+
 
     std::vector<int> outerKfFds = extractKeyfileFds(env, outerKeyfileFds);
     std::vector<int> hiddenKfFds = extractKeyfileFds(env, hiddenKeyfileFds);
@@ -73,6 +79,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerWithHiddenNative(
     env->ReleaseStringUTFChars(hiddenFileSystem, nativeHiddenFS);
 
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 #include "partition_writer.h"
@@ -82,6 +90,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createUsbContainerNative(
         JNIEnv* env, jobject,
         jint volId, jstring partitionScheme, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
         jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds, jboolean quickFormat) {
+    JNI_TRY
+
 
     if (volId < 0 || volId >= MAX_VOLUMES) return JNI_FALSE;
 
@@ -116,6 +126,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createUsbContainerNative(
     env->ReleaseStringUTFChars(password, nativePass);
     env->ReleaseStringUTFChars(fileSystem, nativeFS);
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -127,6 +139,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createUsbContainerWithHiddenNati
         jstring outerFileSystem, jstring hiddenFileSystem, jlong hiddenSizeBytes,
         jint outerCipherId, jint outerHashId, jint hiddenCipherId, jint hiddenHashId,
         jintArray outerKeyfileFds, jintArray hiddenKeyfileFds, jboolean quickFormat) {
+    JNI_TRY
+
 
     if (volId < 0 || volId >= MAX_VOLUMES) return JNI_FALSE;
 
@@ -164,6 +178,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createUsbContainerWithHiddenNati
     env->ReleaseStringUTFChars(hiddenFileSystem, nativeHiddenFS);
 
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -172,6 +188,8 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_changeContainerPasswordNative(
         jint fd, jstring oldPassword, jstring newPassword,
         jint oldPim, jint newPim,
         jint cipherId, jint hashId, jintArray oldKeyfileFds, jintArray newKeyfileFds) {
+    JNI_TRY
+
 
     std::vector<int> oldKfFds = extractKeyfileFds(env, oldKeyfileFds);
     std::vector<int> newKfFds = extractKeyfileFds(env, newKeyfileFds);
@@ -188,4 +206,6 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_changeContainerPasswordNative(
     env->ReleaseStringUTFChars(newPassword, nativeNewPass);
 
     return success ? JNI_TRUE : JNI_FALSE;
+
+    JNI_CATCH_RETURN(JNI_FALSE)
 }

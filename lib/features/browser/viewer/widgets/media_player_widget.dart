@@ -430,8 +430,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       );
     }
 
-    final bool isVideoReady = widget.isAudio ||
-        (_controller.value.size.width > 0 && _controller.value.size.height > 0);
+    final bool isVideoReady = widget.isAudio || (_controller.value.size.width > 0 && _controller.value.size.height > 0);
 
     if (!_initialized || !isVideoReady) {
       return Center(

@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3;
 import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart';
+import 'package:video_player/video_player.dart'
+show ClosedCaptionFile, SubRipCaptionFile, WebVTTCaptionFile, ClosedCaption;
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/native_vlc_controller.dart';
 
 class VideoPlaybackProgress {
   final Duration position;
@@ -61,7 +63,7 @@ class MediaPlayerWidget extends StatefulWidget {
   final bool subtitlesEnabled;
   final int rotationQuarterTurns;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
-  final void Function(VideoPlayerController controller, VoidCallback onEvicted)
+  final void Function(NativeVlcController controller, VoidCallback onEvicted)
       onVideoControllerInitialized;
   final VoidCallback onVideoControllerDisposed;
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
@@ -71,9 +73,9 @@ class MediaPlayerWidget extends StatefulWidget {
   /// A controller already constructed and initialized ahead of time (see
   /// [VideoPlaybackManager.prewarm]). When provided and still valid, this
   /// is adopted directly instead of constructing + initializing a new
-  /// [VideoPlayerController], skipping the MediaCodec/content-URI startup
-  /// latency on the swipe that lands on this widget.
-  final VideoPlayerController? existingController;
+  /// [NativeVlcController], skipping the libVLC open/decode-start latency
+  /// on the swipe that lands on this widget.
+  final NativeVlcController? existingController;
 
   const MediaPlayerWidget({
     super.key,
@@ -102,9 +104,10 @@ class MediaPlayerWidget extends StatefulWidget {
 }
 
 class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
-  late VideoPlayerController _controller;
+  late NativeVlcController _controller;
   bool _initialized = false;
   String? _playerError;
+  ClosedCaptionFile? _captionFile;
   bool _isSeeking = false;
   bool _showLeftIndicator = false;
   bool _showRightIndicator = false;
@@ -143,16 +146,14 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       try {
         final captionFile = await _loadCaptions(widget.fileName);
         if (token != _initToken || !mounted) return;
-        if (captionFile != null) {
-          _controller.setClosedCaptionFile(Future.value(captionFile));
-        }
+        _captionFile = captionFile;
 
         setState(() {
           _initialized = true;
           _playerError = null;
         });
         widget.onVideoControllerInitialized(_controller, _handleEvicted);
-        await _controller.setVolume(1.0);
+        await _controller.setVolume(100);
         await _controller.setLooping(false);
         if (widget.autoPlay && widget.isCurrent) {
           _controller.play();
@@ -166,7 +167,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       return;
     }
 
-    final controller = VideoPlayerController.contentUri(Uri.parse(widget.contentUriString));
+    final controller = NativeVlcController(
+      contentUriString: widget.contentUriString,
+      autoPlay: false,
+    );
     _controller = controller;
 
     controller.addListener(_onControllerTick);
@@ -179,14 +183,15 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         controller.dispose();
         return;
       }
-      if (captionFile != null) {
-        controller.setClosedCaptionFile(Future.value(captionFile));
-      }
+      _captionFile = captionFile;
 
       await initFuture;
       if (token != _initToken || !mounted) {
         controller.dispose();
         return;
+      }
+      if (controller.value.hasError) {
+        throw Exception(controller.value.errorDescription);
       }
 
       setState(() {
@@ -194,7 +199,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         _playerError = null;
       });
       widget.onVideoControllerInitialized(controller, _handleEvicted);
-      await controller.setVolume(1.0);
+      await controller.setVolume(100);
       await controller.setLooping(false);
       if (widget.autoPlay && widget.isCurrent) {
         controller.play();
@@ -221,7 +226,19 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   }
 
   void _onControllerTick() {
-    if (!mounted || !_initialized || !widget.isCurrent) return;
+    if (!mounted) return;
+
+    if (_controller.value.hasError && _playerError == null) {
+      setState(() {
+        _playerError = _controller.value.errorDescription.isNotEmpty
+            ? _controller.value.errorDescription
+            : 'Media stream initialization failed';
+      });
+      widget.onError?.call();
+      return;
+    }
+
+    if (!_initialized || !widget.isCurrent) return;
     widget.progressNotifier.value = widget.progressNotifier.value.copyWith(
       position: _controller.value.position,
       duration: _controller.value.duration,
@@ -259,6 +276,22 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     }
     widget.onSubtitlesAvailableChanged(false);
     return null;
+  }
+
+  /// Linear scan for the caption active at [position] — replicates the
+  /// lookup `video_player`'s `VideoPlayerValue.caption` used to do for us
+  /// internally. libVLC drives playback natively here, so there's no
+  /// controller-side caption plumbing to hook into; we track position
+  /// ourselves via [_onControllerTick] instead.
+  String _captionTextAt(Duration position) {
+    final file = _captionFile;
+    if (file == null) return '';
+    for (final caption in file.captions) {
+      if (position >= caption.start && position <= caption.end) {
+        return caption.text;
+      }
+    }
+    return '';
   }
 
   @override
@@ -452,7 +485,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             else
               RotatedBox(
                 quarterTurns: widget.rotationQuarterTurns,
-                child: VideoPlayer(_controller),
+                child: NativeVlcPlayerView(controller: _controller),
               ),
             if (!widget.isAudio && widget.subtitlesEnabled)
               Positioned(
@@ -463,7 +496,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                   valueListenable: widget.progressNotifier,
                   builder: (context, progress, child) {
                     return ClosedCaption(
-                      text: _controller.value.caption.text,
+                      text: _captionTextAt(progress.position),
                       textStyle: const TextStyle(
                         fontSize: 15,
                         color: Colors.white,

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart';
+import 'package:vaultexplorer/features/browser/viewer/native_vlc_controller.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -84,7 +84,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   
   final Map<String, GlobalKey> _mediaKeys = {};
 
-  VideoPlayerController? _lastListenedController;
+  NativeVlcController? _lastListenedController;
   bool _wakelockEnabled = false;
 
   int _transitionToken = 0;
@@ -211,7 +211,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
-  Future<void> _manualLoop(VideoPlayerController controller) async {
+  Future<void> _manualLoop(NativeVlcController controller) async {
     try {
       await controller.pause();
       await controller.seekTo(Duration.zero);
@@ -933,7 +933,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     HapticFeedback.lightImpact();
                     _startHideTimer(); 
                     setState(() => _isMuted = !_isMuted);
-                    _playbackManager.activeController?.setVolume(_isMuted ? 0.0 : 1.0);
+                    _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
                   },
                   onAdvancedSettingsPressed: () => _showAdvancedSettings(context, isImg),
                   onStartHideTimer: _startHideTimer,

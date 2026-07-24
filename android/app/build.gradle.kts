@@ -8,7 +8,6 @@ if (keystorePropertiesFile.exists()) {
 
 plugins {
     id("com.android.application")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -28,14 +27,19 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-   defaultConfig {
+    packaging {
+        jniLibs {
+            pickFirsts += "lib/**/libc++_shared.so"
+        }
+    }
+
+    defaultConfig {
         applicationId = "com.aeidolon.vaultexplorer"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        
         externalNativeBuild {
             cmake {
                 arguments("-DCMAKE_BUILD_TYPE=Release")
@@ -48,9 +52,9 @@ android {
     if (keystorePropertiesFile.exists()) {
         signingConfigs {
             create("release") {
-                keyAlias      = keystoreProperties["keyAlias"]      as String
-                keyPassword   = keystoreProperties["keyPassword"]   as String
-                storeFile     = file(keystoreProperties["storeFile"] as String)
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
             }
         }
@@ -58,14 +62,16 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists())
+            signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
-            else
+            } else {
                 signingConfigs.getByName("debug")
+            }
 
-                proguardFiles(
+            proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro")
+                "proguard-rules.pro"
+            )
         }
     }
 }
@@ -82,5 +88,6 @@ flutter {
 
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("org.videolan.android:libvlc-all:3.6.3")
     testImplementation("junit:junit:4.13.2")
 }

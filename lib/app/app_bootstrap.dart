@@ -2,39 +2,23 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/services.dart';
-import 'package:fvp/fvp.dart' as fvp;
 import 'package:path_provider/path_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
-/// One-time platform/video-backend wiring that must happen before [runApp]
-/// — system UI mode, a filter for a couple of known-benign platform errors,
-/// and registering the `fvp` video backend.
 
 void configurePlatformIntegrations() {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   PlatformDispatcher.instance.onError = (error, stack) {
     final errStr = error.toString();
-    if (errStr.contains('Cannot add event after closing') ||
-        errStr.contains('video_player_mdk')) {
+    if (errStr.contains('Cannot add event after closing')) {
       return true;
     }
     return false;
   };
-
-  fvp.registerWith(
-    options: {
-      'platforms': ['android'],
-      'video.decoders': [
-        'AMediaCodec',
-        'FFmpeg',      
-      ],
-      'fastSeek': true,
-    },
-  );
 }
 
 /// Settings load, secure-screen setup, package info, and temp-file cleanup —

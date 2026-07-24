@@ -158,11 +158,15 @@ class MainActivity : FlutterFragmentActivity() {
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
 
+    private var vlcPlayerPlugin: com.aeidolon.vaultexplorer.vlcplayer.VlcPlayerPlugin? = null
+
     override fun onDestroy() {
         chooserReceiver?.let { unregisterReceiver(it) }
         usbPermissionReceiver?.let { unregisterReceiver(it) }
         usbDetachReceiver?.let { unregisterReceiver(it) }
         screenOffReceiver?.let { unregisterReceiver(it) }
+        vlcPlayerPlugin?.disposeAll()
+        vlcPlayerPlugin = null
         super.onDestroy()
     }
 
@@ -847,6 +851,12 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        vlcPlayerPlugin = com.aeidolon.vaultexplorer.vlcplayer.VlcPlayerPlugin(
+            applicationContext,
+            flutterEngine.dartExecutor.binaryMessenger,
+            flutterEngine.renderer,
+        )
 
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel

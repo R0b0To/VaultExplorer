@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
-import 'package:video_player/video_player.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/features/browser/viewer/native_vlc_controller.dart';
 
 class VideoPlaybackManager {
-  final Map<String, VideoPlayerController> _controllers = {};
+  final Map<String, NativeVlcController> _controllers = {};
   final Map<String, bool> _subtitlesAvailableMap = {};
 
   final Map<String, VoidCallback> _evictionCallbacks = {};
@@ -12,22 +12,28 @@ class VideoPlaybackManager {
   // the same neighbor doesn't kick off a second concurrent initialize().
   final Set<String> _prewarmingActive = {};
 
-  final ValueNotifier<VideoPlayerController?> activeControllerNotifier =
-      ValueNotifier<VideoPlayerController?>(null);
+  final ValueNotifier<NativeVlcController?> activeControllerNotifier =
+      ValueNotifier<NativeVlcController?>(null);
 
-  VideoPlayerController? get activeController => activeControllerNotifier.value;
+  NativeVlcController? get activeController => activeControllerNotifier.value;
 
-  VideoPlayerController? getController(String fileName) => _controllers[fileName];
+  NativeVlcController? getController(String fileName) => _controllers[fileName];
 
   /// True if [fileName] already has a controller (warm or active) — lets
   /// [MediaPlayerWidget] check whether to adopt an existing controller
   /// instead of constructing + initializing a new one.
   bool hasController(String fileName) => _controllers.containsKey(fileName);
 
-  /// Begins constructing and initializing a [VideoPlayerController] for
+  /// Begins constructing and initializing a [NativeVlcController] for
   /// [fileName] ahead of the user actually swiping to it, so the expensive
-  /// MediaCodec/content-URI startup work is already done (or in flight) by
-  /// the time [MediaPlayerWidget] builds for real.
+  /// libVLC open/decode-start work is already done (or in flight) by the
+  /// time [MediaPlayerWidget] builds for real.
+  ///
+  /// [NativeVlcController.initialize] creates its native player + Flutter
+  /// texture immediately (it isn't tied to a widget mounting the way
+  /// `flutter_vlc_player`'s controller is), so this genuinely hides that
+  /// latency behind however long the user spends on the previous item —
+  /// the same as the original `video_player`-based prewarm did.
   ///
   /// No-ops if a controller already exists for [fileName] (warm, active, or
   /// otherwise) or a prewarm for it is already in flight. The controller is
@@ -43,8 +49,10 @@ class VideoPlaybackManager {
     if (_prewarmingActive.contains(fileName)) return;
 
     _prewarmingActive.add(fileName);
-    final controller =
-        VideoPlayerController.contentUri(Uri.parse(contentUriString));
+    final controller = NativeVlcController(
+      contentUriString: contentUriString,
+      autoPlay: false,
+    );
     try {
       await controller.initialize();
       // The user may have swiped elsewhere while this was initializing —
@@ -54,7 +62,7 @@ class VideoPlaybackManager {
         await controller.dispose();
         return;
       }
-      await controller.setVolume(0.0);
+      await controller.setVolume(0);
       await controller.pause();
 
       _evictDistantControllers(playlist, currentIndex, keep: fileName);
@@ -72,7 +80,7 @@ class VideoPlaybackManager {
 
   void registerController({
     required String fileName,
-    required VideoPlayerController controller,
+    required NativeVlcController controller,
     required bool currentFocus,
     required List<String> playlist,
     required int currentIndex,
@@ -84,7 +92,7 @@ class VideoPlaybackManager {
     if (existing != null && existing != controller) {
       _disposeControllerSafely(existing);
     }
-    
+
     _controllers[fileName] = controller;
     if (onEvicted != null) {
       _evictionCallbacks[fileName] = onEvicted;
@@ -105,7 +113,7 @@ class VideoPlaybackManager {
     activeControllerNotifier.value = _controllers[fileName];
   }
 
-  void pauseAllExcept(VideoPlayerController keepActive) {
+  void pauseAllExcept(NativeVlcController keepActive) {
     for (final ctrl in _controllers.values) {
       if (ctrl != keepActive) {
         try {
@@ -124,7 +132,7 @@ class VideoPlaybackManager {
     }
   }
 
-  void _disposeControllerSafely(VideoPlayerController ctrl) {
+  void _disposeControllerSafely(NativeVlcController ctrl) {
     try {
       ctrl.pause();
       Future.delayed(const Duration(milliseconds: 150), () async {

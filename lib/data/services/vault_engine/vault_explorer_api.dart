@@ -271,4 +271,4 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
   }
 }
 
-final vaultExplorerApi = VaultExplorerApi();
+VaultExplorerApi vaultExplorerApi = const VaultExplorerApi();

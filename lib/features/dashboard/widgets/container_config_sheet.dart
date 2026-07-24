@@ -7,7 +7,6 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
@@ -15,7 +14,6 @@ import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
-import 'package:vaultexplorer/core/widgets/cards/expressive_card.dart';
 
 class ContainerConfigScreen extends StatefulWidget {
   final String uri;
@@ -49,18 +47,18 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   ThumbnailCacheMode? _thumbnailCacheMode;
   ThumbnailQuality? _thumbnailQuality;
   bool _cacheDerivedKey = false;
-  int _cipherId = 255; // Auto
-  int _hashId = 255; // Auto
+  int _cipherId = 255;
+  int _hashId = 255;
   String? _patternHash;
   bool _biometricAvailable = false;
   late bool _settingsLocked;
   bool _changePassword = false;
 
-  /// Format getters for format-specific UI branching
   String get _containerFormat =>
       widget.existingRecord?.containerFormat ??
       widget.mountedContainer?.containerFormat ??
       'veracrypt';
+
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(_containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(_containerFormat);
   bool get _isCryfs => ContainerFormat.isCryfsWire(_containerFormat);
@@ -68,8 +66,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
 
   bool _saving = false;
   bool _loadingPassword = true;
-
-  // --- Initial state trackers (used to determine if edits occurred) ---
   late String _initialLabel;
   late ContainerUnlockMethod _initialUnlockMethod;
   late int _initialAutoCloseMins;
@@ -87,27 +83,25 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   void initState() {
     super.initState();
     final rec = widget.existingRecord;
-
     _initialLabel = rec?.label.isNotEmpty == true ? rec!.label : widget.currentLabel;
     _initialUnlockMethod = rec?.unlockMethod ?? ContainerUnlockMethod.password;
     _initialAutoCloseMins = rec?.autoCloseMins ?? 0;
-    _initialDocumentProvider = rec?.documentProvider ?? widget.appSettings?.defaultDocumentProvider ?? false;
+    _initialDocumentProvider =
+        rec?.documentProvider ?? widget.appSettings?.defaultDocumentProvider ?? false;
     _initialCipherId = rec?.cipherId ?? 255;
     _initialHashId = rec?.hashId ?? 255;
     _initialCacheDerivedKey = rec?.cacheDerivedKey;
-
     _labelCtrl = TextEditingController(text: _initialLabel);
     _passwordCtrl = TextEditingController();
-
     _labelCtrl.addListener(() => setState(() {}));
-
     _unlockMethod = _initialUnlockMethod;
     _showPassword = false;
     _autoCloseMins = _initialAutoCloseMins;
     _documentProvider = _initialDocumentProvider;
     _thumbnailCacheMode = rec?.thumbnailCacheMode;
     _thumbnailQuality = rec?.thumbnailQuality;
-    _cacheDerivedKey = rec?.cacheDerivedKey ?? widget.appSettings?.defaultDerivedKeyCacheEnabled ?? false;
+    _cacheDerivedKey =
+        rec?.cacheDerivedKey ?? widget.appSettings?.defaultDerivedKeyCacheEnabled ?? false;
     _cipherId = _initialCipherId;
     _hashId = _initialHashId;
     _settingsLocked = rec != null;
@@ -118,15 +112,12 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
 
   Future<void> _clearThumbnailCache() async {
     setState(() => _clearingCache = true);
-    
     bool appCacheCleared = false;
     bool containerCacheCleared = false;
     bool isLocked = false;
-
     try {
       await ThumbnailCacheService.clearAppCacheByUri(widget.uri);
       appCacheCleared = true;
-
       await ThumbnailCacheService.clearInContainerCacheByUri(widget.uri);
       containerCacheCleared = true;
     } on PlatformException catch (e) {
@@ -137,7 +128,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     } finally {
       if (mounted) {
         setState(() => _clearingCache = false);
-        
         if (isLocked) {
           showAppSnackBar(
             context,
@@ -173,17 +163,14 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
       _biometricAvailable = await localAuth.canCheckBiometrics &&
           await localAuth.isDeviceSupported();
     } catch (_) {}
-
     try {
       final settings = widget.appSettings ?? await AppSettingsService.loadSettings();
       if (mounted) {
         setState(() {
           _thumbnailCacheMode ??= settings.defaultThumbnailCacheMode;
           _initialThumbnailCacheMode = _thumbnailCacheMode;
-
           _thumbnailQuality ??= settings.defaultThumbnailQuality;
           _initialThumbnailQuality = _thumbnailQuality;
-
           if (widget.appSettings == null && widget.existingRecord == null) {
             _cacheDerivedKey = settings.defaultDerivedKeyCacheEnabled;
           }
@@ -198,12 +185,10 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
         });
       }
     }
-
     if (_unlockMethod == ContainerUnlockMethod.pattern) {
       _patternHash = await ContainerRepository.instance.getPatternHash(widget.uri);
       _initialPatternHash = _patternHash;
     }
-
     if (mounted) setState(() => _loadingPassword = false);
   }
 
@@ -216,7 +201,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
 
   bool get _isModified {
     if (widget.existingRecord == null) return true;
-
     if (_labelCtrl.text.trim() != _initialLabel) return true;
     if (_unlockMethod != _initialUnlockMethod) return true;
     if (_autoCloseMins != _initialAutoCloseMins) return true;
@@ -228,7 +212,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     if (_hashId != _initialHashId) return true;
     if (_changePassword) return true;
     if (_patternHash != _initialPatternHash) return true;
-
     return false;
   }
 
@@ -255,17 +238,13 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
       );
       return;
     }
-
     setState(() => _saving = true);
-
     final label = _labelCtrl.text.trim().isEmpty
         ? widget.currentLabel
         : _labelCtrl.text.trim();
-
     final needsPassword = _unlockMethodNeedsPassword;
     final shouldSavePassword =
         needsPassword && (_wasPasswordless || _changePassword);
-
     final record = ContainerRecord(
       uri: widget.uri,
       label: label,
@@ -288,7 +267,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     if (!_cacheDerivedKey) {
       await vaultExplorerApi.clearDerivedKey(widget.uri);
     }
-
     widget.onSaved(record);
     if (mounted) Navigator.pop(context);
   }
@@ -307,7 +285,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   Future<void> _authenticateSettings() async {
     final record = widget.existingRecord;
     if (record == null) return;
-
     if (record.unlockMethod == ContainerUnlockMethod.biometrics) {
       try {
         final localAuth = LocalAuthentication();
@@ -372,35 +349,230 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     }
   }
 
+  Widget _buildSectionGroup({required List<Widget> children}) {
+    if (children.isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: List.generate(children.length, (index) {
+        final isFirst = index == 0;
+        final isLast = index == children.length - 1;
+        final isOnly = children.length == 1;
+
+        BorderRadius radius;
+        if (isOnly) {
+          radius = BorderRadius.circular(20);
+        } else if (isFirst) {
+          radius = const BorderRadius.vertical(
+            top: Radius.circular(20),
+            bottom: Radius.circular(4),
+          );
+        } else if (isLast) {
+          radius = const BorderRadius.vertical(
+            top: Radius.circular(4),
+            bottom: Radius.circular(20),
+          );
+        } else {
+          radius = BorderRadius.circular(4);
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
+          child: Material(
+            color: cs.surfaceContainerHigh,
+            borderRadius: radius,
+            clipBehavior: Clip.antiAlias,
+            child: ListTileTheme(
+              tileColor: Colors.transparent,
+              child: children[index],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 6),
+      child: Text(
+        title,
+        style: textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: cs.primary,
+          letterSpacing: -0.1,
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildSelectTile<T>({
+    required String label,
+    required T value,
+    required List<_SelectOption<T>> options,
+    required ValueChanged<T> onChanged,
+    String? subtitle,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final currentOption = options.firstWhere(
+      (opt) => opt.value == value,
+      orElse: () => options.first,
+    );
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      title: Text(
+        label,
+        style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: cs.primaryContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              currentOption.label,
+              style: textTheme.labelMedium?.copyWith(
+                color: cs.onPrimaryContainer,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              style: textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                height: 1.25,
+              ),
+            ),
+          ],
+        ],
+      ),
+      onTap: () {
+        showDialog<void>(
+          context: context,
+          builder: (dialogContext) {
+            final dialogTheme = Theme.of(dialogContext);
+            final mediaQuery = MediaQuery.of(dialogContext);
+            final isLandscape =
+                mediaQuery.orientation == Orientation.landscape;
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 440,
+                  maxHeight: isLandscape
+                      ? mediaQuery.size.height * 0.85
+                      : mediaQuery.size.height * 0.75,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          label,
+                          style: dialogTheme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: options.map((opt) {
+                              final isSelected = opt.value == value;
+                              return Container(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? cs.primaryContainer
+                                          .withValues(alpha: 0.5)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: RadioListTile<T>(
+                                  activeColor: cs.primary,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 2,
+                                  ),
+                                  value: opt.value,
+                                  groupValue: value,
+                                  title: Text(
+                                    opt.label,
+                                    style: dialogTheme.textTheme.bodyMedium
+                                        ?.copyWith(
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.w500,
+                                      color: isSelected ? cs.primary : null,
+                                    ),
+                                  ),
+                                  subtitle: opt.subtitle != null
+                                      ? Text(
+                                          opt.subtitle!,
+                                          style: dialogTheme
+                                              .textTheme.bodySmall
+                                              ?.copyWith(
+                                            color: cs.onSurfaceVariant,
+                                          ),
+                                        )
+                                      : null,
+                                  onChanged: (T? newValue) {
+                                    if (newValue != null) {
+                                      Navigator.of(dialogContext).pop();
+                                      onChanged(newValue);
+                                    }
+                                  },
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final inputDecorationTheme = InputDecorationTheme(
-      filled: true,
-      fillColor: cs.surfaceContainerHigh,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(18),
-        borderSide: BorderSide(color: cs.primary, width: 2),
-      ),
-    );
-
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -419,274 +591,251 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
           ],
         ),
       ),
-      body: Theme(
-        data: Theme.of(context).copyWith(
-          inputDecorationTheme: inputDecorationTheme,
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── CARD 1: GENERAL ──────────────────────────────────────────
-                ExpressiveCard(
-                  children: [
-                    const ExpressiveSectionHeader(
-                      title: 'General',
-                      subtitle: 'Identity and display parameters',
-                      icon: Icons.label_outline_rounded,
-                    ),
-                    TextField(
-                      controller: _labelCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'Display Name',
-                        prefixIcon: Icon(Icons.badge_outlined, size: 20, color: cs.primary),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // ── CARD 2: SECURITY & CREDENTIALS ───────────────────────────
-                ExpressiveCard(
-                  children: [
-                    const ExpressiveSectionHeader(
-                      title: 'Security & Credentials',
-                      subtitle: 'Authentication factors and keystore encryption',
-                      icon: Icons.security_rounded,
-                    ),
-                    if (_settingsLocked) ...[
-                      Card(
-                        elevation: 0,
-                        color: cs.surfaceContainerHigh,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: cs.primaryContainer.withValues(alpha: 0.5),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(Icons.lock_rounded, size: 32, color: cs.primary),
-                              ),
-                              const SizedBox(height: 14),
-                              Text(
-                                'Security Options Locked',
-                                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Authenticate with original container credentials to modify security settings.',
-                                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 18),
-                              FilledButton.icon(
-                                onPressed: _authenticateSettings,
-                                icon: Icon(
-                                  widget.existingRecord?.unlockMethod.icon ?? Icons.lock_open_rounded,
-                                  size: 18,
-                                ),
-                                style: FilledButton.styleFrom(
-                                  minimumSize: const Size(0, 48),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                label: const Text('Unlock Settings'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ] else ...[
-                      DropdownButtonFormField<ContainerUnlockMethod>(
-                        initialValue: _unlockMethod,
-                        decoration: InputDecoration(
-                          labelText: 'Unlock Credentials',
-                          prefixIcon: Icon(Icons.vpn_key_outlined, size: 20, color: cs.primary),
-                        ),
-                        items: ContainerUnlockMethod.values
-                            .where((m) =>
-                                m != ContainerUnlockMethod.biometrics ||
-                                _biometricAvailable ||
-                                _unlockMethod == m)
-                            .map((m) {
-                              final isUnavailableBio = m == ContainerUnlockMethod.biometrics && !_biometricAvailable;
-                              return DropdownMenuItem(
-                                value: m,
-                                child: Row(children: [
-                                  Icon(m.icon, size: 18, color: cs.onSurfaceVariant),
-                                  const SizedBox(width: 10),
-                                  Text(isUnavailableBio
-                                      ? '${m.label} (Unavailable)'
-                                      : m.label),
-                                ]),
-                              );
-                            })
-                            .toList(),
-                        onChanged: (v) {
-                          if (v == null) return;
-                          setState(() {
-                            _unlockMethod = v;
-                            if (v == ContainerUnlockMethod.password) {
-                              _passwordCtrl.clear();
-                            }
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 8),
+      body: SafeArea(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── General ─────────────────────────────────────────────
+                  _buildSectionHeader('General'),
+                  _buildSectionGroup(
+                    children: [
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          _unlockMethod.subtitle,
-                          style: textTheme.bodySmall
-                              ?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        child: TextField(
+                          controller: _labelCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Display Name',
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
-                      if (widget.existingRecord != null &&
-                          widget.existingRecord!.unlockMethod != ContainerUnlockMethod.password &&
-                          _unlockMethod != ContainerUnlockMethod.password) ...[
-                        const SizedBox(height: 12),
-                        Material(
+                  // ── Security & Credentials ──────────────────────────────
+                  _buildSectionHeader('Security & Credentials'),
+                  _buildSectionGroup(
+                children: [
+                  if (_settingsLocked) ...[
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
                           color: cs.surfaceContainerHigh,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: CheckboxListTile(
-                            value: _changePassword,
-                            title: Text('Update saved password', style: textTheme.bodyMedium),
-                            onChanged: (v) => setState(() {
-                              _changePassword = v ?? false;
-                              if (!v!) _passwordCtrl.clear();
-                            }),
-                            controlAffinity: ListTileControlAffinity.leading,
-                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: cs.outlineVariant.withValues(alpha: 0.3)),
                         ),
-                      ],
-
-                      if (_unlockMethod != ContainerUnlockMethod.password &&
-                          (widget.existingRecord == null ||
-                           widget.existingRecord!.unlockMethod == ContainerUnlockMethod.password ||
-                           _changePassword)) ...[
-                        const SizedBox(height: 14),
-                        TextField(
+                        child: Column(
+                          children: [
+                            Text(
+                              'Security Options Locked',
+                              style: textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Authenticate with original container credentials to modify security settings.',
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: _authenticateSettings,
+                              icon: const Icon(Icons.lock_open_rounded, size: 18),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(0, 44),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              label: const Text('Unlock Settings'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    _buildSelectTile<ContainerUnlockMethod>(
+                      label: 'Unlock Credentials',
+                      value: _unlockMethod,
+                      subtitle: _unlockMethod.subtitle,
+                      options: ContainerUnlockMethod.values
+                          .where((m) =>
+                              m != ContainerUnlockMethod.biometrics ||
+                              _biometricAvailable ||
+                              _unlockMethod == m)
+                          .map((m) {
+                            final isUnavailableBio =
+                                m == ContainerUnlockMethod.biometrics &&
+                                    !_biometricAvailable;
+                            return _SelectOption(
+                              value: m,
+                              label: isUnavailableBio
+                                  ? '${m.label} (Unavailable)'
+                                  : m.label,
+                              subtitle: m.subtitle,
+                            );
+                          })
+                          .toList(),
+                      onChanged: (v) {
+                        setState(() {
+                          _unlockMethod = v;
+                          if (v == ContainerUnlockMethod.password) {
+                            _passwordCtrl.clear();
+                          }
+                        });
+                      },
+                    ),
+                    if (widget.existingRecord != null &&
+                        widget.existingRecord!.unlockMethod !=
+                            ContainerUnlockMethod.password &&
+                        _unlockMethod != ContainerUnlockMethod.password) ...[
+                      const SizedBox(height: 8),
+                      CheckboxListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        value: _changePassword,
+                        title: Text('Update saved password',
+                            style: textTheme.bodyMedium),
+                        onChanged: (v) => setState(() {
+                          _changePassword = v ?? false;
+                          if (!v!) _passwordCtrl.clear();
+                        }),
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
+                    ],
+                    if (_unlockMethod != ContainerUnlockMethod.password &&
+                        (widget.existingRecord == null ||
+                            widget.existingRecord!.unlockMethod ==
+                                ContainerUnlockMethod.password ||
+                            _changePassword)) ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        child: TextField(
                           controller: _passwordCtrl,
                           obscureText: !_showPassword,
                           autofillHints: null,
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
-                            labelText: 'Container password (optional for keyfile-only)',
-                            prefixIcon: Icon(Icons.lock_rounded, size: 20, color: cs.primary),
+                            labelText:
+                                'Container password (optional for keyfile-only)',
                             suffixIcon: PasswordVisibilityToggle(
                               obscured: !_showPassword,
-                              onToggle: () =>
-                                  setState(() => _showPassword = !_showPassword),
+                              onToggle: () => setState(
+                                  () => _showPassword = !_showPassword),
                             ),
                             hintText: 'Enter container password',
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Text(
-                            'Password is encrypted using an Android Keystore hardware-bound key. Leave blank if using keyfiles only.',
-                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.3),
-                          ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Text(
+                          'Password is encrypted using Android Keystore. Leave blank if using keyfiles only.',
+                          style: textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant, height: 1.3),
                         ),
-                      ],
-
-                      if (_unlockMethod == ContainerUnlockMethod.pattern) ...[
-                        const SizedBox(height: 14),
-                        OutlinedButton.icon(
+                      ),
+                    ],
+                    if (_unlockMethod == ContainerUnlockMethod.pattern) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: OutlinedButton(
                           onPressed: _setupPattern,
-                          icon: Icon(
-                            _patternHash != null
-                                ? Icons.check_circle_rounded
-                                : Icons.pattern_rounded,
-                            size: 18,
-                            color: _patternHash != null ? cs.primary : null,
-                          ),
-                          label: Text(_patternHash != null
-                              ? 'Change Pattern'
-                              : 'Set Pattern'),
                           style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 48),
+                            minimumSize: const Size(double.infinity, 44),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
+                          child: Text(_patternHash != null
+                              ? 'Change Pattern'
+                              : 'Set Pattern'),
                         ),
-                      ],
-
-                      if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
-                        const Divider(height: 32),
-                        Material(
-                          color: cs.surfaceContainerHigh,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: SwitchListTile(
-                            title: Text('Cache Derived Key', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-                            subtitle: Text('Reuse key material in Android Keystore securely.', style: textTheme.bodySmall),
-                            value: _cacheDerivedKey,
-                            onChanged: (v) => setState(() => _cacheDerivedKey = v),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        AdvancedParamsPanel(
+                      ),
+                    ],
+                    if (!_isCryptomator &&
+                        !_isGocryptfs &&
+                        !_isCryfs &&
+                        !_isBitlocker) ...[
+                   
+                      SwitchListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        title: Text('Cache Derived Key',
+                            style: textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600)),
+                        subtitle: Text('Reuse key material in Android Keystore',
+                            style: textTheme.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant)),
+                        value: _cacheDerivedKey,
+                        onChanged: (v) => setState(() => _cacheDerivedKey = v),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: AdvancedParamsPanel(
                           cipherId: _cipherId,
                           hashId: _hashId,
-                          subtitle: 'Pin the algorithm to skip auto-detection on unlock.',
-                          onCipherChanged: (val) => setState(() => _cipherId = val),
-                          onHashChanged: (val) => setState(() => _hashId = val),
+                          subtitle:
+                              'Pin algorithm to skip auto-detection on unlock.',
+                          onCipherChanged: (val) =>
+                              setState(() => _cipherId = val),
+                          onHashChanged: (val) =>
+                              setState(() => _hashId = val),
                         ),
-                      ],
-
-                      if (widget.existingRecord != null) ...[
-                        const Divider(height: 32),
-                        OutlinedButton.icon(
+                      ),
+                    ],
+                    if (widget.existingRecord != null) ...[
+                  
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: OutlinedButton(
                           onPressed: () {
                             final fmt = widget.existingRecord?.containerFormat;
                             if (fmt == 'luks1' || fmt == 'luks2') {
                               showAppSnackBar(
                                 context,
-                                message: 'LUKS password changing is not supported in-app. Use cryptsetup on Linux.',
+                                message:
+                                    'LUKS password changing is not supported in-app. Use cryptsetup on Linux.',
                                 tone: AppBannerTone.warning,
                               );
                             } else if (fmt == 'cryptomator') {
                               showAppSnackBar(
                                 context,
-                                message: 'Cryptomator vault passwords cannot be changed in-app.',
+                                message:
+                                    'Cryptomator vault passwords cannot be changed in-app.',
                                 tone: AppBannerTone.warning,
                               );
                             } else if (fmt == 'gocryptfs') {
                               showAppSnackBar(
                                 context,
-                                message: 'Gocryptfs vault passwords cannot be changed in-app.',
+                                message:
+                                    'Gocryptfs vault passwords cannot be changed in-app.',
                                 tone: AppBannerTone.warning,
                               );
                             } else if (fmt == 'cryfs') {
                               showAppSnackBar(
                                 context,
-                                message: 'CryFS vault passwords cannot be changed in-app.',
+                                message:
+                                    'CryFS vault passwords cannot be changed in-app.',
                                 tone: AppBannerTone.warning,
                               );
                             } else if (fmt == 'bitlocker') {
                               showAppSnackBar(
                                 context,
-                                message: 'BitLocker credentials cannot be changed in-app. Use '
-                                    '"Manage BitLocker" on Windows to add/remove credentials.',
+                                message:
+                                    'BitLocker credentials cannot be changed in-app. Use "Manage BitLocker" on Windows.',
                                 tone: AppBannerTone.warning,
                               );
                             } else {
@@ -695,151 +844,139 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                                 MaterialPageRoute(
                                   builder: (_) => ChangePasswordScreen(
                                     uri: widget.uri,
-                                    initialCipherId: widget.existingRecord!.cipherId,
-                                    initialHashId: widget.existingRecord!.hashId,
+                                    initialCipherId:
+                                        widget.existingRecord!.cipherId,
+                                    initialHashId:
+                                        widget.existingRecord!.hashId,
                                   ),
                                 ),
                               );
                             }
                           },
-                          icon: const Icon(Icons.password_rounded),
-                          label: const Text('Change Container Password'),
                           style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(double.infinity, 48),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            minimumSize: const Size(double.infinity, 44),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             foregroundColor: cs.error,
                           ),
+                          child: const Text('Change Container Password'),
                         ),
-                      ],
+                      ),
                     ],
                   ],
-                ),
-                const SizedBox(height: 16),
+                ],
+              ),
+              const SizedBox(height: 16),
 
-                // ── CARD 3: SYSTEM & INTEGRATION ─────────────────────────────
-                ExpressiveCard(
-                  children: [
-                    const ExpressiveSectionHeader(
-                      title: 'System & Integration',
-                      subtitle: 'Auto-lock timers and Android file provider',
-                      icon: Icons.tune_rounded,
-                    ),
-                    DropdownButtonFormField<int>(
-                      initialValue: _autoCloseMins,
-                      decoration: InputDecoration(
-                        labelText: 'Auto-Lock Duration',
-                        prefixIcon: Icon(Icons.timer_rounded, size: 20, color: cs.primary),
-                      ),
-                      items: _autoCloseOptions.map((mins) {
-                        final label = mins == 0
-                            ? 'Never'
-                            : mins == 1
-                                ? '1 minute'
-                                : '$mins minutes';
-                        return DropdownMenuItem(value: mins, child: Text(label));
-                      }).toList(),
-                      onChanged: (v) {
-                        if (v != null) setState(() => _autoCloseMins = v);
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    Material(
-                      color: cs.surfaceContainerHigh,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: SwitchListTile(
-                        title: Text('Android File Provider', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Expose content to System File Picker when unlocked.', style: textTheme.bodySmall),
-                        value: _documentProvider,
-                        onChanged: (v) => setState(() => _documentProvider = v),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
+              // ── System & Integration ────────────────────────────────
+              _buildSectionHeader('System & Integration'),
+              _buildSectionGroup(
+                children: [
+                  _buildSelectTile<int>(
+                    label: 'Auto-Lock Duration',
+                    value: _autoCloseMins,
+                    subtitle: _autoCloseMins == 0
+                        ? 'Container will not auto-lock'
+                        : 'Locks after $_autoCloseMins minute${_autoCloseMins == 1 ? '' : 's'} of inactivity',
+                    options: _autoCloseOptions.map((mins) {
+                      final label = mins == 0
+                          ? 'Never'
+                          : mins == 1
+                              ? '1 minute'
+                              : '$mins minutes';
+                      return _SelectOption(value: mins, label: label);
+                    }).toList(),
+                    onChanged: (v) => setState(() => _autoCloseMins = v),
+                  ),
+                 
+                  SwitchListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16),
+                    title: Text('Android File Provider',
+                        style: textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+                    subtitle: Text(
+                        'Expose content to System File Picker when unlocked',
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant)),
+                    value: _documentProvider,
+                    onChanged: (v) => setState(() => _documentProvider = v),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
 
-                // ── CARD 4: THUMBNAIL STORAGE ────────────────────────────────
-                ExpressiveCard(
-                  children: [
-                    const ExpressiveSectionHeader(
-                      title: 'Thumbnail Storage',
-                      subtitle: 'Cache policies and preview image quality',
-                      icon: Icons.cached_rounded,
-                    ),
-                    if (_loadingPassword)
-                      const Center(
+              // ── Thumbnail Storage ──────────────────────────────────
+              _buildSectionHeader('Thumbnail Storage'),
+              _buildSectionGroup(
+                children: [
+                  if (_loadingPassword)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
                         child: SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                      )
-                    else ...[
-                      DropdownButtonFormField<ThumbnailCacheMode?>(
-                        initialValue: _thumbnailCacheMode,
-                        decoration: InputDecoration(
-                          labelText: 'Cache Mode',
-                          prefixIcon: Icon(Icons.cached_rounded, size: 20, color: cs.primary),
-                        ),
-                        items: ThumbnailCacheMode.values
-                            .map((mode) => DropdownMenuItem<ThumbnailCacheMode?>(
-                                  value: mode,
-                                  child: Text(mode.label),
-                                ))
-                            .toList(),
-                        onChanged: (v) => setState(() => _thumbnailCacheMode = v),
                       ),
-                      const SizedBox(height: 8),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          _thumbnailCacheMode?.description ??
-                              'Uses default global app settings.',
-                          style: textTheme.bodySmall
-                              ?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      DropdownButtonFormField<ThumbnailQuality?>(
-                        initialValue: _thumbnailQuality,
-                        decoration: InputDecoration(
-                          labelText: 'Thumbnail Quality',
-                          prefixIcon: Icon(Icons.high_quality_rounded, size: 20, color: cs.primary),
-                        ),
-                        items: ThumbnailQuality.values
-                            .map((q) => DropdownMenuItem<ThumbnailQuality?>(
-                                  value: q,
-                                  child: Text(q.label),
-                                ))
-                            .toList(),
-                        onChanged: (v) => setState(() => _thumbnailQuality = v),
-                      ),
-                      const SizedBox(height: 16),
-                      OutlinedButton.icon(
+                    )
+                  else ...[
+                    _buildSelectTile<ThumbnailCacheMode>(
+                      label: 'Cache Mode',
+                      value: _thumbnailCacheMode ?? ThumbnailCacheMode.appCache,
+                      subtitle: _thumbnailCacheMode?.description ??
+                          'Uses default global app settings.',
+                      options: ThumbnailCacheMode.values.map((mode) {
+                        return _SelectOption(
+                          value: mode,
+                          label: mode.label,
+                          subtitle: mode.description,
+                        );
+                      }).toList(),
+                      onChanged: (v) => setState(() => _thumbnailCacheMode = v),
+                    ),
+                 
+                    _buildSelectTile<ThumbnailQuality>(
+                      label: 'Thumbnail Quality',
+                      value: _thumbnailQuality ?? ThumbnailQuality.medium,
+                      options: ThumbnailQuality.values.map((q) {
+                        return _SelectOption(
+                          value: q,
+                          label: q.label,
+                        );
+                      }).toList(),
+                      onChanged: (v) => setState(() => _thumbnailQuality = v),
+                    ),
+                 
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: OutlinedButton.icon(
                         onPressed: _clearingCache ? null : _clearThumbnailCache,
                         icon: _clearingCache
                             ? const SizedBox(
-                                width: 18,
-                                height: 18,
+                                width: 16,
+                                height: 16,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Icon(Icons.delete_sweep_rounded),
+                            : const Icon(Icons.delete_sweep_rounded, size: 18),
                         label: const Text('Clear Thumbnail Cache'),
                         style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 48),
+                          minimumSize: const Size(double.infinity, 44),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           foregroundColor: cs.primary,
                         ),
                       ),
-                    ],
+                    ),
                   ],
-                ),
-                const SizedBox(height: 24),
-              ],
+                ],
+              ),
+              const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
         ),
@@ -852,7 +989,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     final isModified = _isModified;
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
@@ -862,17 +998,13 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
           : Container(
               decoration: BoxDecoration(
                 color: cs.surfaceContainerLow,
-                border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4))),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.06),
-                    blurRadius: 16,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
+                border: Border(
+                    top: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.3))),
               ),
               child: SafeArea(
-                minimum: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                minimum:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -880,7 +1012,8 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.info_outline_rounded, size: 20, color: cs.error),
+                          Icon(Icons.info_outline_rounded,
+                              size: 18, color: cs.error),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -900,18 +1033,20 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                     FilledButton(
                       onPressed: (_saving || !_canSave) ? null : _save,
                       style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(56),
+                        minimumSize: const Size.fromHeight(48),
                         shape: const StadiumBorder(),
                       ),
                       child: _saving
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2.5, color: Colors.white),
                             )
                           : const Text(
                               'Save Configuration',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15),
                             ),
                     ),
                   ],
@@ -921,8 +1056,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     );
   }
 }
-
-// ── Verification Sheets/Dialogs ──────────────────────────────────────────────
 
 class _PatternVerifySheet extends StatefulWidget {
   final String storedHash;
@@ -962,17 +1095,12 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return AppBottomSheet(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(children: [
-            Icon(Icons.pattern_rounded, size: AppIconSize.standard, color: cs.primary),
-            const SizedBox(width: 10),
-            Text('Verify Pattern',
-                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-          ]),
+          Text('Verify Pattern',
+              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 24),
           PatternLockView(
             key: ValueKey(_resetKey),
@@ -1085,6 +1213,7 @@ class _RealPasswordGateDialog extends StatefulWidget {
   final bool documentProvider;
   final bool cacheDerivedKey;
   final String containerFormat;
+
   const _RealPasswordGateDialog({
     required this.uri,
     required this.cipherId,
@@ -1145,7 +1274,6 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
       return;
     }
     setState(() { _loading = true; _error = null; });
-
     if (_isCryptomator || _isGocryptfs || _isCryfs) {
       try {
         final result = _isCryptomator
@@ -1168,7 +1296,6 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
                     displayName: '',
                     documentProvider: widget.documentProvider,
                   );
-        
         if (result == null) {
           if (mounted) setState(() { _loading = false; _error = 'Incorrect password'; });
           return;
@@ -1189,11 +1316,9 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
       }
       return;
     }
-
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final keyfilePaths = keyfiles.map((k) => k.uri).toList();
-
       final result = _isUsb
           ? await vaultExplorerApi.unlockUsbContainer(
               _usbDeviceName,
@@ -1205,7 +1330,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
               hashId: widget.hashId,
               preservedKey: null,
               cacheDerivedKey: widget.cacheDerivedKey,
-              keyfilePaths: keyfilePaths, 
+              keyfilePaths: keyfilePaths,
             )
           : await vaultExplorerApi.unlockContainer(
               widget.uri,
@@ -1217,13 +1342,12 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
               hashId: widget.hashId,
               preservedKey: null,
               cacheDerivedKey: widget.cacheDerivedKey,
-              keyfilePaths: keyfilePaths, 
+              keyfilePaths: keyfilePaths,
             );
       if (result == null) {
         if (mounted) setState(() { _loading = false; _error = 'Incorrect credentials'; });
         return;
       }
-      
       await vaultExplorerApi.lockContainer(_isUsb ? _usbDeviceName : widget.uri);
       if (mounted) {
         Navigator.pop(context, (
@@ -1244,15 +1368,8 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return AlertDialog(
-      title: Row(
-        children: [
-          Icon(Icons.lock_person_outlined, color: cs.primary),
-          const SizedBox(width: 12),
-          const Text('Verify Credentials'),
-        ],
-      ),
+      title: const Text('Verify Credentials'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1269,23 +1386,15 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
               autofocus: true,
               decoration: InputDecoration(
                 labelText: 'Container password (optional for keyfile-only)',
-                prefixIcon: Icon(Icons.key_outlined, size: 20, color: cs.primary),
                 suffixIcon: PasswordVisibilityToggle(
                   obscured: _obscure,
                   onToggle: () => setState(() => _obscure = !_obscure),
-                ),
-                filled: true,
-                fillColor: cs.surfaceContainerLow,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: cs.outlineVariant),
                 ),
               ),
               onSubmitted: (_) => _verify(),
             ),
             if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
               const SizedBox(height: 16),
-
               KeyfilesPicker(
                 keyfiles: keyfiles,
                 picking: pickingKeyfiles,
@@ -1293,19 +1402,11 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
                 onRemove: removeKeyfile,
               ),
               const SizedBox(height: 16),
-
               TextField(
                 controller: _pimCtrl,
                 keyboardType: TextInputType.number,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'PIM (optional)',
-                  prefixIcon: Icon(Icons.tune_rounded, size: 20, color: cs.primary),
-                  filled: true,
-                  fillColor: cs.surfaceContainerLow,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide(color: cs.outlineVariant),
-                  ),
                 ),
               ),
             ],
@@ -1344,4 +1445,16 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
       ],
     );
   }
+}
+
+class _SelectOption<T> {
+  final T value;
+  final String label;
+  final String? subtitle;
+
+  const _SelectOption({
+    required this.value,
+    required this.label,
+    this.subtitle,
+  });
 }

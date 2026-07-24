@@ -227,29 +227,11 @@ ColorScheme _darkColorScheme() => const ColorScheme(
 // ─────────────────────────────────────────────────────────────────────────────
 // THEME BUILDERS
 // ─────────────────────────────────────────────────────────────────────────────
-//
-// buildDarkTheme()/buildLightTheme() both accept an optional pre-built
-// ColorScheme. Pass one through here if you wire up Material You dynamic
-// color (e.g. via the `dynamic_color` package's DynamicColorBuilder):
-//
-//   DynamicColorBuilder(builder: (lightDynamic, darkDynamic) {
-//     return MaterialApp(
-//       theme: buildLightTheme(lightDynamic),
-//       darkTheme: buildDarkTheme(darkDynamic),
-//       themeMode: ThemeMode.system,
-//       ...
-//     );
-//   });
-//
-// Without that package wired up, both simply fall back to the seeded /
-// hand-tuned palettes above — dynamic color is additive, never required.
 
-ThemeData buildDarkTheme([ColorScheme? dynamicScheme]) =>
-    _buildTheme(dynamicScheme ?? _darkColorScheme(), Brightness.dark);
+ThemeData buildDarkTheme() => _buildTheme(_darkColorScheme(), Brightness.dark);
 
-ThemeData buildLightTheme([ColorScheme? dynamicScheme]) => _buildTheme(
-      dynamicScheme ??
-          ColorScheme.fromSeed(seedColor: _seedColor, brightness: Brightness.light),
+ThemeData buildLightTheme() => _buildTheme(
+      ColorScheme.fromSeed(seedColor: _seedColor, brightness: Brightness.light),
       Brightness.light,
     );
 

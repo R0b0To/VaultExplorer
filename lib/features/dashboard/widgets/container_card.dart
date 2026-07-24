@@ -46,9 +46,6 @@ class _BaseContainerCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: effectiveRadius,
-        side: BorderSide(
-          color: cs.outlineVariant.withValues(alpha: 0.35),
-        ),
       ),
       child: InkWell(
         onTap: onTap,
@@ -237,7 +234,7 @@ class SavedContainerCard extends StatelessWidget {
     return _BaseContainerCard(
       onTap: onUnlock,
       icon: iconWidget,
-      iconBackgroundColor: cs.surfaceContainerHigh,
+      iconBackgroundColor: cs.surfaceContainerHighest,
       title: name,
       subtitle: Text(
         isUsb ? 'USB Drive · Locked' : 'Locked container',
@@ -250,7 +247,7 @@ class SavedContainerCard extends StatelessWidget {
         onUnlock: onUnlock,
         isUsb: isUsb,
       ),
-      backgroundColor: cs.surfaceContainerLow,
+      backgroundColor: cs.surfaceContainerHigh,
       borderRadius: borderRadius,
     );
   }

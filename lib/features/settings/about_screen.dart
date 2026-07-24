@@ -3,12 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/widgets/cards/expressive_card.dart';
-
 import '../../app/vault_explorer_app.dart';
 
-
-// ── External links ────────────────────────────────────────────────────────
 const _kGithubUrl = 'https://github.com/R0b0To/VaultExplorer';
 const _kReleasesUrl = '$_kGithubUrl/releases';
 const _kIssuesUrl = '$_kGithubUrl/issues/new/choose';
@@ -97,6 +93,116 @@ class AboutScreen extends StatelessWidget {
     showAppSnackBar(context, message: msg, tone: tone);
   }
 
+  Widget _buildCard(BuildContext context, {required List<Widget> children}) {
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 6),
+      child: Text(
+        title,
+        style: textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: cs.primary,
+          letterSpacing: -0.1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Divider(
+      height: 1,
+      indent: 16,
+      endIndent: 16,
+      color: cs.outlineVariant.withValues(alpha: 0.25),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      children: [
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.asset(
+              'assets/images/app_icon.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'VaultExplorer',
+          style: textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Free · Open Source · Offline Encrypted Vault',
+          style: textTheme.bodyMedium?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _HeaderIconButton(
+              icon: Icons.code_rounded,
+              tooltip: 'Source Code',
+              onTap: () => _openUrl(context, _kGithubUrl),
+            ),
+            const SizedBox(width: 12),
+            _HeaderIconButton(
+              icon: Icons.favorite_rounded,
+              tooltip: 'Donate',
+              onTap: () => _openUrl(context, _kKofiUrl),
+            ),
+            const SizedBox(width: 12),
+            _HeaderIconButton(
+              icon: Icons.share_rounded,
+              tooltip: 'Share App',
+              onTap: () => _shareApp(context),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -107,170 +213,138 @@ class AboutScreen extends StatelessWidget {
         title: const Text('About', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           children: [
-            // ── Header Hero Area ──────────────────────────────────────────
-            Center(
-              child: Column(
-                children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: cs.outlineVariant.withValues(alpha: 0.35),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(22),
-                      child: Image.asset(
-                        'assets/images/app_icon.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'VaultExplorer',
-                    style: textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'Open-source · Offline · VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs & CryFS',
-                      textAlign: TextAlign.center,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  // Primary Quick-Action Bar
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _HeaderIconButton(
-                        icon: Icons.code_rounded,
-                        tooltip: 'Source Code',
-                        onTap: () => _openUrl(context, _kGithubUrl),
-                      ),
-                      const SizedBox(width: 12),
-                      _HeaderIconButton(
-                        icon: Icons.favorite_rounded,
-                        tooltip: 'Donate',
-                        onTap: () => _openUrl(context, _kKofiUrl),
-                      ),
-                      const SizedBox(width: 12),
-                      _HeaderIconButton(
-                        icon: Icons.share_rounded,
-                        tooltip: 'Share App',
-                        onTap: () => _shareApp(context),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
+            _buildHeader(context),
             const SizedBox(height: 24),
 
-            // ── Section 1: Application ────────────────────────────────────
-            ExpressiveCard(
+            // ── Application Card ──────────────────────────────────────
+            _buildSectionHeader(context, 'Application'),
+            _buildCard(
+              context,
               children: [
-                const ExpressiveSectionHeader(
-                  title: 'Application',
-                  subtitle: 'App version, release notes & privacy assurances',
-                  icon: Icons.smartphone_rounded,
-                ),
-                _AboutTile(
-                  icon: Icons.info_outline_rounded,
-                  title: 'Version',
-                  subtitle: 'Tap to copy version info for bug reports',
-                  trailing: _VersionPill(version: appVersion),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  title: Text(
+                    'Version',
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'Tap to copy version info for bug reports',
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      'v$appVersion',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: cs.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
                   onTap: () => _copyVersionInfo(context),
                 ),
-                const SizedBox(height: 4),
-                _AboutTile(
-                  icon: Icons.auto_awesome_outlined,
-                  title: "What's New",
-                  subtitle: 'See recent changes and release notes',
+                _buildDivider(context),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  title: Text(
+                    "What's New",
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'See recent changes and release notes',
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                   onTap: () => _openUrl(context, _kReleasesUrl),
                 ),
-                const SizedBox(height: 4),
-                _AboutTile(
-                  icon: Icons.privacy_tip_outlined,
-                  title: 'Privacy & Data Security',
-                  subtitle: 'What VaultExplorer does — and doesn\'t — collect',
+                _buildDivider(context),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  title: Text(
+                    'Privacy & Data Security',
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'What VaultExplorer does — and doesn\'t — collect',
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                   onTap: () => _showPrivacySheet(context),
                 ),
               ],
             ),
-
             const SizedBox(height: 16),
 
-            // ── Section 2: Open Source & Community ─────────────────────────
-            ExpressiveCard(
+            // ── Community & Legal Card ─────────────────────────────────
+            _buildSectionHeader(context, 'Community & Open Source'),
+            _buildCard(
+              context,
               children: [
-                const ExpressiveSectionHeader(
-                  title: 'Open Source & Community',
-                  subtitle: 'Issue tracking, contributors & third-party licenses',
-                  icon: Icons.hub_rounded,
-                ),
-                _AboutTile(
-                  icon: Icons.bug_report_outlined,
-                  title: 'Report an Issue',
-                  subtitle: 'Found a bug? Submit an issue on GitHub',
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  title: Text(
+                    'Report an Issue',
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'Found a bug? Submit an issue on GitHub',
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                   onTap: () => _openUrl(context, _kIssuesUrl),
                 ),
-                const SizedBox(height: 4),
-                _AboutTile(
-                  icon: Icons.groups_outlined,
-                  title: 'Contributors',
-                  subtitle: 'People who helped build VaultExplorer',
+                _buildDivider(context),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  title: Text(
+                    'Contributors',
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'People who helped build VaultExplorer',
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                   onTap: () => _openUrl(context, _kContributorsUrl),
                 ),
-                const SizedBox(height: 4),
-                _AboutTile(
-                  icon: Icons.article_outlined,
-                  title: 'Open Source Licenses',
-                  subtitle: 'Third-party libraries used in this app',
+                _buildDivider(context),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  title: Text(
+                    'Open Source Licenses',
+                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    'Third-party libraries used in this app',
+                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                   onTap: () => _showLicenses(context),
                 ),
               ],
             ),
-
-            const SizedBox(height: 28),
-
+            const SizedBox(height: 24),
             Center(
               child: Text(
                 'Made with ❤ for privacy.',
                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }
-
-// ── Header quick-action icon button ─────────────────────────────────────────
 
 class _HeaderIconButton extends StatelessWidget {
   final IconData icon;
@@ -304,127 +378,6 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
-// ── Version pill ─────────────────────────────────────────────────────────────
-
-class _VersionPill extends StatelessWidget {
-  final String version;
-  const _VersionPill({required this.version});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: cs.primaryContainer,
-        borderRadius: BorderRadius.circular(100),
-      ),
-      child: Text(
-        'v$version',
-        style: textTheme.labelSmall?.copyWith(
-          color: cs.onPrimaryContainer,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
-
-// ── Single action row ────────────────────────────────────────────────────────
-
-class _AboutTile extends StatelessWidget {
-  final IconData icon;
-  final Color? iconColor;
-  final String title;
-  final String? subtitle;
-  final VoidCallback? onTap;
-  final Widget? trailing;
-
-  const _AboutTile({
-    required this.icon,
-    this.iconColor,
-    required this.title,
-    this.subtitle,
-    this.onTap,
-    this.trailing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final accent = iconColor ?? cs.primary;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, size: 20, color: accent),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle!,
-                        style: textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (trailing != null)
-                trailing!
-              else if (onTap != null)
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHigh,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.chevron_right_rounded,
-                    color: cs.onSurfaceVariant,
-                    size: 18,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Privacy sheet ─────────────────────────────────────────────────────────────
-
 class _PrivacySheet extends StatelessWidget {
   const _PrivacySheet();
 
@@ -432,37 +385,26 @@ class _PrivacySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
-    final points = <(IconData, String, String)>[
+    final points = <(String, String)>[
       (
-        Icons.wifi_off_rounded,
         'No network access required',
-        'VaultExplorer does not request the Internet permission on Android. '
-            'It cannot phone home even if it wanted to.',
+        'VaultExplorer does not request the Internet permission on Android. It cannot phone home even if it wanted to.',
       ),
       (
-        Icons.analytics_outlined,
         'No analytics or telemetry',
-        'There is no crash reporting, usage tracking, or third-party SDK '
-            'collecting data about you or your device.',
+        'There is no crash reporting, usage tracking, or third-party SDK collecting data about you or your device.',
       ),
       (
-        Icons.folder_off_outlined,
         'Your files stay on your device',
-        'Containers, and everything inside them, are read and written '
-            'locally. Nothing is ever uploaded anywhere.',
+        'Containers, and everything inside them, are read and written locally. Nothing is ever uploaded anywhere.',
       ),
       (
-        Icons.key_outlined,
         'Secrets stay in Android Keystore',
-        'Remembered passwords, patterns, and cached derived keys are '
-            'encrypted using the Android Keystore, tied to this device.',
+        'Remembered passwords, patterns, and cached derived keys are encrypted using Android Keystore, tied to this device.',
       ),
       (
-        Icons.open_in_new_rounded,
-        'Links open in your browser',
-        'Tapping Source Code, Donate, or similar links hands off to your '
-            'browser app — that app, not VaultExplorer, handles the request.',
+        'External links open in browser',
+        'Tapping links hands off to your default browser app, which handles the request.',
       ),
     ];
 
@@ -475,82 +417,52 @@ class _PrivacySheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: cs.primaryContainer.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(14),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Privacy & Security',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.privacy_tip_outlined,
-                    color: cs.primary,
-                    size: 20,
+                  const SizedBox(height: 2),
+                  Text(
+                    '100% offline and device-local design',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: points.length,
+                separatorBuilder: (_, _) => Divider(
+                  height: 16,
+                  color: cs.outlineVariant.withValues(alpha: 0.25),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
+                itemBuilder: (_, i) {
+                  final (title, body) = points[i];
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Privacy & Data Security',
-                        style: textTheme.titleMedium?.copyWith(
+                        title,
+                        style: textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Built to work 100% offline and locally',
+                        body,
                         style: textTheme.bodySmall?.copyWith(
                           color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: points.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 16),
-                itemBuilder: (_, i) {
-                  final (icon, title, body) = points[i];
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: cs.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(icon, size: 20, color: cs.primary),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              body,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
+                          height: 1.35,
                         ),
                       ),
                     ],
@@ -562,10 +474,10 @@ class _PrivacySheet extends StatelessWidget {
             FilledButton(
               onPressed: () => Navigator.pop(context),
               style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
+                minimumSize: const Size.fromHeight(48),
                 shape: const StadiumBorder(),
               ),
-              child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),

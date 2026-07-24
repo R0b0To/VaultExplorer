@@ -91,9 +91,13 @@ class _FileManagerToolbarSettingsScreenState
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
           : SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                children: [
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    children: [
                   // ── CARD 1: TOOLBAR LAYOUT ─────────────────────────────────
                   ExpressiveCard(
                     children: [
@@ -262,6 +266,8 @@ class _FileManagerToolbarSettingsScreenState
                 ],
               ),
             ),
+          ),
+        ),
     );
   }
 }

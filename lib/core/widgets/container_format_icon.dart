@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 
 /// Compact, non-trademarked identifiers for each container/vault format
 /// VaultExplorer can mount — plain initials rather than any project's
@@ -6,21 +7,18 @@ import 'package:flutter/material.dart';
 /// etc.) cover the code, not the brand assets, so this deliberately
 /// avoids reproducing anyone's real mark.
 class ContainerFormatIcon extends StatelessWidget {
-  /// Wire-format string, e.g. from [MountedContainer.containerFormat] or
-  /// [ContainerRecord.containerFormat] ('veracrypt', 'luks1', 'luks2',
-  /// 'cryptomator', 'gocryptfs', 'cryfs', 'bitlocker', 'directory_vault').
-  final String format;
+  final ContainerFormat format;
   final Color color;
   final double size;
 
-  static const Map<String, String> _initials = {
-    'veracrypt': 'VC',
-    'luks1': 'L1',
-    'luks2': 'L2',
-    'cryptomator': 'CM',
-    'gocryptfs': 'GC',
-    'cryfs': 'CF',
-    'bitlocker': 'BL',
+  static const Map<ContainerFormat, String> _initials = {
+    ContainerFormat.veracrypt: 'VC',
+    ContainerFormat.luks1: 'L1',
+    ContainerFormat.luks2: 'L2',
+    ContainerFormat.cryptomator: 'CM',
+    ContainerFormat.gocryptfs: 'GC',
+    ContainerFormat.cryfs: 'CF',
+    ContainerFormat.bitlocker: 'BL',
   };
 
   const ContainerFormatIcon({

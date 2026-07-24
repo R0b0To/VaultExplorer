@@ -4,10 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 
@@ -33,7 +35,7 @@ class UsbUnlockSheet extends StatefulWidget {
   State<UsbUnlockSheet> createState() => _UsbUnlockSheetState();
 }
 
-class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
+class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin {
   final _passwordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
 
@@ -48,14 +50,15 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
   int _cipherId = 255; // Auto
   int _hashId = 255; // Auto
   bool _remember = false;
-  final List<KeyfileRef> _keyfiles = [];
-  bool _pickingKeyfiles = false;
+
+  @override
+  void onKeyfilePickError(String message) => setState(() => _error = message);
 
   String _containerFormat = 'veracrypt';
 
   /// Format getters for format-specific UI branching
-  bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
-  bool get _isBitlocker => _containerFormat == 'bitlocker';
+  bool get _isLuks => ContainerFormat.isLuksWire(_containerFormat);
+  bool get _isBitlocker => ContainerFormat.isBitlockerWire(_containerFormat);
 
   // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
@@ -379,7 +382,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
     }
 
     var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
-    if (effectivePassword.isEmpty && preservedKey == null && _keyfiles.isEmpty) {
+    if (effectivePassword.isEmpty && preservedKey == null && keyfiles.isEmpty) {
       setState(() => _error = 'Password or keyfiles required');
       return;
     }
@@ -398,7 +401,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
 
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final displayName = widget.existingRecord?.label ?? device.productName;
-      final keyfilePaths = _keyfiles.map((k) => k.uri).toList();
+      final keyfilePaths = keyfiles.map((k) => k.uri).toList();
 
       final appSettings = await AppSettingsService.loadSettings();
       final isReconnect = widget.existingRecord != null;
@@ -561,29 +564,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
         setState(() { _unlocking = false; _activeVolId = null; _progress = null; });
       }
     }
-  }
-
-  Future<void> _pickKeyfiles() async {
-    setState(() => _pickingKeyfiles = true);
-    try {
-      final picked = await vaultExplorerApi.pickKeyfiles();
-      if (!mounted) return;
-      setState(() {
-        for (final k in picked) {
-          if (!_keyfiles.any((existing) => existing.uri == k.uri)) {
-            _keyfiles.add(k);
-          }
-        }
-      });
-    } on PlatformException catch (e) {
-      if (mounted) setState(() => _error = e.message ?? 'Could not pick keyfiles');
-    } finally {
-      if (mounted) setState(() => _pickingKeyfiles = false);
-    }
-  }
-
-  void _removeKeyfile(KeyfileRef keyfile) {
-    setState(() => _keyfiles.removeWhere((k) => k.uri == keyfile.uri));
   }
 
   @override
@@ -1087,13 +1067,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> {
                         // Keyfiles Component
                         if (!_isBitlocker) ...[
                           KeyfilesPicker(
-                            keyfiles: _keyfiles,
-                            picking: _pickingKeyfiles,
-                            onPick: _pickKeyfiles,
-                            onRemove: _removeKeyfile,
+                            keyfiles: keyfiles,
+                            picking: pickingKeyfiles,
+                            onPick: pickKeyfiles,
+                            onRemove: removeKeyfile,
                             enabled: !busy,
                           ),
-                          if (_isLuks && _keyfiles.isNotEmpty)
+                          if (_isLuks && keyfiles.isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(top: 6, left: 4),
                               child: Text(

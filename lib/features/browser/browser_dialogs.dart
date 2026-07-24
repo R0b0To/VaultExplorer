@@ -67,7 +67,7 @@ abstract class BrowserDialogs {
           ),
         ],
       ),
-    );
+    ).whenComplete(ctrl.dispose);
   }
 
   static void showCreateFile(
@@ -119,7 +119,7 @@ abstract class BrowserDialogs {
           ),
         ],
       ),
-    );
+    ).whenComplete(ctrl.dispose);
   }
 
   static void showRename(
@@ -228,7 +228,7 @@ abstract class BrowserDialogs {
           ),
         ],
       ),
-    );
+    ).whenComplete(ctrl.dispose);
   }
 
   static void showBatchDelete(

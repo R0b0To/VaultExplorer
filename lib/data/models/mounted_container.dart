@@ -1,3 +1,5 @@
+import 'package:vaultexplorer/data/models/container_format.dart';
+
 class MountedContainer {
   final String uri;
   final String displayName;
@@ -41,4 +43,9 @@ class MountedContainer {
       readOnly: readOnly ?? this.readOnly,   
     );
   }
+}
+
+extension MountedContainerFormatX on MountedContainer {
+  /// Typed classification of [containerFormat]. See [ContainerFormat].
+  ContainerFormat get format => ContainerFormat.fromWire(containerFormat);
 }

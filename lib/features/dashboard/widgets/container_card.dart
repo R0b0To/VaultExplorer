@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
@@ -183,7 +184,7 @@ class ContainerCard extends StatelessWidget {
     final iconWidget = isUsb
         ? Icon(Icons.usb_rounded, size: 26, color: cs.onPrimaryContainer)
         : ContainerFormatIcon(
-            format: container.containerFormat,
+            format: container.format,
             size: 26,
             color: cs.onPrimaryContainer,
           );
@@ -228,7 +229,7 @@ class SavedContainerCard extends StatelessWidget {
     final iconWidget = isUsb
         ? Icon(Icons.usb_rounded, size: 26, color: cs.onSurfaceVariant)
         : ContainerFormatIcon(
-            format: containerFormat,
+            format: ContainerFormat.fromWire(containerFormat),
             size: 26,
             color: cs.onSurfaceVariant,
           );

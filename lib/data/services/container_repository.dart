@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -340,6 +341,11 @@ class ContainerRecord {
       containerFormat: j['containerFormat'] as String? ?? 'veracrypt',
     );
   }
+}
+
+extension ContainerRecordFormatX on ContainerRecord {
+  /// Typed classification of [containerFormat]. See [ContainerFormat].
+  ContainerFormat get format => ContainerFormat.fromWire(containerFormat);
 }
 
 // Sentinel object for copyWith's nullable field pattern.

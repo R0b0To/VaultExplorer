@@ -42,6 +42,14 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
 
   bool _isDraggingSlider = false;
 
+  /// The carousel row's actual rendered width, captured from LayoutBuilder
+  /// in build() below. Deliberately NOT MediaQuery.of(context).size.width:
+  /// this row sits inside `SafeArea(top: false, ...)`, which still applies
+  /// left/right insets by default, so the two can differ on devices with
+  /// side safe-area insets (rounded corners in landscape, a side notch) —
+  /// centering against the full screen width would be off by that amount.
+  double? _viewportWidth;
+
   static const double _tileWidth = 108;
   static const double _tileSpacing = 10;
 
@@ -49,7 +57,6 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _centerOnCurrent(animate: false));
   }
 
   @override
@@ -72,11 +79,25 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
     }
   }
 
+  /// Called from the LayoutBuilder in build() below with the carousel
+  /// row's real width. Re-centers whenever that width changes — this
+  /// covers both the very first layout (old value null → always "changed")
+  /// and later changes like device rotation or entering split-screen,
+  /// which previously left the carousel centered on a stale width until
+  /// the user manually scrolled.
+  void _onViewportWidthKnown(double width) {
+    if (_viewportWidth == width) return;
+    _viewportWidth = width;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _centerOnCurrent(animate: false);
+    });
+  }
+
   void _centerOnCurrent({required bool animate}) {
     if (!_scrollController.hasClients || widget.playlist.isEmpty) return;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final viewportWidth = _viewportWidth ?? MediaQuery.of(context).size.width;
     final target = (widget.currentIndex * (_tileWidth + _tileSpacing)) -
-        (screenWidth / 2) +
+        (viewportWidth / 2) +
         (_tileWidth / 2);
     final maxExt = _scrollController.position.maxScrollExtent;
     final clamped = target.clamp(0.0, maxExt > 0 ? maxExt : 0.0);
@@ -150,37 +171,42 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
             ),
             // Horizontal Expressive Thumbnail List
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                itemCount: widget.playlist.length,
-                itemBuilder: (context, index) {
-                  final fileName = widget.playlist[index];
-                  final isSelected = index == widget.currentIndex;
-                  return GestureDetector(
-                    onTap: () => widget.onSelect(index),
-                    child: Container(
-                      width: _tileWidth,
-                      margin: const EdgeInsets.only(right: _tileSpacing),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isSelected ? cs.primary : Colors.white24,
-                          width: isSelected ? 3 : 1,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _onViewportWidthKnown(constraints.maxWidth);
+                  return ListView.builder(
+                    controller: _scrollController,
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    itemCount: widget.playlist.length,
+                    itemBuilder: (context, index) {
+                      final fileName = widget.playlist[index];
+                      final isSelected = index == widget.currentIndex;
+                      return GestureDetector(
+                        onTap: () => widget.onSelect(index),
+                        child: Container(
+                          width: _tileWidth,
+                          margin: const EdgeInsets.only(right: _tileSpacing),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isSelected ? cs.primary : Colors.white24,
+                              width: isSelected ? 3 : 1,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(isSelected ? 13 : 15),
+                            child: _CarouselThumb(
+                              key: ValueKey(fileName),
+                              container: widget.container,
+                              fileName: fileName,
+                              thumbnailQuality: widget.thumbnailQuality,
+                              thumbnailCacheMode: widget.thumbnailCacheMode,
+                            ),
+                          ),
                         ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(isSelected ? 13 : 15),
-                        child: _CarouselThumb(
-                          key: ValueKey(fileName),
-                          container: widget.container,
-                          fileName: fileName,
-                          thumbnailQuality: widget.thumbnailQuality,
-                          thumbnailCacheMode: widget.thumbnailCacheMode,
-                        ),
-                      ),
-                    ),
+                      );
+                    },
                   );
                 },
               ),

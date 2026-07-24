@@ -5,6 +5,7 @@ import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/core/widgets/cards/expressive_card.dart';
 
@@ -18,7 +19,8 @@ class UsbCreateContainerSheet extends StatefulWidget {
       _UsbCreateContainerSheetState();
 }
 
-class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
+class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
+    with KeyfilePickerMixin {
   static const _veraCryptFileSystems = [
     'FAT',
     'exFAT',
@@ -43,14 +45,14 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
   bool _creating = false;
   String? _error;
 
+  @override
+  void onKeyfilePickError(String message) => setState(() => _error = message);
+
   String _sizeUnit = 'MB';
   String _fileSystem = 'exFAT';
   int _cipherId = 0; // AES
   int _hashId = 0; // SHA-512
   bool _quickFormat = true;
-
-  final List<KeyfileRef> _keyfiles = [];
-  bool _pickingKeyfiles = false;
 
   // ── Hidden Volume State ──
   bool _enableHiddenVolume = false;
@@ -199,32 +201,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
     });
   }
 
-  Future<void> _pickKeyfiles() async {
-    setState(() => _pickingKeyfiles = true);
-    try {
-      final picked = await vaultExplorerApi.pickKeyfiles();
-      if (picked.isNotEmpty && mounted) {
-        setState(() {
-          for (final k in picked) {
-            if (!_keyfiles.any((existing) => existing.uri == k.uri)) {
-              _keyfiles.add(k);
-            }
-          }
-        });
-      }
-    } on PlatformException catch (e) {
-      if (mounted) {
-        setState(() => _error = e.message ?? 'Could not pick keyfiles');
-      }
-    } finally {
-      if (mounted) setState(() => _pickingKeyfiles = false);
-    }
-  }
-
-  void _removeKeyfile(KeyfileRef keyfile) {
-    setState(() => _keyfiles.removeWhere((k) => k.uri == keyfile.uri));
-  }
-
   Future<void> _pickHiddenKeyfiles() async {
     setState(() => _pickingHiddenKeyfiles = true);
     try {
@@ -262,7 +238,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
       setState(() => _error = 'Enter a valid size greater than 0');
       return;
     }
-    if (_passwordCtrl.text.isEmpty && _keyfiles.isEmpty) {
+    if (_passwordCtrl.text.isEmpty && keyfiles.isEmpty) {
       setState(
           () => _error = 'A password or at least one keyfile is required');
       return;
@@ -333,7 +309,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
           outerPassword: _passwordCtrl.text,
           hiddenPassword: _hiddenPasswordCtrl.text,
           hasHiddenKeyfiles: _hiddenKeyfiles.isNotEmpty,
-          outerKeyfileUris: _keyfiles.map((k) => k.uri).toSet(),
+          outerKeyfileUris: keyfiles.map((k) => k.uri).toSet(),
           hiddenKeyfileUris: _hiddenKeyfiles.map((k) => k.uri).toSet(),
         );
         if (!validation.isValid) {
@@ -352,7 +328,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
         containerFormat: _format.id,
         cipherId: _cipherId,
         hashId: _hashId,
-        keyfilePaths: _keyfiles.map((k) => k.uri).toList(),
+        keyfilePaths: keyfiles.map((k) => k.uri).toList(),
         quickFormat: _quickFormat,
         createHiddenVolume:
             _enableHiddenVolume && _format == CreateFormat.veracrypt,
@@ -664,10 +640,10 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
         ),
         const SizedBox(height: 16),
         KeyfilesPicker(
-          keyfiles: _keyfiles,
-          picking: _pickingKeyfiles,
-          onPick: _pickKeyfiles,
-          onRemove: _removeKeyfile,
+          keyfiles: keyfiles,
+          picking: pickingKeyfiles,
+          onPick: pickKeyfiles,
+          onRemove: removeKeyfile,
           enabled: !busy,
         ),
         const SizedBox(height: 16),
@@ -725,7 +701,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet> {
   Widget _buildHiddenVolumeSection(ColorScheme cs, TextTheme textTheme) {
     final busy = _creating || _requestingPermission;
     final bool isEnabled =
-        _passwordCtrl.text.isNotEmpty || _keyfiles.isNotEmpty;
+        _passwordCtrl.text.isNotEmpty || keyfiles.isNotEmpty;
 
     return ExpressiveCard(
       children: [

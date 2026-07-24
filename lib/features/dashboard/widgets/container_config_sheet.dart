@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -8,6 +9,7 @@ import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
@@ -59,10 +61,10 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
       widget.existingRecord?.containerFormat ??
       widget.mountedContainer?.containerFormat ??
       'veracrypt';
-  bool get _isCryptomator => _containerFormat == 'cryptomator';
-  bool get _isGocryptfs => _containerFormat == 'gocryptfs';
-  bool get _isCryfs => _containerFormat == 'cryfs';
-  bool get _isBitlocker => _containerFormat == 'bitlocker';
+  bool get _isCryptomator => ContainerFormat.isCryptomatorWire(_containerFormat);
+  bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(_containerFormat);
+  bool get _isCryfs => ContainerFormat.isCryfsWire(_containerFormat);
+  bool get _isBitlocker => ContainerFormat.isBitlockerWire(_containerFormat);
 
   bool _saving = false;
   bool _loadingPassword = true;
@@ -1096,21 +1098,23 @@ class _RealPasswordGateDialog extends StatefulWidget {
   State<_RealPasswordGateDialog> createState() => _RealPasswordGateDialogState();
 }
 
-class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
+class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
+    with KeyfilePickerMixin {
   final _pwCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
   String? _error;
   bool _obscure = true;
   bool _loading = false;
-  final List<KeyfileRef> _keyfiles = [];
-  bool _pickingKeyfiles = false;
+
+  @override
+  void onKeyfilePickError(String message) => setState(() => _error = message);
 
   bool get _isUsb => widget.uri.startsWith('usb:');
   String get _usbDeviceName => widget.uri.substring(4);
-  bool get _isCryptomator => widget.containerFormat == 'cryptomator';
-  bool get _isGocryptfs => widget.containerFormat == 'gocryptfs';
-  bool get _isCryfs => widget.containerFormat == 'cryfs';
-  bool get _isBitlocker => widget.containerFormat == 'bitlocker';
+  bool get _isCryptomator => ContainerFormat.isCryptomatorWire(widget.containerFormat);
+  bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(widget.containerFormat);
+  bool get _isCryfs => ContainerFormat.isCryfsWire(widget.containerFormat);
+  bool get _isBitlocker => ContainerFormat.isBitlockerWire(widget.containerFormat);
 
   int? _activeVolId;
   late final void Function(int) _onUnlockStarted;
@@ -1135,31 +1139,8 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
     super.dispose();
   }
 
-  Future<void> _pickKeyfiles() async {
-    setState(() => _pickingKeyfiles = true);
-    try {
-      final picked = await vaultExplorerApi.pickKeyfiles();
-      if (!mounted) return;
-      setState(() {
-        for (final k in picked) {
-          if (!_keyfiles.any((existing) => existing.uri == k.uri)) {
-            _keyfiles.add(k);
-          }
-        }
-      });
-    } on PlatformException catch (e) {
-      if (mounted) setState(() => _error = e.message ?? 'Could not pick keyfiles');
-    } finally {
-      if (mounted) setState(() => _pickingKeyfiles = false);
-    }
-  }
-
-  void _removeKeyfile(KeyfileRef keyfile) {
-    setState(() => _keyfiles.removeWhere((k) => k.uri == keyfile.uri));
-  }
-
   Future<void> _verify() async {
-    if (_pwCtrl.text.isEmpty && _keyfiles.isEmpty) {
+    if (_pwCtrl.text.isEmpty && keyfiles.isEmpty) {
       setState(() => _error = 'Password or keyfiles required');
       return;
     }
@@ -1211,7 +1192,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
 
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
-      final keyfilePaths = _keyfiles.map((k) => k.uri).toList();
+      final keyfilePaths = keyfiles.map((k) => k.uri).toList();
 
       final result = _isUsb
           ? await vaultExplorerApi.unlockUsbContainer(
@@ -1306,10 +1287,10 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog> {
               const SizedBox(height: 16),
 
               KeyfilesPicker(
-                keyfiles: _keyfiles,
-                picking: _pickingKeyfiles,
-                onPick: _pickKeyfiles,
-                onRemove: _removeKeyfile,
+                keyfiles: keyfiles,
+                picking: pickingKeyfiles,
+                onPick: pickKeyfiles,
+                onRemove: removeKeyfile,
               ),
               const SizedBox(height: 16),
 

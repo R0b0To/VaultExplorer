@@ -4,6 +4,7 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/core/widgets/cards/expressive_card.dart';
 
@@ -14,7 +15,7 @@ class CreateContainerSheet extends StatefulWidget {
   State<CreateContainerSheet> createState() => _CreateContainerSheetState();
 }
 
-class _CreateContainerSheetState extends State<CreateContainerSheet> {
+class _CreateContainerSheetState extends State<CreateContainerSheet> with KeyfilePickerMixin {
   final _nameCtrl = TextEditingController(text: 'vault');
   final _sizeCtrl = TextEditingController(text: '100');
   final _passwordCtrl = TextEditingController();
@@ -48,8 +49,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
   int _hiddenCipherId = 0; // AES
   int _hiddenHashId = 0; // SHA-512
 
-  final List<KeyfileRef> _keyfiles = [];
-  bool _pickingKeyfiles = false;
+  @override
+  void onKeyfilePickError(String message) => setState(() => _error = message);
 
   // ── Folder vault (Cryptomator / Gocryptfs) state ──────────────────────────
   bool _isFolderVault = false;
@@ -158,27 +159,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
     }
   }
 
-  Future<void> _pickKeyfiles() async {
-    setState(() => _pickingKeyfiles = true);
-    try {
-      final picked = await vaultExplorerApi.pickKeyfiles();
-      if (picked.isNotEmpty) {
-        setState(() {
-          for (final k in picked) {
-            if (!_keyfiles.any((existing) => existing.uri == k.uri)) {
-              _keyfiles.add(k);
-            }
-          }
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _pickingKeyfiles = false);
-    }
-  }
-
-  void _removeKeyfile(KeyfileRef keyfile) {
-    setState(() => _keyfiles.remove(keyfile));
-  }
 
   Future<void> _pickHiddenKeyfiles() async {
     setState(() => _pickingHiddenKeyfiles = true);
@@ -265,7 +245,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
       setState(() => _error = 'Enter a valid size greater than 0');
       return;
     }
-    if (_passwordCtrl.text.isEmpty && _keyfiles.isEmpty) {
+    if (_passwordCtrl.text.isEmpty && keyfiles.isEmpty) {
       setState(() => _error = 'A password or at least one keyfile is required');
       return;
     }
@@ -310,7 +290,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
           outerPassword: _passwordCtrl.text,
           hiddenPassword: _hiddenPasswordCtrl.text,
           hasHiddenKeyfiles: _hiddenKeyfiles.isNotEmpty,
-          outerKeyfileUris: _keyfiles.map((k) => k.uri).toSet(),
+          outerKeyfileUris: keyfiles.map((k) => k.uri).toSet(),
           hiddenKeyfileUris: _hiddenKeyfiles.map((k) => k.uri).toSet(),
         );
         if (!validation.isValid) {
@@ -333,7 +313,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
         containerFormat: _format.id,
         cipherId: _cipherId,
         hashId: _hashId,
-        keyfilePaths: _keyfiles.map((k) => k.uri).toList(),
+        keyfilePaths: keyfiles.map((k) => k.uri).toList(),
         createHiddenVolume: _enableHiddenVolume && _format == CreateFormat.veracrypt,
         hiddenPassword: _hiddenPasswordCtrl.text,
         hiddenFileSystem: _hiddenFileSystem.toLowerCase(),
@@ -404,10 +384,10 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
 
   Widget _buildKeyfilesPicker() {
     return KeyfilesPicker(
-      keyfiles: _keyfiles,
-      picking: _pickingKeyfiles,
-      onPick: _pickKeyfiles,
-      onRemove: _removeKeyfile,
+      keyfiles: keyfiles,
+      picking: pickingKeyfiles,
+      onPick: pickKeyfiles,
+      onRemove: removeKeyfile,
       enabled: !_loading,
     );
   }
@@ -529,7 +509,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> {
   }
 
   Widget _buildHiddenVolumeSection(ColorScheme cs, TextTheme textTheme) {
-    final bool isEnabled = _passwordCtrl.text.isNotEmpty || _keyfiles.isNotEmpty;
+    final bool isEnabled = _passwordCtrl.text.isNotEmpty || keyfiles.isNotEmpty;
 
     return ExpressiveCard(
       children: [

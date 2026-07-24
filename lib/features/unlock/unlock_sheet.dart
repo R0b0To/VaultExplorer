@@ -4,10 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
+import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 
 import '../lock/widgets/pattern_lock_view.dart';
 
@@ -33,7 +35,8 @@ class UnlockSheet extends StatefulWidget {
   State<UnlockSheet> createState() => _UnlockSheetState();
 }
 
-class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
+class _UnlockSheetState extends State<UnlockSheet>
+    with WidgetsBindingObserver, KeyfilePickerMixin {
   late TextEditingController _passwordCtrl;
   final _pimCtrl = TextEditingController();
   String? _selectedUri;
@@ -48,21 +51,16 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
   int _hashId = 255; // Auto
   String _containerFormat = 'container';
   
-  final List<KeyfileRef> _keyfiles = [];
-  bool _pickingKeyfiles = false;
+  @override
+  void onKeyfilePickError(String message) => setState(() => _error = message);
 
   /// Format getters for format-specific UI branching
-  bool get _isLuks => _containerFormat == 'luks1' || _containerFormat == 'luks2';
-  bool get _isCryptomator => _containerFormat == 'cryptomator';
-  bool get _isGocryptfs => _containerFormat == 'gocryptfs';
-  bool get _isCryfs => _containerFormat == 'cryfs';
-  bool get _isBitlocker => _containerFormat == 'bitlocker';
-  
-  bool get _isFolderVault =>
-      _containerFormat == 'directory_vault' ||
-      _containerFormat == 'cryptomator' ||
-      _containerFormat == 'gocryptfs' ||
-      _containerFormat == 'cryfs';
+  bool get _isLuks => ContainerFormat.isLuksWire(_containerFormat);
+  bool get _isCryptomator => ContainerFormat.isCryptomatorWire(_containerFormat);
+  bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(_containerFormat);
+  bool get _isCryfs => ContainerFormat.isCryfsWire(_containerFormat);
+  bool get _isBitlocker => ContainerFormat.isBitlockerWire(_containerFormat);
+  bool get _isFolderVault => ContainerFormat.isFolderVaultWire(_containerFormat);
 
   // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
@@ -498,7 +496,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
     }
 
     var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
-    if (effectivePassword.isEmpty && preservedKey == null && _keyfiles.isEmpty) {
+    if (effectivePassword.isEmpty && preservedKey == null && keyfiles.isEmpty) {
       setState(() => _error = 'Password or keyfiles required');
       return;
     }
@@ -604,7 +602,7 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final name = _selectedName ?? 'Container';
-      final keyfilePaths = _keyfiles.map((k) => k.uri).toList();
+      final keyfilePaths = keyfiles.map((k) => k.uri).toList();
 
       final records = await ContainerRepository.instance.loadAll();
       final record = records[_selectedUri!];
@@ -746,29 +744,6 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
         setState(() { _loading = false; _activeVolId = null; _progress = null; });
       }
     }
-  }
-
-  Future<void> _pickKeyfiles() async {
-    setState(() => _pickingKeyfiles = true);
-    try {
-      final picked = await vaultExplorerApi.pickKeyfiles();
-      if (!mounted) return;
-      setState(() {
-        for (final k in picked) {
-          if (!_keyfiles.any((existing) => existing.uri == k.uri)) {
-            _keyfiles.add(k);
-          }
-        }
-      });
-    } on PlatformException catch (e) {
-      if (mounted) setState(() => _error = e.message ?? 'Could not pick keyfiles');
-    } finally {
-      if (mounted) setState(() => _pickingKeyfiles = false);
-    }
-  }
-
-  void _removeKeyfile(KeyfileRef keyfile) {
-    setState(() => _keyfiles.removeWhere((k) => k.uri == keyfile.uri));
   }
 
   bool get _showPasswordUI {
@@ -921,8 +896,8 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
                               alignment: Alignment.center,
                               child: ContainerFormatIcon(
                                 format: _selectedUri != null
-                                    ? _containerFormat
-                                    : (_isFolderVault ? 'directory_vault' : 'container'),
+                                    ? ContainerFormat.fromWire(_containerFormat)
+                                    : ContainerFormat.directoryVault, // pre-selection: both segments render as the generic folder icon, same as before
                                 color: _selectedUri != null
                                     ? cs.onPrimaryContainer
                                     : cs.onSurfaceVariant,
@@ -1335,12 +1310,12 @@ class _UnlockSheetState extends State<UnlockSheet> with WidgetsBindingObserver {
                             // 2. Keyfiles Selection Box
                             if (!_isFolderVault && !_isBitlocker) ...[
                               KeyfilesPicker(
-                                keyfiles: _keyfiles,
-                                picking: _pickingKeyfiles,
-                                onPick: _pickKeyfiles,
-                                onRemove: _removeKeyfile,
+                                keyfiles: keyfiles,
+                                picking: pickingKeyfiles,
+                                onPick: pickKeyfiles,
+                                onRemove: removeKeyfile,
                               ),
-                              if (_isLuks && _keyfiles.isNotEmpty)
+                              if (_isLuks && keyfiles.isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 6, left: 4),
                                   child: Text(

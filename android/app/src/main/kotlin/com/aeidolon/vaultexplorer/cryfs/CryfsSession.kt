@@ -26,7 +26,7 @@ class CryfsSession(
 
     private val pendingWrites = mutableMapOf<String, File>()
 
-    fun close() {
+    override fun close() {
         pendingWrites.values.forEach { it.delete() }
         pendingWrites.clear()
         config.encryptionKey.fill(0)

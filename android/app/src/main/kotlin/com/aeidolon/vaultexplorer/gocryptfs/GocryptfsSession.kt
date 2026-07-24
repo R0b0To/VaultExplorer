@@ -72,7 +72,7 @@ class GocryptfsSession(
 
     private val engine = ChunkedFileEngine(engineDelegate)
 
-    fun close() {
+    override fun close() {
         engine.close()
     }
 

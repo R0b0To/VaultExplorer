@@ -63,8 +63,10 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
   bool _hiddenConfirmObscure = true;
   String _hiddenSizeUnit = 'MB';
   final _hiddenSizeCtrl = TextEditingController(text: '10');
-  final List<KeyfileRef> _hiddenKeyfiles = [];
-  bool _pickingHiddenKeyfiles = false;
+  late final _hiddenKeyfilesController = KeyfilePickerController(
+    notify: () { if (mounted) setState(() {}); },
+    onError: (msg) { if (mounted) setState(() => _error = msg); },
+  );
   String _hiddenFileSystem = 'FAT';
   int _hiddenCipherId = 0; // AES
   int _hiddenHashId = 0; // SHA-512
@@ -201,31 +203,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     });
   }
 
-  Future<void> _pickHiddenKeyfiles() async {
-    setState(() => _pickingHiddenKeyfiles = true);
-    try {
-      final picked = await vaultExplorerApi.pickKeyfiles();
-      if (picked.isNotEmpty && mounted) {
-        setState(() {
-          for (final k in picked) {
-            if (!_hiddenKeyfiles.any((existing) => existing.uri == k.uri)) {
-              _hiddenKeyfiles.add(k);
-            }
-          }
-        });
-      }
-    } on PlatformException catch (e) {
-      if (mounted) {
-        setState(() => _error = e.message ?? 'Could not pick hidden keyfiles');
-      }
-    } finally {
-      if (mounted) setState(() => _pickingHiddenKeyfiles = false);
-    }
-  }
-
-  void _removeHiddenKeyfile(KeyfileRef keyfile) {
-    setState(() => _hiddenKeyfiles.removeWhere((k) => k.uri == keyfile.uri));
-  }
 
   Future<void> _create() async {
     final device = _selected;
@@ -308,9 +285,9 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
           hiddenPimClamped: hiddenPimClamped,
           outerPassword: _passwordCtrl.text,
           hiddenPassword: _hiddenPasswordCtrl.text,
-          hasHiddenKeyfiles: _hiddenKeyfiles.isNotEmpty,
+          hasHiddenKeyfiles: _hiddenKeyfilesController.keyfiles.isNotEmpty,
           outerKeyfileUris: keyfiles.map((k) => k.uri).toSet(),
-          hiddenKeyfileUris: _hiddenKeyfiles.map((k) => k.uri).toSet(),
+          hiddenKeyfileUris: _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toSet(),
         );
         if (!validation.isValid) {
           setState(() => _error = validation.error);
@@ -335,7 +312,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
         hiddenPassword: _hiddenPasswordCtrl.text,
         hiddenFileSystem: _hiddenFileSystem.toLowerCase(),
         hiddenSizeBytes: hiddenSizeBytes,
-        hiddenKeyfilePaths: _hiddenKeyfiles.map((k) => k.uri).toList(),
+        hiddenKeyfilePaths: _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toList(),
         hiddenPim: (_enableHiddenVolume && _format == CreateFormat.veracrypt)
             ? clampPim(
                 _hiddenPimCtrl.text.isEmpty
@@ -814,10 +791,10 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
           ),
           const SizedBox(height: 16),
           KeyfilesPicker(
-            keyfiles: _hiddenKeyfiles,
-            picking: _pickingHiddenKeyfiles,
-            onPick: _pickHiddenKeyfiles,
-            onRemove: _removeHiddenKeyfile,
+            keyfiles: _hiddenKeyfilesController.keyfiles,
+            picking: _hiddenKeyfilesController.picking,
+            onPick: _hiddenKeyfilesController.pick,
+            onRemove: _hiddenKeyfilesController.remove,
             enabled: !busy,
           ),
           const SizedBox(height: 16),

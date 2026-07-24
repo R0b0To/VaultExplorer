@@ -561,6 +561,7 @@ class _UnlockSheetState extends State<UnlockSheet>
             rememberPassword: false,
             readOnly: _readOnly,
             containerFormat: result.containerFormat,
+            documentProvider: widget.documentProvider,
           );
           await ContainerRepository.instance.save(savedRecord);
         } else if (widget.initialUri != null) {
@@ -689,6 +690,7 @@ class _UnlockSheetState extends State<UnlockSheet>
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
             containerFormat: result.containerFormat,
+            documentProvider: widget.documentProvider,
           );
           await ContainerRepository.instance.save(newRecord);
           savedRecord = newRecord;
@@ -897,7 +899,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                               child: ContainerFormatIcon(
                                 format: _selectedUri != null
                                     ? ContainerFormat.fromWire(_containerFormat)
-                                    : ContainerFormat.directoryVault, // pre-selection: both segments render as the generic folder icon, same as before
+                                    : ContainerFormat.directoryVault,
                                 color: _selectedUri != null
                                     ? cs.onPrimaryContainer
                                     : cs.onSurfaceVariant,

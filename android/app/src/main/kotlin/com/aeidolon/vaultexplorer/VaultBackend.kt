@@ -3,8 +3,9 @@ package com.aeidolon.vaultexplorer
 /**
  * Common Tier-2 (file/directory operations against an already-unlocked
  * volId) surface implemented by every pure-Kotlin vault backend —
- * currently [com.aeidolon.vaultexplorer.cryptomator.CryptomatorSession] and
- * [com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSession].
+ * currently [com.aeidolon.vaultexplorer.cryptomator.CryptomatorSession],
+ * [com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSession], and
+ * [com.aeidolon.vaultexplorer.cryfs.CryfsSession].
  *
  * VeraCrypt/LUKS aren't included here: they have no session object at all
  * (native VolumeState slots instead), so they stay behind the
@@ -31,6 +32,11 @@ interface VaultBackend {
     fun importStream(virtualPath: String, inputStream: java.io.InputStream): Boolean
     fun extractFile(virtualPath: String, destinationPath: String): Boolean
     fun getSpaceInfo(): LongArray?
+
+    /** Releases any held resources (pending writes, cached keys, etc). Every
+     *  backend must implement this so [VaultBackendRegistry.remove] can zero
+     *  state without knowing which concrete backend it's holding. */
+    fun close()
 }
 
 /** Process-wide registry of unlocked pure-Kotlin sessions. */
@@ -44,15 +50,6 @@ object VaultBackendRegistry {
     fun get(volId: Int): VaultBackend? = sessions[volId]
 
     fun remove(volId: Int) {
-        // VaultBackend doesn't have close(), but we need to zero keys.
-        // For now, let's cast if we know it needs closing.
-        val session = sessions.remove(volId)
-        if (session is com.aeidolon.vaultexplorer.cryptomator.CryptomatorSession) {
-            session.close()
-        } else if (session is com.aeidolon.vaultexplorer.gocryptfs.GocryptfsSession) {
-            session.close()
-        } else if (session is com.aeidolon.vaultexplorer.cryfs.CryfsSession) {
-            session.close()
-        }
+        sessions.remove(volId)?.close()
     }
 }

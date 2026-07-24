@@ -231,22 +231,7 @@ MediaPlayer.Event.Playing -> {
         }
     }
 
-    /**
-     * Opens [contentUri] (expected to be a `content://` Uri served by
-     * [com.aeidolon.vaultexplorer.ContainerDocumentsProvider]) by resolving
-     * it to a raw seekable [android.os.ParcelFileDescriptor] ourselves and
-     * handing libVLC that descriptor directly, instead of the Uri.
-     *
-     * This is the fix for the hang you hit with flutter_vlc_player: libVLC
-     * only understands MRLs it can parse itself (file paths, http://,
-     * rtsp://, ...). It never resolves `content://` through Android's
-     * ContentResolver on its own — so `Media(libVLC, Uri.parse(contentUri))`
-     * fails to open and the player sits in "opening" forever. Opening the
-     * fd ourselves sidesteps that entirely: libVLC just sees a POSIX file
-     * descriptor and reads from it like any other local file, which is
-     * exactly what `ContainerDocumentsProvider.openDocument()`'s
-     * proxy-fd (backed by the vault's chunked decrypt engine) supports.
-     */
+
     fun setDataSource(contentUri: String, autoPlay: Boolean) {
         if (disposed) return
         lastContentUri = contentUri
@@ -276,25 +261,9 @@ MediaPlayer.Event.Playing -> {
 
         val media = Media(libVLC, pfd.fileDescriptor)
         try {
-            // Hardware decode is disabled unconditionally here. What
-            // looked at first like a VP9-specific bug turned out not to
-            // be: an H.264 stream hit the exact same failure signature —
-            //   libvlc decoder: output: 2130708361 unknown, ...
-            //   libvlc window: request 3 not implemented
-            // 2130708361 is COLOR_FormatSurface (opaque); "request 3" is
-            // the vout asking for something the android-display module on
-            // this device doesn't implement. Since this reproduces across
-            // codecs, it's a device/vout-level MediaCodec-surface
-            // integration issue (seen on this Qualcomm CCodec stack), not
-            // something we can route around per-codec. Forcing libVLC's
-            // own software (FFmpeg/avcodec) decoder sidesteps the broken
-            // surface path entirely, at the cost of higher CPU usage than
-            // hardware decode would use if it worked.
-            media.setHWDecoderEnabled(true, false)
-            media.parse(IMedia.Parse.ParseLocal)
-findVideoTrack(media)?.let { track ->
-    applyVideoSize(track.width, track.height)
-    post(mapOf("event" to "sized", "width" to displayWidth(track), "height" to track.height))
+            findVideoTrack(media)?.let { track ->
+            applyVideoSize(track.width, track.height)
+            post(mapOf("event" to "sized", "width" to displayWidth(track), "height" to track.height))
 }
             mediaPlayer.setMedia(media)
         } finally {

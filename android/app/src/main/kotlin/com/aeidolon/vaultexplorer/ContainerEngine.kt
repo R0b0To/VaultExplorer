@@ -1,22 +1,19 @@
 package com.aeidolon.vaultexplorer
 
-import com.aeidolon.vaultexplorer.cryptomator.CryptomatorStreamRegistry
-import com.aeidolon.vaultexplorer.gocryptfs.GocryptfsStreamRegistry
-import com.aeidolon.vaultexplorer.cryfs.CryfsStreamRegistry
-
 /**
  * Format-neutral native engine boundary.
  *
  * Tier-1 (unlock/create/change-password) operations remain VeraCrypt/LUKS-
- * specific — Cryptomator and Gocryptfs vaults are opened via their respective
- * vault classes directly from MainActivity, not through this facade's unlock* methods,
- * since they have no block-device/FUSE layer for VeraCryptEngine to drive.
+ * specific — Cryptomator, Gocryptfs, and Cryfs vaults are opened via their
+ * respective vault classes directly from MainActivity, not through this
+ * facade's unlock* methods, since they have no block-device/FUSE layer for
+ * VeraCryptEngine to drive.
  *
  * Tier-2 (file/directory operations against an unlocked volId) dispatch
- * here: if [CryptomatorSessionRegistry] or [GocryptfsSessionRegistry] holds a session
- * for the given volId, the call goes to that pure-Kotlin session; otherwise it falls
- * through to the ABI-compatible JNI shim [VeraCryptEngine], unchanged from
- * before. This keeps every existing call site (ContainerFileSystem,
+ * here: if [VaultBackendRegistry] holds a session for the given volId, the
+ * call goes to that pure-Kotlin session; otherwise it falls through to the
+ * ABI-compatible JNI shim [VeraCryptEngine], unchanged from before. This
+ * keeps every existing call site (ContainerFileSystem,
  * ContainerDocumentsProvider, file_operation_service.dart, etc.) working
  * unmodified for all container families — callers key everything off
  * volId and never need to know which backend is actually serving it.
@@ -194,13 +191,8 @@ object ContainerEngine {
     }
 
     fun openStream(path: String, volId: Int): Long {
-        val session = VaultBackendRegistry.get(volId)
-        return when (session?.format) {
-            ContainerFormat.CRYPTOMATOR -> CryptomatorStreamRegistry.open(volId, path)
-            ContainerFormat.GOCRYPTFS -> GocryptfsStreamRegistry.open(volId, path)
-            ContainerFormat.CRYFS -> CryfsStreamRegistry.open(volId, path)
-            else -> VeraCryptEngine.openStream(path, volId)
-        }
+        if (VaultBackendRegistry.get(volId) != null) return VaultStreamRegistry.open(volId, path)
+        return VeraCryptEngine.openStream(path, volId)
     }
 
     fun importStream(path: String, inputStream: java.io.InputStream, volId: Int): Boolean {
@@ -217,22 +209,17 @@ object ContainerEngine {
     }
 
     fun readStream(stream: Long, offset: Long, out: ByteArray, length: Int, volId: Int): Int {
-        val session = VaultBackendRegistry.get(volId)
-        return when (session?.format) {
-            ContainerFormat.CRYPTOMATOR -> CryptomatorStreamRegistry.read(volId, stream, offset, out, length)
-            ContainerFormat.GOCRYPTFS -> GocryptfsStreamRegistry.read(volId, stream, offset, out, length)
-            ContainerFormat.CRYFS -> CryfsStreamRegistry.read(volId, stream, offset, out, length)
-            else -> VeraCryptEngine.readStream(stream, offset, out, length, volId)
+        if (VaultBackendRegistry.get(volId) != null) {
+            return VaultStreamRegistry.read(volId, stream, offset, out, length)
         }
+        return VeraCryptEngine.readStream(stream, offset, out, length, volId)
     }
 
     fun closeStream(stream: Long, volId: Int) {
-        val session = VaultBackendRegistry.get(volId)
-        when (session?.format) {
-            ContainerFormat.CRYPTOMATOR -> CryptomatorStreamRegistry.close(volId, stream)
-            ContainerFormat.GOCRYPTFS -> GocryptfsStreamRegistry.close(volId, stream)
-            ContainerFormat.CRYFS -> CryfsStreamRegistry.close(volId, stream)
-            else -> VeraCryptEngine.closeStream(stream, volId)
+        if (VaultBackendRegistry.get(volId) != null) {
+            VaultStreamRegistry.close(volId, stream)
+        } else {
+            VeraCryptEngine.closeStream(stream, volId)
         }
     }
 }

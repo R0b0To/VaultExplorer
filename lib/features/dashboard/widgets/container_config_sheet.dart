@@ -91,7 +91,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     _initialLabel = rec?.label.isNotEmpty == true ? rec!.label : widget.currentLabel;
     _initialUnlockMethod = rec?.unlockMethod ?? ContainerUnlockMethod.password;
     _initialAutoCloseMins = rec?.autoCloseMins ?? 0;
-    _initialDocumentProvider = rec?.documentProvider ?? false;
+    _initialDocumentProvider = rec?.documentProvider ?? widget.appSettings?.defaultDocumentProvider ?? false;
     _initialCipherId = rec?.cipherId ?? 255;
     _initialHashId = rec?.hashId ?? 255;
     _initialCacheDerivedKey = rec?.cacheDerivedKey;

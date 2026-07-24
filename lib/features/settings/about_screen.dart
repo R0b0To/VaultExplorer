@@ -93,21 +93,48 @@ class AboutScreen extends StatelessWidget {
     showAppSnackBar(context, message: msg, tone: tone);
   }
 
-  Widget _buildCard(BuildContext context, {required List<Widget> children}) {
+  Widget _buildSectionGroup(BuildContext context,
+      {required List<Widget> children}) {
+    if (children.isEmpty) return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
-    return Card(
-      elevation: 0,
-      color: cs.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
-        ),
-      ),
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: List.generate(children.length, (index) {
+        final isFirst = index == 0;
+        final isLast = index == children.length - 1;
+        final isOnly = children.length == 1;
+
+        BorderRadius radius;
+        if (isOnly) {
+          radius = BorderRadius.circular(20);
+        } else if (isFirst) {
+          radius = const BorderRadius.vertical(
+            top: Radius.circular(20),
+            bottom: Radius.circular(4),
+          );
+        } else if (isLast) {
+          radius = const BorderRadius.vertical(
+            top: Radius.circular(4),
+            bottom: Radius.circular(20),
+          );
+        } else {
+          radius = BorderRadius.circular(4);
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
+          child: Material(
+            color: cs.surfaceContainerHigh,
+            borderRadius: radius,
+            clipBehavior: Clip.antiAlias,
+            child: ListTileTheme(
+              tileColor: Colors.transparent,
+              child: children[index],
+            ),
+          ),
+        );
+      }),
     );
   }
 
@@ -124,16 +151,6 @@ class AboutScreen extends StatelessWidget {
           letterSpacing: -0.1,
         ),
       ),
-    );
-  }
-
-  Widget _buildDivider(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Divider(
-      height: 1,
-      indent: 16,
-      endIndent: 16,
-      color: cs.outlineVariant.withValues(alpha: 0.25),
     );
   }
 
@@ -210,7 +227,9 @@ class AboutScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('About', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: cs.surfaceContainerHigh,
+        title:
+            const Text('About', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: Align(
@@ -218,131 +237,133 @@ class AboutScreen extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 800),
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          children: [
-            _buildHeader(context),
-            const SizedBox(height: 24),
-
-            // ── Application Card ──────────────────────────────────────
-            _buildSectionHeader(context, 'Application'),
-            _buildCard(
-              context,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  title: Text(
-                    'Version',
-                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    'Tap to copy version info for bug reports',
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Text(
-                      'v$appVersion',
-                      style: textTheme.labelSmall?.copyWith(
-                        color: cs.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
+                _buildHeader(context),
+                const SizedBox(height: 24),
+
+                // ── Application Section ──────────────────────────────────
+                _buildSectionHeader(context, 'Application'),
+                _buildSectionGroup(
+                  context,
+                  children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      title: Text(
+                        'Version',
+                        style: textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
+                      subtitle: Text(
+                        'v$appVersion · Tap to copy version info for bug reports',
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      onTap: () => _copyVersionInfo(context),
                     ),
-                  ),
-                  onTap: () => _copyVersionInfo(context),
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      title: Text(
+                        "What's New",
+                        style: textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        'See recent changes and release notes',
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      onTap: () => _openUrl(context, _kReleasesUrl),
+                    ),
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      title: Text(
+                        'Privacy & Data Security',
+                        style: textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        'What VaultExplorer does — and doesn\'t — collect',
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      onTap: () => _showPrivacySheet(context),
+                    ),
+                  ],
                 ),
-                _buildDivider(context),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  title: Text(
-                    "What's New",
-                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    'See recent changes and release notes',
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  onTap: () => _openUrl(context, _kReleasesUrl),
-                ),
-                _buildDivider(context),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  title: Text(
-                    'Privacy & Data Security',
-                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    'What VaultExplorer does — and doesn\'t — collect',
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  onTap: () => _showPrivacySheet(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // ── Community & Legal Card ─────────────────────────────────
-            _buildSectionHeader(context, 'Community & Open Source'),
-            _buildCard(
-              context,
-              children: [
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  title: Text(
-                    'Report an Issue',
-                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    'Found a bug? Submit an issue on GitHub',
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  onTap: () => _openUrl(context, _kIssuesUrl),
+                // ── Community & Legal Section ─────────────────────────────
+                _buildSectionHeader(context, 'Community & Open Source'),
+                _buildSectionGroup(
+                  context,
+                  children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      title: Text(
+                        'Report an Issue',
+                        style: textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        'Found a bug? Submit an issue on GitHub',
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      onTap: () => _openUrl(context, _kIssuesUrl),
+                    ),
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      title: Text(
+                        'Contributors',
+                        style: textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        'People who helped build VaultExplorer',
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      onTap: () => _openUrl(context, _kContributorsUrl),
+                    ),
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      title: Text(
+                        'Open Source Licenses',
+                        style: textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        'Third-party libraries used in this app',
+                        style: textTheme.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      onTap: () => _showLicenses(context),
+                    ),
+                  ],
                 ),
-                _buildDivider(context),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  title: Text(
-                    'Contributors',
-                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                const SizedBox(height: 24),
+                Center(
+                  child: Text(
+                    'Made with ❤ for privacy.',
+                    style: textTheme.bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
                   ),
-                  subtitle: Text(
-                    'People who helped build VaultExplorer',
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  onTap: () => _openUrl(context, _kContributorsUrl),
                 ),
-                _buildDivider(context),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  title: Text(
-                    'Open Source Licenses',
-                    style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    'Third-party libraries used in this app',
-                    style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  onTap: () => _showLicenses(context),
-                ),
+                const SizedBox(height: 12),
               ],
             ),
-            const SizedBox(height: 24),
-            Center(
-              child: Text(
-                'Made with ❤ for privacy.',
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
+          ),
         ),
       ),
-    ),
-  ),
-);
+    );
   }
 }
 
@@ -477,7 +498,8 @@ class _PrivacySheet extends StatelessWidget {
                 minimumSize: const Size.fromHeight(48),
                 shape: const StadiumBorder(),
               ),
-              child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('Close',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),

@@ -34,6 +34,7 @@ object VlcCore {
      */
     private val options = arrayListOf(
         "--no-sub-autodetect-file",
+        "-vv",
     )
 
     fun get(context: Context): LibVLC {
@@ -76,6 +77,21 @@ class VlcPlayerEngine(
     // don't leak the proxy-fd thread ContainerDocumentsProvider spins up
     // per open() call.
     private var openParcelFd: ParcelFileDescriptor? = null
+
+    // The Uri last passed to setDataSource(), kept so play() can reopen a
+    // fresh fd + Media for it after EOF — see `reachedEnd` below.
+    private var lastContentUri: String? = null
+
+    // Set once EndReached fires, cleared once we've reopened for a replay.
+    // libVLC's fd-access module closes the raw fd our Media was built
+    // around once it finishes reading it at EOF (that's ownership
+    // semantics of handing it a bare fd, not something we control from
+    // here), so the *same* Media/fd can never be resumed after the end —
+    // trying produces "VLC is unable to open the MRL 'fd://N'" because
+    // that fd number is already closed. play() checks this flag and, if
+    // set, reopens a brand new fd/Media for the same content instead of
+    // calling mediaPlayer.play() directly.
+    private var reachedEnd = false
 
     // Size we last pushed onto the SurfaceTexture's buffer, so repeated
     // onNewVideoLayout callbacks with the same size are cheap no-ops.
@@ -133,18 +149,20 @@ class VlcPlayerEngine(
      * Safe to call repeatedly; no-ops once the size is already applied.
      * Must run on the main thread since it touches the SurfaceTexture/vout.
      */
-    private fun applyVideoSize(width: Int, height: Int) {
-        if (width <= 0 || height <= 0) return
-        if (width == currentVideoWidth && height == currentVideoHeight) return
-        currentVideoWidth = width
-        currentVideoHeight = height
+private fun applyVideoSize(width: Int, height: Int) {
+    Log.d("VlcPlayerEngine", "onNewVideoLayout: ${width}x$height (current: ${currentVideoWidth}x$currentVideoHeight)")
+    if (width <= 0 || height <= 0) return
+    if (width == currentVideoWidth && height == currentVideoHeight) return
+    currentVideoWidth = width
+    currentVideoHeight = height
 
-        mainHandler.post {
-            if (disposed) return@post
-            surfaceTexture.setDefaultBufferSize(width, height)
-            mediaPlayer.vlcVout.setWindowSize(width, height)
-        }
+    mainHandler.post {
+        if (disposed) return@post
+        Log.d("VlcPlayerEngine", "applying size ${width}x$height to surfaceTexture + vout")
+        surfaceTexture.setDefaultBufferSize(width, height)
+        mediaPlayer.vlcVout.setWindowSize(width, height)
     }
+}
 
     private fun post(map: Map<String, Any?>) {
         mainHandler.post { if (!disposed) onEvent(map) }
@@ -156,17 +174,13 @@ class VlcPlayerEngine(
 
 MediaPlayer.Event.Playing -> {
     val track = mediaPlayer.getCurrentVideoTrack()
-    Log.d(
-        "VlcPlayerEngine",
-        "Playing: codec=${track?.codec} originalCodec=${track?.originalCodec} size=${track?.width}x${track?.height}",
-    )
     if (track != null && track.width > 0 && track.height > 0) {
         applyVideoSize(track.width, track.height)
     }
     post(
         mapOf(
             "event" to "playing",
-            "width" to (track?.width ?: 0),
+            "width" to (track?.let { displayWidth(it) } ?: 0),
             "height" to (track?.height ?: 0),
             "durationMs" to mediaPlayer.getLength(),
         )
@@ -192,7 +206,18 @@ MediaPlayer.Event.Playing -> {
                 mapOf("event" to "lengthChanged", "durationMs" to event.getLengthChanged())
             )
 
-            MediaPlayer.Event.EndReached -> post(mapOf("event" to "endReached"))
+            MediaPlayer.Event.EndReached -> {
+                // Reaching EOF tears the input + decoders down (this is
+                // the "killing decoder" / "removing module" / "Program
+                // doesn't contain anymore ES" sequence visible in logcat)
+                // and closes the fd our Media was opened with. From here,
+                // resuming the same Media is not possible — play() must
+                // reopen a fresh fd/Media instead, which the reachedEnd
+                // flag tells it to do.
+                reachedEnd = true
+                mediaPlayer.stop()
+                post(mapOf("event" to "endReached"))
+            }
 
             MediaPlayer.Event.EncounteredError -> post(
                 mapOf(
@@ -224,6 +249,8 @@ MediaPlayer.Event.Playing -> {
      */
     fun setDataSource(contentUri: String, autoPlay: Boolean) {
         if (disposed) return
+        lastContentUri = contentUri
+        reachedEnd = false
         try {
             mediaPlayer.stop()
         } catch (_: Exception) {
@@ -263,7 +290,12 @@ MediaPlayer.Event.Playing -> {
             // own software (FFmpeg/avcodec) decoder sidesteps the broken
             // surface path entirely, at the cost of higher CPU usage than
             // hardware decode would use if it worked.
-            media.setHWDecoderEnabled(false, false)
+            media.setHWDecoderEnabled(true, false)
+            media.parse(IMedia.Parse.ParseLocal)
+findVideoTrack(media)?.let { track ->
+    applyVideoSize(track.width, track.height)
+    post(mapOf("event" to "sized", "width" to displayWidth(track), "height" to track.height))
+}
             mediaPlayer.setMedia(media)
         } finally {
             // Always release our reference, even if setMedia() throws —
@@ -274,7 +306,22 @@ MediaPlayer.Event.Playing -> {
         }
 
         if (autoPlay) {
-            mediaPlayer.play()
+            // Posted through the same mainHandler as the buffer resize
+            // queued by applyVideoSize() above, instead of calling
+            // mediaPlayer.play() here directly — a single Handler runs its
+            // queued runnables in order, so this guarantees the
+            // SurfaceTexture is actually resized before the decoder is
+            // allowed to start pushing frames into it. Calling play()
+            // synchronously here raced that resize: the first frame or
+            // two could get pushed into the surface at its old (or
+            // default 1x1) size before the resize runnable got its turn,
+            // producing a brief flash. That race was always there but
+            // invisible on a normal cold open (hidden behind the loading
+            // spinner); it becomes visible on replay, where the video
+            // widget is already on screen with nothing hiding it.
+            mainHandler.post {
+                if (!disposed) mediaPlayer.play()
+            }
         }
     }
 
@@ -287,8 +334,35 @@ MediaPlayer.Event.Playing -> {
         openParcelFd = null
     }
 
+    private fun findVideoTrack(media: Media): IMedia.VideoTrack? {
+    for (i in 0 until media.trackCount) {
+        val track = media.getTrack(i)
+        if (track is IMedia.VideoTrack) return track
+    }
+    return null
+}
+
+/** Display width corrected for non-square pixels (e.g. an anamorphic
+ *  `pasp` box) — the decode buffer stays at the raw coded size; only the
+ *  aspect ratio we report to Dart needs the correction. */
+private fun displayWidth(track: IMedia.VideoTrack): Int {
+    if (track.sarNum <= 0 || track.sarDen <= 0 || track.sarNum == track.sarDen) return track.width
+    return (track.width.toLong() * track.sarNum / track.sarDen).toInt()
+}
+
     fun play() {
-        if (!disposed) mediaPlayer.play()
+        if (disposed) return
+        if (reachedEnd) {
+            // The Media we had is spent (its fd is closed) — rebuild it
+            // from scratch against the same content, same as the very
+            // first setDataSource() call, then start playing. This is
+            // what makes both the Play button and the app's manual-loop
+            // (pause + seekTo(0) + play) work again after EOF.
+            val uri = lastContentUri ?: return
+            setDataSource(uri, autoPlay = true)
+            return
+        }
+        mediaPlayer.play()
     }
 
     fun pause() {

@@ -133,6 +133,14 @@ class NativeVlcController extends ValueNotifier<NativeVlcValue> {
     final map = Map<String, dynamic>.from(raw as Map);
 
     switch (map['event'] as String?) {
+      case 'sized':
+  value = value.copyWith(
+    size: Size(
+      ((map['width'] as num?) ?? 0).toDouble(),
+      ((map['height'] as num?) ?? 0).toDouble(),
+    ),
+  );
+  break;
       case 'playing':
         value = value.copyWith(
           isInitialized: true,
@@ -170,7 +178,14 @@ class NativeVlcController extends ValueNotifier<NativeVlcValue> {
         break;
 
       case 'endReached':
-        value = value.copyWith(isPlaying: false);
+        // `timeChanged` only ticks periodically, so the last tick before
+        // EOF can land anywhere up to one tick interval short of the real
+        // duration — leaving `position` there makes anything comparing
+        // `position >= duration` (manual loop, auto-advance) unreliable:
+        // the video visually freezes just short of the end and loop/
+        // advance never fires. `endReached` is libVLC's authoritative
+        // "this media finished" signal, so snap position to duration here.
+        value = value.copyWith(isPlaying: false, position: value.duration);
         break;
 
       case 'error':
@@ -295,17 +310,16 @@ class NativeVlcController extends ValueNotifier<NativeVlcValue> {
 /// `RotatedBox` layout the caller already has.
 class NativeVlcPlayerView extends StatelessWidget {
   final NativeVlcController controller;
+
   const NativeVlcPlayerView({super.key, required this.controller});
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<NativeVlcValue>(
       valueListenable: controller,
       builder: (context, value, child) {
         final id = controller.textureId;
-        if (id == null || !value.isInitialized) return const SizedBox.shrink();
-        if (value.size.width <= 0 || value.size.height <= 0) {
-          return const SizedBox.shrink();
-        }
+        if (id == null) return const SizedBox.shrink();
         return Texture(textureId: id);
       },
     );

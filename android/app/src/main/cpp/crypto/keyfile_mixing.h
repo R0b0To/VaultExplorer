@@ -33,7 +33,7 @@ struct ScopeZeroize {
 // below already closes each fd itself as part of mixing, so this is only
 // needed on early-exit paths that bail out *before* reaching that call —
 // keeps the "every keyfile fd is closed exactly once" ownership contract
-// (see VeraCryptEngine.kt's deriveKeyMaterialNative/unlockAndListNative
+// (see NativeEngine.kt's deriveKeyMaterialNative/unlockAndListNative
 // doc comments) intact regardless of which path a caller takes.
 static inline void closeUnusedKeyfileFds(const int* keyfileFds, int keyfileCount) {
     if (!keyfileFds) return;

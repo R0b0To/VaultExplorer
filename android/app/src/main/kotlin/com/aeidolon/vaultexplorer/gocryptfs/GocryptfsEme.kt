@@ -1,6 +1,6 @@
 package com.aeidolon.vaultexplorer.gocryptfs
 
-import com.aeidolon.vaultexplorer.VeraCryptEngine
+import com.aeidolon.vaultexplorer.NativeEngine
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
@@ -17,13 +17,13 @@ class GocryptfsEme(private val key: ByteArray) {
     }
 
     fun encrypt(tweak: ByteArray, plaintext: ByteArray): ByteArray {
-        val nativeBytes = VeraCryptEngine.gocryptfsEmeNative(key, tweak, plaintext, true)
+        val nativeBytes = NativeEngine.gocryptfsEmeNative(key, tweak, plaintext, true)
         if (nativeBytes != null) return nativeBytes
         return transform(tweak, plaintext, encrypt = true)
     }
 
     fun decrypt(tweak: ByteArray, ciphertext: ByteArray): ByteArray {
-        val nativeBytes = VeraCryptEngine.gocryptfsEmeNative(key, tweak, ciphertext, false)
+        val nativeBytes = NativeEngine.gocryptfsEmeNative(key, tweak, ciphertext, false)
         if (nativeBytes != null) return nativeBytes
         return transform(tweak, ciphertext, encrypt = false)
     }

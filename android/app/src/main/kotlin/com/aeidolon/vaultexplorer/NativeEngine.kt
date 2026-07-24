@@ -1,23 +1,29 @@
 package com.aeidolon.vaultexplorer
 
 /**
- * ABI-compatibility JNI shim for the original native export names.
+ * Raw JNI shim over the C++ native library. Binds 1:1 to the fixed
+ * `Java_com_aeidolon_vaultexplorer_NativeEngine_` export names in the
+ * cpp/jni bridge files (crypto_bridge.cpp, filesystem_bridge.cpp,
+ * session_bridge.cpp, container_lifecycle_bridge.cpp) — keeping that ABI
+ * constraint isolated here lets the public Kotlin API evolve independently.
  *
- * App code must use [ContainerEngine]. This object stays format-specific only
- * because the C++ library still exports statically named JNI symbols; keeping
- * that constraint isolated here lets the public API evolve independently.
+ * App code must use [ContainerEngine], never this object directly.
+ * NativeEngine has two kinds of consumers:
  *
- * The native API is split into two clear tiers:
+ *   1. VeraCrypt/LUKS/BitLocker session + file-operation calls, tiered as:
+ *      - Session-establishment: take a real fd + password + pim because
+ *        they are creating the crypto session from scratch.
+ *      - Stateless: take volId only; the C++ side asserts an active
+ *        session exists via requireActiveSession() and throws
+ *        IllegalStateException("NOT_UNLOCKED: ...") if it doesn't.
  *
- *   1. Session-establishment calls — take a real fd + password + pim because
- *      they are creating the crypto session from scratch.
- *
- *   2. Stateless calls — take volId only; the C++ side asserts an active
- *      session exists via requireActiveSession() and throws
- *      IllegalStateException("NOT_UNLOCKED: ...") if it doesn't.
- *
+ *   2. Shared native crypto primitives used by the pure-Kotlin format
+ *      backends that have no session of their own here — scrypt (Cryptomator),
+ *      SIV-mode and EME (Cryptomator/gocryptfs filename/content crypto), and
+ *      the CryFS AES-GCM block cipher. See CryptomatorVault, Scrypt, SivMode,
+ *      GocryptfsEme, CryfsBlockCipher.
  */
-internal object VeraCryptEngine {
+internal object NativeEngine {
     init {
         System.loadLibrary("vaultexplorer")
     }
@@ -200,7 +206,7 @@ external fun createUsbContainerNative(
     ): Boolean
 
     // ── Tier 2: stream lifecycle ───────────────────────────────────────────
-    // Used exclusively by VeraCryptProxyCallback. Passes a raw C++ FIL*
+    // Used exclusively by ContainerProxyCallback. Passes a raw C++ FIL*
     // as a Long — kept separate from the one-shot stateless methods above
     // because the pointer lifetime is tied to the ProxyFileDescriptor callback.
 

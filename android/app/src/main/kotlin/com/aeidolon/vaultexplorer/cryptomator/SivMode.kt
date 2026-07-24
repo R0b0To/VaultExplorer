@@ -1,6 +1,6 @@
 package com.aeidolon.vaultexplorer.cryptomator
 
-import com.aeidolon.vaultexplorer.VeraCryptEngine
+import com.aeidolon.vaultexplorer.NativeEngine
 import com.aeidolon.vaultexplorer.crypto.gf128Double
 import java.security.GeneralSecurityException
 import java.security.MessageDigest
@@ -12,7 +12,7 @@ class SivMode {
 
     fun encrypt(encKey: SecretKeySpec, macKey: SecretKeySpec, plaintext: ByteArray, vararg associatedData: ByteArray): ByteArray {
         val adList = if (associatedData.isNotEmpty()) associatedData.toList().toTypedArray() else null
-        val nativeBytes = VeraCryptEngine.sivEncryptNative(encKey.encoded, macKey.encoded, plaintext, adList)
+        val nativeBytes = NativeEngine.sivEncryptNative(encKey.encoded, macKey.encoded, plaintext, adList)
         if (nativeBytes != null) return nativeBytes
 
         val siv = s2v(macKey, associatedData.toList() + listOf(plaintext))
@@ -25,7 +25,7 @@ class SivMode {
             throw IllegalArgumentException("Ciphertext must be at least 16 bytes (SIV).")
         }
         val adList = if (associatedData.isNotEmpty()) associatedData.toList().toTypedArray() else null
-        val nativeBytes = VeraCryptEngine.sivDecryptNative(encKey.encoded, macKey.encoded, ciphertext, adList)
+        val nativeBytes = NativeEngine.sivDecryptNative(encKey.encoded, macKey.encoded, ciphertext, adList)
         if (nativeBytes != null) return nativeBytes
 
         val siv = ciphertext.copyOfRange(0, 16)

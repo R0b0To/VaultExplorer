@@ -1,6 +1,6 @@
 package com.aeidolon.vaultexplorer.cryptomator
 
-import com.aeidolon.vaultexplorer.VeraCryptEngine
+import com.aeidolon.vaultexplorer.NativeEngine
 import java.nio.charset.StandardCharsets
 
 object Scrypt {
@@ -19,7 +19,7 @@ object Scrypt {
     }
 
     fun scrypt(passphrase: ByteArray, salt: ByteArray, costParam: Int, blockSize: Int, keyLengthBytes: Int, p: Int = DEFAULT_P): ByteArray {
-        val nativeBytes = VeraCryptEngine.scryptNative(passphrase, salt, costParam, blockSize, p, keyLengthBytes)
+        val nativeBytes = NativeEngine.scryptNative(passphrase, salt, costParam, blockSize, p, keyLengthBytes)
         if (nativeBytes != null) {
             return nativeBytes
         }

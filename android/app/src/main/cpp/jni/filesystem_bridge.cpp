@@ -32,7 +32,7 @@
 static constexpr size_t MAX_CHUNK_SIZE = 64 * 1024 * 1024;  // 64 MB per JNI read/write call
 
 extern "C" JNIEXPORT jobjectArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectory(
+Java_com_aeidolon_vaultexplorer_NativeEngine_listDirectory(
         JNIEnv* env, jobject, jstring dirPath, jint volId) {
     JNI_TRY
 
@@ -65,7 +65,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_listDirectory(
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSize(
+Java_com_aeidolon_vaultexplorer_NativeEngine_getFileSize(
         JNIEnv* env, jobject, jstring fileName, jint volId) {
     JNI_TRY
 
@@ -87,7 +87,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFileSize(
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSize(
+Java_com_aeidolon_vaultexplorer_NativeEngine_getFolderSize(
         JNIEnv* env, jobject, jstring dirPath, jint volId) {
     JNI_TRY
 
@@ -109,7 +109,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getFolderSize(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunk(
+Java_com_aeidolon_vaultexplorer_NativeEngine_readFileChunk(
         JNIEnv* env, jobject,
         jstring fileName, jlong offset, jint length, jint volId) {
     JNI_TRY
@@ -139,7 +139,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readFileChunk(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
+Java_com_aeidolon_vaultexplorer_NativeEngine_writeFileChunk(
         JNIEnv* env, jobject,
         jstring fileName, jlong offset, jbyteArray data, jint volId) {
     JNI_TRY
@@ -170,7 +170,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeFileChunk(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
+Java_com_aeidolon_vaultexplorer_NativeEngine_writeBackFile(
         JNIEnv* env, jobject,
         jstring targetFileName, jstring sourcePath, jint volId) {
     JNI_TRY
@@ -198,7 +198,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_writeBackFile(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_extractFile(
+Java_com_aeidolon_vaultexplorer_NativeEngine_extractFile(
         JNIEnv* env, jobject,
         jstring targetFileName, jstring destPath, jint volId) {
     JNI_TRY
@@ -223,7 +223,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_extractFile(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
+Java_com_aeidolon_vaultexplorer_NativeEngine_deleteFile(
         JNIEnv* env, jobject, jstring targetFileName, jint volId) {
     JNI_TRY
 
@@ -248,7 +248,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deleteFile(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
+Java_com_aeidolon_vaultexplorer_NativeEngine_createDirectory(
         JNIEnv* env, jobject, jstring dirPath, jint volId) {
     JNI_TRY
 
@@ -273,7 +273,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createDirectory(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
+Java_com_aeidolon_vaultexplorer_NativeEngine_renameFile(
         JNIEnv* env, jobject,
         jstring oldPath, jstring newPath, jint volId) {
     JNI_TRY
@@ -301,7 +301,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_renameFile(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_setLastModifiedTime(
+Java_com_aeidolon_vaultexplorer_NativeEngine_setLastModifiedTime(
         JNIEnv* env, jobject,
         jstring path, jlong epochSeconds, jint volId) {
     JNI_TRY
@@ -327,7 +327,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_setLastModifiedTime(
 }
 
 extern "C" JNIEXPORT jlongArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
+Java_com_aeidolon_vaultexplorer_NativeEngine_getSpaceInfo(
         JNIEnv* env, jobject, jint volId) {
     JNI_TRY
 
@@ -351,7 +351,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getSpaceInfo(
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_openStream(
+Java_com_aeidolon_vaultexplorer_NativeEngine_openStream(
         JNIEnv* env, jobject, jstring targetFileName, jint volId) {
     JNI_TRY
 
@@ -378,7 +378,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_openStream(
 // openStream() already mounted successfully, so re-checking on every read
 // would be redundant work on a hot path (media playback).
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStream(
+Java_com_aeidolon_vaultexplorer_NativeEngine_readStream(
         JNIEnv* env, jobject,
         jlong streamPtr, jlong offset, jbyteArray outBuffer, jint length, jint volId) {
     JNI_TRY
@@ -400,7 +400,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_readStream(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_closeStream(
+Java_com_aeidolon_vaultexplorer_NativeEngine_closeStream(
         JNIEnv* env, jobject, jlong streamPtr, jint volId) {
     JNI_TRY
 

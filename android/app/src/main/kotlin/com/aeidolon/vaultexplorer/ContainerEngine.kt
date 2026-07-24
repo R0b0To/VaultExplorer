@@ -7,33 +7,33 @@ package com.aeidolon.vaultexplorer
  * specific — Cryptomator, Gocryptfs, and Cryfs vaults are opened via their
  * respective vault classes directly from MainActivity, not through this
  * facade's unlock* methods, since they have no block-device/FUSE layer for
- * VeraCryptEngine to drive.
+ * NativeEngine to drive.
  *
  * Tier-2 (file/directory operations against an unlocked volId) dispatch
  * here: if [VaultBackendRegistry] holds a session for the given volId, the
  * call goes to that pure-Kotlin session; otherwise it falls through to the
- * ABI-compatible JNI shim [VeraCryptEngine], unchanged from before. This
+ * ABI-compatible JNI shim [NativeEngine], unchanged from before. This
  * keeps every existing call site (ContainerFileSystem,
  * ContainerDocumentsProvider, file_operation_service.dart, etc.) working
  * unmodified for all container families — callers key everything off
  * volId and never need to know which backend is actually serving it.
  */
 object ContainerEngine {
-    fun maxVolumes(): Int = VeraCryptEngine.getMaxVolumesNative()
+    fun maxVolumes(): Int = NativeEngine.getMaxVolumesNative()
 
     fun deriveKeyMaterial(
         fd: Int, password: String, pim: Int, cipherId: Int = 255,
         hashId: Int = 255, keyfileFds: IntArray? = null,
-    ): ByteArray? = VeraCryptEngine.deriveKeyMaterialNative(fd, password, pim, cipherId, hashId, keyfileFds)
+    ): ByteArray? = NativeEngine.deriveKeyMaterialNative(fd, password, pim, cipherId, hashId, keyfileFds)
 
     fun lastDerivedKeyMaterial(volId: Int): ByteArray? =
-        VeraCryptEngine.getLastDerivedKeyMaterialNative(volId)
+        NativeEngine.getLastDerivedKeyMaterialNative(volId)
 
     fun unlockFile(
         fd: Int, password: String, pim: Int, volId: Int, cipherId: Int = 255,
         hashId: Int = 255, preservedKey: ByteArray? = null, keyfileFds: IntArray? = null,
         readOnly: Boolean = false,
-    ): Array<String>? = VeraCryptEngine.unlockAndListNative(
+    ): Array<String>? = NativeEngine.unlockAndListNative(
         fd, password, pim, volId, cipherId, hashId, preservedKey, keyfileFds, readOnly
     )
 
@@ -41,19 +41,19 @@ object ContainerEngine {
         password: String, pim: Int, volId: Int, deviceSizeBytes: Long, cipherId: Int = 255,
         hashId: Int = 255, preservedKey: ByteArray? = null, partitionOffsetHint: Long = -1L,
         keyfileFds: IntArray? = null, readOnly: Boolean = false,
-    ): Array<String>? = VeraCryptEngine.unlockUsbAndListNative(
+    ): Array<String>? = NativeEngine.unlockUsbAndListNative(
         password, pim, volId, deviceSizeBytes, cipherId, hashId, preservedKey,
         partitionOffsetHint, keyfileFds, readOnly
     )
 
     /** containerFormat: 0 = VeraCrypt, 1 = LUKS1, 2 = LUKS2. See
-     *  createContainerNative's doc comment in [VeraCryptEngine] for the
+     *  createContainerNative's doc comment in [NativeEngine] for the
      *  cipherId/hashId/keyfileFds semantics, which differ by format. */
     fun create(
         fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
         keyfileFds: IntArray? = null,
-    ): Boolean = VeraCryptEngine.createContainerNative(
+    ): Boolean = NativeEngine.createContainerNative(
         fd, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId, keyfileFds
     )
 
@@ -61,7 +61,7 @@ object ContainerEngine {
         volId: Int, partitionScheme: String, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
         keyfileFds: IntArray? = null, quickFormat: Boolean = false
-    ): Boolean = VeraCryptEngine.createUsbContainerNative(
+    ): Boolean = NativeEngine.createUsbContainerNative(
         volId, partitionScheme, password, pim, sizeBytes, fileSystem, containerFormat, cipherId, hashId, keyfileFds, quickFormat
     )
 
@@ -73,7 +73,7 @@ object ContainerEngine {
         outerCipherId: Int = 255, outerHashId: Int = 255,
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
         outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
-    ): Boolean = VeraCryptEngine.createContainerWithHiddenNative(
+    ): Boolean = NativeEngine.createContainerWithHiddenNative(
         fd, outerPassword, hiddenPassword, outerPim, hiddenPim, sizeBytes,
         outerFileSystem, hiddenFileSystem, hiddenSizeBytes,
         outerCipherId, outerHashId, hiddenCipherId, hiddenHashId,
@@ -90,7 +90,7 @@ object ContainerEngine {
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
         outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
         quickFormat: Boolean = false
-    ): Boolean = VeraCryptEngine.createUsbContainerWithHiddenNative(
+    ): Boolean = NativeEngine.createUsbContainerWithHiddenNative(
         volId, partitionScheme, outerPassword, hiddenPassword, outerPim, hiddenPim, sizeBytes,
         outerFileSystem, hiddenFileSystem, hiddenSizeBytes, outerCipherId, outerHashId,
         hiddenCipherId, hiddenHashId, outerKeyfileFds, hiddenKeyfileFds, quickFormat
@@ -101,7 +101,7 @@ object ContainerEngine {
         oldPim: Int, newPim: Int,
         cipherId: Int = 255, hashId: Int = 255,
         oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null,
-    ): Boolean = VeraCryptEngine.changeContainerPasswordNative(
+    ): Boolean = NativeEngine.changeContainerPasswordNative(
         fd, oldPassword, newPassword, oldPim, newPim, cipherId, hashId,
         oldKeyfileFds, newKeyfileFds
     )
@@ -109,64 +109,64 @@ object ContainerEngine {
     /** Locks/closes volId's session regardless of backend: zeroes the Cryptomator/Gocryptfs masterkey if it's a pure-Kotlin session, otherwise unmounts the native VeraCrypt/LUKS volume as before. */
     fun lock(volId: Int) {
         val session = VaultBackendRegistry.get(volId)
-        if (session != null) VaultBackendRegistry.remove(volId) else VeraCryptEngine.lockNative(volId)
+        if (session != null) VaultBackendRegistry.remove(volId) else NativeEngine.lockNative(volId)
     }
     
-    fun requestUnlockCancellation(volId: Int) = VeraCryptEngine.requestCancelUnlockNative(volId)
+    fun requestUnlockCancellation(volId: Int) = NativeEngine.requestCancelUnlockNative(volId)
     
     fun hashPassword(password: String, salt: ByteArray, iterations: Int): ByteArray? =
-        VeraCryptEngine.hashPasswordNative(password, salt, iterations)
+        NativeEngine.hashPasswordNative(password, salt, iterations)
 
-    fun matchedCipherId(volId: Int): Int = VeraCryptEngine.getMatchedCipherId(volId)
-    fun matchedHashId(volId: Int): Int = VeraCryptEngine.getMatchedHashId(volId)
+    fun matchedCipherId(volId: Int): Int = NativeEngine.getMatchedCipherId(volId)
+    fun matchedHashId(volId: Int): Int = NativeEngine.getMatchedHashId(volId)
 
     fun format(volId: Int): ContainerFormat =
-        VaultBackendRegistry.get(volId)?.format ?: ContainerFormat.fromNative(VeraCryptEngine.getContainerFormat(volId))
+        VaultBackendRegistry.get(volId)?.format ?: ContainerFormat.fromNative(NativeEngine.getContainerFormat(volId))
 
     fun listDirectory(path: String, volId: Int): Array<String>? {
         VaultBackendRegistry.get(volId)?.let { return it.listDirectory(path) }
-        return VeraCryptEngine.listDirectory(path, volId)
+        return NativeEngine.listDirectory(path, volId)
     }
 
     fun createDirectory(path: String, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { return it.createDirectory(path) }
-        return VeraCryptEngine.createDirectory(path, volId)
+        return NativeEngine.createDirectory(path, volId)
     }
 
     fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { return it.renameFile(oldPath, newPath) }
-        return VeraCryptEngine.renameFile(oldPath, newPath, volId)
+        return NativeEngine.renameFile(oldPath, newPath, volId)
     }
 
     fun setLastModifiedTime(path: String, epochSeconds: Long, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { return it.setLastModifiedTime(path, epochSeconds) }
-        return VeraCryptEngine.setLastModifiedTime(path, epochSeconds, volId)
+        return NativeEngine.setLastModifiedTime(path, epochSeconds, volId)
     }
 
     fun deleteFile(path: String, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { return it.deleteFile(path) }
-        return VeraCryptEngine.deleteFile(path, volId)
+        return NativeEngine.deleteFile(path, volId)
     }
 
     fun getFileSize(path: String, volId: Int): Long {
         VaultBackendRegistry.get(volId)?.let { return it.getFileSize(path) }
-        return VeraCryptEngine.getFileSize(path, volId)
+        return NativeEngine.getFileSize(path, volId)
     }
 
     fun getFolderSize(path: String, volId: Int): Long {
         VaultBackendRegistry.get(volId)?.let { return it.getFolderSize(path) }
-        return VeraCryptEngine.getFolderSize(path, volId)
+        return NativeEngine.getFolderSize(path, volId)
     }
 
     fun readFileChunk(path: String, offset: Long, length: Int, volId: Int): ByteArray? {
         VaultBackendRegistry.get(volId)?.let { return it.readFileChunk(path, offset, length) }
-        return VeraCryptEngine.readFileChunk(path, offset, length, volId)
+        return NativeEngine.readFileChunk(path, offset, length, volId)
     }
 
     /** For Cryptomator/Gocryptfs sessions, callers MUST invoke [finishWrite] once after their final writeFileChunk() call for a given path to flush the last (possibly partial) chunk and materialize the file. */
     fun writeFileChunk(path: String, offset: Long, data: ByteArray, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { return it.writeFileChunk(path, offset, data) }
-        return VeraCryptEngine.writeFileChunk(path, offset, data, volId)
+        return NativeEngine.writeFileChunk(path, offset, data, volId)
     }
 
     /** No-op for VeraCrypt/LUKS (whose writeFileChunk is already durable per-call); required for Cryptomator and Gocryptfs to flush their write buffers. Safe to call unconditionally after any writeFileChunk() sequence completes. */
@@ -177,22 +177,22 @@ object ContainerEngine {
 
     fun writeBackFile(path: String, sourcePath: String, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { return it.writeBackFile(path, sourcePath) }
-        return VeraCryptEngine.writeBackFile(path, sourcePath, volId)
+        return NativeEngine.writeBackFile(path, sourcePath, volId)
     }
 
     fun extractFile(path: String, destination: String, volId: Int): Boolean {
         VaultBackendRegistry.get(volId)?.let { return it.extractFile(path, destination) }
-        return VeraCryptEngine.extractFile(path, destination, volId)
+        return NativeEngine.extractFile(path, destination, volId)
     }
 
     fun getSpaceInfo(volId: Int): LongArray? {
         VaultBackendRegistry.get(volId)?.let { return it.getSpaceInfo() }
-        return VeraCryptEngine.getSpaceInfo(volId)
+        return NativeEngine.getSpaceInfo(volId)
     }
 
     fun openStream(path: String, volId: Int): Long {
         if (VaultBackendRegistry.get(volId) != null) return VaultStreamRegistry.open(volId, path)
-        return VeraCryptEngine.openStream(path, volId)
+        return NativeEngine.openStream(path, volId)
     }
 
     fun importStream(path: String, inputStream: java.io.InputStream, volId: Int): Boolean {
@@ -202,7 +202,7 @@ object ContainerEngine {
         val tempFile = java.io.File.createTempFile("vc_import_", ".tmp")
         return try {
             tempFile.outputStream().use { out -> inputStream.copyTo(out) }
-            VeraCryptEngine.writeBackFile(path, tempFile.absolutePath, volId)
+            NativeEngine.writeBackFile(path, tempFile.absolutePath, volId)
         } finally {
             tempFile.delete()
         }
@@ -212,14 +212,14 @@ object ContainerEngine {
         if (VaultBackendRegistry.get(volId) != null) {
             return VaultStreamRegistry.read(volId, stream, offset, out, length)
         }
-        return VeraCryptEngine.readStream(stream, offset, out, length, volId)
+        return NativeEngine.readStream(stream, offset, out, length, volId)
     }
 
     fun closeStream(stream: Long, volId: Int) {
         if (VaultBackendRegistry.get(volId) != null) {
             VaultStreamRegistry.close(volId, stream)
         } else {
-            VeraCryptEngine.closeStream(stream, volId)
+            NativeEngine.closeStream(stream, volId)
         }
     }
 }

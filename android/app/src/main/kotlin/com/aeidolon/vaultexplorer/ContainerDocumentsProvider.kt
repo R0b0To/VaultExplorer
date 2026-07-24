@@ -406,7 +406,7 @@ addDocumentRow(
         ).apply { start() }
         val handler = Handler(handlerThread.looper)
 
-        val callback = VeraCryptProxyCallback(volId, session, fatPath, isWrite, handlerThread)
+        val callback = ContainerProxyCallback(volId, session, fatPath, isWrite, handlerThread)
 
         return try {
             val parcelMode = ParcelFileDescriptor.parseMode(mode ?: "r")
@@ -469,7 +469,7 @@ addDocumentRow(
 
     // ── Proxy callback (Zero-Copy Fast Stream Bridge) ──────────────────────
 
-    inner class VeraCryptProxyCallback(
+    inner class ContainerProxyCallback(
         private val volId: Int,
         private val session: ContainerSession,
         private val fatPath: String,
@@ -505,7 +505,7 @@ addDocumentRow(
                 }
             } catch (e: Exception) {
                 handlerThread.quitSafely()
-                throw FileNotFoundException("VeraCrypt init failed for $fatPath: ${e.message}")
+                throw FileNotFoundException("Container stream init failed for $fatPath: ${e.message}")
             }
         }
 

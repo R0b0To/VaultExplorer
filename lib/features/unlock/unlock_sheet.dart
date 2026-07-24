@@ -196,7 +196,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       if (mounted) setState(() => _loadingAuth = false);
 
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
-        await Future<void>.delayed(const Duration(milliseconds: 300));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
         if (mounted) {
           _tryBiometric();
         }
@@ -282,7 +282,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       });
 
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
-        await Future<void>.delayed(const Duration(milliseconds: 300));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
         if (mounted) {
           _tryBiometric();
         }

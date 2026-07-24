@@ -1,6 +1,6 @@
 #pragma once
 
-// Shared declarations for the VeraCryptEngine JNI bridge, split by domain
+// Shared declarations for the NativeEngine JNI bridge, split by domain
 // across crypto_bridge.cpp / session_bridge.cpp / container_lifecycle_bridge.cpp
 // / filesystem_bridge.cpp (see io/virtual_block_device.cpp for the FatFs
 // diskio + crypto-dispatch layer these all sit on top of).

@@ -13,7 +13,7 @@
 #include "jni_bridge_common.h"
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
         jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds) {
@@ -47,7 +47,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerNative(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerWithHiddenNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_createContainerWithHiddenNative(
         JNIEnv* env, jobject,
         jint fd, jstring outerPassword, jstring hiddenPassword,
         jint outerPim, jint hiddenPim, jlong sizeBytes, jstring outerFileSystem, jstring hiddenFileSystem,
@@ -86,7 +86,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createContainerWithHiddenNative(
 #include "partition_writer.h"
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createUsbContainerNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerNative(
         JNIEnv* env, jobject,
         jint volId, jstring partitionScheme, jstring password, jint pim, jlong sizeBytes, jstring fileSystem,
         jint containerFormat, jint cipherId, jint hashId, jintArray keyfileFds, jboolean quickFormat) {
@@ -131,7 +131,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createUsbContainerNative(
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createUsbContainerWithHiddenNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_createUsbContainerWithHiddenNative(
         JNIEnv* env, jobject,
         jint volId, jstring partitionScheme,
         jstring outerPassword, jstring hiddenPassword,
@@ -183,7 +183,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_createUsbContainerWithHiddenNati
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_changeContainerPasswordNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_changeContainerPasswordNative(
         JNIEnv* env, jobject,
         jint fd, jstring oldPassword, jstring newPassword,
         jint oldPim, jint newPim,

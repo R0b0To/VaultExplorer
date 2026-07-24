@@ -9,7 +9,7 @@ package com.aeidolon.vaultexplorer
  *
  * VeraCrypt/LUKS aren't included here: they have no session object at all
  * (native VolumeState slots instead), so they stay behind the
- * [VeraCryptEngine] JNI shim — [ContainerEngine] falls back to it whenever
+ * [NativeEngine] JNI shim — [ContainerEngine] falls back to it whenever
  * [vaultBackend] returns null for a volId.
  *
  * Method docs live on the call sites in ContainerEngine and on each

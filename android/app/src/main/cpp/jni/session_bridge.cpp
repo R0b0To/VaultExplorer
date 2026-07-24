@@ -24,7 +24,7 @@ static void throwUnlockCancelledException(JNIEnv* env) {
 }
 
 extern "C" JNIEXPORT jobjectArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockAndListNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
         JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds, jboolean readOnly) {
     JNI_TRY
 
@@ -77,7 +77,7 @@ if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strl
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_requestCancelUnlockNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_requestCancelUnlockNative(
         JNIEnv* env, jobject, jint volId) {
     JNI_TRY
 
@@ -87,7 +87,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_requestCancelUnlockNative(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv* env, jobject, jint volId) {
+Java_com_aeidolon_vaultexplorer_NativeEngine_lockNative(JNIEnv* env, jobject, jint volId) {
     JNI_TRY
 
     if (volId < 0 || volId >= MAX_VOLUMES) return;
@@ -119,7 +119,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_lockNative(JNIEnv* env, jobject,
 
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedCipherId(JNIEnv* env, jobject, jint volId) {
+Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedCipherId(JNIEnv* env, jobject, jint volId) {
     JNI_TRY
 
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
@@ -130,7 +130,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedCipherId(JNIEnv* env, 
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedHashId(JNIEnv* env, jobject, jint volId) {
+Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedHashId(JNIEnv* env, jobject, jint volId) {
     JNI_TRY
 
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
@@ -141,7 +141,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedHashId(JNIEnv* env, jo
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getContainerFormat(JNIEnv* env, jobject, jint volId) {
+Java_com_aeidolon_vaultexplorer_NativeEngine_getContainerFormat(JNIEnv* env, jobject, jint volId) {
     JNI_TRY
 
     if (volId < 0 || volId >= MAX_VOLUMES) return 0;
@@ -152,7 +152,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getContainerFormat(JNIEnv* env, 
 }
 
 extern "C" JNIEXPORT jlong JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedPartitionOffset(JNIEnv* env, jobject, jint volId) {
+Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedPartitionOffset(JNIEnv* env, jobject, jint volId) {
     JNI_TRY
 
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
@@ -165,7 +165,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMatchedPartitionOffset(JNIEnv
 
 
 extern "C" JNIEXPORT jobjectArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_unlockUsbAndListNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
         jlong partitionOffsetHint, jintArray keyfileFds, jboolean readOnly) {
     JNI_TRY

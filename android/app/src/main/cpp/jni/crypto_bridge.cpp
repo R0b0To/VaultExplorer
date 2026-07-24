@@ -5,9 +5,9 @@
 // the couple of things shared across all of them.
 //
 // Splitting the JNI entry points across files is safe on its own: JNI
-// resolves `Java_com_aeidolon_vaultexplorer_VeraCryptEngine_*` symbols by
+// resolves `Java_com_aeidolon_vaultexplorer_NativeEngine_*` symbols by
 // name in the built .so, not by source file, so nothing on the Kotlin
-// (VeraCryptEngine.kt) or Dart side needs to change.
+// (NativeEngine.kt) or Dart side needs to change.
 
 #include <jni.h>
 #include <cstring>
@@ -46,7 +46,7 @@ struct MdContextGuard {
 };
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMaxVolumesNative(JNIEnv* env, jobject) {
+Java_com_aeidolon_vaultexplorer_NativeEngine_getMaxVolumesNative(JNIEnv* env, jobject) {
     JNI_TRY
 
     return static_cast<jint>(MAX_VOLUMES);
@@ -55,7 +55,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getMaxVolumesNative(JNIEnv* env,
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getLastDerivedKeyMaterialNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_getLastDerivedKeyMaterialNative(
         JNIEnv* env, jobject, jint volId) {
     JNI_TRY
 
@@ -74,7 +74,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getLastDerivedKeyMaterialNative(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_deriveKeyMaterialNative(
         JNIEnv* env, jobject,
         jint fd, jstring password, jint pim, jint cipherId, jint hashId, jintArray keyfileFds) {
     JNI_TRY
@@ -137,7 +137,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_deriveKeyMaterialNative(
 // ----------------------------------------------------------------====
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_hashPasswordNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_hashPasswordNative(
         JNIEnv* env, jobject,
         jstring password, jbyteArray salt, jint iterations) {
     JNI_TRY
@@ -188,7 +188,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_hashPasswordNative(
 // ── Startup self-check ────────────────────────────────────────────────
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeFingerprint(
+Java_com_aeidolon_vaultexplorer_NativeEngine_getCascadeFingerprint(
         JNIEnv* env, jobject, jint cascadeId) {
     JNI_TRY
 
@@ -205,7 +205,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeFingerprint(
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeIdCount(JNIEnv* env, jobject) {
+Java_com_aeidolon_vaultexplorer_NativeEngine_getCascadeIdCount(JNIEnv* env, jobject) {
     JNI_TRY
 
     return 15; // the eight legacy IDs plus the seven VeraCrypt 1.26.29 additions
@@ -214,7 +214,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getCascadeIdCount(JNIEnv* env, j
 }
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getHashIdCount(JNIEnv* env, jobject) {
+Java_com_aeidolon_vaultexplorer_NativeEngine_getHashIdCount(JNIEnv* env, jobject) {
     JNI_TRY
 
     return 6; // kSha512, kSha256, kWhirlpool, kStreebog, kBlake2s256, kArgon2id
@@ -225,7 +225,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_getHashIdCount(JNIEnv* env, jobj
 
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_gocryptfsEmeNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_gocryptfsEmeNative(
         JNIEnv* env, jobject,
         jbyteArray key, jbyteArray tweak, jbyteArray data, jboolean encrypt) {
     JNI_TRY
@@ -266,7 +266,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_gocryptfsEmeNative(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_sivEncryptNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_sivEncryptNative(
         JNIEnv* env, jobject,
         jbyteArray encKey, jbyteArray macKey, jbyteArray plaintext, jobjectArray adArray) {
     JNI_TRY
@@ -319,7 +319,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_sivEncryptNative(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_sivDecryptNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_sivDecryptNative(
         JNIEnv* env, jobject,
         jbyteArray encKey, jbyteArray macKey, jbyteArray ciphertext, jobjectArray adArray) {
     JNI_TRY
@@ -376,7 +376,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_sivDecryptNative(
 
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_scryptNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_scryptNative(
         JNIEnv* env, jobject,
         jbyteArray passphrase, jbyteArray salt, jint N, jint r, jint p, jint dkLen) {
     JNI_TRY
@@ -421,7 +421,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_scryptNative(
 // side: kotlin/.../cryfs/CryfsBlockCipher.kt.
 
 extern "C" JNIEXPORT jint JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsCipherIdNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_cryfsCipherIdNative(
         JNIEnv* env, jobject, jstring cipherName) {
     JNI_TRY
 
@@ -436,7 +436,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsCipherIdNative(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsEncryptBlockNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_cryfsEncryptBlockNative(
         JNIEnv* env, jobject,
         jint cipherId, jbyteArray key, jbyteArray plaintext) {
     JNI_TRY
@@ -470,7 +470,7 @@ Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsEncryptBlockNative(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_aeidolon_vaultexplorer_VeraCryptEngine_cryfsDecryptBlockNative(
+Java_com_aeidolon_vaultexplorer_NativeEngine_cryfsDecryptBlockNative(
         JNIEnv* env, jobject,
         jint cipherId, jbyteArray key, jbyteArray ciphertext) {
     JNI_TRY

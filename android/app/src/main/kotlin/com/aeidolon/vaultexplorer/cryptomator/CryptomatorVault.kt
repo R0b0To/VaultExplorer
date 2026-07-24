@@ -8,7 +8,7 @@ import java.util.UUID
 
 
 /**
- * Entry point mirroring VeraCryptEngine.unlockFile/create — opens or creates
+ * Entry point mirroring NativeEngine.unlockFile/create — opens or creates
  * a Cryptomator vault rooted at a SAF tree Uri (the folder containing
  * vault.cryptomator + masterkey.cryptomator + d/), given the user's
  * passphrase.

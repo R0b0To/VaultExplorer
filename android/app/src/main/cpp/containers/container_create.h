@@ -6,8 +6,8 @@
 // generates a salt and master key from /dev/urandom, builds and encrypts
 // the volume header (primary + backup copy), zero-fills the data area,
 // then formats the requested filesystem (fat/exfat/ntfs/ext2/ext3/ext4) on
-// top of it. Behind VeraCryptEngine's createContainerNative JNI call (see
-// VeraCryptEngine.kt).
+// top of it. Behind NativeEngine's createContainerNative JNI call (see
+// NativeEngine.kt).
 //
 // Always takes ownership of [fd]: it is closed before this function
 // returns, regardless of outcome (synced first on success). Matches the fd

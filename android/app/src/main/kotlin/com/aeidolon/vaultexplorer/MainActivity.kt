@@ -2317,7 +2317,7 @@ class MainActivity : FlutterFragmentActivity() {
                 retriever = MediaMetadataRetriever()
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    val dataSource = VeraCryptMediaDataSource(this, uriString, fileName, volId)
+                    val dataSource = ContainerMediaDataSource(this, uriString, fileName, volId)
                     retriever.setDataSource(dataSource)
 
                     val durationMs = retriever
@@ -2377,7 +2377,7 @@ class MainActivity : FlutterFragmentActivity() {
                         return@execute
                     }
 
-                var inputStream = BufferedInputStream(VeraCryptInputStream(this, uriString, fileName, volId), 65536)
+                var inputStream = BufferedInputStream(ContainerInputStream(this, uriString, fileName, volId), 65536)
 
                 val options = BitmapFactory.Options().apply {
                     inJustDecodeBounds = true
@@ -2394,7 +2394,7 @@ class MainActivity : FlutterFragmentActivity() {
                     this.inSampleSize = inSampleSize
                 }
 
-                inputStream = BufferedInputStream(VeraCryptInputStream(this, uriString, fileName, volId), 65536)
+                inputStream = BufferedInputStream(ContainerInputStream(this, uriString, fileName, volId), 65536)
                 val rawBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
                 inputStream.close()
 
@@ -2433,7 +2433,7 @@ class MainActivity : FlutterFragmentActivity() {
             try {
                 val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString) ?: return@execute
 
-                var inputStream = BufferedInputStream(VeraCryptInputStream(this, uriString, fileName, volId), 65536)
+                var inputStream = BufferedInputStream(ContainerInputStream(this, uriString, fileName, volId), 65536)
                 val options = BitmapFactory.Options().apply {
                     inJustDecodeBounds = true
                 }
@@ -2444,7 +2444,7 @@ class MainActivity : FlutterFragmentActivity() {
                 val height = options.outHeight
                 val inSampleSize = calculateInSampleSize(width, height, targetSize)
 
-                inputStream = BufferedInputStream(VeraCryptInputStream(this, uriString, fileName, volId), 65536)
+                inputStream = BufferedInputStream(ContainerInputStream(this, uriString, fileName, volId), 65536)
                 val decodeOptions = BitmapFactory.Options().apply {
                     this.inSampleSize = inSampleSize
                 }
@@ -2839,9 +2839,9 @@ class MainActivity : FlutterFragmentActivity() {
     }
 }
 
-// ── VeraCryptInputStream (Optimized Subsampled Native Image Stream) ─────────────
+// ── ContainerInputStream (Optimized Subsampled Native Image Stream) ─────────────
 
-class VeraCryptInputStream(
+class ContainerInputStream(
     private val context: Context,
     private val uriString: String,
     private val fileName: String,
@@ -2897,7 +2897,7 @@ class VeraCryptInputStream(
 }
 
 @TargetApi(Build.VERSION_CODES.M)
-class VeraCryptMediaDataSource(
+class ContainerMediaDataSource(
     private val context: Context,
     private val uriString: String,
     private val fileName: String,

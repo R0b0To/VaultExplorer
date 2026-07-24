@@ -163,7 +163,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         if (_loadDevicesFuture != null) {
           await _loadDevicesFuture;
         }
-        // Small delay allows route & device scan animations to settle before prompting biometrics
         await Future<void>.delayed(const Duration(milliseconds: 300));
         if (mounted && _selected != null && !_reconnectTargetMissing) {
           _tryBiometric();
@@ -236,7 +235,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
       if (e.code == 'auth_in_progress' ||
           e.code == 'AuthenticationInProgress' ||
           (e.message?.contains('Authentication in progress') ?? false)) {
-        // Silently swallow race condition error on startup/transitions
         return;
       }
       if (mounted) {
@@ -566,6 +564,50 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     }
   }
 
+  Widget _buildSectionGroup({required List<Widget> children}) {
+    if (children.isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: List.generate(children.length, (index) {
+        final isFirst = index == 0;
+        final isLast = index == children.length - 1;
+        final isOnly = children.length == 1;
+
+        BorderRadius radius;
+        if (isOnly) {
+          radius = BorderRadius.circular(20);
+        } else if (isFirst) {
+          radius = const BorderRadius.vertical(
+            top: Radius.circular(20),
+            bottom: Radius.circular(4),
+          );
+        } else if (isLast) {
+          radius = const BorderRadius.vertical(
+            top: Radius.circular(4),
+            bottom: Radius.circular(20),
+          );
+        } else {
+          radius = BorderRadius.circular(4);
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
+          child: Material(
+            color: cs.surfaceContainerHigh,
+            borderRadius: radius,
+            clipBehavior: Clip.antiAlias,
+            child: ListTileTheme(
+              tileColor: Colors.transparent,
+              child: children[index],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -575,7 +617,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
 
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
-      fillColor: cs.surfaceContainerHigh,
+      fillColor: cs.surfaceContainerHighest,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
@@ -592,7 +634,9 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     );
 
     return Scaffold(
+      backgroundColor: cs.surfaceContainerLow,
       appBar: AppBar(
+        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           isReconnect ? 'Reconnect "${widget.existingRecord!.label}"' : 'Unlock USB Drive',
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -613,7 +657,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         ),
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -665,14 +709,16 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 16),
-                            OutlinedButton.icon(
+                            FilledButton.tonalIcon(
                               onPressed: _loadDevices,
                               icon: const Icon(Icons.refresh_rounded, size: 16),
                               label: const Text('Retry Connection'),
-                              style: OutlinedButton.styleFrom(
+                              style: FilledButton.styleFrom(
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
+                                backgroundColor: cs.surfaceContainerHighest,
+                                foregroundColor: cs.primary,
                               ),
                             ),
                           ],
@@ -686,7 +732,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                   if (_devices.isEmpty) ...[
                     Card(
                       elevation: 0,
-                      color: cs.surfaceContainerLow,
+                      color: cs.surfaceContainerHigh,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                         side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
@@ -699,7 +745,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: cs.surfaceContainerHigh,
+                                color: cs.surfaceContainerHighest,
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(Icons.usb_off_rounded, size: 36, color: cs.onSurfaceVariant),
@@ -761,10 +807,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                                 child: Card(
                                   elevation: 0,
                                   color: isAlreadyMounted
-                                      ? cs.surfaceContainerLow.withValues(alpha: 0.5)
+                                      ? cs.surfaceContainerHigh.withValues(alpha: 0.5)
                                       : isSelected
                                           ? cs.primaryContainer.withValues(alpha: 0.15)
-                                          : cs.surfaceContainerLow,
+                                          : cs.surfaceContainerHigh,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(20),
                                     side: BorderSide(
@@ -787,7 +833,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                                                 ? cs.surfaceContainer
                                                 : isSelected
                                                     ? cs.primaryContainer
-                                                    : cs.surfaceContainerHigh,
+                                                    : cs.surfaceContainerHighest,
                                             borderRadius: BorderRadius.circular(14),
                                           ),
                                           child: Icon(
@@ -841,7 +887,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                             decoration: BoxDecoration(
-                                              color: cs.surfaceContainerHigh,
+                                              color: cs.surfaceContainerHighest,
                                               borderRadius: BorderRadius.circular(12),
                                             ),
                                             child: Text(
@@ -871,7 +917,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                         )
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
 
                     // Auth View Switchers
                     if (_loadingAuth)
@@ -881,237 +927,237 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       )
-                    else ...[
-                      // Read-only mode toggle
-                      Material(
+                    // Biometric Card
+                    else if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
+                      Card(
+                        elevation: 0,
                         color: cs.surfaceContainerHigh,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(24),
+                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
                         ),
-                        clipBehavior: Clip.antiAlias,
-                        child: SwitchListTile(
-                          value: _readOnly,
-                          onChanged: busy ? null : (val) => setState(() => _readOnly = val),
-                          title: Text(
-                            'Read-only mode',
-                            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: cs.primaryContainer.withValues(alpha: 0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.fingerprint_rounded,
+                                  size: 56,
+                                  color: cs.primary,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                'Biometric Authentication',
+                                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Authenticate to unlock and mount this USB device',
+                                style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 28),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: FilledButton.tonal(
+                                      onPressed: () => setState(() => _showPasswordFallback = true),
+                                      style: FilledButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        backgroundColor: cs.surfaceContainerHighest,
+                                        foregroundColor: cs.primary,
+                                      ),
+                                      child: const Text('Use Password'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: FilledButton(
+                                      onPressed: _tryBiometric,
+                                      style: FilledButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                      ),
+                                      child: const Text('Authenticate'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          subtitle: Text(
-                            'Mount without allowing changes to this drive',
-                            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                          ),
-                          secondary: Icon(Icons.visibility_outlined, color: cs.primary),
                         ),
                       ),
-                      const SizedBox(height: 16),
-
-                      // Biometric Card
-                      if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
-                        Card(
-                          elevation: 0,
-                          color: cs.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                    ]
+                    // Pattern Card
+                    else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
+                      Card(
+                        elevation: 0,
+                        color: cs.surfaceContainerHigh,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Draw Unlock Pattern',
+                                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _patternError ? 'Wrong pattern — try again' : 'Connect your pattern sequence to mount',
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: _patternError ? cs.error : cs.onSurfaceVariant,
+                                  fontWeight: _patternError ? FontWeight.bold : null,
+                                ),
+                              ),
+                              const SizedBox(height: 20),
+                              PatternLockView(
+                                key: ValueKey(_patternResetKey),
+                                onPatternComplete: _onPatternComplete,
+                                showError: _patternError,
+                              ),
+                              const SizedBox(height: 20),
+                              FilledButton.tonal(
+                                onPressed: () => setState(() => _showPasswordFallback = true),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(48),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  backgroundColor: cs.surfaceContainerHighest,
+                                  foregroundColor: cs.primary,
+                                ),
+                                child: const Text('Use Password instead'),
+                              ),
+                            ],
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(28),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(20),
-                                  decoration: BoxDecoration(
-                                    color: cs.primaryContainer.withValues(alpha: 0.5),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.fingerprint_rounded,
-                                    size: 56,
-                                    color: cs.primary,
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                Text(
-                                  'Biometric Authentication',
-                                  style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Authenticate to unlock and mount this USB device',
-                                  style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 28),
-                                Row(
+                        ),
+                      ),
+                    ]
+                    else ...[
+                      // Standard Password & Credentials Section Group
+                      _buildSectionGroup(
+                        children: [
+                          // 1. Password Field
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: TextField(
+                              controller: _passwordCtrl,
+                              obscureText: _obscure,
+                              enabled: !busy,
+                              decoration: InputDecoration(
+                                labelText: 'Password',
+                                hintText: _isBitlocker
+                                    ? 'Enter password or recovery key'
+                                    : 'Enter USB partition password',
+                                prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+                                suffixIcon: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Expanded(
-                                      child: OutlinedButton(
-                                        onPressed: () => setState(() => _showPasswordFallback = true),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 14),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(16),
+                                    if (_passwordPrefilled)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 4),
+                                        child: Tooltip(
+                                          message: 'Using saved password',
+                                          child: Icon(
+                                            Icons.bookmark_rounded,
+                                            size: 20,
+                                            color: cs.primary,
                                           ),
                                         ),
-                                        child: const Text('Use Password'),
                                       ),
+                                    PasswordVisibilityToggle(
+                                      obscured: _obscure,
+                                      onToggle: () => setState(() => _obscure = !_obscure),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: FilledButton(
-                                        onPressed: _tryBiometric,
-                                        style: FilledButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 14),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(16),
-                                          ),
-                                        ),
-                                        child: const Text('Authenticate'),
-                                      ),
-                                    ),
+                                    const SizedBox(width: 8),
                                   ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ]
-                      // Pattern Card
-                      else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
-                        Card(
-                          elevation: 0,
-                          color: cs.surfaceContainerLow,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'Draw Unlock Pattern',
-                                  style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _patternError ? 'Wrong pattern — try again' : 'Connect your pattern sequence to mount',
-                                  style: textTheme.bodyMedium?.copyWith(
-                                    color: _patternError ? cs.error : cs.onSurfaceVariant,
-                                    fontWeight: _patternError ? FontWeight.bold : null,
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                PatternLockView(
-                                  key: ValueKey(_patternResetKey),
-                                  onPatternComplete: _onPatternComplete,
-                                  showError: _patternError,
-                                ),
-                                const SizedBox(height: 20),
-                                OutlinedButton(
-                                  onPressed: () => setState(() => _showPasswordFallback = true),
-                                  style: OutlinedButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(48),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                  child: const Text('Use Password instead'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ]
-                      else ...[
-                        // Standard Password Form View
-                        TextField(
-                          controller: _passwordCtrl,
-                          obscureText: _obscure,
-                          enabled: !busy,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            hintText: _isBitlocker
-                                ? 'Enter password or recovery key'
-                                : 'Enter USB partition password',
-                            prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_passwordPrefilled)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 4),
-                                    child: Tooltip(
-                                      message: 'Using saved password',
-                                      child: Icon(
-                                        Icons.bookmark_rounded,
-                                        size: 20,
-                                        color: cs.primary,
-                                      ),
-                                    ),
-                                  ),
-                                PasswordVisibilityToggle(
-                                  obscured: _obscure,
-                                  onToggle: () => setState(() => _obscure = !_obscure),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Keyfiles Component
-                        if (!_isBitlocker) ...[
-                          KeyfilesPicker(
-                            keyfiles: keyfiles,
-                            picking: pickingKeyfiles,
-                            onPick: pickKeyfiles,
-                            onRemove: removeKeyfile,
-                            enabled: !busy,
-                          ),
-                          if (_isLuks && keyfiles.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6, left: 4),
-                              child: Text(
-                                'For LUKS containers the keyfile replaces the password.',
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
                                 ),
                               ),
                             ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // Collapsible Advanced settings panel
-                        if (!_isLuks && !_isBitlocker)
-                          AdvancedParamsPanel(
-                            pimController: _pimCtrl,
-                            cipherId: _cipherId,
-                            hashId: _hashId,
-                            enabled: !busy,
-                            onCipherChanged: (val) => setState(() => _cipherId = val),
-                            onHashChanged: (val) => setState(() => _hashId = val),
                           ),
-                        const SizedBox(height: 16),
 
-                        // Remember Drive Toggle
-                        if (!isReconnect) ...[
-                          Material(
-                            color: cs.surfaceContainerHigh,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                          // 2. Keyfiles Component
+                          if (!_isBitlocker)
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  KeyfilesPicker(
+                                    keyfiles: keyfiles,
+                                    picking: pickingKeyfiles,
+                                    onPick: pickKeyfiles,
+                                    onRemove: removeKeyfile,
+                                    enabled: !busy,
+                                  ),
+                                  if (_isLuks && keyfiles.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'For LUKS containers the keyfile replaces the password.',
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
-                            clipBehavior: Clip.antiAlias,
-                            child: SwitchListTile(
+
+                          // 3. Collapsible Advanced Settings Panel
+                          if (!_isLuks && !_isBitlocker)
+                            AdvancedParamsPanel(
+                              pimController: _pimCtrl,
+                              cipherId: _cipherId,
+                              hashId: _hashId,
+                              enabled: !busy,
+                              onCipherChanged: (val) => setState(() => _cipherId = val),
+                              onHashChanged: (val) => setState(() => _hashId = val),
+                            ),
+
+                          // 4. Read-Only Mode Switch
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                            value: _readOnly,
+                            onChanged: busy ? null : (val) => setState(() => _readOnly = val),
+                            title: Text(
+                              'Read-only mode',
+                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              'Mount without allowing changes to this drive',
+                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            secondary: Icon(Icons.visibility_outlined, color: cs.primary),
+                          ),
+
+                          // 5. Remember Drive Switch
+                          if (!isReconnect)
+                            SwitchListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                               value: _remember,
                               onChanged: busy ? null : (val) => setState(() => _remember = val),
                               title: Text(
                                 'Remember drive',
-                                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                                style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               subtitle: Text(
                                 'Pin drive on dashboard for quick access',
@@ -1119,65 +1165,63 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                               ),
                               secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
                             ),
-                          ),
-                          const SizedBox(height: 16),
                         ],
+                      ),
 
-                        if (_error != null) ...[
-                          const SizedBox(height: 16),
-                          InlineErrorBanner(_error!),
-                        ],
-                        const SizedBox(height: 28),
+                      if (_error != null) ...[
+                        const SizedBox(height: 16),
+                        InlineErrorBanner(_error!),
+                      ],
+                      const SizedBox(height: 24),
 
-                        // Unlock execution CTA
-                        FilledButton(
-                          onPressed: busy || _devices.isEmpty || _selected == null ? null : _unlock,
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(56),
-                            shape: const StadiumBorder(),
-                          ),
-                          child: busy
-                              ? Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        color: cs.onPrimary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Flexible(
-                                      child: Text(
-                                        _unlocking ? _unlockProgressLabel : 'Requesting permission...',
-                                        overflow: TextOverflow.ellipsis,
-                                        style: textTheme.titleMedium?.copyWith(
-                                          color: cs.primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : Text(
-                                  isReconnect ? 'Unlock & Mount' : 'Unlock Drive',
-                                  style: textTheme.titleMedium?.copyWith(
-                                      color: cs.onPrimary,
-                                      fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                      // Unlock execution CTA
+                      FilledButton(
+                        onPressed: busy || _devices.isEmpty || _selected == null ? null : _unlock,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                          shape: const StadiumBorder(),
                         ),
-                        if (_unlocking && _activeVolId != null) ...[
-                          const SizedBox(height: 8),
-                          Center(
-                            child: TextButton(
-                              onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
-                              child: const Text('Cancel Unlock'),
-                            ),
+                        child: busy
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: cs.onPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Flexible(
+                                    child: Text(
+                                      _unlocking ? _unlockProgressLabel : 'Requesting permission...',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: textTheme.titleMedium?.copyWith(
+                                        color: cs.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                isReconnect ? 'Unlock & Mount' : 'Unlock Drive',
+                                style: textTheme.titleMedium?.copyWith(
+                                    color: cs.onPrimary,
+                                    fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                      if (_unlocking && _activeVolId != null) ...[
+                        const SizedBox(height: 8),
+                        Center(
+                          child: TextButton(
+                            onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
+                            child: const Text('Cancel Unlock'),
                           ),
-                        ],
+                        ),
                       ],
                     ],
                   ],

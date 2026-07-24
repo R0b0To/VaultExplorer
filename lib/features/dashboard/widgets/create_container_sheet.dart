@@ -6,7 +6,6 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
-import 'package:vaultexplorer/core/widgets/cards/expressive_card.dart';
 
 class CreateContainerSheet extends StatefulWidget {
   const CreateContainerSheet({super.key});
@@ -161,7 +160,194 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     }
   }
 
+  Widget _buildSectionHeader(String title) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 6),
+      child: Text(
+        title,
+        style: textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: cs.primary,
+          letterSpacing: -0.1,
+        ),
+      ),
+    );
+  }
 
+  Widget _buildSectionGroup({required List<Widget> children}) {
+    if (children.isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: List.generate(children.length, (index) {
+        final isFirst = index == 0;
+        final isLast = index == children.length - 1;
+        final isOnly = children.length == 1;
+
+        BorderRadius radius;
+        if (isOnly) {
+          radius = BorderRadius.circular(20);
+        } else if (isFirst) {
+          radius = const BorderRadius.vertical(
+            top: Radius.circular(20),
+            bottom: Radius.circular(4),
+          );
+        } else if (isLast) {
+          radius = const BorderRadius.vertical(
+            top: Radius.circular(4),
+            bottom: Radius.circular(20),
+          );
+        } else {
+          radius = BorderRadius.circular(4);
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
+          child: Material(
+            color: cs.surfaceContainerHigh,
+            borderRadius: radius,
+            clipBehavior: Clip.antiAlias,
+            child: ListTileTheme(
+              tileColor: Colors.transparent,
+              child: children[index],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildSelectTile<T>({
+    required String label,
+    required T value,
+    required List<_SelectOption<T>> options,
+    required ValueChanged<T> onChanged,
+    String? subtitle,
+    IconData? prefixIcon,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final currentOption = options.firstWhere(
+      (opt) => opt.value == value,
+      orElse: () => options.first,
+    );
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      leading: prefixIcon != null
+          ? Icon(prefixIcon, size: 20, color: cs.primary)
+          : null,
+      title: Text(
+        label,
+        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(
+          subtitle ?? currentOption.label,
+          style: textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            height: 1.25,
+          ),
+        ),
+      ),
+      onTap: () {
+        showDialog<void>(
+          context: context,
+          builder: (dialogContext) {
+            final dialogTheme = Theme.of(dialogContext);
+            final mediaQuery = MediaQuery.of(dialogContext);
+            final isLandscape =
+                mediaQuery.orientation == Orientation.landscape;
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 440,
+                  maxHeight: isLandscape
+                      ? mediaQuery.size.height * 0.85
+                      : mediaQuery.size.height * 0.75,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          label,
+                          style: dialogTheme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: options.map((opt) {
+                              final isSelected = opt.value == value;
+                              return RadioListTile<T>(
+                                dense: true,
+                                visualDensity: VisualDensity.compact,
+                                activeColor: cs.primary,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 0,
+                                ),
+                                value: opt.value,
+                                groupValue: value,
+                                title: Text(
+                                  opt.label,
+                                  style: dialogTheme.textTheme.bodyMedium
+                                      ?.copyWith(
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: isSelected ? cs.primary : null,
+                                  ),
+                                ),
+                                subtitle: opt.subtitle != null
+                                    ? Text(
+                                        opt.subtitle!,
+                                        style: dialogTheme
+                                            .textTheme.bodySmall
+                                            ?.copyWith(
+                                          color: cs.onSurfaceVariant,
+                                        ),
+                                      )
+                                    : null,
+                                onChanged: (T? newValue) {
+                                  if (newValue != null) {
+                                    Navigator.of(dialogContext).pop();
+                                    onChanged(newValue);
+                                  }
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   // ── Top-level dispatch ─────────────────────────────────────────────────────
 
@@ -348,18 +534,28 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   }
 
   Widget _buildFormatSelector() {
-    return DropdownButtonFormField<CreateFormat>(
-      initialValue: _format,
-      decoration: const InputDecoration(
-        labelText: 'Container Format',
-        prefixIcon: Icon(Icons.dns_outlined, size: 20),
-      ),
-      items: CreateFormat.values
-          .map((f) => DropdownMenuItem(value: f, child: Text(f.label)))
-          .toList(),
-      onChanged: (val) {
-        if (val != null) _onFormatChanged(val);
-      },
+    return SegmentedButton<CreateFormat>(
+      segments: const [
+        ButtonSegment(
+          value: CreateFormat.veracrypt,
+          label: Text('VeraCrypt'),
+          icon: Icon(Icons.lock_rounded),
+        ),
+        ButtonSegment(
+          value: CreateFormat.luks1,
+          label: Text('LUKS1'),
+          icon: Icon(Icons.security_rounded),
+        ),
+        ButtonSegment(
+          value: CreateFormat.luks2,
+          label: Text('LUKS2'),
+          icon: Icon(Icons.shield_rounded),
+        ),
+      ],
+      selected: {_format},
+      onSelectionChanged: _loading
+          ? null
+          : (sel) => _onFormatChanged(sel.first),
     );
   }
 
@@ -384,242 +580,279 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
       onCipherChanged: (val) => setState(() => _cipherId = val),
       onHashChanged: (val) => setState(() => _hashId = val),
       extraFields: [
-        DropdownButtonFormField<String>(
-          initialValue: _fileSystem,
-          decoration: const InputDecoration(
-            labelText: 'Format File System',
-            prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
-          ),
-          items: _availableFileSystems
-              .map((fs) => DropdownMenuItem(value: fs, child: Text(fs)))
+        _buildSelectTile<String>(
+          label: 'Format File System',
+          value: _fileSystem,
+          prefixIcon: Icons.dns_rounded,
+          subtitle: 'File system: $_fileSystem',
+          options: _availableFileSystems
+              .map((fs) => _SelectOption(value: fs, label: fs))
               .toList(),
-          onChanged: (val) {
-            if (val != null) setState(() => _fileSystem = val);
-          },
+          onChanged: (val) => setState(() => _fileSystem = val),
         ),
       ],
     );
   }
 
   Widget _buildMainVolumeSection(ColorScheme cs, TextTheme textTheme) {
-    return ExpressiveCard(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const ExpressiveSectionHeader(
-          title: 'Standard Volume',
-          subtitle: 'Primary container parameters and credentials',
-          icon: Icons.storage_rounded,
-        ),
-        _buildFormatSelector(),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _nameCtrl,
-          decoration: const InputDecoration(
-            labelText: 'File Name',
-            prefixIcon: Icon(Icons.drive_file_rename_outline_rounded, size: 20),
-          ),
-        ),
-        const SizedBox(height: 14),
-        Row(
+        _buildSectionHeader('Standard Volume'),
+        _buildSectionGroup(
           children: [
-            Expanded(
-              flex: 2,
-              child: TextField(
-                controller: _sizeCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Container Size',
-                  prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                initialValue: _sizeUnit,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Unit',
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'MB', child: Text('MB')),
-                  DropdownMenuItem(value: 'GB', child: Text('GB')),
+            // Format Selector
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Container Format',
+                    style: textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildFormatSelector(),
                 ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _sizeUnit = val);
-                },
               ),
             ),
+
+            // File Name Field
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'File Name',
+                  prefixIcon: Icon(Icons.drive_file_rename_outline_rounded,
+                      size: 20),
+                ),
+              ),
+            ),
+
+            // Container Size & Unit Row
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _sizeCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Container Size',
+                        prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildSelectTile<String>(
+                      label: 'Unit',
+                      value: _sizeUnit,
+                      options: const [
+                        _SelectOption(value: 'MB', label: 'MB'),
+                        _SelectOption(value: 'GB', label: 'GB'),
+                      ],
+                      onChanged: (val) => setState(() => _sizeUnit = val),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Password Field
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _passwordCtrl,
+                obscureText: _obscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon:
+                      Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _obscure,
+                    onToggle: () => setState(() => _obscure = !_obscure),
+                  ),
+                ),
+              ),
+            ),
+
+            // Confirm Password Field
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _confirmPasswordCtrl,
+                obscureText: _confirmObscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  labelText: 'Confirm Password',
+                  prefixIcon: Icon(Icons.check_circle_outline_rounded,
+                      size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _confirmObscure,
+                    onToggle: () =>
+                        setState(() => _confirmObscure = !_confirmObscure),
+                  ),
+                ),
+              ),
+            ),
+
+            // Keyfiles Picker
+            _buildKeyfilesPicker(),
+
+            // Advanced Parameters Panel
+            _buildAdvancedTile(context),
           ],
         ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _passwordCtrl,
-          obscureText: _obscure,
-          onChanged: (_) => setState(() {}),
-          autofillHints: const [AutofillHints.newPassword],
-          decoration: InputDecoration(
-            labelText: 'Password',
-            prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
-            suffixIcon: PasswordVisibilityToggle(
-              obscured: _obscure,
-              onToggle: () => setState(() => _obscure = !_obscure),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _confirmPasswordCtrl,
-          obscureText: _confirmObscure,
-          onChanged: (_) => setState(() {}),
-          autofillHints: const [AutofillHints.newPassword],
-          decoration: InputDecoration(
-            labelText: 'Confirm Password',
-            prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
-            suffixIcon: PasswordVisibilityToggle(
-              obscured: _confirmObscure,
-              onToggle: () => setState(() => _confirmObscure = !_confirmObscure),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        _buildKeyfilesPicker(),
-        const SizedBox(height: 16),
-        _buildAdvancedTile(context),
       ],
     );
   }
 
   Widget _buildHiddenVolumeSection(ColorScheme cs, TextTheme textTheme) {
-    final bool isEnabled = _passwordCtrl.text.isNotEmpty || keyfiles.isNotEmpty;
+    final bool isEnabled =
+        _passwordCtrl.text.isNotEmpty || keyfiles.isNotEmpty;
 
-    return ExpressiveCard(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const ExpressiveSectionHeader(
-          title: 'Hidden Volume',
-          subtitle: 'Plausibly deniable secondary volume',
-          icon: Icons.visibility_off_rounded,
-        ),
-        Material(
-          color: cs.surfaceContainerHigh,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: SwitchListTile(
-            value: isEnabled && _enableHiddenVolume,
-            onChanged: isEnabled
-                ? (val) => setState(() => _enableHiddenVolume = val)
-                : null,
-            title: Text('Create Hidden Volume', style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-            subtitle: Text(
-              isEnabled
-                  ? 'Create an invisible secondary volume'
-                  : 'Set outer password or keyfiles first to enable',
-              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-            secondary: Icon(
-              Icons.visibility_off_outlined,
-              color: isEnabled ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ),
-        ),
-        if (isEnabled && _enableHiddenVolume) ...[
-          const SizedBox(height: 16),
-          TextField(
-            controller: _hiddenPasswordCtrl,
-            obscureText: _hiddenObscure,
-            onChanged: (_) => setState(() {}),
-            autofillHints: const [AutofillHints.newPassword],
-            decoration: InputDecoration(
-              labelText: 'Hidden Password',
-              prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
-              suffixIcon: PasswordVisibilityToggle(
-                obscured: _hiddenObscure,
-                onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
+        _buildSectionHeader('Hidden Volume'),
+        _buildSectionGroup(
+          children: [
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              value: isEnabled && _enableHiddenVolume,
+              onChanged: isEnabled
+                  ? (val) => setState(() => _enableHiddenVolume = val)
+                  : null,
+              title: Text('Create Hidden Volume',
+                  style: textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                isEnabled
+                    ? 'Create an invisible secondary volume'
+                    : 'Set outer password or keyfiles first to enable',
+                style: textTheme.bodySmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              secondary: Icon(
+                Icons.visibility_off_outlined,
+                color: isEnabled
+                    ? cs.primary
+                    : cs.onSurfaceVariant.withValues(alpha: 0.5),
               ),
             ),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _hiddenConfirmPasswordCtrl,
-            obscureText: _hiddenConfirmObscure,
-            onChanged: (_) => setState(() {}),
-            autofillHints: const [AutofillHints.newPassword],
-            decoration: InputDecoration(
-              labelText: 'Confirm Hidden Password',
-              prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
-              suffixIcon: PasswordVisibilityToggle(
-                obscured: _hiddenConfirmObscure,
-                onToggle: () => setState(() => _hiddenConfirmObscure = !_hiddenConfirmObscure),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
+            if (isEnabled && _enableHiddenVolume) ...[
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: TextField(
-                  controller: _hiddenSizeCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Hidden Size',
-                    prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
+                  controller: _hiddenPasswordCtrl,
+                  obscureText: _hiddenObscure,
+                  onChanged: (_) => setState(() {}),
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: InputDecoration(
+                    labelText: 'Hidden Password',
+                    prefixIcon:
+                        Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _hiddenObscure,
+                      onToggle: () =>
+                          setState(() => _hiddenObscure = !_hiddenObscure),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: _hiddenSizeUnit,
-                  decoration: const InputDecoration(
-                    labelText: 'Unit',
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: _hiddenConfirmPasswordCtrl,
+                  obscureText: _hiddenConfirmObscure,
+                  onChanged: (_) => setState(() {}),
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: InputDecoration(
+                    labelText: 'Confirm Hidden Password',
+                    prefixIcon: Icon(Icons.check_circle_outline_rounded,
+                        size: 20, color: cs.primary),
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _hiddenConfirmObscure,
+                      onToggle: () => setState(
+                          () => _hiddenConfirmObscure = !_hiddenConfirmObscure),
+                    ),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'MB', child: Text('MB')),
-                    DropdownMenuItem(value: 'GB', child: Text('GB')),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _hiddenSizeCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Hidden Size',
+                          prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildSelectTile<String>(
+                        label: 'Unit',
+                        value: _hiddenSizeUnit,
+                        options: const [
+                          _SelectOption(value: 'MB', label: 'MB (Megabytes)'),
+                          _SelectOption(value: 'GB', label: 'GB (Gigabytes)'),
+                        ],
+                        onChanged: (val) =>
+                            setState(() => _hiddenSizeUnit = val),
+                      ),
+                    ),
                   ],
-                  onChanged: (val) {
-                    if (val != null) setState(() => _hiddenSizeUnit = val);
-                  },
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          KeyfilesPicker(
-            keyfiles: _hiddenKeyfilesController.keyfiles,
-            picking: _hiddenKeyfilesController.picking,
-            onPick: _hiddenKeyfilesController.pick,
-            onRemove: _hiddenKeyfilesController.remove,
-            enabled: !_loading,
-          ),
-          const SizedBox(height: 16),
-          AdvancedParamsPanel(
-            pimController: _hiddenPimCtrl,
-            cipherId: _hiddenCipherId,
-            hashId: _hiddenHashId,
-            includeAuto: false,
-            cipherItems: _cipherItems,
-            hashItems: _hashItems,
-            onCipherChanged: (val) => setState(() => _hiddenCipherId = val),
-            onHashChanged: (val) => setState(() => _hiddenHashId = val),
-            extraFields: [
-              DropdownButtonFormField<String>(
-                initialValue: _hiddenFileSystem,
-                decoration: const InputDecoration(
-                  labelText: 'Hidden File System',
-                  prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
-                ),
-                items: _availableFileSystems.map((fs) => DropdownMenuItem(value: fs, child: Text(fs))).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _hiddenFileSystem = val);
-                },
+              KeyfilesPicker(
+                keyfiles: _hiddenKeyfilesController.keyfiles,
+                picking: _hiddenKeyfilesController.picking,
+                onPick: _hiddenKeyfilesController.pick,
+                onRemove: _hiddenKeyfilesController.remove,
+                enabled: !_loading,
+              ),
+              AdvancedParamsPanel(
+                pimController: _hiddenPimCtrl,
+                cipherId: _hiddenCipherId,
+                hashId: _hiddenHashId,
+                includeAuto: false,
+                cipherItems: _cipherItems,
+                hashItems: _hashItems,
+                onCipherChanged: (val) => setState(() => _hiddenCipherId = val),
+                onHashChanged: (val) => setState(() => _hiddenHashId = val),
+                extraFields: [
+                  _buildSelectTile<String>(
+                    label: 'Hidden File System',
+                    value: _hiddenFileSystem,
+                    prefixIcon: Icons.dns_rounded,
+                    subtitle: 'File system: $_hiddenFileSystem',
+                    options: _availableFileSystems
+                        .map((fs) => _SelectOption(value: fs, label: fs))
+                        .toList(),
+                    onChanged: (val) =>
+                        setState(() => _hiddenFileSystem = val),
+                  ),
+                ],
               ),
             ],
-          ),
-        ],
+          ],
+        ),
       ],
     );
   }
@@ -664,9 +897,11 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
             ? cs.primaryContainer.withValues(alpha: 0.15)
             : cs.surfaceContainerLow,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: hasSelection ? cs.primary : cs.outlineVariant.withValues(alpha: 0.35),
+            color: hasSelection
+                ? cs.primary
+                : cs.outlineVariant.withValues(alpha: 0.35),
             width: hasSelection ? 1.5 : 1,
           ),
         ),
@@ -675,18 +910,21 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
           child: Row(
             children: [
               Container(
-                width: 52,
-                height: 52,
                 decoration: BoxDecoration(
-                  color: hasSelection ? cs.primaryContainer : cs.surfaceContainerHigh,
+                  color: hasSelection
+                      ? cs.primaryContainer
+                      : cs.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Icon(
-                  _folderVaultFormat == 'gocryptfs' || _folderVaultFormat == 'cryfs'
-                      ? Icons.enhanced_encryption_rounded
-                      : Icons.folder_shared_rounded,
+                  _folderVaultFormat == 'gocryptfs' ||
+                          _folderVaultFormat == 'cryfs'
+                      ? Icons.folder_zip
+                      : Icons.folder_zip,
                   size: 26,
-                  color: hasSelection ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                  color: hasSelection
+                      ? cs.onPrimaryContainer
+                      : cs.onSurfaceVariant,
                 ),
               ),
               const SizedBox(width: 14),
@@ -704,10 +942,13 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      _folderVaultDisplayName ?? 'Tap to choose where vault will be created…',
+                      _folderVaultDisplayName ??
+                          'Tap to choose where vault will be created…',
                       style: textTheme.bodyLarge?.copyWith(
-                        color: hasSelection ? cs.onSurface : cs.onSurfaceVariant,
-                        fontWeight: hasSelection ? FontWeight.bold : FontWeight.normal,
+                        color:
+                            hasSelection ? cs.onSurface : cs.onSurfaceVariant,
+                        fontWeight:
+                            hasSelection ? FontWeight.bold : FontWeight.normal,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -755,57 +996,85 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   }
 
   Widget _buildFolderVaultSection(ColorScheme cs, TextTheme textTheme) {
-    return ExpressiveCard(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const ExpressiveSectionHeader(
-          title: 'Folder Vault',
-          subtitle: 'Cryptomator, Gocryptfs, or CryFS compatible directory structure',
-          icon: Icons.folder_shared_rounded,
-        ),
-        _buildFolderVaultFormatSelector(),
-        const SizedBox(height: 16),
-        _buildFolderVaultPickerCard(cs, textTheme),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _folderVaultPasswordCtrl,
-          obscureText: _folderVaultObscure,
-          onChanged: (_) => setState(() {}),
-          autofillHints: const [AutofillHints.newPassword],
-          decoration: InputDecoration(
-            labelText: 'Password',
-            prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
-            suffixIcon: PasswordVisibilityToggle(
-              obscured: _folderVaultObscure,
-              onToggle: () => setState(() => _folderVaultObscure = !_folderVaultObscure),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _folderVaultConfirmCtrl,
-          obscureText: _folderVaultConfirmObscure,
-          onChanged: (_) => setState(() {}),
-          autofillHints: const [AutofillHints.newPassword],
-          decoration: InputDecoration(
-            labelText: 'Confirm Password',
-            prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
-            suffixIcon: PasswordVisibilityToggle(
-              obscured: _folderVaultConfirmObscure,
-              onToggle: () => setState(() => _folderVaultConfirmObscure = !_folderVaultConfirmObscure),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        _buildSectionHeader('Folder Vault'),
+        _buildSectionGroup(
           children: [
-            Icon(Icons.info_outline_rounded, size: 16, color: cs.primary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                "Folder vaults don't support keyfiles, PIM, hidden "
-                'volumes, or VeraCrypt/LUKS cipher choices.',
-                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.3),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Vault Format',
+                    style: textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildFolderVaultFormatSelector(),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildFolderVaultPickerCard(cs, textTheme),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _folderVaultPasswordCtrl,
+                obscureText: _folderVaultObscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon:
+                      Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _folderVaultObscure,
+                    onToggle: () => setState(
+                        () => _folderVaultObscure = !_folderVaultObscure),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _folderVaultConfirmCtrl,
+                obscureText: _folderVaultConfirmObscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  labelText: 'Confirm Password',
+                  prefixIcon: Icon(Icons.check_circle_outline_rounded,
+                      size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _folderVaultConfirmObscure,
+                    onToggle: () => setState(() => _folderVaultConfirmObscure =
+                        !_folderVaultConfirmObscure),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 16, color: cs.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "Folder vaults don't support keyfiles, PIM, hidden "
+                      'volumes, or VeraCrypt/LUKS cipher choices.',
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant, height: 1.3),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -818,11 +1087,12 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
-      fillColor: cs.surfaceContainerHigh,
+      fillColor: cs.surfaceContainerHighest,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
@@ -862,7 +1132,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 )
               : Text(
                   _isFolderVault ? 'Create Vault' : 'Create Container',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style:
+                      const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
         ),
       ],
@@ -871,7 +1142,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     final primarySection = _isFolderVault
         ? _buildFolderVaultSection(cs, textTheme)
         : _buildMainVolumeSection(cs, textTheme);
-    final showHiddenVolumeSection = !_isFolderVault && _format == CreateFormat.veracrypt;
+    final showHiddenVolumeSection =
+        !_isFolderVault && _format == CreateFormat.veracrypt;
 
     return PopScope(
       canPop: !_loading,
@@ -879,19 +1151,24 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         if (!didPop && _loading) {
           showAppSnackBar(
             context,
-            message: '${_isFolderVault ? 'Vault' : 'Container'} creation in progress. Please wait.',
+            message:
+                '${_isFolderVault ? 'Vault' : 'Container'} creation in progress. Please wait.',
             tone: AppBannerTone.warning,
           );
         }
       },
       child: Scaffold(
+        backgroundColor: cs.surfaceContainerLow,
         appBar: AppBar(
+          backgroundColor: cs.surfaceContainerHigh,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () => Navigator.pop(context),
           ),
           title: Text(
-            _isFolderVault ? 'Create Encrypted Vault' : 'Create Encrypted Container',
+            _isFolderVault
+                ? 'Create Encrypted Vault'
+                : 'Create Encrypted Container',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           bottom: _loading
@@ -910,13 +1187,14 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
           ),
           child: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: AutofillGroup(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildVaultKindSelector(),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                     isLandscape
                         ? Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -924,14 +1202,16 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                               Expanded(
                                 child: primarySection,
                               ),
-                              const SizedBox(width: 20),
+                              const SizedBox(width: 16),
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     if (showHiddenVolumeSection) ...[
-                                      _buildHiddenVolumeSection(cs, textTheme),
-                                      const SizedBox(height: 20),
+                                      _buildHiddenVolumeSection(
+                                          cs, textTheme),
+                                      const SizedBox(height: 16),
                                     ],
                                     errorAndSubmit,
                                   ],
@@ -960,4 +1240,16 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
       ),
     );
   }
+}
+
+class _SelectOption<T> {
+  final T value;
+  final String label;
+  final String? subtitle;
+
+  const _SelectOption({
+    required this.value,
+    required this.label,
+    this.subtitle,
+  });
 }

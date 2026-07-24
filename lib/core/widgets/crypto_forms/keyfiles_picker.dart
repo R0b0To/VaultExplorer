@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart' show KeyfileRef;
 
-/// The "keyfiles" picker card — previously hand-duplicated (with minor
-/// visual drift) across `unlock_sheet.dart`, `usb_unlock_sheet.dart`,
-/// `container_config_sheet.dart`'s `_RealPasswordGateDialog`. One
-/// implementation now backs all of them.
+/// The "keyfiles" picker card — backs unlock sheets, container config, and creation flows.
 class KeyfilesPicker extends StatelessWidget {
   final List<KeyfileRef> keyfiles;
   final bool picking;
@@ -27,13 +24,8 @@ class KeyfilesPicker extends StatelessWidget {
     final cs = context.colors;
     final textTheme = context.typography;
 
-    return Container(
+    return Padding(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -42,20 +34,32 @@ class KeyfilesPicker extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.insert_drive_file_outlined, size: AppIconSize.standard, color: cs.primary),
+                  Icon(
+                    Icons.insert_drive_file_outlined,
+                    size: AppIconSize.small,
+                    color: cs.primary,
+                  ),
                   const SizedBox(width: 10),
                   Text(
                     'Keyfiles (optional)',
-                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface),
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
                   ),
                 ],
               ),
-              TextButton.icon(
+              FilledButton.tonalIcon(
                 onPressed: (enabled && !picking) ? onPick : null,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  backgroundColor: cs.surfaceContainerHighest,
+                  foregroundColor: cs.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 icon: picking
                     ? const SizedBox(
@@ -64,35 +68,46 @@ class KeyfilesPicker extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add file'),
+                label: const Text('Add File'),
               ),
             ],
           ),
+          const SizedBox(height: 8),
           if (keyfiles.isNotEmpty) ...[
-            const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: keyfiles
                   .map(
                     (k) => InputChip(
-                      avatar: Icon(Icons.description_outlined, size: 16, color: cs.onSurfaceVariant),
-                      label: Text(k.displayName, style: textTheme.bodySmall, overflow: TextOverflow.ellipsis),
+                      avatar: Icon(
+                        Icons.description_outlined,
+                        size: 16,
+                        color: cs.primary,
+                      ),
+                      label: Text(
+                        k.displayName,
+                        style: textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       onDeleted: enabled ? () => onRemove(k) : null,
                       deleteIconColor: cs.error,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
-                      backgroundColor: cs.surfaceContainerHigh,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide.none,
+                      ),
+                      backgroundColor: cs.surfaceContainerHighest,
                     ),
                   )
                   .toList(),
             ),
           ] else ...[
-            const SizedBox(height: 8),
             Text(
               'No keyfiles attached',
               style: textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-                fontStyle: FontStyle.italic,
+                color: cs.onSurfaceVariant,
               ),
             ),
           ],

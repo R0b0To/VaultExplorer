@@ -7,7 +7,6 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
-import 'package:vaultexplorer/core/widgets/cards/expressive_card.dart';
 
 /// Formats a brand-new encrypted container directly onto a raw USB drive,
 /// erasing everything currently on it.
@@ -203,6 +202,219 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     });
   }
 
+  Widget _buildSectionHeader(String title) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 6),
+      child: Text(
+        title,
+        style: textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: cs.primary,
+          letterSpacing: -0.1,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionGroup({required List<Widget> children}) {
+    if (children.isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: List.generate(children.length, (index) {
+        final isFirst = index == 0;
+        final isLast = index == children.length - 1;
+        final isOnly = children.length == 1;
+
+        BorderRadius radius;
+        if (isOnly) {
+          radius = BorderRadius.circular(20);
+        } else if (isFirst) {
+          radius = const BorderRadius.vertical(
+            top: Radius.circular(20),
+            bottom: Radius.circular(4),
+          );
+        } else if (isLast) {
+          radius = const BorderRadius.vertical(
+            top: Radius.circular(4),
+            bottom: Radius.circular(20),
+          );
+        } else {
+          radius = BorderRadius.circular(4);
+        }
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
+          child: Material(
+            color: cs.surfaceContainerHigh,
+            borderRadius: radius,
+            clipBehavior: Clip.antiAlias,
+            child: ListTileTheme(
+              tileColor: Colors.transparent,
+              child: children[index],
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildSelectTile<T>({
+    required String label,
+    required T value,
+    required List<_SelectOption<T>> options,
+    required ValueChanged<T> onChanged,
+    String? subtitle,
+    IconData? prefixIcon,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final currentOption = options.firstWhere(
+      (opt) => opt.value == value,
+      orElse: () => options.first,
+    );
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      leading: prefixIcon != null
+          ? Icon(prefixIcon, size: 20, color: cs.primary)
+          : null,
+      title: Text(
+        label,
+        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(
+          subtitle ?? currentOption.label,
+          style: textTheme.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            height: 1.25,
+          ),
+        ),
+      ),
+      onTap: () {
+        showDialog<void>(
+          context: context,
+          builder: (dialogContext) {
+            final dialogTheme = Theme.of(dialogContext);
+            final mediaQuery = MediaQuery.of(dialogContext);
+            final isLandscape =
+                mediaQuery.orientation == Orientation.landscape;
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: 440,
+                  maxHeight: isLandscape
+                      ? mediaQuery.size.height * 0.85
+                      : mediaQuery.size.height * 0.75,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          label,
+                          style: dialogTheme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: options.map((opt) {
+                              final isSelected = opt.value == value;
+                              return RadioListTile<T>(
+                                dense: true,
+                                visualDensity: VisualDensity.compact,
+                                activeColor: cs.primary,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 0,
+                                ),
+                                value: opt.value,
+                                groupValue: value,
+                                title: Text(
+                                  opt.label,
+                                  style: dialogTheme.textTheme.bodyMedium
+                                      ?.copyWith(
+                                    fontWeight: isSelected
+                                        ? FontWeight.bold
+                                        : FontWeight.w500,
+                                    color: isSelected ? cs.primary : null,
+                                  ),
+                                ),
+                                subtitle: opt.subtitle != null
+                                    ? Text(
+                                        opt.subtitle!,
+                                        style: dialogTheme
+                                            .textTheme.bodySmall
+                                            ?.copyWith(
+                                          color: cs.onSurfaceVariant,
+                                        ),
+                                      )
+                                    : null,
+                                onChanged: (T? newValue) {
+                                  if (newValue != null) {
+                                    Navigator.of(dialogContext).pop();
+                                    onChanged(newValue);
+                                  }
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFormatSelector() {
+    final busy = _creating || _requestingPermission;
+    return SegmentedButton<CreateFormat>(
+      segments: const [
+        ButtonSegment(
+          value: CreateFormat.veracrypt,
+          label: Text('VeraCrypt'),
+          icon: Icon(Icons.lock_rounded),
+        ),
+        ButtonSegment(
+          value: CreateFormat.luks1,
+          label: Text('LUKS1'),
+          icon: Icon(Icons.security_rounded),
+        ),
+        ButtonSegment(
+          value: CreateFormat.luks2,
+          label: Text('LUKS2'),
+          icon: Icon(Icons.shield_rounded),
+        ),
+      ],
+      selected: {_format},
+      onSelectionChanged: busy ? null : (sel) => _onFormatChanged(sel.first),
+    );
+  }
 
   Future<void> _create() async {
     final device = _selected;
@@ -287,7 +499,8 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
           hiddenPassword: _hiddenPasswordCtrl.text,
           hasHiddenKeyfiles: _hiddenKeyfilesController.keyfiles.isNotEmpty,
           outerKeyfileUris: keyfiles.map((k) => k.uri).toSet(),
-          hiddenKeyfileUris: _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toSet(),
+          hiddenKeyfileUris:
+              _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toSet(),
         );
         if (!validation.isValid) {
           setState(() => _error = validation.error);
@@ -312,7 +525,8 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
         hiddenPassword: _hiddenPasswordCtrl.text,
         hiddenFileSystem: _hiddenFileSystem.toLowerCase(),
         hiddenSizeBytes: hiddenSizeBytes,
-        hiddenKeyfilePaths: _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toList(),
+        hiddenKeyfilePaths:
+            _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toList(),
         hiddenPim: (_enableHiddenVolume && _format == CreateFormat.veracrypt)
             ? clampPim(
                 _hiddenPimCtrl.text.isEmpty
@@ -350,326 +564,359 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
   Widget _buildMainVolumeSection(ColorScheme cs, TextTheme textTheme) {
     final busy = _creating || _requestingPermission;
 
-    return ExpressiveCard(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const ExpressiveSectionHeader(
-          title: 'USB Drive & Standard Volume',
-          subtitle: 'Target device, format and credentials',
-          icon: Icons.usb_rounded,
-        ),
-        InlineBanner(
-          'Formatting erases everything currently on the selected drive.',
-          tone: AppBannerTone.warning,
-        ),
-        const SizedBox(height: 16),
-        DropdownButtonFormField<CreateFormat>(
-          initialValue: _format,
-          decoration: const InputDecoration(
-            labelText: 'Container Format',
-            prefixIcon: Icon(Icons.layers_outlined, size: 20),
-          ),
-          items: CreateFormat.values
-              .map((f) => DropdownMenuItem(value: f, child: Text(f.label)))
-              .toList(),
-          onChanged: busy
-              ? null
-              : (val) {
-                  if (val != null) _onFormatChanged(val);
-                },
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Select USB Drive',
-          style: textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: cs.primary,
-            letterSpacing: 0.5,
-          ),
-        ),
-        const SizedBox(height: 10),
-        if (_loadingDevices)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: CircularProgressIndicator(strokeWidth: 2.5),
+        _buildSectionHeader('USB Drive & Standard Volume'),
+        _buildSectionGroup(
+          children: [
+            // Warning Banner
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: InlineBanner(
+                'Formatting erases everything currently on the selected drive.',
+                tone: AppBannerTone.warning,
+              ),
             ),
-          )
-        else if (_devices.isEmpty)
-          Card(
-            elevation: 0,
-            color: cs.surfaceContainerHigh,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.3)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
+
+            // Format Selector
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.usb_off_rounded,
-                        size: 32, color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 12),
                   Text(
-                    'No USB storage detected',
-                    style: textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                    'Container Format',
+                    style: textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Connect an OTG drive to format',
-                    style: textTheme.bodySmall
-                        ?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: busy ? null : _loadDevices,
-                    icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: const Text('Refresh list'),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 44),
-                      shape: const StadiumBorder(),
-                    ),
-                  ),
+                  const SizedBox(height: 8),
+                  _buildFormatSelector(),
                 ],
               ),
             ),
-          )
-        else
-          RadioGroup<UsbDeviceInfo>(
-            groupValue: _selected,
-            onChanged: (v) {
-              if (!busy && v != null) _selectDevice(v);
-            },
-            child: Column(
-              children: _devices.map((d) {
-                final isSelected = _selected?.deviceName == d.deviceName;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: InkWell(
-                    onTap: busy ? null : () => _selectDevice(d),
-                    borderRadius: BorderRadius.circular(18),
-                    child: Card(
+
+            // USB Drive Selection List
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Select USB Drive',
+                    style: textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: cs.primary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  if (_loadingDevices)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                    )
+                  else if (_devices.isEmpty)
+                    Card(
                       elevation: 0,
-                      color: isSelected
-                          ? cs.primaryContainer.withValues(alpha: 0.15)
-                          : cs.surfaceContainerHigh,
+                      color: cs.surfaceContainerHigh,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(20),
                         side: BorderSide(
-                          color: isSelected
-                              ? cs.primary
-                              : cs.outlineVariant.withValues(alpha: 0.3),
-                          width: isSelected ? 2 : 1,
-                        ),
+                            color: cs.outlineVariant.withValues(alpha: 0.3)),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(10),
+                              padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: isSelected
-                                    ? cs.primaryContainer
-                                    : cs.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(14),
+                                color: cs.surfaceContainerHighest,
+                                shape: BoxShape.circle,
                               ),
-                              child: Icon(
-                                Icons.usb_rounded,
-                                size: 22,
-                                color: isSelected
-                                    ? cs.onPrimaryContainer
-                                    : cs.primary,
-                              ),
+                              child: Icon(Icons.usb_off_rounded,
+                                  size: 32, color: cs.onSurfaceVariant),
                             ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    d.productName,
-                                    style: textTheme.bodyLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    d.hasPermission
-                                        ? 'Ready to format'
-                                        : 'Permission required',
-                                    style: textTheme.bodySmall?.copyWith(
-                                      color: d.hasPermission
-                                          ? cs.primary
-                                          : cs.onSurfaceVariant,
-                                      fontWeight: d.hasPermission
-                                          ? FontWeight.w500
-                                          : null,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'No USB storage detected',
+                              style: textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
-                            Radio<UsbDeviceInfo>(
-                              value: d,
-                              activeColor: cs.primary,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
+                            const SizedBox(height: 4),
+                            Text(
+                              'Connect an OTG drive to format',
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            const SizedBox(height: 16),
+                            FilledButton.icon(
+                              onPressed: busy ? null : _loadDevices,
+                              icon: const Icon(Icons.refresh_rounded, size: 18),
+                              label: const Text('Refresh list'),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(0, 44),
+                                shape: const StadiumBorder(),
+                              ),
                             ),
                           ],
                         ),
                       ),
+                    )
+                  else
+                    RadioGroup<UsbDeviceInfo>(
+                      groupValue: _selected,
+                      onChanged: (v) {
+                        if (!busy && v != null) _selectDevice(v);
+                      },
+                      child: Column(
+                        children: _devices.map((d) {
+                          final isSelected =
+                              _selected?.deviceName == d.deviceName;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: InkWell(
+                              onTap: busy ? null : () => _selectDevice(d),
+                              borderRadius: BorderRadius.circular(18),
+                              child: Card(
+                                elevation: 0,
+                                color: isSelected
+                                    ? cs.primaryContainer.withValues(alpha: 0.15)
+                                    : cs.surfaceContainerHigh,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                  side: BorderSide(
+                                    color: isSelected
+                                        ? cs.primary
+                                        : cs.outlineVariant
+                                            .withValues(alpha: 0.3),
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: isSelected
+                                              ? cs.primaryContainer
+                                              : cs.surfaceContainerHighest,
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                        ),
+                                        child: Icon(
+                                          Icons.usb_rounded,
+                                          size: 22,
+                                          color: isSelected
+                                              ? cs.onPrimaryContainer
+                                              : cs.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              d.productName,
+                                              style: textTheme.bodyLarge
+                                                  ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              d.hasPermission
+                                                  ? 'Ready to format'
+                                                  : 'Permission required',
+                                              style: textTheme.bodySmall
+                                                  ?.copyWith(
+                                                color: d.hasPermission
+                                                    ? cs.primary
+                                                    : cs.onSurfaceVariant,
+                                                fontWeight: d.hasPermission
+                                                    ? FontWeight.w500
+                                                    : null,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Radio<UsbDeviceInfo>(
+                                        value: d,
+                                        activeColor: cs.primary,
+                                        materialTapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // Container Size & Unit Row
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: _sizeCtrl,
+                          enabled: !busy,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: 'Container Size',
+                            prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildSelectTile<String>(
+                          label: 'Unit',
+                          value: _sizeUnit,
+                          options: const [
+                            _SelectOption(
+                                value: 'MB', label: 'MB (Megabytes)'),
+                            _SelectOption(
+                                value: 'GB', label: 'GB (Gigabytes)'),
+                          ],
+                          onChanged: busy
+                              ? (v) {}
+                              : (v) => setState(() => _sizeUnit = v),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      _fetchingCapacity
+                          ? 'Reading drive capacity…'
+                          : _usableCapacityBytes != null
+                              ? 'Drive usable capacity: ${(_usableCapacityBytes! / (1024 * 1024)).floor()} MB. Must not exceed this.'
+                              : 'Must not exceed the drive\'s actual capacity.',
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-          ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: TextField(
-                controller: _sizeCtrl,
-                enabled: !busy,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Container Size',
-                  prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                initialValue: _sizeUnit,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Unit',
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'MB', child: Text('MB')),
-                  DropdownMenuItem(value: 'GB', child: Text('GB')),
                 ],
-                onChanged: busy
-                    ? null
-                    : (v) {
-                        if (v != null) setState(() => _sizeUnit = v);
-                      },
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Text(
-            _fetchingCapacity
-                ? 'Reading drive capacity…'
-                : _usableCapacityBytes != null
-                    ? 'Drive usable capacity: ${(_usableCapacityBytes! / (1024 * 1024)).floor()} MB. Must not exceed this.'
-                    : 'Must not exceed the drive\'s actual capacity.',
-            style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _passwordCtrl,
-          enabled: !busy,
-          obscureText: _obscure,
-          onChanged: (_) => setState(() {}),
-          autofillHints: const [AutofillHints.newPassword],
-          decoration: InputDecoration(
-            labelText: 'Password',
-            prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
-            suffixIcon: PasswordVisibilityToggle(
-              obscured: _obscure,
-              onToggle: () => setState(() => _obscure = !_obscure),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _confirmPasswordCtrl,
-          enabled: !busy,
-          obscureText: _confirmObscure,
-          onChanged: (_) => setState(() {}),
-          autofillHints: const [AutofillHints.newPassword],
-          decoration: InputDecoration(
-            labelText: 'Confirm Password',
-            prefixIcon: Icon(Icons.check_circle_outline_rounded,
-                size: 20, color: cs.primary),
-            suffixIcon: PasswordVisibilityToggle(
-              obscured: _confirmObscure,
-              onToggle: () =>
-                  setState(() => _confirmObscure = !_confirmObscure),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        KeyfilesPicker(
-          keyfiles: keyfiles,
-          picking: pickingKeyfiles,
-          onPick: pickKeyfiles,
-          onRemove: removeKeyfile,
-          enabled: !busy,
-        ),
-        const SizedBox(height: 16),
-        AdvancedParamsPanel(
-          pimController: _pimCtrl,
-          cipherId: _cipherId,
-          hashId: _hashId,
-          includeAuto: false,
-          enabled: !busy,
-          cipherItems: _cipherItems,
-          hashItems: _hashItems,
-          onCipherChanged: (val) => setState(() => _cipherId = val),
-          onHashChanged: (val) => setState(() => _hashId = val),
-          extraFields: [
-            DropdownButtonFormField<String>(
-              initialValue: _fileSystem,
-              decoration: const InputDecoration(
-                labelText: 'Format File System',
-                prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
+
+            // Password Field
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _passwordCtrl,
+                enabled: !busy,
+                obscureText: _obscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  labelText: 'Password',
+                  prefixIcon:
+                      Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _obscure,
+                    onToggle: () => setState(() => _obscure = !_obscure),
+                  ),
+                ),
               ),
-              items: _availableFileSystems
-                  .map((fs) => DropdownMenuItem(value: fs, child: Text(fs)))
-                  .toList(),
-              onChanged: busy
-                  ? null
-                  : (val) {
-                      if (val != null) setState(() => _fileSystem = val);
-                    },
+            ),
+
+            // Confirm Password Field
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _confirmPasswordCtrl,
+                enabled: !busy,
+                obscureText: _confirmObscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  labelText: 'Confirm Password',
+                  prefixIcon: Icon(Icons.check_circle_outline_rounded,
+                      size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _confirmObscure,
+                    onToggle: () =>
+                        setState(() => _confirmObscure = !_confirmObscure),
+                  ),
+                ),
+              ),
+            ),
+
+            // Keyfiles Picker
+            KeyfilesPicker(
+              keyfiles: keyfiles,
+              picking: pickingKeyfiles,
+              onPick: pickKeyfiles,
+              onRemove: removeKeyfile,
+              enabled: !busy,
+            ),
+
+            // Advanced Parameters Panel
+            AdvancedParamsPanel(
+              pimController: _pimCtrl,
+              cipherId: _cipherId,
+              hashId: _hashId,
+              includeAuto: false,
+              enabled: !busy,
+              cipherItems: _cipherItems,
+              hashItems: _hashItems,
+              onCipherChanged: (val) => setState(() => _cipherId = val),
+              onHashChanged: (val) => setState(() => _hashId = val),
+              extraFields: [
+                _buildSelectTile<String>(
+                  label: 'Format File System',
+                  value: _fileSystem,
+                  prefixIcon: Icons.dns_rounded,
+                  subtitle: 'File system: $_fileSystem',
+                  options: _availableFileSystems
+                      .map((fs) => _SelectOption(value: fs, label: fs))
+                      .toList(),
+                  onChanged: busy
+                      ? (val) {}
+                      : (val) => setState(() => _fileSystem = val),
+                ),
+              ],
+            ),
+
+            // Quick Format Switch Tile
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              title: Text('Quick Format',
+                  style: textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                'Skips zero-filling the drive. Faster, but does not securely erase old data.',
+                style: textTheme.bodySmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              value: _quickFormat,
+              onChanged: busy ? null : (val) => setState(() => _quickFormat = val),
             ),
           ],
-        ),
-        const SizedBox(height: 16),
-        Material(
-          color: cs.surfaceContainerHigh,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: SwitchListTile(
-            title: Text('Quick Format',
-                style:
-                    textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-            subtitle: Text(
-              'Skips zero-filling the drive. Faster, but does not securely erase old data.',
-              style: textTheme.bodySmall,
-            ),
-            value: _quickFormat,
-            onChanged: busy ? null : (val) => setState(() => _quickFormat = val),
-          ),
         ),
       ],
     );
@@ -680,155 +927,145 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     final bool isEnabled =
         _passwordCtrl.text.isNotEmpty || keyfiles.isNotEmpty;
 
-    return ExpressiveCard(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const ExpressiveSectionHeader(
-          title: 'Hidden Volume',
-          subtitle: 'Plausibly deniable secondary volume',
-          icon: Icons.visibility_off_rounded,
-        ),
-        Material(
-          color: cs.surfaceContainerHigh,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: SwitchListTile(
-            value: isEnabled && _enableHiddenVolume,
-            onChanged: (isEnabled && !busy)
-                ? (val) => setState(() => _enableHiddenVolume = val)
-                : null,
-            title: Text('Create Hidden Volume',
-                style:
-                    textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-            subtitle: Text(
-              isEnabled
-                  ? 'Create an invisible secondary volume'
-                  : 'Set outer password or keyfiles first to enable',
-              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-            secondary: Icon(
-              Icons.visibility_off_outlined,
-              color: isEnabled
-                  ? cs.primary
-                  : cs.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ),
-        ),
-        if (isEnabled && _enableHiddenVolume) ...[
-          const SizedBox(height: 16),
-          TextField(
-            controller: _hiddenPasswordCtrl,
-            enabled: !busy,
-            obscureText: _hiddenObscure,
-            onChanged: (_) => setState(() {}),
-            autofillHints: const [AutofillHints.newPassword],
-            decoration: InputDecoration(
-              labelText: 'Hidden Password',
-              prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
-              suffixIcon: PasswordVisibilityToggle(
-                obscured: _hiddenObscure,
-                onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
+        _buildSectionHeader('Hidden Volume'),
+        _buildSectionGroup(
+          children: [
+            SwitchListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              value: isEnabled && _enableHiddenVolume,
+              onChanged: (isEnabled && !busy)
+                  ? (val) => setState(() => _enableHiddenVolume = val)
+                  : null,
+              title: Text('Create Hidden Volume',
+                  style: textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                isEnabled
+                    ? 'Create an invisible secondary volume'
+                    : 'Set outer password or keyfiles first to enable',
+                style: textTheme.bodySmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              secondary: Icon(
+                Icons.visibility_off_outlined,
+                color: isEnabled
+                    ? cs.primary
+                    : cs.onSurfaceVariant.withValues(alpha: 0.5),
               ),
             ),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _hiddenConfirmPasswordCtrl,
-            enabled: !busy,
-            obscureText: _hiddenConfirmObscure,
-            onChanged: (_) => setState(() {}),
-            autofillHints: const [AutofillHints.newPassword],
-            decoration: InputDecoration(
-              labelText: 'Confirm Hidden Password',
-              prefixIcon: Icon(Icons.check_circle_outline_rounded,
-                  size: 20, color: cs.primary),
-              suffixIcon: PasswordVisibilityToggle(
-                obscured: _hiddenConfirmObscure,
-                onToggle: () => setState(
-                    () => _hiddenConfirmObscure = !_hiddenConfirmObscure),
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
+            if (isEnabled && _enableHiddenVolume) ...[
+              Padding(
+                padding: const EdgeInsets.all(16),
                 child: TextField(
-                  controller: _hiddenSizeCtrl,
+                  controller: _hiddenPasswordCtrl,
                   enabled: !busy,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Hidden Size',
-                    prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
+                  obscureText: _hiddenObscure,
+                  onChanged: (_) => setState(() {}),
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: InputDecoration(
+                    labelText: 'Hidden Password',
+                    prefixIcon:
+                        Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _hiddenObscure,
+                      onToggle: () =>
+                          setState(() => _hiddenObscure = !_hiddenObscure),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: _hiddenSizeUnit,
-                  decoration: const InputDecoration(
-                    labelText: 'Unit',
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: _hiddenConfirmPasswordCtrl,
+                  enabled: !busy,
+                  obscureText: _hiddenConfirmObscure,
+                  onChanged: (_) => setState(() {}),
+                  autofillHints: const [AutofillHints.newPassword],
+                  decoration: InputDecoration(
+                    labelText: 'Confirm Hidden Password',
+                    prefixIcon: Icon(Icons.check_circle_outline_rounded,
+                        size: 20, color: cs.primary),
+                    suffixIcon: PasswordVisibilityToggle(
+                      obscured: _hiddenConfirmObscure,
+                      onToggle: () => setState(
+                          () => _hiddenConfirmObscure = !_hiddenConfirmObscure),
+                    ),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'MB', child: Text('MB')),
-                    DropdownMenuItem(value: 'GB', child: Text('GB')),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _hiddenSizeCtrl,
+                        enabled: !busy,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'Hidden Size',
+                          prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildSelectTile<String>(
+                        label: 'Unit',
+                        value: _hiddenSizeUnit,
+                        options: const [
+                          _SelectOption(value: 'MB', label: 'MB (Megabytes)'),
+                          _SelectOption(value: 'GB', label: 'GB (Gigabytes)'),
+                        ],
+                        onChanged: busy
+                            ? (val) {}
+                            : (val) => setState(() => _hiddenSizeUnit = val),
+                      ),
+                    ),
                   ],
-                  onChanged: busy
-                      ? null
-                      : (val) {
-                          if (val != null) {
-                            setState(() => _hiddenSizeUnit = val);
-                          }
-                        },
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          KeyfilesPicker(
-            keyfiles: _hiddenKeyfilesController.keyfiles,
-            picking: _hiddenKeyfilesController.picking,
-            onPick: _hiddenKeyfilesController.pick,
-            onRemove: _hiddenKeyfilesController.remove,
-            enabled: !busy,
-          ),
-          const SizedBox(height: 16),
-          AdvancedParamsPanel(
-            pimController: _hiddenPimCtrl,
-            cipherId: _hiddenCipherId,
-            hashId: _hiddenHashId,
-            includeAuto: false,
-            enabled: !busy,
-            cipherItems: _cipherItems,
-            hashItems: _hashItems,
-            onCipherChanged: (val) => setState(() => _hiddenCipherId = val),
-            onHashChanged: (val) => setState(() => _hiddenHashId = val),
-            extraFields: [
-              DropdownButtonFormField<String>(
-                initialValue: _hiddenFileSystem,
-                decoration: const InputDecoration(
-                  labelText: 'Hidden File System',
-                  prefixIcon: Icon(Icons.dns_rounded, size: AppIconSize.small),
-                ),
-                items: _veraCryptFileSystems
-                    .map((fs) => DropdownMenuItem(value: fs, child: Text(fs)))
-                    .toList(),
-                onChanged: busy
-                    ? null
-                    : (val) {
-                        if (val != null) {
-                          setState(() => _hiddenFileSystem = val);
-                        }
-                      },
+              KeyfilesPicker(
+                keyfiles: _hiddenKeyfilesController.keyfiles,
+                picking: _hiddenKeyfilesController.picking,
+                onPick: _hiddenKeyfilesController.pick,
+                onRemove: _hiddenKeyfilesController.remove,
+                enabled: !busy,
+              ),
+              AdvancedParamsPanel(
+                pimController: _hiddenPimCtrl,
+                cipherId: _hiddenCipherId,
+                hashId: _hiddenHashId,
+                includeAuto: false,
+                enabled: !busy,
+                cipherItems: _cipherItems,
+                hashItems: _hashItems,
+                onCipherChanged: (val) => setState(() => _hiddenCipherId = val),
+                onHashChanged: (val) => setState(() => _hiddenHashId = val),
+                extraFields: [
+                  _buildSelectTile<String>(
+                    label: 'Hidden File System',
+                    value: _hiddenFileSystem,
+                    prefixIcon: Icons.dns_rounded,
+                    subtitle: 'File system: $_hiddenFileSystem',
+                    options: _veraCryptFileSystems
+                        .map((fs) => _SelectOption(value: fs, label: fs))
+                        .toList(),
+                    onChanged: busy
+                        ? (val) {}
+                        : (val) => setState(() => _hiddenFileSystem = val),
+                  ),
+                ],
               ),
             ],
-          ),
-        ],
+          ],
+        ),
       ],
     );
   }
@@ -843,7 +1080,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
 
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
-      fillColor: cs.surfaceContainerHigh,
+      fillColor: cs.surfaceContainerHighest,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
@@ -903,7 +1140,9 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
         }
       },
       child: Scaffold(
+        backgroundColor: cs.surfaceContainerLow,
         appBar: AppBar(
+          backgroundColor: cs.surfaceContainerHigh,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () => Navigator.pop(context),
@@ -928,7 +1167,8 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
           ),
           child: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: AutofillGroup(
                 child: isLandscape
                     ? Row(
@@ -937,14 +1177,15 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                           Expanded(
                             child: _buildMainVolumeSection(cs, textTheme),
                           ),
-                          const SizedBox(width: 20),
+                          const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 if (showHiddenSection) ...[
-                                  _buildHiddenVolumeSection(cs, textTheme),
-                                  const SizedBox(height: 20),
+                                  _buildHiddenVolumeSection(
+                                      cs, textTheme),
+                                  const SizedBox(height: 16),
                                 ],
                                 errorAndSubmit,
                               ],
@@ -971,4 +1212,16 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
       ),
     );
   }
+}
+
+class _SelectOption<T> {
+  final T value;
+  final String label;
+  final String? subtitle;
+
+  const _SelectOption({
+    required this.value,
+    required this.label,
+    this.subtitle,
+  });
 }

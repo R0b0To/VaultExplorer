@@ -8,7 +8,7 @@ class ExpressiveCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Card(
-      color: cs.surfaceContainerLowest,
+      color: cs.surfaceContainerHigh,
       elevation: 0,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(

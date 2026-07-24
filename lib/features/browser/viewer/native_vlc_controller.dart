@@ -310,16 +310,17 @@ class NativeVlcController extends ValueNotifier<NativeVlcValue> {
 /// `RotatedBox` layout the caller already has.
 class NativeVlcPlayerView extends StatelessWidget {
   final NativeVlcController controller;
-
   const NativeVlcPlayerView({super.key, required this.controller});
-
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<NativeVlcValue>(
       valueListenable: controller,
       builder: (context, value, child) {
         final id = controller.textureId;
-        if (id == null) return const SizedBox.shrink();
+        if (id == null || !value.isInitialized) return const SizedBox.shrink();
+        if (value.size.width <= 0 || value.size.height <= 0) {
+          return const SizedBox.shrink();
+        }
         return Texture(textureId: id);
       },
     );

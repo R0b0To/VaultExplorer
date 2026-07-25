@@ -64,6 +64,10 @@ abstract final class ChannelMethods {
   static const openWithApp = 'openWithApp';
   static const getVideoThumbnail = 'getVideoThumbnail';
   static const getImageThumbnail = 'getImageThumbnail';
+  // Same output as getImageThumbnail / getVideoThumbnail, plus the source
+  // frame's pre-downscale width/height — see ThumbnailWithSize.
+  static const getImageThumbnailWithSize = 'getImageThumbnailWithSize';
+  static const getVideoThumbnailWithSize = 'getVideoThumbnailWithSize';
   static const generateAndCacheThumbnail = 'generateAndCacheThumbnail';
 
   // ── Crypto ───────────────────────────────────────────────────────────────

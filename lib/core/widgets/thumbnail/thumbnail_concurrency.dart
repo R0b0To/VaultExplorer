@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
+import 'dart:collection';
 
 /// Suppresses the "unhandled future" lint for intentional fire-and-forget
 /// background work (e.g. warming the on-disk cache after an in-memory hit).
@@ -22,7 +23,7 @@ void unawaited(Future<void> future) {
 class ConcurrencyLimiter {
   final int maxConcurrency;
   int _running = 0;
-  final _waiting = <Completer<void>>[];
+  final _waiting = Queue<Completer<void>>(); 
 
   ConcurrencyLimiter(this.maxConcurrency);
 
@@ -51,7 +52,7 @@ class ConcurrencyLimiter {
 
   void _drainNext() {
     while (_waiting.isNotEmpty && _running < maxConcurrency) {
-      final next = _waiting.removeLast();
+      final next = _waiting.removeFirst();
       if (next.isCompleted) {
         continue;
       }

@@ -34,6 +34,7 @@ import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_grid_view.dart';
+import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
@@ -1376,11 +1377,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Widget _buildViewTogglePopupButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final currentIcon = _layoutMode == BrowserLayoutMode.list
-        ? Icons.view_list_rounded
-        : _layoutMode == BrowserLayoutMode.compact
-            ? Icons.list_rounded
-            : Icons.grid_view_rounded;
+    final currentIcon = switch (_layoutMode) {
+      BrowserLayoutMode.list => Icons.view_list_rounded,
+      BrowserLayoutMode.compact => Icons.list_rounded,
+      BrowserLayoutMode.grid => Icons.grid_view_rounded,
+      BrowserLayoutMode.masonry => Icons.dashboard_rounded,
+    };
     return MenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: Icon(currentIcon),
@@ -1400,6 +1402,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           (BrowserLayoutMode.list, 'Detailed List', Icons.view_list_rounded),
           (BrowserLayoutMode.compact, 'Compact List', Icons.list_rounded),
           (BrowserLayoutMode.grid, 'Gallery Grid', Icons.grid_view_rounded),
+          (BrowserLayoutMode.masonry, 'Masonry', Icons.dashboard_rounded),
         ])
           MenuItemButton(
             leadingIcon: Icon(icon, color: _layoutMode == mode ? cs.primary : cs.onSurfaceVariant),
@@ -1955,34 +1958,52 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         message: 'Nothing in this folder matches "${_searchQuery.trim()}".',
       );
     }
-    final content = _layoutMode == BrowserLayoutMode.grid
-        ? FileGridView(
-            container: widget.container,
-            dirs: dirs,
-            files: files,
-            isSelectionMode: isSelectionMode,
-            selectedItems: selectedItems,
-            currentDirPath: _currentDirPath,
-            thumbnailCacheMode: _resolvedThumbnailCacheMode,
-            thumbnailQuality: _resolvedThumbnailQuality,
-            showFileNames: _toolbarConfig.showGridFileNames,
-            onDirTap: _handleDirTap,
-            onFileTap: _handleFileTap,
-            onItemLongPress: _handleItemLongPress,
-            searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
-          )
-        : FileListView(
-            dirs: dirs,
-            files: files,
-            isSelectionMode: isSelectionMode,
-            isCompact: _layoutMode == BrowserLayoutMode.compact,
-            selectedItems: selectedItems,
-            detailColumns: _toolbarConfig.visibleDetailColumns,
-            onDirTap: _handleDirTap,
-            onFileTap: _handleFileTap,
-            onItemLongPress: _handleItemLongPress,
-            searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
-          );
+    final content = switch (_layoutMode) {
+      BrowserLayoutMode.grid => FileGridView(
+          container: widget.container,
+          dirs: dirs,
+          files: files,
+          isSelectionMode: isSelectionMode,
+          selectedItems: selectedItems,
+          currentDirPath: _currentDirPath,
+          thumbnailCacheMode: _resolvedThumbnailCacheMode,
+          thumbnailQuality: _resolvedThumbnailQuality,
+          showFileNames: _toolbarConfig.showGridFileNames,
+          onDirTap: _handleDirTap,
+          onFileTap: _handleFileTap,
+          onItemLongPress: _handleItemLongPress,
+          searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
+        ),
+      BrowserLayoutMode.masonry => FileMasonryView(
+          container: widget.container,
+          dirs: dirs,
+          files: files,
+          isSelectionMode: isSelectionMode,
+          selectedItems: selectedItems,
+          currentDirPath: _currentDirPath,
+          thumbnailCacheMode: _resolvedThumbnailCacheMode,
+          thumbnailQuality: _resolvedThumbnailQuality,
+          showFileNames: _toolbarConfig.showGridFileNames,
+          onDirTap: _handleDirTap,
+          onFileTap: _handleFileTap,
+          onItemLongPress: _handleItemLongPress,
+          searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
+        ),
+      BrowserLayoutMode.list ||
+      BrowserLayoutMode.compact =>
+        FileListView(
+          dirs: dirs,
+          files: files,
+          isSelectionMode: isSelectionMode,
+          isCompact: _layoutMode == BrowserLayoutMode.compact,
+          selectedItems: selectedItems,
+          detailColumns: _toolbarConfig.visibleDetailColumns,
+          onDirTap: _handleDirTap,
+          onFileTap: _handleFileTap,
+          onItemLongPress: _handleItemLongPress,
+          searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
+        ),
+    };
     final refreshable = RefreshIndicator(
       onRefresh: () => _loadDirectoryContents(_currentDirPath),
       child: content,

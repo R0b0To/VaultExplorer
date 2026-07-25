@@ -7,7 +7,10 @@ enum BrowserLayoutMode {
   compact,
 
   /// Multi-column grid optimized for visual media or galleries.
-  grid;
+  grid,
+
+  /// Variable-height, Pinterest-style multi-column layout for galleries.
+  masonry;
 
   // ── Human-readable labels ─────────────────────────────────────────────────
 
@@ -19,6 +22,8 @@ enum BrowserLayoutMode {
         return 'Compact list';
       case BrowserLayoutMode.grid:
         return 'Gallery grid';
+      case BrowserLayoutMode.masonry:
+        return 'Masonry';
     }
   }
 
@@ -30,6 +35,8 @@ enum BrowserLayoutMode {
         return 'Shows files and folders in a tight, high-density list view.';
       case BrowserLayoutMode.grid:
         return 'Shows files and folders as visual cards in a multi-column gallery grid.';
+      case BrowserLayoutMode.masonry:
+        return 'Shows files and folders in a variable-height, Pinterest-style column layout.';
     }
   }
 
@@ -43,6 +50,8 @@ enum BrowserLayoutMode {
         return 'compact';
       case BrowserLayoutMode.grid:
         return 'grid';
+      case BrowserLayoutMode.masonry:
+        return 'masonry';
     }
   }
 
@@ -54,6 +63,8 @@ enum BrowserLayoutMode {
         return BrowserLayoutMode.compact;
       case 'grid':
         return BrowserLayoutMode.grid;
+      case 'masonry':
+        return BrowserLayoutMode.masonry;
       default:
         return null; // Return null so we know it isn't configured
     }

@@ -149,6 +149,36 @@ Future<bool> openWithApp(
     }
   }
 
+  /// Same thumbnail as [getImageThumbnail], plus the source image's true
+  /// pre-downscale width/height (see [ThumbnailWithSize]). Native already
+  /// decodes these bounds to pick a sample size before scaling, so this
+  /// costs no extra decode over [getImageThumbnail] — prefer this variant
+  /// whenever the caller needs the real content aspect ratio (e.g. masonry
+  /// layout) instead of re-deriving it from the JPEG bytes on the Dart side.
+  /// Returns null on failure — callers will display a standard file fallback.
+  Future<ThumbnailWithSize?> getImageThumbnailWithSize(
+    MountedContainer container,
+    String fileName, {
+    int targetSize = 180,
+    int quality = 70,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod(
+        ChannelMethods.getImageThumbnailWithSize,
+        {
+          'filePath': container.uri,
+          'fileName': fileName,
+          'targetSize': targetSize,
+          'quality': quality,
+        },
+      );
+      return ThumbnailWithSize.fromChannelResult(result);
+    } catch (e) {
+      _logSwallowed('getImageThumbnailWithSize', e, expected: true);
+      return null;
+    }
+  }
+
   /// Triggers thumbnail generation and encryption entirely on native threads,
   /// bypassing Dart and saving directly to local App Cache [ThumbnailCacheMode.appCache].
   Future<void> generateAndCacheThumbnail({
@@ -368,6 +398,35 @@ Future<bool> openWithApp(
     return null;
   }
 }
+
+  /// Same thumbnail as [getVideoThumbnail], plus the extracted frame's true
+  /// pre-scale width/height (see [ThumbnailWithSize]). Costs no extra work
+  /// over [getVideoThumbnail] — native already has the frame's own
+  /// dimensions in hand before `scaledToFit` touches it. Prefer this variant
+  /// whenever the caller needs the real content aspect ratio (e.g. masonry
+  /// layout). Returns null on any error — callers should show a fallback icon.
+  Future<ThumbnailWithSize?> getVideoThumbnailWithSize(
+    MountedContainer container,
+    String fileName, {
+    int quality = 60,
+    int targetSize = 180,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod(
+        ChannelMethods.getVideoThumbnailWithSize,
+        {
+          'filePath': container.uri,
+          'fileName': fileName,
+          'quality': quality,
+          'targetSize': targetSize,
+        },
+      );
+      return ThumbnailWithSize.fromChannelResult(result);
+    } catch (e) {
+      _logSwallowed('getVideoThumbnailWithSize', e, expected: true);
+      return null;
+    }
+  }
 
   Future<bool> setSecureScreen(bool enabled) async {
     try {

@@ -10,7 +10,6 @@ import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
-
 import '../lock/widgets/pattern_lock_view.dart';
 
 class UnlockSheet extends StatefulWidget {
@@ -47,14 +46,13 @@ class _UnlockSheetState extends State<UnlockSheet>
   bool _readOnly = false;
   bool _hasAllStorageAccess = false;
   String? _error;
-  int _cipherId = 255; // Auto
-  int _hashId = 255; // Auto
+  int _cipherId = 255;
+  int _hashId = 255;
   String _containerFormat = 'container';
-  
+
   @override
   void onKeyfilePickError(String message) => setState(() => _error = message);
 
-  /// Format getters for format-specific UI branching
   bool get _isLuks => ContainerFormat.isLuksWire(_containerFormat);
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(_containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(_containerFormat);
@@ -62,13 +60,11 @@ class _UnlockSheetState extends State<UnlockSheet>
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(_containerFormat);
   bool get _isFolderVault => ContainerFormat.isFolderVaultWire(_containerFormat);
 
-  // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
   UnlockProgress? _progress;
   late final void Function(int) _onUnlockStarted;
   late final void Function(UnlockProgress) _onUnlockProgress;
 
-  // ── Unlock method state ──────────────────────────────────────────────────
   ContainerUnlockMethod _unlockMethod = ContainerUnlockMethod.password;
   bool _showPasswordFallback = false;
   bool _patternError = false;
@@ -87,7 +83,6 @@ class _UnlockSheetState extends State<UnlockSheet>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _checkStoragePermission();
-
     _passwordCtrl = TextEditingController(text: widget.prefillPassword ?? '');
     if (widget.initialUri != null) {
       _selectedUri = widget.initialUri;
@@ -96,7 +91,6 @@ class _UnlockSheetState extends State<UnlockSheet>
       vaultExplorerApi.warmContainer(widget.initialUri!);
     }
     _initUnlockMethod();
-
     _onUnlockStarted = (volId) {
       if (mounted) setState(() => _activeVolId = volId);
     };
@@ -155,7 +149,6 @@ class _UnlockSheetState extends State<UnlockSheet>
       if (mounted) setState(() => _loadingAuth = false);
       return;
     }
-
     try {
       final records = await ContainerRepository.instance.loadAll();
       final record = records[widget.initialUri];
@@ -163,9 +156,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         if (mounted) setState(() => _loadingAuth = false);
         return;
       }
-
       _containerFormat = record.containerFormat;
-
       var exists = true;
       try {
         exists = await vaultExplorerApi.documentExists(widget.initialUri!);
@@ -181,20 +172,16 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
         return;
       }
-
       _unlockMethod = record.unlockMethod;
       _cipherId = record.cipherId;
       _hashId = record.hashId;
       _readOnly = record.readOnly;
-
       if (_unlockMethod == ContainerUnlockMethod.pattern) {
         _storedPatternHash = await ContainerRepository.instance.getPatternHash(
           widget.initialUri!,
         );
       }
-
       if (mounted) setState(() => _loadingAuth = false);
-
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
         if (mounted) {
@@ -213,11 +200,9 @@ class _UnlockSheetState extends State<UnlockSheet>
       String newUri;
       String newDisplayName;
       String detectedFormat = _containerFormat;
-
       if (_isFolderVault) {
         final picked = await vaultExplorerApi.pickCryptomatorVault();
         if (picked == null || !mounted) return;
-
         final format = picked.format;
         if (format == null) {
           setState(() => _error = 'No masterkey.cryptomator, gocryptfs.conf, or cryfs.config found in that folder.');
@@ -232,9 +217,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         newUri = picked.uri;
         newDisplayName = picked.displayName;
       }
-
       setState(() => _loadingAuth = true);
-
       final records = await ContainerRepository.instance.loadAll();
       final existing = records[oldUri];
       if (existing == null) {
@@ -246,11 +229,9 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
         return;
       }
-
       final savedPassword = await ContainerRepository.instance.getPassword(oldUri);
       final savedPatternHash = await ContainerRepository.instance.getPatternHash(oldUri);
       await ContainerRepository.instance.remove(oldUri);
-
       final migrated = ContainerRecord(
         uri: newUri,
         label: existing.label,
@@ -268,7 +249,6 @@ class _UnlockSheetState extends State<UnlockSheet>
       );
       await ContainerRepository.instance.save(migrated);
       if (!mounted) return;
-
       setState(() {
         _selectedUri = migrated.uri;
         _selectedName = newDisplayName;
@@ -280,7 +260,6 @@ class _UnlockSheetState extends State<UnlockSheet>
         _containerMissing = false;
         _loadingAuth = false;
       });
-
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
         if (mounted) {
@@ -300,7 +279,6 @@ class _UnlockSheetState extends State<UnlockSheet>
   Future<void> _tryBiometric() async {
     if (_isAuthenticating) return;
     _isAuthenticating = true;
-
     try {
       final localAuth = LocalAuthentication();
       final canCheck = await localAuth.canCheckBiometrics;
@@ -314,7 +292,6 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
         return;
       }
-
       final ok = await localAuth.authenticate(
         localizedReason: 'Authenticate to unlock container',
         options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
@@ -337,7 +314,6 @@ class _UnlockSheetState extends State<UnlockSheet>
           );
           return;
         }
-
         final pw = await ContainerRepository.instance.getPassword(widget.initialUri!);
         if (pw != null && pw.isNotEmpty) {
           _passwordCtrl.text = pw;
@@ -374,7 +350,6 @@ class _UnlockSheetState extends State<UnlockSheet>
       });
       return;
     }
-
     final attempt = hashPattern(pattern);
     if (attempt == _storedPatternHash) {
       final records = await ContainerRepository.instance.loadAll();
@@ -386,12 +361,10 @@ class _UnlockSheetState extends State<UnlockSheet>
       final cachedKey = shouldPreloadCachedKey
           ? await vaultExplorerApi.loadDerivedKey(widget.initialUri!)
           : null;
-
       if (cachedKey != null && cachedKey.isNotEmpty) {
         await _unlock(preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldCacheGoingForward);
         return;
       }
-
       final pw = await ContainerRepository.instance.getPassword(widget.initialUri!);
       if (pw != null && pw.isNotEmpty) {
         _passwordCtrl.text = pw;
@@ -412,12 +385,10 @@ class _UnlockSheetState extends State<UnlockSheet>
 
   Future<void> _pickFile() async {
     if (widget.initialUri != null) return;
-    
     try {
       if (_isFolderVault) {
         final result = await vaultExplorerApi.pickCryptomatorVault();
         if (result == null) return;
-        
         if (widget.mountedUris.contains(result.uri)) {
           setState(() {
             _error = 'This container is already mounted.';
@@ -426,9 +397,7 @@ class _UnlockSheetState extends State<UnlockSheet>
           });
           return;
         }
-
         final detectedFormat = result.format;
-        
         if (detectedFormat == null) {
           setState(() {
             _error = 'No masterkey.cryptomator, gocryptfs.conf, or cryfs.config found in that folder.';
@@ -437,16 +406,14 @@ class _UnlockSheetState extends State<UnlockSheet>
           });
           return;
         }
-        
-        setState(() { 
-          _selectedUri = result.uri; 
-          _selectedName = result.displayName; 
+        setState(() {
+          _selectedUri = result.uri;
+          _selectedName = result.displayName;
           _containerFormat = detectedFormat;
-          _error = null; 
+          _error = null;
         });
         return;
       }
-
       final result = await vaultExplorerApi.pickContainer();
       if (result != null) {
         if (widget.mountedUris.contains(result.uri)) {
@@ -457,7 +424,6 @@ class _UnlockSheetState extends State<UnlockSheet>
           });
           return;
         }
-        
         setState(() {
           _selectedUri = result.uri;
           _selectedName = result.displayName;
@@ -489,19 +455,15 @@ class _UnlockSheetState extends State<UnlockSheet>
       setState(() => _error = 'Select a container first');
       return;
     }
-
     if (widget.mountedUris.contains(_selectedUri)) {
       setState(() => _error = 'This container is already mounted.');
       return;
     }
-
     var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
     if (effectivePassword.isEmpty && preservedKey == null && keyfiles.isEmpty) {
       setState(() => _error = 'Password or keyfiles required');
       return;
     }
-
-    // CryFS Performance Warning Check on Unlock
     if (_isCryfs && !_hasAllStorageAccess) {
       final grant = await showAppConfirmDialog(
         context,
@@ -515,13 +477,11 @@ class _UnlockSheetState extends State<UnlockSheet>
         return;
       }
     }
-
     if (_isCryptomator || _isGocryptfs || _isCryfs) {
       setState(() {
         _loading = true;
         _error = null;
       });
-      
       try {
         final name = _selectedName ?? 'Vault';
         final result = _isCryptomator
@@ -547,12 +507,10 @@ class _UnlockSheetState extends State<UnlockSheet>
                     documentProvider: widget.documentProvider,
                     readOnly: _readOnly,
                   );
-        
         if (result == null) {
           setState(() => _error = 'Incorrect password or invalid vault');
           return;
         }
-
         ContainerRecord? savedRecord;
         if (_remember && widget.initialUri == null) {
           savedRecord = ContainerRecord(
@@ -568,7 +526,6 @@ class _UnlockSheetState extends State<UnlockSheet>
           final records = await ContainerRepository.instance.loadAll();
           savedRecord = records[widget.initialUri];
         }
-
         widget.onMounted(
           MountedContainer(
             uri: _selectedUri!,
@@ -583,10 +540,8 @@ class _UnlockSheetState extends State<UnlockSheet>
           ),
           record: savedRecord,
         );
-        
         HapticFeedback.lightImpact();
         TextInput.finishAutofillContext(shouldSave: false);
-        
         if (mounted) Navigator.pop(context);
       } on PlatformException catch (e) {
         if (e.code != 'CANCELLED') {
@@ -597,35 +552,27 @@ class _UnlockSheetState extends State<UnlockSheet>
       }
       return;
     }
-
     setState(() { _loading = true; _error = null; _activeVolId = null; _progress = null; });
-
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final name = _selectedName ?? 'Container';
       final keyfilePaths = keyfiles.map((k) => k.uri).toList();
-
       final records = await ContainerRepository.instance.loadAll();
       final record = records[_selectedUri!];
       final appSettings = await AppSettingsService.loadSettings();
       final isKnownRecord = record != null;
-      
       final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
           ((isKnownRecord || _remember) &&
               ((record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
-
       final shouldPreloadCachedKey = preservedKey == null &&
           _unlockMethod == ContainerUnlockMethod.rememberPassword &&
           _passwordPrefilled &&
           (record?.cacheDerivedKey ?? false);
-          
       final resolvedPreservedKey = preservedKey ??
           (shouldPreloadCachedKey
               ? await vaultExplorerApi.loadDerivedKey(_selectedUri!)
               : null);
-              
       debugPrint('unlock: method=$_unlockMethod shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
-
       var result = resolvedPreservedKey == null
           ? await vaultExplorerApi.unlockContainer(
               _selectedUri!,
@@ -653,7 +600,6 @@ class _UnlockSheetState extends State<UnlockSheet>
               keyfilePaths: keyfilePaths,
               readOnly: _readOnly,
             ));
-
       if (result == null && resolvedPreservedKey != null) {
         await vaultExplorerApi.clearDerivedKey(_selectedUri!);
         if (effectivePassword.isEmpty) {
@@ -676,10 +622,8 @@ class _UnlockSheetState extends State<UnlockSheet>
           );
         }
       }
-
       if (result != null) {
         ContainerRecord? savedRecord;
-
         if (_remember && widget.initialUri == null) {
           final newRecord = ContainerRecord(
             uri: _selectedUri!,
@@ -701,7 +645,7 @@ class _UnlockSheetState extends State<UnlockSheet>
               (existing.cipherId != result.matchedCipherId ||
                   existing.hashId != result.matchedHashId ||
                   existing.containerFormat != result.containerFormat ||
-                  existing.readOnly != _readOnly)) { 
+                  existing.readOnly != _readOnly)) {
             final updated = existing.copyWith(
               cacheDerivedKey: shouldCacheDerivedKey,
               cipherId: result.matchedCipherId,
@@ -715,7 +659,6 @@ class _UnlockSheetState extends State<UnlockSheet>
             savedRecord = existing;
           }
         }
-
         widget.onMounted(
           MountedContainer(
             uri: _selectedUri!,
@@ -726,13 +669,12 @@ class _UnlockSheetState extends State<UnlockSheet>
             totalSpace: 0,
             freeSpace: 0,
             readOnly: _readOnly,
+            containerFormat: result.containerFormat,
           ),
           record: savedRecord,
         );
-
         HapticFeedback.lightImpact();
         TextInput.finishAutofillContext(shouldSave: false);
-
         if (mounted) Navigator.pop(context);
       } else {
         setState(() => _error = 'Incorrect password or invalid container');
@@ -771,9 +713,7 @@ class _UnlockSheetState extends State<UnlockSheet>
     final hashName = hashAlgorithmName(p.hashId);
     final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
     final slotName = p.slot == 1 ? 'Hidden Volume' : 'Standard Volume';
-    
     final algo = cipherName.isNotEmpty ? '$hashName + $cipherName' : hashName;
-
     return p.total > 1
         ? 'Trying $algo ($slotName)…'
         : 'Trying $algo ($slotName)…';
@@ -783,7 +723,6 @@ class _UnlockSheetState extends State<UnlockSheet>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
@@ -801,7 +740,6 @@ class _UnlockSheetState extends State<UnlockSheet>
         borderSide: BorderSide(color: cs.primary, width: 2),
       ),
     );
-
     return PopScope(
       canPop: !_loading,
       onPopInvokedWithResult: (didPop, result) {
@@ -836,7 +774,6 @@ class _UnlockSheetState extends State<UnlockSheet>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ── Format Segment Selector (New Container only) ───────────
                   if (widget.initialUri == null) ...[
                     SegmentedButton<String>(
                       segments: const [
@@ -865,8 +802,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                     ),
                     const SizedBox(height: 16),
                   ],
-
-                  // ── Expressive File Picker Container Card ───────────────────
                   GestureDetector(
                     onTap: _loading ? null : _pickFile,
                     child: Card(
@@ -992,8 +927,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // ── Direct Storage Access Performance Warning Banner (Folder Vaults Only) ──
                   if (_isFolderVault && !_hasAllStorageAccess) ...[
                     InlineBanner(
                       _isCryfs
@@ -1008,8 +941,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                     ),
                     const SizedBox(height: 16),
                   ],
-
-                  // ── Auth-specific UI ──────────────────────────────────────────
                   if (_loadingAuth)
                     const Center(
                       child: Padding(
@@ -1017,7 +948,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                         child: CircularProgressIndicator(strokeWidth: 3),
                       ),
                     )
-                  // ── Container File Unreachable Card ────────────────────────
                   else if (_containerMissing) ...[
                     Card(
                       elevation: 0,
@@ -1120,7 +1050,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                       ),
                     ),
                   ]
-                  // ── Biometric Unlock Card ──────────────────────────────────
                   else if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
                     Card(
                       elevation: 0,
@@ -1195,7 +1124,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                       ),
                     ),
                   ]
-                  // ── Pattern Unlock Card ───────────────────────────────────
                   else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
                     Card(
                       elevation: 0,
@@ -1245,12 +1173,10 @@ class _UnlockSheetState extends State<UnlockSheet>
                       ),
                     ),
                   ]
-                  // ── Standard Password & Credentials Section Group ───────────
                   else if (_showPasswordUI) ...[
                     AutofillGroup(
                       child: SectionCard(
                         children: [
-                          // 1. Password Field
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: TextField(
@@ -1295,8 +1221,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                               ),
                             ),
                           ),
-
-                          // 2. Keyfiles Selection Box
                           if (!_isFolderVault && !_isBitlocker)
                             Padding(
                               padding: const EdgeInsets.all(16),
@@ -1321,8 +1245,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                                 ],
                               ),
                             ),
-
-                          // 3. Collapsible Advanced Parameters
                           if (!_isLuks && !_isFolderVault && !_isBitlocker)
                             AdvancedParamsPanel(
                               pimController: _pimCtrl,
@@ -1332,8 +1254,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                               onCipherChanged: (val) => setState(() => _cipherId = val),
                               onHashChanged: (val) => setState(() => _hashId = val),
                             ),
-
-                          // 4. Read-only mode toggle
                           SwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                             value: _readOnly,
@@ -1348,8 +1268,6 @@ class _UnlockSheetState extends State<UnlockSheet>
                             ),
                             secondary: Icon(Icons.visibility_outlined, color: cs.primary),
                           ),
-
-                          // 5. Remember Container Toggle
                           if (widget.initialUri == null)
                             SwitchListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1368,14 +1286,11 @@ class _UnlockSheetState extends State<UnlockSheet>
                         ],
                       ),
                     ),
-
                     if (_error != null) ...[
                       const SizedBox(height: 16),
                       InlineErrorBanner(_error!),
                     ],
                     const SizedBox(height: 24),
-
-                    // Primary Unlock Button
                     FilledButton(
                       onPressed: _loading ? null : _unlock,
                       style: FilledButton.styleFrom(

@@ -109,8 +109,17 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   }
 
   bool _clearingCache = false;
-
   Future<void> _clearThumbnailCache() async {
+    final confirm = await showAppConfirmDialog(
+      context,
+      title: 'Clear Thumbnail Cache?',
+      message:
+          'This will delete cached thumbnails for this vault. They will be regenerated the next time you browse media.',
+      confirmLabel: 'Clear Cache',
+      isDestructive: true,
+    );
+    if (!confirm || !mounted) return;
+
     setState(() => _clearingCache = true);
     bool appCacheCleared = false;
     bool containerCacheCleared = false;
@@ -766,27 +775,36 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           }).toList(),
                           onChanged: (v) => setState(() => _thumbnailQuality = v),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: FilledButton.tonalIcon(
-                            onPressed: _clearingCache ? null : _clearThumbnailCache,
-                            icon: _clearingCache
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.delete_sweep_rounded, size: 18),
-                            label: const Text('Clear Thumbnail Cache'),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 44),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              backgroundColor: cs.surfaceContainerHighest,
-                              foregroundColor: cs.primary,
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
+                          ),
+                          title: Text(
+                            'Clear Thumbnail Cache',
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
+                          subtitle: Text(
+                            'Remove cached image and video thumbnails',
+                            style: textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                          trailing: _clearingCache
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                          onTap: _clearingCache ? null : _clearThumbnailCache,
                         ),
                       ],
                     ],

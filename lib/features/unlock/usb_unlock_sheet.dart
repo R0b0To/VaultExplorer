@@ -38,7 +38,6 @@ class UsbUnlockSheet extends StatefulWidget {
 class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin {
   final _passwordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
-
   List<UsbDeviceInfo> _devices = [];
   UsbDeviceInfo? _selected;
   bool _obscure = true;
@@ -47,20 +46,17 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
   bool _unlocking = false;
   bool _readOnly = false;
   String? _error;
-  int _cipherId = 255; // Auto
-  int _hashId = 255; // Auto
+  int _cipherId = 255;
+  int _hashId = 255;
   bool _remember = false;
 
   @override
   void onKeyfilePickError(String message) => setState(() => _error = message);
 
   String _containerFormat = 'veracrypt';
-
-  /// Format getters for format-specific UI branching
   bool get _isLuks => ContainerFormat.isLuksWire(_containerFormat);
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(_containerFormat);
 
-  // ── Cancel / progress state ──────────────────────────────────────────────
   int? _activeVolId;
   UnlockProgress? _progress;
   late final void Function(int) _onUnlockStarted;
@@ -103,9 +99,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     final hashName = hashAlgorithmName(p.hashId);
     final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
     final slotName = p.slot == 1 ? 'Hidden Volume' : 'Standard Volume';
-    
     final algo = cipherName.isNotEmpty ? '$hashName + $cipherName' : hashName;
-
     return p.total > 1
         ? 'Trying $algo ($slotName)…'
         : 'Trying $algo ($slotName)…';
@@ -124,7 +118,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     }
     _loadDevicesFuture = _loadDevices();
     _initUnlockMethod();
-
     _onUnlockStarted = (volId) {
       if (mounted) setState(() => _activeVolId = volId);
     };
@@ -148,17 +141,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
       if (mounted) setState(() => _loadingAuth = false);
       return;
     }
-
     try {
       _unlockMethod = record.unlockMethod;
       _readOnly = record.readOnly;
-
       if (_unlockMethod == ContainerUnlockMethod.pattern) {
         _storedPatternHash = await ContainerRepository.instance.getPatternHash(record.uri);
       }
-
       if (mounted) setState(() => _loadingAuth = false);
-
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
         if (_loadDevicesFuture != null) {
           await _loadDevicesFuture;
@@ -176,19 +165,16 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
   Future<void> _tryBiometric() async {
     if (_isAuthenticating) return;
     _isAuthenticating = true;
-
     final record = widget.existingRecord;
     if (record == null) {
       _isAuthenticating = false;
       return;
     }
-    
     if (_selected == null) {
       if (mounted) setState(() => _error = 'Select a USB drive first');
       _isAuthenticating = false;
       return;
     }
-
     try {
       final localAuth = LocalAuthentication();
       final canCheck = await localAuth.canCheckBiometrics;
@@ -202,7 +188,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         }
         return;
       }
-
       final ok = await localAuth.authenticate(
         localizedReason: 'Authenticate to unlock USB drive',
         options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
@@ -219,7 +204,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
           await _unlock(preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldUseCachedKey);
           return;
         }
-
         final pw = await ContainerRepository.instance.getPassword(record.uri);
         if (pw != null && pw.isNotEmpty) {
           _passwordCtrl.text = pw;
@@ -258,7 +242,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
       });
       return;
     }
-
     final attempt = hashPattern(pattern);
     if (attempt == _storedPatternHash) {
       final appSettings = await AppSettingsService.loadSettings();
@@ -268,12 +251,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
           ? await vaultExplorerApi.loadDerivedKey(deviceName)
           : null;
       debugPrint('usb unlock: pattern cached-key present=${cachedKey != null && cachedKey.isNotEmpty} for ${record.uri}');
-
       if (cachedKey != null && cachedKey.isNotEmpty) {
         await _unlock(preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldUseCachedKey);
         return;
       }
-
       final pw = await ContainerRepository.instance.getPassword(record.uri);
       if (pw != null && pw.isNotEmpty) {
         _passwordCtrl.text = pw;
@@ -317,7 +298,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         setState(() {
           _devices = devices;
           _loadingDevices = false;
-
           final expected = _expectedDeviceName;
           if (expected != null) {
             final matches = devices.where((d) => d.deviceName == expected);
@@ -372,21 +352,17 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
       setState(() => _error = 'Select a USB drive first');
       return;
     }
-    
     final newUri = 'usb:${device.deviceName}';
     if (widget.mountedUris.contains(newUri)) {
       setState(() => _error = 'This USB device is already active and mounted.');
       return;
     }
-
     var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
     if (effectivePassword.isEmpty && preservedKey == null && keyfiles.isEmpty) {
       setState(() => _error = 'Password or keyfiles required');
       return;
     }
-
     setState(() { _unlocking = true; _error = null; _activeVolId = null; _progress = null; });
-
     try {
       if (!device.hasPermission) {
         await _ensurePermission(device);
@@ -396,17 +372,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
           return;
         }
       }
-
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final displayName = widget.existingRecord?.label ?? device.productName;
       final keyfilePaths = keyfiles.map((k) => k.uri).toList();
-
       final appSettings = await AppSettingsService.loadSettings();
       final isReconnect = widget.existingRecord != null;
       final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
           ((isReconnect || _remember) &&
               ((widget.existingRecord?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
-
       final shouldPreloadCachedKey = preservedKey == null &&
           _unlockMethod == ContainerUnlockMethod.rememberPassword &&
           _passwordPrefilled &&
@@ -416,7 +389,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
               ? await vaultExplorerApi.loadDerivedKey(device.deviceName)
               : null);
       debugPrint('usb unlock: method=$_unlockMethod shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
-
       var result = resolvedPreservedKey == null
           ? await vaultExplorerApi.unlockUsbContainer(
               device.deviceName,
@@ -444,7 +416,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
               keyfilePaths: keyfilePaths,
               readOnly: _readOnly,
             ));
-
       if (result == null && resolvedPreservedKey != null) {
         await vaultExplorerApi.clearDerivedKey(device.deviceName);
         if (effectivePassword.isEmpty && widget.existingRecord != null) {
@@ -467,12 +438,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
           );
         }
       }
-
       if (result == null) {
         setState(() => _error = 'Incorrect password/keyfiles or unsupported drive');
         return;
       }
-
       final tempContainer = MountedContainer(
         uri: newUri,
         displayName: displayName,
@@ -482,6 +451,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         totalSpace: 0,
         freeSpace: 0,
         readOnly: _readOnly,
+        containerFormat: result.containerFormat,
       );
       final space = await vaultExplorerApi.getSpaceInfo(tempContainer);
       final total = (space != null && space.isNotEmpty) ? space[0] : 0;
@@ -490,13 +460,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         totalSpace: total,
         freeSpace: free,
       );
-
       final existing = widget.existingRecord;
       if (existing != null && existing.uri != newUri) {
         final savedPassword = await ContainerRepository.instance.getPassword(existing.uri);
         final savedPatternHash = await ContainerRepository.instance.getPatternHash(existing.uri);
         await ContainerRepository.instance.remove(existing.uri);
-
         final migrated = ContainerRecord(
           uri: newUri,
           label: existing.label,
@@ -514,17 +482,16 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
           containerFormat: result.containerFormat,
         );
         await ContainerRepository.instance.save(migrated);
-
         widget.onReconnected?.call(finalContainer, migrated, existing.uri);
       } else if (existing != null) {
         var effectiveExisting = existing;
         if (existing.cipherId != result.matchedCipherId ||
             existing.hashId != result.matchedHashId ||
             existing.containerFormat != result.containerFormat ||
-            existing.readOnly != _readOnly) {   
+            existing.readOnly != _readOnly) {
           effectiveExisting = existing.copyWith(
             cacheDerivedKey: shouldCacheDerivedKey,
-            readOnly: _readOnly,   
+            readOnly: _readOnly,
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
             containerFormat: result.containerFormat,
@@ -549,7 +516,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         }
         widget.onMounted(finalContainer, record: savedRecord);
       }
-
       HapticFeedback.lightImpact();
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -570,7 +536,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     final textTheme = Theme.of(context).textTheme;
     final busy = _unlocking || _requestingPermission;
     final isReconnect = widget.existingRecord != null;
-
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
@@ -588,7 +553,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         borderSide: BorderSide(color: cs.primary, width: 2),
       ),
     );
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
@@ -624,7 +588,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                     ),
                   )
                 else ...[
-                  // Reconnect Drive Offline Banner
                   if (isReconnect && _reconnectTargetMissing) ...[
                     Card(
                       elevation: 0,
@@ -682,8 +645,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                     ),
                     const SizedBox(height: 16),
                   ],
-
-                  // Empty State: No Devices Found
                   if (_devices.isEmpty) ...[
                     Card(
                       elevation: 0,
@@ -729,7 +690,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                       ),
                     ),
                   ] else ...[
-                    // 1. Device list group
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -756,7 +716,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                               final deviceUri = 'usb:${d.deviceName}';
                               final isAlreadyMounted = widget.mountedUris.contains(deviceUri);
                               final isSelected = _selected?.deviceName == d.deviceName;
-                              
                               return GestureDetector(
                                 onTap: (busy || isAlreadyMounted) ? null : () => setState(() => _selected = d),
                                 child: Card(
@@ -873,8 +832,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                       ],
                     ),
                     const SizedBox(height: 16),
-
-                    // Auth View Switchers
                     if (_loadingAuth)
                       const Center(
                         child: Padding(
@@ -882,7 +839,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       )
-                    // Biometric Card
                     else if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
                       Card(
                         elevation: 0,
@@ -957,7 +913,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                         ),
                       ),
                     ]
-                    // Pattern Card
                     else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
                       Card(
                         elevation: 0,
@@ -1008,10 +963,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                       ),
                     ]
                     else ...[
-                      // Standard Password & Credentials Section Group
                       SectionCard(
                         children: [
-                          // 1. Password Field
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: TextField(
@@ -1049,8 +1002,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                               ),
                             ),
                           ),
-
-                          // 2. Keyfiles Component
                           if (!_isBitlocker)
                             Padding(
                               padding: const EdgeInsets.all(16),
@@ -1076,8 +1027,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                                 ],
                               ),
                             ),
-
-                          // 3. Collapsible Advanced Settings Panel
                           if (!_isLuks && !_isBitlocker)
                             AdvancedParamsPanel(
                               pimController: _pimCtrl,
@@ -1087,8 +1036,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                               onCipherChanged: (val) => setState(() => _cipherId = val),
                               onHashChanged: (val) => setState(() => _hashId = val),
                             ),
-
-                          // 4. Read-Only Mode Switch
                           SwitchListTile(
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                             value: _readOnly,
@@ -1103,8 +1050,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                             ),
                             secondary: Icon(Icons.visibility_outlined, color: cs.primary),
                           ),
-
-                          // 5. Remember Drive Switch
                           if (!isReconnect)
                             SwitchListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1122,14 +1067,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                             ),
                         ],
                       ),
-
                       if (_error != null) ...[
                         const SizedBox(height: 16),
                         InlineErrorBanner(_error!),
                       ],
                       const SizedBox(height: 24),
-
-                      // Unlock execution CTA
                       FilledButton(
                         onPressed: busy || _devices.isEmpty || _selected == null ? null : _unlock,
                         style: FilledButton.styleFrom(

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/widgets/cards/expressive_card.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   final String uri;
@@ -26,17 +25,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _confirmPasswordCtrl = TextEditingController();
   final _oldPimCtrl = TextEditingController();
   final _newPimCtrl = TextEditingController();
-
   final List<KeyfileRef> _oldKeyfiles = [];
   bool _pickingOldKeyfiles = false;
-
   final List<KeyfileRef> _newKeyfiles = [];
   bool _pickingNewKeyfiles = false;
-
   bool _oldObscure = true;
   bool _newObscure = true;
   bool _confirmObscure = true;
-
   bool _isProcessing = false;
   String? _errorMsg;
 
@@ -144,102 +139,114 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     }
   }
 
-  Widget _buildCurrentCredentials(ColorScheme cs, TextTheme textTheme) {
-    return ExpressiveCard(
+  Widget _buildCurrentCredentials(ColorScheme cs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const ExpressiveSectionHeader(
-          title: 'Current Credentials',
-          subtitle: 'Enter existing container password and keyfiles',
-          icon: Icons.lock_clock_rounded,
-        ),
-        TextField(
-          controller: _oldPasswordCtrl,
-          obscureText: _oldObscure,
-          onChanged: (_) => setState(() {}),
-          autofillHints: const [AutofillHints.password],
-          decoration: InputDecoration(
-            labelText: 'Old Password',
-            prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
-            suffixIcon: PasswordVisibilityToggle(
-              obscured: _oldObscure,
-              onToggle: () => setState(() => _oldObscure = !_oldObscure),
+        SectionHeader('Current Credentials'),
+        SectionCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _oldPasswordCtrl,
+                obscureText: _oldObscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: const [AutofillHints.password],
+                decoration: InputDecoration(
+                  labelText: 'Old Password',
+                  prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _oldObscure,
+                    onToggle: () => setState(() => _oldObscure = !_oldObscure),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _oldPimCtrl,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Old PIM (Optional)',
-            prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
-          ),
-        ),
-        const SizedBox(height: 16),
-        KeyfilesPicker(
-          keyfiles: _oldKeyfiles,
-          picking: _pickingOldKeyfiles,
-          onPick: _pickOldKeyfiles,
-          onRemove: _removeOldKeyfile,
-          enabled: !_isProcessing,
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _oldPimCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Old PIM (Optional)',
+                  prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+                ),
+              ),
+            ),
+            KeyfilesPicker(
+              keyfiles: _oldKeyfiles,
+              picking: _pickingOldKeyfiles,
+              onPick: _pickOldKeyfiles,
+              onRemove: _removeOldKeyfile,
+              enabled: !_isProcessing,
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildNewCredentials(ColorScheme cs, TextTheme textTheme) {
-    return ExpressiveCard(
+  Widget _buildNewCredentials(ColorScheme cs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const ExpressiveSectionHeader(
-          title: 'New Credentials',
-          subtitle: 'Set new container password, PIM and keyfiles',
-          icon: Icons.lock_reset_rounded,
-        ),
-        TextField(
-          controller: _newPasswordCtrl,
-          obscureText: _newObscure,
-          onChanged: (_) => setState(() {}),
-          autofillHints: const [AutofillHints.newPassword],
-          decoration: InputDecoration(
-            labelText: 'New Password',
-            prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
-            suffixIcon: PasswordVisibilityToggle(
-              obscured: _newObscure,
-              onToggle: () => setState(() => _newObscure = !_newObscure),
+        SectionHeader('New Credentials'),
+        SectionCard(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _newPasswordCtrl,
+                obscureText: _newObscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  labelText: 'New Password',
+                  prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _newObscure,
+                    onToggle: () => setState(() => _newObscure = !_newObscure),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _confirmPasswordCtrl,
-          obscureText: _confirmObscure,
-          onChanged: (_) => setState(() {}),
-          autofillHints: const [AutofillHints.newPassword],
-          decoration: InputDecoration(
-            labelText: 'Confirm New Password',
-            prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
-            suffixIcon: PasswordVisibilityToggle(
-              obscured: _confirmObscure,
-              onToggle: () => setState(() => _confirmObscure = !_confirmObscure),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _confirmPasswordCtrl,
+                obscureText: _confirmObscure,
+                onChanged: (_) => setState(() {}),
+                autofillHints: const [AutofillHints.newPassword],
+                decoration: InputDecoration(
+                  labelText: 'Confirm New Password',
+                  prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
+                  suffixIcon: PasswordVisibilityToggle(
+                    obscured: _confirmObscure,
+                    onToggle: () => setState(() => _confirmObscure = !_confirmObscure),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _newPimCtrl,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'New PIM (Optional)',
-            prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
-          ),
-        ),
-        const SizedBox(height: 16),
-        KeyfilesPicker(
-          keyfiles: _newKeyfiles,
-          picking: _pickingNewKeyfiles,
-          onPick: _pickNewKeyfiles,
-          onRemove: _removeNewKeyfile,
-          enabled: !_isProcessing,
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _newPimCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'New PIM (Optional)',
+                  prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+                ),
+              ),
+            ),
+            KeyfilesPicker(
+              keyfiles: _newKeyfiles,
+              picking: _pickingNewKeyfiles,
+              onPick: _pickNewKeyfiles,
+              onRemove: _removeNewKeyfile,
+              enabled: !_isProcessing,
+            ),
+          ],
         ),
       ],
     );
@@ -248,12 +255,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
-      fillColor: cs.surfaceContainerHigh,
+      fillColor: cs.surfaceContainerHighest,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
@@ -301,10 +307,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.pop(context),
-        ),
+        backgroundColor: cs.surfaceContainerHigh,
         title: const Text(
           'Change Password',
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -316,37 +319,39 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         ),
         child: SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: isLandscape
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: _buildCurrentCredentials(cs, textTheme),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildNewCredentials(cs, textTheme),
-                            const SizedBox(height: 20),
-                            actionArea,
-                          ],
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: AutofillGroup(
+              child: isLandscape
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _buildCurrentCredentials(cs),
                         ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildCurrentCredentials(cs, textTheme),
-                      const SizedBox(height: 16),
-                      _buildNewCredentials(cs, textTheme),
-                      const SizedBox(height: 20),
-                      actionArea,
-                    ],
-                  ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildNewCredentials(cs),
+                              const SizedBox(height: 16),
+                              actionArea,
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildCurrentCredentials(cs),
+                        const SizedBox(height: 16),
+                        _buildNewCredentials(cs),
+                        const SizedBox(height: 16),
+                        actionArea,
+                      ],
+                    ),
+            ),
           ),
         ),
       ),

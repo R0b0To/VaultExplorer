@@ -52,33 +52,24 @@ class _VaultDashboardState extends State<VaultDashboard>
     with WidgetsBindingObserver {
   final List<MountedContainer> _mounted = [];
   Map<String, ContainerRecord> _records = {};
-
   final List<String> _recordsOrder = [];
-
   AppSettings _appSettings = AppSettings();
   bool _actionInFlight = false;
   bool _isLoading = true;
-
   final Map<int, Timer> _autoCloseTimers = {};
-
   late final SessionLockController _lockController;
   final SwipeRowGroupController _swipeGroup = SwipeRowGroupController();
-
-  // Undo action, animation, and layout state
   ContainerRecord? _recentlyDeletedRecord;
   String? _recentlyDeletedUri;
   int? _recentlyDeletedIndex;
   bool _showUndoBar = false;
   Timer? _undoTimer;
-
-  // Track cards currently animating
   final Set<String> _animatingOutUris = {};
   final Set<String> _animatingInUris = {};
 
   @override
   void initState() {
     super.initState();
-
     _lockController = SessionLockController(
       settings: () => _appSettings,
       lockAllMountedContainers: _lockAllMountedContainers,
@@ -141,7 +132,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
   }
 
-
   Future<void> _loadAll() async {
     final settings = await AppSettingsService.loadSettings();
     final records = await ContainerRepository.instance.loadAll();
@@ -171,8 +161,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (!_recordsOrder.contains(uri)) _recordsOrder.add(uri);
   }
 
-  // ── Auto-close ────────────────────────────────────────────────────────────
-
   void _scheduleAutoClose(MountedContainer container) {
     final record = _records[container.uri];
     final mins = record?.autoCloseMins ?? 0;
@@ -180,13 +168,11 @@ class _VaultDashboardState extends State<VaultDashboard>
       _cancelAutoClose(container.volId);
       return;
     }
-
     _autoCloseTimers[container.volId]?.cancel();
     _autoCloseTimers[container.volId] = Timer(
       Duration(minutes: mins),
       () async {
         if (!mounted) return;
-
         if (!vaultExplorerApi.acquireLockGuard(container.volId)) {
           if (mounted) {
             _autoCloseTimers[container.volId] = Timer(
@@ -198,7 +184,6 @@ class _VaultDashboardState extends State<VaultDashboard>
           }
           return;
         }
-
         try {
           await vaultExplorerApi.lockContainer(container.uri);
           if (!mounted) return;
@@ -228,11 +213,8 @@ class _VaultDashboardState extends State<VaultDashboard>
     _autoCloseTimers.remove(volId);
   }
 
-  // ── Container lifecycle ───────────────────────────────────────────────────
-
   void _onContainerMounted(MountedContainer container, {ContainerRecord? record}) {
     if (_mounted.any((c) => c.uri == container.uri)) return;
-
     setState(() {
       _mounted.add(container);
       if (record != null && !_records.containsKey(container.uri)) {
@@ -241,7 +223,7 @@ class _VaultDashboardState extends State<VaultDashboard>
       _ensureOrdered(container.uri);
     });
     _scheduleAutoClose(container);
-    _refreshContainerSpace(container.volId); 
+    _refreshContainerSpace(container.volId);
   }
 
   void _onUsbContainerDetached(int volId) {
@@ -261,7 +243,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     String oldUri,
   ) {
     if (_mounted.any((c) => c.uri == container.uri)) return;
-
     setState(() {
       _mounted.add(container);
       final oldIndex = _recordsOrder.indexOf(oldUri);
@@ -279,14 +260,11 @@ class _VaultDashboardState extends State<VaultDashboard>
 
   void _onContainerLocked(int volId) {
     _cancelAutoClose(volId);
-
     final clip = CrossContainerClipboard.instance;
     if (clip.hasItems && clip.sourceVolId == volId) {
       clip.clear();
     }
-
     FullResImageCache.clear();
-
     if (mounted) {
       setState(() => _mounted.removeWhere((c) => c.volId == volId));
     }
@@ -312,18 +290,13 @@ class _VaultDashboardState extends State<VaultDashboard>
     } catch (_) {}
   }
 
-  // ── Unlock & Create Actions ───────────────────────────────────────────────
-
   Future<void> _showUnlockSheet({String? uri, String? name}) async {
     if (uri != null && _mounted.any((c) => c.uri == uri)) {
       showAppSnackBar(context, message: 'This container is already mounted.');
       return;
     }
-
-
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
-
     String? rememberedPassword;
     if (uri != null) {
       final record = _records[uri];
@@ -331,12 +304,10 @@ class _VaultDashboardState extends State<VaultDashboard>
         rememberedPassword = await ContainerRepository.instance.getPassword(uri);
       }
     }
-
     final record = uri != null ? _records[uri] : null;
     final docProvider = record?.documentProvider ?? _appSettings.defaultDocumentProvider;
-
     try {
-      if (!mounted) return; 
+      if (!mounted) return;
       await Navigator.push(
         context,
         SlideRightRoute(
@@ -359,14 +330,12 @@ class _VaultDashboardState extends State<VaultDashboard>
   Future<void> _showUsbUnlockSheet({ContainerRecord? existingRecord}) async {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
-
     String? rememberedPassword;
     if (existingRecord != null && existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
       rememberedPassword = await ContainerRepository.instance.getPassword(existingRecord.uri);
     }
-
     try {
-      if (!mounted) return; 
+      if (!mounted) return;
       await Navigator.push(
         context,
         SlideRightRoute(
@@ -409,9 +378,7 @@ class _VaultDashboardState extends State<VaultDashboard>
 
   Future<void> _showAddOptionsSheet() async {
     if (_actionInFlight) return;
-    
     setState(() => _actionInFlight = true);
-    
     bool hasUsb = false;
     try {
       final devices = await vaultExplorerApi.listUsbDevices();
@@ -419,14 +386,11 @@ class _VaultDashboardState extends State<VaultDashboard>
     } catch (e) {
       debugPrint('Failed to check USB devices: $e');
     }
-
     if (!mounted) return;
     setState(() => _actionInFlight = false);
-
     HapticFeedback.lightImpact();
     final cs = Theme.of(context).colorScheme;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    
     showModalBottomSheet(
       context: context,
       isScrollControlled: isLandscape,
@@ -523,7 +487,6 @@ class _VaultDashboardState extends State<VaultDashboard>
               final newName = record.label.isNotEmpty ? record.label : record.uri.split('/').last;
               final newContainer = oldContainer.copyWith(displayName: newName);
               if (mounted) setState(() => _mounted[idx] = newContainer);
-
               await vaultExplorerApi.updateContainerSettings(uri, newName, record.documentProvider);
               _scheduleAutoClose(newContainer);
             }
@@ -535,7 +498,6 @@ class _VaultDashboardState extends State<VaultDashboard>
 
   void _handleSwipeToRemove(String uri, ContainerRecord record) async {
     final originalIndex = _recordsOrder.indexOf(uri);
-
     setState(() {
       _animatingOutUris.add(uri);
       _recentlyDeletedRecord = record;
@@ -543,12 +505,10 @@ class _VaultDashboardState extends State<VaultDashboard>
       _recentlyDeletedIndex = originalIndex;
       _showUndoBar = true;
     });
-
     _undoTimer?.cancel();
     _undoTimer = Timer(const Duration(seconds: 5), () {
       _dismissUndo();
     });
-
     Future.delayed(const Duration(milliseconds: 300), () async {
       await ContainerRepository.instance.remove(uri);
       if (mounted) {
@@ -582,16 +542,12 @@ class _VaultDashboardState extends State<VaultDashboard>
     final record = _recentlyDeletedRecord;
     final uri = _recentlyDeletedUri;
     final index = _recentlyDeletedIndex;
-
     if (record == null || uri == null) return;
-
     _undoTimer?.cancel();
     setState(() {
       _showUndoBar = false;
     });
-
     await ContainerRepository.instance.save(record);
-
     if (mounted) {
       setState(() {
         _records[uri] = record;
@@ -603,7 +559,6 @@ class _VaultDashboardState extends State<VaultDashboard>
         }
       });
     }
-
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) {
         setState(() {
@@ -615,8 +570,6 @@ class _VaultDashboardState extends State<VaultDashboard>
       }
     });
   }
-
-  // ── Navigate to browser ───────────────────────────────────────────────────
 
   Future<void> _openBrowser(MountedContainer container) async {
     await Navigator.push(
@@ -640,8 +593,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     );
     if (mounted) _refreshContainerSpace(container.volId);
   }
-
-  // ── Card actions (tap / swipe-edit / swipe-delete) ────────────────────────
 
   void _openItem(VaultListItem item) {
     switch (item) {
@@ -670,8 +621,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     _handleSwipeToRemove(item.uri, (item as LockedVaultItem).record);
   }
 
-  // ── Display list & reordering ─────────────────────────────────────────────
-
   DateTime _dateAddedProxy(String uri) {
     final idx = _recordsOrder.indexOf(uri);
     if (idx != -1) return DateTime.fromMillisecondsSinceEpoch(idx * 1000);
@@ -685,7 +634,6 @@ class _VaultDashboardState extends State<VaultDashboard>
         if (!_mounted.any((m) => m.uri == entry.key))
           entry.key: LockedVaultItem(entry.value, sortDate: _dateAddedProxy(entry.key)),
     };
-
     final ordered = <VaultListItem>[
       for (final uri in _recordsOrder)
         if (byUri[uri] != null) byUri[uri]!,
@@ -726,20 +674,16 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (newIndex > oldIndex) newIndex -= 1;
     final items = _buildDisplayItems();
     final movedUri = items[oldIndex].uri;
-
     setState(() {
       _recordsOrder.remove(movedUri);
       _recordsOrder.insert(newIndex.clamp(0, _recordsOrder.length), movedUri);
     });
   }
 
-  // ── Body ───────────────────────────────────────────────────────────────────
-
   Widget _buildBody(List<VaultListItem> displayItems) {
     if (displayItems.isEmpty && !_isLoading) {
       return EmptyState(onAdd: _showAddOptionsSheet);
     }
-
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
@@ -748,6 +692,23 @@ class _VaultDashboardState extends State<VaultDashboard>
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
           itemCount: displayItems.length,
           onReorderItem: _handleReorder,
+          proxyDecorator: (Widget child, int index, Animation<double> animation) {
+            return AnimatedBuilder(
+              animation: animation,
+              builder: (BuildContext context, Widget? child) {
+                final double animValue = Curves.easeInOut.transform(animation.value);
+                final double elevation = Tween<double>(begin: 0, end: 8).transform(animValue);
+                return Material(
+                  elevation: elevation,
+                  color: Colors.transparent,
+                  shadowColor: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(AppRadius.xl),
+                  child: child,
+                );
+              },
+              child: child,
+            );
+          },
           itemBuilder: (context, i) {
             final item = displayItems[i];
             final bool triggerNudge = i == 0 && !_appSettings.hasSeenSwipeTutorial;
@@ -763,8 +724,8 @@ class _VaultDashboardState extends State<VaultDashboard>
               isRemoving: _animatingOutUris.contains(item.uri),
               isInserting: _animatingInUris.contains(item.uri),
               triggerNudge: triggerNudge,
-              swapActions: _appSettings.swapCardActions,                                   
-              dragEnabled: _appSettings.containerSortMode == ContainerSortMode.manual,  
+              swapActions: _appSettings.swapCardActions,
+              dragEnabled: _appSettings.containerSortMode == ContainerSortMode.manual,
               onNudgeComplete: () async {
                 final updated = _appSettings.copyWith(hasSeenSwipeTutorial: true);
                 await AppSettingsService.saveSettings(updated);
@@ -786,7 +747,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     final displayItems = _buildDisplayItems();
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final double undoBarHeight = 64.0 + (bottomInset > 0 ? bottomInset : 16.0);
-
     return Listener(
       behavior: HitTestBehavior.translucent,
       onPointerDown: (_) => _lockController.scheduleAutoLock(),
@@ -863,17 +823,14 @@ class _VaultDashboardState extends State<VaultDashboard>
 class _FloatingUndoBar extends StatelessWidget {
   final String label;
   final VoidCallback onUndo;
-
   const _FloatingUndoBar({
     required this.label,
     required this.onUndo,
   });
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return FloatingPill(
       color: cs.inverseSurface,
       child: Row(

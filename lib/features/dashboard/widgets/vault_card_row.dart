@@ -47,7 +47,6 @@ class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecogni
         final delta = event.position - startPosition;
         final double dx = delta.dx.abs();
         final double dy = delta.dy.abs();
-
         if (dy > dx && dy > 6.0) {
           rejectGesture(event.pointer);
           _startPositions.remove(event.pointer);
@@ -77,8 +76,8 @@ class VaultCardRow extends StatefulWidget {
   final SwipeRowGroupController group;
   final bool isRemoving;
   final bool isInserting;
-  final bool triggerNudge;             
-  final VoidCallback? onNudgeComplete; 
+  final bool triggerNudge;
+  final VoidCallback? onNudgeComplete;
   final bool swapActions;
   final bool dragEnabled;
 
@@ -106,18 +105,14 @@ class VaultCardRow extends StatefulWidget {
 class _VaultCardRowState extends State<VaultCardRow>
     with SingleTickerProviderStateMixin {
   static const double _revealExtent = 96;
-  static const double _flingVelocity = 1200.0; 
+  static const double _flingVelocity = 1200.0;
 
   late final AnimationController _controller;
-
   double _dx = 0;
   _OpenSide _openSide = _OpenSide.none;
   _OpenSide _gestureStartSide = _OpenSide.none;
-  
   bool _isDragging = false;
   bool _isCurrentlyInserting = false;
-  
-  // Guard flag to prevent triggering the nudge multiple times within the same cycle
   bool _hasTriggeredNudge = false;
 
   @override
@@ -125,7 +120,6 @@ class _VaultCardRowState extends State<VaultCardRow>
     super.initState();
     _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 220));
     widget.group.addListener(_onGroupChanged);
-
     if (widget.isInserting) {
       _isCurrentlyInserting = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -136,8 +130,6 @@ class _VaultCardRowState extends State<VaultCardRow>
         }
       });
     }
-
-    // Handles trigger on fresh initial build
     if (widget.triggerNudge && !widget.isInserting) {
       _hasTriggeredNudge = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -153,15 +145,12 @@ class _VaultCardRowState extends State<VaultCardRow>
       oldWidget.group.removeListener(_onGroupChanged);
       widget.group.addListener(_onGroupChanged);
     }
-
-    // Checks for transitions when returning from other screens (like AppSettingsScreen)
     if (widget.triggerNudge && !oldWidget.triggerNudge && !_hasTriggeredNudge) {
       _hasTriggeredNudge = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _triggerPeekNudge();
       });
     } else if (!widget.triggerNudge) {
-      // Reset the local trigger flag once triggerNudge becomes false
       _hasTriggeredNudge = false;
     }
   }
@@ -182,19 +171,14 @@ class _VaultCardRowState extends State<VaultCardRow>
   Future<void> _triggerPeekNudge() async {
     debugPrint('[VaultCardRow] Nudge checks passed. Starting delayed trigger...');
     if (!mounted || _isDragging || _openSide != _OpenSide.none) return;
-
     await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
-
     debugPrint('[VaultCardRow] Executing nudge slide actions...');
     await _animatePeekTo(-90.0, const Duration(milliseconds: 500));
     await Future.delayed(const Duration(milliseconds: 650));
-
     await _animatePeekTo(90.0, const Duration(milliseconds: 500));
     await Future.delayed(const Duration(milliseconds: 650));
-
     await _animatePeekTo(0.0, const Duration(milliseconds: 500));
-    
     if (mounted) {
       debugPrint('[VaultCardRow] Nudge complete, calling onNudgeComplete callback.');
       widget.onNudgeComplete?.call();
@@ -204,23 +188,18 @@ class _VaultCardRowState extends State<VaultCardRow>
   Future<void> _animatePeekTo(double targetDx, Duration duration) {
     final completer = Completer<void>();
     if (!mounted) return Future.value();
-
     _controller.stop();
     _controller.duration = duration;
     _controller.reset();
-
     final animation = Tween<double>(begin: _dx, end: targetDx).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic),
     );
-
     void listener() => setState(() => _dx = animation.value);
     animation.addListener(listener);
-
     _controller.forward().whenCompleteOrCancel(() {
       animation.removeListener(listener);
       completer.complete();
     });
-
     return completer.future;
   }
 
@@ -230,7 +209,6 @@ class _VaultCardRowState extends State<VaultCardRow>
       _OpenSide.end => -_revealExtent,
       _OpenSide.none => 0.0,
     };
-
     _controller.stop();
     _controller.duration = const Duration(milliseconds: 220);
     _controller.reset();
@@ -242,7 +220,6 @@ class _VaultCardRowState extends State<VaultCardRow>
     _controller.forward().whenCompleteOrCancel(() {
       animation.removeListener(listener);
     });
-
     setState(() => _openSide = target);
     if (target == _OpenSide.none) {
       widget.group.notifyClosed(widget.item.uri);
@@ -259,7 +236,6 @@ class _VaultCardRowState extends State<VaultCardRow>
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (!_isDragging) return;
-
     setState(() {
       final next = _dx + details.delta.dx;
       _dx = switch (_gestureStartSide) {
@@ -273,10 +249,8 @@ class _VaultCardRowState extends State<VaultCardRow>
   void _onDragEnd(DragEndDetails details) {
     if (!_isDragging) return;
     _isDragging = false;
-
     final velocity = details.primaryVelocity ?? 0.0;
     final _OpenSide target;
-    
     if (velocity > _flingVelocity) {
       target = _dx > 0 ? _OpenSide.start : _OpenSide.none;
     } else if (velocity < -_flingVelocity) {
@@ -288,10 +262,10 @@ class _VaultCardRowState extends State<VaultCardRow>
     } else {
       target = _OpenSide.none;
     }
-    
     _animateTo(target);
   }
-    Widget _maybeDragWrap({required Widget child}) {
+
+  Widget _maybeDragWrap({required Widget child}) {
     if (!widget.dragEnabled) return child;
     return ReorderableDelayedDragStartListener(index: widget.index, child: child);
   }
@@ -323,19 +297,16 @@ class _VaultCardRowState extends State<VaultCardRow>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     final double leftRadius = _dx > 0
         ? AppRadius.xl * (1 - (_dx / AppRadius.xl).clamp(0.0, 1.0))
         : AppRadius.xl;
     final double rightRadius = _dx < 0
         ? AppRadius.xl * (1 - (-_dx / AppRadius.xl).clamp(0.0, 1.0))
         : AppRadius.xl;
-
     final dynamicRadius = BorderRadius.horizontal(
       left: Radius.circular(leftRadius),
       right: Radius.circular(rightRadius),
     );
-
     final card = switch (widget.item) {
       MountedVaultItem(:final container) => ContainerCard(
           key: ValueKey('mounted_${widget.item.uri}'),
@@ -353,30 +324,21 @@ class _VaultCardRowState extends State<VaultCardRow>
           borderRadius: dynamicRadius,
         ),
     };
-
-    // Progress is tied to drag *position* (left slot reveals when dragging
-    // right, right slot reveals when dragging left) — swapActions only
-    // changes which action/icon/color sits in which slot, not the physics.
     final leftSlotProgress = (_dx / _revealExtent).clamp(0.0, 1.0);
     final rightSlotProgress = (-_dx / _revealExtent).clamp(0.0, 1.0);
-
     final leftIsDelete = !widget.swapActions;
     final leftIcon = leftIsDelete ? Icons.delete_outline_rounded : Icons.edit_outlined;
     final leftLabel = leftIsDelete ? 'Delete' : 'Edit';
     final leftBackground = leftIsDelete ? cs.errorContainer : cs.secondaryContainer;
     final leftForeground = leftIsDelete ? cs.onErrorContainer : cs.onSecondaryContainer;
     final leftOnTap = leftIsDelete ? _fireDelete : _fireEdit;
-
     final rightIsDelete = widget.swapActions;
     final rightIcon = rightIsDelete ? Icons.delete_outline_rounded : Icons.edit_outlined;
     final rightLabel = rightIsDelete ? 'Delete' : 'Edit';
     final rightBackground = rightIsDelete ? cs.errorContainer : cs.secondaryContainer;
     final rightForeground = rightIsDelete ? cs.onErrorContainer : cs.onSecondaryContainer;
     final rightOnTap = rightIsDelete ? _fireDelete : _fireEdit;
-
     final isHidden = widget.isRemoving || _isCurrentlyInserting;
-
-
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
@@ -386,9 +348,9 @@ class _VaultCardRowState extends State<VaultCardRow>
         opacity: isHidden ? 0.0 : 1.0,
         child: isHidden
             ? const SizedBox(width: double.infinity, height: 0)
-            : _maybeDragWrap(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
+            : Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: _maybeDragWrap(
                   child: Semantics(
                     customSemanticsActions: {
                       const CustomSemanticsAction(label: 'Edit'): widget.onEdit,
@@ -414,7 +376,17 @@ class _VaultCardRowState extends State<VaultCardRow>
                                   ),
                                 ),
                                 const Spacer(),
-
+                                SizedBox(
+                                  width: _revealExtent,
+                                  child: _SwipeActionButton(
+                                    icon: rightIcon,
+                                    label: rightLabel,
+                                    background: rightBackground,
+                                    foreground: rightForeground,
+                                    progress: rightSlotProgress,
+                                    onTap: rightOnTap,
+                                  ),
+                                ),
                               ],
                             ),
                           ),

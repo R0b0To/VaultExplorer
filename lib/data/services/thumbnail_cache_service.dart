@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -83,7 +84,6 @@ class ThumbnailCacheService {
   }
 
   // ── Filename / key encoding ────────────────────────────────────────────────
-// ── Filename / key encoding ────────────────────────────────────────────────
   static String _encodeKey(String value) {
     const int fnvPrime = 1099511628211;
     const int offsetBasis = -2875151525287752661; // 0xcbf29ce484222325 as signed 64-bit int
@@ -99,13 +99,30 @@ class ThumbnailCacheService {
     return hash.toRadixString(16);
   }
 
+  // ── Quality-qualified path key ─────────────────────────────────────────────
+  //
+  // Folds size+quality into the string that gets hashed/stored, so a settings
+  // change (app default or per-container override) naturally produces a new
+  // cache key instead of silently serving a stale thumbnail rendered at the
+  // old size/quality. Old entries just become unreachable orphans, cleaned up
+  // the same way any other stale cache entry is (manual clear / prune).
+  static String _qualifiedPath(String filePath, ThumbnailQuality quality) =>
+      '$filePath|${quality.size}|${quality.quality}';
+
   // ── Memory-tier key ───────────────────────────────────────────────────────
   //
   // Includes mountedAt so that a new session for the same volId always
   // generates a distinct key, preventing stale bytes from a previous container
-  // from being served without a disk/API round-trip.
-  static String _memKey(MountedContainer container, String filePath) =>
-      '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:$filePath';
+  // from being served without a disk/API round-trip. Also includes the
+  // requested quality/size so switching the setting doesn't return a
+  // wrong-resolution thumbnail from the in-memory tier.
+  static String _memKey(
+    MountedContainer container,
+    String filePath,
+    ThumbnailQuality quality,
+  ) =>
+      '${container.volId}:${container.mountedAt.millisecondsSinceEpoch}:'
+      '${_qualifiedPath(filePath, quality)}';
 
   // ── AES-GCM helpers ────────────────────────────────────────────────────────
 
@@ -190,17 +207,26 @@ class ThumbnailCacheService {
   // ── Memory-tier public helpers ─────────────────────────────────────────────
 
   /// Synchronous O(1) lookup into the in-memory tier.
+  ///
+  /// [quality] defaults to [ThumbnailQuality.defaultQuality] for callers that
+  /// only want an optimistic "whatever's cached" placeholder (e.g. showing
+  /// something instantly before a full-res load) and don't have the current
+  /// quality setting in scope. Callers that fetch/store real thumbnails at a
+  /// specific quality should always pass it explicitly so they read back
+  /// exactly what they wrote.
   static Uint8List? getFromMemory(
     MountedContainer container,
-    String filePath,
-  ) => _memoryCache[_memKey(container, filePath)];
+    String filePath, [
+    ThumbnailQuality quality = ThumbnailQuality.defaultQuality,
+  ]) => _memoryCache[_memKey(container, filePath, quality)];
 
-  /// Writes directly to the in-memory tier.
+  /// Writes directly to the in-memory tier. See [getFromMemory] re: [quality].
   static void putInMemory(
     MountedContainer container,
     String filePath,
-    Uint8List data,
-  ) => _memoryCache[_memKey(container, filePath)] = data;
+    Uint8List data, [
+    ThumbnailQuality quality = ThumbnailQuality.defaultQuality,
+  ]) => _memoryCache[_memKey(container, filePath, quality)] = data;
 
   // ── Public: read ──────────────────────────────────────────────────────────
 
@@ -208,18 +234,19 @@ class ThumbnailCacheService {
     required MountedContainer container,
     required String filePath,
     required ThumbnailCacheMode mode,
+    required ThumbnailQuality quality,
   }) async {
     if (mode == ThumbnailCacheMode.disabled) return null;
 
     // Tier 1: memory.
-    final mem = getFromMemory(container, filePath);
+    final mem = getFromMemory(container, filePath, quality);
     if (mem != null) return mem;
 
     // Tier 2: disk / in-container.
     try {
       if (mode == ThumbnailCacheMode.appCache) {
         final dir = await _thumbDir(container);
-        final file = File('$dir/${_encodeKey(filePath)}');
+        final file = File('$dir/${_encodeKey(_qualifiedPath(filePath, quality))}');
 
         final Uint8List raw;
         try {
@@ -236,10 +263,11 @@ class ThumbnailCacheService {
         final decrypted = await _decrypt(raw, key);
         if (decrypted == null || decrypted.isEmpty) return null;
 
-        putInMemory(container, filePath, decrypted);
+        putInMemory(container, filePath, decrypted, quality);
         return decrypted;
       } else {
-        final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
+        final cachePath =
+            '$inContainerDir/${_encodeKey(_qualifiedPath(filePath, quality))}';
         // Single round trip instead of getFileSize() + readFileChunk(): a
         // miss (file doesn't exist) comes back null/empty either way, and a
         // hit is always far smaller than _inContainerReadCap.
@@ -250,7 +278,7 @@ class ThumbnailCacheService {
           _inContainerReadCap,
         );
         if (bytes != null && bytes.isNotEmpty) {
-          putInMemory(container, filePath, bytes);
+          putInMemory(container, filePath, bytes, quality);
         }
         return bytes;
       }
@@ -313,10 +341,11 @@ static Future<void> put({
   required String filePath,
   required Uint8List data,
   required ThumbnailCacheMode mode,
+  required ThumbnailQuality quality,
 }) async {
   if (mode == ThumbnailCacheMode.disabled || data.isEmpty) return;
 
-  putInMemory(container, filePath, data);
+  putInMemory(container, filePath, data, quality);
 
   try {
     if (mode == ThumbnailCacheMode.appCache) {
@@ -327,7 +356,7 @@ static Future<void> put({
       }
       await _ensuredThumbDirs[dirPath];
 
-      final file = File('$dirPath/${_encodeKey(filePath)}');
+      final file = File('$dirPath/${_encodeKey(_qualifiedPath(filePath, quality))}');
       final key = await getOrFetchKey();
       final encrypted = await _encrypt(data, key);
 
@@ -339,7 +368,8 @@ static Future<void> put({
 
       await tmp.rename(file.path);
     } else {
-      final cachePath = '$inContainerDir/${_encodeKey(filePath)}';
+      final cachePath =
+          '$inContainerDir/${_encodeKey(_qualifiedPath(filePath, quality))}';
       
       // Unique temp path for the vault to prevent write conflicts
       final uniqueId = DateTime.now().microsecondsSinceEpoch;

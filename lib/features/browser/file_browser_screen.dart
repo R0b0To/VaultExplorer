@@ -54,11 +54,13 @@ class FileBrowserScreen extends StatefulWidget {
   final MountedContainer container;
   final MountedContainer? Function(int volId)? resolveContainer;
   final ThumbnailCacheMode? thumbnailCacheMode;
+  final ThumbnailQuality? thumbnailQuality;
   final VoidCallback? onUserActivity;
   const FileBrowserScreen({
     super.key,
     required this.container,
     this.thumbnailCacheMode,
+    this.thumbnailQuality,
     this.onUserActivity,
     this.resolveContainer,
   });
@@ -126,21 +128,26 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     setState(() => _isLoading = true);
     try {
       final appSettings = await AppSettingsService.loadSettings();
-      if (widget.thumbnailCacheMode != null) {
-        _resolvedThumbnailCacheMode = widget.thumbnailCacheMode!;
-      } else {
+      // Cache mode and quality each resolve independently: an explicit
+      // widget override for one must not strand the other at its hardcoded
+      // default. Only look up the saved container record if at least one of
+      // the two wasn't supplied by the caller.
+      ContainerRecord? record;
+      if (widget.thumbnailCacheMode == null || widget.thumbnailQuality == null) {
         final records = await ContainerRepository.instance.loadAll();
-        final record = records[widget.container.uri];
-        if (mounted) {
-          setState(() {
-            _resolvedThumbnailCacheMode =
-                record?.thumbnailCacheMode ??
-                appSettings.defaultThumbnailCacheMode;
-            _resolvedThumbnailQuality =
-                record?.thumbnailQuality ??
-                appSettings.defaultThumbnailQuality;
-          });
-        }
+        record = records[widget.container.uri];
+      }
+      if (mounted) {
+        setState(() {
+          _resolvedThumbnailCacheMode =
+              widget.thumbnailCacheMode ??
+              record?.thumbnailCacheMode ??
+              appSettings.defaultThumbnailCacheMode;
+          _resolvedThumbnailQuality =
+              widget.thumbnailQuality ??
+              record?.thumbnailQuality ??
+              appSettings.defaultThumbnailQuality;
+        });
       }
       if (mounted) {
         setState(() {

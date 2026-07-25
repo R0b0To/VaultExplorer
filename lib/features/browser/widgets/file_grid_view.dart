@@ -380,6 +380,7 @@ class _EncryptedImageGridThumb extends StatelessWidget {
         container: container,
         filePath: path,
         mode: mode,
+        quality: quality,
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
@@ -400,11 +401,11 @@ class _EncryptedImageGridThumb extends StatelessWidget {
       );
       if (raw == null || raw.isEmpty) throw Exception('Read failed: $path');
       if (raw.length < 200 * 1024) {
-        ThumbnailCacheService.putInMemory(container, path, raw);
+        ThumbnailCacheService.putInMemory(container, path, raw, quality);
       }
       return raw;
     }
-    ThumbnailCacheService.putInMemory(container, path, thumbBytes);
+    ThumbnailCacheService.putInMemory(container, path, thumbBytes, quality);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(
@@ -412,6 +413,7 @@ class _EncryptedImageGridThumb extends StatelessWidget {
           filePath: path,
           data: thumbBytes,
           mode: mode,
+          quality: quality,
         ),
       );
     }
@@ -430,7 +432,7 @@ class _EncryptedImageGridThumb extends StatelessWidget {
       fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 100),
       syncLookup: () =>
-          ThumbnailCacheService.getFromMemory(container, filePath),
+          ThumbnailCacheService.getFromMemory(container, filePath, quality),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
@@ -488,6 +490,7 @@ class _VideoThumb extends StatelessWidget {
         container: container,
         filePath: path,
         mode: mode,
+        quality: quality,
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
@@ -498,7 +501,7 @@ class _VideoThumb extends StatelessWidget {
       targetSize: quality.scaledSize(180),
     );
     if (data == null || data.isEmpty) return Uint8List(0);
-    ThumbnailCacheService.putInMemory(container, path, data);
+    ThumbnailCacheService.putInMemory(container, path, data, quality);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(
@@ -506,6 +509,7 @@ class _VideoThumb extends StatelessWidget {
           filePath: path,
           data: data,
           mode: mode,
+          quality: quality,
         ),
       );
     }
@@ -527,7 +531,7 @@ class _VideoThumb extends StatelessWidget {
           fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
           debounce: const Duration(milliseconds: 150),
           syncLookup: () =>
-              ThumbnailCacheService.getFromMemory(container, filePath),
+              ThumbnailCacheService.getFromMemory(container, filePath, quality),
           cacheHeight: quality.scaledSize(180),
           imageBuilder: (context, bytes, cacheHeight) => Image.memory(
             bytes,

@@ -312,6 +312,7 @@ class _CarouselThumb extends StatelessWidget {
         container: container,
         filePath: path,
         mode: mode,
+        quality: quality,
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
@@ -329,7 +330,7 @@ class _CarouselThumb extends StatelessWidget {
       throw Exception('Empty image thumbnail: $path');
     }
 
-    ThumbnailCacheService.putInMemory(container, path, data);
+    ThumbnailCacheService.putInMemory(container, path, data, quality);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(
@@ -337,6 +338,7 @@ class _CarouselThumb extends StatelessWidget {
           filePath: path,
           data: data,
           mode: mode,
+          quality: quality,
         ),
       );
     }
@@ -354,6 +356,7 @@ class _CarouselThumb extends StatelessWidget {
         container: container,
         filePath: path,
         mode: mode,
+        quality: quality,
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
@@ -371,7 +374,7 @@ class _CarouselThumb extends StatelessWidget {
       throw Exception('Empty video thumbnail: $path');
     }
 
-    ThumbnailCacheService.putInMemory(container, path, data);
+    ThumbnailCacheService.putInMemory(container, path, data, quality);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(
@@ -379,6 +382,7 @@ class _CarouselThumb extends StatelessWidget {
           filePath: path,
           data: data,
           mode: mode,
+          quality: quality,
         ),
       );
     }
@@ -413,7 +417,8 @@ class _CarouselThumb extends StatelessWidget {
       debounce: isVideo
           ? const Duration(milliseconds: 150)
           : const Duration(milliseconds: 100),
-      syncLookup: () => ThumbnailCacheService.getFromMemory(container, fileName),
+      syncLookup: () =>
+          ThumbnailCacheService.getFromMemory(container, fileName, thumbnailQuality),
       cacheHeight: scaledSize,
       imageBuilder: (context, bytes, cacheHeight) => Stack(
         fit: StackFit.expand,

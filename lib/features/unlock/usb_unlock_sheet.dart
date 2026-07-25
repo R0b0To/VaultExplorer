@@ -590,7 +590,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     );
 
     return Scaffold(
-      backgroundColor: cs.surfaceContainerLow,
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
         title: Text(

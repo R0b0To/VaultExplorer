@@ -13,6 +13,8 @@
 #include <cstring>
 #include <algorithm>
 #include <atomic>
+#include <future>
+#include <vector>
 
 
 struct AesCtxPair {
@@ -260,15 +262,43 @@ static bool pbkdf2HmacCustom(HashId hash,
                                        cancelCheck, &localFailed);
     };
 
-    // Computes blocks sequentially to avoid thread oversubscription. 
-    // Parallelism is already handled at the hash level inside ThreadPool.
-    for (unsigned int block = 1; block <= blockCount; block++) {
-        if (!runBlock(block)) {
-            localFailed.store(true, std::memory_order_relaxed);
-            return false;
+    if (blockCount == 1) {
+        if (!runBlock(1)) return false;
+    } else {
+        // Each block's output depends only on (password, salt, block index)
+        // -- the blocks are cryptographically independent of each other, so
+        // they can run concurrently instead of one-at-a-time. blockCount is
+        // small and bounded (outLen is always 192 here, so at most 6 blocks
+        // for a 32-byte digest like BLAKE2s256), so this uses a handful of
+        // dedicated std::async threads scoped to just this call rather than
+        // the shared global ThreadPool: every current caller of
+        // pbkdf2HmacCustom already runs on a ThreadPool worker thread itself
+        // (the per-hash-candidate search in session_prepare.cpp and the
+        // per-keyslot search in luks_header.cpp both dispatch through
+        // ThreadPool::enqueue), and a worker that submits more work to its
+        // own fixed-size pool and then blocks waiting for it can starve or
+        // deadlock that pool once enough outer tasks are in flight. A
+        // handful of independent threads sidesteps that risk entirely.
+        std::vector<std::future<bool>> futures;
+        futures.reserve(blockCount - 1);
+        for (unsigned int block = 2; block <= blockCount; block++) {
+            futures.push_back(std::async(std::launch::async, [&, block]() -> bool {
+                bool ok = runBlock(block);
+                if (!ok) localFailed.store(true, std::memory_order_relaxed);
+                return ok;
+            }));
         }
+
+        bool ok = runBlock(1);
+        if (!ok) localFailed.store(true, std::memory_order_relaxed);
+
+        for (auto& f : futures) {
+            ok = f.get() && ok;
+        }
+        if (!ok) return false;
+        return true;
     }
-    
+
     return true;
 }
 

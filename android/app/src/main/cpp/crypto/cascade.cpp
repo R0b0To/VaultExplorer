@@ -76,6 +76,21 @@ bool cascadeSetKeys(CascadeContext& ctx, CascadeId id,
     CascadeSpec spec = cascadeSpecFor(id);
     ctx.layerCount = spec.layerCount;
 
+    // An unrecognized/out-of-range CascadeId (e.g. a corrupt or malicious
+    // on-disk cipher-ID field cast straight to this enum) falls through
+    // cascadeSpecFor's if/else chain with layerCount left at 0. Without this
+    // check, the length check below passes trivially (0 < anything is
+    // false), the key-setup loop below runs zero times, and the context is
+    // marked initialized anyway -- silently turning encrypt/decrypt into a
+    // no-op passthrough instead of failing. Every current caller happens to
+    // validate the cipher ID before reaching here, but that shouldn't be the
+    // only thing standing between "unknown cipher" and "no encryption at
+    // all" -- this primitive must fail closed on its own.
+    if (ctx.layerCount <= 0) {
+        ctx.initialized = false;
+        return false;
+    }
+
     if (keyMaterialLen < static_cast<size_t>(ctx.layerCount) * 64) {
         return false;
     }
@@ -149,7 +164,10 @@ void cascadeDecryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
             for (int j = 0; j < 16; j++) blockOut[j] = tmp[j] ^ T[j];
             xtsMultiplyTweak(T);
         }
-        if (i < ctx.layerCount - 1) std::memcpy(temp, out, 512);  // was: i > 0
+        // Feed this layer's output forward as the next layer's input --
+        // skipped on the last iteration since `out` already holds the
+        // final result at that point.
+        if (i < ctx.layerCount - 1) std::memcpy(temp, out, 512);
     }
 }
 
@@ -183,6 +201,9 @@ void cascadeEncryptSector(const CascadeContext& ctx, uint64_t sectorNumber,
             for (int j = 0; j < 16; j++) blockOut[j] = tmp[j] ^ T[j];
             xtsMultiplyTweak(T);
         }
-        if (i > 0) std::memcpy(temp, out, 512);   // was: i < layerCount - 1
+        // Feed this layer's output forward as the next (more outer) layer's
+        // input -- skipped once i reaches 0 (outermost), since `out` already
+        // holds the final result at that point.
+        if (i > 0) std::memcpy(temp, out, 512);
     }
 }

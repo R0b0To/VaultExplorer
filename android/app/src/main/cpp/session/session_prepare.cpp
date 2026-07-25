@@ -88,7 +88,22 @@ static std::vector<PartitionCandidate> scanPartitionTable(
                         uint32_t numEntries = readUint32LE(&sector1[80]);
                         uint32_t entrySize = readUint32LE(&sector1[84]);
 
-                        if (entrySize >= 128 && numEntries <= 128) {
+                        // gptBuf is exactly 33*512 bytes (header sector + 32
+                        // sectors of entry array); only 33*512-512 = 16384
+                        // bytes past `gptEntries` are actually allocated.
+                        // entrySize/numEntries come straight from an
+                        // on-disk (possibly corrupt or maliciously crafted)
+                        // GPT header, so the two bounds must be checked
+                        // together -- numEntries<=128 alone doesn't stop an
+                        // oversized entrySize (e.g. 256) from indexing past
+                        // the buffer.
+                        constexpr uint64_t kGptEntriesBufBytes = 33ull * 512 - 512;
+                        const bool entriesFit =
+                            entrySize >= 128 &&
+                            static_cast<uint64_t>(numEntries) * static_cast<uint64_t>(entrySize)
+                                <= kGptEntriesBufBytes;
+
+                        if (entriesFit) {
                             for (uint32_t i = 0; i < numEntries; i++) {
                                 const unsigned char* entry = gptEntries + (i * entrySize);
 

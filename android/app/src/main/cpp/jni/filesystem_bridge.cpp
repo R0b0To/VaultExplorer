@@ -385,6 +385,16 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_readStream(
 
     if (streamPtr == 0 || length <= 0) return -1;
     if (volId < 0 || volId >= MAX_VOLUMES) return -1;
+    if (outBuffer == nullptr) return -1;
+
+    // The caller-supplied `length` must never exceed the real capacity of
+    // outBuffer: fsReadStream is trusted to write up to `length` bytes into
+    // destBuf, so an oversized `length` here would overflow the JVM-managed
+    // array (see writeFileChunk above, which already bounds `len` against
+    // GetArrayLength(data) the same way).
+    const jsize bufCapacity = env->GetArrayLength(outBuffer);
+    if (length > bufCapacity) length = bufCapacity;
+    if (length <= 0) return -1;
 
     std::lock_guard<std::mutex> fsLock(volumes[volId].mutex);
     jbyte* destBuf = env->GetByteArrayElements(outBuffer, nullptr);

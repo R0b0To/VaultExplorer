@@ -349,192 +349,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     }
   }
 
-  Widget _buildSectionGroup({required List<Widget> children}) {
-    if (children.isEmpty) return const SizedBox.shrink();
-    final cs = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: List.generate(children.length, (index) {
-        final isFirst = index == 0;
-        final isLast = index == children.length - 1;
-        final isOnly = children.length == 1;
-
-        BorderRadius radius;
-        if (isOnly) {
-          radius = BorderRadius.circular(20);
-        } else if (isFirst) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(20),
-            bottom: Radius.circular(4),
-          );
-        } else if (isLast) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(4),
-            bottom: Radius.circular(20),
-          );
-        } else {
-          radius = BorderRadius.circular(4);
-        }
-
-        return Padding(
-          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
-          child: Material(
-            color: cs.surfaceContainerHigh,
-            borderRadius: radius,
-            clipBehavior: Clip.antiAlias,
-            child: ListTileTheme(
-              tileColor: Colors.transparent,
-              child: children[index],
-            ),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 16, 12, 6),
-      child: Text(
-        title,
-        style: textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: cs.primary,
-          letterSpacing: -0.1,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSelectTile<T>({
-    required String label,
-    required T value,
-    required List<_SelectOption<T>> options,
-    required ValueChanged<T> onChanged,
-    String? subtitle,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      title: Text(
-        label,
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-      ),
-      subtitle: subtitle != null
-          ? Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                subtitle,
-                style: textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  height: 1.25,
-                ),
-              ),
-            )
-          : null,
-      onTap: () {
-        showDialog<void>(
-          context: context,
-          builder: (dialogContext) {
-            final dialogTheme = Theme.of(dialogContext);
-            final mediaQuery = MediaQuery.of(dialogContext);
-            final isLandscape =
-                mediaQuery.orientation == Orientation.landscape;
-
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 440,
-                  maxHeight: isLandscape
-                      ? mediaQuery.size.height * 0.85
-                      : mediaQuery.size.height * 0.75,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Text(
-                          label,
-                          style: dialogTheme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Flexible(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: options.map((opt) {
-                              final isSelected = opt.value == value;
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                child: RadioListTile<T>(
-                                  activeColor: cs.primary,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 0,
-                                  ),
-                                  value: opt.value,
-                                  groupValue: value,
-                                  title: Text(
-                                    opt.label,
-                                    style: dialogTheme.textTheme.bodyMedium
-                                        ?.copyWith(
-                                      fontWeight: isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                      color: isSelected ? cs.primary : null,
-                                    ),
-                                  ),
-                                  subtitle: opt.subtitle != null
-                                      ? Text(
-                                          opt.subtitle!,
-                                          style: dialogTheme
-                                              .textTheme.bodySmall
-                                              ?.copyWith(
-                                            color: cs.onSurfaceVariant,
-                                          ),
-                                        )
-                                      : null,
-                                  onChanged: (T? newValue) {
-                                    if (newValue != null) {
-                                      Navigator.of(dialogContext).pop();
-                                      onChanged(newValue);
-                                    }
-                                  },
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -571,8 +385,8 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // ── General ─────────────────────────────────────────────
-                  _buildSectionHeader('General'),
-                  _buildSectionGroup(
+                  SectionHeader('General'),
+                  SectionCard(
                     children: [
                       Padding(
                         padding: const EdgeInsets.symmetric(
@@ -591,8 +405,8 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                   const SizedBox(height: 16),
 
                   // ── Security & Credentials ──────────────────────────────
-                  _buildSectionHeader('Security & Credentials'),
-                  _buildSectionGroup(
+                  SectionHeader('Security & Credentials'),
+                  SectionCard(
                     children: [
                       if (_settingsLocked) ...[
                         Padding(
@@ -636,7 +450,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           ),
                         ),
                       ] else ...[
-                        _buildSelectTile<ContainerUnlockMethod>(
+                        OptionPickerTile<ContainerUnlockMethod>(
                           label: 'Unlock Credentials',
                           value: _unlockMethod,
                           subtitle: _unlockMethod.subtitle,
@@ -649,7 +463,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                                 final isUnavailableBio =
                                     m == ContainerUnlockMethod.biometrics &&
                                         !_biometricAvailable;
-                                return _SelectOption(
+                                return SelectOption(
                                   value: m,
                                   label: isUnavailableBio
                                       ? '${m.label} (Unavailable)'
@@ -866,22 +680,19 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                   const SizedBox(height: 16),
 
                   // ── System & Integration ────────────────────────────────
-                  _buildSectionHeader('System & Integration'),
-                  _buildSectionGroup(
+                  SectionHeader('System & Integration'),
+                  SectionCard(
                     children: [
-                      _buildSelectTile<int>(
+                      OptionPickerTile<int>(
                         label: 'Auto-Lock Duration',
                         value: _autoCloseMins,
-                        subtitle: _autoCloseMins == 0
-                            ? 'Container will not auto-lock'
-                            : 'Locks after $_autoCloseMins minute${_autoCloseMins == 1 ? '' : 's'} of inactivity',
                         options: _autoCloseOptions.map((mins) {
                           final label = mins == 0
                               ? 'Never'
                               : mins == 1
                                   ? '1 minute'
                                   : '$mins minutes';
-                          return _SelectOption(value: mins, label: label);
+                          return SelectOption(value: mins, label: label);
                         }).toList(),
                         onChanged: (v) => setState(() => _autoCloseMins = v),
                       ),
@@ -903,8 +714,8 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                   const SizedBox(height: 16),
 
                   // ── Thumbnail Storage ──────────────────────────────────
-                  _buildSectionHeader('Thumbnail Storage'),
-                  _buildSectionGroup(
+                  SectionHeader('Thumbnail Storage'),
+                  SectionCard(
                     children: [
                       if (_loadingPassword)
                         const Center(
@@ -918,13 +729,12 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           ),
                         )
                       else ...[
-                        _buildSelectTile<ThumbnailCacheMode>(
+                        OptionPickerTile<ThumbnailCacheMode>(
                           label: 'Cache Mode',
                           value: _thumbnailCacheMode ?? ThumbnailCacheMode.appCache,
-                          subtitle: _thumbnailCacheMode?.description ??
-                              'Uses default global app settings.',
+                          subtitle: _thumbnailCacheMode?.label ?? 'Use global default',
                           options: ThumbnailCacheMode.values.map((mode) {
-                            return _SelectOption(
+                            return SelectOption(
                               value: mode,
                               label: mode.label,
                               subtitle: mode.description,
@@ -932,13 +742,11 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           }).toList(),
                           onChanged: (v) => setState(() => _thumbnailCacheMode = v),
                         ),
-                        _buildSelectTile<ThumbnailQuality>(
+                        OptionPickerTile<ThumbnailQuality>(
                           label: 'Thumbnail Quality',
                           value: _thumbnailQuality ?? ThumbnailQuality.medium,
-                          subtitle:
-                              'Thumbnails are generated with ${(_thumbnailQuality ?? ThumbnailQuality.medium).label.toLowerCase()} quality',
                           options: ThumbnailQuality.values.map((q) {
-                            return _SelectOption(
+                            return SelectOption(
                               value: q,
                               label: q.label,
                             );
@@ -1447,14 +1255,3 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
   }
 }
 
-class _SelectOption<T> {
-  final T value;
-  final String label;
-  final String? subtitle;
-
-  const _SelectOption({
-    required this.value,
-    required this.label,
-    this.subtitle,
-  });
-}

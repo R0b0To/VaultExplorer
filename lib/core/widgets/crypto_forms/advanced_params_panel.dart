@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
 /// The collapsible "Advanced parameters" (PIM / cipher / hash) panel —
@@ -50,7 +51,7 @@ class AdvancedParamsPanel extends StatelessWidget {
     this.hashItems,
   });
 
-  List<_SelectOption<int>> _convertToSelectOptions(
+  List<SelectOption<int>> _convertToSelectOptions(
       List<DropdownMenuItem<int>> items) {
     return items.map((item) {
       String label = '';
@@ -59,150 +60,11 @@ class AdvancedParamsPanel extends StatelessWidget {
       } else {
         label = item.value?.toString() ?? '';
       }
-      return _SelectOption<int>(
+      return SelectOption<int>(
         value: item.value ?? 255,
         label: label,
       );
     }).toList();
-  }
-
-  Widget _buildSelectTile({
-    required BuildContext context,
-    required String label,
-    required int value,
-    required List<_SelectOption<int>> options,
-    required ValueChanged<int> onChanged,
-    required IconData prefixIcon,
-  }) {
-    final cs = context.colors;
-    final textTheme = context.typography;
-
-    final currentOption = options.firstWhere(
-      (opt) => opt.value == value,
-      orElse: () => options.first,
-    );
-
-    return ListTile(
-      enabled: enabled,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: Icon(prefixIcon, size: AppIconSize.small, color: cs.primary),
-      title: Text(
-        label,
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: Text(
-          currentOption.label,
-          style: textTheme.bodySmall?.copyWith(
-            color: cs.onSurfaceVariant,
-            height: 1.25,
-          ),
-        ),
-      ),
-      onTap: enabled
-          ? () {
-              showDialog<void>(
-                context: context,
-                builder: (dialogContext) {
-                  final dialogTheme = Theme.of(dialogContext);
-                  final mediaQuery = MediaQuery.of(dialogContext);
-                  final isLandscape =
-                      mediaQuery.orientation == Orientation.landscape;
-
-                  return Dialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
-                    ),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: 440,
-                        maxHeight: isLandscape
-                            ? mediaQuery.size.height * 0.85
-                            : mediaQuery.size.height * 0.75,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24),
-                              child: Text(
-                                label,
-                                style:
-                                    dialogTheme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Flexible(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: options.map((opt) {
-                                    final isSelected = opt.value == value;
-                                    return Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      child: RadioListTile<int>(
-                                        activeColor: cs.primary,
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 0,
-                                        ),
-                                        value: opt.value,
-                                        groupValue: value,
-                                        title: Text(
-                                          opt.label,
-                                          style: dialogTheme
-                                              .textTheme.bodyMedium
-                                              ?.copyWith(
-                                            fontWeight: isSelected
-                                                ? FontWeight.bold
-                                                : FontWeight.w500,
-                                            color:
-                                                isSelected ? cs.primary : null,
-                                          ),
-                                        ),
-                                        subtitle: opt.subtitle != null
-                                            ? Text(
-                                                opt.subtitle!,
-                                                style: dialogTheme
-                                                    .textTheme.bodySmall
-                                                    ?.copyWith(
-                                                  color: cs.onSurfaceVariant,
-                                                ),
-                                              )
-                                            : null,
-                                        onChanged: (int? newValue) {
-                                          if (newValue != null) {
-                                            Navigator.of(dialogContext).pop();
-                                            onChanged(newValue);
-                                          }
-                                        },
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              );
-            }
-          : null,
-    );
   }
 
   @override
@@ -263,36 +125,24 @@ class AdvancedParamsPanel extends StatelessWidget {
             field,
             const SizedBox(height: 8),
           ],
-          _buildSelectTile(
-            context: context,
+          OptionPickerTile<int>(
             label: 'Encryption Algorithm',
             value: cipherId,
             prefixIcon: Icons.security_rounded,
             options: cipherOptions,
             onChanged: onCipherChanged,
+            enabled: enabled,
           ),
-          _buildSelectTile(
-            context: context,
+          OptionPickerTile<int>(
             label: 'Hash Algorithm',
             value: hashId,
             prefixIcon: Icons.tag_rounded,
             options: hashOptions,
             onChanged: onHashChanged,
+            enabled: enabled,
           ),
         ],
       ),
     );
   }
-}
-
-class _SelectOption<T> {
-  final T value;
-  final String label;
-  final String? subtitle;
-
-  const _SelectOption({
-    required this.value,
-    required this.label,
-    this.subtitle,
-  });
 }

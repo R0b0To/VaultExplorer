@@ -77,6 +77,12 @@ static inline bool mixKeyfileIntoPool(int fd, unsigned char* keyPool, size_t key
     size_t totalRead = 0;
     bool sawAnyByte = false;
 
+    // Both callers only ever pass KEYFILE_POOL_LEGACY_SIZE (64) or
+    // KEYFILE_POOL_SIZE (128) -- both powers of two -- so the wraparound
+    // can be a mask instead of a division, run up to 4x per input byte
+    // across up to KEYFILE_MAX_READ_LEN bytes per keyfile.
+    const uint32_t poolMask = static_cast<uint32_t>(keyPoolSize - 1);
+
     while (totalRead < KEYFILE_MAX_READ_LEN) {
         ssize_t n = read(fd, buffer, sizeof(buffer));
         if (n < 0) return false; // read error
@@ -87,13 +93,13 @@ static inline bool mixKeyfileIntoPool(int fd, unsigned char* keyPool, size_t key
             crc = vcKeyfileCrc32UpdateByte(crc, buffer[i]);
 
             keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + ((crc >> 24) & 0xFF));
-            writePos = (writePos + 1) % keyPoolSize;
+            writePos = (writePos + 1) & poolMask;
             keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + ((crc >> 16) & 0xFF));
-            writePos = (writePos + 1) % keyPoolSize;
+            writePos = (writePos + 1) & poolMask;
             keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + ((crc >> 8) & 0xFF));
-            writePos = (writePos + 1) % keyPoolSize;
+            writePos = (writePos + 1) & poolMask;
             keyPool[writePos] = static_cast<unsigned char>(keyPool[writePos] + (crc & 0xFF));
-            writePos = (writePos + 1) % keyPoolSize;
+            writePos = (writePos + 1) & poolMask;
 
             if (++totalRead >= KEYFILE_MAX_READ_LEN) break;
         }

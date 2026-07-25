@@ -73,7 +73,6 @@ class _FileManagerToolbarSettingsScreenState
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: cs.surfaceContainerLow,
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
         title: const Text(

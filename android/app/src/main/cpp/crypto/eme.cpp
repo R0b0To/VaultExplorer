@@ -29,15 +29,30 @@ bool eme_transform(const uint8_t* key, size_t keyLen,
     size_t m = len / 16;
     if (m < 1 || m > 128) return false;
 
-    mbedtls_aes_context encCtx, decCtx;
+    // The L-table mask is always AES(K,0) using the *encrypt* direction,
+    // regardless of whether this call is doing an EME encrypt or decrypt --
+    // only the core per-block transform below switches direction. So the
+    // encrypt-direction schedule is always needed, but the decrypt-direction
+    // schedule is only needed when this call is itself a decrypt; scheduling
+    // it unconditionally (as before) wasted a full AES key expansion on
+    // every encrypt call.
+    mbedtls_aes_context encCtx;
     mbedtls_aes_init(&encCtx);
-    mbedtls_aes_init(&decCtx);
-
-    if (mbedtls_aes_setkey_enc(&encCtx, key, keyLen * 8) != 0 ||
-        mbedtls_aes_setkey_dec(&decCtx, key, keyLen * 8) != 0) {
+    if (mbedtls_aes_setkey_enc(&encCtx, key, keyLen * 8) != 0) {
         mbedtls_aes_free(&encCtx);
-        mbedtls_aes_free(&decCtx);
         return false;
+    }
+
+    mbedtls_aes_context decCtx;
+    bool haveDecCtx = false;
+    if (!encrypt) {
+        mbedtls_aes_init(&decCtx);
+        if (mbedtls_aes_setkey_dec(&decCtx, key, keyLen * 8) != 0) {
+            mbedtls_aes_free(&encCtx);
+            mbedtls_aes_free(&decCtx);
+            return false;
+        }
+        haveDecCtx = true;
     }
 
     mbedtls_aes_context* mainCtx = encrypt ? &encCtx : &decCtx;
@@ -47,13 +62,17 @@ bool eme_transform(const uint8_t* key, size_t keyLen,
     uint8_t Li[16];
     mbedtls_aes_crypt_ecb(&encCtx, MBEDTLS_AES_ENCRYPT, eZero, Li);
 
-    std::vector<std::vector<uint8_t>> LTable(m, std::vector<uint8_t>(16));
+    // One contiguous buffer instead of a vector-of-vectors: m <= 128 was
+    // already enforced above, so this is at most 128*16 = 2048 bytes in a
+    // single allocation rather than up to 128 separate small heap
+    // allocations (one per LTable[i]).
+    std::vector<uint8_t> LTable(m * 16);
     uint8_t currentL[16];
     std::memcpy(currentL, Li, 16);
 
     for (size_t i = 0; i < m; i++) {
         emeMultByTwo(currentL, currentL);
-        std::memcpy(LTable[i].data(), currentL, 16);
+        std::memcpy(LTable.data() + i * 16, currentL, 16);
     }
 
     std::vector<uint8_t> C(len);
@@ -61,7 +80,7 @@ bool eme_transform(const uint8_t* key, size_t keyLen,
     // Step 1: PP_j = P_j ^ L_j; PPP_j = AES(K, PP_j)
     uint8_t PPj[16];
     for (size_t j = 0; j < m; j++) {
-        xor16(PPj, in + j * 16, LTable[j].data());
+        xor16(PPj, in + j * 16, LTable.data() + j * 16);
         mbedtls_aes_crypt_ecb(mainCtx, encrypt ? MBEDTLS_AES_ENCRYPT : MBEDTLS_AES_DECRYPT, PPj, C.data() + j * 16);
     }
 
@@ -99,10 +118,26 @@ bool eme_transform(const uint8_t* key, size_t keyLen,
     // Step 3: CC_j = AES(K, CCC_j); C_j = CC_j ^ L_j
     for (size_t j = 0; j < m; j++) {
         mbedtls_aes_crypt_ecb(mainCtx, encrypt ? MBEDTLS_AES_ENCRYPT : MBEDTLS_AES_DECRYPT, C.data() + j * 16, C.data() + j * 16);
-        xor16(out + j * 16, C.data() + j * 16, LTable[j].data());
+        xor16(out + j * 16, C.data() + j * 16, LTable.data() + j * 16);
     }
 
     mbedtls_aes_free(&encCtx);
-    mbedtls_aes_free(&decCtx);
+    if (haveDecCtx) mbedtls_aes_free(&decCtx);
+
+    // These are all key-derived or key-adjacent intermediate values (the
+    // L-table is AES(K,0) directly); wipe them rather than leaving them on
+    // the stack/heap after we're done, consistent with the zeroization
+    // discipline used elsewhere in the crypto layer.
+    mbedtls_platform_zeroize(Li, sizeof(Li));
+    mbedtls_platform_zeroize(currentL, sizeof(currentL));
+    mbedtls_platform_zeroize(LTable.data(), LTable.size());
+    mbedtls_platform_zeroize(C.data(), C.size());
+    mbedtls_platform_zeroize(PPj, sizeof(PPj));
+    mbedtls_platform_zeroize(MP, sizeof(MP));
+    mbedtls_platform_zeroize(MC, sizeof(MC));
+    mbedtls_platform_zeroize(M, sizeof(M));
+    mbedtls_platform_zeroize(CCCj, sizeof(CCCj));
+    mbedtls_platform_zeroize(CCC1, sizeof(CCC1));
+
     return true;
 }

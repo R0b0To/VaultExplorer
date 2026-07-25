@@ -193,5 +193,14 @@ bool siv_decrypt(const uint8_t* encKey, size_t encKeyLen,
     for (int i = 0; i < 16; i++) {
         diff |= (embeddedSiv[i] ^ expectedSiv[i]);
     }
-    return diff == 0;
+
+    if (diff != 0) {
+        // Authentication failed: `out` was already filled with CTR-decrypted
+        // (but unauthenticated) plaintext above. Wipe it rather than leaving
+        // it there, so a caller that uses `out` without first checking the
+        // return value can't act on tampered data.
+        mbedtls_platform_zeroize(out, outLen);
+        return false;
+    }
+    return true;
 }

@@ -9,18 +9,6 @@
 # to add the virtual I/O backend -- see virtual_io.h for the design.
 # ─────────────────────────────────────────────────────────────────────────
 
-# Pinned to a specific commit rather than the "master" branch, so builds are
-# reproducible and upstream changes go through a deliberate version bump here
-# instead of arriving silently (this matters more than usual for dislocker:
-# it's cryptographic code, and every other FetchContent dependency in this
-# project is already pinned to a tag or commit -- this was the one exception).
-#
-# This hash (4572dc7, 46 commits past the v0.7.3 tag) was resolved via web
-# search of downstream packaging metadata (BlackArch's PKGBUILD, mirrored on
-# Repology) rather than a live `git ls-remote`, since this environment has no
-# outbound network access. Before relying on this long-term, re-verify with:
-#   git ls-remote https://github.com/Aorimn/dislocker.git master
-# and replace the hash (and this note) once you have a freshly-confirmed one.
 FetchContent_Declare(
     dislocker_upstream
     GIT_REPOSITORY https://github.com/Aorimn/dislocker.git
@@ -54,15 +42,6 @@ file(COPY ${DISLOCKER_PATCHES}/config.priv.h DESTINATION ${DISLOCKER_INC}/disloc
 file(COPY ${DISLOCKER_PATCHES}/virtual_io.h  DESTINATION ${DISLOCKER_INC}/dislocker)
 
 # ── Patch metadata.c to support negative virtual fds ─────────────────────
-# NOTE: this is deliberately the simple, silent-on-mismatch form, not the
-# assert-if-missing version from an earlier pass -- that version correctly
-# detects upstream drift, but also (correctly) fires on a stale/cached
-# FetchContent source directory that a previous configure already patched
-# in place, which is indistinguishable from real drift without checking
-# for the already-patched "== -1" form too. Confirmed working as-is against
-# the pinned commit above; if you want the drift-detection back, the fix is
-# to also check for "fd == -1" / "volume_fd == -1" as a "already patched,
-# not missing" case before failing.
 file(READ ${DISLOCKER_SRC}/metadata/metadata.c METADATA_C)
 string(REPLACE "fd < 0" "fd == -1" METADATA_C "${METADATA_C}")
 string(REPLACE "volume_fd < 0" "volume_fd == -1" METADATA_C "${METADATA_C}")

@@ -27,6 +27,7 @@ class OptionPickerTile<T> extends StatelessWidget {
   final ValueChanged<T> onChanged;
   final String? subtitle;
   final IconData? prefixIcon;
+  final bool enabled;
 
   const OptionPickerTile({
     super.key,
@@ -36,6 +37,7 @@ class OptionPickerTile<T> extends StatelessWidget {
     required this.onChanged,
     this.subtitle,
     this.prefixIcon,
+    this.enabled = true,
   });
 
   @override
@@ -49,6 +51,7 @@ class OptionPickerTile<T> extends StatelessWidget {
     );
 
     return ListTile(
+      enabled: enabled,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       leading: prefixIcon != null
           ? Icon(prefixIcon, size: AppIconSize.standard, color: cs.primary)
@@ -67,7 +70,7 @@ class OptionPickerTile<T> extends StatelessWidget {
           ),
         ),
       ),
-      onTap: () => _showPicker(context),
+      onTap: enabled ? () => _showPicker(context) : null,
     );
   }
 

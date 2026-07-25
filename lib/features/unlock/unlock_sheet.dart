@@ -810,7 +810,6 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
       },
       child: Scaffold(
-        backgroundColor: cs.surfaceContainerLow,
         appBar: AppBar(
           backgroundColor: cs.surfaceContainerHigh,
           title: Text(

@@ -439,12 +439,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           if (_settings.lockContainersOnScreenLock)
                             OptionPickerTile<int>(
                               label: 'Auto-Lock Timeout',
-                              subtitle: _settings.autoLockMins == 0
-                                  ? 'Containers lock immediately on screen lock'
-                                  : 'Locks after ${_settings.autoLockMins} minute${_settings.autoLockMins == 1 ? '' : 's'} of inactivity',
                               value: _settings.autoLockMins,
                               options: const [
-                                SelectOption(value: 0, label: 'Never'),
+                                SelectOption(value: 0, label: 'Immediately'),
                                 SelectOption(value: 1, label: '1 minute'),
                                 SelectOption(value: 2, label: '2 minutes'),
                                 SelectOption(value: 5, label: '5 minutes'),
@@ -504,11 +501,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                         children: [
                           OptionPickerTile<ThemeMode>(
                             label: 'App Theme',
-                            subtitle: _settings.themeMode == ThemeMode.system
-                                ? 'App uses System Default theme'
-                                : _settings.themeMode == ThemeMode.light
-                                    ? 'App uses Light Theme'
-                                    : 'App uses Dark Theme',
                             value: _settings.themeMode,
                             options: const [
                               SelectOption(
@@ -528,10 +520,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           ),
                           OptionPickerTile<ContainerSortMode>(
                             label: 'Sort Containers By',
-                            subtitle: _settings.containerSortMode ==
-                                    ContainerSortMode.manual
-                                ? 'Long-press and drag cards on dashboard to reorder'
-                                : 'Containers are sorted by ${_settings.containerSortMode.label} automatically',
                             value: _settings.containerSortMode,
                             options: ContainerSortMode.values.map((mode) {
                               return SelectOption(
@@ -622,8 +610,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           ),
                           OptionPickerTile<ThumbnailCacheMode>(
                             label: 'Thumbnail Caching (default)',
-                            subtitle:
-                                _settings.defaultThumbnailCacheMode.description,
                             value: _settings.defaultThumbnailCacheMode,
                             options: ThumbnailCacheMode.values.map((mode) {
                               return SelectOption(
@@ -640,8 +626,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           ),
                           OptionPickerTile<ThumbnailQuality>(
                             label: 'Thumbnail Quality (default)',
-                            subtitle:
-                                'Thumbnails are generated with ${_settings.defaultThumbnailQuality.label.toLowerCase()} quality',
                             value: _settings.defaultThumbnailQuality,
                             options: ThumbnailQuality.values.map((q) {
                               return SelectOption(

@@ -148,14 +148,30 @@ bool scrypt_crypto(const uint8_t* passphrase, size_t passphraseLen,
     if (N < 2 || (N & (N - 1)) != 0) return false;
     if (r == 0 || p == 0) return false;
 
+    // Upper bounds: N/r/p ultimately come from a JNI jint (crypto_bridge.cpp)
+    // with no other cap, so a huge-but-technically-valid combination could
+    // otherwise ask the native heap for many gigabytes below and OOM-kill
+    // the app. These caps are generous relative to any real-world scrypt
+    // parameter set (N=2^20, r=8, p=16 alone is already far beyond typical
+    // usage) while still bounding worst-case memory.
+    constexpr uint32_t kMaxN = 1u << 20;
+    constexpr uint32_t kMaxR = 8;
+    constexpr uint32_t kMaxP = 16;
+    constexpr size_t kMaxTotalMemoryBytes = 512u * 1024 * 1024;
+    if (N > kMaxN || r > kMaxR || p > kMaxP) return false;
+
     size_t blockLen = 128 * r;
     size_t bLen = blockLen * p;
+
+    if (bLen / p != blockLen) return false; // overflow guard (unreachable given caps, kept defensive)
+
+    // Allocated on native C heap - bypasses JVM 256MB limit!
+    size_t vLen = blockLen * (size_t)N;
+    if (vLen / N != blockLen || vLen > kMaxTotalMemoryBytes) return false;
 
     std::vector<uint8_t> B(bLen);
     std::vector<uint8_t> XY(256 * r);
 
-    // Allocated on native C heap - bypasses JVM 256MB limit!
-    size_t vLen = blockLen * (size_t)N;
     uint8_t* V = static_cast<uint8_t*>(std::malloc(vLen));
     if (!V) {
         return false;

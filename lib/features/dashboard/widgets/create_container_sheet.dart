@@ -396,7 +396,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
           label: 'Format File System',
           value: _fileSystem,
           prefixIcon: Icons.dns_rounded,
-          subtitle: 'File system: $_fileSystem',
           options: _availableFileSystems
               .map((fs) => SelectOption(value: fs, label: fs))
               .toList(),
@@ -653,7 +652,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                     label: 'Hidden File System',
                     value: _hiddenFileSystem,
                     prefixIcon: Icons.dns_rounded,
-                    subtitle: 'File system: $_hiddenFileSystem',
                     options: _availableFileSystems
                         .map((fs) => SelectOption(value: fs, label: fs))
                         .toList(),
@@ -970,7 +968,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         }
       },
       child: Scaffold(
-        backgroundColor: cs.surfaceContainerLow,
         appBar: AppBar(
           backgroundColor: cs.surfaceContainerHigh,
           leading: IconButton(

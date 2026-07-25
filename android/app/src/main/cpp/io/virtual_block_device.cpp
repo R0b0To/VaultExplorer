@@ -305,10 +305,18 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         // exact (offset, length) match rather than sub-range splitting.
         const uint64_t cacheKeyOffset = alignedFirstPhysical * 512;
         {
-            std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
-            std::vector<unsigned char> cached(totalBytes);
-            if (v.decryptedBlockCache.get(cacheKeyOffset, totalBytes, cached.data())) {
-                std::memcpy(curBuf, cached.data() + copyOffset, copyBytes);
+            // Plain new[] (no parens) rather than std::vector: this buffer
+            // only matters on a cache *hit*, where DecryptedBlockCache::get()
+            // fills it in full before we read from it -- on the (likely
+            // common, e.g. first-time streaming reads) miss path it's
+            // discarded unread, so there's no reason to pay for
+            // std::vector's zero-initialization of up to several MB on
+            // every single disk_read call.
+            std::unique_lock<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
+            std::unique_ptr<unsigned char[]> cached(new unsigned char[totalBytes]);
+            if (v.decryptedBlockCache.get(cacheKeyOffset, totalBytes, cached.get())) {
+                cacheLock.unlock();
+                std::memcpy(curBuf, cached.get() + copyOffset, copyBytes);
                 continue;
             }
         }
@@ -332,14 +340,14 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
         // decryptedOut regardless of which branch below runs, so it can be
         // cached once at the end rather than duplicating the cache-populate
         // call three times (and risking one branch forgetting it).
-        std::vector<unsigned char> decryptedOut(totalBytes);
+        std::unique_ptr<unsigned char[]> decryptedOut(new unsigned char[totalBytes]);
 
         if (v.containerFormat == ContainerFormat::kVeraCrypt) {
             parallelCryptoLoop(batch.count, [&](uint32_t i) {
                 const uint64_t physSector = firstPhysical + i;
                 const uint64_t tweak = physSector - v.partitionStartSector;
                 cascadeDecryptSector(v.cascade, tweak, encBuf + (i*512),
-                                     decryptedOut.data() + copyOffset + (i * 512));
+                                     decryptedOut.get() + copyOffset + (i * 512));
             });
             // VeraCrypt never needs multi-sector alignment (sectorsPerUnit
             // is always 1), so copyOffset is always 0 and decryptedOut is
@@ -351,10 +359,10 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorNum >> (b * 8)) & 0xFF;
                 if (v.luksUsesGenericCipher) {
                     genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, 512, tweakBuf,
-                                         encBuf + (i * 512), decryptedOut.data() + copyOffset + (i * 512));
+                                         encBuf + (i * 512), decryptedOut.get() + copyOffset + (i * 512));
                 } else {
                     mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, 512, tweakBuf,
-                                           encBuf + (i * 512), decryptedOut.data() + copyOffset + (i * 512));
+                                           encBuf + (i * 512), decryptedOut.get() + copyOffset + (i * 512));
                 }
             });
         } else {
@@ -370,19 +378,19 @@ extern "C" DRESULT disk_read(BYTE pdrv, BYTE* buff, LBA_t sector, UINT count) {
                 for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
                 if (v.luksUsesGenericCipher) {
                     genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                         encBuf + (u * 512), decryptedOut.data() + (u * 512));
+                                         encBuf + (u * 512), decryptedOut.get() + (u * 512));
                 } else {
                     mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
-                                           encBuf + (u * 512), decryptedOut.data() + (u * 512));
+                                           encBuf + (u * 512), decryptedOut.get() + (u * 512));
                 }
             });
         }
 
-        std::memcpy(curBuf, decryptedOut.data() + copyOffset, copyBytes);
+        std::memcpy(curBuf, decryptedOut.get() + copyOffset, copyBytes);
 
         {
             std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
-            v.decryptedBlockCache.put(cacheKeyOffset, totalBytes, decryptedOut.data());
+            v.decryptedBlockCache.put(cacheKeyOffset, totalBytes, decryptedOut.get());
         }
     }
         
@@ -470,22 +478,30 @@ extern "C" DRESULT disk_write(BYTE pdrv, const BYTE* buff, LBA_t sector, UINT co
             std::vector<unsigned char> plain(totalBytes);
             const uint32_t unitCount = static_cast<uint32_t>(alignedCount / sectorsPerUnit);
             if (needsSplice) {
-                std::vector<unsigned char> existingEnc(totalBytes);
-                if (!physicalRead(pdrv, alignedFirstPhysical * 512, existingEnc.data(), totalBytes))
-                    return RES_ERROR;
-                parallelCryptoLoop(unitCount, [&](uint32_t unitIdx) {
-                    const uint64_t u = static_cast<uint64_t>(unitIdx) * sectorsPerUnit;
-                    const uint64_t sectorTweak = alignedRelStart + u;
-                    unsigned char tweakBuf[16] = {0};
-                    for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
-                    if (v.luksUsesGenericCipher) {
-                        genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
-                                             existingEnc.data() + (u * 512), plain.data() + (u * 512));
-                    } else {
-                        mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
-                                               existingEnc.data() + (u * 512), plain.data() + (u * 512));
-                    }
-                });
+                const uint64_t spliceCacheKeyOffset = alignedFirstPhysical * 512;
+                bool gotFromCache;
+                {
+                    std::lock_guard<std::mutex> cacheLock(v.decryptedBlockCacheMutex);
+                    gotFromCache = v.decryptedBlockCache.get(spliceCacheKeyOffset, totalBytes, plain.data());
+                }
+                if (!gotFromCache) {
+                    std::vector<unsigned char> existingEnc(totalBytes);
+                    if (!physicalRead(pdrv, alignedFirstPhysical * 512, existingEnc.data(), totalBytes))
+                        return RES_ERROR;
+                    parallelCryptoLoop(unitCount, [&](uint32_t unitIdx) {
+                        const uint64_t u = static_cast<uint64_t>(unitIdx) * sectorsPerUnit;
+                        const uint64_t sectorTweak = alignedRelStart + u;
+                        unsigned char tweakBuf[16] = {0};
+                        for (int b = 0; b < 8; b++) tweakBuf[b] = (sectorTweak >> (b * 8)) & 0xFF;
+                        if (v.luksUsesGenericCipher) {
+                            genericLuksXtsCrypt(v.luksGenericCascade.layers[0], false, luksUnit, tweakBuf,
+                                                 existingEnc.data() + (u * 512), plain.data() + (u * 512));
+                        } else {
+                            mbedtls_aes_crypt_xts(&v.luksXts.dec, MBEDTLS_AES_DECRYPT, luksUnit, tweakBuf,
+                                                   existingEnc.data() + (u * 512), plain.data() + (u * 512));
+                        }
+                    });
+                }
             }
             const size_t copyOffset = static_cast<size_t>(relStart - alignedRelStart) * 512;
             std::memcpy(plain.data() + copyOffset, curBuf, static_cast<size_t>(batch.count) * 512);

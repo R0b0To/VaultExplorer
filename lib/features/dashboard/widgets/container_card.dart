@@ -121,15 +121,22 @@ class ContainerCard extends StatelessWidget {
   });
 
   Color _barColor(double fraction, ColorScheme cs) {
-    if (fraction > 0.90) return cs.error;
-    if (fraction > 0.70) return cs.tertiary;
-    return cs.primary;
+    final isLight = cs.brightness == Brightness.light;
+    if (fraction > 0.90) {
+      return isLight ? cs.error.withValues(alpha: 0.6) : cs.error;
+    }
+    if (fraction > 0.70) {
+      return isLight ? cs.tertiary.withValues(alpha: 0.6) : cs.tertiary;
+    }
+    return isLight ? cs.primary.withValues(alpha: 0.6) : cs.primary;
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final isLight = cs.brightness == Brightness.light;
+
     final usedBytes = container.totalSpace - container.freeSpace;
     final usedFraction = container.totalSpace > 0
         ? (usedBytes / container.totalSpace).clamp(0.0, 1.0)
@@ -169,7 +176,9 @@ class ContainerCard extends StatelessWidget {
           builder: (context, animatedFraction, _) => LinearProgressIndicator(
             value: animatedFraction,
             minHeight: 6,
-            backgroundColor: cs.surfaceContainerHighest,
+            backgroundColor: isLight
+                ? cs.primary.withValues(alpha: 0.12)
+                : cs.onPrimaryContainer.withValues(alpha: 0.15),
             valueColor: AlwaysStoppedAnimation<Color>(
               _barColor(usedFraction, cs),
             ),
@@ -186,6 +195,14 @@ class ContainerCard extends StatelessWidget {
             color: cs.onPrimaryContainer,
           );
 
+    // Compute a 100% solid, opaque card background using alpha blend so dragging remains solid
+    final cardBg = Color.alphaBlend(
+      isLight
+          ? cs.primaryContainer.withValues(alpha: 0.55)
+          : cs.primaryContainer.withValues(alpha: 0.35),
+      cs.surfaceContainerHigh,
+    );
+
     return _BaseContainerCard(
       onTap: onBrowse,
       icon: iconWidget,
@@ -194,7 +211,7 @@ class ContainerCard extends StatelessWidget {
       subtitle: subtitleWidget,
       trailingAction: _LockButton(container: container, onLocked: onLocked),
       bottomContent: bottomContent,
-      backgroundColor: cs.surfaceContainer,
+      backgroundColor: cardBg,
       borderRadius: borderRadius,
     );
   }

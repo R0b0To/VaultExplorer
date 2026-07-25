@@ -171,7 +171,6 @@ extension AppThemeX on BuildContext {
 // COLOR SCHEMES
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Seed used when dynamic color (Material You) isn't available/enabled.
 const Color _seedColor = Color(0xFF0B57D0); // Google Blue
 
 /// Hand-tuned MD3 dark palette (kept from the original app design — this is

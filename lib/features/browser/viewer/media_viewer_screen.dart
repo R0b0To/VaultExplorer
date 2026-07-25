@@ -112,13 +112,45 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _playbackManager.activeControllerNotifier.addListener(
       _onActiveVideoControllerChanged,
     );
+    _playbackManager.currentFileNotifier.addListener(
+      _onCurrentMediaFileChanged,
+    );
 
     _loadConfig();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startSlideshowTimerIfNeeded();
       _prefetchSurroundingItems();
+      _activateCurrentMedia();
     });
+  }
+
+  /// Points the single shared native player (owned by [_playbackManager])
+  /// at whatever the playlist's current file is right now, or pauses it if
+  /// the current page isn't a video/audio file. This is the sole place
+  /// that decides "what should the player be showing" — call it the
+  /// instant a navigation target is known (button press, or mid-swipe once
+  /// `PageView` settles on a new index), not after any page-turn animation
+  /// finishes. Mirrors VLC's `PlaylistManager.playIndex()`, which starts
+  /// `PlayerController.startPlayback()` synchronously the moment `next()`/
+  /// `previous()` is called rather than waiting on any UI transition.
+  ///
+  /// Cheap to call redundantly — [VideoPlaybackManager.activate] no-ops if
+  /// the target file is already loaded — so this is called defensively
+  /// from several navigation-adjacent spots as a resync, not just the one
+  /// "real" trigger.
+  void _activateCurrentMedia() {
+    if (_playlistController.isEmpty) return;
+    final file = _playlistController.currentFile;
+    if (MediaViewerConstants.isVideo(file) || MediaViewerConstants.isAudio(file)) {
+      _playbackManager.activate(
+        fileName: file,
+        contentUriString: _contentUriFor(file),
+        autoPlay: _autoPlay,
+      );
+    } else {
+      _playbackManager.pauseActive();
+    }
   }
 
   Future<void> _loadConfig() async {
@@ -167,6 +199,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
+  // Fires once, the first time _playbackManager creates its one shared
+  // controller (subsequent navigations reuse that same instance, so this
+  // notifier doesn't fire again) — this is just where we attach our own
+  // tick listener to it. Per-navigation resets (progress bar, playback
+  // speed) live in _onCurrentMediaFileChanged below, since the controller
+  // identity itself no longer changes on every swipe the way it did when
+  // each file got its own controller.
   void _onActiveVideoControllerChanged() {
     if (_lastListenedController != null) {
       try {
@@ -176,15 +215,22 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final controller = _playbackManager.activeController;
     _lastListenedController = controller;
     if (controller == null) {
-      _videoProgressNotifier.value = const VideoPlaybackProgress();
       _updateWakelock(false);
       return;
     }
-    _videoProgressNotifier.value = const VideoPlaybackProgress();
-    _playbackManager.pauseAllExcept(controller);
     controller.addListener(_onControllerTickUpdate);
-    controller.setPlaybackSpeed(_playbackSpeed);
     _updateWakelock(controller.value.isPlaying);
+  }
+
+  // Fires on every navigation that switches the shared player to a
+  // different file (see VideoPlaybackManager.activate). Resets the
+  // progress display and reapplies the current playback speed to the
+  // (reused) controller — both of which used to happen implicitly as a
+  // side effect of _onActiveVideoControllerChanged firing per-file, back
+  // when each file had its own controller instance.
+  void _onCurrentMediaFileChanged() {
+    _videoProgressNotifier.value = const VideoPlaybackProgress();
+    _playbackManager.activeController?.setPlaybackSpeed(_playbackSpeed);
   }
 
   void _onControllerTickUpdate() {
@@ -193,30 +239,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _updateWakelock(controller.value.isPlaying);
     final isInitialized = controller.value.isInitialized;
     final progress = _videoProgressNotifier.value;
+    // Looping itself is handled natively now (VlcPlayerEngine bakes
+    // input-repeat into the Media whenever setLooping(true) is in
+    // effect) — this listener only needs to care about auto-advance.
     if (isInitialized &&
-        _videoPlaybackMode == VideoPlaybackMode.loop &&
+        _videoPlaybackMode == VideoPlaybackMode.playAndAdvance &&
         progress.duration > Duration.zero &&
         progress.position >= progress.duration) {
-      _manualLoop(controller);
-    } else if (isInitialized &&
-        _videoPlaybackMode != VideoPlaybackMode.loop &&
-        progress.duration > Duration.zero &&
-        progress.position >= progress.duration) {
-      if (_videoPlaybackMode == VideoPlaybackMode.playAndAdvance) {
-        if (!_transitionInProgress) {
-          _navigateToNext();
-        }
+      if (!_transitionInProgress) {
+        _navigateToNext();
       }
-    }
-  }
-
-  Future<void> _manualLoop(NativeVlcController controller) async {
-    try {
-      await controller.pause();
-      await controller.seekTo(Duration.zero);
-      await controller.play();
-    } catch (e) {
-      debugPrint('Manual loop error execution: $e');
     }
   }
 
@@ -237,42 +269,33 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final nextFile = next < playlist.length ? playlist[next] : null;
     final prevFile = prev >= 0 ? playlist[prev] : null;
 
+    // Still-image thumbnails for images, poster frames for video — both
+    // just a small decoded/decrypted preview, so this is cheap regardless
+    // of what the current item's type is. This is also what a non-current
+    // video page now shows instead of a live decode (see
+    // MediaPlayerWidget's doc comment): there's exactly one native player
+    // for the whole session, so any neighbor kept alive by PageView's
+    // cache extent needs *something* to show that isn't a black box.
+    if (nextFile != null) _prefetchThumbnail(nextFile);
+    if (prevFile != null) _prefetchThumbnail(prevFile);
+
     final currentFile = _playlistController.currentFile;
-    final currentIsMedia = MediaViewerConstants.isVideo(currentFile) ||
-        MediaViewerConstants.isAudio(currentFile);
-
-    if (!currentIsMedia) {
-      if (nextFile != null) _prefetchThumbnail(nextFile);
-      if (prevFile != null) _prefetchThumbnail(prevFile);
-
+    if (MediaViewerConstants.isImage(currentFile) && nextFile != null) {
       // Warm full-resolution bytes for the very next image only (not prev —
       // swiping back re-hits the native ChunkedFileEngine's own decrypted-
       // chunk cache and open-handle LRU cheaply, and isn't worth doubling
       // the concurrent background transfer load). This hides the decrypt +
       // platform-channel cost behind however long the user spends looking
       // at the current image, instead of paying it synchronously on swipe.
-      if (nextFile != null) _prefetchFullRes(nextFile);
-    }
-
-    // Pre-warm the next video/audio controller regardless of what the
-    // current item's type is, so leaving an image and entering a video
-    // doesn't pay full MediaCodec/content-URI startup latency synchronously
-    // on that swipe either. Only the immediate next item is warmed, capped
-    // by maxLiveVideoControllers via VideoPlaybackManager's own eviction.
-    if (nextFile != null &&
-        (MediaViewerConstants.isVideo(nextFile) ||
-            MediaViewerConstants.isAudio(nextFile))) {
-      _playbackManager.prewarm(
-        fileName: nextFile,
-        contentUriString: _contentUriFor(nextFile),
-        playlist: playlist,
-        currentIndex: index,
-      );
+      // No-ops on its own if nextFile isn't an image.
+      _prefetchFullRes(nextFile);
     }
   }
 
   Future<void> _prefetchThumbnail(String fileName) async {
-    if (!MediaViewerConstants.isImage(fileName)) return;
+    final isImg = MediaViewerConstants.isImage(fileName);
+    final isVid = MediaViewerConstants.isVideo(fileName);
+    if (!isImg && !isVid) return;
     if (_prefetchedImages.containsKey(fileName) ||
         _prefetchingActive.contains(fileName)) {
       return;
@@ -280,12 +303,18 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
     _prefetchingActive.add(fileName);
     try {
-      final thumbBytes = await vaultExplorerApi.getImageThumbnail(
-        widget.container,
-        fileName,
-        targetSize: MediaViewerConstants.thumbnailTargetSize,
-        quality: widget.thumbnailQuality.jpegQuality,
-      );
+      final thumbBytes = isImg
+          ? await vaultExplorerApi.getImageThumbnail(
+              widget.container,
+              fileName,
+              targetSize: MediaViewerConstants.thumbnailTargetSize,
+              quality: widget.thumbnailQuality.jpegQuality,
+            )
+          : await vaultExplorerApi.getVideoThumbnail(
+              widget.container,
+              fileName,
+              targetSize: MediaViewerConstants.thumbnailTargetSize,
+            );
       if (thumbBytes != null && thumbBytes.isNotEmpty && mounted) {
         setState(() {
           _prefetchedImages[fileName] = thumbBytes;
@@ -359,6 +388,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _startHideTimer();
 
       _playlistController.updateIndex(index);
+      // Point the shared player at the new target immediately — before the
+      // page-turn animation below even starts — so the native open/decode
+      // has the whole animation's duration as head start instead of only
+      // beginning once it finishes.
+      _activateCurrentMedia();
       _prefetchSurroundingItems();
 
       if (_pageController.hasClients) {
@@ -424,15 +458,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   void _onScrollEnd() {
     _isSwiping = false;
-    final currentFile = _playlistController.currentFile;
-    _playbackManager.handlePageChange(currentFile);
+    // Resync as a safety net — the real trigger already ran in
+    // _transitionTo/onPageChanged the moment the target became known;
+    // this just covers other paths that land here (delete, playlist-mode
+    // change) and is a cheap no-op if the right file is already loaded.
+    _activateCurrentMedia();
 
+    final currentFile = _playlistController.currentFile;
     if (MediaViewerConstants.isImage(currentFile)) {
       _startSlideshowTimerIfNeeded();
-    } else {
-      if (_autoPlay) {
-        _playbackManager.activeController?.play();
-      }
     }
 
     if (mounted) setState(() {});
@@ -603,6 +637,12 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _cancelSlideshowTimer();
       }
     });
+    // Only meaningful while a video is active (the loop toggle in
+    // MediaViewerBottomControls only shows for videos), but harmless to
+    // call regardless — this is what makes VlcPlayerEngine bake
+    // `input-repeat` into the next Media it opens, and turns it back off
+    // the moment the mode changes away from loop.
+    _playbackManager.activeController?.setLooping(mode == VideoPlaybackMode.loop);
   }
 
   void _showAdvancedSettings(BuildContext context, bool isImage) {
@@ -680,6 +720,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _playbackManager.activeControllerNotifier.removeListener(
       _onActiveVideoControllerChanged,
     );
+    _playbackManager.currentFileNotifier.removeListener(
+      _onCurrentMediaFileChanged,
+    );
     _updateWakelock(false);
     _prefetchDebounceTimer?.cancel();
     _cancelSlideshowTimer();
@@ -732,7 +775,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               return NotificationListener<ScrollNotification>(
                 onNotification: (ScrollNotification notification) {
                   if (notification.depth == 0) {
-                    if (notification is ScrollStartNotification) {
+                    // dragDetails is only non-null for a scroll the user's
+                    // finger actually started — animateToPage (arrow-press
+                    // navigation) and jumpToPage also emit a
+                    // ScrollStartNotification, but with dragDetails null.
+                    // Without this check, _onScrollStart's pause-on-touch
+                    // would immediately re-pause the item _activateCurrentMedia
+                    // just started playing for a button-triggered transition,
+                    // right as its own animation began.
+                    if (notification is ScrollStartNotification &&
+                        notification.dragDetails != null) {
                       _onScrollStart();
                     } else if (notification is ScrollEndNotification) {
                       _onScrollEnd();
@@ -752,6 +804,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   onPageChanged: (index) {
                     if (!_transitionInProgress) {
                       _playlistController.updateIndex(index);
+                      // Fires as soon as the drag crosses the halfway point
+                      // to the next page — well before the finger lifts or
+                      // any fling-settle animation finishes. Switching the
+                      // shared player right here, instead of waiting for
+                      // ScrollEndNotification, is what actually removes the
+                      // ~1s "swipe, then wait" gap: the native open/decode
+                      // now runs *during* the rest of the swipe instead of
+                      // starting only once it's fully settled.
+                      _activateCurrentMedia();
                       _prefetchDebounceTimer?.cancel();
                       _prefetchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
                         if (mounted) _prefetchSurroundingItems();
@@ -790,18 +851,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                               container: widget.container,
                               fileName: fileName,
                               contentUriString: contentUriString,
-                              existingController:
-                                  _playbackManager.getController(fileName),
+                              playbackManager: _playbackManager,
+                              posterBytes: prefetchedBytes,
                               showUI: _showUI,
                               onToggleUI: _setUIVisibility,
                               skipSeconds: _doubleTapSkipSeconds,
-                              autoPlay: false,
                               isAudio: isAudio,
                               subtitlesEnabled: _subtitlesEnabled,
                               playbackSpeed: _playbackSpeed,
                               rotationQuarterTurns: _rotations[fileName] ?? 0,
                               progressNotifier: _videoProgressNotifier,
-                              isCurrent: fileName == _playlistController.currentFile,
                               onSubtitlesAvailableChanged: (val) {
                                 _playbackManager.updateSubtitleStatus(fileName, val);
                                 if (fileName == _playlistController.currentFile) {
@@ -812,24 +871,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                                 _swipePhysicsNotifier.value = allowSwipe
                                     ? const BouncingScrollPhysics()
                                     : const NeverScrollableScrollPhysics();
-                              },
-                              onVideoControllerInitialized: (controller, onEvicted) {
-                                _playbackManager.registerController(
-                                  fileName: fileName,
-                                  controller: controller,
-                                  currentFocus: fileName == _playlistController.currentFile,
-                                  playlist: _playlistController.playlist,
-                                  currentIndex: _playlistController.currentIndex,
-                                  onEvicted: onEvicted,
-                                );
-                                if (fileName == _playlistController.currentFile &&
-                                    !_isSwiping &&
-                                    _autoPlay) {
-                                  controller.play();
-                                }
-                              },
-                              onVideoControllerDisposed: () {
-                                _playbackManager.handleDisposed(fileName);
                               },
                               onError: () => _handleMediaError(fileName),
                             ),

@@ -59,16 +59,6 @@ class NativeVlcValue {
   }
 }
 
-/// Controls a native libVLC player instance running behind
-/// `com.aeidolon.vaultexplorer.vlcplayer.VlcPlayerPlugin` on the Android
-/// side.
-///
-/// Unlike `flutter_vlc_player`'s `VlcPlayerController`, [initialize] is a
-/// plain async method you can call before anything is on screen — the
-/// native side creates its `MediaPlayer` + Flutter `Texture` immediately
-/// and starts opening the media right away. That means [VideoPlaybackManager]
-/// can genuinely prewarm the next item in the background again, the same
-/// way the old `video_player`-based implementation did.
 class NativeVlcController extends ValueNotifier<NativeVlcValue> {
   static const MethodChannel _channel =
       MethodChannel('com.aeidolon.vaultexplorer/vlc_player');
@@ -124,6 +114,18 @@ class NativeVlcController extends ValueNotifier<NativeVlcValue> {
     await _channel.invokeMethod('setDataSource', {
       'playerId': _playerId,
       'contentUri': contentUriString,
+      'autoPlay': autoPlay,
+    });
+  }
+
+
+  Future<void> switchTo(String newContentUriString, {bool autoPlay = false}) async {
+    if (_playerId == null || _disposed) return;
+    _initCompleted = false;
+    value = const NativeVlcValue();
+    await _channel.invokeMethod('setDataSource', {
+      'playerId': _playerId,
+      'contentUri': newContentUriString,
       'autoPlay': autoPlay,
     });
   }

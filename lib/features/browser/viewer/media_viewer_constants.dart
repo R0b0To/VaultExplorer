@@ -12,7 +12,6 @@ class MediaViewerConstants {
   static const double maxVideoZoom = 6.0;
 
   static const int maxPrefetchCacheSize = 5;
-  static const int maxLiveVideoControllers = 3;
   static const int maxDirectorySearchDepth = 20;
   // Caps how many subdirectories _scanDirectoryRecursively will walk
   // concurrently at each level, so a huge "All (incl. subfolders)" vault

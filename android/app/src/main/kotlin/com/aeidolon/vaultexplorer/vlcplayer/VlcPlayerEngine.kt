@@ -42,6 +42,9 @@ object VlcCore {
      */
     private val options = arrayListOf(
         "--no-sub-autodetect-file",
+       "--no-mediacodec-dr",
+        "--avcodec-hw=any",
+        
     )
 
     fun get(context: Context): LibVLC {
@@ -177,6 +180,16 @@ class VlcPlayerEngine(
     private var currentVideoHeight = 0
 
     private var disposed = false
+
+    // Sticky loop intent, set by setLooping(). Read at the top of every
+    // setDataSource() so a freshly-created Media gets `input-repeat` baked
+    // in before it's ever opened (see setDataSource below) — that's what
+    // lets libVLC loop internally at the input layer instead of ever
+    // reaching EndReached / closing the fd. Survives across reopens
+    // (including the reachedEnd reopen in play()) precisely because it
+    // lives here on the engine, not on a Media instance that gets replaced
+    // every time.
+    private var isLooping = false
 
     val textureId: Long get() = textureEntry.id()
 
@@ -394,6 +407,16 @@ MediaPlayer.Event.Playing -> {
                 openParcelFd = pfd
 
                 val media = Media(libVLC, pfd.fileDescriptor)
+                if (isLooping) {
+                    // Must be added before setMedia() — this is an
+                    // input-open-time option, not something libVLC
+                    // re-reads if applied to a Media that's already
+                    // playing. Set here (not just in setLooping()) so it
+                    // survives the reachedEnd reopen in play(), which
+                    // builds a brand-new Media every time and would
+                    // otherwise silently drop it.
+                    media.addOption(":input-repeat=65535")
+                }
                 try {
                     mediaPlayer.setMedia(media)
                 } finally {
@@ -488,6 +511,13 @@ private fun displayWidth(track: IMedia.VideoTrack): Int {
 
     fun setLooping(looping: Boolean) {
         if (disposed) return
+        isLooping = looping
+        // Best-effort only: input-repeat is read by libVLC when the input
+        // is opened, so poking the Media that's already attached and
+        // playing generally has no effect on the current playthrough.
+        // What actually makes looping work is `isLooping` above being
+        // read at the top of setDataSource() next time a Media is built —
+        // including the reopen play() does after EndReached.
         mediaPlayer.media?.let {
             it.addOption(if (looping) ":input-repeat=65535" else ":input-repeat=0")
         }

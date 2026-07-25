@@ -1204,11 +1204,6 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'No credentials are saved on this dashboard. Enter current password and keyfiles to prove ownership.',
-              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-            const SizedBox(height: 20),
             TextField(
               controller: _pwCtrl,
               obscureText: _obscure,

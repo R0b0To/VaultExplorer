@@ -43,13 +43,6 @@ private object ChannelMethods {
     const val OPEN_WITH_APP             = "openWithApp"
     const val GET_VIDEO_THUMBNAIL       = "getVideoThumbnail"
     const val GET_IMAGE_THUMBNAIL       = "getImageThumbnail"
-    // Same output as GET_IMAGE_THUMBNAIL / GET_VIDEO_THUMBNAIL, plus the
-    // source frame's pre-downscale width/height. Native already decodes
-    // these bounds while producing the thumbnail (see handleGetImageThumbnail
-    // / handleGetVideoThumbnail), so reporting them back costs nothing extra
-    // — no new decode, no new I/O. Kept as separate methods rather than
-    // changing the existing ones' return shape, so callers that only want
-    // bytes (grid view, media viewer, carousel) are unaffected.
     const val GET_IMAGE_THUMBNAIL_WITH_SIZE = "getImageThumbnailWithSize"
     const val GET_VIDEO_THUMBNAIL_WITH_SIZE = "getVideoThumbnailWithSize"
     const val GENERATE_AND_CACHE_THUMBNAIL = "generateAndCacheThumbnail"
@@ -84,60 +77,23 @@ private object ChannelMethods {
     const val IS_CRYFS_VAULT            = "isCryfsVault"
 }
 
-/**
- * Activity glue only: Android lifecycle, BroadcastReceiver registration,
- * and the MethodChannel dispatch table. All actual handler logic lives in
- * the per-domain classes below, constructed here as eager (non-lazy)
- * properties — instantiation order matters, since later handler classes
- * take earlier ones (e.g. [nativeOps]) as constructor dependencies. See
- * [NativeOpSupport]'s doc comment for why none of these constructors touch
- * Context-dependent Activity state (contentResolver, getSystemService,
- * etc.) directly: this class is constructed before
- * Activity.attachBaseContext() runs, and doing so would crash on launch.
- *
- * - [NativeOpSupport] — shared native-op/error-translation plumbing
- * - [DerivedKeyHandlers] — Keystore-backed "remembered password" feature
- * - [UsbContainerHandlers] — USB mass-storage container lifecycle
- * - [VaultPickerHandlers] — SAF pickers for every vault format
- * - [VaultCreationHandlers] — vault/container creation
- * - [VaultUnlockHandlers] — unlock/lock/lifecycle for non-USB sources
- * - [ThumbnailHandlers] — image/video thumbnail generation
- * - [ImportExportHandlers] — bulk import/export with progress reporting
- * - [FileOperationHandlers] — Tier-2 file/directory CRUD passthroughs
- * - [SystemPermissionHandlers] — screen-secure, all-files-access, open-with
- */
 class MainActivity : FlutterFragmentActivity() {
-
     private val CHANNEL = "com.aeidolon.vaultexplorer/engine"
-
     internal val ACTION_CHOOSER = "com.aeidolon.vaultexplorer.ACTION_CHOOSER"
     private var chooserReceiver: BroadcastReceiver? = null
-
     internal var methodChannel: MethodChannel? = null
-
     internal val usbManager: UsbManager by lazy {
         getSystemService(Context.USB_SERVICE) as UsbManager
     }
-
     private val ACTION_USB_PERMISSION = "com.aeidolon.vaultexplorer.USB_PERMISSION"
     private var usbPermissionReceiver: BroadcastReceiver? = null
-
-    // Warm Thread Pool to process I/O tasks dynamically without thread-spawning latency
     private val ioExecutor = Executors.newFixedThreadPool(4)
-
-    // Dedicated pool for thumbnail generation
     private val thumbnailExecutor = Executors.newFixedThreadPool(3)
-
-    // Dedicated pool for full-resolution media reads
     private val fullResExecutor = Executors.newFixedThreadPool(2)
-
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
-
     private var vlcPlayerPlugin: com.aeidolon.vaultexplorer.vlcplayer.VlcPlayerPlugin? = null
-
     private val pendingResult = PendingActivityResult()
-
     private val nativeOps = NativeOpSupport(this, ioExecutor)
     private val derivedKeyHandlers = DerivedKeyHandlers(this, ioExecutor, nativeOps)
     private val usbHandlers = UsbContainerHandlers(this, ACTION_USB_PERMISSION, ioExecutor, nativeOps, derivedKeyHandlers)
@@ -166,18 +122,15 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-
         vlcPlayerPlugin = com.aeidolon.vaultexplorer.vlcplayer.VlcPlayerPlugin(
             applicationContext,
             flutterEngine.dartExecutor.binaryMessenger,
             flutterEngine.renderer,
         )
-
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel
         UnlockProgressBridge.channel = channel
         ImportProgressBridge.channel = channel
-
         val filter = IntentFilter(ACTION_CHOOSER)
         chooserReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -198,7 +151,6 @@ class MainActivity : FlutterFragmentActivity() {
                 }
             }
         }
-
         val usbFilter = IntentFilter(ACTION_USB_PERMISSION)
         usbPermissionReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -211,7 +163,6 @@ class MainActivity : FlutterFragmentActivity() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(usbPermissionReceiver, usbFilter)
         }
-
         usbDetachReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != UsbManager.ACTION_USB_DEVICE_DETACHED) return
@@ -231,7 +182,6 @@ class MainActivity : FlutterFragmentActivity() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(usbDetachReceiver, detachFilter)
         }
-
         screenOffReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != Intent.ACTION_SCREEN_OFF) return
@@ -252,7 +202,6 @@ class MainActivity : FlutterFragmentActivity() {
         } else {
             registerReceiver(chooserReceiver, filter)
         }
-
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 ChannelMethods.SET_SECURE_SCREEN -> systemHandlers.handleSetSecureScreen(call, result)

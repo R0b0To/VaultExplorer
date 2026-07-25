@@ -39,6 +39,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/truncated_banner.dart';
+import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
@@ -57,6 +58,7 @@ class FileBrowserScreen extends StatefulWidget {
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
   final VoidCallback? onUserActivity;
+
   const FileBrowserScreen({
     super.key,
     required this.container,
@@ -89,10 +91,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   ArchiveContext? _archiveContext;
   ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.defaultQuality;
-
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
   static const int _maxScanDepth = 20;
-
   static const _documentExts = {
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf',
     'csv', 'zip', 'tar', 'gz', 'json', 'xml',
@@ -129,10 +129,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     setState(() => _isLoading = true);
     try {
       final appSettings = await AppSettingsService.loadSettings();
-      // Cache mode and quality each resolve independently: an explicit
-      // widget override for one must not strand the other at its hardcoded
-      // default. Only look up the saved container record if at least one of
-      // the two wasn't supplied by the caller.
       ContainerRecord? record;
       if (widget.thumbnailCacheMode == null || widget.thumbnailQuality == null) {
         final records = await ContainerRepository.instance.loadAll();
@@ -150,11 +146,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               appSettings.defaultThumbnailQuality;
         });
       }
+
       if (mounted) {
         setState(() {
           _layoutMode = appSettings.defaultLayoutMode;
         });
       }
+
       if (mounted &&
           widget.container.readOnly &&
           _resolvedThumbnailCacheMode == ThumbnailCacheMode.inContainer) {
@@ -361,6 +359,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return;
     }
+
     if (_archiveContext != null) {
       _signalActivity();
       setState(() => _isLoading = true);
@@ -396,6 +395,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return;
     }
+
     if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
       final item = await VaultItemsService.instance.loadItem(widget.container, fullPath);
       if (item != null) {
@@ -419,6 +419,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return;
     }
+
     final settings = await AppSettingsService.loadSettings();
     final pref = settings.extensionPreferences[ext];
     if (pref == 'editor') {
@@ -669,6 +670,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         );
       },
     );
+
     if (result == 'editor') {
       if (remember) {
         settings.extensionPreferences[ext] = 'editor';
@@ -1052,7 +1054,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     }
-
     op.addListener(listener);
   }
 
@@ -1155,7 +1156,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     }
-
     op.addListener(listener);
   }
 
@@ -1191,8 +1191,38 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     }
-
     op.addListener(listener);
+  }
+
+  Future<void> _captureFromCamera() async {
+    if (_isReadOnly) {
+      _setStatus('This container is mounted read-only.', error: true);
+      return;
+    }
+    _signalActivity();
+    try {
+      final captured = await Navigator.push<({String savedName, bool isVideo})>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CameraCaptureScreen(
+            container: widget.container,
+            targetDirPath: _currentDirPath,
+          ),
+        ),
+      );
+      if (captured == null || !mounted) return;
+      await _loadDirectoryContents(_currentDirPath);
+      _setStatus(
+        captured.isVideo
+            ? 'Video captured and encrypted'
+            : 'Photo captured and encrypted',
+        autoClear: const Duration(seconds: 3),
+      );
+    } catch (e) {
+      if (mounted) {
+        _setStatus('Camera capture failed: ${e.runtimeType}', error: true);
+      }
+    }
   }
 
   bool _matchesFilter(String fileName) {
@@ -1343,6 +1373,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               readOnly: _isReadOnly,
             );
           },
+        ),
+        MenuItemButton(
+          leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
+          child: const Text('Camera'),
+          onPressed: _captureFromCamera,
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),

@@ -441,19 +441,7 @@ Future<bool> openWithApp(
     }
   }
 
-  /// Checks if the folder at [uri] contains a "gocryptfs.conf" file.
-  Future<bool> isGocryptfsVault(String uri) async {
-    try {
-      final result = await _channel.invokeMethod<bool>(
-        'isGocryptfsVault',
-        {'uri': uri},
-      );
-      return result ?? false;
-    } catch (e) {
-      _logSwallowed('isGocryptfsVault', e);
-      return false;
-    }
-  }
+
 
   /// Checks if the folder at [uri] contains a "cryfs.config" file.
   Future<bool> isCryfsVault(String uri) async {

@@ -33,9 +33,21 @@ import 'dart:ui' as ui;
 /// the grid view and viewer use.
 ///
 /// A tile starts at a neutral 1:1 placeholder and reflows to its real ratio
-/// the moment a fresh thumbnail fetch reports its size and
-/// [MediaAspectRatioCache] has recorded it (see `_onSizeKnown`). Once
-/// recorded, the ratio is cached for the session (keyed like
+/// the moment a size becomes known and [MediaAspectRatioCache] has recorded
+/// it (see `_onSizeKnown`). The size comes from, in order of preference:
+///  1. [ThumbnailCacheService] — a cache hit now carries the width/height
+///     alongside the bytes (packed in by [ThumbnailCacheService.put] at
+///     write time), so a cached thumbnail reports its ratio with no extra
+///     decode, even across app restarts where [MediaAspectRatioCache]'s
+///     in-memory entries are gone.
+///  2. A fresh fetch — `getImageThumbnailWithSize` / `getVideoThumbnailWithSize`
+///     report the source frame's pre-downscale width/height alongside the
+///     thumbnail bytes, values native already has in hand while generating
+///     the thumbnail itself (see `handleGetImageThumbnailWithSize` /
+///     `handleGetVideoThumbnailWithSize` in MainActivity.kt).
+///  3. A last-resort Dart-side JPEG decode ([_checkAndReportSizeFromBytes]),
+///     only for cache entries written before size-tracking existed.
+/// Once recorded, the ratio is cached for the session (keyed like
 /// [ThumbnailCacheService]'s memory tier) so revisiting a directory or
 /// scrolling back doesn't reshuffle heights or ask native again.
 class FileMasonryView extends StatefulWidget {
@@ -489,15 +501,24 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
     void Function(int width, int height) onSizeKnown,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
+      final cached = await ThumbnailCacheService.getWithSize(
         container: container,
         filePath: path,
         mode: mode,
         quality: quality,
       );
-      if (cached != null && cached.isNotEmpty) {
-        await _checkAndReportSizeFromBytes(container, path, cached, onSizeKnown);
-        return cached;
+      if (cached != null && cached.$1.isNotEmpty) {
+        final (bytes, width, height) = cached;
+        if (width != null && height != null) {
+          onSizeKnown(width, height);
+        } else {
+          // Legacy entry cached before size tracking existed — fall back to
+          // reading it off the JPEG bytes this once. The next _fetch for
+          // this path (after the current write, below, or after this file's
+          // cache entry naturally expires) will carry a size and skip this.
+          await _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown);
+        }
+        return bytes;
       }
     }
     final thumb = await vaultExplorerApi.getImageThumbnailWithSize(
@@ -524,7 +545,9 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       return raw;
     }
     onSizeKnown(thumb!.width, thumb.height);
-    ThumbnailCacheService.putInMemory(container, path, thumbBytes, quality);
+    ThumbnailCacheService.putInMemory(
+      container, path, thumbBytes, quality, thumb.width, thumb.height,
+    );
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(
@@ -533,6 +556,8 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
           data: thumbBytes,
           mode: mode,
           quality: quality,
+          width: thumb.width,
+          height: thumb.height,
         ),
       );
     }
@@ -542,9 +567,15 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final syncBytes = ThumbnailCacheService.getFromMemory(container, filePath, quality);
-    if (syncBytes != null && syncBytes.isNotEmpty) {
-      _checkAndReportSizeFromBytes(container, filePath, syncBytes, onSizeKnown);
+    final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(container, filePath, quality);
+    final syncBytes = syncEntry?.$1;
+    if (syncEntry != null && syncEntry.$1.isNotEmpty) {
+      final (bytes, width, height) = syncEntry;
+      if (width != null && height != null) {
+        onSizeKnown(width, height);
+      } else {
+        _checkAndReportSizeFromBytes(container, filePath, bytes, onSizeKnown);
+      }
     }
     return AsyncThumbnail(
       key: ValueKey('img:$filePath'),
@@ -629,15 +660,20 @@ class _VideoMasonryThumb extends StatelessWidget {
     void Function(int width, int height) onSizeKnown,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
-      final cached = await ThumbnailCacheService.get(
+      final cached = await ThumbnailCacheService.getWithSize(
         container: container,
         filePath: path,
         mode: mode,
         quality: quality,
       );
-      if (cached != null && cached.isNotEmpty) {
-        await _checkAndReportSizeFromBytes(container, path, cached, onSizeKnown);
-        return cached;
+      if (cached != null && cached.$1.isNotEmpty) {
+        final (bytes, width, height) = cached;
+        if (width != null && height != null) {
+          onSizeKnown(width, height);
+        } else {
+          await _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown);
+        }
+        return bytes;
       }
     }
     final thumb = await vaultExplorerApi.getVideoThumbnailWithSize(
@@ -649,7 +685,9 @@ class _VideoMasonryThumb extends StatelessWidget {
     final data = thumb?.bytes;
     if (data == null || data.isEmpty) return Uint8List(0);
     onSizeKnown(thumb!.width, thumb.height);
-    ThumbnailCacheService.putInMemory(container, path, data, quality);
+    ThumbnailCacheService.putInMemory(
+      container, path, data, quality, thumb.width, thumb.height,
+    );
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(
@@ -658,6 +696,8 @@ class _VideoMasonryThumb extends StatelessWidget {
           data: data,
           mode: mode,
           quality: quality,
+          width: thumb.width,
+          height: thumb.height,
         ),
       );
     }
@@ -667,9 +707,15 @@ class _VideoMasonryThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final syncBytes = ThumbnailCacheService.getFromMemory(container, filePath, quality);
-    if (syncBytes != null && syncBytes.isNotEmpty) {
-      _checkAndReportSizeFromBytes(container, filePath, syncBytes, onSizeKnown);
+    final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(container, filePath, quality);
+    final syncBytes = syncEntry?.$1;
+    if (syncEntry != null && syncEntry.$1.isNotEmpty) {
+      final (bytes, width, height) = syncEntry;
+      if (width != null && height != null) {
+        onSizeKnown(width, height);
+      } else {
+        _checkAndReportSizeFromBytes(container, filePath, bytes, onSizeKnown);
+      }
     }
     return Stack(
       fit: StackFit.expand,

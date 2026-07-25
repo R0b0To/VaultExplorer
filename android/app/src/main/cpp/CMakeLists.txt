@@ -387,6 +387,12 @@ add_library(
         ${MKNTFS_EMBEDDED_SOURCE}
 )
 
+# 16 KB page-size ELF alignment for the LOAD segments of this .so, so it
+# stays valid on 16 KB-page-size devices (Android 15+) regardless of which
+# NDK version happens to be active (NDK r28+ defaults to this already, but
+# pinning it explicitly here doesn't depend on that).
+target_link_options(vaultexplorer PRIVATE "-Wl,-z,max-page-size=16384")
+
 # Force core.c to include your local thread.h at compile time without modifying core.c on disk
 set_source_files_properties(${VC_ARGON2_DIR}/src/core.c
         TARGET_DIRECTORY vaultexplorer

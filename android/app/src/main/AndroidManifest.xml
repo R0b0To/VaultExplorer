@@ -6,7 +6,12 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
-    ...
+
+    <!-- Built-in camera capture (CameraCaptureActivity) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
         android:label="Vault Explorer"
@@ -42,6 +47,13 @@
             <!-- END OF ADDITION -->
 
         </activity>
+        <activity
+            android:name=".camera.CameraCaptureActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="stateAlwaysHidden" />
         <provider
             android:name="com.aeidolon.vaultexplorer.ContainerDocumentsProvider"
             android:authorities="com.aeidolon.vaultexplorer.documents"

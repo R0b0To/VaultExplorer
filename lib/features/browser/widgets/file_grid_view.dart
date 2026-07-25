@@ -12,7 +12,6 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 
-/// A dynamic gallery grid for the file browser supporting pinch-to-zoom.
 class FileGridView extends StatefulWidget {
   final MountedContainer container;
   final List<RawEntry> dirs;
@@ -22,12 +21,11 @@ class FileGridView extends StatefulWidget {
   final String currentDirPath;
   final ThumbnailCacheMode thumbnailCacheMode;
   final ThumbnailQuality thumbnailQuality;
+  final bool showFileNames;
   final ValueChanged<RawEntry> onDirTap;
   final ValueChanged<RawEntry> onFileTap;
   final ValueChanged<RawEntry> onItemLongPress;
   final ValueChanged<RawEntry>? onFileLongMenu;
-
-  /// Active search query for text highlighting (null or empty = no highlight).
   final String? searchQuery;
 
   const FileGridView({
@@ -40,6 +38,7 @@ class FileGridView extends StatefulWidget {
     required this.currentDirPath,
     required this.thumbnailCacheMode,
     required this.thumbnailQuality,
+    this.showFileNames = true,
     required this.onDirTap,
     required this.onFileTap,
     required this.onItemLongPress,
@@ -67,16 +66,21 @@ class _FileGridViewState extends State<FileGridView> {
   }
 
   int get _minColumns {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     return isLandscape ? 3 : 1;
   }
 
   int get _maxColumns {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     return isLandscape ? 7 : 4;
   }
 
   double _getAspectRatio(int columns) {
+    if (!widget.showFileNames) {
+      return 1.0;
+    }
     switch (columns) {
       case 1:
         return 1.45;
@@ -100,7 +104,6 @@ class _FileGridViewState extends State<FileGridView> {
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     final scale = details.scale;
     final factor = scale / _baselineScale;
-
     if (factor > 1.35) {
       if (_crossAxisCount > _minColumns) {
         setState(() {
@@ -121,17 +124,16 @@ class _FileGridViewState extends State<FileGridView> {
   @override
   Widget build(BuildContext context) {
     final total = widget.dirs.length + widget.files.length;
-
     return GestureDetector(
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
       child: GridView.builder(
-        // Generous bottom padding for Edge-to-Edge compliance and FloatingActivityStack clearance
         padding: EdgeInsets.fromLTRB(
           10,
           12,
           10,
-          AppSpacing.floatingStackClearance + MediaQuery.paddingOf(context).bottom,
+          AppSpacing.floatingStackClearance +
+              MediaQuery.paddingOf(context).bottom,
         ),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: _crossAxisCount,
@@ -156,10 +158,10 @@ class _FileGridViewState extends State<FileGridView> {
   Widget _buildDirCell(BuildContext context, RawEntry entry) {
     final isSelected = widget.selectedItems.contains(entry);
     final cs = Theme.of(context).colorScheme;
-
     return _GridCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
+      showFileName: widget.showFileNames,
       onTap: () => widget.onDirTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       preview: Center(
@@ -178,17 +180,12 @@ class _FileGridViewState extends State<FileGridView> {
     final cleanName = entry.name;
     final fullPath = widget.currentDirPath.isEmpty
         ? cleanName
-        : '${widget.currentDirPath}/$cleanName';
+        : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mrow><mi>w</mi><mi>i</mi><mi>d</mi><mi>g</mi><mi>e</mi><mi>t</mi><mi mathvariant="normal">.</mi><mi>c</mi><mi>u</mi><mi>r</mi><mi>r</mi><mi>e</mi><mi>n</mi><mi>t</mi><mi>D</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi></mrow><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">{widget.currentDirPath}/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02691em;">w</span><span class="mord mathnormal">i</span><span class="mord mathnormal">d</span><span class="mord mathnormal" style="margin-right:0.03588em;">g</span><span class="mord mathnormal">e</span><span class="mord mathnormal">t</span><span class="mord">.</span><span class="mord mathnormal">c</span><span class="mord mathnormal">u</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">t</span><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span></span><span class="mord">/</span></span></span></span>cleanName';
     final isSelected = widget.selectedItems.contains(entry);
-
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
-
-    // Use the shared vault-type helpers from file_type_utils.dart.
     final vaultIcon = vaultIconForExt(ext);
     final vaultColor = vaultColorForExt(ext);
-
-    // Strip the vault extension from the display name.
     if (vaultIcon != null) {
       final nameParts = cleanName.split('.');
       if (nameParts.length > 1) {
@@ -196,10 +193,8 @@ class _FileGridViewState extends State<FileGridView> {
         displayName = nameParts.join('.');
       }
     }
-
     final isImg = MediaViewerConstants.isImage(cleanName);
     final isVid = MediaViewerConstants.isVideo(cleanName);
-
     Widget previewWidget;
     if (vaultIcon != null) {
       previewWidget = Center(
@@ -232,10 +227,10 @@ class _FileGridViewState extends State<FileGridView> {
         ),
       );
     }
-
     return _GridCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
+      showFileName: widget.showFileNames,
       onTap: () => widget.onFileTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       onMoreTap: widget.isSelectionMode
@@ -248,16 +243,13 @@ class _FileGridViewState extends State<FileGridView> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Generic grid cell
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _GridCell extends StatelessWidget {
   final Widget preview;
   final String label;
   final String? searchQuery;
   final bool isSelected;
   final bool isSelectionMode;
+  final bool showFileName;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
@@ -268,6 +260,7 @@ class _GridCell extends StatelessWidget {
     this.searchQuery,
     required this.isSelected,
     required this.isSelectionMode,
+    this.showFileName = true,
     required this.onTap,
     required this.onLongPress,
     this.onMoreTap,
@@ -277,14 +270,13 @@ class _GridCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Card(
-      clipBehavior: Clip.antiAlias, // Ensures internal components match the Card's radii
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
         side: BorderSide(
           color: isSelected ? cs.primary : cs.outlineVariant,
-          width: isSelected ? 2.0 : 1.0, // MD3 active border is generally 2dp
+          width: isSelected ? 2.0 : 1.0,
         ),
       ),
       color: isSelected
@@ -321,29 +313,29 @@ class _GridCell extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              color: isSelected
-                  ? Colors.transparent // Card color handles background
-                  : cs.surfaceContainer,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  HighlightedText(
-                    text: label,
-                    query: searchQuery,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface,
+            if (showFileName)
+              Container(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                color: isSelected
+                    ? Colors.transparent
+                    : cs.surfaceContainer,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    HighlightedText(
+                      text: label,
+                      query: searchQuery,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
+                      ),
                     ),
-                  ),
-
-                ],
+                  ],
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -355,19 +347,14 @@ class _CheckBadge extends StatelessWidget {
   final Color color;
   final Color onColor;
   const _CheckBadge({required this.color, required this.onColor});
-
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(4),
-    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    child: Icon(Icons.check_rounded, size: AppIconSize.inline, color: onColor),
-  );
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        child:
+            Icon(Icons.check_rounded, size: AppIconSize.inline, color: onColor),
+      );
 }
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Encrypted image thumbnail
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _EncryptedImageGridThumb extends StatelessWidget {
   final MountedContainer container;
@@ -396,14 +383,12 @@ class _EncryptedImageGridThumb extends StatelessWidget {
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
-
     Uint8List? thumbBytes = await vaultExplorerApi.getImageThumbnail(
       container,
       path,
-      targetSize: quality.scaledSize(180), 
+      targetSize: quality.scaledSize(180),
       quality: quality.jpegQuality,
     );
-
     if (thumbBytes == null || thumbBytes.isEmpty) {
       final size = await vaultExplorerApi.getFileSize(container, path);
       if (size <= 0) throw Exception('Empty file: $path');
@@ -419,7 +404,6 @@ class _EncryptedImageGridThumb extends StatelessWidget {
       }
       return raw;
     }
-
     ThumbnailCacheService.putInMemory(container, path, thumbBytes);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
@@ -431,7 +415,6 @@ class _EncryptedImageGridThumb extends StatelessWidget {
         ),
       );
     }
-
     return thumbBytes;
   }
 
@@ -446,7 +429,8 @@ class _EncryptedImageGridThumb extends StatelessWidget {
       limiter: ThumbnailConcurrency.imageLimiter,
       fetchFn: (c, p) => _fetch(c, p, cacheMode, quality),
       debounce: const Duration(milliseconds: 100),
-      syncLookup: () => ThumbnailCacheService.getFromMemory(container, filePath),
+      syncLookup: () =>
+          ThumbnailCacheService.getFromMemory(container, filePath),
       cacheHeight: quality.scaledSize(180),
       imageBuilder: (context, bytes, cacheHeight) => Image.memory(
         bytes,
@@ -472,15 +456,13 @@ class _EncryptedImageGridThumb extends StatelessWidget {
   }
 
   Widget _errorPlaceholder(ColorScheme cs) => Container(
-    color: cs.surfaceContainerLow,
-    child: Center(
-      child: Icon(Icons.broken_image_rounded, size: AppIconSize.feature, color: cs.outline),
-    ),
-  );
+        color: cs.surfaceContainerLow,
+        child: Center(
+          child: Icon(Icons.broken_image_rounded,
+              size: AppIconSize.feature, color: cs.outline),
+        ),
+      );
 }
-// ─────────────────────────────────────────────────────────────────────────────
-// Video thumbnail
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _VideoThumb extends StatelessWidget {
   final MountedContainer container;
@@ -509,16 +491,13 @@ class _VideoThumb extends StatelessWidget {
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
-
     final data = await vaultExplorerApi.getVideoThumbnail(
-      container, 
-      path, 
+      container,
+      path,
       quality: quality.jpegQuality,
       targetSize: quality.scaledSize(180),
     );
     if (data == null || data.isEmpty) return Uint8List(0);
-   
-
     ThumbnailCacheService.putInMemory(container, path, data);
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
@@ -530,14 +509,12 @@ class _VideoThumb extends StatelessWidget {
         ),
       );
     }
-
     return data;
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -589,9 +566,10 @@ class _VideoThumb extends StatelessWidget {
   }
 
   Widget _errorPlaceholder(ColorScheme cs) => Container(
-    color: cs.surfaceContainerLow,
-    child: Center(
-      child: Icon(Icons.broken_image_rounded, size: AppIconSize.feature, color: cs.outline),
-    ),
-  );
+        color: cs.surfaceContainerLow,
+        child: Center(
+          child: Icon(Icons.broken_image_rounded,
+              size: AppIconSize.feature, color: cs.outline),
+        ),
+      );
 }

@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
-
-/// Renders a modern inset list of directory entries by delegating each row
-/// to [DirectoryTile] or [FileTile].
 
 class FileListView extends StatefulWidget {
   final List<RawEntry> dirs;
@@ -13,15 +11,11 @@ class FileListView extends StatefulWidget {
   final bool isSelectionMode;
   final bool isCompact;
   final Set<RawEntry> selectedItems;
-
+  final List<FileDetailColumn> detailColumns;
   final ValueChanged<RawEntry> onDirTap;
   final ValueChanged<RawEntry> onFileTap;
   final ValueChanged<RawEntry> onItemLongPress;
-
-  /// Called when the trailing "⋯" icon on a file tile is tapped.
   final ValueChanged<RawEntry>? onFileLongMenu;
-
-  /// Active search query for text highlighting (null or empty = no highlight).
   final String? searchQuery;
 
   const FileListView({
@@ -31,6 +25,7 @@ class FileListView extends StatefulWidget {
     required this.isSelectionMode,
     this.isCompact = false,
     required this.selectedItems,
+    this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     required this.onDirTap,
     required this.onFileTap,
     required this.onItemLongPress,
@@ -59,10 +54,8 @@ class _FileListViewState extends State<FileListView> {
   @override
   Widget build(BuildContext context) {
     final total = widget.dirs.length + widget.files.length;
-
     return Column(
       children: [
-        // Modern MD3 drops full-width dividers in favor of whitespace padding
         const SizedBox(height: 8),
         Expanded(
           child: GestureDetector(
@@ -76,44 +69,47 @@ class _FileListViewState extends State<FileListView> {
                 ),
               ),
               child: ListView.builder(
-            // Increased safe padding for bottom sheets & floating clipboards
-            padding: EdgeInsets.only(
-              top: 0,
-              bottom: AppSpacing.floatingStackClearance + MediaQuery.paddingOf(context).bottom,
-            ),
-            itemCount: total,
-            itemBuilder: (_, index) {
-              final isDir = index < widget.dirs.length;
-              final entry = isDir ? widget.dirs[index] : widget.files[index - widget.dirs.length];
-              final isSelected = widget.selectedItems.contains(entry);
-
-              if (isDir) {
-                return DirectoryTile(
-                  key: ValueKey('dir:${entry.raw}'),
-                  entry: entry,
-                  isSelectionMode: widget.isSelectionMode,
-                  isSelected: isSelected,
-                  isCompact: widget.isCompact,
-                  zoomLevel: _zoomLevel,
-                  searchQuery: widget.searchQuery,
-                  onTap: () => widget.onDirTap(entry),
-                  onLongPress: () => widget.onItemLongPress(entry),
-                );
-              }
-              return FileTile(
-                key: ValueKey('file:${entry.raw}'),
-                entry: entry,
-                isSelectionMode: widget.isSelectionMode,
-                isSelected: isSelected,
-                isCompact: widget.isCompact,
-                zoomLevel: _zoomLevel,
-                searchQuery: widget.searchQuery,
-                onTap: () => widget.onFileTap(entry),
-                onLongPress: () => widget.onItemLongPress(entry),
-                onLongMenu: widget.onFileLongMenu,
-              );
-            },
-          ),
+                padding: EdgeInsets.only(
+                  top: 0,
+                  bottom: AppSpacing.floatingStackClearance +
+                      MediaQuery.paddingOf(context).bottom,
+                ),
+                itemCount: total,
+                itemBuilder: (_, index) {
+                  final isDir = index < widget.dirs.length;
+                  final entry = isDir
+                      ? widget.dirs[index]
+                      : widget.files[index - widget.dirs.length];
+                  final isSelected = widget.selectedItems.contains(entry);
+                  if (isDir) {
+                    return DirectoryTile(
+                      key: ValueKey('dir:${entry.raw}'),
+                      entry: entry,
+                      isSelectionMode: widget.isSelectionMode,
+                      isSelected: isSelected,
+                      isCompact: widget.isCompact,
+                      zoomLevel: _zoomLevel,
+                      detailColumns: widget.detailColumns,
+                      searchQuery: widget.searchQuery,
+                      onTap: () => widget.onDirTap(entry),
+                      onLongPress: () => widget.onItemLongPress(entry),
+                    );
+                  }
+                  return FileTile(
+                    key: ValueKey('file:${entry.raw}'),
+                    entry: entry,
+                    isSelectionMode: widget.isSelectionMode,
+                    isSelected: isSelected,
+                    isCompact: widget.isCompact,
+                    zoomLevel: _zoomLevel,
+                    detailColumns: widget.detailColumns,
+                    searchQuery: widget.searchQuery,
+                    onTap: () => widget.onFileTap(entry),
+                    onLongPress: () => widget.onItemLongPress(entry),
+                    onLongMenu: widget.onFileLongMenu,
+                  );
+                },
+              ),
             ),
           ),
         ),

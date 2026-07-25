@@ -44,9 +44,6 @@ import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 
-
-// ── Path segment model ────────────────────────────────────────────────────────
-
 class PathSegment {
   final String label;
   final String fatPath;
@@ -54,25 +51,11 @@ class PathSegment {
   const PathSegment(this.label, this.fatPath, {this.isArchiveRoot = false});
 }
 
-// ── Screen ────────────────────────────────────────────────────────────────────
-//
-// Layout philosophy (modularity):
-//   - The app bar is deliberately minimal: back button, container name, and
-//     a single "settings" menu holding Filters + a link to the toolbar
-//     customization screen. It never turns into a search field.
-//   - Every functional action (search, add, view mode, sort, play media)
-//     lives in one reusable [FileManagerActionBar] — rendered horizontally
-//     as the portrait bottom bar, and vertically as the landscape sidebar
-//     rail — driven by a user-editable [FileManagerToolbarConfig] so people
-//     can reorder or hide entries from FileManagerToolbarSettingsScreen.
-//   - Search results in a bottom-docked field (see [BottomSearchBar]) that
-//     rides above the keyboard instead of replacing the app bar.
 class FileBrowserScreen extends StatefulWidget {
   final MountedContainer container;
   final MountedContainer? Function(int volId)? resolveContainer;
   final ThumbnailCacheMode? thumbnailCacheMode;
   final VoidCallback? onUserActivity;
-
   const FileBrowserScreen({
     super.key,
     required this.container,
@@ -98,23 +81,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   FileOperationService get _opSvc => FileOperationService.instance;
   bool _searchActive = false;
   String _searchQuery = '';
-
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
   String? _currentFilter;
   bool _menuIsOpen = false;
   ArchiveContext? _archiveContext;
-
   ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.medium;
 
-  // User-customizable ordering/visibility of the action bar — see
-  // FileManagerToolbarSettingsScreen.
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
-
   static const int _maxScanDepth = 20;
 
-  // Document-type extensions used only by _matchesFilter; has no media
-  // equivalent in MediaViewerConstants so it stays local.
   static const _documentExts = {
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf',
     'csv', 'zip', 'tar', 'gz', 'json', 'xml',
@@ -123,8 +99,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
   bool get _isReadOnly => widget.container.readOnly;
-
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
   void initState() {
@@ -149,13 +123,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
-  // ── Init ──────────────────────────────────────────────────────────────────
-
   Future<void> _initSettingsAndContents() async {
     setState(() => _isLoading = true);
     try {
       final appSettings = await AppSettingsService.loadSettings();
-      
       if (widget.thumbnailCacheMode != null) {
         _resolvedThumbnailCacheMode = widget.thumbnailCacheMode!;
       } else {
@@ -172,23 +143,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           });
         }
       }
-
-      // Load default layout mode here
       if (mounted) {
         setState(() {
           _layoutMode = appSettings.defaultLayoutMode;
         });
       }
-
-      // A read-only mount refuses every write native-side (physicalWrite()'s
-      // hard readOnly check), including the .thumbcache/ writes
-      // ThumbnailCacheService.put() makes for ThumbnailCacheMode.inContainer.
-      // Those writes already fail silently (caught + debugPrint'd) rather
-      // than surfacing anywhere — thumbnails still render fine from native
-      // generation + the in-memory LRU tier, they're just regenerated every
-      // session instead of persisting — but the person chose "inside
-      // container" specifically for that persistence, so say so once up
-      // front instead of letting it fail invisibly.
       if (mounted &&
           widget.container.readOnly &&
           _resolvedThumbnailCacheMode == ThumbnailCacheMode.inContainer) {
@@ -212,8 +171,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     setState(() => _toolbarConfig = config);
   }
 
-  // ── Inline status ─────────────────────────────────────────────────────────
-
   void _setStatus(String msg, {bool error = false, Duration? autoClear}) {
     if (!mounted) return;
     setState(() {
@@ -234,27 +191,21 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (mounted) setState(() => _statusMessage = null);
   }
 
-  // ── Directory loading ─────────────────────────────────────────────────────
-
   Future<void> _loadDirectoryContents(String path) async {
     setState(() => _isLoading = true);
     _signalActivity();
-
     if (_archiveContext != null) {
       _loadArchiveContents(path);
       return;
     }
-
     try {
       final items = await vaultExplorerApi.listDirectory(widget.container, path);
-
       List<int>? space;
       try {
         space = await vaultExplorerApi.getSpaceInfo(widget.container);
       } catch (_) {
-        space = null; // e.g. Cryptomator vault with no reportable free space
+        space = null;
       }
-
       if (mounted) {
         final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
         setState(() {
@@ -278,16 +229,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   void _loadArchiveContents(String path) {
     if (_archiveContext == null) return;
-    
-    // The subPath we pass to archiveContext should be relative to the archive root
-    // To calculate this, we take the current fatPath and strip the archive root's fatPath
     final archiveRootPath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
     String subPath = '';
     if (path.length > archiveRootPath.length) {
       subPath = path.substring(archiveRootPath.length);
       if (subPath.startsWith('/')) subPath = subPath.substring(1);
     }
-
     final items = _archiveContext!.listDirectory(subPath);
     if (mounted) {
       setState(() {
@@ -301,21 +248,18 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Future<void> _openArchive(String fullPath, String archiveName) async {
     setState(() => _isLoading = true);
     _signalActivity();
-
     try {
       final ctx = await ArchiveService.open(
         container: widget.container,
         archivePathInContainer: fullPath,
         pathStackEntryIndex: _pathStack.length,
       );
-      
       setState(() {
         _archiveContext = ctx;
         _pathStack.add(PathSegment(archiveName, fullPath, isArchiveRoot: true));
         _clearSearch();
         _currentFilter = null;
       });
-      
       _loadArchiveContents(fullPath);
     } catch (e) {
       if (mounted) {
@@ -330,19 +274,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _archiveContext = null;
   }
 
-  // ── Search ────────────────────────────────────────────────────────────────
-
   void _clearSearch() {
     _searchActive = false;
     _searchQuery = '';
   }
 
-  // ── Navigation ────────────────────────────────────────────────────────────
-
   void _enterDirectory(RawEntry entry) {
     final newPath = _currentDirPath.isEmpty
         ? entry.name
-        : '$_currentDirPath/${entry.name}';
+        : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mrow></mrow><mi>c</mi></msub><mi>u</mi><mi>r</mi><mi>r</mi><mi>e</mi><mi>n</mi><mi>t</mi><mi>D</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">_currentDirPath/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">u</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">t</span><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord">/</span></span></span></span>{entry.name}';
     setState(() {
       _pathStack.add(PathSegment(entry.name, newPath));
       _clearSearch();
@@ -353,13 +293,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   void _navigateUp() {
     if (_atRoot) return;
-    
-    // Check if we're about to leave the archive
-    if (_archiveContext != null && 
+    if (_archiveContext != null &&
         _pathStack.length - 1 <= _archiveContext!.pathStackEntryIndex) {
       _closeArchive();
     }
-    
     setState(() {
       _pathStack.removeLast();
       _clearSearch();
@@ -370,12 +307,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   void _jumpTo(int index) {
     if (index == _pathStack.length - 1) return;
-    
-    // Check if we jumped out of the archive
     if (_archiveContext != null && index < _archiveContext!.pathStackEntryIndex) {
       _closeArchive();
     }
-    
     setState(() {
       _pathStack.removeRange(index + 1, _pathStack.length);
       _clearSearch();
@@ -384,8 +318,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _loadDirectoryContents(_currentDirPath);
   }
 
-  // ── SelectionMixin override ───────────────────────────────────────────────
-
   @override
   void toggleSelectItem(RawEntry item) {
     super.toggleSelectItem(item);
@@ -393,8 +325,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       fetchFolderSizes(widget.container, _currentDirPath);
     }
   }
-
-  // ── Item interaction ──────────────────────────────────────────────────────
 
   void _handleDirTap(RawEntry entry) {
     _signalActivity();
@@ -411,15 +341,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       toggleSelectItem(entry);
       return;
     }
-
     final fullPath = _currentDirPath.isEmpty
         ? entry.name
-        : '$_currentDirPath/${entry.name}';
-
+        : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mrow></mrow><mi>c</mi></msub><mi>u</mi><mi>r</mi><mi>r</mi><mi>e</mi><mi>n</mi><mi>t</mi><mi>D</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">_currentDirPath/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">u</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">t</span><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord">/</span></span></span></span>{entry.name}';
     final parts = entry.name.split('.');
     final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
-
-    // Check if it's an archive we can browse
     if (ArchiveService.isArchive(ext)) {
       if (ArchiveService.isSupported(ext)) {
         await _openArchive(fullPath, entry.name);
@@ -428,8 +354,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return;
     }
-
-    // Check if we are inside an archive
     if (_archiveContext != null) {
       _signalActivity();
       setState(() => _isLoading = true);
@@ -440,7 +364,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           subPath = fullPath.substring(archiveRootPath.length);
           if (subPath.startsWith('/')) subPath = subPath.substring(1);
         }
-
         final tempFilePath = await _archiveContext!.extractEntry(subPath);
         if (mounted) {
           setState(() => _isLoading = false);
@@ -466,16 +389,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return;
     }
-
-    // Check if it's a VaultItem (secure item)
     if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
       final item = await VaultItemsService.instance.loadItem(widget.container, fullPath);
-
       if (item != null) {
-        // Force the title to perfectly match the file's base name in case it was renamed externally
         final baseName = entry.name.substring(0, entry.name.lastIndexOf('.'));
         item.title = baseName;
-
         if (mounted) {
           await Navigator.push(
             context,
@@ -494,11 +412,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return;
     }
-
-    // Normal files
     final settings = await AppSettingsService.loadSettings();
     final pref = settings.extensionPreferences[ext];
-
     if (pref == 'editor') {
       if (!mounted) return;
       await Navigator.push(
@@ -526,8 +441,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   void _openMediaViewer(String fileName, String fullPath) {
-    // Opens just the tapped file. The viewer's own "Playlist" menu lets the
-    // user opt into scanning this folder (or all subfolders) afterward.
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -552,9 +465,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     bool remember = false;
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     final isMedia = _isSupportedMedia(fileName);
-
     final result = await showDialog<String>(
       context: context,
       builder: (context) {
@@ -626,98 +537,97 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                     ),
                   ),
                   const SizedBox(height: 12),
-const SizedBox(height: 12),
-InkWell(
-  onTap: () => Navigator.of(context).pop('external'),
-  borderRadius: BorderRadius.circular(12),
-  child: Ink(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: cs.surfaceContainerLow,
-      border: Border.all(color: cs.outlineVariant),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      children: [
-        Icon(
-          Icons.open_in_new_rounded,
-          color: cs.secondary,
-          size: 28,
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'External App',
-                style: textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                'Send file to third-party app',
-                style: textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Icon(
-          Icons.chevron_right_rounded,
-          color: cs.onSurfaceVariant,
-        ),
-      ],
-    ),
-  ),
-),
-const SizedBox(height: 12),
-InkWell(
-  onTap: () => Navigator.of(context).pop('open_as'),
-  borderRadius: BorderRadius.circular(12),
-  child: Ink(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: cs.surfaceContainerLow,
-      border: Border.all(color: cs.outlineVariant),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      children: [
-        Icon(
-          Icons.app_registration_rounded,
-          color: cs.secondary,
-          size: 28,
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Open As...',
-                style: textTheme.bodyLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                'Choose file type to open as',
-                style: textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Icon(
-          Icons.chevron_right_rounded,
-          color: cs.onSurfaceVariant,
-        ),
-      ],
-    ),
-  ),
-),
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop('external'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Ink(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerLow,
+                        border: Border.all(color: cs.outlineVariant),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.open_in_new_rounded,
+                            color: cs.secondary,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'External App',
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'Send file to third-party app',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop('open_as'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Ink(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerLow,
+                        border: Border.all(color: cs.outlineVariant),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.app_registration_rounded,
+                            color: cs.secondary,
+                            size: 28,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Open As...',
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'Choose file type to open as',
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -752,7 +662,6 @@ InkWell(
         );
       },
     );
-
     if (result == 'editor') {
       if (remember) {
         settings.extensionPreferences[ext] = 'editor';
@@ -774,72 +683,70 @@ InkWell(
       }
       _openMediaViewer(fileName, fullPath);
     } else if (result == 'external') {
-  if (remember) {
-    VaultExplorerApi.onAppSelectedCallback = (selectedExt, pkg) {
-      if (selectedExt.toLowerCase() == ext.toLowerCase()) {
-        settings.extensionPreferences[ext] = 'package:$pkg';
-        AppSettingsService.saveSettings(settings);
-        VaultExplorerApi.onAppSelectedCallback = null;
+      if (remember) {
+        VaultExplorerApi.onAppSelectedCallback = (selectedExt, pkg) {
+          if (selectedExt.toLowerCase() == ext.toLowerCase()) {
+            settings.extensionPreferences[ext] = 'package:$pkg';
+            AppSettingsService.saveSettings(settings);
+            VaultExplorerApi.onAppSelectedCallback = null;
+          }
+        };
       }
-    };
-  }
-  _openFileWithApp(fileName, fullPath);
-} else if (result == 'open_as') {
-  if (!mounted) return;
-
-  final mimeType = await showDialog<String>(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        title: const Text('Open As'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-  leading: const Icon(Icons.text_fields_rounded),
-  title: const Text('Text'),
-  onTap: () => Navigator.of(context).pop('text/plain'),
-),
-ListTile(
-  leading: const Icon(Icons.image_outlined),
-  title: const Text('Image'),
-  onTap: () => Navigator.of(context).pop('image/*'),
-),
-ListTile(
-  leading: const Icon(Icons.ondemand_video_outlined),
-  title: const Text('Video'),
-  onTap: () => Navigator.of(context).pop('video/*'),
-),
-ListTile(
-  leading: const Icon(Icons.audio_file_outlined),
-  title: const Text('Audio'),
-  onTap: () => Navigator.of(context).pop('audio/*'),
-),
-ListTile(
-  leading: const Icon(Icons.archive_outlined),
-  title: const Text('Archive'),
-  onTap: () => Navigator.of(context).pop('application/zip'),
-),
-ListTile(
-  leading: const Icon(Icons.insert_drive_file_outlined),
-  title: const Text('Other'),
-  onTap: () => Navigator.of(context).pop('*/*'),
-),
-          ],
-        ),
+      _openFileWithApp(fileName, fullPath);
+    } else if (result == 'open_as') {
+      if (!mounted) return;
+      final mimeType = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Open As'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.text_fields_rounded),
+                  title: const Text('Text'),
+                  onTap: () => Navigator.of(context).pop('text/plain'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.image_outlined),
+                  title: const Text('Image'),
+                  onTap: () => Navigator.of(context).pop('image/*'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.ondemand_video_outlined),
+                  title: const Text('Video'),
+                  onTap: () => Navigator.of(context).pop('video/*'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.audio_file_outlined),
+                  title: const Text('Audio'),
+                  onTap: () => Navigator.of(context).pop('audio/*'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.archive_outlined),
+                  title: const Text('Archive'),
+                  onTap: () => Navigator.of(context).pop('application/zip'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.insert_drive_file_outlined),
+                  title: const Text('Other'),
+                  onTap: () => Navigator.of(context).pop('*/*'),
+                ),
+              ],
+            ),
+          );
+        },
       );
-    },
-  );
-
-  if (mimeType != null) {
-    _openFileWithApp(
-      fileName,
-      fullPath,
-      mimeType: mimeType,
-    );
+      if (mimeType != null) {
+        _openFileWithApp(
+          fileName,
+          fullPath,
+          mimeType: mimeType,
+        );
+      }
+    }
   }
-}
-}
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
@@ -849,10 +756,9 @@ ListTile(
         .map((e) => e.name)
         .where(_isSupportedMedia)
         .toList();
-
     if (localMedia.isNotEmpty) {
       final resolvedPaths = localMedia
-          .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
+          .map((f) => _currentDirPath.isEmpty ? f : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mrow></mrow><mi>c</mi></msub><mi>u</mi><mi>r</mi><mi>r</mi><mi>e</mi><mi>n</mi><mi>t</mi><mi>D</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">_currentDirPath/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">u</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">t</span><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord">/</span></span></span></span>f')
           .toList();
       Navigator.push(
         context,
@@ -869,7 +775,6 @@ ListTile(
       );
       return;
     }
-
     setState(() => _isLoading = true);
     _setStatus(
       'Scanning subfolders for media…',
@@ -922,8 +827,6 @@ ListTile(
     }
   }
 
-  // ── Media helpers ─────────────────────────────────────────────────────────
-
   bool _isSupportedMedia(String fileName) =>
       MediaViewerConstants.isSupported(fileName);
 
@@ -946,13 +849,13 @@ ListTile(
           if (e.isDir) {
             subdirNames.add(e.name);
           } else if (_isSupportedMedia(e.name)) {
-            foundFiles.add(dirPath.isEmpty ? e.name : '$dirPath/${e.name}');
+            foundFiles.add(dirPath.isEmpty ? e.name : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">dirPath/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">d</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord">/</span></span></span></span>{e.name}');
           }
         }
         if (subdirNames.isNotEmpty) {
           final nested = await Future.wait(
             subdirNames.map((name) {
-              final subPath = dirPath.isEmpty ? name : '$dirPath/$name';
+              final subPath = dirPath.isEmpty ? name : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">dirPath/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">d</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord">/</span></span></span></span>name';
               return _scanMediaRecursively(subPath, depth: depth + 1);
             }),
           );
@@ -967,29 +870,27 @@ ListTile(
     return foundFiles;
   }
 
-Future<void> _openFileWithApp(
-  String cleanName,
-  String fullPath, {
-  String? packageName,
-  String? mimeType,
-}) async {
-  _signalActivity();
-  try {
-    final ok = await vaultExplorerApi.openWithApp(
-      widget.container,
-      fullPath,
-      packageName: packageName,
-      mimeType: mimeType,
-    );
-    if (!ok && mounted) {
-      _setStatus('No app found for this file type', error: true);
+  Future<void> _openFileWithApp(
+    String cleanName,
+    String fullPath, {
+    String? packageName,
+    String? mimeType,
+  }) async {
+    _signalActivity();
+    try {
+      final ok = await vaultExplorerApi.openWithApp(
+        widget.container,
+        fullPath,
+        packageName: packageName,
+        mimeType: mimeType,
+      );
+      if (!ok && mounted) {
+        _setStatus('No app found for this file type', error: true);
+      }
+    } catch (_) {
+      if (mounted) _setStatus('Could not open "$cleanName"', error: true);
     }
-  } catch (_) {
-    if (mounted) _setStatus('Could not open "$cleanName"', error: true);
   }
-}
-
-  // ── Vault items ───────────────────────────────────────────────────────────
 
   Future<void> _addVaultItem(VaultItemType type) async {
     if (_isReadOnly) {
@@ -1007,11 +908,8 @@ Future<void> _openFileWithApp(
         ),
       ),
     );
-    // Refresh directory as VaultItems natively exist in the filesystem now
     _loadDirectoryContents(_currentDirPath);
   }
-
-  // ── Clipboard ─────────────────────────────────────────────────────────────
 
   void _initClipboard({required bool cut}) {
     if (cut && _isReadOnly) {
@@ -1022,11 +920,10 @@ Future<void> _openFileWithApp(
       return;
     }
     _signalActivity();
-
     final clipItems = selectedItems.map((entry) {
       final path = _currentDirPath.isEmpty
           ? entry.name
-          : '$_currentDirPath/${entry.name}';
+          : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mrow></mrow><mi>c</mi></msub><mi>u</mi><mi>r</mi><mi>r</mi><mi>e</mi><mi>n</mi><mi>t</mi><mi>D</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">_currentDirPath/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">u</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">t</span><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord">/</span></span></span></span>{entry.name}';
       return ClipboardItem(
         path: path,
         isDir: entry.isDir,
@@ -1034,7 +931,6 @@ Future<void> _openFileWithApp(
         modifiedSecs: entry.modifiedSecs,
       );
     }).toList();
-
     _clip.set(
       volId: widget.container.volId,
       displayName: widget.container.displayName,
@@ -1054,17 +950,14 @@ Future<void> _openFileWithApp(
       return;
     }
     _signalActivity();
-
     final srcVolId = _clip.sourceVolId;
     if (srcVolId == null) {
       _setStatus('Clipboard source is invalid', error: true);
       _clip.clear();
       return;
     }
-
     final isCrossContainer = !_clip.isFromVolume(widget.container.volId);
     MountedContainer? srcContainer;
-
     if (isCrossContainer) {
       if (widget.resolveContainer == null) {
         _setStatus('Cross-container paste is not configured.', error: true);
@@ -1083,10 +976,8 @@ Future<void> _openFileWithApp(
     } else {
       srcContainer = widget.container;
     }
-
     final items = List<ClipboardItem>.from(_clip.items);
     final isCut = _clip.isCutOperation;
-
     final existingRaw =
         await vaultExplorerApi.listDirectory(
           widget.container,
@@ -1094,7 +985,6 @@ Future<void> _openFileWithApp(
         ) ??
         [];
     if (!mounted) return;
-
     final existingNames = <String>{};
     final existingDirs = <String>{};
     for (final raw in existingRaw) {
@@ -1102,20 +992,17 @@ Future<void> _openFileWithApp(
       existingNames.add(e.name.toLowerCase());
       if (e.isDir) existingDirs.add(e.name.toLowerCase());
     }
-
     final conflicts = <ConflictEntry>[];
     for (final item in items) {
       final fileName = item.name;
       if (!existingNames.contains(fileName.toLowerCase())) continue;
-
       final wouldBeSamePath =
           !isCrossContainer &&
           item.path ==
               (_currentDirPath.isEmpty
                   ? fileName
-                  : '$_currentDirPath/$fileName');
+                  : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mrow></mrow><mi>c</mi></msub><mi>u</mi><mi>r</mi><mi>r</mi><mi>e</mi><mi>n</mi><mi>t</mi><mi>D</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">_currentDirPath/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">u</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">t</span><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord">/</span></span></span></span>fileName');
       if (wouldBeSamePath) continue;
-
       conflicts.add(
         ConflictEntry(
           item: item,
@@ -1123,7 +1010,6 @@ Future<void> _openFileWithApp(
         ),
       );
     }
-
     ConflictPlan conflictPlan = const {};
     if (conflicts.isNotEmpty) {
       if (!mounted) return;
@@ -1135,7 +1021,6 @@ Future<void> _openFileWithApp(
       if (result == null) return;
       conflictPlan = result;
     }
-
     final op = _opSvc.enqueue(
       isCut: isCut,
       source: srcContainer,
@@ -1144,10 +1029,8 @@ Future<void> _openFileWithApp(
       items: items,
       conflictPlan: conflictPlan,
     );
-
     _clip.clear();
-
-void listener() {
+    void listener() {
       if (!mounted) {
         op.removeListener(listener);
         return;
@@ -1162,6 +1045,7 @@ void listener() {
         }
       }
     }
+
     op.addListener(listener);
   }
 
@@ -1180,14 +1064,12 @@ void listener() {
       toDelete: List<RawEntry>.from(selectedItems),
       onConfirmed: (entries) async {
         setState(() => _isLoading = true);
-
         final clipItems = entries.map((e) {
           final path = _currentDirPath.isEmpty
               ? e.name
-              : '$_currentDirPath/${e.name}';
+              : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mrow></mrow><mi>c</mi></msub><mi>u</mi><mi>r</mi><mi>r</mi><mi>e</mi><mi>n</mi><mi>t</mi><mi>D</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">_currentDirPath/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">u</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">t</span><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord">/</span></span></span></span>{e.name}';
           return ClipboardItem(path: path, isDir: e.isDir);
         }).toList();
-
         int failCount = 0;
         final deleted = await _opSvc.deleteItems(
           container: widget.container,
@@ -1195,13 +1077,12 @@ void listener() {
           onProgress: (done, total) {},
         );
         failCount = clipItems.length - deleted;
-
         exitSelectionMode();
         await _loadDirectoryContents(_currentDirPath);
         _setStatus(
           failCount == 0
               ? 'Deleted $deleted item(s)'
-              : '$deleted deleted · $failCount failed',
+              : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>d</mi><mi>e</mi><mi>l</mi><mi>e</mi><mi>t</mi><mi>e</mi><mi>d</mi><mi>d</mi><mi>e</mi><mi>l</mi><mi>e</mi><mi>t</mi><mi>e</mi><mi>d</mi><mo separator="true">⋅</mo></mrow><annotation encoding="application/x-tex">deleted deleted ·</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal">d</span><span class="mord mathnormal">e</span><span class="mord mathnormal" style="margin-right:0.01968em;">l</span><span class="mord mathnormal">e</span><span class="mord mathnormal">t</span><span class="mord mathnormal">e</span><span class="mord mathnormal">dd</span><span class="mord mathnormal">e</span><span class="mord mathnormal" style="margin-right:0.01968em;">l</span><span class="mord mathnormal">e</span><span class="mord mathnormal">t</span><span class="mord mathnormal">e</span><span class="mord mathnormal">d</span><span class="mpunct">⋅</span></span></span></span>failCount failed',
           error: failCount > 0,
         );
       },
@@ -1210,16 +1091,13 @@ void listener() {
 
   Future<void> _exportSelectedToStorage() async {
     _signalActivity();
-
     final items = selectedItems.map((e) {
       final path = _currentDirPath.isEmpty
           ? e.name
-          : '$_currentDirPath/${e.name}';
+          : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mrow></mrow><mi>c</mi></msub><mi>u</mi><mi>r</mi><mi>r</mi><mi>e</mi><mi>n</mi><mi>t</mi><mi>D</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">_currentDirPath/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">u</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">t</span><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord">/</span></span></span></span>{e.name}';
       return <String, dynamic>{'path': path, 'isDir': e.isDir};
     }).toList();
-
     if (items.isEmpty) return;
-
     setState(() => _isLoading = true);
     try {
       final count = await vaultExplorerApi.exportSelectedToFolder(
@@ -1254,7 +1132,6 @@ void listener() {
         opId,
       ),
     );
-
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
@@ -1291,7 +1168,6 @@ void listener() {
         opId,
       ),
     );
-
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
@@ -1311,8 +1187,6 @@ void listener() {
 
     op.addListener(listener);
   }
-
-  // ── Filter helpers ────────────────────────────────────────────────────────
 
   bool _matchesFilter(String fileName) {
     if (_currentFilter == null) return true;
@@ -1364,12 +1238,10 @@ void listener() {
       _setStatus('This container is mounted read-only.', error: true);
       return;
     }
-    
     final archivePath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
-    final parentDir = archivePath.contains('/') 
-        ? archivePath.substring(0, archivePath.lastIndexOf('/')) 
+    final parentDir = archivePath.contains('/')
+        ? archivePath.substring(0, archivePath.lastIndexOf('/'))
         : '';
-        
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1381,18 +1253,14 @@ void listener() {
         ],
       ),
     );
-    
     if (confirm != true || !mounted) return;
-    
     setState(() => _isLoading = true);
-    
     try {
       final count = await ArchiveService.extractAllToContainer(
         container: widget.container,
         archiveContext: _archiveContext!,
         targetDirInContainer: parentDir,
       );
-      
       if (mounted) {
         _setStatus('Extracted $count files', autoClear: const Duration(seconds: 3));
       }
@@ -1405,11 +1273,8 @@ void listener() {
     }
   }
 
-  // ── Add / Sort popup buttons ──────────────────────────────────────────────
-
   Widget _buildAddPopupButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     if (_isReadOnly) {
       return IconButton(
         icon: Icon(
@@ -1423,7 +1288,6 @@ void listener() {
         ),
       );
     }
-
     if (_archiveContext != null) {
       return IconButton(
         icon: const Icon(Icons.unarchive_rounded, size: 28),
@@ -1431,7 +1295,6 @@ void listener() {
         onPressed: _extractArchive,
       );
     }
-
     return MenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: const Icon(Icons.add_rounded, size: 28),
@@ -1504,7 +1367,7 @@ void listener() {
       ],
     );
   }
-  
+
   Widget _buildViewTogglePopupButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final currentIcon = _layoutMode == BrowserLayoutMode.list
@@ -1512,7 +1375,6 @@ void listener() {
         : _layoutMode == BrowserLayoutMode.compact
             ? Icons.list_rounded
             : Icons.grid_view_rounded;
-
     return MenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: Icon(currentIcon),
@@ -1605,8 +1467,6 @@ void listener() {
     );
   }
 
-  // ── Action bar wiring ─────────────────────────────────────────────────────
-
   Map<FileManagerAction, WidgetBuilder> _buildActionBuilders() {
     final hasLocalMedia = _currentItems
         .where((e) => !e.isDir)
@@ -1614,7 +1474,6 @@ void listener() {
         .any(_isSupportedMedia);
     final hasSubfolders = _currentItems.any((e) => e.isDir);
     final canPlayMedia = hasLocalMedia || hasSubfolders;
-
     return {
       FileManagerAction.search: (context) => IconButton(
             icon: Icon(_searchActive ? Icons.search_off_rounded : Icons.search_rounded),
@@ -1634,12 +1493,6 @@ void listener() {
           ),
     };
   }
-
-  // ── Settings menu (app bar) ───────────────────────────────────────────────
-  //
-  // The app bar's only action: Filters + a link to the toolbar customize
-  // screen. Everything functional (search/add/sort/view/play) lives in the
-  // action bar instead.
 
   Widget _buildSettingsMenuButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1679,17 +1532,13 @@ void listener() {
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final dirs = _currentItems.where((e) => e.isDir).toList()
       ..sort(compareItems);
     final files = _currentItems.where((e) => !e.isDir).toList()
       ..sort(compareItems);
-
     final query = _searchQuery.trim().toLowerCase();
-
     final filteredDirs = (query.isEmpty && _currentFilter == null)
         ? dirs
         : (query.isEmpty
@@ -1699,18 +1548,15 @@ void listener() {
                       (d) => d.name.toLowerCase().contains(query),
                     )
                     .toList());
-
     final filteredFiles = files.where((f) {
       final name = f.name;
       if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
       return _matchesFilter(name);
     }).toList();
-
     final cs = Theme.of(context).colorScheme;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final actionBuilders = _buildActionBuilders();
     final showActionBar = !_searchActive;
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -1726,9 +1572,6 @@ void listener() {
         }
       },
       child: Scaffold(
-        // Handled manually by BottomSearchBar via MediaQuery.viewInsets, so
-        // the search bar's own positioning stays deterministic instead of
-        // fighting with Scaffold's automatic resize.
         resizeToAvoidBottomInset: false,
         appBar: _buildAppBar(context, filteredDirs, filteredFiles),
         bottomNavigationBar: (!isLandscape && showActionBar)
@@ -1738,8 +1581,6 @@ void listener() {
                 builders: actionBuilders,
               )
             : null,
-
-        // ── Floating activity stack / search bar ────────────────────────
         body: Stack(
           children: [
             Column(
@@ -1800,12 +1641,6 @@ void listener() {
     );
   }
 
-  // ── App bar ───────────────────────────────────────────────────────────────
-  //
-  // Deliberately minimal: back button, container name, and one settings
-  // menu (Filters + "Customize toolbar"). It never swaps into a search
-  // field — see BottomSearchBar for where search actually lives.
-
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
     List<RawEntry> dirs,
@@ -1816,11 +1651,9 @@ void listener() {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !_searchActive;
     final actionBuilders = _buildActionBuilders();
-
     if (isSelectionMode) {
       final single = selectedItems.length == 1;
       final singleFile = single && !selectedItems.first.isDir;
-
       final totalBytes = selectedTotalBytes;
       final isPending = hasPendingFolderSizes;
       final sizeLabel = isPending
@@ -1828,10 +1661,8 @@ void listener() {
                 ? '${formatBytes(totalBytes)} (calculating…)'
                 : 'calculating…')
           : formatBytes(totalBytes);
-
       void doRename() {
         final entries = selectedItems.toList();
-
         for (final entry in entries) {
           final parts = entry.name.split('.');
           final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
@@ -1841,10 +1672,8 @@ void listener() {
              return;
           }
         }
-
         final oldNames = entries.map((e) => e.name).toList();
         final existingNames = allItems.map((e) => e.name).toSet();
-
         BrowserDialogs.showRename(
           context,
           container: widget.container,
@@ -1856,27 +1685,23 @@ void listener() {
         );
         exitSelectionMode();
       }
-
       Future<void> doOpenWithApp() async {
         final entry = selectedItems.first;
         final path = _currentDirPath.isEmpty
             ? entry.name
-            : '$_currentDirPath/${entry.name}';
+            : '<span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mrow></mrow><mi>c</mi></msub><mi>u</mi><mi>r</mi><mi>r</mi><mi>e</mi><mi>n</mi><mi>t</mi><mi>D</mi><mi>i</mi><mi>r</mi><mi>P</mi><mi>a</mi><mi>t</mi><mi>h</mi><mi mathvariant="normal">/</mi></mrow><annotation encoding="application/x-tex">_currentDirPath/</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span></span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.1514em;"><span style="top:-2.55em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">c</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mord mathnormal">u</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal">e</span><span class="mord mathnormal">n</span><span class="mord mathnormal">t</span><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="mord mathnormal">i</span><span class="mord mathnormal" style="margin-right:0.02778em;">r</span><span class="mord mathnormal" style="margin-right:0.13889em;">P</span><span class="mord mathnormal">a</span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord">/</span></span></span></span>{entry.name}';
         final parts = entry.name.split('.');
         final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
         exitSelectionMode();
-
         if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
            _setStatus('Vault items cannot be opened in external apps', error: true);
            return;
         }
-
         final settings = await AppSettingsService.loadSettings();
         if (mounted) {
           await _showOpenWithDialog(entry.name, path, ext, settings);
         }
       }
-
       if (!isLandscape) {
         return SelectionAppBar(
           selectedCount: selectedItems.length,
@@ -1894,13 +1719,7 @@ void listener() {
           onOpenWithApp: doOpenWithApp,
         );
       }
-
-      // Landscape: one AppBar split into two zones — selection operations
-      // on the left, the regular toolbar actions on the right — instead of
-      // swapping in a full-width SelectionAppBar that would otherwise
-      // cover/replace the toolbar rail entirely.
       final textTheme = Theme.of(context).textTheme;
-
       return AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
@@ -1936,7 +1755,6 @@ void listener() {
           ],
         ),
         actions: [
-          // ── Left zone: selection operations ──────────────────────────
           IconButton(
             icon: Icon(
               Icons.delete_outline_rounded,
@@ -2012,24 +1830,17 @@ void listener() {
                 ),
             ],
           ),
-
-          // ── Divider between the two zones ────────────────────────────
           const SizedBox(width: 8),
           VerticalDivider(width: 1, indent: 12, endIndent: 12, color: cs.outlineVariant),
           const SizedBox(width: 4),
-
-          // ── Right zone: regular toolbar actions ──────────────────────
           if (showActionBar)
             ..._toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
-
           const SizedBox(width: 4),
         ],
       );
     }
-
     final query = _searchQuery.trim().toLowerCase();
     final isFiltered = query.isNotEmpty || _currentFilter != null;
-
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
@@ -2097,9 +1908,6 @@ void listener() {
     );
   }
 
-  /// Compact "N folders · N files · free space [· filtered]" line shown
-  /// under the container name in the app bar — same information as
-  /// [StatsBar], condensed to fit as a title subtitle.
   Widget _buildAppBarStatsSubtitle({
     required int dirCount,
     required int fileCount,
@@ -2108,14 +1916,10 @@ void listener() {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final style = textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant);
-
     final parts = <String>[
-      '$dirCount folder${dirCount == 1 ? '' : 's'}',
-      '$fileCount file${fileCount == 1 ? '' : 's'}',
       if (_freeSpace >= 0) '${formatBytes(_freeSpace)} free',
       if (isFiltered) 'filtered',
     ];
-
     return Text(
       parts.join(' · '),
       maxLines: 1,
@@ -2124,16 +1928,11 @@ void listener() {
     );
   }
 
-  // ── Body ──────────────────────────────────────────────────────────────────
-
   Widget _buildBody(List<RawEntry> dirs, List<RawEntry> files) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
     }
     if (_currentItems.isEmpty) {
-      // FIX (audit, Duplicate Components): was a private _EmptyPlaceholder
-      // class reimplementing the same icon/title/message/action pattern
-      // AppEmptyState already generalizes (and animates).
       return AppEmptyState(
         icon: Icons.folder_open_rounded,
         title: 'Empty Folder',
@@ -2144,15 +1943,12 @@ void listener() {
       );
     }
     if (_searchQuery.trim().isNotEmpty && dirs.isEmpty && files.isEmpty) {
-      // FIX (audit, Duplicate Components): was a private _SearchEmptyState
-      // class — same consolidation as above.
       return AppEmptyState(
         icon: Icons.search_off_rounded,
         title: 'No results',
         message: 'Nothing in this folder matches "${_searchQuery.trim()}".',
       );
     }
-
     final content = _layoutMode == BrowserLayoutMode.grid
         ? FileGridView(
             container: widget.container,
@@ -2163,6 +1959,7 @@ void listener() {
             currentDirPath: _currentDirPath,
             thumbnailCacheMode: _resolvedThumbnailCacheMode,
             thumbnailQuality: _resolvedThumbnailQuality,
+            showFileNames: _toolbarConfig.showGridFileNames,
             onDirTap: _handleDirTap,
             onFileTap: _handleFileTap,
             onItemLongPress: _handleItemLongPress,
@@ -2174,19 +1971,17 @@ void listener() {
             isSelectionMode: isSelectionMode,
             isCompact: _layoutMode == BrowserLayoutMode.compact,
             selectedItems: selectedItems,
+            detailColumns: _toolbarConfig.visibleDetailColumns,
             onDirTap: _handleDirTap,
             onFileTap: _handleFileTap,
             onItemLongPress: _handleItemLongPress,
             searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
           );
-
     final refreshable = RefreshIndicator(
       onRefresh: () => _loadDirectoryContents(_currentDirPath),
       child: content,
     );
-
     if (!_isListingTruncated) return refreshable;
-
     return Column(
       children: [
         const TruncatedBanner(),

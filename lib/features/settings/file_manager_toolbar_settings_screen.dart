@@ -4,8 +4,6 @@ import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 
-/// Lets the user reorder and show/hide the file browser's action-bar
-/// entries (the bottom bar in portrait / sidebar rail in landscape).
 class FileManagerToolbarSettingsScreen extends StatefulWidget {
   const FileManagerToolbarSettingsScreen({super.key});
 
@@ -62,6 +60,30 @@ class _FileManagerToolbarSettingsScreenState
     _persist();
   }
 
+  void _onReorderDetailColumns(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    setState(() {
+      final order = List<FileDetailColumn>.from(_config.detailColumnsOrder);
+      final moved = order.removeAt(oldIndex);
+      order.insert(newIndex, moved);
+      _config = _config.copyWith(detailColumnsOrder: order);
+    });
+    _persist();
+  }
+
+  void _toggleDetailColumnVisible(FileDetailColumn col, bool visible) {
+    setState(() {
+      final hidden = Set<FileDetailColumn>.from(_config.hiddenDetailColumns);
+      if (visible) {
+        hidden.remove(col);
+      } else {
+        hidden.add(col);
+      }
+      _config = _config.copyWith(hiddenDetailColumns: hidden);
+    });
+    _persist();
+  }
+
   Future<void> _resetToDefaults() async {
     setState(() => _config = FileManagerToolbarConfig.defaults());
     await _persist();
@@ -71,7 +93,6 @@ class _FileManagerToolbarSettingsScreenState
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
@@ -99,7 +120,6 @@ class _FileManagerToolbarSettingsScreenState
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     children: [
-                      // ── SECTION 1: TOOLBAR LAYOUT ──────────────────────────────
                       SectionHeader('Toolbar Layout'),
                       ReorderableListView.builder(
                         shrinkWrap: true,
@@ -184,10 +204,120 @@ class _FileManagerToolbarSettingsScreenState
                           );
                         },
                       ),
-
                       const SizedBox(height: 16),
-
-                      // ── SECTION 2: BROWSER LAYOUT ──────────────────────────────
+                      SectionHeader('Detailed List View Columns'),
+                      ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        buildDefaultDragHandles: false,
+                        itemCount: _config.detailColumnsOrder.length,
+                        onReorder: _onReorderDetailColumns,
+                        itemBuilder: (context, i) {
+                          final col = _config.detailColumnsOrder[i];
+                          final visible =
+                              !_config.hiddenDetailColumns.contains(col);
+                          return Padding(
+                            key: ValueKey(col),
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Material(
+                              color: cs.surfaceContainerHigh,
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(i == 0 ? 20 : 4),
+                                bottom: Radius.circular(
+                                    i == _config.detailColumnsOrder.length - 1
+                                        ? 20
+                                        : 4),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 2),
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: visible
+                                        ? cs.primaryContainer.withValues(alpha: 0.5)
+                                        : cs.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    col.icon,
+                                    size: 20,
+                                    color: visible
+                                        ? cs.primary
+                                        : cs.onSurfaceVariant
+                                            .withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                title: Text(
+                                  col.label,
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: visible
+                                        ? cs.onSurface
+                                        : cs.onSurfaceVariant
+                                            .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Switch(
+                                      value: visible,
+                                      onChanged: (v) =>
+                                          _toggleDetailColumnVisible(col, v),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    ReorderableDragStartListener(
+                                      index: i,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: cs.surfaceContainerHighest
+                                              .withValues(alpha: 0.5),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(
+                                          Icons.drag_handle_rounded,
+                                          color: cs.onSurfaceVariant,
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      SectionHeader('Gallery Grid View'),
+                      SectionCard(
+                        children: [
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: _config.showGridFileNames,
+                            onChanged: (v) {
+                              setState(() =>
+                                  _config = _config.copyWith(showGridFileNames: v));
+                              _persist();
+                            },
+                            title: Text('Show File Names',
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                                'Display text labels under items in grid layout',
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant)),
+                            secondary: Icon(Icons.label_outlined,
+                                color: cs.primary),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       SectionHeader('Browser Layout'),
                       SectionCard(
                         children: [
@@ -230,10 +360,7 @@ class _FileManagerToolbarSettingsScreenState
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 16),
-
-                      // ── SECTION 3: MEDIA VIEWER ────────────────────────────────
                       SectionHeader('Media Viewer'),
                       SectionCard(
                         children: [
@@ -258,7 +385,6 @@ class _FileManagerToolbarSettingsScreenState
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 24),
                     ],
                   ),

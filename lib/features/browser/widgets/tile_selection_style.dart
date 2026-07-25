@@ -1,46 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 
-/// Single source of truth for the selection-mode visual language shared by
-/// every row-style list tile in the file browser ([FileTile], [DirectoryTile]).
-///
-/// ### Why this exists
-/// [FileTile] and [DirectoryTile] previously each hard-coded the same five
-/// decisions independently:
-///   - selected background tint (`cs.primaryContainer.withValues(alpha:0.3)`)
-///   - trailing check / unchecked-circle icon + size + color
-///   - selected title font weight
-///   - content padding
-///   - `dense: true`
-///
-/// A change to any of these (e.g. swapping the check icon, adjusting the
-/// tint alpha) required editing both files identically, with no compiler
-/// error if one was missed. This class centralises those decisions.
-///
-/// [FileGridView]'s `_GridCell` intentionally does NOT use this — the grid
-/// uses a different visual language (full-cell tint + corner badge,
-/// appropriate for a card-style cell rather than a row), so sharing here
-/// would be a false abstraction across two genuinely different layouts.
 abstract final class TileSelectionStyle {
-  /// Background tint applied to a selected [ListTile] via `selectedTileColor`.
   static Color selectedBackground(ColorScheme cs) =>
       cs.primaryContainer.withValues(alpha: 0.3);
-
-  /// Standard content padding shared by both row tiles.
   static const contentPadding = EdgeInsets.symmetric(
     horizontal: 16,
     vertical: 4,
   );
-
-  /// Title [FontWeight] — slightly bolder when selected so the row reads as
-  /// "active" without changing size or color.
   static FontWeight titleWeight(bool selected) =>
       selected ? FontWeight.w500 : FontWeight.normal;
-
-  /// Leading icon color: primary when selected, otherwise [unselectedColor]
-  /// (the tile's own type-specific color — e.g. a folder's secondary tint or
-  /// a file's extension-based color).
   static Color leadingIconColor(
     ColorScheme cs, {
     required bool selected,
@@ -48,18 +21,9 @@ abstract final class TileSelectionStyle {
   }) => selected ? cs.primary : unselectedColor;
 }
 
-/// The trailing checkbox-style indicator shown on a row tile while
-/// [selectionMode] is active.
-///
-/// Renders a filled check circle when [selected], an empty outline circle
-/// otherwise. Both [FileTile] and [DirectoryTile] render this identically;
-/// extracting it means the indicator can only ever look one way across the
-/// whole list view.
 class TileSelectionIndicator extends StatelessWidget {
   final bool selected;
-
   const TileSelectionIndicator({super.key, required this.selected});
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -73,24 +37,17 @@ class TileSelectionIndicator extends StatelessWidget {
   }
 }
 
-/// Shared row shell for [DirectoryTile] and [FileTile] — the squircle
-/// leading icon, name, date column, and trailing slot, wrapped in the
-/// tap/long-press/selection treatment from [TileSelectionStyle].
-
 class FileRowShell extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final bool isCompact;
   final double zoomLevel;
-
-  /// Squircle background when NOT selected — differs between directories
-  /// (a tinted secondaryContainer) and files (surfaceContainerHighest).
   final Color unselectedIconBackground;
-
   final String displayName;
   final String? searchQuery;
-  final String dateStr;
-  final Widget trailing;
+  final RawEntry entry;
+  final List<FileDetailColumn> detailColumns;
+  final Widget? trailing;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -102,8 +59,9 @@ class FileRowShell extends StatelessWidget {
     required this.unselectedIconBackground,
     required this.displayName,
     this.searchQuery,
-    required this.dateStr,
-    required this.trailing,
+    required this.entry,
+    this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
+    this.trailing,
     required this.isSelected,
     required this.onTap,
     required this.onLongPress,
@@ -111,18 +69,53 @@ class FileRowShell extends StatelessWidget {
     this.zoomLevel = 1.0,
   });
 
+  Widget _buildColumnWidget(FileDetailColumn col, BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final String text = switch (col) {
+      FileDetailColumn.date => formatEntryDate(entry.modifiedSecs),
+      FileDetailColumn.size => entry.isDir ? '' : formatBytes(entry.sizeBytes),
+      FileDetailColumn.type => _getTypeLabel(entry),
+    };
+
+    final double width = switch (col) {
+      FileDetailColumn.date => 72,
+      FileDetailColumn.size => 72,
+      FileDetailColumn.type => 56,
+    };
+
+    return SizedBox(
+      width: width * zoomLevel,
+      child: Text(
+        text,
+        textAlign: TextAlign.right,
+        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  static String _getTypeLabel(RawEntry entry) {
+    if (entry.isDir) return 'Folder';
+    final name = entry.name;
+    if (!name.contains('.')) return 'File';
+    final ext = name.split('.').last.trim();
+    if (ext.isEmpty) return 'File';
+    return ext.toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     final squircleBackground =
         isSelected ? cs.primaryContainer : unselectedIconBackground;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16), // Rounded ripples
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         onLongPress: onLongPress,
         child: Ink(
@@ -134,11 +127,10 @@ class FileRowShell extends StatelessWidget {
           ),
           padding: EdgeInsets.symmetric(
             horizontal: 12,
-            vertical: (isCompact ? 4 : 10) * zoomLevel, // Plush interior targets
+            vertical: (isCompact ? 4 : 10) * zoomLevel,
           ),
           child: Row(
             children: [
-              // 1. The plush "Squircle" leading icon
               Container(
                 width: (isCompact ? 32 : 44) * zoomLevel,
                 height: (isCompact ? 32 : 44) * zoomLevel,
@@ -157,8 +149,6 @@ class FileRowShell extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-
-              // 2. Name
               Expanded(
                 child: HighlightedText(
                   text: displayName,
@@ -172,31 +162,14 @@ class FileRowShell extends StatelessWidget {
                 ),
               ),
               if (!isCompact) ...[
-                const SizedBox(width: 12),
-
-                // 3. Date column
-                SizedBox(
-                  width: 80, // Reduced from 90 to give more space to file name
-                  child: Text(
-                    dateStr,
-                    textAlign: TextAlign.right,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+                for (final col in detailColumns) ...[
+                  const SizedBox(width: 8),
+                  _buildColumnWidget(col, context),
+                ],
               ],
-              
-              if (!isCompact) ...[
-                const SizedBox(width: 12),
-
-                // 4. Trailing column (size, selection indicator, or "⋯" menu)
-                SizedBox(width: 80, child: trailing), // Reduced from 96
-              ] else ...[
+              if (trailing != null) ...[
                 const SizedBox(width: 8),
-                trailing,
+                trailing!,
               ],
             ],
           ),

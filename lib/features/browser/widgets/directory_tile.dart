@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
 
-/// Row renderer for a single directory entry in [FileListView].
 class DirectoryTile extends StatelessWidget {
-  /// Parsed directory entry. Parsing happens once at the directory-listing
-  /// boundary (see [FileBrowserScreen._loadDirectoryContents]) rather than
-  /// here on every rebuild.
   final RawEntry entry;
   final bool isSelectionMode;
   final bool isSelected;
@@ -16,6 +12,7 @@ class DirectoryTile extends StatelessWidget {
   final VoidCallback onLongPress;
   final bool isCompact;
   final double zoomLevel;
+  final List<FileDetailColumn> detailColumns;
 
   const DirectoryTile({
     super.key,
@@ -27,25 +24,23 @@ class DirectoryTile extends StatelessWidget {
     required this.onLongPress,
     this.isCompact = false,
     this.zoomLevel = 1.0,
+    this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     return FileRowShell(
       icon: Icons.folder_rounded,
       iconColor: cs.secondary,
       unselectedIconBackground: cs.secondaryContainer.withValues(alpha: 0.4),
       displayName: entry.name,
       searchQuery: searchQuery,
-      dateStr: formatEntryDate(entry.modifiedSecs),
+      entry: entry,
+      detailColumns: detailColumns,
       trailing: isSelectionMode && isSelected
-          ? const Align(
-              alignment: Alignment.centerRight,
-              child: TileSelectionIndicator(selected: true),
-            )
-          : const SizedBox.shrink(),
+          ? const TileSelectionIndicator(selected: true)
+          : null,
       isSelected: isSelected,
       onTap: onTap,
       onLongPress: onLongPress,

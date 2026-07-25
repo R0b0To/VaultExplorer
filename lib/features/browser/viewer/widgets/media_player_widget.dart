@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart'
 show ClosedCaptionFile, SubRipCaptionFile, WebVTTCaptionFile, ClosedCaption;
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_vlc_controller.dart';
@@ -112,17 +113,43 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   TapDownDetails? _videoDoubleTapDetails;
   Size _lastKnownVideoSize = Size.zero;
 
+  /// The file's true aspect ratio, if this session already knows it —
+  /// from browsing this file's thumbnail in the grid/masonry view before
+  /// opening the player (see [MediaAspectRatioCache]), which populates it
+  /// from native's `getImageThumbnailWithSize` / `getVideoThumbnailWithSize`
+  /// with no extra decode anywhere.
+  ///
+  /// Known *before* VLC ever opens the file, this lets the poster
+  /// pre-letterbox to the video's real shape instead of filling the parent
+  /// edge-to-edge — so when the player actually becomes ready and swaps in
+  /// (see [_boundController]/`isVideoReady` in [build]), it lands in the
+  /// exact same box the poster was already sized to, with nothing to pop or
+  /// reflow. Purely a best-known-so-far hint: once VLC reports its own
+  /// non-zero size, that's ground truth and takes over (see
+  /// `computedAspectRatio` in [build]).
+  double? _knownAspectRatio;
+
   @override
   void initState() {
     super.initState();
     widget.playbackManager.activeControllerNotifier.addListener(_onSharedControllerChanged);
     widget.playbackManager.currentFileNotifier.addListener(_onCurrentFileChanged);
+    _knownAspectRatio =
+        MediaAspectRatioCache.get(widget.container, widget.fileName);
     _syncBoundController();
   }
 
   @override
   void didUpdateWidget(covariant MediaPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.fileName != widget.fileName) {
+      // A new file's ratio replaces the old one outright — a stale ratio
+      // from the previous file would be actively wrong here, not just
+      // absent, so this can't be left to linger the way _lastKnownVideoSize
+      // resets independently once the newly-bound controller reports in.
+      _knownAspectRatio =
+          MediaAspectRatioCache.get(widget.container, widget.fileName);
+    }
     if (_boundController != null && oldWidget.playbackSpeed != widget.playbackSpeed) {
       _boundController!.setPlaybackSpeed(widget.playbackSpeed);
     }
@@ -200,6 +227,18 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   final newSize = controller.value.size;
   if (newSize.width > 0 && newSize.height > 0 && newSize != _lastKnownVideoSize) {
     _lastKnownVideoSize = newSize;
+    // Feed this back into the shared cache: if this file's ratio wasn't
+    // already known (never browsed as a thumbnail before being opened
+    // directly), the *next* time it's opened — including the poster on
+    // this same viewer session if the user swipes away and back — gets
+    // the pre-letterboxed poster too, closing the loop for files the grid
+    // never had a chance to learn.
+    MediaAspectRatioCache.put(
+      widget.container,
+      widget.fileName,
+      newSize.width.round(),
+      newSize.height.round(),
+    );
     if (mounted) setState(() {});
   }
 
@@ -570,12 +609,41 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
     final poster = widget.posterBytes;
+    // Pre-letterbox to the same shape the player will use once ready (see
+    // _knownAspectRatio), so the poster→player swap in build() is a pure
+    // texture change with nothing to pop or reflow. isAudio uses the same
+    // fixed 0.8 ratio the player itself falls back to for audio files, so
+    // there's nothing to swap in the first place. Genuinely unknown (no
+    // prior thumbnail view, first time this file's ever been opened) falls
+    // back to a neutral square — still better than the old edge-to-edge
+    // fill, and self-corrects for next time once VLC reports the real size.
+    // Match the same rotation correction the player applies (see
+    // computedAspectRatio in build()): _knownAspectRatio is native's raw,
+    // pre-rotation frame shape, so a user-rotated video (rotationQuarterTurns
+    // persists per-file across sessions via _rotations) needs the same
+    // inversion here or the poster would show the wrong orientation right up
+    // until the swap.
+    final isRotated = widget.rotationQuarterTurns % 2 != 0;
+    final knownRatio = _knownAspectRatio;
+    final effectiveKnownRatio = (knownRatio != null && isRotated)
+        ? 1.0 / knownRatio
+        : knownRatio;
+    final posterAspectRatio =
+        widget.isAudio ? 0.8 : (effectiveKnownRatio ?? 1.0);
     return Stack(
       fit: StackFit.expand,
       children: [
         Container(color: Colors.black),
         if (poster != null)
-          Image.memory(poster, fit: BoxFit.contain)
+          Center(
+            child: AspectRatio(
+              aspectRatio: posterAspectRatio,
+              child: RotatedBox(
+                quarterTurns: widget.rotationQuarterTurns,
+                child: Image.memory(poster, fit: BoxFit.cover),
+              ),
+            ),
+          )
         else if (widget.isAudio)
           Center(child: _buildAudioCenterVisual(cs, isPlaying: false)),
         Positioned.fill(

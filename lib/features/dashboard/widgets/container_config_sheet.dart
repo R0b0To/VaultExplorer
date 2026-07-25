@@ -349,6 +349,18 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     }
   }
 
+  Future<void> _editDisplayName() async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => _DisplayNameDialog(
+        initialText: _labelCtrl.text,
+      ),
+    );
+    if (result != null && result.trim().isNotEmpty) {
+      _labelCtrl.text = result.trim();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -388,17 +400,20 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                   SectionHeader('General'),
                   SectionCard(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        child: TextField(
-                          controller: _labelCtrl,
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: cs.surfaceContainerHighest,
-                            labelText: 'Display Name',
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
+                        title: Text(
+                            _labelCtrl.text.trim().isEmpty
+                                ? _initialLabel
+                                : _labelCtrl.text.trim(),
                           ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: 'Rename',
+                          onPressed: _editDisplayName,
                         ),
+                        onTap: _editDisplayName,
                       ),
                     ],
                   ),
@@ -608,71 +623,69 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                         ],
                       ],
                       if (widget.existingRecord != null) ...[
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: FilledButton.tonal(
-                            onPressed: () {
-                              final fmt = widget.existingRecord?.containerFormat;
-                              if (fmt == 'luks1' || fmt == 'luks2') {
-                                showAppSnackBar(
-                                  context,
-                                  message:
-                                      'LUKS password changing is not supported in-app. Use cryptsetup on Linux.',
-                                  tone: AppBannerTone.warning,
-                                );
-                              } else if (fmt == 'cryptomator') {
-                                showAppSnackBar(
-                                  context,
-                                  message:
-                                      'Cryptomator vault passwords cannot be changed in-app.',
-                                  tone: AppBannerTone.warning,
-                                );
-                              } else if (fmt == 'gocryptfs') {
-                                showAppSnackBar(
-                                  context,
-                                  message:
-                                      'Gocryptfs vault passwords cannot be changed in-app.',
-                                  tone: AppBannerTone.warning,
-                                );
-                              } else if (fmt == 'cryfs') {
-                                showAppSnackBar(
-                                  context,
-                                  message:
-                                      'CryFS vault passwords cannot be changed in-app.',
-                                  tone: AppBannerTone.warning,
-                                );
-                              } else if (fmt == 'bitlocker') {
-                                showAppSnackBar(
-                                  context,
-                                  message:
-                                      'BitLocker credentials cannot be changed in-app. Use "Manage BitLocker" on Windows.',
-                                  tone: AppBannerTone.warning,
-                                );
-                              } else {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChangePasswordScreen(
-                                      uri: widget.uri,
-                                      initialCipherId:
-                                          widget.existingRecord!.cipherId,
-                                      initialHashId:
-                                          widget.existingRecord!.hashId,
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 44),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              backgroundColor: cs.errorContainer,
-                              foregroundColor: cs.onErrorContainer,
-                            ),
-                            child: const Text('Change Container Password'),
+                        ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 4),
+                          leading: Icon(Icons.key_rounded, color: cs.primary),
+                          title: Text(
+                            'Change Container Password',
+                            style: textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
                           ),
+                          trailing: Icon(Icons.chevron_right_rounded,
+                              color: cs.onSurfaceVariant),
+                          onTap: () {
+                            final fmt = widget.existingRecord?.containerFormat;
+                            if (fmt == 'luks1' || fmt == 'luks2') {
+                              showAppSnackBar(
+                                context,
+                                message:
+                                    'LUKS password changing is not supported in-app. Use cryptsetup on Linux.',
+                                tone: AppBannerTone.warning,
+                              );
+                            } else if (fmt == 'cryptomator') {
+                              showAppSnackBar(
+                                context,
+                                message:
+                                    'Cryptomator vault passwords cannot be changed in-app.',
+                                tone: AppBannerTone.warning,
+                              );
+                            } else if (fmt == 'gocryptfs') {
+                              showAppSnackBar(
+                                context,
+                                message:
+                                    'Gocryptfs vault passwords cannot be changed in-app.',
+                                tone: AppBannerTone.warning,
+                              );
+                            } else if (fmt == 'cryfs') {
+                              showAppSnackBar(
+                                context,
+                                message:
+                                    'CryFS vault passwords cannot be changed in-app.',
+                                tone: AppBannerTone.warning,
+                              );
+                            } else if (fmt == 'bitlocker') {
+                              showAppSnackBar(
+                                context,
+                                message:
+                                    'BitLocker credentials cannot be changed in-app. Use "Manage BitLocker" on Windows.',
+                                tone: AppBannerTone.warning,
+                              );
+                            } else {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ChangePasswordScreen(
+                                    uri: widget.uri,
+                                    initialCipherId:
+                                        widget.existingRecord!.cipherId,
+                                    initialHashId:
+                                        widget.existingRecord!.hashId,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
                         ),
                       ],
                     ],
@@ -1249,6 +1262,54 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
           child: _loading
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : const Text('Verify'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DisplayNameDialog extends StatefulWidget {
+  final String initialText;
+
+  const _DisplayNameDialog({required this.initialText});
+
+  @override
+  State<_DisplayNameDialog> createState() => _DisplayNameDialogState();
+}
+
+class _DisplayNameDialogState extends State<_DisplayNameDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialText);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Display Name'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(hintText: 'Container name'),
+        onSubmitted: (value) => Navigator.pop(context, value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('Save'),
         ),
       ],
     );

@@ -306,13 +306,17 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
     final record = uri != null ? _records[uri] : null;
     final docProvider = record?.documentProvider ?? _appSettings.defaultDocumentProvider;
+    MountedContainer? newlyMountedContainer;
     try {
       if (!mounted) return;
       await Navigator.push(
         context,
         SlideRightRoute(
           page: UnlockSheet(
-            onMounted: _onContainerMounted,
+            onMounted: (container, {record}) {
+              _onContainerMounted(container, record: record);
+              newlyMountedContainer = container;
+            },
             initialUri: uri,
             initialName: name,
             prefillPassword: rememberedPassword,
@@ -322,6 +326,9 @@ class _VaultDashboardState extends State<VaultDashboard>
         ),
       );
       await _loadAll();
+      if (newlyMountedContainer != null && _appSettings.autoOpenOnUnlock && mounted) {
+        _openBrowser(newlyMountedContainer!);
+      }
     } finally {
       if (mounted) setState(() => _actionInFlight = false);
     }
@@ -334,14 +341,21 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (existingRecord != null && existingRecord.unlockMethod == ContainerUnlockMethod.rememberPassword) {
       rememberedPassword = await ContainerRepository.instance.getPassword(existingRecord.uri);
     }
+    MountedContainer? newlyMountedContainer;
     try {
       if (!mounted) return;
       await Navigator.push(
         context,
         SlideRightRoute(
           page: UsbUnlockSheet(
-            onMounted: _onContainerMounted,
-            onReconnected: _onUsbContainerReconnected,
+            onMounted: (container, {record}) {
+              _onContainerMounted(container, record: record);
+              newlyMountedContainer = container;
+            },
+            onReconnected: (container, migratedRecord, oldUri) {
+              _onUsbContainerReconnected(container, migratedRecord, oldUri);
+              newlyMountedContainer = container;
+            },
             documentProvider: existingRecord?.documentProvider ?? _appSettings.defaultDocumentProvider,
             existingRecord: existingRecord,
             prefillPassword: rememberedPassword,
@@ -349,6 +363,9 @@ class _VaultDashboardState extends State<VaultDashboard>
         ),
       );
       await _loadAll();
+      if (newlyMountedContainer != null && _appSettings.autoOpenOnUnlock && mounted) {
+        _openBrowser(newlyMountedContainer!);
+      }
     } finally {
       if (mounted) setState(() => _actionInFlight = false);
     }

@@ -199,9 +199,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
-
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
         title: const Text('App Settings',
@@ -218,7 +216,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     children: [
-                      // ── Security & Privacy ──────────────────────────────────
                       SectionHeader('Security & Privacy'),
                       SectionCard(
                         children: [
@@ -494,8 +491,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                         ],
                       ),
                       const SizedBox(height: 16),
-
-                      // ── Appearance & Interface ──────────────────────────────
                       SectionHeader('Appearance & Interface'),
                       SectionCard(
                         children: [
@@ -569,11 +564,28 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                         ],
                       ),
                       const SizedBox(height: 16),
-
-                      // ── Vault & File Handling ──────────────────────────────
                       SectionHeader('Vault & File Handling'),
                       SectionCard(
                         children: [
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text('Auto-Open on Unlock',
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                              _settings.autoOpenOnUnlock
+                                  ? 'Automatically open after unlocking a vault'
+                                  : 'Only unlock vault and stay on dashboard',
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: _settings.autoOpenOnUnlock,
+                            onChanged: (v) {
+                              setState(() => _settings.autoOpenOnUnlock = v);
+                              _persist();
+                            },
+                          ),
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
@@ -722,8 +734,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                         ],
                       ),
                       const SizedBox(height: 16),
-
-                      // ── About Card ──────────────────────────────────────────
                       SectionCard(
                         children: [
                           ListTile(

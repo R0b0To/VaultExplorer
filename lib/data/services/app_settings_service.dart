@@ -7,20 +7,13 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
-
 import 'package:flutter/material.dart';
-
 export 'container_repository.dart'
     show ContainerRepository, ContainerRecord, ContainerUnlockMethod;
 
-// ── Secure storage instance ───────────────────────────────────────────────────
-
 const _secure = AppSecureStorage.instance;
-
 const _kMasterHash = 'vc_master_hash_v2';
 const _kMasterSalt = 'vc_master_salt_v2';
-
-// ── Global app settings ───────────────────────────────────────────────────────
 
 class AppSettings {
   bool useMasterPassword;
@@ -35,20 +28,11 @@ class AppSettings {
   ContainerSortMode containerSortMode;
   bool swapCardActions;
   ThemeMode themeMode;
-
-  /// Default browser layout mode (list, compact, grid).
   BrowserLayoutMode defaultLayoutMode;
-
-  /// App-wide default thumbnail cache mode, applied to every container whose
-  /// [ContainerRecord.thumbnailCacheMode] is null.
   ThumbnailCacheMode defaultThumbnailCacheMode;
-
-  /// App-wide default thumbnail quality settings, applied to every container whose
-  /// [ContainerRecord.thumbnailQuality] is null.
   ThumbnailQuality defaultThumbnailQuality;
-
   Map<String, String> extensionPreferences;
-
+  bool autoOpenOnUnlock;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
 
@@ -62,12 +46,13 @@ class AppSettings {
     this.lockContainersOnScreenLock = true,
     this.defaultDerivedKeyCacheEnabled = false,
     this.autoLockMins = 0,
-    this.defaultLayoutMode = BrowserLayoutMode.list, // Default added
+    this.defaultLayoutMode = BrowserLayoutMode.list,
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
     this.defaultThumbnailQuality = ThumbnailQuality.medium,
-    this.containerSortMode = ContainerSortMode.manual,   // ADD
+    this.containerSortMode = ContainerSortMode.manual,
     this.swapCardActions = false,
     this.themeMode = ThemeMode.system,
+    this.autoOpenOnUnlock = false,
     Map<String, String>? extensionPreferences,
     this._masterPasswordHash,
     this._masterPasswordSalt,
@@ -102,12 +87,13 @@ class AppSettings {
     int? autoLockMins,
     bool? hasSeenSwipeTutorial,
     ContainerSortMode? containerSortMode,
-    bool? swapCardActions,   
+    bool? swapCardActions,
     ThemeMode? themeMode,
     BrowserLayoutMode? defaultLayoutMode,
     ThumbnailCacheMode? defaultThumbnailCacheMode,
     ThumbnailQuality? defaultThumbnailQuality,
     Map<String, String>? extensionPreferences,
+    bool? autoOpenOnUnlock,
     String? masterPasswordHash,
     String? masterPasswordSalt,
   }) {
@@ -123,11 +109,12 @@ class AppSettings {
       hasSeenSwipeTutorial: hasSeenSwipeTutorial ?? this.hasSeenSwipeTutorial,
       defaultLayoutMode: defaultLayoutMode ?? this.defaultLayoutMode,
       containerSortMode: containerSortMode ?? this.containerSortMode,
-      swapCardActions: swapCardActions ?? this.swapCardActions, 
+      swapCardActions: swapCardActions ?? this.swapCardActions,
       themeMode: themeMode ?? this.themeMode,
       defaultThumbnailCacheMode: defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
       defaultThumbnailQuality: defaultThumbnailQuality ?? this.defaultThumbnailQuality,
       extensionPreferences: extensionPreferences ?? this.extensionPreferences,
+      autoOpenOnUnlock: autoOpenOnUnlock ?? this.autoOpenOnUnlock,
       masterPasswordHash: masterPasswordHash ?? _masterPasswordHash,
       masterPasswordSalt: masterPasswordSalt ?? _masterPasswordSalt,
     );
@@ -143,13 +130,14 @@ class AppSettings {
     'lockContainersOnScreenLock': lockContainersOnScreenLock,
     'autoLockMins': autoLockMins,
     'hasSeenSwipeTutorial': hasSeenSwipeTutorial,
-    'defaultLayoutMode': defaultLayoutMode.toJson(), // Serialize layout mode
+    'defaultLayoutMode': defaultLayoutMode.toJson(),
     'defaultThumbnailCacheMode': defaultThumbnailCacheMode.toJson(),
     'defaultThumbnailQuality': defaultThumbnailQuality.toJson(),
     'containerSortMode': containerSortMode.toJson(),
     'swapCardActions': swapCardActions,
     'themeMode': themeMode.index,
     'extensionPreferences': extensionPreferences,
+    'autoOpenOnUnlock': autoOpenOnUnlock,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -160,19 +148,16 @@ class AppSettings {
     blockScreenshots: j['blockScreenshots'] as bool? ?? false,
     hasSeenSwipeTutorial: j['hasSeenSwipeTutorial'] as bool? ?? false,
     defaultDerivedKeyCacheEnabled: j['defaultDerivedKeyCacheEnabled'] as bool? ?? false,
-    containerSortMode: ContainerSortMode.fromJson(j['containerSortMode'] as String?),  
-    swapCardActions: j['swapCardActions'] as bool? ?? false,   
+    containerSortMode: ContainerSortMode.fromJson(j['containerSortMode'] as String?),
+    swapCardActions: j['swapCardActions'] as bool? ?? false,
     themeMode: j['themeMode'] != null ? ThemeMode.values[j['themeMode'] as int] : ThemeMode.system,
     lockContainersOnScreenLock: j['lockContainersOnScreenLock'] as bool? ?? true,
     autoLockMins: j['autoLockMins'] as int? ?? 0,
-
-    // Deserialize layout mode, defaulting to list if missing
     defaultLayoutMode:
         BrowserLayoutMode.fromJson(
           j['defaultLayoutMode'] as String?,
         ) ??
         BrowserLayoutMode.list,
-
     defaultThumbnailCacheMode:
         ThumbnailCacheMode.fromJson(
           j['defaultThumbnailCacheMode'] as String?,
@@ -188,10 +173,9 @@ class AppSettings {
           (k, v) => MapEntry(k, v as String),
         ) ??
         {},
+    autoOpenOnUnlock: j['autoOpenOnUnlock'] as bool? ?? false,
   );
 }
-
-// ── Persistence service ───────────────────────────────────────────────────────
 
 class AppSettingsService {
   static Future<File> get _settingsFile async {
@@ -213,7 +197,6 @@ class AppSettingsService {
     } catch (_) {
       settings = AppSettings();
     }
-
     if (settings.useMasterPassword) {
       final hash = await _secure.read(key: _kMasterHash);
       final salt = await _secure.read(key: _kMasterSalt) ?? '';
@@ -221,7 +204,6 @@ class AppSettingsService {
         settings._setHashMaterial(hash, salt);
       }
     }
-
     return settings;
   }
 

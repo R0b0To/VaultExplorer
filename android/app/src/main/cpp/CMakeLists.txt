@@ -36,11 +36,15 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fatfs)
 
 # 3. Download Tuxera NTFS-3G (NTFS Filesystem Engine)
-
+#
+# Pinned to a specific commit rather than the "edge" branch, so builds are
+# reproducible and upstream changes go through a deliberate version bump
+# here instead of arriving silently. Verified via:
+#   git ls-remote https://github.com/tuxera/ntfs-3g.git edge
 FetchContent_Declare(
         ntfs3g
         GIT_REPOSITORY https://github.com/tuxera/ntfs-3g.git
-        GIT_TAG        d327833ec1d5eb1358b6f2c37139f10a3460944d
+        GIT_TAG        d327833ec1d5eb1358b6f2c37139f10a3460944
 )
 FetchContent_MakeAvailable(ntfs3g)
 

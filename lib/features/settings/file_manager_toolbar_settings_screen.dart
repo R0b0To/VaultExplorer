@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
+import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 
 /// Lets the user reorder and show/hide the file browser's action-bar
 /// entries (the bottom bar in portrait / sidebar rail in landscape).
@@ -66,206 +67,6 @@ class _FileManagerToolbarSettingsScreenState
     await _persist();
   }
 
-  Widget _buildSectionHeader(String title) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 16, 12, 6),
-      child: Text(
-        title,
-        style: textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: cs.primary,
-          letterSpacing: -0.1,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionGroup({required List<Widget> children}) {
-    if (children.isEmpty) return const SizedBox.shrink();
-    final cs = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: List.generate(children.length, (index) {
-        final isFirst = index == 0;
-        final isLast = index == children.length - 1;
-        final isOnly = children.length == 1;
-
-        BorderRadius radius;
-        if (isOnly) {
-          radius = BorderRadius.circular(20);
-        } else if (isFirst) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(20),
-            bottom: Radius.circular(4),
-          );
-        } else if (isLast) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(4),
-            bottom: Radius.circular(20),
-          );
-        } else {
-          radius = BorderRadius.circular(4);
-        }
-
-        return Padding(
-          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
-          child: Material(
-            color: cs.surfaceContainerHigh,
-            borderRadius: radius,
-            clipBehavior: Clip.antiAlias,
-            child: ListTileTheme(
-              tileColor: Colors.transparent,
-              child: children[index],
-            ),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildSelectTile<T>({
-    required String label,
-    required T value,
-    required List<_SelectOption<T>> options,
-    required ValueChanged<T> onChanged,
-    String? subtitle,
-    IconData? prefixIcon,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    final currentOption = options.firstWhere(
-      (opt) => opt.value == value,
-      orElse: () => options.first,
-    );
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      leading: prefixIcon != null
-          ? Icon(prefixIcon, size: 20, color: cs.primary)
-          : null,
-      title: Text(
-        label,
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-      ),
-      subtitle: subtitle != null
-          ? Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                subtitle,
-                style: textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  height: 1.25,
-                ),
-              ),
-            )
-          : Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                currentOption.label,
-                style: textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  height: 1.25,
-                ),
-              ),
-            ),
-      onTap: () {
-        showDialog<void>(
-          context: context,
-          builder: (dialogContext) {
-            final dialogTheme = Theme.of(dialogContext);
-            final mediaQuery = MediaQuery.of(dialogContext);
-            final isLandscape =
-                mediaQuery.orientation == Orientation.landscape;
-
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 440,
-                  maxHeight: isLandscape
-                      ? mediaQuery.size.height * 0.85
-                      : mediaQuery.size.height * 0.75,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Text(
-                          label,
-                          style: dialogTheme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Flexible(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: options.map((opt) {
-                              final isSelected = opt.value == value;
-                              return RadioListTile<T>(
-                                dense: true,
-                                visualDensity: VisualDensity.compact,
-                                activeColor: cs.primary,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 0,
-                                ),
-                                value: opt.value,
-                                groupValue: value,
-                                title: Text(
-                                  opt.label,
-                                  style: dialogTheme.textTheme.bodyMedium
-                                      ?.copyWith(
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    color: isSelected ? cs.primary : null,
-                                  ),
-                                ),
-                                subtitle: opt.subtitle != null
-                                    ? Text(
-                                        opt.subtitle!,
-                                        style: dialogTheme
-                                            .textTheme.bodySmall
-                                            ?.copyWith(
-                                          color: cs.onSurfaceVariant,
-                                        ),
-                                      )
-                                    : null,
-                                onChanged: (T? newValue) {
-                                  if (newValue != null) {
-                                    Navigator.of(dialogContext).pop();
-                                    onChanged(newValue);
-                                  }
-                                },
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -300,7 +101,7 @@ class _FileManagerToolbarSettingsScreenState
                         horizontal: 16, vertical: 12),
                     children: [
                       // ── SECTION 1: TOOLBAR LAYOUT ──────────────────────────────
-                      _buildSectionHeader('Toolbar Layout'),
+                      SectionHeader('Toolbar Layout'),
                       ReorderableListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -388,8 +189,8 @@ class _FileManagerToolbarSettingsScreenState
                       const SizedBox(height: 16),
 
                       // ── SECTION 2: BROWSER LAYOUT ──────────────────────────────
-                      _buildSectionHeader('Browser Layout'),
-                      _buildSectionGroup(
+                      SectionHeader('Browser Layout'),
+                      SectionCard(
                         children: [
                           SwitchListTile(
                             contentPadding:
@@ -434,8 +235,8 @@ class _FileManagerToolbarSettingsScreenState
                       const SizedBox(height: 16),
 
                       // ── SECTION 3: MEDIA VIEWER ────────────────────────────────
-                      _buildSectionHeader('Media Viewer'),
-                      _buildSectionGroup(
+                      SectionHeader('Media Viewer'),
+                      SectionCard(
                         children: [
                           SwitchListTile(
                             contentPadding:
@@ -467,16 +268,4 @@ class _FileManagerToolbarSettingsScreenState
             ),
     );
   }
-}
-
-class _SelectOption<T> {
-  final T value;
-  final String label;
-  final String? subtitle;
-
-  const _SelectOption({
-    required this.value,
-    required this.label,
-    this.subtitle,
-  });
 }

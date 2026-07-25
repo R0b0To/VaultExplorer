@@ -93,67 +93,6 @@ class AboutScreen extends StatelessWidget {
     showAppSnackBar(context, message: msg, tone: tone);
   }
 
-  Widget _buildSectionGroup(BuildContext context,
-      {required List<Widget> children}) {
-    if (children.isEmpty) return const SizedBox.shrink();
-    final cs = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: List.generate(children.length, (index) {
-        final isFirst = index == 0;
-        final isLast = index == children.length - 1;
-        final isOnly = children.length == 1;
-
-        BorderRadius radius;
-        if (isOnly) {
-          radius = BorderRadius.circular(20);
-        } else if (isFirst) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(20),
-            bottom: Radius.circular(4),
-          );
-        } else if (isLast) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(4),
-            bottom: Radius.circular(20),
-          );
-        } else {
-          radius = BorderRadius.circular(4);
-        }
-
-        return Padding(
-          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
-          child: Material(
-            color: cs.surfaceContainerHigh,
-            borderRadius: radius,
-            clipBehavior: Clip.antiAlias,
-            child: ListTileTheme(
-              tileColor: Colors.transparent,
-              child: children[index],
-            ),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 16, 12, 6),
-      child: Text(
-        title,
-        style: textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: cs.primary,
-          letterSpacing: -0.1,
-        ),
-      ),
-    );
-  }
-
   Widget _buildHeader(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -244,9 +183,8 @@ class AboutScreen extends StatelessWidget {
                 const SizedBox(height: 24),
 
                 // ── Application Section ──────────────────────────────────
-                _buildSectionHeader(context, 'Application'),
-                _buildSectionGroup(
-                  context,
+                SectionHeader('Application'),
+                SectionCard(
                   children: [
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(
@@ -298,9 +236,8 @@ class AboutScreen extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 // ── Community & Legal Section ─────────────────────────────
-                _buildSectionHeader(context, 'Community & Open Source'),
-                _buildSectionGroup(
-                  context,
+                SectionHeader('Community & Open Source'),
+                SectionCard(
                   children: [
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(

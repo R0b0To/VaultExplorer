@@ -141,26 +141,10 @@ const bool useExt   = strncasecmp(fileSystem, "ext2", 4) == 0 ||
         body[VC_HDR_OFF_HEADER_CRC + 2] = (hdrCrc >> 8) & 0xFF; body[VC_HDR_OFF_HEADER_CRC + 3] = (hdrCrc) & 0xFF;
 
         unsigned char encBody[VC_HEADER_BODY_SIZE];
-        {
-            CascadeContext hdrCtx;
-            if (!cascadeSetKeys(hdrCtx, createCipher, headerKey, masterKeyLen)) {
-                LOGI("createUsbContainer: cascadeSetKeys failed for header");
-                break;
-            }
-            std::memcpy(encBody, body, VC_HEADER_BODY_SIZE);
-            for (int layer = cSpec.layerCount - 1; layer >= 0; layer--) {
-                const XtsLayerKey& lk = hdrCtx.layers[layer];
-                unsigned char T[16] = {0};
-                blockCipherEncryptBlock(lk.tweakKey, T, T);
-                for (int blk = 0; blk < 28; blk++) {
-                    unsigned char* bp = encBody + blk * 16;
-                    unsigned char tmp[16];
-                    for (int j = 0; j < 16; j++) tmp[j] = bp[j] ^ T[j];
-                    blockCipherEncryptBlock(lk.dataKeyEnc, tmp, tmp);
-                    for (int j = 0; j < 16; j++) bp[j] = tmp[j] ^ T[j];
-                    xtsMultiplyTweak(T);
-                }
-            }
+        if (!encryptVeraCryptHeaderBody(createCipher, headerKey, masterKeyLen,
+                                         cSpec.layerCount, body, encBody)) {
+            LOGI("createUsbContainer: cascadeSetKeys failed for header");
+            break;
         }
 
         mbedtls_platform_zeroize(headerKey, sizeof(headerKey));

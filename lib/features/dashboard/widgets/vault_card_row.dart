@@ -187,10 +187,10 @@ class _VaultCardRowState extends State<VaultCardRow>
     if (!mounted) return;
 
     debugPrint('[VaultCardRow] Executing nudge slide actions...');
-    await _animatePeekTo(-90.0, const Duration(milliseconds: 500));
+    await _animatePeekTo(-100.0, const Duration(milliseconds: 500));
     await Future.delayed(const Duration(milliseconds: 650));
 
-    await _animatePeekTo(90.0, const Duration(milliseconds: 500));
+    await _animatePeekTo(100.0, const Duration(milliseconds: 500));
     await Future.delayed(const Duration(milliseconds: 650));
 
     await _animatePeekTo(0.0, const Duration(milliseconds: 500));

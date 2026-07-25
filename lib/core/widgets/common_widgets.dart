@@ -7,7 +7,9 @@
 library;
 
 export 'package:vaultexplorer/core/widgets/layout/section_label.dart';
+export 'package:vaultexplorer/core/widgets/layout/section_card.dart';
 export 'package:vaultexplorer/core/widgets/layout/settings_toggle_row.dart';
+export 'package:vaultexplorer/core/widgets/inputs/option_picker_tile.dart';
 export 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart';
 export 'package:vaultexplorer/core/widgets/feedback/app_feedback.dart';
 export 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';

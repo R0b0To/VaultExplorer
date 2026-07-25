@@ -564,50 +564,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     }
   }
 
-  Widget _buildSectionGroup({required List<Widget> children}) {
-    if (children.isEmpty) return const SizedBox.shrink();
-    final cs = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: List.generate(children.length, (index) {
-        final isFirst = index == 0;
-        final isLast = index == children.length - 1;
-        final isOnly = children.length == 1;
-
-        BorderRadius radius;
-        if (isOnly) {
-          radius = BorderRadius.circular(20);
-        } else if (isFirst) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(20),
-            bottom: Radius.circular(4),
-          );
-        } else if (isLast) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(4),
-            bottom: Radius.circular(20),
-          );
-        } else {
-          radius = BorderRadius.circular(4);
-        }
-
-        return Padding(
-          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
-          child: Material(
-            color: cs.surfaceContainerHigh,
-            borderRadius: radius,
-            clipBehavior: Clip.antiAlias,
-            child: ListTileTheme(
-              tileColor: Colors.transparent,
-              child: children[index],
-            ),
-          ),
-        );
-      }),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1054,7 +1010,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                     ]
                     else ...[
                       // Standard Password & Credentials Section Group
-                      _buildSectionGroup(
+                      SectionCard(
                         children: [
                           // 1. Password Field
                           Padding(

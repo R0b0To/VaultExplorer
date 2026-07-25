@@ -2,7 +2,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <ctime>
+
+#include "crypto/cipher_shim.h"
+#include "crypto/vc_header_layout.h"
+#include "crypto/xts_tweak.h"
 
 namespace {
 
@@ -156,4 +161,28 @@ uint32_t crc32(const unsigned char* data, size_t length) {
         crc = table[(crc ^ data[i]) & 0xFFu] ^ (crc >> 8);
     }
     return crc ^ 0xFFFFFFFFu;
+}
+
+bool encryptVeraCryptHeaderBody(CascadeId cipher, const unsigned char* headerKey,
+                                 int masterKeyLen, int layerCount,
+                                 const unsigned char* body, unsigned char* encBody) {
+    CascadeContext hdrCtx;
+    if (!cascadeSetKeys(hdrCtx, cipher, headerKey, static_cast<size_t>(masterKeyLen))) {
+        return false;
+    }
+    std::memcpy(encBody, body, VC_HEADER_BODY_SIZE);
+    for (int layer = layerCount - 1; layer >= 0; layer--) {
+        const XtsLayerKey& lk = hdrCtx.layers[layer];
+        unsigned char T[16] = {0};
+        blockCipherEncryptBlock(lk.tweakKey, T, T);
+        for (int blk = 0; blk < 28; blk++) {
+            unsigned char* bp = encBody + blk * 16;
+            unsigned char tmp[16];
+            for (int j = 0; j < 16; j++) tmp[j] = bp[j] ^ T[j];
+            blockCipherEncryptBlock(lk.dataKeyEnc, tmp, tmp);
+            for (int j = 0; j < 16; j++) bp[j] = tmp[j] ^ T[j];
+            xtsMultiplyTweak(T);
+        }
+    }
+    return true;
 }

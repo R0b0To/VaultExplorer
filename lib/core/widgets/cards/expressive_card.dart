@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 
 class ExpressiveCard extends StatelessWidget {
   final List<Widget> children;
@@ -12,7 +13,7 @@ class ExpressiveCard extends StatelessWidget {
       elevation: 0,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -44,7 +45,7 @@ class ExpressiveSectionHeader extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Row(
         children: [
           if (icon != null) ...[
@@ -54,7 +55,7 @@ class ExpressiveSectionHeader extends StatelessWidget {
                 color: cs.primaryContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, size: 20, color: cs.primary),
+              child: Icon(icon, size: AppIconSize.standard, color: cs.primary),
             ),
             const SizedBox(width: 14),
           ],

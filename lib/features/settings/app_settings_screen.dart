@@ -195,192 +195,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     return 'External App';
   }
 
-  Widget _buildSectionGroup({required List<Widget> children}) {
-    if (children.isEmpty) return const SizedBox.shrink();
-    final cs = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: List.generate(children.length, (index) {
-        final isFirst = index == 0;
-        final isLast = index == children.length - 1;
-        final isOnly = children.length == 1;
-
-        BorderRadius radius;
-        if (isOnly) {
-          radius = BorderRadius.circular(20);
-        } else if (isFirst) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(20),
-            bottom: Radius.circular(4),
-          );
-        } else if (isLast) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(4),
-            bottom: Radius.circular(20),
-          );
-        } else {
-          radius = BorderRadius.circular(4);
-        }
-
-        return Padding(
-          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
-          child: Material(
-            color: cs.surfaceContainerHigh,
-            borderRadius: radius,
-            clipBehavior: Clip.antiAlias,
-            child: ListTileTheme(
-              tileColor: Colors.transparent,
-              child: children[index],
-            ),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 16, 12, 6),
-      child: Text(
-        title,
-        style: textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: cs.primary,
-          letterSpacing: -0.1,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSelectTile<T>({
-    required String label,
-    required T value,
-    required List<_SelectOption<T>> options,
-    required ValueChanged<T> onChanged,
-    String? subtitle,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      title: Text(
-        label,
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-      ),
-      subtitle: subtitle != null
-          ? Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                subtitle,
-                style: textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  height: 1.25,
-                ),
-              ),
-            )
-          : null,
-      onTap: () {
-        showDialog<void>(
-          context: context,
-          builder: (dialogContext) {
-            final dialogTheme = Theme.of(dialogContext);
-            final mediaQuery = MediaQuery.of(dialogContext);
-            final isLandscape =
-                mediaQuery.orientation == Orientation.landscape;
-
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 440,
-                  maxHeight: isLandscape
-                      ? mediaQuery.size.height * 0.85
-                      : mediaQuery.size.height * 0.75,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Text(
-                          label,
-                          style: dialogTheme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Flexible(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: options.map((opt) {
-                              final isSelected = opt.value == value;
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                child: RadioListTile<T>(
-                                  activeColor: cs.primary,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 0,
-                                  ),
-                                  value: opt.value,
-                                  groupValue: value,
-                                  title: Text(
-                                    opt.label,
-                                    style: dialogTheme.textTheme.bodyMedium
-                                        ?.copyWith(
-                                      fontWeight: isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.w500,
-                                      color: isSelected ? cs.primary : null,
-                                    ),
-                                  ),
-                                  subtitle: opt.subtitle != null
-                                      ? Text(
-                                          opt.subtitle!,
-                                          style: dialogTheme
-                                              .textTheme.bodySmall
-                                              ?.copyWith(
-                                            color: cs.onSurfaceVariant,
-                                          ),
-                                        )
-                                      : null,
-                                  onChanged: (T? newValue) {
-                                    if (newValue != null) {
-                                      Navigator.of(dialogContext).pop();
-                                      onChanged(newValue);
-                                    }
-                                  },
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -405,8 +219,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                         horizontal: 16, vertical: 12),
                     children: [
                       // ── Security & Privacy ──────────────────────────────────
-                      _buildSectionHeader('Security & Privacy'),
-                      _buildSectionGroup(
+                      SectionHeader('Security & Privacy'),
+                      SectionCard(
                         children: [
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -623,21 +437,21 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             },
                           ),
                           if (_settings.lockContainersOnScreenLock)
-                            _buildSelectTile<int>(
+                            OptionPickerTile<int>(
                               label: 'Auto-Lock Timeout',
                               subtitle: _settings.autoLockMins == 0
                                   ? 'Containers lock immediately on screen lock'
                                   : 'Locks after ${_settings.autoLockMins} minute${_settings.autoLockMins == 1 ? '' : 's'} of inactivity',
                               value: _settings.autoLockMins,
                               options: const [
-                                _SelectOption(value: 0, label: 'Never'),
-                                _SelectOption(value: 1, label: '1 minute'),
-                                _SelectOption(value: 2, label: '2 minutes'),
-                                _SelectOption(value: 5, label: '5 minutes'),
-                                _SelectOption(value: 10, label: '10 minutes'),
-                                _SelectOption(value: 15, label: '15 minutes'),
-                                _SelectOption(value: 30, label: '30 minutes'),
-                                _SelectOption(value: 60, label: '60 minutes'),
+                                SelectOption(value: 0, label: 'Never'),
+                                SelectOption(value: 1, label: '1 minute'),
+                                SelectOption(value: 2, label: '2 minutes'),
+                                SelectOption(value: 5, label: '5 minutes'),
+                                SelectOption(value: 10, label: '10 minutes'),
+                                SelectOption(value: 15, label: '15 minutes'),
+                                SelectOption(value: 30, label: '30 minutes'),
+                                SelectOption(value: 60, label: '60 minutes'),
                               ],
                               onChanged: (v) {
                                 setState(() => _settings.autoLockMins = v);
@@ -685,10 +499,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                       const SizedBox(height: 16),
 
                       // ── Appearance & Interface ──────────────────────────────
-                      _buildSectionHeader('Appearance & Interface'),
-                      _buildSectionGroup(
+                      SectionHeader('Appearance & Interface'),
+                      SectionCard(
                         children: [
-                          _buildSelectTile<ThemeMode>(
+                          OptionPickerTile<ThemeMode>(
                             label: 'App Theme',
                             subtitle: _settings.themeMode == ThemeMode.system
                                 ? 'App uses System Default theme'
@@ -697,13 +511,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                     : 'App uses Dark Theme',
                             value: _settings.themeMode,
                             options: const [
-                              _SelectOption(
+                              SelectOption(
                                   value: ThemeMode.system,
                                   label: 'System Default'),
-                              _SelectOption(
+                              SelectOption(
                                   value: ThemeMode.light,
                                   label: 'Light Theme'),
-                              _SelectOption(
+                              SelectOption(
                                   value: ThemeMode.dark, label: 'Dark Theme'),
                             ],
                             onChanged: (v) {
@@ -712,7 +526,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                          _buildSelectTile<ContainerSortMode>(
+                          OptionPickerTile<ContainerSortMode>(
                             label: 'Sort Containers By',
                             subtitle: _settings.containerSortMode ==
                                     ContainerSortMode.manual
@@ -720,7 +534,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                 : 'Containers are sorted by ${_settings.containerSortMode.label} automatically',
                             value: _settings.containerSortMode,
                             options: ContainerSortMode.values.map((mode) {
-                              return _SelectOption(
+                              return SelectOption(
                                 value: mode,
                                 label: mode.label,
                               );
@@ -769,8 +583,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                       const SizedBox(height: 16),
 
                       // ── Vault & File Handling ──────────────────────────────
-                      _buildSectionHeader('Vault & File Handling'),
-                      _buildSectionGroup(
+                      SectionHeader('Vault & File Handling'),
+                      SectionCard(
                         children: [
                           SwitchListTile(
                             contentPadding:
@@ -806,13 +620,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                          _buildSelectTile<ThumbnailCacheMode>(
+                          OptionPickerTile<ThumbnailCacheMode>(
                             label: 'Thumbnail Caching (default)',
                             subtitle:
                                 _settings.defaultThumbnailCacheMode.description,
                             value: _settings.defaultThumbnailCacheMode,
                             options: ThumbnailCacheMode.values.map((mode) {
-                              return _SelectOption(
+                              return SelectOption(
                                 value: mode,
                                 label: mode.label,
                                 subtitle: mode.description,
@@ -824,13 +638,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                          _buildSelectTile<ThumbnailQuality>(
+                          OptionPickerTile<ThumbnailQuality>(
                             label: 'Thumbnail Quality (default)',
                             subtitle:
                                 'Thumbnails are generated with ${_settings.defaultThumbnailQuality.label.toLowerCase()} quality',
                             value: _settings.defaultThumbnailQuality,
                             options: ThumbnailQuality.values.map((q) {
-                              return _SelectOption(
+                              return SelectOption(
                                 value: q,
                                 label: q.label,
                               );
@@ -926,7 +740,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                       const SizedBox(height: 16),
 
                       // ── About Card ──────────────────────────────────────────
-                      _buildSectionGroup(
+                      SectionCard(
                         children: [
                           ListTile(
                             contentPadding:
@@ -959,16 +773,4 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
             ),
     );
   }
-}
-
-class _SelectOption<T> {
-  final T value;
-  final String label;
-  final String? subtitle;
-
-  const _SelectOption({
-    required this.value,
-    required this.label,
-    this.subtitle,
-  });
 }

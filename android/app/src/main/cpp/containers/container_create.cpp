@@ -170,26 +170,10 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
         body[VC_HDR_OFF_HEADER_CRC + 3] = (hdrCrc      ) & 0xFF;
 
         unsigned char encBody[VC_HEADER_BODY_SIZE];
-        {
-            CascadeContext hdrCtx;
-            if (!cascadeSetKeys(hdrCtx, createCipher, headerKey, masterKeyLen)) {
-                LOGI("createContainer: cascadeSetKeys failed for header");
-                break;
-            }
-            std::memcpy(encBody, body, VC_HEADER_BODY_SIZE);
-            for (int layer = cSpec.layerCount - 1; layer >= 0; layer--) {
-                const XtsLayerKey& lk = hdrCtx.layers[layer];
-                unsigned char T[16] = {0};
-                blockCipherEncryptBlock(lk.tweakKey, T, T);
-                for (int blk = 0; blk < 28; blk++) {
-                    unsigned char* bp = encBody + blk * 16;
-                    unsigned char tmp[16];
-                    for (int j = 0; j < 16; j++) tmp[j] = bp[j] ^ T[j];
-                    blockCipherEncryptBlock(lk.dataKeyEnc, tmp, tmp);
-                    for (int j = 0; j < 16; j++) bp[j] = tmp[j] ^ T[j];
-                    xtsMultiplyTweak(T);
-                }
-            }
+        if (!encryptVeraCryptHeaderBody(createCipher, headerKey, masterKeyLen,
+                                         cSpec.layerCount, body, encBody)) {
+            LOGI("createContainer: cascadeSetKeys failed for header");
+            break;
         }
 
         mbedtls_platform_zeroize(headerKey, sizeof(headerKey));
@@ -718,26 +702,10 @@ bool createContainerWithHidden(int fd,
         writeBE32(body, VC_HDR_OFF_HEADER_CRC, hdrCrc);
 
         unsigned char encBody[VC_HEADER_BODY_SIZE];
-        {
-            CascadeContext hdrCtx;
-            if (!cascadeSetKeys(hdrCtx, createCipher, hiddenHeaderKey, masterKeyLen)) {
-                LOGI("createContainerWithHidden: cascadeSetKeys failed for header");
-                break;
-            }
-            std::memcpy(encBody, body, VC_HEADER_BODY_SIZE);
-            for (int layer = cSpec.layerCount - 1; layer >= 0; layer--) {
-                const XtsLayerKey& lk = hdrCtx.layers[layer];
-                unsigned char T[16] = {0};
-                blockCipherEncryptBlock(lk.tweakKey, T, T);
-                for (int blk = 0; blk < 28; blk++) {
-                    unsigned char* bp = encBody + blk * 16;
-                    unsigned char tmp[16];
-                    for (int j = 0; j < 16; j++) tmp[j] = bp[j] ^ T[j];
-                    blockCipherEncryptBlock(lk.dataKeyEnc, tmp, tmp);
-                    for (int j = 0; j < 16; j++) bp[j] = tmp[j] ^ T[j];
-                    xtsMultiplyTweak(T);
-                }
-            }
+        if (!encryptVeraCryptHeaderBody(createCipher, hiddenHeaderKey, masterKeyLen,
+                                         cSpec.layerCount, body, encBody)) {
+            LOGI("createContainerWithHidden: cascadeSetKeys failed for header");
+            break;
         }
 
         mbedtls_platform_zeroize(body, sizeof(body));
@@ -958,28 +926,12 @@ bool changeContainerPassword(int fd,
         }
 
         unsigned char encBody[VC_HEADER_BODY_SIZE];
-        {
-            CascadeSpec cSpec = cascadeSpecFor(matchedCipher);
-            int masterKeyLen = cSpec.layerCount * 64;
-            CascadeContext hdrCtx;
-            if (!cascadeSetKeys(hdrCtx, matchedCipher, newHeaderKey, masterKeyLen)) {
-                LOGI("changeContainerPassword: cascadeSetKeys failed for header");
-                break;
-            }
-            std::memcpy(encBody, decryptedBody, VC_HEADER_BODY_SIZE);
-            for (int layer = cSpec.layerCount - 1; layer >= 0; layer--) {
-                const XtsLayerKey& lk = hdrCtx.layers[layer];
-                unsigned char T[16] = {0};
-                blockCipherEncryptBlock(lk.tweakKey, T, T);
-                for (int blk = 0; blk < 28; blk++) {
-                    unsigned char* bp = encBody + blk * 16;
-                    unsigned char tmp[16];
-                    for (int j = 0; j < 16; j++) tmp[j] = bp[j] ^ T[j];
-                    blockCipherEncryptBlock(lk.dataKeyEnc, tmp, tmp);
-                    for (int j = 0; j < 16; j++) bp[j] = tmp[j] ^ T[j];
-                    xtsMultiplyTweak(T);
-                }
-            }
+        CascadeSpec cSpec = cascadeSpecFor(matchedCipher);
+        int masterKeyLen = cSpec.layerCount * 64;
+        if (!encryptVeraCryptHeaderBody(matchedCipher, newHeaderKey, masterKeyLen,
+                                         cSpec.layerCount, decryptedBody, encBody)) {
+            LOGI("changeContainerPassword: cascadeSetKeys failed for header");
+            break;
         }
         mbedtls_platform_zeroize(decryptedBody, sizeof(decryptedBody));
 

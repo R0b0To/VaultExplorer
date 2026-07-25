@@ -196,7 +196,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       if (mounted) setState(() => _loadingAuth = false);
 
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
-        await Future<void>.delayed(const Duration(milliseconds: 150));
+        await Future<void>.delayed(const Duration(milliseconds: 300));
         if (mounted) {
           _tryBiometric();
         }
@@ -282,7 +282,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       });
 
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
-        await Future<void>.delayed(const Duration(milliseconds: 150));
+        await Future<void>.delayed(const Duration(milliseconds: 300));
         if (mounted) {
           _tryBiometric();
         }
@@ -779,179 +779,6 @@ class _UnlockSheetState extends State<UnlockSheet>
         : 'Trying $algo ($slotName)…';
   }
 
-  Widget _buildSectionGroup({required List<Widget> children}) {
-    if (children.isEmpty) return const SizedBox.shrink();
-    final cs = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: List.generate(children.length, (index) {
-        final isFirst = index == 0;
-        final isLast = index == children.length - 1;
-        final isOnly = children.length == 1;
-
-        BorderRadius radius;
-        if (isOnly) {
-          radius = BorderRadius.circular(20);
-        } else if (isFirst) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(20),
-            bottom: Radius.circular(4),
-          );
-        } else if (isLast) {
-          radius = const BorderRadius.vertical(
-            top: Radius.circular(4),
-            bottom: Radius.circular(20),
-          );
-        } else {
-          radius = BorderRadius.circular(4);
-        }
-
-        return Padding(
-          padding: EdgeInsets.only(bottom: isLast ? 0 : 2.0),
-          child: Material(
-            color: cs.surfaceContainerHigh,
-            borderRadius: radius,
-            clipBehavior: Clip.antiAlias,
-            child: ListTileTheme(
-              tileColor: Colors.transparent,
-              child: children[index],
-            ),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildSelectTile<T>({
-    required String label,
-    required T value,
-    required List<_SelectOption<T>> options,
-    required ValueChanged<T> onChanged,
-    String? subtitle,
-    IconData? prefixIcon,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    final currentOption = options.firstWhere(
-      (opt) => opt.value == value,
-      orElse: () => options.first,
-    );
-
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      leading: prefixIcon != null
-          ? Icon(prefixIcon, size: 20, color: cs.primary)
-          : null,
-      title: Text(
-        label,
-        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: Text(
-          subtitle ?? currentOption.label,
-          style: textTheme.bodySmall?.copyWith(
-            color: cs.onSurfaceVariant,
-            height: 1.25,
-          ),
-        ),
-      ),
-      onTap: () {
-        showDialog<void>(
-          context: context,
-          builder: (dialogContext) {
-            final dialogTheme = Theme.of(dialogContext);
-            final mediaQuery = MediaQuery.of(dialogContext);
-            final isLandscape =
-                mediaQuery.orientation == Orientation.landscape;
-
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: 440,
-                  maxHeight: isLandscape
-                      ? mediaQuery.size.height * 0.85
-                      : mediaQuery.size.height * 0.75,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Text(
-                          label,
-                          style: dialogTheme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Flexible(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: options.map((opt) {
-                              final isSelected = opt.value == value;
-                              return RadioListTile<T>(
-                                dense: true,
-                                visualDensity: VisualDensity.compact,
-                                activeColor: cs.primary,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 0,
-                                ),
-                                value: opt.value,
-                                groupValue: value,
-                                title: Text(
-                                  opt.label,
-                                  style: dialogTheme.textTheme.bodyMedium
-                                      ?.copyWith(
-                                    fontWeight: isSelected
-                                        ? FontWeight.bold
-                                        : FontWeight.w500,
-                                    color: isSelected ? cs.primary : null,
-                                  ),
-                                ),
-                                subtitle: opt.subtitle != null
-                                    ? Text(
-                                        opt.subtitle!,
-                                        style: dialogTheme
-                                            .textTheme.bodySmall
-                                            ?.copyWith(
-                                          color: cs.onSurfaceVariant,
-                                        ),
-                                      )
-                                    : null,
-                                onChanged: (T? newValue) {
-                                  if (newValue != null) {
-                                    Navigator.of(dialogContext).pop();
-                                    onChanged(newValue);
-                                  }
-                                },
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1422,7 +1249,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                   // ── Standard Password & Credentials Section Group ───────────
                   else if (_showPasswordUI) ...[
                     AutofillGroup(
-                      child: _buildSectionGroup(
+                      child: SectionCard(
                         children: [
                           // 1. Password Field
                           Padding(
@@ -1610,16 +1437,4 @@ class _UnlockSheetState extends State<UnlockSheet>
       ),
     );
   }
-}
-
-class _SelectOption<T> {
-  final T value;
-  final String label;
-  final String? subtitle;
-
-  const _SelectOption({
-    required this.value,
-    required this.label,
-    this.subtitle,
-  });
 }

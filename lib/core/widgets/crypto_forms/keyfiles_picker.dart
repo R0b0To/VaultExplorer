@@ -58,7 +58,7 @@ class KeyfilesPicker extends StatelessWidget {
                   backgroundColor: cs.surfaceContainerHighest,
                   foregroundColor: cs.primary,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
                   ),
                 ),
                 icon: picking
@@ -67,7 +67,7 @@ class KeyfilesPicker extends StatelessWidget {
                         height: 14,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.add_rounded, size: 18),
+                    : const Icon(Icons.add_rounded, size: AppIconSize.small),
                 label: const Text('Add File'),
               ),
             ],
@@ -95,7 +95,7 @@ class KeyfilesPicker extends StatelessWidget {
                       onDeleted: enabled ? () => onRemove(k) : null,
                       deleteIconColor: cs.error,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadius.md),
                         side: BorderSide.none,
                       ),
                       backgroundColor: cs.surfaceContainerHighest,

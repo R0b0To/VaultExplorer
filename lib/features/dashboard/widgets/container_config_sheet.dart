@@ -764,15 +764,9 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           }).toList(),
                           onChanged: (v) => setState(() => _thumbnailCacheMode = v),
                         ),
-                        OptionPickerTile<ThumbnailQuality>(
+                        ThumbnailQualityTile(
                           label: 'Thumbnail Quality',
-                          value: _thumbnailQuality ?? ThumbnailQuality.medium,
-                          options: ThumbnailQuality.values.map((q) {
-                            return SelectOption(
-                              value: q,
-                              label: q.label,
-                            );
-                          }).toList(),
+                          value: _thumbnailQuality ?? ThumbnailQuality.defaultQuality,
                           onChanged: (v) => setState(() => _thumbnailQuality = v),
                         ),
                         ListTile(

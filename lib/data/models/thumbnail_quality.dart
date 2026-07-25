@@ -1,61 +1,72 @@
-enum ThumbnailQuality {
-  low,
-  medium,
-  high,
-  veryHigh;
+import 'package:flutter/foundation.dart';
 
-  String get label {
-    switch (this) {
-      case ThumbnailQuality.low:
-        return 'Low (faster, smaller)';
-      case ThumbnailQuality.medium:
-        return 'Medium (balanced)';
-      case ThumbnailQuality.high:
-        return 'High (slower, larger)';
-      case ThumbnailQuality.veryHigh:
-        return 'Very High (sharpest, largest)';
-    }
-  }
+@immutable
+class ThumbnailQuality {
+  final int quality; // JPEG quality: 10..100
+  final int size; // Target max edge in px: 100..500
 
-  int get jpegQuality {
-    switch (this) {
-      case ThumbnailQuality.low:
-        return 40;
-      case ThumbnailQuality.medium:
-        return 80;
-      case ThumbnailQuality.high:
-        return 90;
-      case ThumbnailQuality.veryHigh:
-        return 98;
-    }
-  }
+  const ThumbnailQuality({
+    this.quality = 80,
+    this.size = 180,
+  });
+
+  static const defaultQuality = ThumbnailQuality(quality: 80, size: 180);
+
+  int get jpegQuality => quality.clamp(10, 100);
 
   int scaledSize(int base) {
-    final pct = switch (this) {
-      ThumbnailQuality.low => 75,
-      ThumbnailQuality.medium => 100,
-      ThumbnailQuality.high => 160,
-      ThumbnailQuality.veryHigh => 200,
-    };
-    return (base * pct / 100).round();
+    return (base * (size / 180.0)).round().clamp(40, 1000);
   }
 
-  String toJson() {
-    return name;
+  String get label => '${size}px · $quality% quality';
+
+  ThumbnailQuality copyWith({
+    int? quality,
+    int? size,
+  }) {
+    return ThumbnailQuality(
+      quality: (quality ?? this.quality).clamp(10, 100),
+      size: (size ?? this.size).clamp(80, 600),
+    );
   }
 
-  static ThumbnailQuality? fromJson(String? value) {
-    switch (value) {
-      case 'low':
-        return ThumbnailQuality.low;
-      case 'medium':
-        return ThumbnailQuality.medium;
-      case 'high':
-        return ThumbnailQuality.high;
-      case 'veryHigh':
-        return ThumbnailQuality.veryHigh;
-      default:
-        return null;
+  Map<String, dynamic> toJson() => {
+        'quality': quality,
+        'size': size,
+      };
+
+  static ThumbnailQuality fromJson(dynamic value) {
+    if (value == null) return defaultQuality;
+    if (value is Map<String, dynamic>) {
+      return ThumbnailQuality(
+        quality: (value['quality'] as num?)?.toInt() ?? 80,
+        size: (value['size'] as num?)?.toInt() ?? 180,
+      );
     }
+    if (value is String) {
+      switch (value) {
+        case 'low':
+          return const ThumbnailQuality(quality: 40, size: 140);
+        case 'medium':
+          return const ThumbnailQuality(quality: 80, size: 180);
+        case 'high':
+          return const ThumbnailQuality(quality: 90, size: 280);
+        case 'veryHigh':
+          return const ThumbnailQuality(quality: 98, size: 360);
+        default:
+          return defaultQuality;
+      }
+    }
+    return defaultQuality;
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ThumbnailQuality &&
+          other.quality == quality &&
+          other.size == size;
+
+  @override
+  int get hashCode => Object.hash(quality, size);
 }

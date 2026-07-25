@@ -37,7 +37,6 @@ import 'package:vaultexplorer/features/browser/widgets/file_grid_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
-import 'package:vaultexplorer/features/browser/widgets/stats_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/truncated_banner.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
@@ -86,7 +85,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   bool _menuIsOpen = false;
   ArchiveContext? _archiveContext;
   ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
-  ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.medium;
+  ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.defaultQuality;
 
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
   static const int _maxScanDepth = 20;

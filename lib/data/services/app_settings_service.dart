@@ -48,7 +48,7 @@ class AppSettings {
     this.autoLockMins = 0,
     this.defaultLayoutMode = BrowserLayoutMode.list,
     this.defaultThumbnailCacheMode = ThumbnailCacheMode.disabled,
-    this.defaultThumbnailQuality = ThumbnailQuality.medium,
+    this.defaultThumbnailQuality = ThumbnailQuality.defaultQuality,
     this.containerSortMode = ContainerSortMode.manual,
     this.swapCardActions = false,
     this.themeMode = ThemeMode.system,
@@ -164,10 +164,7 @@ class AppSettings {
         ) ??
         ThumbnailCacheMode.appCache,
     defaultThumbnailQuality:
-        ThumbnailQuality.fromJson(
-          j['defaultThumbnailQuality'] as String?,
-        ) ??
-        ThumbnailQuality.medium,
+        ThumbnailQuality.fromJson(j['defaultThumbnailQuality']),
     extensionPreferences:
         (j['extensionPreferences'] as Map<String, dynamic>?)?.map(
           (k, v) => MapEntry(k, v as String),

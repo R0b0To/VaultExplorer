@@ -6,6 +6,7 @@
 /// migrated incrementally to importing the specific widget file it needs.
 library;
 
+export 'package:vaultexplorer/core/widgets/inputs/thumbnail_quality_picker.dart';
 export 'package:vaultexplorer/core/widgets/layout/section_label.dart';
 export 'package:vaultexplorer/core/widgets/layout/section_card.dart';
 export 'package:vaultexplorer/core/widgets/layout/settings_toggle_row.dart';

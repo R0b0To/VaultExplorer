@@ -1231,8 +1231,6 @@ class MainActivity : FlutterFragmentActivity() {
         result.success(true)
     }
 
-    // ── USB device management ──────────────────────────────────────────
-
     private fun handleListUsbDevices(call: MethodCall, result: MethodChannel.Result) {
         val list = usbManager.deviceList.values
             .filter { device -> (0 until device.interfaceCount).any { i ->
@@ -1508,8 +1506,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    // ── Vault/container pickers ──────────────────────────────────────────
-
     private fun handlePickContainer(call: MethodCall, result: MethodChannel.Result) {
         pendingResultCheck(result)
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -1546,8 +1542,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
         pickKeyfilesLauncher.launch(intent)
     }
-
-    // ── Vault/container creation ──────────────────────────────────────────
 
     private fun handleCreateContainer(call: MethodCall, result: MethodChannel.Result) {
         val name = call.argument<String>("displayName") ?: "vault.hc"
@@ -1687,8 +1681,6 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
     }
-
-    // ── Unlock & format detection ──────────────────────────────────────────
 
     private fun handleUnlockContainer(call: MethodCall, result: MethodChannel.Result) {
         val uriString   = call.argument<String>("filePath")
@@ -2064,8 +2056,6 @@ class MainActivity : FlutterFragmentActivity() {
         result.success(true)
     }
 
-    // ── Container lifecycle ──────────────────────────────────────────
-
     private fun handleChangeContainerPassword(call: MethodCall, result: MethodChannel.Result) {
         val uri = call.argument<String>("uri")
         val oldPassword = call.argument<String>("oldPassword") ?: ""
@@ -2206,8 +2196,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    // ── Derived-key / password management ──────────────────────────────────────────
-
     private fun handleDeriveDerivedKey(call: MethodCall, result: MethodChannel.Result) {
         val filePath = call.argument<String>("filePath")
         val password = call.argument<String>("password")
@@ -2291,8 +2279,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    // ── Thumbnails ──────────────────────────────────────────
-
     private fun handleGetVideoThumbnail(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val fileName  = call.argument<String>("fileName")
@@ -2339,10 +2325,13 @@ class MainActivity : FlutterFragmentActivity() {
                     }
 
                     if (frame != null) {
-                        val quality = call.argument<Int>("quality") ?: 60
+                        val scaledFrame = scaledToFit(frame, targetSize)
+                        val quality = (call.argument<Int>("quality") ?: 60).coerceIn(1, 100)
                         val stream = ByteArrayOutputStream()
-                        frame.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+                        scaledFrame.compress(Bitmap.CompressFormat.JPEG, quality, stream)
                         val bytes = stream.toByteArray()
+                        if (scaledFrame != frame) scaledFrame.recycle()
+                        frame.recycle()
                         runOnUiThread { result.success(bytes) }
                     } else {
                         runOnUiThread { result.error("FRAME_FAILED", "Failed to extract frame", null) }
@@ -2403,7 +2392,8 @@ class MainActivity : FlutterFragmentActivity() {
                     if (scaledBitmap != rawBitmap) rawBitmap.recycle()
 
                     val stream = ByteArrayOutputStream()
-                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+                    val qualityVal = quality.coerceIn(1, 100)
+                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, qualityVal, stream)
                     val bytes = stream.toByteArray()
                     scaledBitmap.recycle()
 
@@ -2452,13 +2442,14 @@ class MainActivity : FlutterFragmentActivity() {
                 inputStream.close()
 
                 if (rawBitmap != null) {
-                    val scaledBitmap = Bitmap.createScaledBitmap(rawBitmap, targetSize, targetSize, true)
+                    val scaledBitmap = scaledToFit(rawBitmap, targetSize)
                     if (scaledBitmap != rawBitmap) {
                         rawBitmap.recycle()
                     }
 
                     val stream = ByteArrayOutputStream()
-                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+                    val qualityVal = quality.coerceIn(1, 100)
+                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, qualityVal, stream)
                     val thumbData = stream.toByteArray()
                     scaledBitmap.recycle()
 
@@ -2493,8 +2484,6 @@ class MainActivity : FlutterFragmentActivity() {
 
         result.success(null)
     }
-
-    // ── Import / export ──────────────────────────────────────────
 
     private fun handleCancelImport(call: MethodCall, result: MethodChannel.Result) {
         val opId = call.argument<Number>("opId")?.toInt()
@@ -2535,7 +2524,7 @@ class MainActivity : FlutterFragmentActivity() {
         }
         val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
         if (volId == null) {
-            result.error("NOT_MOUNTED", "Container not mounted", null)
+            result.error("NOT_MOUNTED", "Container is not mounted", null)
             return
         }
         @Suppress("UNCHECKED_CAST")
@@ -2571,7 +2560,7 @@ class MainActivity : FlutterFragmentActivity() {
         }
         val volId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
         if (volId == null) {
-            result.error("NOT_MOUNTED", "Container not mounted", null)
+            result.error("NOT_MOUNTED", "Container is not mounted", null)
             return
         }
         pendingExportFile = PendingExportFile(containerUri, sourcePath, volId)
@@ -2584,8 +2573,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
         exportFileLauncher.launch(intent)
     }
-
-    // ── File & directory operations ──────────────────────────────────────────
 
     private fun handleDecryptFile(call: MethodCall, result: MethodChannel.Result) {
         val fileName = call.argument<String>("fileName")
@@ -2750,8 +2737,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    // ── Misc ──────────────────────────────────────────
-
     private fun handleOpenWithApp(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val fileName  = call.argument<String>("fileName")
@@ -2838,8 +2823,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 }
-
-// ── ContainerInputStream (Optimized Subsampled Native Image Stream) ─────────────
 
 class ContainerInputStream(
     private val context: Context,

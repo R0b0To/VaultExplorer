@@ -36,7 +36,7 @@ class MediaViewerScreen extends StatefulWidget {
     required this.mediaFiles,
     required this.initialIndex,
     this.startingFolder,
-    this.thumbnailQuality = ThumbnailQuality.medium,
+    this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     required this.thumbnailCacheMode,
   });
 

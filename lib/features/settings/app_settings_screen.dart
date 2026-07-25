@@ -636,15 +636,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                          OptionPickerTile<ThumbnailQuality>(
+                          ThumbnailQualityTile(
                             label: 'Thumbnail Quality (default)',
-                            value: _settings.defaultThumbnailQuality,
-                            options: ThumbnailQuality.values.map((q) {
-                              return SelectOption(
-                                value: q,
-                                label: q.label,
-                              );
-                            }).toList(),
+                            value: _settings.defaultThumbnailQuality,                            
                             onChanged: (v) {
                               setState(
                                   () => _settings.defaultThumbnailQuality = v);

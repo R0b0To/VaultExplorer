@@ -332,7 +332,7 @@ class ContainerRecord {
           ? ThumbnailCacheMode.fromJson(j['thumbnailCacheMode'] as String?)
           : null,
       thumbnailQuality: j.containsKey('thumbnailQuality')
-          ? ThumbnailQuality.fromJson(j['thumbnailQuality'] as String?)
+          ? ThumbnailQuality.fromJson(j['thumbnailQuality'])
           : null,
       cacheDerivedKey: j['cacheDerivedKey'] as bool? ?? false,
       readOnly: j['readOnly'] as bool? ?? false,

@@ -67,6 +67,13 @@ class MediaPlayerWidget extends StatefulWidget {
   final bool isCurrent;
   final VoidCallback? onError;
   final NativeVlcController? existingController;
+  // Called when this widget transitions from not-current to current
+  // (didUpdateWidget seeing isCurrent flip true) — NOT when autoPlay is
+  // true, since widget.autoPlay is always passed as false from
+  // media_viewer_screen.dart; the real "should this play automatically"
+  // flag is that screen's own _autoPlay, which this widget has no access
+  // to. The parent decides and calls play() on the controller it's given.
+  final void Function(NativeVlcController controller)? onBecameCurrent;
 
   const MediaPlayerWidget({
     super.key,
@@ -89,6 +96,7 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.isCurrent,
     this.existingController,
     this.onError,
+    this.onBecameCurrent,
   });
 
   @override
@@ -127,6 +135,25 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     if (_initialized && oldWidget.playbackSpeed != widget.playbackSpeed) {
       _controller.setPlaybackSpeed(widget.playbackSpeed);
     }
+    // _initPlayer() only checks widget.isCurrent once, at the moment it
+    // finishes creating/adopting the controller (in initState()). That
+    // snapshot is stale for any page whose widget already existed before
+    // it became current — every prewarmed item, and any neighbor PageView
+    // kept alive — since nothing else here was calling play() when
+    // isCurrent actually flipped true on navigation. Whatever eventually
+    // got these playing before (an indirect chain through _onScrollEnd,
+    // or a rebuild that happened to re-run _initPlayer) was incidental,
+    // not a real trigger — hence the inconsistent delay.
+    //
+    // Goes through onBecameCurrent, not widget.autoPlay directly —
+    // widget.autoPlay is always passed as false by media_viewer_screen.dart,
+    // so checking it here would silently never fire. The parent's real
+    // autoplay flag is only known to the parent.
+    if (_initialized && !oldWidget.isCurrent && widget.isCurrent) {
+      widget.onBecameCurrent?.call(_controller);
+    } else if (_initialized && oldWidget.isCurrent && !widget.isCurrent) {
+      _controller.pause();
+    }
   }
 
   Future<void> _initPlayer() async {
@@ -147,8 +174,17 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         await _controller.setVolume(100);
         await _controller.setLooping(false);
         await _controller.setPlaybackSpeed(widget.playbackSpeed);
-        if (widget.autoPlay && widget.isCurrent) {
-          _controller.play();
+        // Not "widget.autoPlay && widget.isCurrent" — widget.autoPlay is
+        // always false (see onBecameCurrent's doc comment). This branch
+        // runs once, right after adopting an existing controller; if
+        // isCurrent is already true here (the common case for a gesture-
+        // swipe destination, whose isCurrent can already be true by the
+        // time this widget is first built — currentIndex having already
+        // moved via onPageChanged before this page enters the viewport),
+        // there is no false→true transition left for didUpdateWidget to
+        // ever see, so this is the only place that will call play().
+        if (widget.isCurrent) {
+          widget.onBecameCurrent?.call(_controller);
         }
       } catch (e) {
         if (token == _initToken && mounted) {
@@ -190,8 +226,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       await controller.setVolume(100);
       await controller.setLooping(false);
       await controller.setPlaybackSpeed(widget.playbackSpeed);
-      if (widget.autoPlay && widget.isCurrent) {
-        controller.play();
+      // Same reasoning as the adoption branch above: widget.autoPlay is
+      // always false, so this must go through onBecameCurrent instead.
+      if (widget.isCurrent) {
+        widget.onBecameCurrent?.call(controller);
       }
     } catch (e) {
       if (token == _initToken && mounted) {

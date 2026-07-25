@@ -1,3 +1,5 @@
+// File: lib/data/services/container_repository.dart
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -8,24 +10,10 @@ import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
-/// Logs an exception this class is about to swallow (return/continue with a
-/// default instead of rethrowing) so a real failure — a corrupted data
-/// file, a keystore write that didn't take, a stale native session — is at
-/// least visible in the debug console instead of silently degrading to
-/// "no containers" or "the edit didn't save," which look identical to
-/// legitimate states at every call site.
 void _logSwallowed(String method, Object error) {
   debugPrint('[ContainerRepository] $method failed: $error');
 }
 
-// ── ContainerUnlockMethod ─────────────────────────────────────────────────────
-
-/// How the user authenticates before a container is unlocked.
-///
-/// [password]         – user types the container password every time.
-/// [rememberPassword] – password is stored in Android Keystore; auto-filled.
-/// [biometrics]       – biometric prompt gates access to the stored password.
-/// [pattern]          – drawn pattern gates access to the stored password.
 enum ContainerUnlockMethod {
   password,
   rememberPassword,
@@ -33,55 +21,44 @@ enum ContainerUnlockMethod {
   pattern;
 
   String get label => switch (this) {
-    ContainerUnlockMethod.password => 'Manual Password',
-    ContainerUnlockMethod.rememberPassword => 'Remember Password',
-    ContainerUnlockMethod.biometrics => 'Biometric Unlock',
-    ContainerUnlockMethod.pattern => 'Pattern Unlock',
-  };
+        ContainerUnlockMethod.password => 'Manual Password',
+        ContainerUnlockMethod.rememberPassword => 'Remember Password',
+        ContainerUnlockMethod.biometrics => 'Biometric Unlock',
+        ContainerUnlockMethod.pattern => 'Pattern Unlock',
+      };
 
   String get subtitle => switch (this) {
-    ContainerUnlockMethod.password => 'Type the password every time',
-    ContainerUnlockMethod.rememberPassword =>
-      'Stored securely in Android Keystore',
-    ContainerUnlockMethod.biometrics => 'Use fingerprint or face to unlock',
-    ContainerUnlockMethod.pattern => 'Draw a pattern to unlock',
-  };
+        ContainerUnlockMethod.password => 'Type the password every time',
+        ContainerUnlockMethod.rememberPassword =>
+          'Stored securely in Android Keystore',
+        ContainerUnlockMethod.biometrics => 'Use fingerprint or face to unlock',
+        ContainerUnlockMethod.pattern => 'Draw a pattern to unlock',
+      };
 
   IconData get icon => switch (this) {
-    ContainerUnlockMethod.password => Icons.key_rounded,
-    ContainerUnlockMethod.rememberPassword => Icons.lock_open_rounded,
-    ContainerUnlockMethod.biometrics => Icons.fingerprint,
-    ContainerUnlockMethod.pattern => Icons.pattern,
-  };
+        ContainerUnlockMethod.password => Icons.key_rounded,
+        ContainerUnlockMethod.rememberPassword => Icons.lock_open_rounded,
+        ContainerUnlockMethod.biometrics => Icons.fingerprint,
+        ContainerUnlockMethod.pattern => Icons.pattern,
+      };
 
   String toJson() => name;
 
   static ContainerUnlockMethod fromJson(String? value) => switch (value) {
-    'password' => ContainerUnlockMethod.password,
-    'rememberPassword' => ContainerUnlockMethod.rememberPassword,
-    'biometrics' => ContainerUnlockMethod.biometrics,
-    'pattern' => ContainerUnlockMethod.pattern,
-    _ => ContainerUnlockMethod.password,
-  };
+        'password' => ContainerUnlockMethod.password,
+        'rememberPassword' => ContainerUnlockMethod.rememberPassword,
+        'biometrics' => ContainerUnlockMethod.biometrics,
+        'pattern' => ContainerUnlockMethod.pattern,
+        _ => ContainerUnlockMethod.password,
+      };
 }
 
-/// Unified repository for per-container state.
-///
-/// Replaces the split between [SavedContainerService] (saved_containers.json)
-/// and [AppSettingsService] container config handling (container_configs.json).
-///
-/// Lifecycle: [add] → [update] → [remove] atomically handles all three
-/// backing stores: the JSON index, the config JSON, and Android Keystore.
-///
 class ContainerRepository {
   ContainerRepository._();
+
   static final ContainerRepository instance = ContainerRepository._();
-
-  // ── Backing stores ────────────────────────────────────────────────────────
-
   static const _secure = AppSecureStorage.instance;
 
-  // In-memory cache — loaded once on first access, written-through on every mutation.
   Map<String, ContainerRecord>? _cache;
 
   static Future<File> get _dataFile async {
@@ -89,21 +66,15 @@ class ContainerRepository {
     return File('${dir.path}/containers_v2.json');
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────
-
-  /// Loads all containers. Subsequent calls return the in-memory cache.
   Future<Map<String, ContainerRecord>> loadAll() async {
     if (_cache != null) return Map.unmodifiable(_cache!);
     await _hydrate();
     return Map.unmodifiable(_cache!);
   }
 
-  /// Inserts or fully replaces a container record.
   Future<void> save(ContainerRecord record) async {
     await _ensureLoaded();
     _cache![record.uri] = record;
-
-    // ── Password storage ──────────────────────────────────────────────────
     final needsPassword = record.unlockMethod != ContainerUnlockMethod.password;
     if (needsPassword && record.pendingPassword != null) {
       await _secure.write(
@@ -113,8 +84,6 @@ class ContainerRepository {
     } else if (!needsPassword) {
       await _secure.delete(key: _keystoreKey(record.uri));
     }
-
-    // ── Pattern hash storage ──────────────────────────────────────────────
     if (record.unlockMethod == ContainerUnlockMethod.pattern &&
         record.pendingPatternHash != null) {
       await _secure.write(
@@ -122,14 +91,30 @@ class ContainerRepository {
         value: record.pendingPatternHash,
       );
     } else if (record.unlockMethod != ContainerUnlockMethod.pattern) {
-      // Clean up stale pattern hash when switching away from pattern unlock.
       await _secure.delete(key: _patternHashKey(record.uri));
     }
-
     await _persist();
   }
 
-Future<void> remove(String uri) async {
+  Future<void> saveOrder(List<String> orderedUris) async {
+    await _ensureLoaded();
+    if (_cache == null) return;
+    final newCache = <String, ContainerRecord>{};
+    for (final uri in orderedUris) {
+      if (_cache!.containsKey(uri)) {
+        newCache[uri] = _cache![uri]!;
+      }
+    }
+    for (final entry in _cache!.entries) {
+      if (!newCache.containsKey(entry.key)) {
+        newCache[entry.key] = entry.value;
+      }
+    }
+    _cache = newCache;
+    await _persist();
+  }
+
+  Future<void> remove(String uri) async {
     await _ensureLoaded();
     _cache!.remove(uri);
     await _secure.delete(key: _keystoreKey(uri));
@@ -142,18 +127,13 @@ Future<void> remove(String uri) async {
     await _persist();
   }
 
-  /// Reads the stored password for [uri] from Android Keystore.
   Future<String?> getPassword(String uri) =>
       _secure.read(key: _keystoreKey(uri));
 
-  /// Reads the stored pattern hash for [uri] from Android Keystore.
   Future<String?> getPatternHash(String uri) =>
       _secure.read(key: _patternHashKey(uri));
 
-  /// Invalidates the in-memory cache, forcing a reload on next access.
   void invalidate() => _cache = null;
-
-  // ── Internals ─────────────────────────────────────────────────────────────
 
   static String _keystoreKey(String uri) {
     final encoded = base64Url.encode(utf8.encode(uri));
@@ -182,10 +162,6 @@ Future<void> remove(String uri) async {
         _cache![r.uri] = r;
       }
     } catch (e) {
-      // Falling back to an empty cache is deliberate — a corrupted data
-      // file shouldn't crash the app — but doing so with no log line means
-      // a genuinely corrupted file looks identical to "user has never
-      // added a container." At minimum this now leaves a trace.
       _logSwallowed('_hydrate', e);
       _cache = {};
     }
@@ -197,25 +173,11 @@ Future<void> remove(String uri) async {
       final list = _cache!.values.map((r) => r.toJson()).toList();
       await file.writeAsString(jsonEncode(list));
     } catch (e) {
-      // A failed write here means whatever the caller just did — add,
-      // rename, remove a container — did not actually save, and will
-      // silently revert on next launch. Logging doesn't fix that, but it
-      // makes the failure discoverable instead of indistinguishable from
-      // success.
       _logSwallowed('_persist', e);
     }
   }
 }
 
-// ── ContainerRecord ───────────────────────────────────────────────────────────
-
-/// Unified model for a saved container entry.
-///
-/// [pendingPassword] is transient — it is written to Keystore during [save]
-/// and is never serialised to the JSON file.
-///
-/// [thumbnailCacheMode] is null when the container should inherit the
-/// app-level default (see [AppSettings.defaultThumbnailCacheMode]).
 class ContainerRecord {
   final String uri;
   final String label;
@@ -229,11 +191,6 @@ class ContainerRecord {
   final bool readOnly;
   final String? pendingPassword;
   final String? pendingPatternHash;
-
-  // FIX (perf): the cipher/hash combo that successfully unlocked this
-  // container last time. 255 = unknown / never resolved — falls back to
-  // full auto-detect. Persisting this collapses a 5x8-combination search
-  // down to exactly one KDF run on every subsequent unlock.
   final int cipherId;
   final int hashId;
   final String containerFormat;
@@ -256,9 +213,6 @@ class ContainerRecord {
     this.containerFormat = 'veracrypt',
   });
 
-  /// True for containers mounted from a USB mass-storage device (uri format
-  /// `usb:<deviceName>`) rather than a picked container file (content:// or
-  /// file:// uri).
   bool get isUsbSource => uri.startsWith('usb:');
 
   ContainerRecord copyWith({
@@ -301,26 +255,25 @@ class ContainerRecord {
   }
 
   Map<String, dynamic> toJson() => {
-    'uri': uri,
-    'label': label,
-    'rememberPassword': rememberPassword,
-    'unlockMethod': unlockMethod.toJson(),
-    'autoCloseMins': autoCloseMins,
-    'documentProvider': documentProvider,
-    if (thumbnailCacheMode != null)
-      'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
-    if (thumbnailQuality != null)
-      'thumbnailQuality': thumbnailQuality!.toJson(),
-    'cacheDerivedKey': cacheDerivedKey,
-    'readOnly': readOnly,
-    'cipherId': cipherId,
-    'hashId': hashId,
-    'containerFormat': containerFormat,
-  };
+        'uri': uri,
+        'label': label,
+        'rememberPassword': rememberPassword,
+        'unlockMethod': unlockMethod.toJson(),
+        'autoCloseMins': autoCloseMins,
+        'documentProvider': documentProvider,
+        if (thumbnailCacheMode != null)
+          'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
+        if (thumbnailQuality != null)
+          'thumbnailQuality': thumbnailQuality!.toJson(),
+        'cacheDerivedKey': cacheDerivedKey,
+        'readOnly': readOnly,
+        'cipherId': cipherId,
+        'hashId': hashId,
+        'containerFormat': containerFormat,
+      };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
     final method = ContainerUnlockMethod.fromJson(j['unlockMethod'] as String?);
-
     return ContainerRecord(
       uri: j['uri'] as String,
       label: j['label'] as String? ?? '',
@@ -344,9 +297,7 @@ class ContainerRecord {
 }
 
 extension ContainerRecordFormatX on ContainerRecord {
-  /// Typed classification of [containerFormat]. See [ContainerFormat].
   ContainerFormat get format => ContainerFormat.fromWire(containerFormat);
 }
 
-// Sentinel object for copyWith's nullable field pattern.
 const _keep = Object();

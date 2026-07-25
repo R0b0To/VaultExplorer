@@ -1,3 +1,5 @@
+// File: lib/features/dashboard/vault_dashboard_screen.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,7 +45,6 @@ class SlideRightRoute<T> extends PageRouteBuilder<T> {
 
 class VaultDashboard extends StatefulWidget {
   const VaultDashboard({super.key});
-
   @override
   State<VaultDashboard> createState() => _VaultDashboardState();
 }
@@ -256,6 +257,7 @@ class _VaultDashboardState extends State<VaultDashboard>
       }
     });
     _scheduleAutoClose(container);
+    ContainerRepository.instance.saveOrder(_recordsOrder);
   }
 
   void _onContainerLocked(int volId) {
@@ -534,6 +536,7 @@ class _VaultDashboardState extends State<VaultDashboard>
           _records.remove(uri);
           _recordsOrder.remove(uri);
         });
+        await ContainerRepository.instance.saveOrder(_recordsOrder);
       }
     });
   }
@@ -575,6 +578,7 @@ class _VaultDashboardState extends State<VaultDashboard>
           _recordsOrder.add(uri);
         }
       });
+      await ContainerRepository.instance.saveOrder(_recordsOrder);
     }
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) {
@@ -690,11 +694,14 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (_appSettings.containerSortMode != ContainerSortMode.manual) return;
     if (newIndex > oldIndex) newIndex -= 1;
     final items = _buildDisplayItems();
-    final movedUri = items[oldIndex].uri;
+    final movedItem = items.removeAt(oldIndex);
+    items.insert(newIndex, movedItem);
+    final newOrder = items.map((item) => item.uri).toList();
     setState(() {
-      _recordsOrder.remove(movedUri);
-      _recordsOrder.insert(newIndex.clamp(0, _recordsOrder.length), movedUri);
+      _recordsOrder.clear();
+      _recordsOrder.addAll(newOrder);
     });
+    ContainerRepository.instance.saveOrder(_recordsOrder);
   }
 
   Widget _buildBody(List<VaultListItem> displayItems) {
@@ -844,6 +851,7 @@ class _FloatingUndoBar extends StatelessWidget {
     required this.label,
     required this.onUndo,
   });
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

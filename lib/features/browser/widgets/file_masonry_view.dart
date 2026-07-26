@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -137,50 +138,18 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     final fileEntries = widget.files;
     final total = dirEntries.length + fileEntries.length;
 
-    final columns = List.generate(_columnCount, (_) => <Widget>[]);
-    final columnHeights = List.filled(_columnCount, 0.0);
-
-    const estimatedColumnWidth = 160.0;
-
-    for (var i = 0; i < total; i++) {
-      final isDir = i < dirEntries.length;
-      final entry = isDir ? dirEntries[i] : fileEntries[i - dirEntries.length];
-      final fullPath = widget.currentDirPath.isEmpty
-          ? entry.name
-          : '${widget.currentDirPath}/${entry.name}';
-
-      final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
-      final ratio = _aspectRatioFor(entry, fullPath,
-          hasVisualPreview: hasVisualPreview);
-
-      final estimatedTileHeight = estimatedColumnWidth / ratio;
-      var shortestColumn = 0;
-      for (var c = 1; c < _columnCount; c++) {
-        if (columnHeights[c] < columnHeights[shortestColumn]) {
-          shortestColumn = c;
-        }
-      }
-
-      final tile = Padding(
-        key: ValueKey('${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}'),
-        padding: const EdgeInsets.only(bottom: 8),
-        child: AspectRatio(
-          aspectRatio: ratio,
-          child: isDir
-              ? _buildDirCell(context, entry)
-              : _buildFileCell(context, entry, fullPath),
-        ),
-      );
-
-      columns[shortestColumn].add(tile);
-      columnHeights[shortestColumn] +=
-          estimatedTileHeight + 8; // + the bottom padding above
+    if (total == 0) {
+      return const SizedBox.shrink();
     }
 
     return GestureDetector(
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
-      child: SingleChildScrollView(
+      child: MasonryGridView.count(
+        crossAxisCount: _columnCount,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        cacheExtent: 800,
         padding: EdgeInsets.fromLTRB(
           10,
           12,
@@ -188,19 +157,28 @@ class _FileMasonryViewState extends State<FileMasonryView> {
           AppSpacing.floatingStackClearance +
               MediaQuery.paddingOf(context).bottom,
         ),
-        child: total == 0
-            ? const SizedBox.shrink()
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var c = 0; c < _columnCount; c++) ...[
-                    if (c > 0) const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(children: columns[c]),
-                    ),
-                  ],
-                ],
-              ),
+        itemCount: total,
+        itemBuilder: (context, i) {
+          final isDir = i < dirEntries.length;
+          final entry =
+              isDir ? dirEntries[i] : fileEntries[i - dirEntries.length];
+          final fullPath = widget.currentDirPath.isEmpty
+              ? entry.name
+              : '${widget.currentDirPath}/${entry.name}';
+
+          final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
+          final ratio = _aspectRatioFor(entry, fullPath,
+              hasVisualPreview: hasVisualPreview);
+
+          return AspectRatio(
+            key: ValueKey(
+                '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}'),
+            aspectRatio: ratio,
+            child: isDir
+                ? _buildDirCell(context, entry)
+                : _buildFileCell(context, entry, fullPath),
+          );
+        },
       ),
     );
   }

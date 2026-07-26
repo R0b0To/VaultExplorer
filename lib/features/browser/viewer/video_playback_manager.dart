@@ -27,9 +27,11 @@ class VideoPlaybackManager {
     required String fileName,
     required String contentUriString,
     required bool autoPlay,
+    required double playbackSpeed,
   }) async {
     if (currentFileNotifier.value == fileName && _controllers.containsKey(fileName)) {
       final ctrl = _controllers[fileName]!;
+      await ctrl.setPlaybackSpeed(playbackSpeed);
       if (autoPlay) await ctrl.play();
       return;
     }
@@ -41,22 +43,33 @@ class VideoPlaybackManager {
       _scheduleDisposal(previousFile, prevCtrl);
     }
 
-    currentFileNotifier.value = fileName;
-
     NativeFFmpegController controller;
     if (_controllers.containsKey(fileName)) {
       controller = _controllers[fileName]!;
+      await controller.setPlaybackSpeed(playbackSpeed);
       if (autoPlay) await controller.play();
     } else {
       controller = NativeFFmpegController(
         contentUriString: contentUriString,
         autoPlay: autoPlay,
+        initialSpeed: playbackSpeed,
       );
       _controllers[fileName] = controller;
       unawaited(controller.initialize());
     }
 
+    // Assign the resolved controller *before* currentFileNotifier fires --
+    // listeners on currentFileNotifier (e.g. the screen's per-navigation
+    // resync) read activeController synchronously as soon as
+    // currentFileNotifier notifies, so activeControllerNotifier must already
+    // point at this (correct, just-resolved) controller by then. Doing this
+    // in the other order was what made a file-change handler apply settings
+    // like playback speed to the *previous* file's controller instead of the
+    // new one -- previousFile's controller was still "active" at the moment
+    // that listener ran.
     activeControllerNotifier.value = controller;
+    currentFileNotifier.value = fileName;
+
     _cleanupOldControllers(keepFiles: {fileName, if (previousFile != null) previousFile});
   }
 

@@ -79,7 +79,7 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
   Timer? _positionTicker;
   Duration _extrapolationAnchorPosition = Duration.zero;
   DateTime _extrapolationAnchorWallClock = DateTime.now();
-  double _currentSpeed = 1.0;
+  double _currentSpeed;
 
   void _resetExtrapolationAnchor() {
     _extrapolationAnchorPosition = value.position;
@@ -98,7 +98,12 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
     }
   }
 
-  NativeFFmpegController({required this.contentUriString, this.autoPlay = false}) : super(const NativeFFmpegValue());
+  NativeFFmpegController({
+    required this.contentUriString,
+    this.autoPlay = false,
+    double initialSpeed = 1.0,
+  })  : _currentSpeed = initialSpeed,
+        super(const NativeFFmpegValue());
 
   int? get textureId => _textureId;
 
@@ -125,6 +130,18 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
       'contentUri': contentUriString,
       'autoPlay': autoPlay,
     });
+
+    // Bring the native side up to the speed the previous item was playing
+    // at (_currentSpeed comes from initialSpeed above) -- setDataSource
+    // always (re)opens the native player at 1x, so without this every new
+    // controller silently drops back to normal speed the moment a fresh
+    // item is created, even though Dart's own _currentSpeed/UI state still
+    // say otherwise.
+    if (!_disposed && _currentSpeed != 1.0) {
+      try {
+        await _channel.invokeMethod('setRate', {'playerId': _playerId, 'rate': _currentSpeed});
+      } catch (_) {}
+    }
   }
 
   Future<void> switchTo(String newContentUriString, {bool autoPlay = false}) async {
@@ -216,7 +233,17 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
     _tickExtrapolatedPosition();
     _resetExtrapolationAnchor();
     _currentSpeed = speed;
-    if (!_disposed) await _channel.invokeMethod('setRate', {'playerId': _playerId, 'rate': speed});
+    if (_disposed || _playerId == null) return;
+    // Swallow failures here rather than letting them propagate: a speed
+    // change can legitimately land just as this controller is being torn
+    // down (e.g. right after swiping to the next item), in which case the
+    // native side has already discarded the player and returns an error
+    // for the id. That's a harmless no-op for a controller nobody is
+    // looking at anymore, not something that should surface as an
+    // unhandled exception.
+    try {
+      await _channel.invokeMethod('setRate', {'playerId': _playerId, 'rate': speed});
+    } catch (_) {}
   }
   Future<void> setLooping(bool loop) async {
     if (!_disposed) await _channel.invokeMethod('setLooping', {'playerId': _playerId, 'looping': loop});

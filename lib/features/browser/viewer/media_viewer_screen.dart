@@ -149,6 +149,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         fileName: file,
         contentUriString: _contentUriFor(file),
         autoPlay: _autoPlay,
+        playbackSpeed: _playbackSpeed,
       );
     } else {
       _playbackManager.pauseActive();
@@ -224,15 +225,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _updateWakelock(controller.value.isPlaying);
   }
 
-  // Fires on every navigation that switches the shared player to a
-  // different file (see VideoPlaybackManager.activate). Resets the
-  // progress display and reapplies the current playback speed to the
-  // (reused) controller — both of which used to happen implicitly as a
-  // side effect of _onActiveVideoControllerChanged firing per-file, back
-  // when each file had its own controller instance.
+  // Fires on every navigation that switches the player to a different file
+  // (see VideoPlaybackManager.activate). Just resets the progress display —
+  // playback speed is applied inside activate() itself, to whichever
+  // controller (new or reused) it actually resolves for the target file,
+  // rather than here via activeController (which, at the moment this
+  // listener runs, could still be pointing at the previous file).
   void _onCurrentMediaFileChanged() {
     _videoProgressNotifier.value = const VideoPlaybackProgress();
-    _playbackManager.activeController?.setPlaybackSpeed(_playbackSpeed);
   }
 
   void _onControllerTickUpdate() {
@@ -240,14 +240,25 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     if (controller == null || controller.value.hasError) return;
     _updateWakelock(controller.value.isPlaying);
     final isInitialized = controller.value.isInitialized;
-    final progress = _videoProgressNotifier.value;
+    // Read straight off the controller rather than _videoProgressNotifier:
+    // that notifier is only updated by MediaPlayerWidget's own listener,
+    // deferred to a postFrameCallback, so at the instant this handler runs
+    // (synchronously, in the same notifyListeners() call as the native
+    // endReached event) it still reflects the *previous* frame's position —
+    // never quite caught up to duration yet. Checking controller.value
+    // directly means this fires reliably the moment endReached lands,
+    // instead of only on whatever later event happens to fire next (e.g.
+    // pressing play, which is what made it look like a manual press was
+    // required to advance).
+    final position = controller.value.position;
+    final duration = controller.value.duration;
     // Looping itself is handled natively now (VlcPlayerEngine bakes
     // input-repeat into the Media whenever setLooping(true) is in
     // effect) — this listener only needs to care about auto-advance.
     if (isInitialized &&
         _videoPlaybackMode == VideoPlaybackMode.playAndAdvance &&
-        progress.duration > Duration.zero &&
-        progress.position >= progress.duration) {
+        duration > Duration.zero &&
+        position >= duration) {
       if (!_transitionInProgress) {
         _navigateToNext();
       }

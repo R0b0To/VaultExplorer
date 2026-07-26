@@ -58,7 +58,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
       widget.existingRecord?.containerFormat ??
       widget.mountedContainer?.containerFormat ??
       'veracrypt';
-
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(_containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(_containerFormat);
   bool get _isCryfs => ContainerFormat.isCryfsWire(_containerFormat);
@@ -66,6 +65,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
 
   bool _saving = false;
   bool _loadingPassword = true;
+
   late String _initialLabel;
   late ContainerUnlockMethod _initialUnlockMethod;
   late int _initialAutoCloseMins;
@@ -104,11 +104,18 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
         rec?.cacheDerivedKey ?? widget.appSettings?.defaultDerivedKeyCacheEnabled ?? false;
     _cipherId = _initialCipherId;
     _hashId = _initialHashId;
-    _settingsLocked = rec != null;
+
+    // Grant 1 minute window post-unlock to access security settings without re-authenticating
+    final recentlyUnlocked = widget.mountedContainer != null &&
+        DateTime.now().difference(widget.mountedContainer!.mountedAt) <
+            const Duration(minutes: 1);
+    _settingsLocked = rec != null && !recentlyUnlocked;
+
     _initAsync();
   }
 
   bool _clearingCache = false;
+
   Future<void> _clearThumbnailCache() async {
     final confirm = await showAppConfirmDialog(
       context,
@@ -119,7 +126,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
       isDestructive: true,
     );
     if (!confirm || !mounted) return;
-
     setState(() => _clearingCache = true);
     bool appCacheCleared = false;
     bool containerCacheCleared = false;
@@ -227,15 +233,11 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   bool get _wasPasswordless =>
       widget.existingRecord == null ||
       widget.existingRecord!.unlockMethod == ContainerUnlockMethod.password;
-
   bool get _unlockMethodNeedsPassword =>
       _unlockMethod != ContainerUnlockMethod.password;
-
   bool get _needsPasswordSetup => false;
-
   bool get _needsPatternSetup =>
       _unlockMethod == ContainerUnlockMethod.pattern && _patternHash == null;
-
   bool get _canSave => !_needsPasswordSetup && !_needsPatternSetup;
 
   Future<void> _save() async {
@@ -374,7 +376,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -405,7 +406,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ── General ─────────────────────────────────────────────
                   SectionHeader('General'),
                   SectionCard(
                     children: [
@@ -427,8 +427,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // ── Security & Credentials ──────────────────────────────
                   SectionHeader('Security & Credentials'),
                   SectionCard(
                     children: [
@@ -700,8 +698,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // ── System & Integration ────────────────────────────────
                   SectionHeader('System & Integration'),
                   SectionCard(
                     children: [
@@ -734,8 +730,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-
-                  // ── Thumbnail Storage ──────────────────────────────────
                   SectionHeader('Thumbnail Storage'),
                   SectionCard(
                     children: [
@@ -1277,7 +1271,6 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
 
 class _DisplayNameDialog extends StatefulWidget {
   final String initialText;
-
   const _DisplayNameDialog({required this.initialText});
 
   @override
@@ -1322,4 +1315,3 @@ class _DisplayNameDialogState extends State<_DisplayNameDialog> {
     );
   }
 }
-

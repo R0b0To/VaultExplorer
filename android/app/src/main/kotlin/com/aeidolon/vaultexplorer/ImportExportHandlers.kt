@@ -114,6 +114,39 @@ class ImportExportHandlers(
     }
 
     /**
+     * Raw-file counterpart of [exportEntryRecursive]. Since decryption
+     * already goes through [ContainerFileSystem.extractToFile] (native
+     * writes straight to a destination path), a raw destination lets us
+     * decrypt directly into the final location — no cache temp file, no
+     * SAF create/open round trip per item.
+     */
+    private fun exportEntryRecursiveRaw(
+        destParent: File, fatPath: String, isDir: Boolean, volId: Int
+    ): Int {
+        val name = fatPath.substringAfterLast("/")
+        if (!isDir) {
+            return try {
+                val target = File(destParent, name)
+                if (target.exists()) target.delete()
+                val ok = ContainerFileSystem.extractToFile(volId, fatPath, target.absolutePath)
+                if (ok && target.exists()) 1 else 0
+            } catch (_: Exception) { 0 }
+        }
+        val destDir = File(destParent, name)
+        if (!destDir.exists() && !destDir.mkdirs()) return 0
+        val children = ContainerFileSystem.listDirectory(volId, fatPath) ?: return 0
+        var count = 0
+        for (entry in children) {
+            if (entry.startsWith("System:")) continue
+            val childIsDir = entry.startsWith("[DIR] ")
+            val childName = if (childIsDir) entry.substringAfter("[DIR] ").substringBefore("|")
+                            else entry.substringBefore("|")
+            count += exportEntryRecursiveRaw(destDir, "$fatPath/$childName", childIsDir, volId)
+        }
+        return count
+    }
+
+    /**
      * Resolves [uri] (single-document or tree) to a raw [File] when "All
      * Files Access" (MANAGE_EXTERNAL_STORAGE) is granted and the document
      * lives on local external storage. Returns null otherwise — including
@@ -398,12 +431,21 @@ class ImportExportHandlers(
             ioExecutor.execute {
                 try {
                     var successCount = 0
-                    val destTree = DocumentFile.fromTreeUri(activity, treeUri)
-                    if (destTree != null) {
+                    val rawDestTree = rawFileFor(treeUri)
+                    if (rawDestTree != null) {
                         for (item in pending.items) {
                             val path  = item["path"] as? String ?: continue
                             val isDir = item["isDir"] as? Boolean ?: false
-                            successCount += exportEntryRecursive(destTree, path, isDir, pending.containerUri, pending.volId)
+                            successCount += exportEntryRecursiveRaw(rawDestTree, path, isDir, pending.volId)
+                        }
+                    } else {
+                        val destTree = DocumentFile.fromTreeUri(activity, treeUri)
+                        if (destTree != null) {
+                            for (item in pending.items) {
+                                val path  = item["path"] as? String ?: continue
+                                val isDir = item["isDir"] as? Boolean ?: false
+                                successCount += exportEntryRecursive(destTree, path, isDir, pending.containerUri, pending.volId)
+                            }
                         }
                     }
                     activity.runOnUiThread { res.success(successCount) }
@@ -481,18 +523,24 @@ class ImportExportHandlers(
             val destUri = data.data!!
             ioExecutor.execute {
                 try {
-                    val tempFile = File(activity.cacheDir, "export_temp")
-                    val ok = ContainerFileSystem.extractToFile(pending.volId, pending.sourcePath, tempFile.absolutePath)
-
-                    if (ok && tempFile.exists()) {
-                        activity.contentResolver.openOutputStream(destUri)?.use { out ->
-                            tempFile.inputStream().use { it.copyTo(out) }
-                        }
-                        tempFile.delete()
-                        activity.runOnUiThread { res.success(true) }
+                    val rawDest = rawFileFor(destUri)
+                    if (rawDest != null) {
+                        val ok = ContainerFileSystem.extractToFile(pending.volId, pending.sourcePath, rawDest.absolutePath)
+                        activity.runOnUiThread { res.success(ok && rawDest.exists()) }
                     } else {
-                        tempFile.delete()
-                        activity.runOnUiThread { res.success(false) }
+                        val tempFile = File(activity.cacheDir, "export_temp")
+                        val ok = ContainerFileSystem.extractToFile(pending.volId, pending.sourcePath, tempFile.absolutePath)
+
+                        if (ok && tempFile.exists()) {
+                            activity.contentResolver.openOutputStream(destUri)?.use { out ->
+                                tempFile.inputStream().use { it.copyTo(out) }
+                            }
+                            tempFile.delete()
+                            activity.runOnUiThread { res.success(true) }
+                        } else {
+                            tempFile.delete()
+                            activity.runOnUiThread { res.success(false) }
+                        }
                     }
                 } catch (e: Exception) {
                     activity.runOnUiThread { nativeOps.dispatchNativeError(e, res) }

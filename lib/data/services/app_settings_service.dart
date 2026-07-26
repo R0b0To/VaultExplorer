@@ -6,7 +6,6 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
-import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:flutter/material.dart';
 export 'container_repository.dart'
     show ContainerRepository, ContainerRecord, ContainerUnlockMethod;

@@ -324,6 +324,34 @@ set(MKNTFS_EMBEDDED_SOURCE ${CMAKE_CURRENT_BINARY_DIR}/mkntfs_embedded.c)
 file(WRITE ${MKNTFS_EMBEDDED_SOURCE}
 "#include <ntfs-3g/device.h>\nextern struct ntfs_device_operations vExplorer_ntfs_ops;\n#undef ntfs_device_default_io_ops\n#define ntfs_device_default_io_ops vExplorer_ntfs_ops\n#define VERSION \"embedded\"\n#define main vaultexplorer_mkntfs_main\n#include \"${ntfs3g_SOURCE_DIR}/ntfsprogs/mkntfs.c\"\n")
 
+
+# --- FFmpeg & Oboe Player Engine ---
+set(FFMPEG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ffmpeg/${ANDROID_ABI})
+
+add_library(avcodec SHARED IMPORTED)
+set_target_properties(avcodec PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavcodec.so)
+
+add_library(avformat SHARED IMPORTED)
+set_target_properties(avformat PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavformat.so)
+
+add_library(avutil SHARED IMPORTED)
+set_target_properties(avutil PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavutil.so)
+
+add_library(swscale SHARED IMPORTED)
+set_target_properties(swscale PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libswscale.so)
+
+add_library(swresample SHARED IMPORTED)
+set_target_properties(swresample PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libswresample.so)
+
+FetchContent_Declare(
+        oboe
+        GIT_REPOSITORY https://github.com/google/oboe.git
+        GIT_TAG        1.10.0
+)
+FetchContent_MakeAvailable(oboe)
+
+
+
 # 4. Build target: FatFs + original code + VeraCrypt crypto primitives + NTFS-3G
 add_library(
         vaultexplorer
@@ -387,11 +415,26 @@ add_library(
         ${MKNTFS_EMBEDDED_SOURCE}
 )
 
+target_sources(vaultexplorer PRIVATE
+    player/ffmpeg_player.cpp
+    player/jni_player_bridge.cpp
+)
+
 # 16 KB page-size ELF alignment for the LOAD segments of this .so, so it
 # stays valid on 16 KB-page-size devices (Android 15+) regardless of which
 # NDK version happens to be active (NDK r28+ defaults to this already, but
 # pinning it explicitly here doesn't depend on that).
-target_link_options(vaultexplorer PRIVATE "-Wl,-z,max-page-size=16384")
+#
+# Both flags are required for NDK r27 and earlier -- Android's own docs
+# (developer.android.com/guide/practices/page-sizes) call out
+# common-page-size as well, not just max-page-size: max-page-size alone
+# controls the largest page size the linker will *accept* mapping
+# segments to, but common-page-size is what actually controls the
+# alignment/padding the linker uses when laying out LOAD segments. Without
+# it, segments can still end up padded to the old 4 KB boundary.
+target_link_options(vaultexplorer PRIVATE
+        "-Wl,-z,max-page-size=16384"
+        "-Wl,-z,common-page-size=16384")
 
 # Force core.c to include your local thread.h at compile time without modifying core.c on disk
 set_source_files_properties(${VC_ARGON2_DIR}/src/core.c
@@ -427,6 +470,7 @@ target_include_directories(
         ${ntfs3g_SOURCE_DIR}/include/ntfs-3g
         ${ntfs3g_SOURCE_DIR}/ntfsprogs
         ${CMAKE_CURRENT_BINARY_DIR} # config.h location
+        ${FFMPEG_DIR}/include
         ${VC_CRYPTO_DIR}
         ${VC_SRC_DIR}
         ${VC_ARGON2_DIR}/include
@@ -447,6 +491,7 @@ target_link_libraries(
         e2fs_ext2fs
         e2fs_com_err
         e2fs_uuid
+        avcodec avformat avutil swscale swresample oboe android
         cjson
         dislocker_lib)
 

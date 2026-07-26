@@ -1,0 +1,14 @@
+prefix=/home/aeidolon/android/app/src/main/cpp/ffmpeg/arm64-v8a
+exec_prefix=${prefix}
+libdir=/home/aeidolon/android/app/src/main/cpp/ffmpeg/arm64-v8a/lib
+includedir=/home/aeidolon/android/app/src/main/cpp/ffmpeg/arm64-v8a/include
+
+Name: libavutil
+Description: FFmpeg utility library
+Version: 60.26.102
+Requires: 
+Requires.private: 
+Conflicts:
+Libs: -L${libdir}  -lavutil 
+Libs.private: -lm -lz -latomic -landroid -lmediandk -pthread
+Cflags: -I${includedir}

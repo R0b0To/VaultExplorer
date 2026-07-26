@@ -92,7 +92,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val fullResExecutor = Executors.newFixedThreadPool(2)
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
-    private var vlcPlayerPlugin: com.aeidolon.vaultexplorer.vlcplayer.VlcPlayerPlugin? = null
+    private var ffmpegPlayerPlugin: com.aeidolon.vaultexplorer.ffmpegplayer.FFmpegPlayerPlugin? = null
     private val pendingResult = PendingActivityResult()
     private val nativeOps = NativeOpSupport(this, ioExecutor)
     private val derivedKeyHandlers = DerivedKeyHandlers(this, ioExecutor, nativeOps)
@@ -110,8 +110,8 @@ class MainActivity : FlutterFragmentActivity() {
         usbPermissionReceiver?.let { unregisterReceiver(it) }
         usbDetachReceiver?.let { unregisterReceiver(it) }
         screenOffReceiver?.let { unregisterReceiver(it) }
-        vlcPlayerPlugin?.disposeAll()
-        vlcPlayerPlugin = null
+        ffmpegPlayerPlugin?.disposeAll()
+        ffmpegPlayerPlugin = null
         super.onDestroy()
     }
 
@@ -122,11 +122,11 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        vlcPlayerPlugin = com.aeidolon.vaultexplorer.vlcplayer.VlcPlayerPlugin(
-            applicationContext,
-            flutterEngine.dartExecutor.binaryMessenger,
-            flutterEngine.renderer,
-        )
+ffmpegPlayerPlugin = com.aeidolon.vaultexplorer.ffmpegplayer.FFmpegPlayerPlugin(
+    applicationContext,
+    flutterEngine.dartExecutor.binaryMessenger,
+    flutterEngine.renderer,
+)
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel
         UnlockProgressBridge.channel = channel

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:vaultexplorer/features/browser/viewer/native_vlc_controller.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -19,6 +18,8 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_botto
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+
+import 'native_ffmpeg_controller.dart';
 
 enum VideoPlaybackMode { playOnce, loop, playAndAdvance }
 
@@ -84,7 +85,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   
   final Map<String, GlobalKey> _mediaKeys = {};
 
-  NativeVlcController? _lastListenedController;
+  NativeFFmpegController? _lastListenedController;
   bool _wakelockEnabled = false;
 
   int _transitionToken = 0;

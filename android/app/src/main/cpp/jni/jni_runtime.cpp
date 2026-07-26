@@ -15,6 +15,8 @@ jmethodID g_progressReportMethod = nullptr;
 jclass    g_illegalStateExceptionClass = nullptr;
 jclass    g_unlockCancelledExceptionClass = nullptr;
 
+extern "C" int av_jni_set_java_vm(void *vm, void *log_ctx);
+
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     g_vm = vm;
     JNIEnv* env = nullptr;

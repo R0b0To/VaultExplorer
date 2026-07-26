@@ -9,8 +9,9 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
-import 'package:vaultexplorer/features/browser/viewer/native_vlc_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
+
+import '../native_ffmpeg_controller.dart';
 
 class VideoPlaybackProgress {
   final Duration position;
@@ -93,7 +94,7 @@ class MediaPlayerWidget extends StatefulWidget {
 
 class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
-  NativeVlcController? _boundController;
+  NativeFFmpegController? _boundController;
   bool _isActive = false;
   bool _initialized = false;
   String? _playerError;
@@ -464,7 +465,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             else
               RotatedBox(
                 quarterTurns: widget.rotationQuarterTurns,
-                child: NativeVlcPlayerView(controller: controller),
+                child: NativeFFmpegPlayerView(controller: controller),
               ),
             if (!widget.isAudio && widget.subtitlesEnabled)
               Positioned(

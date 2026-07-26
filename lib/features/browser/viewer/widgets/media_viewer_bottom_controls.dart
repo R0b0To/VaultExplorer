@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
-import 'package:vaultexplorer/features/browser/viewer/native_vlc_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
+
+import '../native_ffmpeg_controller.dart';
 
 class MediaViewerBottomControls extends StatelessWidget {
   final PlaylistController playlistController;
@@ -357,7 +358,7 @@ class MediaViewerBottomControls extends StatelessWidget {
     final bool isLast =
         playlistController.currentIndex == playlistController.playlist.length - 1;
 
-    return ValueListenableBuilder<NativeVlcController?>(
+    return ValueListenableBuilder<NativeFFmpegController?>(
       valueListenable: playbackManager.activeControllerNotifier,
       builder: (context, activeCtrl, _) {
         if (isImage || activeCtrl == null) {
@@ -370,7 +371,7 @@ class MediaViewerBottomControls extends StatelessWidget {
           );
         }
 
-        return ValueListenableBuilder<NativeVlcValue>(
+        return ValueListenableBuilder<NativeFFmpegValue>(
           valueListenable: activeCtrl,
           builder: (context, vlcValue, _) {
             final bool isPlayingState = vlcValue.isPlaying;

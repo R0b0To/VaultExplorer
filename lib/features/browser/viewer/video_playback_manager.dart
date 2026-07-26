@@ -1,24 +1,22 @@
+// File: lib/features/browser/viewer/video_playback_manager.dart
 import 'package:flutter/foundation.dart';
-import 'package:vaultexplorer/features/browser/viewer/native_vlc_controller.dart';
-
+import 'package:vaultexplorer/features/browser/viewer/native_ffmpeg_controller.dart';
 
 class VideoPlaybackManager {
-  NativeVlcController? _controller;
-
-
+  NativeFFmpegController? _controller;
   final ValueNotifier<String?> currentFileNotifier = ValueNotifier<String?>(null);
   String? get currentFileName => currentFileNotifier.value;
 
-  final ValueNotifier<NativeVlcController?> activeControllerNotifier =
-      ValueNotifier<NativeVlcController?>(null);
-  NativeVlcController? get activeController => activeControllerNotifier.value;
+  final ValueNotifier<NativeFFmpegController?> activeControllerNotifier =
+      ValueNotifier<NativeFFmpegController?>(null);
+
+  NativeFFmpegController? get activeController => activeControllerNotifier.value;
 
   final Map<String, bool> _subtitlesAvailableMap = {};
   bool isSubtitleAvailable(String fileName) => _subtitlesAvailableMap[fileName] ?? false;
   void updateSubtitleStatus(String fileName, bool available) {
     _subtitlesAvailableMap[fileName] = available;
   }
-
 
   Future<void> activate({
     required String fileName,
@@ -29,12 +27,10 @@ class VideoPlaybackManager {
       if (autoPlay) await _controller!.play();
       return;
     }
-
     currentFileNotifier.value = fileName;
-
     final existing = _controller;
     if (existing == null) {
-      final controller = NativeVlcController(
+      final controller = NativeFFmpegController(
         contentUriString: contentUriString,
         autoPlay: autoPlay,
       );
@@ -42,15 +38,11 @@ class VideoPlaybackManager {
       activeControllerNotifier.value = controller;
       await controller.initialize();
     } else {
-
       await existing.switchTo(contentUriString, autoPlay: autoPlay);
     }
   }
 
-
-  void pauseActive() {
-    _controller?.pause();
-  }
+  void pauseActive() => _controller?.pause();
 
   void dispose() {
     currentFileNotifier.dispose();

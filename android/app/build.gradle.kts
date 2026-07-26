@@ -42,7 +42,11 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments("-DCMAKE_BUILD_TYPE=Release")
+                arguments(
+                    "-DCMAKE_BUILD_TYPE=Release",
+                    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384",
+                    "-DCMAKE_MODULE_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
+                )
                 cFlags("-O3", "-funroll-loops")
                 cppFlags("-O3", "-funroll-loops")
             }
@@ -88,6 +92,5 @@ flutter {
 
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
-    implementation("org.videolan.android:libvlc-all:3.6.3")
     testImplementation("junit:junit:4.13.2")
 }

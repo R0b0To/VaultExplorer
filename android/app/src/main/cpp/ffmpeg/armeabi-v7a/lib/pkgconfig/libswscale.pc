@@ -1,0 +1,14 @@
+prefix=/home/aeidolon/android/app/src/main/cpp/ffmpeg/armeabi-v7a
+exec_prefix=${prefix}
+libdir=/home/aeidolon/android/app/src/main/cpp/ffmpeg/armeabi-v7a/lib
+includedir=/home/aeidolon/android/app/src/main/cpp/ffmpeg/armeabi-v7a/include
+
+Name: libswscale
+Description: FFmpeg image rescaling library
+Version: 9.5.102
+Requires: 
+Requires.private: libavutil >= 60.26.102
+Conflicts:
+Libs: -L${libdir}  -lswscale 
+Libs.private: -lm -latomic
+Cflags: -I${includedir}

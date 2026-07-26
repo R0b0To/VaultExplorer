@@ -1,0 +1,14 @@
+prefix=/home/aeidolon/android/app/src/main/cpp/ffmpeg/arm64-v8a
+exec_prefix=${prefix}
+libdir=/home/aeidolon/android/app/src/main/cpp/ffmpeg/arm64-v8a/lib
+includedir=/home/aeidolon/android/app/src/main/cpp/ffmpeg/arm64-v8a/include
+
+Name: libavformat
+Description: FFmpeg container format library
+Version: 62.12.102
+Requires: 
+Requires.private: libavcodec >= 62.28.102, libswresample >= 6.3.102, libavutil >= 60.26.102
+Conflicts:
+Libs: -L${libdir}  -lavformat 
+Libs.private: -lm -latomic -lz
+Cflags: -I${includedir}

@@ -37,6 +37,43 @@ class ImportExportHandlers(
     private data class PendingExportFile(val containerUri: String, val sourcePath: String, val volId: Int)
     private var pendingExportFile: PendingExportFile? = null
 
+    private fun existingNamesLowercase(volId: Int, dirPath: String): Set<String> {
+        val entries = ContainerFileSystem.listDirectory(volId, dirPath) ?: return emptySet()
+        return entries.mapNotNull { entry ->
+            if (entry.startsWith("System:")) return@mapNotNull null
+            val isDir = entry.startsWith("[DIR] ")
+            val name = if (isDir) entry.substringAfter("[DIR] ").substringBefore("|")
+                       else entry.substringBefore("|")
+            name.lowercase()
+        }.toSet()
+    }
+
+    /**
+     * Returns [desiredName] unchanged if nothing in [dirPath] already has
+     * that name (case-insensitively), otherwise appends " (1)", " (2)", etc.
+     * (preserving the file extension, if any) until it finds a free name.
+     *
+     * Import previously wrote straight to the sanitized source name, so a
+     * file/folder already at the destination was silently overwritten.
+     * Every import target now goes through this first.
+     */
+    private fun uniqueImportName(volId: Int, dirPath: String, desiredName: String): String {
+        val existing = existingNamesLowercase(volId, dirPath)
+        if (desiredName.lowercase() !in existing) return desiredName
+
+        val dot = desiredName.lastIndexOf('.')
+        val hasExt = dot > 0 && dot < desiredName.length - 1
+        val base = if (hasExt) desiredName.substring(0, dot) else desiredName
+        val ext = if (hasExt) desiredName.substring(dot) else ""
+
+        var n = 1
+        while (true) {
+            val candidate = "$base ($n)$ext"
+            if (candidate.lowercase() !in existing) return candidate
+            n++
+        }
+    }
+
     private fun exportEntryRecursive(
         destParent: DocumentFile, fatPath: String, isDir: Boolean,
         containerUri: String, volId: Int
@@ -217,7 +254,8 @@ class ImportExportHandlers(
                         val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                         var successCount = 0
                         for (srcDoc in srcDocs) {
-                            val name = FatFileNameSanitizer.sanitize(srcDoc.name ?: "imported_file")
+                            val rawName = FatFileNameSanitizer.sanitize(srcDoc.name ?: "imported_file")
+                            val name = uniqueImportName(pending.volId, pending.targetDir, rawName)
                             val targetFatPath = if (pending.targetDir.isEmpty()) name else "${pending.targetDir}/$name"
                             successCount += importEntryRecursive(
                                 srcDoc, pending.containerUri, targetFatPath, pending.volId,
@@ -291,7 +329,8 @@ class ImportExportHandlers(
             val srcRoot = DocumentFile.fromTreeUri(activity, treeUri)
             if (srcRoot != null) {
                 ImportSourceRegistry.recordFolder(pending.opId, treeUri)
-                val folderName = FatFileNameSanitizer.sanitize(srcRoot.name ?: "imported_folder")
+                val rawFolderName = FatFileNameSanitizer.sanitize(srcRoot.name ?: "imported_folder")
+                val folderName = uniqueImportName(pending.volId, pending.targetDir, rawFolderName)
                 val targetFatPath = if (pending.targetDir.isEmpty()) folderName else "${pending.targetDir}/$folderName"
                 ioExecutor.execute {
                     try {

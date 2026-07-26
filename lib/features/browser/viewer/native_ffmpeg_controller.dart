@@ -160,6 +160,24 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
     if (!_disposed) await _channel.invokeMethod('setLooping', {'playerId': _playerId, 'looping': loop});
   }
 
+  /// Best-effort technical diagnostics (codec, frame rate, bitrate, sample
+  /// rate...) read directly from the container/track metadata on the native
+  /// side, independent of the decode pipeline. Returns an empty map if the
+  /// player isn't ready yet or nothing could be determined -- callers should
+  /// treat every field as optional.
+  Future<Map<String, dynamic>> getDiagnostics() async {
+    if (_disposed || _playerId == null) return const {};
+    try {
+      final result = await _channel.invokeMapMethod<String, dynamic>(
+        'getDiagnostics',
+        {'playerId': _playerId},
+      );
+      return result ?? const {};
+    } catch (_) {
+      return const {};
+    }
+  }
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;

@@ -16,6 +16,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widge
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_top_bar.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_bottom_controls.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_sheet.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -702,6 +703,24 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     ).whenComplete(_menuClosed);
   }
 
+  void _showDiagnostics(BuildContext context) {
+    final controller = _playbackManager.activeController;
+    if (controller == null) return;
+    _menuOpened();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return MediaDiagnosticsSheet(
+          fileName: _playlistController.currentFile,
+          controller: controller,
+          playbackSpeed: _playbackSpeed,
+        );
+      },
+    ).whenComplete(_menuClosed);
+  }
+
   void _updateWakelock(bool enable) {
     if (_wakelockEnabled != enable) {
       _wakelockEnabled = enable;
@@ -977,6 +996,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
                   },
                   onAdvancedSettingsPressed: () => _showAdvancedSettings(context, isImg),
+                  onDiagnosticsPressed: isImg ? null : () => _showDiagnostics(context),
                   onStartHideTimer: _startHideTimer,
                   onShowUIChanged: _setUIVisibility,
                   isCarouselVisible: _isCarouselVisible,

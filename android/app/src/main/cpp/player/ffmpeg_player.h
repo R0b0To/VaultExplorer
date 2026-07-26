@@ -4,6 +4,7 @@
 #include <android/native_window.h>
 #include <string>
 #include <atomic>
+#include <cstdint>
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -35,6 +36,15 @@ public:
     void setVolume(int volume);
     void setPlaybackSpeed(float speed);
     void setLooping(bool looping);
+
+    // Synchronous, JNI-thread-safe snapshot of decoder-level diagnostics
+    // (codec, resolution, frame rate, bitrate, live frame counters...) for
+    // the debug overlay. Unlike notifyEvent(), this is a pull rather than a
+    // push -- called directly from the JNI bridge function on whatever
+    // thread the Flutter method channel call arrived on, using the JNIEnv
+    // JNI already handed that thread, so it doesn't need getJniEnv()'s
+    // attach dance. Returns a local ref to a new java.util.HashMap.
+    jobject getDiagnosticsSnapshot(JNIEnv* env);
 
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream* audioStream, void* audioData, int32_t numFrames) override;
 
@@ -93,6 +103,24 @@ private:
     int media_fd = -1;
     int64_t media_size = 0;
 
+    // Guards format_ctx/io_ctx/video_codec_ctx/audio_codec_ctx against a
+    // genuine use-after-free between stop() freeing them and
+    // getDiagnosticsSnapshot() reading them. Every other access to these
+    // pointers (demux_thread/video_thread/audio_thread) is already safe
+    // without it: those threads are always join()'d by stop() before it
+    // frees anything (see stop()'s ordering), so there's no concurrent
+    // free/use between them. getDiagnosticsSnapshot() is different -- it's
+    // called directly from whatever thread the Flutter method channel
+    // handed the JNI bridge, with no join() or other ordering against
+    // stop() at all, so without this lock a stop() (e.g. the user backing
+    // out of the viewer) racing a diagnostics call could free one of these
+    // out from under it. Held only briefly at each assignment/free site
+    // (not across avformat_open_input/avformat_find_stream_info, which can
+    // block for a while) and for the duration of getDiagnosticsSnapshot's
+    // read -- see that function for why the whole read has to be inside
+    // the lock rather than just the null-checks.
+    std::mutex native_state_mutex;
+
     AVFormatContext* format_ctx = nullptr;
     AVIOContext* io_ctx = nullptr;
     
@@ -119,6 +147,21 @@ private:
     std::vector<float> audio_buffer;
     std::atomic<double> audio_clock{0.0};
     std::atomic<double> video_clock{0.0};
+
+    // Diagnostics-only counters read by getDiagnosticsSnapshot(). Written
+    // exclusively from video_thread (videoDecodeThreadFunc), so no mutex is
+    // needed for the writes themselves -- only atomic for the cross-thread
+    // read from getDiagnosticsSnapshot(). measured_fps is a rolling actual-
+    // render rate (distinct from the container's declared avg_frame_rate),
+    // recomputed once per ~1s window using a monotonic clock so it isn't
+    // affected by system clock adjustments. fps_window_reset_requested lets
+    // performPendingSeek() (demux_thread) ask video_thread to restart that
+    // window after a seek, so one post-seek window doesn't get diluted by
+    // the stall while queues were flushed/refilled.
+    std::atomic<double> measured_fps{0.0};
+    std::atomic<uint64_t> frames_rendered_total{0};
+    std::atomic<uint64_t> frames_decoded_total{0};
+    std::atomic<bool> fps_window_reset_requested{false};
 
     SwsContext* sws_ctx = nullptr;
 };

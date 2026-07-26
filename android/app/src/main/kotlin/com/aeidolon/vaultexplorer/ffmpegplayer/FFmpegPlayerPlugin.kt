@@ -74,6 +74,13 @@ class FFmpegPlayerPlugin(
                     engine.setLooping(args["looping"] as? Boolean ?: false)
                     result.success(null)
                 }
+                "getDiagnostics" -> withEngine(call, result) { engine, _ ->
+                    // Unlike the fire-and-forget calls above, this one waits for
+                    // engine.getDiagnostics' async callback before resolving --
+                    // there's no separate event-channel notification for it, so
+                    // the method result itself has to carry the answer.
+                    engine.getDiagnostics { diagnostics -> result.success(diagnostics) }
+                }
                 "dispose" -> {
                     val id = (call.arguments as Map<*, *>)["playerId"] as Number
                     disposePlayer(id.toLong())

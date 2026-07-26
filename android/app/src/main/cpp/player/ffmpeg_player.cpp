@@ -137,6 +137,14 @@ void FFmpegPlayer::setDataSource(int fd, bool autoPlay) {
     seek_requested = false;
     input_eof = false;
 
+    // Fresh counters for the new source. No fps_window_reset_requested
+    // needed here (unlike after a seek) -- video_thread is a brand new
+    // thread below, so its own local fps-window variables start clean by
+    // construction.
+    measured_fps = 0.0;
+    frames_rendered_total = 0;
+    frames_decoded_total = 0;
+
     demux_thread = std::thread(&FFmpegPlayer::demuxThreadFunc, this);
 }
 
@@ -186,10 +194,20 @@ void FFmpegPlayer::stop() {
     if (audio_thread.joinable()) audio_thread.join();
 
     // 3. Safe cleanup
-    if (video_codec_ctx) { avcodec_free_context(&video_codec_ctx); video_codec_ctx = nullptr; }
-    if (audio_codec_ctx) { avcodec_free_context(&audio_codec_ctx); audio_codec_ctx = nullptr; }
-    if (format_ctx) { avformat_close_input(&format_ctx); format_ctx = nullptr; }
-    if (io_ctx) { av_freep(&io_ctx->buffer); avio_context_free(&io_ctx); io_ctx = nullptr; }
+    //
+    // format_ctx/video_codec_ctx/audio_codec_ctx/io_ctx are freed under
+    // native_state_mutex -- see that field's comment in the header --
+    // since getDiagnosticsSnapshot() can be called from a completely
+    // unrelated thread at any time, including right now, with no join() or
+    // other happens-before relationship to this function to rely on
+    // instead.
+    {
+        std::lock_guard<std::mutex> lock(native_state_mutex);
+        if (video_codec_ctx) { avcodec_free_context(&video_codec_ctx); video_codec_ctx = nullptr; }
+        if (audio_codec_ctx) { avcodec_free_context(&audio_codec_ctx); audio_codec_ctx = nullptr; }
+        if (format_ctx) { avformat_close_input(&format_ctx); format_ctx = nullptr; }
+        if (io_ctx) { av_freep(&io_ctx->buffer); avio_context_free(&io_ctx); io_ctx = nullptr; }
+    }
     if (swr_ctx) { swr_free(&swr_ctx); swr_ctx = nullptr; }
     if (sws_ctx) { sws_freeContext(sws_ctx); sws_ctx = nullptr; }
 
@@ -277,6 +295,11 @@ void FFmpegPlayer::performPendingSeek() {
     // longer at end-of-stream, so audio_clock is trustworthy again -- see
     // videoDecodeThreadFunc's A/V-sync block.
     input_eof = false;
+    // Same idea for the measured-fps window: the queue-flush/refill stall
+    // this seek just caused isn't representative of steady-state render
+    // rate, so have video_thread restart its window from here rather than
+    // let the stall dilute whatever window it was mid-way through.
+    fps_window_reset_requested = true;
     notifyEvent("timeChanged", (double)targetMs, (double)format_ctx->duration / AV_TIME_BASE * 1000);
 }
 
@@ -284,12 +307,130 @@ void FFmpegPlayer::setVolume(int v) { volume_multiplier = v / 100.0f; }
 void FFmpegPlayer::setPlaybackSpeed(float speed) { playback_speed = speed; }
 void FFmpegPlayer::setLooping(bool loop) { looping = loop; }
 
+jobject FFmpegPlayer::getDiagnosticsSnapshot(JNIEnv* env) {
+    jclass mapClass = env->FindClass("java/util/HashMap");
+    jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
+    jmethodID put = env->GetMethodID(mapClass, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+    jobject map = env->NewObject(mapClass, mapInit);
+
+    auto putString = [&](const char* key, const char* value) {
+        if (!value) return;
+        jstring k = env->NewStringUTF(key);
+        jstring v = env->NewStringUTF(value);
+        env->CallObjectMethod(map, put, k, v);
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(v);
+    };
+    auto putInt = [&](const char* key, int value) {
+        jstring k = env->NewStringUTF(key);
+        jclass boxClass = env->FindClass("java/lang/Integer");
+        jmethodID boxInit = env->GetMethodID(boxClass, "<init>", "(I)V");
+        jobject v = env->NewObject(boxClass, boxInit, value);
+        env->CallObjectMethod(map, put, k, v);
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(v);
+        env->DeleteLocalRef(boxClass);
+    };
+    auto putLong = [&](const char* key, int64_t value) {
+        jstring k = env->NewStringUTF(key);
+        jclass boxClass = env->FindClass("java/lang/Long");
+        jmethodID boxInit = env->GetMethodID(boxClass, "<init>", "(J)V");
+        jobject v = env->NewObject(boxClass, boxInit, (jlong)value);
+        env->CallObjectMethod(map, put, k, v);
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(v);
+        env->DeleteLocalRef(boxClass);
+    };
+    auto putDouble = [&](const char* key, double value) {
+        jstring k = env->NewStringUTF(key);
+        jclass boxClass = env->FindClass("java/lang/Double");
+        jmethodID boxInit = env->GetMethodID(boxClass, "<init>", "(D)V");
+        jobject v = env->NewObject(boxClass, boxInit, value);
+        env->CallObjectMethod(map, put, k, v);
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(v);
+        env->DeleteLocalRef(boxClass);
+    };
+
+    // Live engine counters are independent atomics written only by
+    // video_thread (see their declarations in the header) -- no relation
+    // to format_ctx/codec-context lifetime, so these are safe to read
+    // outside native_state_mutex.
+    putDouble("measuredFps", measured_fps.load());
+    putLong("framesDecoded", (int64_t)frames_decoded_total.load());
+    putLong("framesRendered", (int64_t)frames_rendered_total.load());
+
+    // Real container/codec info, read straight from FFmpeg's own
+    // AVFormatContext/AVCodecContext rather than a separate
+    // MediaExtractor/MediaMetadataRetriever pass over the same file --
+    // this is what's actually driving playback, so it's authoritative for
+    // any container FFmpeg can open at all (including ones the platform
+    // extractor doesn't recognize).
+    //
+    // The whole block has to stay inside native_state_mutex, not just a
+    // null-check up front: format_ctx (and video_codec_ctx/audio_codec_ctx)
+    // can be concurrently freed by a stop() running on another thread the
+    // instant after a bare null-check released the lock, which is exactly
+    // the use-after-free native_state_mutex exists to rule out -- see its
+    // comment in the header.
+    {
+        std::lock_guard<std::mutex> lock(native_state_mutex);
+        if (format_ctx) {
+            if (format_ctx->iformat) {
+                putString("containerFormat", format_ctx->iformat->long_name ? format_ctx->iformat->long_name : format_ctx->iformat->name);
+            }
+            if (format_ctx->bit_rate > 0) {
+                putLong("containerBitrate", format_ctx->bit_rate);
+            }
+
+            if (video_stream_idx >= 0 && video_codec_ctx) {
+                putString("videoCodec", avcodec_get_name(video_codec_ctx->codec_id));
+                if (video_codec_ctx->width > 0 && video_codec_ctx->height > 0) {
+                    putInt("videoWidth", video_codec_ctx->width);
+                    putInt("videoHeight", video_codec_ctx->height);
+                }
+                int64_t videoBitrate = video_codec_ctx->bit_rate > 0
+                    ? video_codec_ctx->bit_rate
+                    : format_ctx->streams[video_stream_idx]->codecpar->bit_rate;
+                if (videoBitrate > 0) putLong("videoBitrate", videoBitrate);
+
+                AVRational frameRate = format_ctx->streams[video_stream_idx]->avg_frame_rate;
+                if (frameRate.num > 0 && frameRate.den > 0) putDouble("frameRate", av_q2d(frameRate));
+            }
+
+            if (audio_stream_idx >= 0 && audio_codec_ctx) {
+                putString("audioCodec", avcodec_get_name(audio_codec_ctx->codec_id));
+                if (audio_codec_ctx->sample_rate > 0) putInt("audioSampleRate", audio_codec_ctx->sample_rate);
+                if (audio_codec_ctx->ch_layout.nb_channels > 0) putInt("audioChannels", audio_codec_ctx->ch_layout.nb_channels);
+                int64_t audioBitrate = audio_codec_ctx->bit_rate > 0
+                    ? audio_codec_ctx->bit_rate
+                    : format_ctx->streams[audio_stream_idx]->codecpar->bit_rate;
+                if (audioBitrate > 0) putLong("audioBitrate", audioBitrate);
+            }
+        }
+    }
+
+    env->DeleteLocalRef(mapClass);
+    return map;
+}
+
 void FFmpegPlayer::demuxThreadFunc() {
     notifyEvent("opening");
 
     unsigned char* io_buffer = (unsigned char*)av_malloc(32768);
-    io_ctx = avio_alloc_context(io_buffer, 32768, 0, this, readPacketCallback, NULL, seekCallback);
-    format_ctx = avformat_alloc_context();
+    {
+        // See native_state_mutex's comment in the header: this only needs
+        // to cover the pointer assignments themselves, not the blocking
+        // avformat_open_input/avformat_find_stream_info calls below -- a
+        // getDiagnosticsSnapshot() call landing in that narrow window would
+        // just see format_ctx before its streams are fully parsed (fields
+        // it reads default to "unknown" via its own null/zero checks), not
+        // a freed pointer, which is the only thing this lock has to
+        // prevent.
+        std::lock_guard<std::mutex> lock(native_state_mutex);
+        io_ctx = avio_alloc_context(io_buffer, 32768, 0, this, readPacketCallback, NULL, seekCallback);
+        format_ctx = avformat_alloc_context();
+    }
     format_ctx->pb = io_ctx;
 
     if (avformat_open_input(&format_ctx, NULL, NULL, NULL) != 0) {
@@ -309,7 +450,10 @@ void FFmpegPlayer::demuxThreadFunc() {
         AVCodecParameters* codecpar = format_ctx->streams[video_stream_idx]->codecpar;
         const AVCodec* codec = avcodec_find_decoder(codecpar->codec_id);
         if (codec) {
-            video_codec_ctx = avcodec_alloc_context3(codec);
+            {
+                std::lock_guard<std::mutex> lock(native_state_mutex);
+                video_codec_ctx = avcodec_alloc_context3(codec);
+            }
             avcodec_parameters_to_context(video_codec_ctx, codecpar);
             avcodec_open2(video_codec_ctx, codec, NULL);
             
@@ -327,7 +471,10 @@ void FFmpegPlayer::demuxThreadFunc() {
         AVCodecParameters* codecpar = format_ctx->streams[audio_stream_idx]->codecpar;
         const AVCodec* codec = avcodec_find_decoder(codecpar->codec_id);
         if (codec) {
-            audio_codec_ctx = avcodec_alloc_context3(codec);
+            {
+                std::lock_guard<std::mutex> lock(native_state_mutex);
+                audio_codec_ctx = avcodec_alloc_context3(codec);
+            }
             avcodec_parameters_to_context(audio_codec_ctx, codecpar);
             avcodec_open2(audio_codec_ctx, codec, NULL);
 
@@ -475,7 +622,20 @@ void FFmpegPlayer::waitForQueuesDrained() {
 
 void FFmpegPlayer::videoDecodeThreadFunc() {
     AVFrame* frame = av_frame_alloc();
+
+    // Rolling actual-render-rate measurement (see measured_fps's comment in
+    // the header). av_gettime_relative() is a monotonic clock with an
+    // unspecified epoch -- only meaningful for deltas within this process,
+    // which is all this uses it for.
+    double fps_window_start_sec = av_gettime_relative() / 1000000.0;
+    int fps_window_frame_count = 0;
+
     while (!stop_requested) {
+        if (fps_window_reset_requested.exchange(false)) {
+            fps_window_start_sec = av_gettime_relative() / 1000000.0;
+            fps_window_frame_count = 0;
+        }
+
         AVPacket* pkt = nullptr;
         {
             std::unique_lock<std::mutex> lock(video_queue_mutex);
@@ -498,6 +658,14 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                     recvRet = avcodec_receive_frame(video_codec_ctx, frame);
                 }
                 if (recvRet != 0) break;
+
+                // Counted here rather than after the render block below:
+                // this is "the decoder produced a frame," full stop,
+                // independent of whether it's actually drawn (native_window
+                // can be null briefly during teardown, or is_playing can be
+                // false if paused mid-decode) -- see frames_rendered_total
+                // for the "did we actually draw it" counterpart.
+                frames_decoded_total.fetch_add(1, std::memory_order_relaxed);
 
                 double pts = frame->best_effort_timestamp * av_q2d(format_ctx->streams[video_stream_idx]->time_base);
                 video_clock = pts;
@@ -544,6 +712,25 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                         int dstStride[4] = { windowBuffer.stride * 4, 0, 0, 0 };
                         sws_scale(sws_ctx, frame->data, frame->linesize, 0, video_codec_ctx->height, dst, dstStride);
                         ANativeWindow_unlockAndPost(native_window);
+
+                        // measured_fps is the actual on-screen render rate,
+                        // as opposed to frameRate (the container's declared
+                        // avg_frame_rate) -- it's what a "stats for nerds"
+                        // overlay actually wants, since it reflects real
+                        // dropped-frame/pacing behavior rather than just
+                        // what the file claims. Recomputed once per ~1s
+                        // window rather than every frame so it reads as a
+                        // stable rate instead of jittering with each
+                        // individual frame's render time.
+                        frames_rendered_total.fetch_add(1, std::memory_order_relaxed);
+                        fps_window_frame_count++;
+                        double now_sec = av_gettime_relative() / 1000000.0;
+                        double window_elapsed = now_sec - fps_window_start_sec;
+                        if (window_elapsed >= 1.0) {
+                            measured_fps = fps_window_frame_count / window_elapsed;
+                            fps_window_start_sec = now_sec;
+                            fps_window_frame_count = 0;
+                        }
                     }
                 }
                 

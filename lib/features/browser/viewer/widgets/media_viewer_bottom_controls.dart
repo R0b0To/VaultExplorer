@@ -25,6 +25,7 @@ class MediaViewerBottomControls extends StatelessWidget {
   final ValueChanged<VideoPlaybackMode> onPlaybackModeChanged;
   final VoidCallback onToggleMute;
   final VoidCallback onAdvancedSettingsPressed;
+  final VoidCallback? onDiagnosticsPressed;
   final VoidCallback onStartHideTimer;
   final ValueChanged<bool> onShowUIChanged;
   final bool isCarouselVisible;
@@ -48,6 +49,7 @@ class MediaViewerBottomControls extends StatelessWidget {
     required this.onPlaybackModeChanged,
     required this.onToggleMute,
     required this.onAdvancedSettingsPressed,
+    this.onDiagnosticsPressed,
     required this.onStartHideTimer,
     required this.onShowUIChanged,
     this.isCarouselVisible = false,
@@ -233,6 +235,7 @@ class MediaViewerBottomControls extends StatelessWidget {
         ],
         Semantics(
           label: 'Advanced settings',
+          hint: onDiagnosticsPressed != null ? 'Long press for playback diagnostics' : null,
           button: true,
           child: _CircleOverlayButton(
             icon: Icons.tune_rounded,
@@ -241,6 +244,12 @@ class MediaViewerBottomControls extends StatelessWidget {
               HapticFeedback.lightImpact();
               onAdvancedSettingsPressed();
             },
+            onLongPress: onDiagnosticsPressed == null
+                ? null
+                : () {
+                    HapticFeedback.mediumImpact();
+                    onDiagnosticsPressed!();
+                  },
           ),
         ),
       ],
@@ -479,6 +488,7 @@ class _CircleOverlayButton extends StatelessWidget {
   final Color? iconColor;
   final String tooltip;
   final VoidCallback? onPressed;
+  final VoidCallback? onLongPress;
   final double iconSize;
   final double containerSize;
   const _CircleOverlayButton({
@@ -486,6 +496,7 @@ class _CircleOverlayButton extends StatelessWidget {
     this.iconColor,
     required this.tooltip,
     this.onPressed,
+    this.onLongPress,
     this.iconSize = 20,
     this.containerSize = 40,
   });
@@ -505,6 +516,7 @@ class _CircleOverlayButton extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onPressed,
+            onLongPress: onLongPress,
             child: Center(
               child: Icon(
                 icon,

@@ -69,3 +69,17 @@ Java_com_aeidolon_vaultexplorer_ffmpegplayer_FFmpegPlayerEngine_nativeDispose(JN
     auto player = reinterpret_cast<FFmpegPlayer*>(ptr);
     if (player) delete player;
 }
+
+// Synchronous, unlike every other native* call above: it returns its
+// result directly instead of going through notifyEvent()'s async
+// JNIEnv-attach dance, using the JNIEnv this JNI call was already handed
+// on whatever thread Flutter's method channel landed on. See
+// getDiagnosticsSnapshot()'s comment in ffmpeg_player.h for why that's
+// safe here specifically (cheap atomic/pointer reads under a short-lived
+// native mutex, no blocking I/O) when it wouldn't be for the other calls.
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_aeidolon_vaultexplorer_ffmpegplayer_FFmpegPlayerEngine_nativeGetDiagnostics(JNIEnv* env, jobject thiz, jlong ptr) {
+    auto player = reinterpret_cast<FFmpegPlayer*>(ptr);
+    if (!player) return nullptr;
+    return player->getDiagnosticsSnapshot(env);
+}

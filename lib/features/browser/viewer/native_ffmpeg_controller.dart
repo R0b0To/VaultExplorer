@@ -138,11 +138,6 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
     });
   }
 
-  // --- Temporary diagnostics for the seekbar-stepping investigation ---
-  // See the matching LOGD_SYNC/LOGD_AUDIO comment in ffmpeg_player.cpp.
-  // Remove alongside that once the root cause is confirmed.
-  DateTime? _lastTimeChangedLoggedAt;
-
   void _onEvent(dynamic raw) {
     if (_disposed) return;
     final map = Map<String, dynamic>.from(raw as Map);
@@ -173,11 +168,6 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
         break;
       case 'timeChanged':
         final newPositionMs = ((map['positionMs'] as num?) ?? 0).toInt();
-        final now = DateTime.now();
-        final sinceLastMs = _lastTimeChangedLoggedAt == null ? null : now.difference(_lastTimeChangedLoggedAt!).inMilliseconds;
-        final jumpMs = newPositionMs - value.position.inMilliseconds;
-        debugPrint('[FFmpegDebug] timeChanged pos=${newPositionMs}ms sinceLastEvent=${sinceLastMs}ms jump=${jumpMs}ms');
-        _lastTimeChangedLoggedAt = now;
         value = value.copyWith(
           isInitialized: true,
           position: Duration(milliseconds: newPositionMs),
@@ -195,7 +185,22 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
   }
 
   Future<void> play() async { if (!_disposed) await _channel.invokeMethod('play', {'playerId': _playerId}); }
-  Future<void> pause() async { if (!_disposed) await _channel.invokeMethod('pause', {'playerId': _playerId}); }
+
+  Future<void> pause() async {
+    if (_disposed) return;
+    // Set locally before the round trip, not after: _tickExtrapolatedPosition
+    // only advances position while value.isPlaying is true, but that flag
+    // previously only flipped once native's own "paused" event came back
+    // through pause() -> JNI -> mainHandler.post -> the event channel. During
+    // that window the ticker kept extrapolating position forward from the
+    // last-known speed, which is what made the seek bar visibly creep after
+    // the pause button was tapped. Native no longer advances its own clocks
+    // once paused (see is_playing gating in video/audioDecodeThreadFunc), but
+    // there's still a real round-trip delay before Dart hears about it --
+    // this removes the dependency on that round trip entirely.
+    value = value.copyWith(isPlaying: false);
+    await _channel.invokeMethod('pause', {'playerId': _playerId});
+  }
   Future<void> stop() async { if (!_disposed) await _channel.invokeMethod('stop', {'playerId': _playerId}); }
   Future<void> seekTo(Duration position) async {
     if (!_disposed) await _channel.invokeMethod('seekTo', {'playerId': _playerId, 'positionMs': position.inMilliseconds});
@@ -204,7 +209,6 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
     if (!_disposed) await _channel.invokeMethod('setVolume', {'playerId': _playerId, 'volume': vol});
   }
   Future<void> setPlaybackSpeed(double speed) async {
-    debugPrint('[FFmpegDebug] setPlaybackSpeed($speed) at ${DateTime.now()}');
     // Bring the extrapolated position up to date under the *old* speed
     // before changing it, then re-anchor -- otherwise the ticker would
     // retroactively apply the new speed to time that already elapsed under

@@ -5,17 +5,13 @@
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "FFmpegPlayer", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "FFmpegPlayer", __VA_ARGS__)
-// Temporary diagnostic instrumentation for the seekbar-stepping /
-// speed-hunting-during-2x-hold investigation. Filter logcat on these tags
-// specifically (they're deliberately separate from LOGI/LOGE above so they
-// can be grep'd out independently). NOTE: LOGD_SYNC in particular fires
-// from onAudioReady(), which runs on the real-time Oboe audio callback
-// thread -- __android_log_print() does I/O and is not real-time-safe, so
-// having this active can itself perturb timing. Treat results captured
-// while it's enabled as "probably indicative", not definitive, and pull
-// these calls back out once the root cause is confirmed.
-#define LOGD_SYNC(...) __android_log_print(ANDROID_LOG_DEBUG, "FFmpegPlayer.Sync", __VA_ARGS__)
-#define LOGD_AUDIO(...) __android_log_print(ANDROID_LOG_DEBUG, "FFmpegPlayer.Audio", __VA_ARGS__)
+// (Prior temporary LOGD_SYNC/LOGD_AUDIO instrumentation for the
+// seekbar-stepping / speed-hunting investigation has been removed now that
+// the root causes are fixed -- see pause-gating in video/audioDecodeThreadFunc,
+// frame-drop + frame-timer pacing in videoDecodeThreadFunc, and the demux
+// admission-control fix in demuxThreadFunc. LOGD_SYNC in particular ran on
+// the real-time Oboe audio callback thread, where __android_log_print()'s
+// blocking I/O could itself perturb the timing being measured.)
 
 FFmpegPlayer::FFmpegPlayer(JNIEnv* env, jobject plugin_instance, ANativeWindow* window) {
     env->GetJavaVM(&jvm);
@@ -185,6 +181,7 @@ void FFmpegPlayer::setDataSource(int fd, bool autoPlay) {
     stop_requested = false;
     is_playing = autoPlay;
     audio_clock = 0.0;
+    audio_chunk_end_pts = 0.0;
     video_clock = 0.0;
     seek_requested = false;
     input_eof = false;
@@ -202,26 +199,21 @@ void FFmpegPlayer::setDataSource(int fd, bool autoPlay) {
 }
 
 void FFmpegPlayer::play() {
+    if (!is_playing) {
+        // Synchronize on resume: clear stale audio buffer and align audio clock 
+        // to the exact video frame currently on screen.
+        std::lock_guard<std::mutex> lock(audio_buf_mutex);
+        audio_buffer.clear();
+        double current_v_clock = video_clock.load();
+        if (current_v_clock > 0) {
+            audio_clock = current_v_clock;
+            audio_chunk_end_pts = current_v_clock;
+        }
+    }
     is_playing = true;
-    // Reaching the natural end leaves the pipeline idling with nothing
-    // queued (see the demux loop's EOF handling) -- without an explicit
-    // seek there is nothing left to feed, so play() would otherwise be a
-    // silent no-op right when the video is sitting at its end. Most
-    // players treat "press play at the end" as "restart from the top",
-    // so mirror that instead.
     if (input_eof.load()) {
         seekTo(0);
     }
-    // pause()/"endReached" both push isPlaying=false to the Dart side via
-    // an event; without a matching push here, the Dart-side value gets
-    // stuck at isPlaying=false forever after the first pause, since
-    // nothing ever tells it playback resumed (only the demux thread's
-    // one-time initial "playing" event on open used to fire this).
-    // durationMs is included so a resume after the video was already open
-    // is a no-op on the Dart side rather than a re-initialization; width/
-    // height are deliberately omitted (default 0 -> excluded from the
-    // event map entirely, see notifyEvent) so this doesn't stomp the
-    // already-known video size with 0x0.
     double durationMs = format_ctx ? (double)format_ctx->duration / AV_TIME_BASE * 1000 : 0;
     notifyEvent("playing", video_clock.load() * 1000, durationMs);
 }
@@ -347,6 +339,7 @@ void FFmpegPlayer::performPendingSeek() {
     }
 
     audio_clock = targetMs / 1000.0;
+    audio_chunk_end_pts = targetMs / 1000.0;
     video_clock = targetMs / 1000.0;
     // A seek (whether user-initiated or a loop restart) means we're no
     // longer at end-of-stream, so audio_clock is trustworthy again -- see
@@ -398,9 +391,6 @@ void FFmpegPlayer::setPlaybackSpeed(float speed) {
     std::lock_guard<std::mutex> lock(audio_buf_mutex);
     if (speed_swr_ctx) swr_free(&speed_swr_ctx);
     speed_swr_ctx = newCtx;
-    LOGD_AUDIO("setPlaybackSpeed speed=%.2f swr_ctx=%s buffered_frames_at_switch=%zu",
-               speed, newCtx ? "reconfigured" : (speed == 1.0f ? "n/a(1x)" : "FAILED"),
-               audio_buffer.size() / kOutputChannels);
 }
 void FFmpegPlayer::setLooping(bool loop) { looping = loop; }
 
@@ -607,7 +597,32 @@ void FFmpegPlayer::demuxThreadFunc() {
             continue;
         }
 
-        if (video_queue.size() > kMaxQueuedVideoPackets || audio_queue.size() > kMaxQueuedAudioPackets) {
+        // Pause demuxing as soon as EITHER queue reaches its target depth.
+        //
+        // This used to require BOTH queues to be full before pausing (with a
+        // 200-packet hard ceiling as a backstop), specifically to stop audio
+        // from starving while video was full. But that condition has no
+        // upper bound on a single queue as long as the other stays under its
+        // target: if video decode/present is ever the slower side (a heavy
+        // frame, a slow ANativeWindow_lock waiting on the compositor,
+        // thermal throttling), video_queue could grow all the way to the
+        // 200-packet ceiling -- several seconds of backlog -- while
+        // audio_queue stayed small, which is exactly the asymmetric-buffer
+        // skew this was supposed to prevent, just on the other queue.
+        //
+        // The reason audio could starve under a simple either-full condition
+        // was that video_thread paced itself 1:1 with real time even when
+        // badly behind, so a full video_queue could stay full for a long
+        // stretch and block new audio packets from being read too.
+        // videoDecodeThreadFunc now drops frames instead of pacing through a
+        // large backlog (see kAvSyncFrameDropThresholdSec there), so
+        // video_queue drains quickly even when video is struggling, and an
+        // either-full condition is safe again without reintroducing the
+        // starvation the both-full check was patching over.
+        bool video_full = (video_stream_idx >= 0) && (video_queue.size() > kMaxQueuedVideoPackets);
+        bool audio_full = (audio_stream_idx >= 0) && (audio_queue.size() > kMaxQueuedAudioPackets);
+
+        if (video_full || audio_full) {
             std::this_thread::sleep_for(std::chrono::milliseconds(kIdlePollIntervalMs));
             continue;
         }
@@ -715,10 +730,41 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
     double fps_window_start_sec = av_gettime_relative() / 1000000.0;
     int fps_window_frame_count = 0;
 
+    // Presentation deadline for frame-timer-style pacing, kept across loop
+    // iterations (thread-local, not shared -- this thread is the sole owner
+    // of its own pacing schedule). Rather than computing a fresh delay and
+    // sleep_for()'ing it every single frame -- which lets each frame's own
+    // scheduling error (OS scheduler granularity, mutex wait, sws_scale
+    // time, etc.) go uncorrected until the *next* frame's audio_clock diff
+    // happens to catch it -- this thread now advances an absolute wall-clock
+    // deadline once per frame and sleeps *to* it, so an individual frame
+    // arriving a few ms late doesn't push every subsequent frame later too.
+    // Reset to "no deadline yet" (have_deadline=false) any time there's been
+    // a gap that makes the old schedule meaningless: paused, seeked, or a
+    // frame just got dropped.
+    auto next_frame_deadline = std::chrono::steady_clock::now();
+    bool have_deadline = false;
+
     while (!stop_requested) {
         if (fps_window_reset_requested.exchange(false)) {
             fps_window_start_sec = av_gettime_relative() / 1000000.0;
             fps_window_frame_count = 0;
+            have_deadline = false;
+        }
+
+        // Paused: don't pop and decode any *new* packet. Without this check,
+        // this thread had no notion of "paused" at all -- it kept draining
+        // whatever was already queued (up to kMaxQueuedVideoPackets, roughly
+        // a second of content), advancing video_clock and firing
+        // notifyEvent("timeChanged") the whole time, with only the actual
+        // on-screen draw skipped. That's what made the reported position
+        // keep creeping forward for a moment after pause instead of freezing
+        // immediately -- see the matching check inside the decode loop below
+        // for the packet that was already in flight when pause() landed.
+        if (!is_playing.load()) {
+            have_deadline = false;
+            std::this_thread::sleep_for(std::chrono::milliseconds(kIdlePollIntervalMs));
+            continue;
         }
 
         AVPacket* pkt = nullptr;
@@ -752,48 +798,125 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                 // for the "did we actually draw it" counterpart.
                 frames_decoded_total.fetch_add(1, std::memory_order_relaxed);
 
-                double pts = frame->best_effort_timestamp * av_q2d(format_ctx->streams[video_stream_idx]->time_base);
-                video_clock = pts;
-                
-                // A/V Synchronization
-                //
-                // audio_clock is only ever updated when audioDecodeThreadFunc
-                // decodes a new packet (see that function) -- it does NOT
-                // track wall-clock time on its own. Audio and video tracks
-                // essentially never end at exactly the same timestamp (encoder
-                // delay, differing track durations, etc.), so on nearly every
-                // file the audio track's last packet gets decoded first,
-                // audio_clock stops updating and sits frozen from then on,
-                // while pts here keeps advancing for the video frames still
-                // arriving. diff = pts - audio_clock then grows without bound,
-                // and for however many frames it takes to cross the 1.0s cap
-                // below, this was sleeping for close to a full second per
-                // frame -- experienced as the video grinding almost to a halt
-                // for the last stretch before it actually reaches the end.
-                // input_eof (set once the demuxer truly has no more packets
-                // coming for either stream) tells us audio_clock can no longer
-                // be trusted, so we fall back to plain fps-based pacing
-                // instead of chasing it.
-                if (audio_stream_idx >= 0 && audio_clock > 0 && !input_eof.load()) {
-                    double diff = pts - audio_clock;
-                    int sleepMs = 0;
-                    bool slept = (diff > kAvSyncMinDiffSec && diff < kAvSyncMaxDiffSec);
-                    if (slept) {
-                        sleepMs = (int)(diff * 1000 / playback_speed);
-                        std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
-                    }
-                    LOGD_SYNC("mode=diff pts=%.3f audio_clock=%.3f diff=%.3f speed=%.2f sleep_ms=%d slept=%d",
-                              pts, audio_clock.load(), diff, playback_speed.load(), sleepMs, slept);
-                } else {
-                    double fps = av_q2d(format_ctx->streams[video_stream_idx]->avg_frame_rate);
-                    int delay_ms = (fps > 0) ? (int)(1000.0 / fps / playback_speed) : kFallbackFrameDelayMs;
-                    std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
-                    LOGD_SYNC("mode=fallback pts=%.3f audio_clock=%.3f fps=%.2f speed=%.2f sleep_ms=%d reason=%s",
-                              pts, audio_clock.load(), fps, playback_speed.load(), delay_ms,
-                              (audio_stream_idx < 0) ? "no_audio_stream" : (audio_clock <= 0 ? "audio_clock_not_set" : "input_eof"));
+                // Paused mid-packet: this packet was already popped (and
+                // possibly already mid-decode) before pause() landed. Still
+                // drain the decoder's output for it -- avcodec_receive_frame
+                // has to be called to completion or the next
+                // avcodec_send_packet can return EAGAIN -- but don't advance
+                // video_clock, run sync pacing, render, or notify Dart from
+                // it. That keeps the reported/paced position from moving at
+                // all once paused, rather than only for the packets that
+                // hadn't been popped yet.
+                if (!is_playing.load()) {
+                    continue;
                 }
 
-                if (native_window && is_playing) {
+                double pts;
+                if (frame->best_effort_timestamp != AV_NOPTS_VALUE) {
+                    pts = frame->best_effort_timestamp * av_q2d(format_ctx->streams[video_stream_idx]->time_base);
+                } else {
+                    // Malformed/unusual stream with no usable timestamp for
+                    // this frame -- best_effort_timestamp's sentinel is
+                    // INT64_MIN, so multiplying it by time_base would feed a
+                    // huge garbage value into video_clock and the sync math
+                    // below. Hold at the last known position instead.
+                    pts = video_clock.load();
+                }
+                video_clock = pts;
+
+                // A/V Synchronization
+                //
+                // audio_clock reflects the real-time audio consumer's
+                // position (see onAudioReady) -- it does NOT track
+                // wall-clock time on its own between updates. Audio and
+                // video tracks essentially never end at exactly the same
+                // timestamp (encoder delay, differing track durations,
+                // etc.), so on nearly every file the audio track's last
+                // packet gets consumed first, audio_clock stops updating and
+                // sits frozen from then on, while pts here keeps advancing
+                // for the video frames still arriving. diff = pts -
+                // audio_clock then grows without bound, and for however many
+                // frames it takes to cross the 1.0s cap below, this was
+                // sleeping for close to a full second per frame --
+                // experienced as the video grinding almost to a halt for the
+                // last stretch before it actually reaches the end.
+                // input_eof (set once the demuxer truly has no more packets
+                // coming for either stream) tells us audio_clock can no
+                // longer be trusted, so we fall back to plain fps-based
+                // pacing instead of chasing it.
+                bool should_render = true;
+                int sleepMs = 0;
+                if (audio_stream_idx >= 0 && audio_clock > 0 && !input_eof.load()) {
+                    double fps = av_q2d(format_ctx->streams[video_stream_idx]->avg_frame_rate);
+                    double default_delay = (fps > 0) ? (1.0 / fps) : (kFallbackFrameDelayMs / 1000.0);
+                    double delay = default_delay;
+
+                    double diff = pts - audio_clock;
+                    if (diff > kAvSyncMinDiffSec && diff < kAvSyncMaxDiffSec) {
+                        // Video is ahead: extend frame delay by at most +20%
+                        double max_extra = default_delay * 0.2;
+                        double extra = std::min(diff, max_extra);
+                        delay += extra;
+                    } else if (diff < -kAvSyncFrameDropThresholdSec) {
+                        // Video is severely behind: drop this frame outright
+                        // instead of presenting it. Rendering every
+                        // backlogged frame at zero delay (the old behavior)
+                        // still pays the full sws_scale + ANativeWindow
+                        // lock/present cost per frame, so a real backlog
+                        // took real wall-clock time to burn through, all of
+                        // it rendered back-to-back -- that's what was
+                        // visible as the video suddenly "speeding up," then
+                        // settling back down once the backlog cleared. Not
+                        // presenting the stale frame at all skips that cost,
+                        // so the backlog clears faster and nothing is ever
+                        // actually shown sped up.
+                        should_render = false;
+                        delay = 0.0;
+                    } else if (diff < -0.100) {
+                        // Video is behind (>100ms but under the drop
+                        // threshold): catch up by presenting immediately
+                        // with no sleep, same as before -- just bounded now,
+                        // since anything further behind is dropped above
+                        // instead of piling into this branch.
+                        delay = 0.0;
+                    } else if (diff < -kAvSyncMinDiffSec) {
+                        // Video is slightly behind (<100ms): shorten frame delay slightly
+                        double max_sub = default_delay * 0.2;
+                        double sub = std::min(-diff, max_sub);
+                        delay = std::max(0.0, delay - sub);
+                    }
+
+                    sleepMs = (int)(delay * 1000.0 / playback_speed);
+                } else {
+                    double fps = av_q2d(format_ctx->streams[video_stream_idx]->avg_frame_rate);
+                    sleepMs = (fps > 0) ? (int)(1000.0 / fps / playback_speed) : kFallbackFrameDelayMs;
+                }
+
+                if (!should_render) {
+                    // Dropping: don't schedule a slot for this frame at all,
+                    // and don't let the deadline fall further behind wall-
+                    // clock reality while we're catching up.
+                    next_frame_deadline = std::chrono::steady_clock::now();
+                } else {
+                    if (!have_deadline) {
+                        next_frame_deadline = std::chrono::steady_clock::now();
+                        have_deadline = true;
+                    }
+                    next_frame_deadline += std::chrono::microseconds((int64_t)(sleepMs * 1000));
+                    auto now = std::chrono::steady_clock::now();
+                    if (next_frame_deadline > now) {
+                        std::this_thread::sleep_until(next_frame_deadline);
+                    } else {
+                        // Already past the computed deadline -- don't sleep
+                        // (would just add more delay), and pull the deadline
+                        // back to now so a single late frame doesn't leave
+                        // every subsequent frame perpetually trying to catch
+                        // up to a schedule that's already behind reality.
+                        next_frame_deadline = now;
+                    }
+                }
+
+                if (should_render && native_window && is_playing) {
                     ANativeWindow_Buffer windowBuffer;
                     if (ANativeWindow_lock(native_window, &windowBuffer, NULL) == 0) {
                         if (!sws_ctx) {
@@ -828,7 +951,6 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                 }
                 
                 if (++frame_notify_count % kTimeChangedNotifyEveryNFrames == 0) {
-                    LOGD_SYNC("timeChanged fire pts=%.3f wall_clock_us=%lld", pts, (long long)av_gettime());
                     notifyEvent("timeChanged", pts * 1000, (double)format_ctx->duration / AV_TIME_BASE * 1000);
                 }
             }
@@ -841,6 +963,31 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
 void FFmpegPlayer::audioDecodeThreadFunc() {
     AVFrame* frame = av_frame_alloc();
     while (!stop_requested) {
+        // Paused: don't pop and decode any *new* packet -- mirrors the same
+        // check in videoDecodeThreadFunc. Without it, this thread had no
+        // notion of "paused" either: it kept draining whatever was already
+        // queued into audio_buffer the whole time (bounded only by the 0.5s
+        // backpressure cap below), which used to also keep dragging
+        // audio_clock forward during a pause. audio_clock is no longer
+        // written from this thread at all now (see the push block below),
+        // so this check's remaining job is just to stop burning through the
+        // queue while paused rather than to protect the clock.
+        if (!is_playing.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(kIdlePollIntervalMs));
+            continue;
+        }
+
+        // Backpressure: If audio_buffer already holds > 0.5s of audio, wait for onAudioReady to consume it.
+        // This prevents audio_buffer from ballooning to 10+ seconds and breaking A/V sync.
+        {
+            std::unique_lock<std::mutex> lock(audio_buf_mutex);
+            if (audio_buffer.size() / kOutputChannels > kMaxBufferedAudioFrames) {
+                lock.unlock();
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                continue;
+            }
+        }
+
         AVPacket* pkt = nullptr;
         {
             std::unique_lock<std::mutex> lock(audio_queue_mutex);
@@ -877,28 +1024,34 @@ void FFmpegPlayer::audioDecodeThreadFunc() {
                     int num_floats = converted_samples * kOutputChannels;
                     audio_buffer.insert(audio_buffer.end(), float_buf, float_buf + num_floats);
 
-                    // audio_clock has to reflect the sample that's about to
-                    // actually play next, not whatever was just decoded --
-                    // this thread only waits on packet availability (see
-                    // the condition_variable wait above), not on real
-                    // playback time, so decode+resample regularly races
-                    // seconds ahead of what onAudioReady() has actually
-                    // consumed so far. Using the raw decoded PTS here was
-                    // the root cause of "most videos play too fast": video
-                    // frames are paced against this clock (see
-                    // videoDecodeThreadFunc's A/V sync block), so an
-                    // audio_clock running ahead of true playback dragged
-                    // video pacing ahead with it, skipping most of its
-                    // sleep_for(). Backing out however much audio is still
-                    // sitting unplayed in audio_buffer gives the PTS of the
-                    // sample that will actually be heard next.
-                    double frame_pts = frame->best_effort_timestamp *
-                        av_q2d(format_ctx->streams[audio_stream_idx]->time_base);
+                    // audio_chunk_end_pts publishes the decode-side frontier
+                    // (the content PTS just past the samples this thread has
+                    // now handed off) -- that's a fact this thread genuinely
+                    // owns. audio_clock itself is intentionally NOT written
+                    // here: it needs to reflect the sample that's about to
+                    // actually play next, which depends on how much of what
+                    // this thread has pushed is still sitting unplayed --
+                    // information only the real-time consumer (onAudioReady)
+                    // has, since this thread only waits on packet
+                    // availability, not on real playback time. Having two
+                    // independent writers to the same clock (this thread
+                    // computing an "optimistic" value, onAudioReady
+                    // computing the "real" one) was harmless only by
+                    // accident of both being mutex-guarded -- collapsing to
+                    // onAudioReady as the single owner removes that
+                    // duplication rather than just leaving it in place.
+                    double frame_pts;
+                    if (frame->best_effort_timestamp != AV_NOPTS_VALUE) {
+                        frame_pts = frame->best_effort_timestamp *
+                            av_q2d(format_ctx->streams[audio_stream_idx]->time_base);
+                    } else {
+                        // No usable timestamp for this frame -- hold at the
+                        // last known frontier rather than feeding the
+                        // AV_NOPTS_VALUE sentinel into the PTS math.
+                        frame_pts = audio_chunk_end_pts.load();
+                    }
                     double chunk_end_pts = frame_pts + (double)converted_samples / kOutputSampleRate;
-                    double buffered_seconds = (double)(audio_buffer.size() / kOutputChannels) / kOutputSampleRate;
-                    audio_clock = chunk_end_pts - buffered_seconds;
-                    LOGD_AUDIO("push frame_pts=%.3f converted_samples=%d buffered_frames=%zu buffered_sec=%.3f audio_clock=%.3f",
-                               frame_pts, converted_samples, audio_buffer.size() / kOutputChannels, buffered_seconds, audio_clock.load());
+                    audio_chunk_end_pts = chunk_end_pts;
                 }
                 av_freep(&out_buffer);
             }
@@ -938,9 +1091,9 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
                 out[i] = audio_buffer[i] * vol;
             }
             audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + numFloatsNeeded);
+            double buffered_seconds = (double)(audio_buffer.size() / kOutputChannels) / kOutputSampleRate;
+            audio_clock = audio_chunk_end_pts.load() - buffered_seconds;
         } else {
-            LOGD_SYNC("onAudioReady UNDERRUN mode=1x have_frames=%zu need_frames=%d",
-                      audio_buffer.size() / kOutputChannels, numFrames);
             memset(out, 0, numFloatsNeeded * sizeof(float));
         }
         return oboe::DataCallbackResult::Continue;
@@ -953,7 +1106,6 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
     // playback_speed's atomic store and setPlaybackSpeed() reaching its
     // lock below -- treat that the same as an underrun.
     if (!speed_swr_ctx) {
-        LOGD_SYNC("onAudioReady UNDERRUN mode=speed reason=null_swr_ctx speed=%.2f", speed);
         memset(out, 0, numFrames * kOutputChannels * sizeof(float));
         return oboe::DataCallbackResult::Continue;
     }
@@ -966,8 +1118,6 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
     size_t availableFrames = audio_buffer.size() / kOutputChannels;
     size_t minFramesNeeded = (size_t)(numFrames * (double)speed);
     if (availableFrames < minFramesNeeded) {
-        LOGD_SYNC("onAudioReady UNDERRUN mode=speed speed=%.2f have_frames=%zu need_frames=%zu",
-                  speed, availableFrames, minFramesNeeded);
         memset(out, 0, numFrames * kOutputChannels * sizeof(float));
         return oboe::DataCallbackResult::Continue;
     }
@@ -988,13 +1138,17 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
         availableFrames = audio_buffer.size() / kOutputChannels;
         if (availableFrames == 0) break; // genuinely out of input; pad silence below
 
+        // swr_convert() greedily consumes ALL input provided to it, buffering
+        // whatever it doesn't immediately output. To prevent it from swallowing
+        // the entire audio_buffer (and ruining the audio_clock calculation), we
+        // only feed it roughly the number of frames it needs to produce outCap
+        // (plus a tiny 32-frame margin for the resampling filter's internal delay).
+        int framesToFeed = std::min((int)availableFrames, (int)(outCap * speed) + 32);
+
         const uint8_t* inPtr = reinterpret_cast<const uint8_t*>(audio_buffer.data());
-        produced = swr_convert(speed_swr_ctx, &outSlice, outCap, &inPtr, (int)availableFrames);
-        // swr_convert() always fully consumes the in_count it's given --
-        // anything it can't fit into out_count is buffered internally and
-        // returned by a later drain/next call, not left in `in` -- so this
-        // whole chunk is gone from audio_buffer regardless of `produced`.
-        audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + availableFrames * kOutputChannels);
+        produced = swr_convert(speed_swr_ctx, &outSlice, outCap, &inPtr, framesToFeed);
+        
+        audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + framesToFeed * kOutputChannels);
 
         if (produced > 0) {
             framesWritten += produced;
@@ -1007,23 +1161,17 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
     }
 
     if (framesWritten < numFrames) {
-        LOGD_SYNC("onAudioReady UNDERRUN mode=speed speed=%.2f frames_written=%d frames_needed=%d remaining_buffer_frames=%zu",
-                  speed, framesWritten, numFrames, audio_buffer.size() / kOutputChannels);
         memset(out + framesWritten * kOutputChannels, 0,
                (numFrames - framesWritten) * kOutputChannels * sizeof(float));
-    } else if (++audio_ready_log_counter % 30 == 0) {
-        // Trend line, not a problem report -- throttled to roughly once
-        // every ~0.5-1s (30 callbacks) so it's readable rather than one
-        // line per callback, while still showing whether buffer headroom
-        // is trending down over the course of a 2x hold.
-        LOGD_SYNC("onAudioReady ok speed=%.2f frames_written=%d remaining_buffer_frames=%zu",
-                  speed, framesWritten, audio_buffer.size() / kOutputChannels);
     }
 
     if (vol != 1.0f) {
         int totalFloats = numFrames * kOutputChannels;
         for (int i = 0; i < totalFloats; i++) out[i] *= vol;
     }
+
+    double buffered_seconds = (double)(audio_buffer.size() / kOutputChannels) / kOutputSampleRate;
+    audio_clock = audio_chunk_end_pts.load() - buffered_seconds;
 
     return oboe::DataCallbackResult::Continue;
 }

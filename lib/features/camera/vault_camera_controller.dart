@@ -1,0 +1,281 @@
+import 'dart:async';
+import 'package:flutter/services.dart';
+
+class NativeCameraLens {
+  final String cameraId;
+  final String facing; // 'back', 'front', 'external'
+  final bool isLogical;
+  final double zoomMin;
+  final double zoomMax;
+
+  const NativeCameraLens({
+    required this.cameraId,
+    required this.facing,
+    required this.isLogical,
+    required this.zoomMin,
+    required this.zoomMax,
+  });
+
+  factory NativeCameraLens.fromMap(Map<dynamic, dynamic> map) {
+    return NativeCameraLens(
+      cameraId: map['cameraId'] as String? ?? '',
+      facing: map['facing'] as String? ?? 'back',
+      isLogical: map['isLogical'] as bool? ?? false,
+      zoomMin: (map['zoomMin'] as num?)?.toDouble() ?? 1.0,
+      zoomMax: (map['zoomMax'] as num?)?.toDouble() ?? 1.0,
+    );
+  }
+}
+
+class VaultCameraSessionInfo {
+  final int sessionId;
+  final int textureId;
+  final String cameraId;
+  final double zoomMin;
+  final double zoomMax;
+  final double minExposureEv;
+  final double maxExposureEv;
+  final List<NativeCameraLens> lenses;
+
+  const VaultCameraSessionInfo({
+    required this.sessionId,
+    required this.textureId,
+    required this.cameraId,
+    required this.zoomMin,
+    required this.zoomMax,
+    required this.minExposureEv,
+    required this.maxExposureEv,
+    required this.lenses,
+  });
+
+  factory VaultCameraSessionInfo.fromMap(Map<dynamic, dynamic> map) {
+    final lensesList = (map['lenses'] as List<dynamic>?)
+            ?.map((e) => NativeCameraLens.fromMap(e as Map<dynamic, dynamic>))
+            .toList() ??
+        [];
+
+    return VaultCameraSessionInfo(
+      sessionId: (map['sessionId'] as num).toInt(),
+      textureId: (map['textureId'] as num).toInt(),
+      cameraId: map['cameraId'] as String? ?? '',
+      zoomMin: (map['zoomMin'] as num?)?.toDouble() ?? 1.0,
+      zoomMax: (map['zoomMax'] as num?)?.toDouble() ?? 1.0,
+      minExposureEv: (map['minExposureEv'] as num?)?.toDouble() ?? 0.0,
+      maxExposureEv: (map['maxExposureEv'] as num?)?.toDouble() ?? 0.0,
+      lenses: lensesList,
+    );
+  }
+}
+
+class VaultCameraController {
+  static const MethodChannel _channel = MethodChannel('com.aeidolon.vaultexplorer/camera');
+
+  int? _sessionId;
+  int? _textureId;
+  String? _cameraId;
+  double _zoomMin = 1.0;
+  double _zoomMax = 1.0;
+  double _minExposureEv = 0.0;
+  double _maxExposureEv = 0.0;
+  List<NativeCameraLens> _lenses = [];
+
+  StreamSubscription? _eventSubscription;
+  final StreamController<Map<String, dynamic>> _eventsController = StreamController.broadcast();
+
+  Stream<Map<String, dynamic>> get events => _eventsController.stream;
+  int? get sessionId => _sessionId;
+  int? get textureId => _textureId;
+  String? get cameraId => _cameraId;
+  double get zoomMin => _zoomMin;
+  double get zoomMax => _zoomMax;
+  double get minExposureEv => _minExposureEv;
+  double get maxExposureEv => _maxExposureEv;
+  List<NativeCameraLens> get lenses => _lenses;
+  bool get isInitialized => _sessionId != null && _textureId != null;
+
+  static Future<List<NativeCameraLens>> listLenses() async {
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('listLenses');
+    final lenses = (res?['lenses'] as List<dynamic>?)
+            ?.map((e) => NativeCameraLens.fromMap(e as Map<dynamic, dynamic>))
+            .toList() ??
+        [];
+    return lenses;
+  }
+
+  static Future<bool> hasPermissions() async {
+    final res = await _channel.invokeMethod<bool>('hasPermissions');
+    return res ?? false;
+  }
+
+  static Future<void> requestPermissions() async {
+    await _channel.invokeMethod('requestPermissions');
+  }
+
+  Future<VaultCameraSessionInfo> open({
+    String? cameraId,
+    String facing = 'back',
+    String quality = 'fhd',
+  }) async {
+    await close();
+
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('open', {
+      if (cameraId != null) 'cameraId': cameraId,
+      'facing': facing,
+      'quality': quality,
+    });
+
+    if (res == null) throw Exception('Failed to open camera');
+    final info = VaultCameraSessionInfo.fromMap(res);
+
+    _sessionId = info.sessionId;
+    _textureId = info.textureId;
+    _cameraId = info.cameraId;
+    _zoomMin = info.zoomMin;
+    _zoomMax = info.zoomMax;
+    _minExposureEv = info.minExposureEv;
+    _maxExposureEv = info.maxExposureEv;
+    _lenses = info.lenses;
+
+    final eventChannel = EventChannel('com.aeidolon.vaultexplorer/camera/events/$_sessionId');
+    _eventSubscription = eventChannel.receiveBroadcastStream().listen((data) {
+      if (data is Map) {
+        _eventsController.add(Map<String, dynamic>.from(data));
+      }
+    });
+
+    return info;
+  }
+
+  Future<void> switchLens(String cameraId) async {
+    final sId = _sessionId;
+    if (sId == null) return;
+
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('switchLens', {
+      'sessionId': sId,
+      'cameraId': cameraId,
+    });
+
+    if (res != null) {
+      _textureId = (res['textureId'] as num?)?.toInt() ?? _textureId;
+      _cameraId = res['cameraId'] as String? ?? _cameraId;
+      _zoomMin = (res['zoomMin'] as num?)?.toDouble() ?? _zoomMin;
+      _zoomMax = (res['zoomMax'] as num?)?.toDouble() ?? _zoomMax;
+      _minExposureEv = (res['minExposureEv'] as num?)?.toDouble() ?? _minExposureEv;
+      _maxExposureEv = (res['maxExposureEv'] as num?)?.toDouble() ?? _maxExposureEv;
+    }
+  }
+
+  Future<void> setZoom(double zoom) async {
+    final sId = _sessionId;
+    if (sId == null) return;
+    await _channel.invokeMethod('setZoom', {
+      'sessionId': sId,
+      'zoom': zoom,
+    });
+  }
+
+  Future<void> setFlash(String mode) async {
+    final sId = _sessionId;
+    if (sId == null) return;
+    await _channel.invokeMethod('setFlash', {
+      'sessionId': sId,
+      'mode': mode,
+    });
+  }
+
+  Future<void> setExposureOffset(double ev) async {
+    final sId = _sessionId;
+    if (sId == null) return;
+    await _channel.invokeMethod('setExposureOffset', {
+      'sessionId': sId,
+      'ev': ev,
+    });
+  }
+
+  Future<void> setFocusAndExposurePoint(double x, double y) async {
+    final sId = _sessionId;
+    if (sId == null) return;
+    await _channel.invokeMethod('setFocusAndExposurePoint', {
+      'sessionId': sId,
+      'x': x,
+      'y': y,
+    });
+  }
+
+  Future<void> setOrientationDegrees(int degrees) async {
+    final sId = _sessionId;
+    if (sId == null) return;
+    await _channel.invokeMethod('setOrientationDegrees', {
+      'sessionId': sId,
+      'degrees': degrees,
+    });
+  }
+
+  Future<({bool success, String? error})> takePhoto({
+    required int volId,
+    required String virtualPath,
+  }) async {
+    final sId = _sessionId;
+    if (sId == null) return (success: false, error: 'Camera not open');
+
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('takePhoto', {
+      'sessionId': sId,
+      'volId': volId,
+      'virtualPath': virtualPath,
+    });
+
+    final ok = res?['success'] as bool? ?? false;
+    final error = res?['error'] as String?;
+    return (success: ok, error: error);
+  }
+
+  Future<({bool success, String? error})> startVideoRecording({
+    required int volId,
+    required String virtualPath,
+  }) async {
+    final sId = _sessionId;
+    if (sId == null) return (success: false, error: 'Camera not open');
+
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('startVideoRecording', {
+      'sessionId': sId,
+      'volId': volId,
+      'virtualPath': virtualPath,
+    });
+
+    final ok = res?['success'] as bool? ?? false;
+    final error = res?['error'] as String?;
+    return (success: ok, error: error);
+  }
+
+  Future<({bool success, int durationMs, String? error})> stopVideoRecording() async {
+    final sId = _sessionId;
+    if (sId == null) return (success: false, durationMs: 0, error: 'Camera not open');
+
+    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('stopVideoRecording', {
+      'sessionId': sId,
+    });
+
+    final ok = res?['success'] as bool? ?? false;
+    final durationMs = (res?['durationMs'] as num?)?.toInt() ?? 0;
+    final error = res?['error'] as String?;
+    return (success: ok, durationMs: durationMs, error: error);
+  }
+
+  Future<void> close() async {
+    final sId = _sessionId;
+    _sessionId = null;
+    _textureId = null;
+    await _eventSubscription?.cancel();
+    _eventSubscription = null;
+    if (sId != null) {
+      try {
+        await _channel.invokeMethod('close', {'sessionId': sId});
+      } catch (_) {}
+    }
+  }
+
+  void dispose() {
+    close();
+    _eventsController.close();
+  }
+}

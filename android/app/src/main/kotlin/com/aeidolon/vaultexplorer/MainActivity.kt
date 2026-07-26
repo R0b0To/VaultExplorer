@@ -93,6 +93,7 @@ class MainActivity : FlutterFragmentActivity() {
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
     private var ffmpegPlayerPlugin: com.aeidolon.vaultexplorer.ffmpegplayer.FFmpegPlayerPlugin? = null
+    private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
     private val pendingResult = PendingActivityResult()
     private val nativeOps = NativeOpSupport(this, ioExecutor)
     private val derivedKeyHandlers = DerivedKeyHandlers(this, ioExecutor, nativeOps)
@@ -112,7 +113,17 @@ class MainActivity : FlutterFragmentActivity() {
         screenOffReceiver?.let { unregisterReceiver(it) }
         ffmpegPlayerPlugin?.disposeAll()
         ffmpegPlayerPlugin = null
+        vaultCameraPlugin?.disposeAll()
+        vaultCameraPlugin = null
         super.onDestroy()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == com.aeidolon.vaultexplorer.camera.CAMERA_PERMISSION_REQUEST_CODE) {
+            val granted = grantResults.isNotEmpty() && grantResults.all { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
+            methodChannel?.invokeMethod("onCameraPermissionResult", mapOf("granted" to granted))
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -124,6 +135,11 @@ class MainActivity : FlutterFragmentActivity() {
         super.configureFlutterEngine(flutterEngine)
 ffmpegPlayerPlugin = com.aeidolon.vaultexplorer.ffmpegplayer.FFmpegPlayerPlugin(
     applicationContext,
+    flutterEngine.dartExecutor.binaryMessenger,
+    flutterEngine.renderer,
+)
+vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(
+    this,
     flutterEngine.dartExecutor.binaryMessenger,
     flutterEngine.renderer,
 )

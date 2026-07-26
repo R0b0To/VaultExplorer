@@ -2,6 +2,7 @@
 #include <android/log.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <cmath>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "FFmpegPlayer", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "FFmpegPlayer", __VA_ARGS__)
@@ -473,6 +474,47 @@ jobject FFmpegPlayer::getDiagnosticsSnapshot(JNIEnv* env) {
 
                 AVRational frameRate = format_ctx->streams[video_stream_idx]->avg_frame_rate;
                 if (frameRate.num > 0 && frameRate.den > 0) putDouble("frameRate", av_q2d(frameRate));
+
+                // MP4 (and similar) muxers store rotation as a display
+                // transformation matrix in the stream's side data -- the
+                // same "tkhd" rotation Android's MediaRecorder writes via
+                // setOrientationHint(), and what
+                // MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION reads
+                // on the Kotlin fallback path (see FFmpegPlayerEngine's
+                // collectNativeOnlyGaps/collectFallbackDiagnostics). Reading
+                // it here, straight off the AVStream that's already open
+                // and actively driving playback, doesn't depend on a
+                // second, independent MediaMetadataRetriever pass
+                // succeeding against whatever custom content:// provider
+                // fed this player its file descriptor in the first place --
+                // and per this function's own merge-precedence doc, this
+                // value wins over the Kotlin fallback's whenever both are
+                // present.
+                //
+                // av_stream_get_side_data() (the older AVStream-level
+                // accessor) was removed from this vendored FFmpeg build --
+                // side data now lives on AVCodecParameters directly, so
+                // it's read straight from there instead.
+                const AVCodecParameters* video_par = format_ctx->streams[video_stream_idx]->codecpar;
+                const int32_t* display_matrix = nullptr;
+                for (int sd = 0; sd < video_par->nb_coded_side_data; sd++) {
+                    if (video_par->coded_side_data[sd].type == AV_PKT_DATA_DISPLAYMATRIX) {
+                        display_matrix = reinterpret_cast<const int32_t*>(video_par->coded_side_data[sd].data);
+                        break;
+                    }
+                }
+                if (display_matrix) {
+                    // av_display_rotation_get() returns degrees
+                    // counterclockwise; Android's rotation convention (and
+                    // this app's RotatedBox usage) is clockwise degrees
+                    // needed to display the frame correctly, hence the
+                    // negation.
+                    double ccwDegrees = av_display_rotation_get(display_matrix);
+                    if (!std::isnan(ccwDegrees)) {
+                        int rotation = ((int)std::lround(-ccwDegrees) % 360 + 360) % 360;
+                        putInt("rotationDegrees", rotation);
+                    }
+                }
             }
 
             if (audio_stream_idx >= 0 && audio_codec_ctx) {

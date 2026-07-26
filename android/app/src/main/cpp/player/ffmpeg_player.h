@@ -21,6 +21,7 @@ extern "C" {
 #include <libavutil/time.h>
 #include <libavutil/opt.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/display.h>
 }
 
 class FFmpegPlayer : public oboe::AudioStreamDataCallback {

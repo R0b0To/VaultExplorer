@@ -382,8 +382,8 @@ class MediaViewerBottomControls extends StatelessWidget {
 
         return ValueListenableBuilder<NativeFFmpegValue>(
           valueListenable: activeCtrl,
-          builder: (context, vlcValue, _) {
-            final bool isPlayingState = vlcValue.isPlaying;
+          builder: (context, playerValue, _) {
+            final bool isPlayingState = playerValue.isPlaying;
             return _buildTransportRow(
               cs: cs,
               isFirst: isFirst,

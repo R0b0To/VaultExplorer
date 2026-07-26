@@ -49,6 +49,25 @@ public:
     oboe::DataCallbackResult onAudioReady(oboe::AudioStream* audioStream, void* audioData, int32_t numFrames) override;
 
 private:
+    // Tunable pipeline constants. Grouped here so the thresholds governing
+    // buffering, polling, and A/V sync are named and visible in one place
+    // instead of as bare literals scattered through the .cpp.
+    static constexpr int kIoBufferSize = 32768;               // avio staging buffer, bytes
+    static constexpr size_t kMaxQueuedVideoPackets = 50;       // demux backpressure threshold
+    static constexpr size_t kMaxQueuedAudioPackets = 100;      // demux backpressure threshold
+    static constexpr int kIdlePollIntervalMs = 10;             // paused / queues-full idle sleep
+    static constexpr int kEofIdlePollIntervalMs = 50;          // idle sleep once input_eof is set
+    static constexpr int kTimeChangedNotifyEveryNFrames = 15;  // "timeChanged" event throttle
+    static constexpr int kDrainMaxIterations = 500;            // waitForQueuesDrained cap (~5s)
+    static constexpr int kDrainPollIntervalMs = 10;
+    static constexpr int kDrainGraceMs = 60;                   // post-drain settle time
+    static constexpr double kAvSyncMinDiffSec = 0.005;         // below this, don't bother sleeping
+    static constexpr double kAvSyncMaxDiffSec = 1.0;           // above this, audio_clock is untrusted
+    static constexpr int kFallbackFrameDelayMs = 33;           // used when avg_frame_rate is unknown
+    static constexpr double kFpsWindowSec = 1.0;               // measured_fps rolling window
+    static constexpr int kOutputSampleRate = 48000;            // fixed oboe/swr output rate
+    static constexpr int kOutputChannels = 2;                  // fixed oboe/swr output channel count
+
     void demuxThreadFunc();
     void videoDecodeThreadFunc();
     void audioDecodeThreadFunc();
@@ -60,6 +79,44 @@ private:
 
     void notifyEvent(const char* eventName, double positionMs = 0, double durationMs = 0, int width = 0, int height = 0, const char* errorMsg = nullptr);
     JNIEnv* getJniEnv();
+
+    // java.util.HashMap/Double/Integer/Long and the plugin's
+    // onEventFromNative are all resolved via FindClass/GetMethodID/
+    // GetObjectClass fresh on every single notifyEvent()/
+    // getDiagnosticsSnapshot() call -- notifyEvent() alone can fire many
+    // times a second (every ~15th decoded video frame, see
+    // kTimeChangedNotifyEveryNFrames). jclass/jmethodID are stable for the
+    // lifetime of the class (not tied to any particular instance or JNIEnv),
+    // so they're safe to resolve once, as global refs, and reuse from then
+    // on -- ensureJniCache()/ensureEventMethodCache() do that lazily on
+    // first use. java.util.HashMap/Double/Integer/Long are bootstrap-
+    // classloader framework classes, so (unlike an app-defined class)
+    // FindClass for them is safe to call from any attached thread,
+    // including the demux/video/audio decode threads -- see getJniEnv().
+    static void ensureJniCache(JNIEnv* env);
+    static std::once_flag jni_cache_once;
+    static jclass hashmap_class;
+    static jmethodID hashmap_init;
+    static jmethodID hashmap_put;
+    static jclass double_class;
+    static jmethodID double_init;
+    static jclass integer_class;
+    static jmethodID integer_init;
+    static jclass long_class;
+    static jmethodID long_init;
+
+    // Cached separately from the framework classes above: this one is
+    // keyed off plugin_instance_ref (an app class, FFmpegPlayerEngine),
+    // resolved via GetObjectClass rather than FindClass specifically
+    // because FindClass for app-defined classes is unreliable from a
+    // native-created thread (demux/video/audio threads) whose classloader
+    // context isn't the app's -- see getJniEnv()'s attach dance. Every
+    // FFmpegPlayer instance shares the one FFmpegPlayerEngine class object,
+    // so per-process caching (rather than per-instance) is correct here too.
+    void ensureEventMethodCache(JNIEnv* env);
+    static std::once_flag event_method_once;
+    static jclass plugin_class;
+    static jmethodID on_event_method;
 
     JavaVM* jvm = nullptr;
     jobject plugin_instance_ref = nullptr;

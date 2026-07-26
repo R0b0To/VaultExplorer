@@ -3,14 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3;
 import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart'
-show ClosedCaptionFile, SubRipCaptionFile, WebVTTCaptionFile, ClosedCaption;
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 
+import '../caption_track.dart';
 import '../native_ffmpeg_controller.dart';
 
 class VideoPlaybackProgress {
@@ -98,7 +97,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   bool _isActive = false;
   bool _initialized = false;
   String? _playerError;
-  ClosedCaptionFile? _captionFile;
+  CaptionTrack? _captionFile;
   bool _isSeeking = false;
   bool _showLeftIndicator = false;
   bool _showRightIndicator = false;
@@ -272,7 +271,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   );
 }
 
-  Future<ClosedCaptionFile?> _loadCaptions(String videoPath) async {
+  Future<CaptionTrack?> _loadCaptions(String videoPath) async {
     final dotIndex = videoPath.lastIndexOf('.');
     if (dotIndex == -1) return null;
     final basePath = videoPath.substring(0, dotIndex);
@@ -294,8 +293,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             final text = utf8.decode(data, allowMalformed: true);
             widget.onSubtitlesAvailableChanged(true);
             return ext == 'srt'
-                ? SubRipCaptionFile(text)
-                : WebVTTCaptionFile(text);
+                ? CaptionTrack.subRip(text)
+                : CaptionTrack.webVtt(text);
           }
         }
       } catch (_) {}
@@ -497,7 +496,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                 child: ValueListenableBuilder<VideoPlaybackProgress>(
                   valueListenable: widget.progressNotifier,
                   builder: (context, progress, child) {
-                    return ClosedCaption(
+                    return ClosedCaptionText(
                       text: _captionTextAt(progress.position),
                       textStyle: const TextStyle(
                         fontSize: 15,

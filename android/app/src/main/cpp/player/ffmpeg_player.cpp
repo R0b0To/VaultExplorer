@@ -28,6 +28,56 @@ FFmpegPlayer::~FFmpegPlayer() {
     }
 }
 
+std::once_flag FFmpegPlayer::jni_cache_once;
+jclass FFmpegPlayer::hashmap_class = nullptr;
+jmethodID FFmpegPlayer::hashmap_init = nullptr;
+jmethodID FFmpegPlayer::hashmap_put = nullptr;
+jclass FFmpegPlayer::double_class = nullptr;
+jmethodID FFmpegPlayer::double_init = nullptr;
+jclass FFmpegPlayer::integer_class = nullptr;
+jmethodID FFmpegPlayer::integer_init = nullptr;
+jclass FFmpegPlayer::long_class = nullptr;
+jmethodID FFmpegPlayer::long_init = nullptr;
+
+std::once_flag FFmpegPlayer::event_method_once;
+jclass FFmpegPlayer::plugin_class = nullptr;
+jmethodID FFmpegPlayer::on_event_method = nullptr;
+
+void FFmpegPlayer::ensureJniCache(JNIEnv* env) {
+    std::call_once(jni_cache_once, [env]() {
+        auto globalClass = [env](const char* name) -> jclass {
+            jclass local = env->FindClass(name);
+            jclass global = local ? (jclass)env->NewGlobalRef(local) : nullptr;
+            if (local) env->DeleteLocalRef(local);
+            return global;
+        };
+
+        hashmap_class = globalClass("java/util/HashMap");
+        hashmap_init = env->GetMethodID(hashmap_class, "<init>", "()V");
+        hashmap_put = env->GetMethodID(hashmap_class, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+
+        double_class = globalClass("java/lang/Double");
+        double_init = env->GetMethodID(double_class, "<init>", "(D)V");
+
+        integer_class = globalClass("java/lang/Integer");
+        integer_init = env->GetMethodID(integer_class, "<init>", "(I)V");
+
+        long_class = globalClass("java/lang/Long");
+        long_init = env->GetMethodID(long_class, "<init>", "(J)V");
+    });
+}
+
+void FFmpegPlayer::ensureEventMethodCache(JNIEnv* env) {
+    std::call_once(event_method_once, [this, env]() {
+        jclass local = env->GetObjectClass(plugin_instance_ref);
+        plugin_class = local ? (jclass)env->NewGlobalRef(local) : nullptr;
+        if (local) env->DeleteLocalRef(local);
+        if (plugin_class) {
+            on_event_method = env->GetMethodID(plugin_class, "onEventFromNative", "(Ljava/util/Map;)V");
+        }
+    });
+}
+
 JNIEnv* FFmpegPlayer::getJniEnv() {
     JNIEnv* env = nullptr;
     if (!jvm) return nullptr;
@@ -41,14 +91,15 @@ void FFmpegPlayer::notifyEvent(const char* eventName, double positionMs, double 
     JNIEnv* env = getJniEnv();
     if (!env || !plugin_instance_ref) return;
 
-    jclass mapClass = env->FindClass("java/util/HashMap");
-    jmethodID init = env->GetMethodID(mapClass, "<init>", "()V");
-    jmethodID put = env->GetMethodID(mapClass, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
-    jobject map = env->NewObject(mapClass, init);
+    ensureJniCache(env);
+    ensureEventMethodCache(env);
+    if (!hashmap_class || !on_event_method) return;
+
+    jobject map = env->NewObject(hashmap_class, hashmap_init);
 
     jstring eventKey = env->NewStringUTF("event");
     jstring eventVal = env->NewStringUTF(eventName);
-    env->CallObjectMethod(map, put, eventKey, eventVal);
+    env->CallObjectMethod(map, hashmap_put, eventKey, eventVal);
     env->DeleteLocalRef(eventKey);
     env->DeleteLocalRef(eventVal);
 
@@ -60,20 +111,16 @@ void FFmpegPlayer::notifyEvent(const char* eventName, double positionMs, double 
     // why the seekbar never appeared to move / always read back at 0.
     if (positionMs > 0 || durationMs > 0) {
         jstring posKey = env->NewStringUTF("positionMs");
-        jclass doubleClass = env->FindClass("java/lang/Double");
-        jmethodID doubleInit = env->GetMethodID(doubleClass, "<init>", "(D)V");
-        jobject posVal = env->NewObject(doubleClass, doubleInit, positionMs);
-        env->CallObjectMethod(map, put, posKey, posVal);
+        jobject posVal = env->NewObject(double_class, double_init, positionMs);
+        env->CallObjectMethod(map, hashmap_put, posKey, posVal);
         env->DeleteLocalRef(posKey);
         env->DeleteLocalRef(posVal);
     }
 
     if (durationMs > 0) {
         jstring durKey = env->NewStringUTF("durationMs");
-        jclass doubleClass = env->FindClass("java/lang/Double");
-        jmethodID doubleInit = env->GetMethodID(doubleClass, "<init>", "(D)V");
-        jobject durVal = env->NewObject(doubleClass, doubleInit, durationMs);
-        env->CallObjectMethod(map, put, durKey, durVal);
+        jobject durVal = env->NewObject(double_class, double_init, durationMs);
+        env->CallObjectMethod(map, hashmap_put, durKey, durVal);
         env->DeleteLocalRef(durKey);
         env->DeleteLocalRef(durVal);
     }
@@ -81,12 +128,10 @@ void FFmpegPlayer::notifyEvent(const char* eventName, double positionMs, double 
     if (width > 0 && height > 0) {
         jstring wKey = env->NewStringUTF("width");
         jstring hKey = env->NewStringUTF("height");
-        jclass intClass = env->FindClass("java/lang/Integer");
-        jmethodID intInit = env->GetMethodID(intClass, "<init>", "(I)V");
-        jobject wVal = env->NewObject(intClass, intInit, width);
-        jobject hVal = env->NewObject(intClass, intInit, height);
-        env->CallObjectMethod(map, put, wKey, wVal);
-        env->CallObjectMethod(map, put, hKey, hVal);
+        jobject wVal = env->NewObject(integer_class, integer_init, width);
+        jobject hVal = env->NewObject(integer_class, integer_init, height);
+        env->CallObjectMethod(map, hashmap_put, wKey, wVal);
+        env->CallObjectMethod(map, hashmap_put, hKey, hVal);
         env->DeleteLocalRef(wKey); env->DeleteLocalRef(hKey);
         env->DeleteLocalRef(wVal); env->DeleteLocalRef(hVal);
     }
@@ -94,17 +139,13 @@ void FFmpegPlayer::notifyEvent(const char* eventName, double positionMs, double 
     if (errorMsg) {
         jstring errKey = env->NewStringUTF("message");
         jstring errVal = env->NewStringUTF(errorMsg);
-        env->CallObjectMethod(map, put, errKey, errVal);
+        env->CallObjectMethod(map, hashmap_put, errKey, errVal);
         env->DeleteLocalRef(errKey);
         env->DeleteLocalRef(errVal);
     }
 
-    jclass pluginClass = env->GetObjectClass(plugin_instance_ref);
-    jmethodID onEventMethod = env->GetMethodID(pluginClass, "onEventFromNative", "(Ljava/util/Map;)V");
-    if (onEventMethod) env->CallVoidMethod(plugin_instance_ref, onEventMethod, map);
-    
+    env->CallVoidMethod(plugin_instance_ref, on_event_method, map);
     env->DeleteLocalRef(map);
-    env->DeleteLocalRef(mapClass);
 }
 
 int FFmpegPlayer::readPacketCallback(void* opaque, uint8_t* buf, int buf_size) {
@@ -308,48 +349,38 @@ void FFmpegPlayer::setPlaybackSpeed(float speed) { playback_speed = speed; }
 void FFmpegPlayer::setLooping(bool loop) { looping = loop; }
 
 jobject FFmpegPlayer::getDiagnosticsSnapshot(JNIEnv* env) {
-    jclass mapClass = env->FindClass("java/util/HashMap");
-    jmethodID mapInit = env->GetMethodID(mapClass, "<init>", "()V");
-    jmethodID put = env->GetMethodID(mapClass, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
-    jobject map = env->NewObject(mapClass, mapInit);
+    ensureJniCache(env);
+    if (!hashmap_class) return nullptr;
+    jobject map = env->NewObject(hashmap_class, hashmap_init);
 
     auto putString = [&](const char* key, const char* value) {
         if (!value) return;
         jstring k = env->NewStringUTF(key);
         jstring v = env->NewStringUTF(value);
-        env->CallObjectMethod(map, put, k, v);
+        env->CallObjectMethod(map, hashmap_put, k, v);
         env->DeleteLocalRef(k);
         env->DeleteLocalRef(v);
     };
     auto putInt = [&](const char* key, int value) {
         jstring k = env->NewStringUTF(key);
-        jclass boxClass = env->FindClass("java/lang/Integer");
-        jmethodID boxInit = env->GetMethodID(boxClass, "<init>", "(I)V");
-        jobject v = env->NewObject(boxClass, boxInit, value);
-        env->CallObjectMethod(map, put, k, v);
+        jobject v = env->NewObject(integer_class, integer_init, value);
+        env->CallObjectMethod(map, hashmap_put, k, v);
         env->DeleteLocalRef(k);
         env->DeleteLocalRef(v);
-        env->DeleteLocalRef(boxClass);
     };
     auto putLong = [&](const char* key, int64_t value) {
         jstring k = env->NewStringUTF(key);
-        jclass boxClass = env->FindClass("java/lang/Long");
-        jmethodID boxInit = env->GetMethodID(boxClass, "<init>", "(J)V");
-        jobject v = env->NewObject(boxClass, boxInit, (jlong)value);
-        env->CallObjectMethod(map, put, k, v);
+        jobject v = env->NewObject(long_class, long_init, (jlong)value);
+        env->CallObjectMethod(map, hashmap_put, k, v);
         env->DeleteLocalRef(k);
         env->DeleteLocalRef(v);
-        env->DeleteLocalRef(boxClass);
     };
     auto putDouble = [&](const char* key, double value) {
         jstring k = env->NewStringUTF(key);
-        jclass boxClass = env->FindClass("java/lang/Double");
-        jmethodID boxInit = env->GetMethodID(boxClass, "<init>", "(D)V");
-        jobject v = env->NewObject(boxClass, boxInit, value);
-        env->CallObjectMethod(map, put, k, v);
+        jobject v = env->NewObject(double_class, double_init, value);
+        env->CallObjectMethod(map, hashmap_put, k, v);
         env->DeleteLocalRef(k);
         env->DeleteLocalRef(v);
-        env->DeleteLocalRef(boxClass);
     };
 
     // Live engine counters are independent atomics written only by
@@ -410,14 +441,13 @@ jobject FFmpegPlayer::getDiagnosticsSnapshot(JNIEnv* env) {
         }
     }
 
-    env->DeleteLocalRef(mapClass);
     return map;
 }
 
 void FFmpegPlayer::demuxThreadFunc() {
     notifyEvent("opening");
 
-    unsigned char* io_buffer = (unsigned char*)av_malloc(32768);
+    unsigned char* io_buffer = (unsigned char*)av_malloc(kIoBufferSize);
     {
         // See native_state_mutex's comment in the header: this only needs
         // to cover the pointer assignments themselves, not the blocking
@@ -428,7 +458,7 @@ void FFmpegPlayer::demuxThreadFunc() {
         // a freed pointer, which is the only thing this lock has to
         // prevent.
         std::lock_guard<std::mutex> lock(native_state_mutex);
-        io_ctx = avio_alloc_context(io_buffer, 32768, 0, this, readPacketCallback, NULL, seekCallback);
+        io_ctx = avio_alloc_context(io_buffer, kIoBufferSize, 0, this, readPacketCallback, NULL, seekCallback);
         format_ctx = avformat_alloc_context();
     }
     format_ctx->pb = io_ctx;
@@ -480,10 +510,10 @@ void FFmpegPlayer::demuxThreadFunc() {
 
             // Modern FFmpeg 7/8 Channel Layout setup
             AVChannelLayout out_ch_layout = AV_CHANNEL_LAYOUT_STEREO;
-            int sample_rate = audio_codec_ctx->sample_rate > 0 ? audio_codec_ctx->sample_rate : 48000;
+            int sample_rate = audio_codec_ctx->sample_rate > 0 ? audio_codec_ctx->sample_rate : kOutputSampleRate;
 
             swr_alloc_set_opts2(&swr_ctx,
-                &out_ch_layout, AV_SAMPLE_FMT_FLT, 48000,
+                &out_ch_layout, AV_SAMPLE_FMT_FLT, kOutputSampleRate,
                 &audio_codec_ctx->ch_layout, audio_codec_ctx->sample_fmt, sample_rate,
                 0, NULL);
             swr_init(swr_ctx);
@@ -492,8 +522,8 @@ void FFmpegPlayer::demuxThreadFunc() {
             builder.setDirection(oboe::Direction::Output)
                    ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
                    ->setFormat(oboe::AudioFormat::Float)
-                   ->setChannelCount(2)
-                   ->setSampleRate(48000)
+                   ->setChannelCount(kOutputChannels)
+                   ->setSampleRate(kOutputSampleRate)
                    ->setDataCallback(this);
             builder.openStream(audio_stream);
             audio_stream->requestStart();
@@ -507,7 +537,7 @@ void FFmpegPlayer::demuxThreadFunc() {
         performPendingSeek();
 
         if (!is_playing) { 
-            std::this_thread::sleep_for(std::chrono::milliseconds(10)); 
+            std::this_thread::sleep_for(std::chrono::milliseconds(kIdlePollIntervalMs)); 
             continue; 
         }
 
@@ -517,12 +547,12 @@ void FFmpegPlayer::demuxThreadFunc() {
         // instead of re-running av_read_frame every iteration for no
         // reason.
         if (input_eof.load()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            std::this_thread::sleep_for(std::chrono::milliseconds(kEofIdlePollIntervalMs));
             continue;
         }
 
-        if (video_queue.size() > 50 || audio_queue.size() > 100) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        if (video_queue.size() > kMaxQueuedVideoPackets || audio_queue.size() > kMaxQueuedAudioPackets) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(kIdlePollIntervalMs));
             continue;
         }
 
@@ -601,8 +631,7 @@ void FFmpegPlayer::demuxThreadFunc() {
 // render/sleep -- queue-empty alone doesn't guarantee that. Capped so a
 // stuck decode thread can't hang this one forever.
 void FFmpegPlayer::waitForQueuesDrained() {
-    const int maxIterations = 500; // ~5s at 10ms/iteration
-    for (int i = 0; i < maxIterations && !stop_requested; i++) {
+    for (int i = 0; i < kDrainMaxIterations && !stop_requested; i++) {
         bool videoEmpty, audioEmpty;
         {
             std::lock_guard<std::mutex> l(video_queue_mutex);
@@ -613,10 +642,10 @@ void FFmpegPlayer::waitForQueuesDrained() {
             audioEmpty = audio_queue.empty();
         }
         if (videoEmpty && audioEmpty) break;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(kDrainPollIntervalMs));
     }
     if (!stop_requested) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+        std::this_thread::sleep_for(std::chrono::milliseconds(kDrainGraceMs));
     }
 }
 
@@ -691,12 +720,12 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                 // instead of chasing it.
                 if (audio_stream_idx >= 0 && audio_clock > 0 && !input_eof.load()) {
                     double diff = pts - audio_clock;
-                    if (diff > 0.005 && diff < 1.0) {
+                    if (diff > kAvSyncMinDiffSec && diff < kAvSyncMaxDiffSec) {
                         std::this_thread::sleep_for(std::chrono::milliseconds((int)(diff * 1000 / playback_speed)));
                     }
                 } else {
                     double fps = av_q2d(format_ctx->streams[video_stream_idx]->avg_frame_rate);
-                    int delay_ms = (fps > 0) ? (int)(1000.0 / fps / playback_speed) : 33;
+                    int delay_ms = (fps > 0) ? (int)(1000.0 / fps / playback_speed) : kFallbackFrameDelayMs;
                     std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
                 }
 
@@ -726,7 +755,7 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                         fps_window_frame_count++;
                         double now_sec = av_gettime_relative() / 1000000.0;
                         double window_elapsed = now_sec - fps_window_start_sec;
-                        if (window_elapsed >= 1.0) {
+                        if (window_elapsed >= kFpsWindowSec) {
                             measured_fps = fps_window_frame_count / window_elapsed;
                             fps_window_start_sec = now_sec;
                             fps_window_frame_count = 0;
@@ -735,7 +764,7 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                 }
                 
                 static int frame_count = 0;
-                if (++frame_count % 15 == 0) {
+                if (++frame_count % kTimeChangedNotifyEveryNFrames == 0) {
                     notifyEvent("timeChanged", pts * 1000, (double)format_ctx->duration / AV_TIME_BASE * 1000);
                 }
             }
@@ -773,15 +802,15 @@ void FFmpegPlayer::audioDecodeThreadFunc() {
 
                 uint8_t* out_buffer = nullptr;
                 int out_samples = av_rescale_rnd(swr_get_delay(swr_ctx, audio_codec_ctx->sample_rate) + frame->nb_samples, 
-                                                 48000, audio_codec_ctx->sample_rate, AV_ROUND_UP);
-                av_samples_alloc(&out_buffer, NULL, 2, out_samples, AV_SAMPLE_FMT_FLT, 0);
+                                                 kOutputSampleRate, audio_codec_ctx->sample_rate, AV_ROUND_UP);
+                av_samples_alloc(&out_buffer, NULL, kOutputChannels, out_samples, AV_SAMPLE_FMT_FLT, 0);
                 
                 int converted_samples = swr_convert(swr_ctx, &out_buffer, out_samples, (const uint8_t**)frame->data, frame->nb_samples);
                 
                 if (converted_samples > 0) {
                     std::lock_guard<std::mutex> lock(audio_buf_mutex);
                     float* float_buf = (float*)out_buffer;
-                    int num_floats = converted_samples * 2;
+                    int num_floats = converted_samples * kOutputChannels;
                     audio_buffer.insert(audio_buffer.end(), float_buf, float_buf + num_floats);
 
                     // audio_clock has to reflect the sample that's about to
@@ -801,8 +830,8 @@ void FFmpegPlayer::audioDecodeThreadFunc() {
                     // sample that will actually be heard next.
                     double frame_pts = frame->best_effort_timestamp *
                         av_q2d(format_ctx->streams[audio_stream_idx]->time_base);
-                    double chunk_end_pts = frame_pts + (double)converted_samples / 48000.0;
-                    double buffered_seconds = (double)(audio_buffer.size() / 2) / 48000.0;
+                    double chunk_end_pts = frame_pts + (double)converted_samples / kOutputSampleRate;
+                    double buffered_seconds = (double)(audio_buffer.size() / kOutputChannels) / kOutputSampleRate;
                     audio_clock = chunk_end_pts - buffered_seconds;
                 }
                 av_freep(&out_buffer);
@@ -818,7 +847,7 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
     std::lock_guard<std::mutex> lock(audio_buf_mutex);
 
     if (!is_playing) {
-        memset(out, 0, numFrames * 2 * sizeof(float));
+        memset(out, 0, numFrames * kOutputChannels * sizeof(float));
         return oboe::DataCallbackResult::Continue;
     }
 
@@ -838,7 +867,7 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
     // stretching), which is the standard trade-off for a simple speed
     // control.
     if (speed == 1.0f) {
-        int numFloatsNeeded = numFrames * 2;
+        int numFloatsNeeded = numFrames * kOutputChannels;
         if (audio_buffer.size() >= (size_t)numFloatsNeeded) {
             for (int i = 0; i < numFloatsNeeded; i++) {
                 out[i] = audio_buffer[i] * vol;
@@ -850,12 +879,14 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
         return oboe::DataCallbackResult::Continue;
     }
 
-    size_t availableFrames = audio_buffer.size() / 2;
+    size_t availableFrames = audio_buffer.size() / kOutputChannels;
+    // "+ 2" is a one-frame interpolation safety margin (idx1 = idx0 + 1
+    // below needs a frame past the last one consumed), not a channel count.
     size_t framesNeeded = (size_t)(numFrames * (double)speed) + 2;
     if (availableFrames < framesNeeded) {
         // Not enough buffered audio to safely resample this callback --
         // output silence rather than reading past the end of the buffer.
-        memset(out, 0, numFrames * 2 * sizeof(float));
+        memset(out, 0, numFrames * kOutputChannels * sizeof(float));
         return oboe::DataCallbackResult::Continue;
     }
 
@@ -864,16 +895,16 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
         size_t idx0 = (size_t)srcPos;
         double frac = srcPos - (double)idx0;
         size_t idx1 = idx0 + 1;
-        for (int ch = 0; ch < 2; ch++) {
-            float s0 = audio_buffer[idx0 * 2 + ch];
-            float s1 = audio_buffer[idx1 * 2 + ch];
-            out[i * 2 + ch] = (float)(s0 + (s1 - s0) * frac) * vol;
+        for (int ch = 0; ch < kOutputChannels; ch++) {
+            float s0 = audio_buffer[idx0 * kOutputChannels + ch];
+            float s1 = audio_buffer[idx1 * kOutputChannels + ch];
+            out[i * kOutputChannels + ch] = (float)(s0 + (s1 - s0) * frac) * vol;
         }
         srcPos += speed;
     }
     size_t consumedFrames = (size_t)srcPos;
     if (consumedFrames > availableFrames) consumedFrames = availableFrames;
-    audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + consumedFrames * 2);
+    audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + consumedFrames * kOutputChannels);
 
     return oboe::DataCallbackResult::Continue;
 }

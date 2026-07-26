@@ -247,4 +247,5 @@ private fun CameraLensInfo.toMap(): Map<String, Any?> = mapOf(
     "isLogical" to isLogicalMultiCamera,
     "zoomMin" to zoomMin.toDouble(),
     "zoomMax" to zoomMax.toDouble(),
+    "relativeZoom" to relativeZoom.toDouble(),
 )

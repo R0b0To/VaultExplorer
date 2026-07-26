@@ -7,6 +7,12 @@ class NativeCameraLens {
   final bool isLogical;
   final double zoomMin;
   final double zoomMax;
+  // Approximate optical zoom factor vs. this facing's primary/wide lens
+  // (e.g. ~0.5 for ultrawide, 1.0 for the main lens, ~2-5 for telephoto).
+  // Derived natively from focal length + sensor size, since each physical
+  // lens's own zoomMin/zoomMax is relative to itself (nearly always 1.0)
+  // and isn't meaningful for comparing lenses against each other.
+  final double relativeZoom;
 
   const NativeCameraLens({
     required this.cameraId,
@@ -14,6 +20,7 @@ class NativeCameraLens {
     required this.isLogical,
     required this.zoomMin,
     required this.zoomMax,
+    this.relativeZoom = 1.0,
   });
 
   factory NativeCameraLens.fromMap(Map<dynamic, dynamic> map) {
@@ -23,6 +30,7 @@ class NativeCameraLens {
       isLogical: map['isLogical'] as bool? ?? false,
       zoomMin: (map['zoomMin'] as num?)?.toDouble() ?? 1.0,
       zoomMax: (map['zoomMax'] as num?)?.toDouble() ?? 1.0,
+      relativeZoom: (map['relativeZoom'] as num?)?.toDouble() ?? 1.0,
     );
   }
 }

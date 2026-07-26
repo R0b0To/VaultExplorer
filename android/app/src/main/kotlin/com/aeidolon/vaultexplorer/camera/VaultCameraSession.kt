@@ -73,6 +73,13 @@ class VaultCameraSession(
     private var exposureStepValue = 1.0 / 6.0
     private var currentExposureSteps = 0
     private var lastOrientationDegrees = 0
+    // The orientation hint that was actually baked into `videoRecorder` at
+    // prepare() time (MediaRecorder can't have its orientation hint changed
+    // once prepared). Used to detect when the device has rotated since the
+    // recorder was last (re)prepared, so the *next* recording picks up the
+    // rotation the phone is actually being held in instead of a stale one
+    // from whenever the session/lens was opened or the previous clip ended.
+    private var lastPreparedOrientationDegrees: Int? = null
     private var photoSize: Size = Size(1920, 1080)
     private var videoSize: Size = Size(1920, 1080)
     private var pendingQuality: VaultVideoQuality = VaultVideoQuality.FHD
@@ -228,7 +235,9 @@ class VaultCameraSession(
         jpegReader = reader
 
         val recorder = VaultVideoRecorder(videoSize.width, videoSize.height, videoQuality, recordAudio = true, cacheDir = context.cacheDir)
-        recorder.prepareEncoder(computeCaptureOrientation())
+        val orientation = computeCaptureOrientation()
+        recorder.prepareEncoder(orientation)
+        lastPreparedOrientationDegrees = orientation
         videoRecorder = recorder
         currentPreviewWidth = previewSize.width
         currentPreviewHeight = previewSize.height
@@ -364,7 +373,51 @@ class VaultCameraSession(
      *  the old lockCaptureOrientation()-based Dart code already computed
      *  from the accelerometer. Applied to the next photo/video capture. */
     fun setOrientationDegrees(deviceRotationDegrees: Int) {
-        lastOrientationDegrees = ((deviceRotationDegrees % 360) + 360) % 360
+        val normalized = ((deviceRotationDegrees % 360) + 360) % 360
+        if (normalized == lastOrientationDegrees) return
+        lastOrientationDegrees = normalized
+
+        // Bake the new orientation into the video encoder right away, while
+        // the phone is just sitting in preview -- not only after a recording
+        // stops. Previously the encoder's orientation hint was set once when
+        // the session/lens was opened (or right after the *previous* clip
+        // finished) and never touched again, so a video recorded after
+        // rotating the phone kept the old, wrong rotation baked into its
+        // MP4 metadata. Skipped mid-recording since MediaRecorder can't be
+        // reconfigured once started -- that recording keeps the orientation
+        // it began with, which is correct for it; the rotation will be
+        // picked up for the recording after it via the same post-stop path.
+        if (!isRecording) {
+            reprepareVideoRecorderForCurrentOrientationLocked()
+        }
+    }
+
+    /**
+     * Re-prepares the (idle) video encoder with the current device
+     * orientation if it differs from what's already baked in, and
+     * reconfigures the capture session to point at the fresh encoder
+     * Surface. A MediaRecorder can't be started twice or have its
+     * orientation hint changed after prepare(), so a fresh instance +
+     * surface is required; doing it here (either right after a clip stops,
+     * mirroring the previous behavior, or as soon as the phone rotates
+     * while idle) hides that cost from the user instead of paying it the
+     * next time they press record.
+     */
+    private fun reprepareVideoRecorderForCurrentOrientationLocked() {
+        if (characteristics == null || cameraDevice == null) return
+        val needed = computeCaptureOrientation()
+        if (needed == lastPreparedOrientationDegrees) return
+        try {
+            val fresh = VaultVideoRecorder(videoSize.width, videoSize.height, pendingQuality, recordAudio = true, cacheDir = context.cacheDir)
+            fresh.prepareEncoder(needed)
+            videoRecorder?.releaseEncoder()
+            videoRecorder = fresh
+            lastPreparedOrientationDegrees = needed
+            android.util.Log.d(TAG, "reprepareVideoRecorderForCurrentOrientationLocked: orientation=$needed, reconfiguring session")
+            createSessionLocked()
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "reprepareVideoRecorderForCurrentOrientationLocked failed - next recording may have wrong rotation", e)
+        }
     }
 
     private fun computeCaptureOrientation(): Int {
@@ -489,9 +542,11 @@ class VaultCameraSession(
     private fun rearmVideoRecorder() {
         if (characteristics == null || cameraDevice == null) return
         try {
+            val orientation = computeCaptureOrientation()
             val fresh = VaultVideoRecorder(videoSize.width, videoSize.height, pendingQuality, recordAudio = true, cacheDir = context.cacheDir)
-            fresh.prepareEncoder(computeCaptureOrientation())
+            fresh.prepareEncoder(orientation)
             videoRecorder = fresh
+            lastPreparedOrientationDegrees = orientation
             android.util.Log.d(TAG, "rearmVideoRecorder: re-prepared, reconfiguring session")
             createSessionLocked()
         } catch (e: Exception) {

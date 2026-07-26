@@ -612,7 +612,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
       final backLenses = _lenses.where((l) => l.facing == 'back').toList();
       if (backLenses.length > 1) {
         for (final lens in backLenses) {
-          options.add((zoom: lens.zoomMin, switchCameraId: lens.cameraId));
+          options.add((zoom: lens.relativeZoom, switchCameraId: lens.cameraId));
         }
       } else {
         if (_minZoom <= 0.6) options.add((zoom: _minZoom, switchCameraId: null));
@@ -641,7 +641,14 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
           else if (zoom >= 3.5 && _currentZoom >= 3.5) isSelected = true;
         }
 
-        String label = zoom == 1.0 ? '1x' : zoom < 1.0 ? '${zoom.toStringAsFixed(1)}x' : '${zoom.toInt()}x';
+        String label;
+        if ((zoom - 1.0).abs() < 0.05) {
+          label = '1x';
+        } else if (zoom < 1.0) {
+          label = '${zoom.toStringAsFixed(1)}x';
+        } else {
+          label = '${zoom.round()}x';
+        }
 
         return GestureDetector(
           onTap: () async {
@@ -650,13 +657,22 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
             if (option.switchCameraId != null && option.switchCameraId != _selectedCameraId) {
               setState(() => _isInitialized = false);
-              await _cameraController.switchLens(option.switchCameraId!);
-              if (mounted) {
-                setState(() {
-                  _selectedCameraId = option.switchCameraId!;
-                  _currentZoom = _cameraController.zoomMin;
-                  _isInitialized = true;
-                });
+              try {
+                await _cameraController.switchLens(option.switchCameraId!);
+                if (mounted) {
+                  setState(() {
+                    _selectedCameraId = option.switchCameraId!;
+                    _currentZoom = _cameraController.zoomMin;
+                    _isInitialized = true;
+                  });
+                }
+              } catch (e) {
+                // Lens switch can fail if a lens can't be opened as a
+                // standalone stream; fall back to re-opening the previously
+                // selected lens instead of leaving the screen stuck on a
+                // blank/uninitialized preview.
+                if (mounted) _showErrorToast('Could not switch lens');
+                await _initCamera(cameraId: _selectedCameraId);
               }
               return;
             }
@@ -704,21 +720,6 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
               _buildZoomSelector(),
               const SizedBox(height: 16),
             ],
-            if (!_isRecording && !_isCountingDown)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  GestureDetector(
-                    onTap: () => _setVideoMode(false),
-                    child: Text('PHOTO', style: TextStyle(color: !_isVideoMode ? Colors.amber : Colors.white70, fontWeight: FontWeight.bold, fontSize: 13)),
-                  ),
-                  const SizedBox(width: 32),
-                  GestureDetector(
-                    onTap: () => _setVideoMode(true),
-                    child: Text('VIDEO', style: TextStyle(color: _isVideoMode ? Colors.amber : Colors.white70, fontWeight: FontWeight.bold, fontSize: 13)),
-                  ),
-                ],
-              ),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -748,12 +749,51 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
                     ),
                   ),
                 ),
-                const SizedBox(width: 48),
+                if (!_isRecording && !_isCountingDown)
+                  _buildModeToggle()
+                else
+                  const SizedBox(width: 48),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildModeToggle() {
+    Widget modeButton({required bool selected, required IconData icon, required VoidCallback onTap}) {
+      return GestureDetector(
+        onTap: onTap,
+        child: _rotated(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: selected ? Colors.amber : Colors.black45,
+            ),
+            child: Icon(icon, color: selected ? Colors.black : Colors.white, size: 20),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        modeButton(
+          selected: !_isVideoMode,
+          icon: Icons.photo_camera_rounded,
+          onTap: () => _setVideoMode(false),
+        ),
+        const SizedBox(height: 10),
+        modeButton(
+          selected: _isVideoMode,
+          icon: Icons.videocam_rounded,
+          onTap: () => _setVideoMode(true),
+        ),
+      ],
     );
   }
 }

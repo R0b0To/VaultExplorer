@@ -381,19 +381,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   Future<void> _transitionTo(int index, {bool animate = true}) async {
     if (_transitionInProgress) return;
     if (index < 0 || index >= _playlistController.playlist.length) return;
-    if (index == _playlistController.currentIndex && _pageController.hasClients && _pageController.page?.round() == index) return;
-
+    if (index == _playlistController.currentIndex &&
+        _pageController.hasClients &&
+        _pageController.page?.round() == index) return;
     _transitionInProgress = true;
     final token = ++_transitionToken;
     try {
       _cancelSlideshowTimer();
       _startHideTimer();
 
+      // Activate immediately at t = 0ms so video starts loading instantly
       _playlistController.updateIndex(index);
-      // Point the shared player at the new target immediately — before the
-      // page-turn animation below even starts — so the native open/decode
-      // has the whole animation's duration as head start instead of only
-      // beginning once it finishes.
       _activateCurrentMedia();
       _prefetchSurroundingItems();
 
@@ -419,7 +417,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       }
     }
   }
-
   void _navigateToNext() {
     if (_transitionInProgress) return;
     final index = _playlistController.currentIndex;
@@ -460,10 +457,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   void _onScrollEnd() {
     _isSwiping = false;
-    // Resync as a safety net — the real trigger already ran in
-    // _transitionTo/onPageChanged the moment the target became known;
-    // this just covers other paths that land here (delete, playlist-mode
-    // change) and is a cheap no-op if the right file is already loaded.
     _activateCurrentMedia();
 
     final currentFile = _playlistController.currentFile;
@@ -821,16 +814,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   controller: _pageController,
                   physics: physics,
                   itemCount: _playlistController.playlist.length,
-                  onPageChanged: (index) {
-                    if (!_transitionInProgress) {
-                      _playlistController.updateIndex(index);
-                      _activateCurrentMedia();
-                      _prefetchDebounceTimer?.cancel();
-                      _prefetchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
-                        if (mounted) _prefetchSurroundingItems();
-                      });
-                    }
-                  },
+onPageChanged: (index) {
+    if (!_transitionInProgress) {
+      _playlistController.updateIndex(index);
+      _activateCurrentMedia();
+      _prefetchDebounceTimer?.cancel();
+      _prefetchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+        if (mounted) _prefetchSurroundingItems();
+      });
+    }
+  },
                   itemBuilder: (context, index) {
                     final fileName = _playlistController.playlist[index];
                     final contentUriString = _contentUriFor(fileName);

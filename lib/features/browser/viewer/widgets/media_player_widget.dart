@@ -48,7 +48,6 @@ class VideoPlaybackProgress {
   }
 }
 
-
 class MediaPlayerWidget extends StatefulWidget {
   final MountedContainer container;
   final String fileName;
@@ -92,7 +91,6 @@ class MediaPlayerWidget extends StatefulWidget {
 }
 
 class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
-
   NativeFFmpegController? _boundController;
   bool _isActive = false;
   bool _initialized = false;
@@ -113,25 +111,16 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   TapDownDetails? _videoDoubleTapDetails;
   Size _lastKnownVideoSize = Size.zero;
 
-  /// The file's true aspect ratio, if this session already knows it —
-  /// from browsing this file's thumbnail in the grid/masonry view before
-  /// opening the player (see [MediaAspectRatioCache]), which populates it
-  /// from native's `getImageThumbnailWithSize` / `getVideoThumbnailWithSize`
-  /// with no extra decode anywhere.
-  ///
-  /// Known *before* VLC ever opens the file, this lets the poster
-  /// pre-letterbox to the video's real shape instead of filling the parent
-  /// edge-to-edge — so when the player actually becomes ready and swaps in
-  /// (see [_boundController]/`isVideoReady` in [build]), it lands in the
-  /// exact same box the poster was already sized to, with nothing to pop or
-  /// reflow. Purely a best-known-so-far hint: once VLC reports its own
-  /// non-zero size, that's ground truth and takes over (see
-  /// `computedAspectRatio` in [build]).
   double? _knownAspectRatio;
+  Uint8List? _localPosterBytes;
 
   @override
   void initState() {
     super.initState();
+    _localPosterBytes = widget.posterBytes;
+    if (_localPosterBytes == null && !widget.isAudio) {
+      _loadLocalPoster();
+    }
     widget.playbackManager.activeControllerNotifier.addListener(_onSharedControllerChanged);
     widget.playbackManager.currentFileNotifier.addListener(_onCurrentFileChanged);
     _knownAspectRatio =
@@ -139,14 +128,27 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     _syncBoundController();
   }
 
+  Future<void> _loadLocalPoster() async {
+    try {
+      final data = await vaultExplorerApi.getVideoThumbnail(
+        widget.container,
+        widget.fileName,
+        targetSize: MediaViewerConstants.thumbnailTargetSize,
+      );
+      if (data != null && data.isNotEmpty && mounted) {
+        setState(() => _localPosterBytes = data);
+      }
+    } catch (_) {}
+  }
+
   @override
   void didUpdateWidget(covariant MediaPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.fileName != widget.fileName) {
-      // A new file's ratio replaces the old one outright — a stale ratio
-      // from the previous file would be actively wrong here, not just
-      // absent, so this can't be left to linger the way _lastKnownVideoSize
-      // resets independently once the newly-bound controller reports in.
+      _localPosterBytes = widget.posterBytes;
+      if (_localPosterBytes == null && !widget.isAudio) {
+        _loadLocalPoster();
+      }
       _knownAspectRatio =
           MediaAspectRatioCache.get(widget.container, widget.fileName);
     }
@@ -159,58 +161,44 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   void _onSharedControllerChanged() => _syncBoundController();
   void _onCurrentFileChanged() => _syncBoundController();
 
-
   void _syncBoundController() {
-    final shouldBind = widget.playbackManager.currentFileName == widget.fileName;
-    final target = shouldBind ? widget.playbackManager.activeController : null;
-    if (shouldBind == _isActive && identical(target, _boundController)) return;
+    final shouldBeActive = widget.playbackManager.currentFileName == widget.fileName;
+    final target = widget.playbackManager.getControllerFor(widget.fileName) ??
+        (shouldBeActive ? widget.playbackManager.activeController : null);
 
-    final becameActive = shouldBind && !_isActive;
-    final becameInactive = !shouldBind && _isActive;
+    if (shouldBeActive == _isActive && identical(target, _boundController)) return;
+
+    final becameActive = shouldBeActive && !_isActive;
+    final becameInactive = !shouldBeActive && _isActive;
 
     _boundController?.removeListener(_onControllerTick);
     _boundController = target;
     target?.addListener(_onControllerTick);
 
     final nowInitialized = target?.value.isInitialized ?? false;
-    void applyState() {
-      _isActive = shouldBind;
-      _initialized = nowInitialized;
-      _playerError = null;
-      _lastKnownVideoSize = target?.value.size ?? Size.zero;
-      // Swiping away leaves any pinch/double-tap zoom on this video in
-      // place (it's on this State, which persists across swipes via the
-      // per-file GlobalKey) -- with nothing resetting it, swiping back and
-      // resuming playback shows the video still zoomed in, i.e. its frame
-      // reads as "bigger" than it should be. Resetting here, the instant
-      // this page stops being the active one, means every video always
-      // resumes at its correct, un-zoomed size.
-      if (becameInactive) {
-        _videoScale = _minZoomScale;
-        _videoTransformationController.value = Matrix4.identity();
-      }
+
+    _isActive = shouldBeActive;
+    _initialized = nowInitialized;
+    _playerError = null;
+    if (target != null && target.value.size != Size.zero) {
+      _lastKnownVideoSize = target.value.size;
+    }
+    if (becameInactive) {
+      _videoScale = _minZoomScale;
+      _videoTransformationController.value = Matrix4.identity();
     }
 
-    if (mounted) {
-      setState(applyState);
-    } else {
-      applyState();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
+
     _onControllerTick();
 
     if (becameActive) {
       _loadCaptionsForThisFile();
     } else if (becameInactive) {
-      _captionsToken++; // invalidate any in-flight load for this file
+      _captionsToken++;
       _captionFile = null;
-      // Matches the zoom reset above: nothing left zoomed, so swiping
-      // shouldn't stay locked out. Deferred to after this frame because
-      // _syncBoundController (and so this whole branch) can run from
-      // didUpdateWidget, which fires mid-build -- calling onZoomChanged
-      // synchronously from there ends up calling setState() on a
-      // different, already-clean widget (the screen's physics listener)
-      // while the framework is still mid-build, which is exactly what
-      // throws "setState() or markNeedsBuild() called during build".
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.onZoomChanged(true);
       });
@@ -225,51 +213,64 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   }
 
   void _onControllerTick() {
-  if (!mounted) return;
-  final controller = _boundController;
-  if (controller == null) return;
-  
-  if (controller.value.hasError) {
-    if (_playerError == null) {
-      setState(() {
-        _playerError = controller.value.errorDescription.isNotEmpty
-            ? controller.value.errorDescription
-            : 'Media stream initialization failed';
-      });
-      widget.onError?.call();
+    if (!mounted) return;
+    final controller = _boundController;
+    if (controller == null) return;
+
+    if (controller.value.hasError) {
+      if (_playerError == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _playerError == null) {
+            setState(() {
+              _playerError = controller.value.errorDescription.isNotEmpty
+                  ? controller.value.errorDescription
+                  : 'Media stream initialization failed';
+            });
+            widget.onError?.call();
+          }
+        });
+      }
+      return;
     }
-    return;
-  }
-  
-  if (!_initialized && controller.value.isInitialized) {
-    setState(() => _initialized = true);
-  }
 
-  // FIX: Only update size if it is a valid non-zero dimension
-  final newSize = controller.value.size;
-  if (newSize.width > 0 && newSize.height > 0 && newSize != _lastKnownVideoSize) {
-    _lastKnownVideoSize = newSize;
-    // Feed this back into the shared cache: if this file's ratio wasn't
-    // already known (never browsed as a thumbnail before being opened
-    // directly), the *next* time it's opened — including the poster on
-    // this same viewer session if the user swipes away and back — gets
-    // the pre-letterboxed poster too, closing the loop for files the grid
-    // never had a chance to learn.
-    MediaAspectRatioCache.put(
-      widget.container,
-      widget.fileName,
-      newSize.width.round(),
-      newSize.height.round(),
+    if (!_initialized && controller.value.isInitialized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_initialized) {
+          setState(() => _initialized = true);
+        }
+      });
+    }
+
+    final newSize = controller.value.size;
+    if (newSize.width > 0 && newSize.height > 0 && newSize != _lastKnownVideoSize) {
+      _lastKnownVideoSize = newSize;
+      MediaAspectRatioCache.put(
+        widget.container,
+        widget.fileName,
+        newSize.width.round(),
+        newSize.height.round(),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {});
+      });
+    }
+
+    if (!_isActive) return;
+
+    final newProgress = widget.progressNotifier.value.copyWith(
+      position: controller.value.position,
+      duration: controller.value.duration,
     );
-    if (mounted) setState(() {});
-  }
 
-  if (!_isActive) return;
-  widget.progressNotifier.value = widget.progressNotifier.value.copyWith(
-    position: controller.value.position,
-    duration: controller.value.duration,
-  );
-}
+    if (widget.progressNotifier.value.position != newProgress.position ||
+        widget.progressNotifier.value.duration != newProgress.duration) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _isActive) {
+          widget.progressNotifier.value = newProgress;
+        }
+      });
+    }
+  }
 
   Future<CaptionTrack?> _loadCaptions(String videoPath) async {
     final dotIndex = videoPath.lastIndexOf('.');
@@ -322,11 +323,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     widget.playbackManager.currentFileNotifier.removeListener(_onCurrentFileChanged);
     _videoTransformationController.dispose();
     super.dispose();
-    // Deliberately does NOT pause or dispose the controller: it's owned by
-    // widget.playbackManager for the whole viewer session, not by this
-    // widget — this page being torn down (e.g. PageView recycling it once
-    // it's out of the cache-extent window) says nothing about whether the
-    // shared player should stop.
   }
 
   void _onSpeedHoldStart(LongPressStartDetails _) {
@@ -423,6 +419,61 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     });
   }
 
+  Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
+    final poster = _localPosterBytes ?? widget.posterBytes;
+    final isRotated = widget.rotationQuarterTurns % 2 != 0;
+    final knownRatio = _knownAspectRatio;
+    final effectiveKnownRatio = (knownRatio != null && isRotated)
+        ? 1.0 / knownRatio
+        : knownRatio;
+
+    Widget? posterContent;
+    if (poster != null && poster.isNotEmpty) {
+      if (widget.isAudio) {
+        posterContent = Center(
+          child: AspectRatio(
+            aspectRatio: 0.8,
+            child: RotatedBox(
+              quarterTurns: widget.rotationQuarterTurns,
+              child: Image.memory(poster, fit: BoxFit.cover),
+            ),
+          ),
+        );
+      } else if (effectiveKnownRatio != null) {
+        posterContent = Center(
+          child: AspectRatio(
+            aspectRatio: effectiveKnownRatio,
+            child: RotatedBox(
+              quarterTurns: widget.rotationQuarterTurns,
+              child: Image.memory(poster, fit: BoxFit.cover),
+            ),
+          ),
+        );
+      } else {
+        posterContent = RotatedBox(
+          quarterTurns: widget.rotationQuarterTurns,
+          child: Image.memory(
+            poster,
+            fit: BoxFit.contain,
+            width: double.infinity,
+            height: double.infinity,
+          ),
+        );
+      }
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(color: Colors.black),
+        if (posterContent != null)
+          posterContent
+        else if (widget.isAudio)
+          Center(child: _buildAudioCenterVisual(cs, isPlaying: false)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -464,16 +515,14 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         _initialized &&
         (widget.isAudio || (controller.value.size.width > 0 && controller.value.size.height > 0));
 
-    if (controller == null || !isVideoReady) {
-      return _buildPoster(cs, isLoading: _isActive);
-    }
-
     final isRotated = widget.rotationQuarterTurns % 2 != 0;
     final double computedAspectRatio = widget.isAudio
         ? 0.8
-        : (isRotated
-            ? 1.0 / controller.value.aspectRatio
-            : controller.value.aspectRatio);
+        : (isVideoReady
+            ? (isRotated ? 1.0 / controller!.value.aspectRatio : controller!.value.aspectRatio)
+            : ((_knownAspectRatio != null && isRotated)
+                ? 1.0 / _knownAspectRatio!
+                : (_knownAspectRatio ?? 16 / 9)));
 
     Widget corePlayerWidget = Center(
       child: AspectRatio(
@@ -481,14 +530,20 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            if (widget.isAudio)
-              _buildAudioCenterVisual(cs, isPlaying: controller.value.isPlaying)
-            else
+            // 1. Poster thumbnail ALWAYS rendered as base layer to prevent 1-frame black flash
+            _buildPoster(cs, isLoading: _isActive),
+
+            // 2. Native Video Texture rendered ON TOP of thumbnail when ready
+            if (!widget.isAudio && controller != null && isVideoReady)
               RotatedBox(
                 quarterTurns: widget.rotationQuarterTurns,
                 child: NativeFFmpegPlayerView(controller: controller),
               ),
-            if (!widget.isAudio && widget.subtitlesEnabled)
+
+            // 3. Subtitles / Audio Visualizer
+            if (widget.isAudio && controller != null && isVideoReady)
+              _buildAudioCenterVisual(cs, isPlaying: controller.value.isPlaying)
+            else if (!widget.isAudio && widget.subtitlesEnabled)
               Positioned(
                 bottom: widget.showUI ? 130 : 25,
                 left: 20,
@@ -513,6 +568,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                   },
                 ),
               ),
+
+            // 4. Gesture detector overlay
             Positioned.fill(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -625,79 +682,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             ),
         ],
       ),
-    );
-  }
-
-
-  Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
-    final poster = widget.posterBytes;
-    // Pre-letterbox to the same shape the player will use once ready (see
-    // _knownAspectRatio), so the poster→player swap in build() is a pure
-    // texture change with nothing to pop or reflow. isAudio uses the same
-    // fixed 0.8 ratio the player itself falls back to for audio files, so
-    // there's nothing to swap in the first place.
-    // Match the same rotation correction the player applies (see
-    // computedAspectRatio in build()): _knownAspectRatio is native's raw,
-    // pre-rotation frame shape, so a user-rotated video (rotationQuarterTurns
-    // persists per-file across sessions via _rotations) needs the same
-    // inversion here or the poster would show the wrong orientation right up
-    // until the swap.
-    final isRotated = widget.rotationQuarterTurns % 2 != 0;
-    final knownRatio = _knownAspectRatio;
-    final effectiveKnownRatio = (knownRatio != null && isRotated)
-        ? 1.0 / knownRatio
-        : knownRatio;
-
-    Widget? posterContent;
-    if (poster != null) {
-      if (widget.isAudio) {
-        posterContent = Center(
-          child: AspectRatio(
-            aspectRatio: 0.8,
-            child: RotatedBox(
-              quarterTurns: widget.rotationQuarterTurns,
-              child: Image.memory(poster, fit: BoxFit.cover),
-            ),
-          ),
-        );
-      } else if (effectiveKnownRatio != null) {
-        posterContent = Center(
-          child: AspectRatio(
-            aspectRatio: effectiveKnownRatio,
-            child: RotatedBox(
-              quarterTurns: widget.rotationQuarterTurns,
-              child: Image.memory(poster, fit: BoxFit.cover),
-            ),
-          ),
-        );
-      } else {
-        posterContent = RotatedBox(
-          quarterTurns: widget.rotationQuarterTurns,
-          child: Image.memory(
-            poster, 
-            fit: BoxFit.contain,
-            width: double.infinity,
-            height: double.infinity,
-          ),
-        );
-      }
-    }
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Container(color: Colors.black),
-        if (posterContent != null)
-          posterContent
-        else if (widget.isAudio)
-          Center(child: _buildAudioCenterVisual(cs, isPlaying: false)),
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => widget.onToggleUI(!widget.showUI),
-          ),
-        ),
-      ],
     );
   }
 

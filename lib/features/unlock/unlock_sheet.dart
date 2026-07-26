@@ -485,7 +485,32 @@ class _UnlockSheetState extends State<UnlockSheet>
       });
       try {
         final name = _selectedName ?? 'Vault';
-        final result = _isCryptomator
+
+        // CryFS is the only folder-vault backend whose native layer currently
+        // understands a cached combined key (see CryfsVault.openWithCombinedKey);
+        // Cryptomator/gocryptfs still take a plain password every time.
+        ContainerRecord? cryfsRecord;
+        var shouldCacheDerivedKey = false;
+        Uint8List? resolvedPreservedKey;
+        if (_isCryfs) {
+          final records = await ContainerRepository.instance.loadAll();
+          cryfsRecord = records[_selectedUri!];
+          final appSettings = await AppSettingsService.loadSettings();
+          final isKnownRecord = cryfsRecord != null;
+          shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
+              ((isKnownRecord || _remember) &&
+                  ((cryfsRecord?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
+          final shouldPreloadCachedKey = preservedKey == null &&
+              _unlockMethod == ContainerUnlockMethod.rememberPassword &&
+              _passwordPrefilled &&
+              (cryfsRecord?.cacheDerivedKey ?? false);
+          resolvedPreservedKey = preservedKey ??
+              (shouldPreloadCachedKey
+                  ? await vaultExplorerApi.loadDerivedKey(_selectedUri!)
+                  : null);
+        }
+
+        var result = _isCryptomator
             ? await vaultExplorerApi.unlockCryptomatorVault(
                 _selectedUri!,
                 effectivePassword,
@@ -501,13 +526,43 @@ class _UnlockSheetState extends State<UnlockSheet>
                     documentProvider: widget.documentProvider,
                     readOnly: _readOnly,
                   )
-                : await vaultExplorerApi.unlockCryfsVault(
-                    _selectedUri!,
-                    effectivePassword,
-                    displayName: name,
-                    documentProvider: widget.documentProvider,
-                    readOnly: _readOnly,
-                  );
+                : resolvedPreservedKey == null
+                    ? await vaultExplorerApi.unlockCryfsVault(
+                        _selectedUri!,
+                        effectivePassword,
+                        displayName: name,
+                        documentProvider: widget.documentProvider,
+                        readOnly: _readOnly,
+                        cacheDerivedKey: shouldCacheDerivedKey,
+                      )
+                    : await _unlockSwallowingStaleAuthFail(() => vaultExplorerApi.unlockCryfsVault(
+                          _selectedUri!,
+                          effectivePassword,
+                          displayName: name,
+                          documentProvider: widget.documentProvider,
+                          readOnly: _readOnly,
+                          preservedKey: resolvedPreservedKey,
+                          cacheDerivedKey: shouldCacheDerivedKey,
+                        ));
+        if (result == null && _isCryfs && resolvedPreservedKey != null) {
+          // Cached key was stale (vault password changed elsewhere, cache
+          // corrupted, etc.) — drop it and fall back to a real password.
+          await vaultExplorerApi.clearDerivedKey(_selectedUri!);
+          if (effectivePassword.isEmpty) {
+            effectivePassword =
+                (await ContainerRepository.instance.getPassword(_selectedUri!))?.trim() ?? '';
+          }
+          if (effectivePassword.isNotEmpty) {
+            result = await vaultExplorerApi.unlockCryfsVault(
+              _selectedUri!,
+              effectivePassword,
+              displayName: name,
+              documentProvider: widget.documentProvider,
+              readOnly: _readOnly,
+              cacheDerivedKey: shouldCacheDerivedKey,
+            );
+          }
+        }
         if (result == null) {
           setState(() => _error = 'Incorrect password or invalid vault');
           return;
@@ -518,6 +573,7 @@ class _UnlockSheetState extends State<UnlockSheet>
             uri: _selectedUri!,
             label: name,
             rememberPassword: false,
+            cacheDerivedKey: _isCryfs ? shouldCacheDerivedKey : false,
             readOnly: _readOnly,
             containerFormat: result.containerFormat,
             documentProvider: widget.documentProvider,
@@ -526,6 +582,12 @@ class _UnlockSheetState extends State<UnlockSheet>
         } else if (widget.initialUri != null) {
           final records = await ContainerRepository.instance.loadAll();
           savedRecord = records[widget.initialUri];
+          if (_isCryfs &&
+              savedRecord != null &&
+              savedRecord.cacheDerivedKey != shouldCacheDerivedKey) {
+            savedRecord = savedRecord.copyWith(cacheDerivedKey: shouldCacheDerivedKey);
+            await ContainerRepository.instance.save(savedRecord);
+          }
         }
         widget.onMounted(
           MountedContainer(

@@ -38,9 +38,48 @@ class DerivedKeyHandlers(
     private val ioExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
 ) {
+    /** Marker/config file names checked, in order, when [filePath] turns out
+     *  to be a folder-vault tree URI rather than a single document. Their
+     *  contents are small and unique per vault (they embed the KDF salt
+     *  and/or wrapped keys), so hashing them gives folder vaults the same
+     *  "survives rename/move" fingerprinting that single-file containers get
+     *  from hashing their own header bytes. */
+    private val FOLDER_VAULT_MARKER_FILES = listOf(
+        "cryfs.config",       // CryFS
+        "gocryptfs.conf",     // gocryptfs
+        "vault.cryptomator",  // Cryptomator (legacy vault format marker)
+        "masterkey.cryptomator",
+    )
+
+    private fun folderVaultFingerprint(treeUri: Uri): String? {
+        return try {
+            val root = androidx.documentfile.provider.DocumentFile.fromTreeUri(activity, treeUri) ?: return null
+            val saf = com.aeidolon.vaultexplorer.saf.SafDocumentOps(activity)
+            for (markerName in FOLDER_VAULT_MARKER_FILES) {
+                val markerDoc = saf.childOf(root, markerName) ?: continue
+                return activity.contentResolver.openInputStream(markerDoc.uri)?.use { stream ->
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        val read = stream.read(buffer)
+                        if (read <= 0) break
+                        digest.update(buffer, 0, read)
+                    }
+                    android.util.Base64.encodeToString(digest.digest(), android.util.Base64.NO_WRAP)
+                }
+            }
+            null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun containerFingerprint(filePath: String): String? {
         return try {
             val uri = Uri.parse(filePath)
+            if (android.provider.DocumentsContract.isTreeUri(uri)) {
+                return folderVaultFingerprint(uri)
+            }
             when (uri.scheme) {
                 "content" -> {
                     activity.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->

@@ -623,7 +623,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                         ],
                         if (!_isCryptomator &&
                             !_isGocryptfs &&
-                            !_isCryfs &&
                             !_isBitlocker) ...[
                           SwitchListTile(
                             contentPadding:
@@ -631,22 +630,26 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                             title: Text('Cache Derived Key',
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text('Reuse key material in Android Keystore',
+                            subtitle: Text(
+                                _isCryfs
+                                    ? 'Skip CryFS\'s scrypt KDF next time (key kept in Android Keystore)'
+                                    : 'Reuse key material in Android Keystore',
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant)),
                             value: _cacheDerivedKey,
                             onChanged: (v) => setState(() => _cacheDerivedKey = v),
                           ),
-                          AdvancedParamsPanel(
-                            cipherId: _cipherId,
-                            hashId: _hashId,
-                            subtitle:
-                                'Pin algorithm to skip auto-detection on unlock.',
-                            onCipherChanged: (val) =>
-                                setState(() => _cipherId = val),
-                            onHashChanged: (val) =>
-                                setState(() => _hashId = val),
-                          ),
+                          if (!_isCryfs)
+                            AdvancedParamsPanel(
+                              cipherId: _cipherId,
+                              hashId: _hashId,
+                              subtitle:
+                                  'Pin algorithm to skip auto-detection on unlock.',
+                              onCipherChanged: (val) =>
+                                  setState(() => _cipherId = val),
+                              onHashChanged: (val) =>
+                                  setState(() => _hashId = val),
+                            ),
                         ],
                       ],
                       if (widget.existingRecord != null) ...[

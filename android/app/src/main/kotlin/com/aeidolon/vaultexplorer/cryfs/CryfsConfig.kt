@@ -58,8 +58,20 @@ object CryfsConfigFile {
         else -> throw CryfsUnsupportedCipherException(cipherName)
     }
 
-    @Throws(CryfsConfigException::class, CryfsWrongPasswordException::class)
-    fun parse(raw: ByteArray, password: CharArray): CryfsConfig {
+    /** Size in bytes of the scrypt output ([parse]'s `combinedKey`); the shape
+     *  that a cached "derived key" must have to be replayed via
+     *  [parseWithCombinedKey]. */
+    const val COMBINED_KEY_LENGTH = COMBINED_KEY_SIZE
+
+    private class KdfHeader(
+        val salt: ByteArray,
+        val scryptN: Int,
+        val scryptR: Int,
+        val scryptP: Int,
+        val encryptedInnerConfig: ByteArray,
+    )
+
+    private fun readKdfHeader(raw: ByteArray): KdfHeader {
         var pos = 0
 
         val (header, afterHeader) = readNullTerminatedString(raw, pos)
@@ -92,54 +104,100 @@ object CryfsConfigFile {
             throw CryfsConfigException("Unsupported scrypt N parameter: $scryptN")
         }
 
+        return KdfHeader(salt, scryptN.toInt(), scryptR.toInt(), scryptP.toInt(), encryptedInnerConfig)
+    }
+
+    /**
+     * Runs scrypt over [raw]'s KDF parameters with [password] and returns the
+     * raw 88-byte combined key — the expensive part of [parse]. Callers that
+     * want a "remember this vault" fast-unlock cache should stash this (e.g.
+     * via the same Keystore-backed store [DerivedKeyHandlers] uses for file
+     * containers) and later skip straight to [parseWithCombinedKey].
+     */
+    @Throws(CryfsConfigException::class)
+    fun deriveCombinedKey(raw: ByteArray, password: CharArray): ByteArray {
+        val kdf = readKdfHeader(raw)
         val passwordBytes = passwordToUtf8Bytes(password)
-        val combinedKey = try {
+        return try {
             com.aeidolon.vaultexplorer.cryptomator.Scrypt.scrypt(
-                passwordBytes, salt, scryptN.toInt(), scryptR.toInt(), COMBINED_KEY_SIZE, scryptP.toInt()
+                passwordBytes, kdf.salt, kdf.scryptN, kdf.scryptR, COMBINED_KEY_SIZE, kdf.scryptP
             )
         } finally {
             passwordBytes.fill(0)
         }
+    }
 
-        try {
-            val outerKey = combinedKey.copyOfRange(0, OUTER_KEY_SIZE)
-            val outerPadded = try {
-                CryfsBlockCipher.decrypt(OUTER_CIPHER_ID, outerKey, encryptedInnerConfig)
-                    ?: throw CryfsWrongPasswordException()
-            } finally {
-                outerKey.fill(0)
-            }
-            val serializedInnerConfig = removePadding(outerPadded)
-
-            var ipos = 0
-            val (innerHeader, afterInnerHeader) = readNullTerminatedString(serializedInnerConfig, ipos)
-                ?: throw CryfsConfigException("Malformed inner config (missing/unterminated header).")
-            if (innerHeader != INNER_HEADER) {
-                throw CryfsConfigException(
-                    "Malformed inner config (expected header \"$INNER_HEADER\", found \"$innerHeader\")."
-                )
-            }
-            ipos = afterInnerHeader
-            val (cipherName, afterCipherName) = readNullTerminatedString(serializedInnerConfig, ipos)
-                ?: throw CryfsConfigException("Malformed inner config (missing/unterminated cipher name).")
-            ipos = afterCipherName
-            val encryptedConfig = serializedInnerConfig.copyOfRange(ipos, serializedInnerConfig.size)
-
-            val innerCipherId = CryfsBlockCipher.cipherIdFor(cipherName)
-            val innerKeySize = cipherKeySizeBytes(cipherName)
-            val innerKey = combinedKey.copyOfRange(OUTER_KEY_SIZE, OUTER_KEY_SIZE + innerKeySize)
-            val innerPadded = try {
-                CryfsBlockCipher.decrypt(innerCipherId, innerKey, encryptedConfig)
-                    ?: throw CryfsWrongPasswordException()
-            } finally {
-                innerKey.fill(0)
-            }
-            val json = removePadding(innerPadded)
-
-            return parsePayload(json, cipherName)
+    @Throws(CryfsConfigException::class, CryfsWrongPasswordException::class)
+    fun parse(raw: ByteArray, password: CharArray): CryfsConfig {
+        val kdf = readKdfHeader(raw)
+        val passwordBytes = passwordToUtf8Bytes(password)
+        val combinedKey = try {
+            com.aeidolon.vaultexplorer.cryptomator.Scrypt.scrypt(
+                passwordBytes, kdf.salt, kdf.scryptN, kdf.scryptR, COMBINED_KEY_SIZE, kdf.scryptP
+            )
+        } finally {
+            passwordBytes.fill(0)
+        }
+        return try {
+            decryptConfig(combinedKey, kdf.encryptedInnerConfig)
         } finally {
             combinedKey.fill(0)
         }
+    }
+
+    /**
+     * Fast-path counterpart of [parse]: decrypts cryfs.config using an
+     * already-derived [combinedKey] (as previously returned by
+     * [deriveCombinedKey]/[parse]) instead of running scrypt again. A wrong
+     * cached key surfaces the same [CryfsWrongPasswordException] as a wrong
+     * password, so callers can fall back to a full password prompt.
+     */
+    @Throws(CryfsConfigException::class, CryfsWrongPasswordException::class)
+    fun parseWithCombinedKey(raw: ByteArray, combinedKey: ByteArray): CryfsConfig {
+        if (combinedKey.size != COMBINED_KEY_SIZE) {
+            throw CryfsWrongPasswordException()
+        }
+        val kdf = readKdfHeader(raw)
+        return decryptConfig(combinedKey, kdf.encryptedInnerConfig)
+    }
+
+    @Throws(CryfsConfigException::class, CryfsWrongPasswordException::class)
+    private fun decryptConfig(combinedKey: ByteArray, encryptedInnerConfig: ByteArray): CryfsConfig {
+        val outerKey = combinedKey.copyOfRange(0, OUTER_KEY_SIZE)
+        val outerPadded = try {
+            CryfsBlockCipher.decrypt(OUTER_CIPHER_ID, outerKey, encryptedInnerConfig)
+                ?: throw CryfsWrongPasswordException()
+        } finally {
+            outerKey.fill(0)
+        }
+        val serializedInnerConfig = removePadding(outerPadded)
+
+        var ipos = 0
+        val (innerHeader, afterInnerHeader) = readNullTerminatedString(serializedInnerConfig, ipos)
+            ?: throw CryfsConfigException("Malformed inner config (missing/unterminated header).")
+        if (innerHeader != INNER_HEADER) {
+            throw CryfsConfigException(
+                "Malformed inner config (expected header \"$INNER_HEADER\", found \"$innerHeader\")."
+            )
+        }
+        ipos = afterInnerHeader
+        val (cipherName, afterCipherName) = readNullTerminatedString(serializedInnerConfig, ipos)
+            ?: throw CryfsConfigException("Malformed inner config (missing/unterminated cipher name).")
+        ipos = afterCipherName
+        val encryptedConfig = serializedInnerConfig.copyOfRange(ipos, serializedInnerConfig.size)
+
+        val innerCipherId = CryfsBlockCipher.cipherIdFor(cipherName)
+        val innerKeySize = cipherKeySizeBytes(cipherName)
+        val innerKey = combinedKey.copyOfRange(OUTER_KEY_SIZE, OUTER_KEY_SIZE + innerKeySize)
+        val innerPadded = try {
+            CryfsBlockCipher.decrypt(innerCipherId, innerKey, encryptedConfig)
+                ?: throw CryfsWrongPasswordException()
+        } finally {
+            innerKey.fill(0)
+        }
+        val json = removePadding(innerPadded)
+
+        return parsePayload(json, cipherName)
     }
 
     private fun parsePayload(payloadJson: ByteArray, expectedCipherName: String): CryfsConfig {

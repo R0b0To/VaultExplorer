@@ -1,22 +1,6 @@
 part of 'vault_explorer_api.dart';
 
-/// Container/vault creation, unlocking, and management -- VeraCrypt/LUKS
-/// file and USB containers, Cryptomator/gocryptfs directory vaults, and the
-/// USB device listing/permission calls those creation flows depend on.
-/// Mirrors the native-side `ContainerEngine` router (see the Kotlin bridge
-/// layer) on the Dart side of the platform channel.
 mixin _ContainerLifecycleOps {
-  // ── Container lifecycle ───────────────────────────────────────────────────
-
-  /// [containerFormat]: 0 = VeraCrypt, 1 = LUKS1, 2 = LUKS2 (see
-  /// [CreateFormat] in crypto_algorithms.dart) — matches the native
-  /// ContainerFormat ordinal.
-  ///
-  /// [keyfilePaths]: for VeraCrypt, keyfiles mix ADDITIVELY into
-  /// [password] (an empty password with keyfiles alone is valid, matching
-  /// real VeraCrypt). For LUKS, a keyfile REPLACES [password] entirely
-  /// (matching real `cryptsetup --key-file`) and only the first keyfile is
-  /// used.
   Future<bool> createContainer({
     required String displayName,
     required int sizeBytes,
@@ -86,9 +70,6 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Returns usable capacity in bytes (device capacity minus the MBR
-  /// partition offset), or null on failure. Requires [deviceName] to
-  /// already have USB permission granted.
   Future<int?> getUsbDeviceCapacity(String deviceName) async {
     try {
       final result = await _channel.invokeMethod<int>(
@@ -153,9 +134,6 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Changes the password (and optionally PIM) of a VeraCrypt container.
-  /// For LUKS containers, password change is not supported in-app — the user
-  /// should use `cryptsetup luksChangeKey` on a Linux machine.
   Future<bool> changeContainerPassword({
     required String uri,
     required String oldPassword,
@@ -198,8 +176,6 @@ mixin _ContainerLifecycleOps {
     );
   }
 
-  /// Opens a multi-select document picker for keyfiles. Returns an empty
-  /// list if the user cancels.
   Future<List<KeyfileRef>> pickKeyfiles() async {
     final raw = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.pickKeyfiles,
@@ -214,8 +190,6 @@ mixin _ContainerLifecycleOps {
         .toList();
   }
 
-  /// Opens a folder picker (ACTION_OPEN_DOCUMENT_TREE) for selecting a
-  /// Cryptomator vault or directory vault.
   Future<({String uri, String displayName, bool looksLikeVault, String? format})?> pickCryptomatorVault() async {
     try {
       final res = await _channel.invokeMapMethod<String, dynamic>(ChannelMethods.pickCryptomatorVault);
@@ -232,7 +206,6 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Unlocks a Cryptomator vault.
   Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockCryptomatorVault(
     String filePath,
     String password, {
@@ -249,7 +222,9 @@ mixin _ContainerLifecycleOps {
           'readOnly': readOnly,
         });
     if (raw == null) return null;
+    
     final files = (raw['files'] as List<Object?>).cast<String>();
+    
     return (
       volId: raw['volId'] as int,
       files: files,
@@ -259,7 +234,6 @@ mixin _ContainerLifecycleOps {
     );
   }
 
-  /// Creates a new Cryptomator vault in an empty folder.
   Future<bool> createCryptomatorVault(String folderUri, String password) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -273,7 +247,6 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Opens a folder picker for selecting a Gocryptfs vault.
   Future<({String uri, String displayName, bool looksLikeVault, String? format})?> pickGocryptfsVault() async {
     try {
       final res = await _channel.invokeMapMethod<String, dynamic>(ChannelMethods.pickGocryptfsVault);
@@ -303,7 +276,6 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Unlocks a Gocryptfs vault.
   Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockGocryptfsVault(
     String filePath,
     String password, {
@@ -320,7 +292,9 @@ mixin _ContainerLifecycleOps {
           'readOnly': readOnly,
         });
     if (raw == null) return null;
+    
     final files = (raw['files'] as List<Object?>).cast<String>();
+    
     return (
       volId: raw['volId'] as int,
       files: files,
@@ -330,7 +304,6 @@ mixin _ContainerLifecycleOps {
     );
   }
 
-  /// Creates a new Gocryptfs vault in an empty folder.
   Future<bool> createGocryptfsVault(String folderUri, String password) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -344,7 +317,6 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Opens a folder picker for selecting a CryFS vault.
   Future<({String uri, String displayName, bool looksLikeVault, String? format})?> pickCryfsVault() async {
     try {
       final res = await _channel.invokeMapMethod<String, dynamic>(ChannelMethods.pickCryfsVault);
@@ -374,13 +346,14 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Unlocks a CryFS vault.
   Future<({int volId, List<String> files, int matchedCipherId, int matchedHashId, String containerFormat})?> unlockCryfsVault(
     String filePath,
     String password, {
     String? displayName,
     bool documentProvider = false,
     bool readOnly = false,
+    Uint8List? preservedKey,
+    bool cacheDerivedKey = false,
   }) async {
     final raw = await _channel
         .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockCryfsVault, {
@@ -389,9 +362,13 @@ mixin _ContainerLifecycleOps {
           'displayName': displayName,
           'documentProvider': documentProvider,
           'readOnly': readOnly,
+          if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
+          'cacheDerivedKey': cacheDerivedKey,
         });
     if (raw == null) return null;
+    
     final files = (raw['files'] as List<Object?>).cast<String>();
+    
     return (
       volId: raw['volId'] as int,
       files: files,
@@ -401,7 +378,6 @@ mixin _ContainerLifecycleOps {
     );
   }
 
-  /// Creates a new CryFS vault in an empty folder.
   Future<bool> createCryfsVault(String folderUri, String password) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -415,8 +391,6 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Must be called once after the final [writeFileChunk] call in a
-  /// sequence for a given [fileName] on Cryptomator/gocryptfs/CryFS vaults.
   Future<bool> finishWriteIfCryptomator(
     MountedContainer container,
     String fileName,
@@ -433,7 +407,6 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Asks native to abort the in-flight unlock for [volId].
   Future<void> cancelUnlock(int volId) async {
     try {
       await _channel.invokeMethod(ChannelMethods.cancelUnlock, {'volId': volId});
@@ -470,9 +443,12 @@ mixin _ContainerLifecycleOps {
             'keyfilePaths': keyfilePaths,
           'readOnly': readOnly,
         });
+
     if (raw == null) return null;
+
     final volId = raw['volId'] as int;
     final files = (raw['files'] as List<Object?>).cast<String>();
+
     return (
       volId: volId,
       files: files,
@@ -482,7 +458,6 @@ mixin _ContainerLifecycleOps {
     );
   }
 
-  /// Checks whether the document/file at [filePath] can currently be resolved.
   Future<bool> documentExists(String filePath) async {
     try {
       final result = await _channel.invokeMethod<bool>(
@@ -496,7 +471,6 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Speculatively warms [filePath] for a subsequent [unlockContainer] call.
   void warmContainer(String filePath) {
     _channel
         .invokeMethod(ChannelMethods.warmContainer, {'filePath': filePath})
@@ -508,6 +482,7 @@ mixin _ContainerLifecycleOps {
       ChannelMethods.listUsbDevices,
     );
     if (raw == null) return [];
+
     return raw
         .cast<Map<Object?, Object?>>()
         .map((m) => UsbDeviceInfo(
@@ -560,9 +535,12 @@ mixin _ContainerLifecycleOps {
         'readOnly': readOnly,
       },
     );
+
     if (raw == null) return null;
+
     final volId = raw['volId'] as int;
     final files = (raw['files'] as List<Object?>).cast<String>();
+
     return (
       volId: volId,
       files: files,

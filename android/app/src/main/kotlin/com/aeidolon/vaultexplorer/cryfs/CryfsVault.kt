@@ -16,16 +16,59 @@ object CryfsVault {
         return saf.childOf(root, CONFIG_FILE_NAME) != null
     }
 
+    private fun readConfigBytes(context: Context, root: DocumentFile): ByteArray? {
+        val saf = SafDocumentOps(context)
+        val configDoc = saf.childOf(root, CONFIG_FILE_NAME) ?: return null
+        return context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
+    }
+
     fun open(context: Context, vaultRootUri: Uri, password: CharArray, readOnly: Boolean): VaultOpenResult<CryfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
-        val saf = SafDocumentOps(context)
-        val configDoc = saf.childOf(root, CONFIG_FILE_NAME)
+        val configBytes = readConfigBytes(context, root)
             ?: return VaultOpenResult.InvalidVault("No cryfs.config found — this doesn't look like a CryFS vault.")
-        val configBytes = context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
-            ?: return VaultOpenResult.InvalidVault("Could not read cryfs.config")
+        val combinedKey = try {
+            CryfsConfigFile.deriveCombinedKey(configBytes, password)
+        } catch (e: CryfsConfigException) {
+            return VaultOpenResult.InvalidVault(e.message ?: "Malformed cryfs.config")
+        }
         val config = try {
-            CryfsConfigFile.parse(configBytes, password)
+            CryfsConfigFile.parseWithCombinedKey(configBytes, combinedKey)
+        } catch (e: CryfsWrongPasswordException) {
+            combinedKey.fill(0)
+            return VaultOpenResult.WrongPassword
+        } catch (e: CryfsUnsupportedCipherException) {
+            combinedKey.fill(0)
+            return VaultOpenResult.InvalidVault(e.message ?: "Unsupported cipher")
+        } catch (e: CryfsConfigException) {
+            combinedKey.fill(0)
+            return VaultOpenResult.InvalidVault(e.message ?: "Malformed cryfs.config")
+        }
+        return try {
+            buildSession(context, vaultRootUri, root, config, readOnly, combinedKey)
+        } catch (e: Exception) {
+            combinedKey.fill(0)
+            VaultOpenResult.InvalidVault("Could not open vault: ${e.message}")
+        }
+    }
+
+    /**
+     * Fast-path counterpart of [open]: reopens the vault with a previously
+     * cached `combinedKey` (see [VaultOpenResult.Success.derivedKey]),
+     * skipping cryfs's scrypt KDF entirely — the same trick DroidFS's native
+     * cryfs/gocryptfs JNI layer plays via its `givenHash` parameter. A stale
+     * or wrong cached key surfaces as [VaultOpenResult.WrongPassword], same
+     * as a wrong password, so the caller can fall back to a password prompt.
+     */
+    fun openWithCombinedKey(
+        context: Context, vaultRootUri: Uri, combinedKey: ByteArray, readOnly: Boolean,
+    ): VaultOpenResult<CryfsSession> {
+        val root = DocumentFile.fromTreeUri(context, vaultRootUri)
+            ?: return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
+        val configBytes = readConfigBytes(context, root)
+            ?: return VaultOpenResult.InvalidVault("No cryfs.config found — this doesn't look like a CryFS vault.")
+        val config = try {
+            CryfsConfigFile.parseWithCombinedKey(configBytes, combinedKey)
         } catch (e: CryfsWrongPasswordException) {
             return VaultOpenResult.WrongPassword
         } catch (e: CryfsUnsupportedCipherException) {
@@ -34,7 +77,7 @@ object CryfsVault {
             return VaultOpenResult.InvalidVault(e.message ?: "Malformed cryfs.config")
         }
         return try {
-            buildSession(context, vaultRootUri, root, config, readOnly)
+            buildSession(context, vaultRootUri, root, config, readOnly, combinedKey)
         } catch (e: Exception) {
             VaultOpenResult.InvalidVault("Could not open vault: ${e.message}")
         }
@@ -69,6 +112,7 @@ object CryfsVault {
 
     private fun buildSession(
         context: Context, vaultRootUri: Uri, root: DocumentFile, config: CryfsConfig, readOnly: Boolean,
+        derivedKey: ByteArray? = null,
     ): VaultOpenResult<CryfsSession> {
         val cipherId = try {
             CryfsBlockCipher.cipherIdFor(config.blockCipherName)
@@ -83,6 +127,6 @@ object CryfsVault {
         val dataTree = CryfsDataTree(blockStore, virtualBlockSize, SecureRandom())
         val tree = CryfsVaultTree(dataTree, config.rootBlobId)
         val session = CryfsSession(context, vaultRootUri, config, dataTree, tree, readOnly)
-        return VaultOpenResult.Success(session, root.name ?: "Vault")
+        return VaultOpenResult.Success(session, root.name ?: "Vault", derivedKey)
     }
 }

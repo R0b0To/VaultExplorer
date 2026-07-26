@@ -270,8 +270,11 @@ class VaultUnlockHandlers(
         val displayName = call.argument<String>("displayName")
         val docProvider = call.argument<Boolean>("documentProvider") ?: false
         val readOnly = call.argument<Boolean>("readOnly") ?: false
-        if (uriString == null || password == null) {
-            result.error("INVALID_ARGS", "filePath and password required", null)
+        val preservedKeyBase64 = call.argument<String>("preservedKey")
+        val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+        val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
+        if (uriString == null || (password == null && preservedKey == null)) {
+            result.error("INVALID_ARGS", "filePath and (password or preservedKey) required", null)
             return
         }
         val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
@@ -284,11 +287,20 @@ class VaultUnlockHandlers(
         ioExecutor.execute {
             try {
                 val uri = Uri.parse(uriString)
-                val passwordChars = password.toCharArray()
-                val openResult = try {
-                    com.aeidolon.vaultexplorer.cryfs.CryfsVault.open(activity, uri, passwordChars, readOnly)
-                } finally {
-                    passwordChars.fill('\u0000')
+                if (preservedKey != null) {
+                    Log.i("VaultExplorer_C++", "CryFS unlock using preserved combined key (len=${preservedKey.size})")
+                } else if (cacheDerivedKey) {
+                    Log.i("VaultExplorer_C++", "CryFS unlock will derive and cache a fresh combined key")
+                }
+                val openResult = if (preservedKey != null) {
+                    com.aeidolon.vaultexplorer.cryfs.CryfsVault.openWithCombinedKey(activity, uri, preservedKey, readOnly)
+                } else {
+                    val passwordChars = password!!.toCharArray()
+                    try {
+                        com.aeidolon.vaultexplorer.cryfs.CryfsVault.open(activity, uri, passwordChars, readOnly)
+                    } finally {
+                        passwordChars.fill('\u0000')
+                    }
                 }
 
                 val files = if (openResult is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success) {
@@ -320,6 +332,12 @@ class VaultUnlockHandlers(
                                 "matchedHashId" to 255,
                                 "containerFormat" to "cryfs",
                             ))
+                            if (cacheDerivedKey && preservedKey == null) {
+                                val derived = openResult.derivedKey
+                                if (derived != null) {
+                                    ioExecutor.execute { derivedKeyHandlers.storeDerivedKeyBytes(uriString, derived) }
+                                }
+                            }
                         }
                         is com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword -> {
                             result.error("AUTH_FAIL", "Incorrect password", null)

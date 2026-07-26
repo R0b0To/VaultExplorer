@@ -43,6 +43,7 @@ private:
     void videoDecodeThreadFunc();
     void audioDecodeThreadFunc();
     void performPendingSeek(); // called only from demux_thread
+    void waitForQueuesDrained(); // called only from demux_thread
     
     static int readPacketCallback(void* opaque, uint8_t* buf, int buf_size);
     static int64_t seekCallback(void* opaque, int64_t offset, int whence);
@@ -69,6 +70,25 @@ private:
     // this same thread looping back to 0 at EOF.
     std::atomic<bool> seek_requested{false};
     std::atomic<int64_t> seek_target_ms{0};
+
+    // Set once av_read_frame() genuinely runs out of input (demux_thread,
+    // non-looping path) and cleared on setDataSource()/performPendingSeek().
+    // videoDecodeThreadFunc's A/V-sync block uses this to stop trusting
+    // audio_clock once no more audio packets will ever arrive -- see that
+    // block's comment for why a frozen audio_clock otherwise makes
+    // playback crawl to a near-halt right before the end.
+    std::atomic<bool> input_eof{false};
+
+    // avcodec_flush_buffers() (called from performPendingSeek(), which
+    // only ever runs on demux_thread) must not run concurrently with
+    // avcodec_send_packet()/avcodec_receive_frame() on the same context
+    // from video_thread/audio_thread -- FFmpeg does not guarantee any
+    // safety between those calls without external locking. These guard
+    // every access to their respective codec context so a seek's flush
+    // can't land mid-decode (see performPendingSeek()'s comment for the
+    // crash this caused).
+    std::mutex video_codec_mutex;
+    std::mutex audio_codec_mutex;
 
     int media_fd = -1;
     int64_t media_size = 0;

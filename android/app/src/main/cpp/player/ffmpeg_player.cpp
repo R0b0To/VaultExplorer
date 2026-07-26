@@ -135,12 +135,22 @@ void FFmpegPlayer::setDataSource(int fd, bool autoPlay) {
     audio_clock = 0.0;
     video_clock = 0.0;
     seek_requested = false;
+    input_eof = false;
 
     demux_thread = std::thread(&FFmpegPlayer::demuxThreadFunc, this);
 }
 
 void FFmpegPlayer::play() {
     is_playing = true;
+    // Reaching the natural end leaves the pipeline idling with nothing
+    // queued (see the demux loop's EOF handling) -- without an explicit
+    // seek there is nothing left to feed, so play() would otherwise be a
+    // silent no-op right when the video is sitting at its end. Most
+    // players treat "press play at the end" as "restart from the top",
+    // so mirror that instead.
+    if (input_eof.load()) {
+        seekTo(0);
+    }
     // pause()/"endReached" both push isPlaying=false to the Dart side via
     // an event; without a matching push here, the Dart-side value gets
     // stuck at isPlaying=false forever after the first pause, since
@@ -238,11 +248,35 @@ void FFmpegPlayer::performPendingSeek() {
     // was silently breaking looping too: seekTo(0) at EOF landed back on
     // the exact same unflushed decoders, which then failed to produce
     // usable frames from the restarted stream.
-    if (video_codec_ctx) avcodec_flush_buffers(video_codec_ctx);
-    if (audio_codec_ctx) avcodec_flush_buffers(audio_codec_ctx);
+    //
+    // This used to call avcodec_flush_buffers() directly here, with no
+    // synchronization against video_thread/audio_thread -- but those
+    // threads can be mid-avcodec_send_packet()/avcodec_receive_frame() on
+    // the exact same AVCodecContext at this exact moment (they only wait
+    // on packet availability, not on the demux thread doing anything).
+    // FFmpeg does not support flushing a codec context concurrently with
+    // decode calls on it from another thread: the flush resets internal
+    // state (reference frames, reorder buffers) out from under a decode
+    // call that's actively reading it, corrupting it. That's what was
+    // crashing with a SIGSEGV inside avcodec_send_packet whenever the
+    // seekbar was used. Taking the same mutex the decode threads hold
+    // around their codec calls (see video/audioDecodeThreadFunc) makes
+    // the flush wait for any in-flight decode call to finish first.
+    {
+        std::lock_guard<std::mutex> lock(video_codec_mutex);
+        if (video_codec_ctx) avcodec_flush_buffers(video_codec_ctx);
+    }
+    {
+        std::lock_guard<std::mutex> lock(audio_codec_mutex);
+        if (audio_codec_ctx) avcodec_flush_buffers(audio_codec_ctx);
+    }
 
     audio_clock = targetMs / 1000.0;
     video_clock = targetMs / 1000.0;
+    // A seek (whether user-initiated or a loop restart) means we're no
+    // longer at end-of-stream, so audio_clock is trustworthy again -- see
+    // videoDecodeThreadFunc's A/V-sync block.
+    input_eof = false;
     notifyEvent("timeChanged", (double)targetMs, (double)format_ctx->duration / AV_TIME_BASE * 1000);
 }
 
@@ -330,6 +364,16 @@ void FFmpegPlayer::demuxThreadFunc() {
             continue; 
         }
 
+        // Sitting at true end-of-stream (non-looping): nothing left to
+        // read until a seek lands, and performPendingSeek() above already
+        // clears input_eof the moment one does. Skip straight to idling
+        // instead of re-running av_read_frame every iteration for no
+        // reason.
+        if (input_eof.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            continue;
+        }
+
         if (video_queue.size() > 50 || audio_queue.size() > 100) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
@@ -347,15 +391,68 @@ void FFmpegPlayer::demuxThreadFunc() {
             }
             av_packet_unref(packet);
         } else {
+            // For a very short clip, av_read_frame can read the *entire*
+            // file and hit EOF within milliseconds -- far faster than the
+            // decode threads render it back out at real, paced speed.
+            // Restarting (loop) or declaring the end right here, before
+            // those threads have actually drained what's already queued,
+            // used to clear/abandon frames that hadn't played yet: for
+            // looping, that repeatedly wiped the whole clip out from
+            // under the decode threads on every lap, leaving playback
+            // stuck showing a single frame; for a one-shot clip, it fired
+            // "endReached" (which the Dart side treats as playback
+            // having reached the very end) well before what was on
+            // screen had actually finished. Waiting here first fixes both.
+            waitForQueuesDrained();
+            if (stop_requested) break;
+
             if (looping) { 
                 seekTo(0); 
-            } else { 
-                notifyEvent("endReached"); 
-                break; 
+            } else if (!input_eof.exchange(true)) {
+                // No more packets will ever arrive for either stream from
+                // here on -- see videoDecodeThreadFunc's A/V-sync block
+                // for why the video thread needs to know that.
+                notifyEvent("endReached");
+                // Deliberately does not break/return here: seekTo() (the
+                // user dragging the seekbar, including back to the very
+                // start) only ever gets *acted on* by this thread's own
+                // performPendingSeek() call at the top of this loop --
+                // exiting the thread here, as this used to do, left any
+                // later seek (or play(), which now also seeks to 0 -- see
+                // play()) permanently stranded with nothing left alive to
+                // service it. Falling through and looping back around
+                // just idles (see the input_eof check above) until either
+                // a seek arrives or stop() tears this thread down.
             }
         }
     }
     av_packet_free(&packet);
+}
+
+// Waits until both decode queues have been fully drained by their
+// consumer threads (i.e. video/audioDecodeThreadFunc have popped
+// everything already read), plus a short grace period for whichever
+// packet each thread most recently popped to finish its own paced
+// render/sleep -- queue-empty alone doesn't guarantee that. Capped so a
+// stuck decode thread can't hang this one forever.
+void FFmpegPlayer::waitForQueuesDrained() {
+    const int maxIterations = 500; // ~5s at 10ms/iteration
+    for (int i = 0; i < maxIterations && !stop_requested; i++) {
+        bool videoEmpty, audioEmpty;
+        {
+            std::lock_guard<std::mutex> l(video_queue_mutex);
+            videoEmpty = video_queue.empty();
+        }
+        {
+            std::lock_guard<std::mutex> l(audio_queue_mutex);
+            audioEmpty = audio_queue.empty();
+        }
+        if (videoEmpty && audioEmpty) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    if (!stop_requested) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+    }
 }
 
 void FFmpegPlayer::videoDecodeThreadFunc() {
@@ -370,13 +467,43 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
             video_queue.pop();
         }
 
-        if (avcodec_send_packet(video_codec_ctx, pkt) == 0) {
-            while (avcodec_receive_frame(video_codec_ctx, frame) == 0) {
+        int sendRet;
+        {
+            std::lock_guard<std::mutex> codecLock(video_codec_mutex);
+            sendRet = avcodec_send_packet(video_codec_ctx, pkt);
+        }
+        if (sendRet == 0) {
+            while (true) {
+                int recvRet;
+                {
+                    std::lock_guard<std::mutex> codecLock(video_codec_mutex);
+                    recvRet = avcodec_receive_frame(video_codec_ctx, frame);
+                }
+                if (recvRet != 0) break;
+
                 double pts = frame->best_effort_timestamp * av_q2d(format_ctx->streams[video_stream_idx]->time_base);
                 video_clock = pts;
                 
                 // A/V Synchronization
-                if (audio_stream_idx >= 0 && audio_clock > 0) {
+                //
+                // audio_clock is only ever updated when audioDecodeThreadFunc
+                // decodes a new packet (see that function) -- it does NOT
+                // track wall-clock time on its own. Audio and video tracks
+                // essentially never end at exactly the same timestamp (encoder
+                // delay, differing track durations, etc.), so on nearly every
+                // file the audio track's last packet gets decoded first,
+                // audio_clock stops updating and sits frozen from then on,
+                // while pts here keeps advancing for the video frames still
+                // arriving. diff = pts - audio_clock then grows without bound,
+                // and for however many frames it takes to cross the 1.0s cap
+                // below, this was sleeping for close to a full second per
+                // frame -- experienced as the video grinding almost to a halt
+                // for the last stretch before it actually reaches the end.
+                // input_eof (set once the demuxer truly has no more packets
+                // coming for either stream) tells us audio_clock can no longer
+                // be trusted, so we fall back to plain fps-based pacing
+                // instead of chasing it.
+                if (audio_stream_idx >= 0 && audio_clock > 0 && !input_eof.load()) {
                     double diff = pts - audio_clock;
                     if (diff > 0.005 && diff < 1.0) {
                         std::this_thread::sleep_for(std::chrono::milliseconds((int)(diff * 1000 / playback_speed)));
@@ -425,8 +552,20 @@ void FFmpegPlayer::audioDecodeThreadFunc() {
             audio_queue.pop();
         }
 
-        if (avcodec_send_packet(audio_codec_ctx, pkt) == 0) {
-            while (avcodec_receive_frame(audio_codec_ctx, frame) == 0) {
+        int sendRet;
+        {
+            std::lock_guard<std::mutex> codecLock(audio_codec_mutex);
+            sendRet = avcodec_send_packet(audio_codec_ctx, pkt);
+        }
+        if (sendRet == 0) {
+            while (true) {
+                int recvRet;
+                {
+                    std::lock_guard<std::mutex> codecLock(audio_codec_mutex);
+                    recvRet = avcodec_receive_frame(audio_codec_ctx, frame);
+                }
+                if (recvRet != 0) break;
+
                 uint8_t* out_buffer = nullptr;
                 int out_samples = av_rescale_rnd(swr_get_delay(swr_ctx, audio_codec_ctx->sample_rate) + frame->nb_samples, 
                                                  48000, audio_codec_ctx->sample_rate, AV_ROUND_UP);
@@ -471,17 +610,65 @@ void FFmpegPlayer::audioDecodeThreadFunc() {
 
 oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStream, void* audioData, int32_t numFrames) {
     float* out = static_cast<float*>(audioData);
-    int numFloatsNeeded = numFrames * 2;
-    
     std::lock_guard<std::mutex> lock(audio_buf_mutex);
-    if (audio_buffer.size() >= (size_t)numFloatsNeeded && is_playing) {
-        float vol = volume_multiplier;
-        for (int i = 0; i < numFloatsNeeded; i++) {
-            out[i] = audio_buffer[i] * vol;
-        }
-        audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + numFloatsNeeded);
-    } else {
-        memset(out, 0, numFloatsNeeded * sizeof(float));
+
+    if (!is_playing) {
+        memset(out, 0, numFrames * 2 * sizeof(float));
+        return oboe::DataCallbackResult::Continue;
     }
+
+    float speed = playback_speed.load();
+    if (speed <= 0.0f) speed = 1.0f;
+    float vol = volume_multiplier;
+
+    // Previously this always copied audio out 1:1 regardless of
+    // playback_speed -- the video thread's A/V-sync sleeps already scale
+    // by playback_speed (see videoDecodeThreadFunc), but with audio
+    // always actually playing at 1x, video just kept re-syncing back to
+    // real-time audio, so changing speed had no real effect on anything
+    // audible. Speeding up/slowing down here too -- by consuming source
+    // frames faster/slower than 1:1 per output frame via linear
+    // interpolation -- is what actually makes setPlaybackSpeed do
+    // something. This shifts pitch along with rate (no independent time-
+    // stretching), which is the standard trade-off for a simple speed
+    // control.
+    if (speed == 1.0f) {
+        int numFloatsNeeded = numFrames * 2;
+        if (audio_buffer.size() >= (size_t)numFloatsNeeded) {
+            for (int i = 0; i < numFloatsNeeded; i++) {
+                out[i] = audio_buffer[i] * vol;
+            }
+            audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + numFloatsNeeded);
+        } else {
+            memset(out, 0, numFloatsNeeded * sizeof(float));
+        }
+        return oboe::DataCallbackResult::Continue;
+    }
+
+    size_t availableFrames = audio_buffer.size() / 2;
+    size_t framesNeeded = (size_t)(numFrames * (double)speed) + 2;
+    if (availableFrames < framesNeeded) {
+        // Not enough buffered audio to safely resample this callback --
+        // output silence rather than reading past the end of the buffer.
+        memset(out, 0, numFrames * 2 * sizeof(float));
+        return oboe::DataCallbackResult::Continue;
+    }
+
+    double srcPos = 0.0;
+    for (int32_t i = 0; i < numFrames; i++) {
+        size_t idx0 = (size_t)srcPos;
+        double frac = srcPos - (double)idx0;
+        size_t idx1 = idx0 + 1;
+        for (int ch = 0; ch < 2; ch++) {
+            float s0 = audio_buffer[idx0 * 2 + ch];
+            float s1 = audio_buffer[idx1 * 2 + ch];
+            out[i * 2 + ch] = (float)(s0 + (s1 - s0) * frac) * vol;
+        }
+        srcPos += speed;
+    }
+    size_t consumedFrames = (size_t)srcPos;
+    if (consumedFrames > availableFrames) consumedFrames = availableFrames;
+    audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + consumedFrames * 2);
+
     return oboe::DataCallbackResult::Continue;
 }

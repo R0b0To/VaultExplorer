@@ -179,6 +179,17 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       _initialized = nowInitialized;
       _playerError = null;
       _lastKnownVideoSize = target?.value.size ?? Size.zero;
+      // Swiping away leaves any pinch/double-tap zoom on this video in
+      // place (it's on this State, which persists across swipes via the
+      // per-file GlobalKey) -- with nothing resetting it, swiping back and
+      // resuming playback shows the video still zoomed in, i.e. its frame
+      // reads as "bigger" than it should be. Resetting here, the instant
+      // this page stops being the active one, means every video always
+      // resumes at its correct, un-zoomed size.
+      if (becameInactive) {
+        _videoScale = _minZoomScale;
+        _videoTransformationController.value = Matrix4.identity();
+      }
     }
 
     if (mounted) {
@@ -193,6 +204,17 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     } else if (becameInactive) {
       _captionsToken++; // invalidate any in-flight load for this file
       _captionFile = null;
+      // Matches the zoom reset above: nothing left zoomed, so swiping
+      // shouldn't stay locked out. Deferred to after this frame because
+      // _syncBoundController (and so this whole branch) can run from
+      // didUpdateWidget, which fires mid-build -- calling onZoomChanged
+      // synchronously from there ends up calling setState() on a
+      // different, already-clean widget (the screen's physics listener)
+      // while the framework is still mid-build, which is exactly what
+      // throws "setState() or markNeedsBuild() called during build".
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onZoomChanged(true);
+      });
     }
   }
 
@@ -614,10 +636,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     // _knownAspectRatio), so the poster→player swap in build() is a pure
     // texture change with nothing to pop or reflow. isAudio uses the same
     // fixed 0.8 ratio the player itself falls back to for audio files, so
-    // there's nothing to swap in the first place. Genuinely unknown (no
-    // prior thumbnail view, first time this file's ever been opened) falls
-    // back to a neutral square — still better than the old edge-to-edge
-    // fill, and self-corrects for next time once VLC reports the real size.
+    // there's nothing to swap in the first place.
     // Match the same rotation correction the player applies (see
     // computedAspectRatio in build()): _knownAspectRatio is native's raw,
     // pre-rotation frame shape, so a user-rotated video (rotationQuarterTurns
@@ -629,22 +648,55 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     final effectiveKnownRatio = (knownRatio != null && isRotated)
         ? 1.0 / knownRatio
         : knownRatio;
-    final posterAspectRatio =
-        widget.isAudio ? 0.8 : (effectiveKnownRatio ?? 1.0);
+
+    Widget? posterContent;
+    if (poster != null) {
+      if (widget.isAudio) {
+        posterContent = Center(
+          child: AspectRatio(
+            aspectRatio: 0.8,
+            child: RotatedBox(
+              quarterTurns: widget.rotationQuarterTurns,
+              child: Image.memory(poster, fit: BoxFit.cover),
+            ),
+          ),
+        );
+      } else if (effectiveKnownRatio != null) {
+        posterContent = Center(
+          child: AspectRatio(
+            aspectRatio: effectiveKnownRatio,
+            child: RotatedBox(
+              quarterTurns: widget.rotationQuarterTurns,
+              child: Image.memory(poster, fit: BoxFit.cover),
+            ),
+          ),
+        );
+      } else {
+        // Genuinely unknown (no prior thumbnail view, first time this
+        // file's ever been opened this session -- routine in playlist
+        // mode, where most files haven't been seen yet). Guessing a box
+        // size here -- the old fallback used a neutral square -- is
+        // virtually always going to be some amount wrong once the real
+        // video reports its true size, and that wrong guess sitting at a
+        // visibly different size than the real video is exactly the
+        // "preview is bigger than the player, then it readapts" layout
+        // shift. Filling the full frame edge-to-edge instead means there's
+        // nothing sized wrong to begin with -- just one clean transition
+        // into the correctly-letterboxed video once its real size is
+        // known, instead of a wrong-box-then-right-box double shift.
+        posterContent = RotatedBox(
+          quarterTurns: widget.rotationQuarterTurns,
+          child: Image.memory(poster, fit: BoxFit.cover),
+        );
+      }
+    }
+
     return Stack(
       fit: StackFit.expand,
       children: [
         Container(color: Colors.black),
-        if (poster != null)
-          Center(
-            child: AspectRatio(
-              aspectRatio: posterAspectRatio,
-              child: RotatedBox(
-                quarterTurns: widget.rotationQuarterTurns,
-                child: Image.memory(poster, fit: BoxFit.cover),
-              ),
-            ),
-          )
+        if (posterContent != null)
+          posterContent
         else if (widget.isAudio)
           Center(child: _buildAudioCenterVisual(cs, isPlaying: false)),
         Positioned.fill(

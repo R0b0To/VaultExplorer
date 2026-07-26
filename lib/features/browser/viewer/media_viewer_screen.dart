@@ -694,7 +694,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             setState(() {
               _playbackSpeed = speed;
             });
-            _playbackManager.activeController?.setPlaybackSpeed(speed);
           },
           onSubtitlesEnabledChanged: (enabled) {
             _startHideTimer();

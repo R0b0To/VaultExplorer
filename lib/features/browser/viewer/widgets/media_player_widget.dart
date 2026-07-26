@@ -153,7 +153,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
           MediaAspectRatioCache.get(widget.container, widget.fileName);
     }
     if (_boundController != null && oldWidget.playbackSpeed != widget.playbackSpeed) {
-      _boundController!.setPlaybackSpeed(widget.playbackSpeed);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _boundController?.setPlaybackSpeed(widget.playbackSpeed);
+      });
     }
     _syncBoundController();
   }

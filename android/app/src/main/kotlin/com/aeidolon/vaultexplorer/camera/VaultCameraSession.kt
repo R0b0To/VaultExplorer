@@ -22,6 +22,8 @@ import android.view.Surface
 import io.flutter.view.TextureRegistry
 import kotlin.math.abs
 
+private const val TAG = "VaultCameraSession"
+
 /**
  * Owns one Camera2 device + one CameraCaptureSession for its whole
  * lifetime (until close()/lens switch). The session's output surfaces
@@ -74,6 +76,8 @@ class VaultCameraSession(
     private var photoSize: Size = Size(1920, 1080)
     private var videoSize: Size = Size(1920, 1080)
     private var pendingQuality: VaultVideoQuality = VaultVideoQuality.FHD
+    private var currentPreviewWidth: Int = 1920
+    private var currentPreviewHeight: Int = 1080
 
     private var isRecording = false
     private var recordingChunkWriter: VaultChunkWriter? = null
@@ -88,6 +92,14 @@ class VaultCameraSession(
     val currentZoomMax: Float get() = zoomMaxCurrent
     val currentMinExposureEv: Double get() = minExposureSteps * exposureStepValue
     val currentMaxExposureEv: Double get() = maxExposureSteps * exposureStepValue
+    // Raw sensor-space preview dimensions (e.g. 1920x1080, always in the
+    // camera's landscape sensor orientation regardless of how the phone is
+    // held) plus the sensor's mounting angle, so Dart can work out the
+    // correct on-screen aspect ratio for the Texture instead of stretching
+    // it to whatever size the widget happens to be given.
+    val previewWidth: Int get() = currentPreviewWidth
+    val previewHeight: Int get() = currentPreviewHeight
+    val sensorOrientationDegrees: Int get() = characteristics?.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
 
     // ── Static enumeration -- no camera is opened for this ─────────────
 
@@ -216,8 +228,10 @@ class VaultCameraSession(
         jpegReader = reader
 
         val recorder = VaultVideoRecorder(videoSize.width, videoSize.height, videoQuality, recordAudio = true, cacheDir = context.cacheDir)
-        recorder.prepareEncoder()
+        recorder.prepareEncoder(computeCaptureOrientation())
         videoRecorder = recorder
+        currentPreviewWidth = previewSize.width
+        currentPreviewHeight = previewSize.height
     }
 
     private fun createSessionLocked() {
@@ -420,16 +434,19 @@ class VaultCameraSession(
     fun startRecording(volId: Int, virtualPath: String, callback: (Boolean, String?) -> Unit) {
         val recorder = videoRecorder
         if (recorder == null || isRecording) {
+            android.util.Log.w(TAG, "startRecording: not ready (recorder=$recorder, isRecording=$isRecording)")
             callback(false, "not ready")
             return
         }
         try {
-            recorder.beginRecording(computeCaptureOrientation())
+            android.util.Log.d(TAG, "startRecording: $virtualPath")
+            recorder.beginRecording()
             recordingChunkWriter = VaultChunkWriter(volId, virtualPath)
             isRecording = true
             updateRepeatingRequest()
             callback(true, null)
         } catch (e: Exception) {
+            android.util.Log.e(TAG, "startRecording failed", e)
             callback(false, e.message)
         }
     }
@@ -438,16 +455,47 @@ class VaultCameraSession(
         val recorder = videoRecorder
         val writer = recordingChunkWriter
         if (recorder == null || !isRecording || writer == null) {
+            android.util.Log.w(TAG, "stopRecording: not recording (recorder=$recorder, isRecording=$isRecording, writer=$writer)")
             callback(false, 0, "not recording")
             return
         }
         isRecording = false
+        // Nothing else should target this recorder's surface once it stops
+        // -- the repeating request falls back to preview-only immediately,
+        // before the (blocking, native) stop()/write-out below even runs.
+        videoRecorder = null
         updateRepeatingRequest()
         bgHandler.post {
             val result = recorder.requestStop()
             val ok = recorder.writeTo(writer)
             recordingChunkWriter = null
+            recorder.releaseEncoder()
+            android.util.Log.d(TAG, "stopRecording: ok=$ok durationMs=${result.durationMs}")
             callback(ok, result.durationMs, if (ok) null else "vault write failed")
+            rearmVideoRecorder()
+        }
+    }
+
+    /**
+     * A MediaRecorder can't be start()ed again once stopped -- it needs a
+     * fresh prepare(), which means a fresh output Surface. Since Camera2
+     * only accepts targets that were part of the session's surfaces at
+     * createCaptureSession() time, that means reconfiguring the capture
+     * session too. Doing this here, right after a recording finishes
+     * (while Dart is still showing its "encrypting..." overlay), hides
+     * that cost instead of paying it the next time the user presses
+     * record.
+     */
+    private fun rearmVideoRecorder() {
+        if (characteristics == null || cameraDevice == null) return
+        try {
+            val fresh = VaultVideoRecorder(videoSize.width, videoSize.height, pendingQuality, recordAudio = true, cacheDir = context.cacheDir)
+            fresh.prepareEncoder(computeCaptureOrientation())
+            videoRecorder = fresh
+            android.util.Log.d(TAG, "rearmVideoRecorder: re-prepared, reconfiguring session")
+            createSessionLocked()
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "rearmVideoRecorder failed - next recording will fail to start", e)
         }
     }
 

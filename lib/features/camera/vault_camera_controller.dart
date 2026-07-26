@@ -35,6 +35,9 @@ class VaultCameraSessionInfo {
   final double zoomMax;
   final double minExposureEv;
   final double maxExposureEv;
+  final int previewWidth;
+  final int previewHeight;
+  final int sensorOrientation;
   final List<NativeCameraLens> lenses;
 
   const VaultCameraSessionInfo({
@@ -45,6 +48,9 @@ class VaultCameraSessionInfo {
     required this.zoomMax,
     required this.minExposureEv,
     required this.maxExposureEv,
+    required this.previewWidth,
+    required this.previewHeight,
+    required this.sensorOrientation,
     required this.lenses,
   });
 
@@ -62,6 +68,9 @@ class VaultCameraSessionInfo {
       zoomMax: (map['zoomMax'] as num?)?.toDouble() ?? 1.0,
       minExposureEv: (map['minExposureEv'] as num?)?.toDouble() ?? 0.0,
       maxExposureEv: (map['maxExposureEv'] as num?)?.toDouble() ?? 0.0,
+      previewWidth: (map['previewWidth'] as num?)?.toInt() ?? 1920,
+      previewHeight: (map['previewHeight'] as num?)?.toInt() ?? 1080,
+      sensorOrientation: (map['sensorOrientation'] as num?)?.toInt() ?? 90,
       lenses: lensesList,
     );
   }
@@ -77,6 +86,9 @@ class VaultCameraController {
   double _zoomMax = 1.0;
   double _minExposureEv = 0.0;
   double _maxExposureEv = 0.0;
+  int _previewWidth = 1920;
+  int _previewHeight = 1080;
+  int _sensorOrientation = 90;
   List<NativeCameraLens> _lenses = [];
 
   StreamSubscription? _eventSubscription;
@@ -90,6 +102,22 @@ class VaultCameraController {
   double get zoomMax => _zoomMax;
   double get minExposureEv => _minExposureEv;
   double get maxExposureEv => _maxExposureEv;
+  int get previewWidth => _previewWidth;
+  int get previewHeight => _previewHeight;
+  int get sensorOrientation => _sensorOrientation;
+  /// The preview's on-screen aspect ratio (width / height) once the sensor's
+  /// mounting rotation is accounted for. Camera2 always reports preview
+  /// sizes in the sensor's own landscape coordinate space, so a 90/270
+  /// mounting (true on virtually every phone) means the on-screen aspect
+  /// ratio is actually the *inverse* of previewWidth/previewHeight.
+  double get previewAspectRatio {
+    final rotated = _sensorOrientation % 180 != 0;
+    final w = rotated ? _previewHeight : _previewWidth;
+    final h = rotated ? _previewWidth : _previewHeight;
+    if (h == 0) return 1.0;
+    return w / h;
+  }
+
   List<NativeCameraLens> get lenses => _lenses;
   bool get isInitialized => _sessionId != null && _textureId != null;
 
@@ -134,6 +162,9 @@ class VaultCameraController {
     _zoomMax = info.zoomMax;
     _minExposureEv = info.minExposureEv;
     _maxExposureEv = info.maxExposureEv;
+    _previewWidth = info.previewWidth;
+    _previewHeight = info.previewHeight;
+    _sensorOrientation = info.sensorOrientation;
     _lenses = info.lenses;
 
     final eventChannel = EventChannel('com.aeidolon.vaultexplorer/camera/events/$_sessionId');
@@ -162,6 +193,9 @@ class VaultCameraController {
       _zoomMax = (res['zoomMax'] as num?)?.toDouble() ?? _zoomMax;
       _minExposureEv = (res['minExposureEv'] as num?)?.toDouble() ?? _minExposureEv;
       _maxExposureEv = (res['maxExposureEv'] as num?)?.toDouble() ?? _maxExposureEv;
+      _previewWidth = (res['previewWidth'] as num?)?.toInt() ?? _previewWidth;
+      _previewHeight = (res['previewHeight'] as num?)?.toInt() ?? _previewHeight;
+      _sensorOrientation = (res['sensorOrientation'] as num?)?.toInt() ?? _sensorOrientation;
     }
   }
 

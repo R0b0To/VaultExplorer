@@ -391,6 +391,21 @@ void FFmpegPlayer::demuxThreadFunc() {
             }
             av_packet_unref(packet);
         } else {
+            // Flip this *before* waiting for the queues to drain below,
+            // not after: videoDecodeThreadFunc's A/V-sync block needs to
+            // stop trusting audio_clock (which is about to freeze -- no
+            // more audio packets are coming either) right away. Setting
+            // it only after the drain wait finishes meant the video
+            // thread spent that entire wait still chasing a frozen
+            // audio_clock exactly as before this existed -- reproducing
+            // the near-end slowdown this flag was added to fix, just
+            // relocated into this wait instead of removed. Looping also
+            // needs it set here for the same reason (the queues below
+            // still have to drain before the seekTo(0) restart); it gets
+            // cleared again the moment that seek actually lands, in
+            // performPendingSeek().
+            input_eof = true;
+
             // For a very short clip, av_read_frame can read the *entire*
             // file and hit EOF within milliseconds -- far faster than the
             // decode threads render it back out at real, paced speed.
@@ -408,10 +423,13 @@ void FFmpegPlayer::demuxThreadFunc() {
 
             if (looping) { 
                 seekTo(0); 
-            } else if (!input_eof.exchange(true)) {
+            } else {
                 // No more packets will ever arrive for either stream from
-                // here on -- see videoDecodeThreadFunc's A/V-sync block
-                // for why the video thread needs to know that.
+                // here on. This only runs once per real end: the moment
+                // input_eof (set above) is true, the top-of-loop check
+                // skips straight past av_read_frame on every later
+                // iteration, so this branch can't be re-entered until a
+                // seek clears that flag again.
                 notifyEvent("endReached");
                 // Deliberately does not break/return here: seekTo() (the
                 // user dragging the seekbar, including back to the very

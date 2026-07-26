@@ -49,6 +49,8 @@ class MemFile {
 
 data class RecordingResult(val durationMs: Long)
 
+private const val TAG = "VaultVideoRecorder"
+
 class VaultVideoRecorder(
     private val width: Int,
     private val height: Int,
@@ -64,10 +66,11 @@ class VaultVideoRecorder(
     private var startTimeMs: Long = 0L
     private var stopTimeMs: Long = 0L
 
-    fun prepareEncoder() {
+    fun prepareEncoder(orientationDegrees: Int = 0) {
         releaseEncoder()
         val temp = File.createTempFile("vx_vid_", ".mp4", cacheDir)
         tempFile = temp
+        android.util.Log.d(TAG, "prepareEncoder: ${width}x$height quality=$quality orientation=$orientationDegrees audio=$recordAudio")
 
         @Suppress("DEPRECATION")
         val recorder = MediaRecorder()
@@ -77,6 +80,12 @@ class VaultVideoRecorder(
         }
         recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE)
         recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+        // setOrientationHint() is only legal before prepare() -- calling it
+        // afterwards (as beginRecording() used to) throws the recorder into
+        // "setParameters is called in an invalid state: 8" (8 == PREPARED),
+        // because prepare() has already moved it past the state where
+        // parameter setters are allowed.
+        recorder.setOrientationHint(orientationDegrees)
         recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
         if (recordAudio) {
             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -91,13 +100,15 @@ class VaultVideoRecorder(
         recorder.prepare()
         inputSurface = recorder.surface
         mediaRecorder = recorder
+        android.util.Log.d(TAG, "prepareEncoder: prepared ok, surface=$inputSurface")
     }
 
-    fun beginRecording(orientationDegrees: Int) {
+    fun beginRecording() {
         val recorder = mediaRecorder ?: throw IllegalStateException("Encoder not prepared")
-        recorder.setOrientationHint(orientationDegrees)
+        android.util.Log.d(TAG, "beginRecording: starting")
         recorder.start()
         startTimeMs = System.currentTimeMillis()
+        android.util.Log.d(TAG, "beginRecording: started at $startTimeMs")
     }
 
     fun requestStop(): RecordingResult {
@@ -106,15 +117,20 @@ class VaultVideoRecorder(
         try {
             recorder.stop()
         } catch (e: Exception) {
-            android.util.Log.e("VaultVideoRecorder", "MediaRecorder.stop failed", e)
+            android.util.Log.e(TAG, "MediaRecorder.stop failed", e)
         }
         val duration = maxOf(0L, stopTimeMs - startTimeMs)
+        android.util.Log.d(TAG, "requestStop: duration=${duration}ms")
         return RecordingResult(duration)
     }
 
     fun writeTo(writer: VaultChunkWriter): Boolean {
         val temp = tempFile ?: return false
-        if (!temp.exists() || temp.length() == 0L) return false
+        if (!temp.exists() || temp.length() == 0L) {
+            android.util.Log.e(TAG, "writeTo: temp file missing or empty (exists=${temp.exists()}, len=${temp.length()})")
+            return false
+        }
+        android.util.Log.d(TAG, "writeTo: streaming ${temp.length()} bytes to vault")
 
         try {
             FileInputStream(temp).use { fis ->

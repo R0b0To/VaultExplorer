@@ -100,6 +100,13 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
       if (_iconTurns != snappedTurns && mounted) {
         setState(() => _iconTurns = snappedTurns);
+        // Native only bakes this into the video encoder once, at
+        // prepare-time (see VaultCameraSession/VaultVideoRecorder) rather
+        // than per-recording, so keep it updated continuously instead of
+        // just before a capture - otherwise a rotation that happens after
+        // the camera was opened wouldn't be picked up until the next lens
+        // switch.
+        _cameraController.setOrientationDegrees(_computeDeviceRotationDegrees());
       }
     });
   }
@@ -432,8 +439,26 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
                       }
                     },
                     onTapDown: (details) => _onTapToFocus(details, constraints),
-                    child: Center(
-                      child: Texture(textureId: _cameraController.textureId!),
+                    // The camera always reports its preview size in the
+                    // sensor's own (landscape) coordinate space -- without
+                    // this, Texture just stretches to fill whatever box
+                    // it's given, distorting the picture to match the
+                    // phone's screen aspect ratio instead of the camera's.
+                    // FittedBox+cover fills the screen and crops overflow,
+                    // matching how stock camera apps present the preview.
+                    child: ClipRect(
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: _cameraController.previewAspectRatio >= 1
+                              ? _cameraController.previewHeight.toDouble()
+                              : _cameraController.previewWidth.toDouble(),
+                          height: _cameraController.previewAspectRatio >= 1
+                              ? _cameraController.previewWidth.toDouble()
+                              : _cameraController.previewHeight.toDouble(),
+                          child: Texture(textureId: _cameraController.textureId!),
+                        ),
+                      ),
                     ),
                   );
                 },

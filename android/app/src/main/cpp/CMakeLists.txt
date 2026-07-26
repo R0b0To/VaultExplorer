@@ -326,6 +326,13 @@ file(WRITE ${MKNTFS_EMBEDDED_SOURCE}
 
 
 # --- FFmpeg & Oboe Player Engine ---
+# The .so files under ffmpeg/<ABI>/ are prebuilt, not fetched/built by this
+# CMake project -- They're produced by scripts/build_ffmpeg_android.sh, which
+# pins FFMPEG_VERSION and lists every --enable-decoder/--enable-demuxer/
+# --enable-hwaccel explicitly (--disable-everything + allowlist, so the
+# binary's decode surface is no bigger than native_ffmpeg_controller.dart
+# actually uses). To rebuild after bumping FFMPEG_VERSION in that script,
+# rerun it and commit the regenerated libs under ffmpeg/<ABI>/.
 set(FFMPEG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ffmpeg/${ANDROID_ABI})
 
 add_library(avcodec SHARED IMPORTED)

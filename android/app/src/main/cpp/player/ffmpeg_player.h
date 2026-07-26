@@ -198,6 +198,21 @@ private:
     std::condition_variable audio_queue_cond;
 
     SwrContext* swr_ctx = nullptr;
+
+    // Separate from swr_ctx above, which only ever runs codec-format ->
+    // FLT/stereo/kOutputSampleRate once per decoded frame on the decode
+    // thread. This one is FLT/stereo -> FLT/stereo and exists purely to
+    // change the *declared* input rate to reflect playback_speed, so
+    // onAudioReady() can pull resampled audio through FFmpeg's own
+    // (anti-aliased) resampler instead of the hand-rolled linear
+    // interpolation it used to do. Reconfigured only from
+    // setPlaybackSpeed() -- swr_alloc/swr_init/swr_free must never run on
+    // the real-time Oboe audio thread, since unbounded allocation there is
+    // how audio glitches happen. audio_buf_mutex (already held for all of
+    // onAudioReady) guards the pointer swap so the audio thread never
+    // observes a torn/half-initialized context.
+    SwrContext* speed_swr_ctx = nullptr;
+
     std::shared_ptr<oboe::AudioStream> audio_stream;
     
     std::mutex audio_buf_mutex;
@@ -219,6 +234,19 @@ private:
     std::atomic<uint64_t> frames_rendered_total{0};
     std::atomic<uint64_t> frames_decoded_total{0};
     std::atomic<bool> fps_window_reset_requested{false};
+
+    // Was previously `static int frame_count` local to
+    // videoDecodeThreadFunc -- a function-local static is one variable
+    // shared by every call to that function *from every FFmpegPlayer
+    // instance in the process*, not one per instance. With a single player
+    // alive at a time (today's usage) that's harmless; the moment two
+    // players ever run concurrently (picture-in-picture, playlist
+    // prefetch, etc.) their video_threads would race on the same counter
+    // with no synchronization -- a genuine data race, plus the throttle
+    // would fire at whatever combined rate both threads happen to hit it.
+    // Only ever touched from this instance's own video_thread, so plain
+    // (non-atomic) is correct.
+    int frame_notify_count = 0;
 
     SwsContext* sws_ctx = nullptr;
 };

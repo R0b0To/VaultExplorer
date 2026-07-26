@@ -185,6 +185,7 @@ void FFmpegPlayer::setDataSource(int fd, bool autoPlay) {
     measured_fps = 0.0;
     frames_rendered_total = 0;
     frames_decoded_total = 0;
+    frame_notify_count = 0;
 
     demux_thread = std::thread(&FFmpegPlayer::demuxThreadFunc, this);
 }
@@ -250,6 +251,10 @@ void FFmpegPlayer::stop() {
         if (io_ctx) { av_freep(&io_ctx->buffer); avio_context_free(&io_ctx); io_ctx = nullptr; }
     }
     if (swr_ctx) { swr_free(&swr_ctx); swr_ctx = nullptr; }
+    {
+        std::lock_guard<std::mutex> lock(audio_buf_mutex);
+        if (speed_swr_ctx) { swr_free(&speed_swr_ctx); speed_swr_ctx = nullptr; }
+    }
     if (sws_ctx) { sws_freeContext(sws_ctx); sws_ctx = nullptr; }
 
     std::lock_guard<std::mutex> l1(video_queue_mutex);
@@ -345,7 +350,44 @@ void FFmpegPlayer::performPendingSeek() {
 }
 
 void FFmpegPlayer::setVolume(int v) { volume_multiplier = v / 100.0f; }
-void FFmpegPlayer::setPlaybackSpeed(float speed) { playback_speed = speed; }
+void FFmpegPlayer::setPlaybackSpeed(float speed) {
+    if (speed <= 0.0f) speed = 1.0f;
+    playback_speed = speed;
+
+    // This runs on whichever thread called setRate() (JNI -> the Kotlin
+    // caller's thread), never the audio thread -- see speed_swr_ctx's
+    // comment in the header for why that matters. At speed == 1.0f,
+    // onAudioReady() takes its 1:1 fast path and never touches
+    // speed_swr_ctx at all, so there's nothing to (re)configure; just
+    // release whatever's cached from a previous non-1x speed instead.
+    SwrContext* newCtx = nullptr;
+    if (speed != 1.0f) {
+        AVChannelLayout layout = AV_CHANNEL_LAYOUT_STEREO;
+        // Telling swr the input is at kOutputSampleRate * speed while the
+        // output stays at the fixed device rate kOutputSampleRate is what
+        // makes this a *speed* change rather than a real resample: for
+        // speed > 1, swr believes it's converting down from a higher rate,
+        // so it consumes source frames faster than they're played back
+        // (pitch rises); for speed < 1, the reverse. This is the same
+        // "consume source faster/slower than 1:1" trick the old linear
+        // interpolation used (srcPos += speed per output sample) -- pitch
+        // still shifts with rate, just via swr's actual anti-aliased
+        // resampler instead of a hand-rolled per-sample lerp.
+        int declaredInRate = (int)(kOutputSampleRate * (double)speed + 0.5);
+        swr_alloc_set_opts2(&newCtx,
+            &layout, AV_SAMPLE_FMT_FLT, kOutputSampleRate,
+            &layout, AV_SAMPLE_FMT_FLT, declaredInRate,
+            0, nullptr);
+        if (newCtx && swr_init(newCtx) < 0) {
+            swr_free(&newCtx);
+            newCtx = nullptr;
+        }
+    }
+
+    std::lock_guard<std::mutex> lock(audio_buf_mutex);
+    if (speed_swr_ctx) swr_free(&speed_swr_ctx);
+    speed_swr_ctx = newCtx;
+}
 void FFmpegPlayer::setLooping(bool loop) { looping = loop; }
 
 jobject FFmpegPlayer::getDiagnosticsSnapshot(JNIEnv* env) {
@@ -763,8 +805,7 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                     }
                 }
                 
-                static int frame_count = 0;
-                if (++frame_count % kTimeChangedNotifyEveryNFrames == 0) {
+                if (++frame_notify_count % kTimeChangedNotifyEveryNFrames == 0) {
                     notifyEvent("timeChanged", pts * 1000, (double)format_ctx->duration / AV_TIME_BASE * 1000);
                 }
             }
@@ -861,11 +902,10 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
     // always actually playing at 1x, video just kept re-syncing back to
     // real-time audio, so changing speed had no real effect on anything
     // audible. Speeding up/slowing down here too -- by consuming source
-    // frames faster/slower than 1:1 per output frame via linear
-    // interpolation -- is what actually makes setPlaybackSpeed do
-    // something. This shifts pitch along with rate (no independent time-
-    // stretching), which is the standard trade-off for a simple speed
-    // control.
+    // frames faster/slower than 1:1 per output frame -- is what actually
+    // makes setPlaybackSpeed do something. This shifts pitch along with
+    // rate (no independent time-stretching), which is the standard
+    // trade-off for a simple speed control.
     if (speed == 1.0f) {
         int numFloatsNeeded = numFrames * kOutputChannels;
         if (audio_buffer.size() >= (size_t)numFloatsNeeded) {
@@ -879,32 +919,72 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
         return oboe::DataCallbackResult::Continue;
     }
 
-    size_t availableFrames = audio_buffer.size() / kOutputChannels;
-    // "+ 2" is a one-frame interpolation safety margin (idx1 = idx0 + 1
-    // below needs a frame past the last one consumed), not a channel count.
-    size_t framesNeeded = (size_t)(numFrames * (double)speed) + 2;
-    if (availableFrames < framesNeeded) {
-        // Not enough buffered audio to safely resample this callback --
-        // output silence rather than reading past the end of the buffer.
+    // Non-1x speed: pull resampled audio through speed_swr_ctx (configured
+    // by setPlaybackSpeed(), never here -- see that function and
+    // speed_swr_ctx's header comment for why). It can be null very briefly
+    // right after a speed change, if this callback lands between
+    // playback_speed's atomic store and setPlaybackSpeed() reaching its
+    // lock below -- treat that the same as an underrun.
+    if (!speed_swr_ctx) {
         memset(out, 0, numFrames * kOutputChannels * sizeof(float));
         return oboe::DataCallbackResult::Continue;
     }
 
-    double srcPos = 0.0;
-    for (int32_t i = 0; i < numFrames; i++) {
-        size_t idx0 = (size_t)srcPos;
-        double frac = srcPos - (double)idx0;
-        size_t idx1 = idx0 + 1;
-        for (int ch = 0; ch < kOutputChannels; ch++) {
-            float s0 = audio_buffer[idx0 * kOutputChannels + ch];
-            float s1 = audio_buffer[idx1 * kOutputChannels + ch];
-            out[i * kOutputChannels + ch] = (float)(s0 + (s1 - s0) * frac) * vol;
-        }
-        srcPos += speed;
+    // Require roughly the same amount of buffered input the old
+    // interpolator did before resampling at all -- without this, a
+    // nearly-empty audio_buffer would feed swr a tiny, noisy trickle of
+    // input every callback instead of accumulating enough to resample
+    // smoothly.
+    size_t availableFrames = audio_buffer.size() / kOutputChannels;
+    size_t minFramesNeeded = (size_t)(numFrames * (double)speed);
+    if (availableFrames < minFramesNeeded) {
+        memset(out, 0, numFrames * kOutputChannels * sizeof(float));
+        return oboe::DataCallbackResult::Continue;
     }
-    size_t consumedFrames = (size_t)srcPos;
-    if (consumedFrames > availableFrames) consumedFrames = availableFrames;
-    audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + consumedFrames * kOutputChannels);
+
+    int32_t framesWritten = 0;
+    while (framesWritten < numFrames) {
+        uint8_t* outSlice = reinterpret_cast<uint8_t*>(out + framesWritten * kOutputChannels);
+        int outCap = numFrames - framesWritten;
+
+        // Drain whatever swr already has buffered internally from a prior
+        // callback before feeding it more input.
+        int produced = swr_convert(speed_swr_ctx, &outSlice, outCap, nullptr, 0);
+        if (produced > 0) {
+            framesWritten += produced;
+            continue;
+        }
+
+        availableFrames = audio_buffer.size() / kOutputChannels;
+        if (availableFrames == 0) break; // genuinely out of input; pad silence below
+
+        const uint8_t* inPtr = reinterpret_cast<const uint8_t*>(audio_buffer.data());
+        produced = swr_convert(speed_swr_ctx, &outSlice, outCap, &inPtr, (int)availableFrames);
+        // swr_convert() always fully consumes the in_count it's given --
+        // anything it can't fit into out_count is buffered internally and
+        // returned by a later drain/next call, not left in `in` -- so this
+        // whole chunk is gone from audio_buffer regardless of `produced`.
+        audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + availableFrames * kOutputChannels);
+
+        if (produced > 0) {
+            framesWritten += produced;
+        } else {
+            // Fed everything available and swr still has nothing to emit
+            // -- this callback has a hard time budget, so don't spin on
+            // it; pad the remainder with silence instead.
+            break;
+        }
+    }
+
+    if (framesWritten < numFrames) {
+        memset(out + framesWritten * kOutputChannels, 0,
+               (numFrames - framesWritten) * kOutputChannels * sizeof(float));
+    }
+
+    if (vol != 1.0f) {
+        int totalFloats = numFrames * kOutputChannels;
+        for (int i = 0; i < totalFloats; i++) out[i] *= vol;
+    }
 
     return oboe::DataCallbackResult::Continue;
 }

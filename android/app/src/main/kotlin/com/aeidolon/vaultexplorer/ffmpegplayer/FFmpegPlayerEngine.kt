@@ -96,11 +96,21 @@ class FFmpegPlayerEngine(
     //    native-side mutex, no blocking I/O; see getDiagnosticsSnapshot()'s
     //    comment in ffmpeg_player.h) to call directly on the calling thread
     //    rather than hopping to ioExecutor first.
-    // 2. collectDiagnostics(): the pre-existing MediaExtractor/
-    //    MediaMetadataRetriever pass. Kept as a fallback for fields the
-    //    native side doesn't surface at all (rotation) and for files where
-    //    playback hasn't reached avformat_find_stream_info yet, so the
-    //    sheet isn't left completely empty during that window.
+    // 2. A MediaExtractor/MediaMetadataRetriever pass over the container.
+    //    Native covers codec/resolution/frame-rate/bitrate for both tracks
+    //    once avformat_find_stream_info() has run, so the only fields this
+    //    pass is ever needed for once native is warmed up are rotation and
+    //    the container's declared MIME type, neither of which FFmpeg's
+    //    AVFormatContext surfaces the way the platform APIs do. The *full*
+    //    pass (collectFallbackDiagnostics, including the MediaExtractor
+    //    track loop) is only run while native hasn't reported a track yet --
+    //    i.e. playback hasn't reached avformat_find_stream_info() -- so the
+    //    sheet isn't left completely empty during that brief window.
+    //    Previously this ran unconditionally on every call, meaning every
+    //    time the diagnostics sheet was opened after playback had already
+    //    started (the common case), the app fully reopened and re-parsed
+    //    the container from scratch just to compute values native had
+    //    already reported and that this function then discards below.
     //
     // Native values win wherever both sources report the same key, since
     // they reflect the file actually being decoded rather than a second,
@@ -117,17 +127,44 @@ class FFmpegPlayerEngine(
             mainHandler.post { callback(nativeDiagnostics) }
             return
         }
+
+        val nativeHasTrackInfo = nativeDiagnostics.containsKey("videoCodec") || nativeDiagnostics.containsKey("audioCodec")
+
         ioExecutor.execute {
             val merged = if (disposed) {
                 emptyMap()
+            } else if (nativeHasTrackInfo) {
+                LinkedHashMap<String, Any?>(collectNativeOnlyGaps(uriString)).apply { putAll(nativeDiagnostics) }
             } else {
-                LinkedHashMap<String, Any?>(collectDiagnostics(uriString)).apply { putAll(nativeDiagnostics) }
+                LinkedHashMap<String, Any?>(collectFallbackDiagnostics(uriString)).apply { putAll(nativeDiagnostics) }
             }
             mainHandler.post { if (!disposed) callback(merged) }
         }
     }
 
-    private fun collectDiagnostics(uriString: String): Map<String, Any?> {
+    // Rotation and the container MIME type: the two fields native's
+    // AVFormatContext-based diagnostics never surfaces at all, so these are
+    // fetched unconditionally regardless of whether native has already
+    // reported. Deliberately does *not* open a MediaExtractor -- that's
+    // only for the video/audio track fields native already covers once
+    // it's warmed up (see collectFallbackDiagnostics).
+    private fun collectNativeOnlyGaps(uriString: String): Map<String, Any?> {
+        val result = LinkedHashMap<String, Any?>()
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(context, Uri.parse(uriString))
+            result["containerMimeType"] = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+                ?.toIntOrNull()?.let { result["rotationDegrees"] = it }
+        } catch (e: Exception) {
+            // Best-effort, same rationale as collectFallbackDiagnostics().
+        } finally {
+            try { retriever.release() } catch (e: Exception) {}
+        }
+        return result
+    }
+
+    private fun collectFallbackDiagnostics(uriString: String): Map<String, Any?> {
         val result = LinkedHashMap<String, Any?>()
         val uri = Uri.parse(uriString)
 

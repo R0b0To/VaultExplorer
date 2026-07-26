@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
-
 import 'camera_vault_service.dart';
 import 'vault_camera_controller.dart';
 
@@ -28,18 +27,17 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
   List<NativeCameraLens> _lenses = [];
   String _selectedCameraId = '';
-
   bool _isInitialized = false;
+
   bool _isVideoMode = false;
   bool _isRecording = false;
   bool _isEncrypting = false;
-
   bool _isStartingVideo = false;
   bool _pendingStopAfterStart = false;
-  bool _showShutterFlash = false;
 
-  String _flashMode = 'auto'; // 'off', 'auto', 'on', 'torch'
-  String _videoQuality = 'fhd'; // 'hd', 'fhd', 'uhd'
+  bool _showShutterFlash = false;
+  String _flashMode = 'auto';
+  String _videoQuality = 'fhd';
 
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
@@ -49,7 +47,6 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   double _minExposureEv = 0.0;
   double _maxExposureEv = 0.0;
   double _currentExposureEv = 0.0;
-
   bool _showExposureSlider = false;
   Timer? _exposureHideTimer;
   Offset? _focusPoint;
@@ -58,24 +55,21 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   bool _isCountingDown = false;
   int _countdownValue = 0;
 
-  String _busyLabel = 'Encrypting…';
+  String _busyLabel = 'Saving…';
   String _timerText = '00:00';
   DateTime? _recordingStart;
   Timer? _timer;
-  String? _permissionError;
 
+  String? _permissionError;
   String? _currentRecordingName;
   String? _currentRecordingPath;
 
-  // --- SENSOR STATE ---
   StreamSubscription<AccelerometerEvent>? _sensorSubscription;
   double _iconTurns = 0.0;
 
   @override
   void initState() {
     super.initState();
-
-    // Lock app system UI strictly to portrait
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
@@ -100,12 +94,6 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
       if (_iconTurns != snappedTurns && mounted) {
         setState(() => _iconTurns = snappedTurns);
-        // Native only bakes this into the video encoder once, at
-        // prepare-time (see VaultCameraSession/VaultVideoRecorder) rather
-        // than per-recording, so keep it updated continuously instead of
-        // just before a capture - otherwise a rotation that happens after
-        // the camera was opened wouldn't be picked up until the next lens
-        // switch.
         _cameraController.setOrientationDegrees(_computeDeviceRotationDegrees());
       }
     });
@@ -171,9 +159,11 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
         _minZoom = info.zoomMin;
         _maxZoom = info.zoomMax;
         _currentZoom = 1.0.clamp(_minZoom, _maxZoom);
+
         _minExposureEv = info.minExposureEv;
         _maxExposureEv = info.maxExposureEv;
         _currentExposureEv = 0.0;
+
         _isInitialized = true;
         _permissionError = null;
       });
@@ -192,6 +182,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
   Future<void> _flipCamera() async {
     if (_isRecording || _isEncrypting || _isCountingDown || _isStartingVideo || _lenses.length <= 1) return;
+
     HapticFeedback.lightImpact();
 
     final currentLens = _lenses.firstWhere(
@@ -277,12 +268,14 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
   Future<void> _startPhotoCountdownAndCapture() async {
     setState(() { _isCountingDown = true; _countdownValue = _timerDelaySeconds; });
+
     for (int i = _timerDelaySeconds; i > 0; i--) {
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted || !_isCountingDown) return;
       HapticFeedback.lightImpact();
       setState(() => _countdownValue = i - 1);
     }
+
     setState(() => _isCountingDown = false);
     await _takePhoto();
   }
@@ -298,6 +291,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     if (!_cameraController.isInitialized || _isEncrypting) return;
 
     _triggerShutterFlash();
+
     setState(() { _isEncrypting = true; _busyLabel = 'Encrypting photo…'; });
     await Future.delayed(const Duration(milliseconds: 50));
 
@@ -306,6 +300,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
       final virtualPath = _vaultService.buildVirtualPath(name);
 
       await _cameraController.setOrientationDegrees(_computeDeviceRotationDegrees());
+
       final result = await _cameraController.takePhoto(
         volId: widget.container.volId,
         virtualPath: virtualPath,
@@ -328,13 +323,16 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     if (!_cameraController.isInitialized || _isEncrypting || _isRecording || _isStartingVideo) return;
 
     _isStartingVideo = true;
+
     try {
       final name = await _vaultService.nextAvailableName(isPhoto: false);
       final virtualPath = _vaultService.buildVirtualPath(name);
+
       _currentRecordingName = name;
       _currentRecordingPath = virtualPath;
 
       await _cameraController.setOrientationDegrees(_computeDeviceRotationDegrees());
+
       final result = await _cameraController.startVideoRecording(
         volId: widget.container.volId,
         virtualPath: virtualPath,
@@ -346,6 +344,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
       }
 
       _recordingStart = DateTime.now();
+
       if (!mounted) return;
       setState(() { _isRecording = true; _timerText = '00:00'; });
 
@@ -367,10 +366,11 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
   Future<void> _stopVideoRecording() async {
     if (!_cameraController.isInitialized || !_isRecording) return;
-    _timer?.cancel();
 
+    _timer?.cancel();
     final startedAt = _recordingStart;
     _recordingStart = null;
+
     setState(() { _isRecording = false; _isEncrypting = true; _busyLabel = 'Encrypting video…'; });
     await Future.delayed(const Duration(milliseconds: 50));
 
@@ -425,10 +425,11 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
         body: Stack(
           fit: StackFit.expand,
           children: [
-            // 1. Camera Viewfinder
             if (_isInitialized && _cameraController.textureId != null)
               LayoutBuilder(
                 builder: (context, constraints) {
+                  final bool isRotated = _cameraController.sensorOrientation % 180 != 0;
+                  
                   return GestureDetector(
                     onScaleStart: (_) => _baseZoom = _currentZoom,
                     onScaleUpdate: (d) async {
@@ -439,21 +440,14 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
                       }
                     },
                     onTapDown: (details) => _onTapToFocus(details, constraints),
-                    // The camera always reports its preview size in the
-                    // sensor's own (landscape) coordinate space -- without
-                    // this, Texture just stretches to fill whatever box
-                    // it's given, distorting the picture to match the
-                    // phone's screen aspect ratio instead of the camera's.
-                    // FittedBox+cover fills the screen and crops overflow,
-                    // matching how stock camera apps present the preview.
                     child: ClipRect(
                       child: FittedBox(
                         fit: BoxFit.cover,
                         child: SizedBox(
-                          width: _cameraController.previewAspectRatio >= 1
+                          width: isRotated
                               ? _cameraController.previewHeight.toDouble()
                               : _cameraController.previewWidth.toDouble(),
-                          height: _cameraController.previewAspectRatio >= 1
+                          height: isRotated
                               ? _cameraController.previewWidth.toDouble()
                               : _cameraController.previewHeight.toDouble(),
                           child: Texture(textureId: _cameraController.textureId!),
@@ -468,7 +462,6 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
             else
               const Center(child: CircularProgressIndicator(color: Colors.white)),
 
-            // 2. Focus & Exposure UI
             if (_showExposureSlider && _focusPoint != null) ...[
               Positioned(
                 left: _focusPoint!.dx - 30, top: _focusPoint!.dy - 30,
@@ -493,11 +486,9 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
                 ),
             ],
 
-            // 3. Stable Single-Layout UI (Top/Bottom anchored)
             Positioned(top: 0, left: 0, right: 0, child: _buildTopControls()),
             Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomControls()),
 
-            // 3b. Shutter flash
             IgnorePointer(
               child: AnimatedOpacity(
                 opacity: _showShutterFlash ? 1.0 : 0.0,
@@ -506,7 +497,6 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
               ),
             ),
 
-            // 4. Overlays
             if (_isCountingDown)
               Center(
                 child: _rotated(
@@ -612,7 +602,6 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     );
   }
 
-  // --- CAMERA LENS / ZOOM SELECTOR PILLS ---
   Widget _buildZoomSelector() {
     final currentLens = _lenses.firstWhere((l) => l.cameraId == _selectedCameraId, orElse: () => _lenses.firstOrNull ?? const NativeCameraLens(cameraId: '', facing: 'back', isLogical: false, zoomMin: 1.0, zoomMax: 1.0));
     final isBackCamera = currentLens.facing == 'back';
@@ -643,7 +632,6 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
       children: options.map((option) {
         final zoom = option.zoom;
         bool isSelected = false;
-
         if (option.switchCameraId != null) {
           isSelected = option.switchCameraId == _selectedCameraId;
         } else {
@@ -672,7 +660,6 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
               }
               return;
             }
-
             setState(() => _currentZoom = zoom);
             try {
               await _cameraController.setZoom(zoom);
@@ -713,13 +700,10 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 1. Lens / Zoom Selector Pills
             if (!_isRecording && !_isCountingDown) ...[
               _buildZoomSelector(),
               const SizedBox(height: 16),
             ],
-
-            // 2. Mode Selectors (PHOTO / VIDEO)
             if (!_isRecording && !_isCountingDown)
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -735,10 +719,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
                   ),
                 ],
               ),
-
             const SizedBox(height: 24),
-
-            // 3. Shutter Area
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -767,7 +748,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
                     ),
                   ),
                 ),
-                const SizedBox(width: 48), // Spacer offsets flip icon to center shutter
+                const SizedBox(width: 48),
               ],
             ),
           ],

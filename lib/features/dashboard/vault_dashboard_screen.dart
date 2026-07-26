@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
+import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
@@ -260,8 +261,13 @@ class _VaultDashboardState extends State<VaultDashboard>
     ContainerRepository.instance.saveOrder(_recordsOrder);
   }
 
-  void _onContainerLocked(int volId) {
+ void _onContainerLocked(int volId) {
     _cancelAutoClose(volId);
+    final idx = _mounted.indexWhere((c) => c.volId == volId);
+    if (idx != -1) {
+      final uri = _mounted[idx].uri;
+      AppSecureStorage.instance.delete(key: 'temp_pw_$uri');
+    }
     final clip = CrossContainerClipboard.instance;
     if (clip.hasItems && clip.sourceVolId == volId) {
       clip.clear();

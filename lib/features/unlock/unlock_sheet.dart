@@ -10,6 +10,7 @@ import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
+import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import '../lock/widgets/pattern_lock_view.dart';
 
 class UnlockSheet extends StatefulWidget {
@@ -623,6 +624,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
       }
       if (result != null) {
+        await AppSecureStorage.instance.write(key: 'temp_pw_$_selectedUri', value: effectivePassword);
         ContainerRecord? savedRecord;
         if (_remember && widget.initialUri == null) {
           final newRecord = ContainerRecord(

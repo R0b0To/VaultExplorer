@@ -12,6 +12,7 @@ import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dar
 import 'package:vaultexplorer/features/lock/widgets/pattern_setup_sheet.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
+import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/change_password_screen.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
@@ -104,14 +105,12 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
         rec?.cacheDerivedKey ?? widget.appSettings?.defaultDerivedKeyCacheEnabled ?? false;
     _cipherId = _initialCipherId;
     _hashId = _initialHashId;
-
-    final recentlyUnlocked = widget.mountedContainer != null &&
-        DateTime.now().difference(widget.mountedContainer!.mountedAt) <
-            const Duration(minutes: 1);
-    _settingsLocked = rec != null && !recentlyUnlocked;
-
+    final isMounted = widget.mountedContainer != null;
+    _settingsLocked = rec != null && !isMounted;
     _initAsync();
   }
+
+  
 
   bool _clearingCache = false;
 
@@ -171,7 +170,13 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     }
   }
 
-  Future<void> _initAsync() async {
+ Future<void> _initAsync() async {
+    try {
+      final tempPw = await AppSecureStorage.instance.read(key: 'temp_pw_${widget.uri}');
+      if (tempPw != null && tempPw.isNotEmpty && mounted) {
+        setState(() => _passwordCtrl.text = tempPw);
+      }
+    } catch (_) {}
     try {
       final localAuth = LocalAuthentication();
       _biometricAvailable = await localAuth.canCheckBiometrics &&
@@ -232,9 +237,19 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   bool get _wasPasswordless =>
       widget.existingRecord == null ||
       widget.existingRecord!.unlockMethod == ContainerUnlockMethod.password;
-  bool get _unlockMethodNeedsPassword =>
+ bool get _unlockMethodNeedsPassword =>
       _unlockMethod != ContainerUnlockMethod.password;
-  bool get _needsPasswordSetup => false;
+
+  bool get _needsPasswordSetup {
+    if (!_unlockMethodNeedsPassword) return false;
+    if (_wasPasswordless || _changePassword) {
+      if (_passwordCtrl.text.isEmpty && !_cacheDerivedKey) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool get _needsPatternSetup =>
       _unlockMethod == ContainerUnlockMethod.pattern && _patternHash == null;
   bool get _canSave => !_needsPasswordSetup && !_needsPatternSetup;
@@ -846,10 +861,10 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              _needsPatternSetup
-                                  ? 'Set up a pattern above before saving.'
-                                  : 'Configure required security settings above before saving.',
-                              style: textTheme.bodySmall?.copyWith(
+                      _needsPatternSetup
+                          ? 'Set up a pattern above before saving.'
+                          : 'A password or "Cache Derived Key" is required for this unlock method.',
+                      style: textTheme.bodySmall?.copyWith(
                                 color: cs.error,
                                 fontWeight: FontWeight.bold,
                               ),

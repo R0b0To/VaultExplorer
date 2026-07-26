@@ -10,7 +10,7 @@ import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
-import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 
 class UsbUnlockSheet extends StatefulWidget {
@@ -442,6 +442,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         setState(() => _error = 'Incorrect password/keyfiles or unsupported drive');
         return;
       }
+      await AppSecureStorage.instance.write(key: 'temp_pw_$newUri', value: effectivePassword);
       final tempContainer = MountedContainer(
         uri: newUri,
         displayName: displayName,

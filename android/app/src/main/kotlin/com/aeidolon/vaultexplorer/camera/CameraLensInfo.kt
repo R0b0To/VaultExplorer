@@ -31,10 +31,10 @@ data class CameraLensInfo(
 
 enum class VaultFlashMode { OFF, AUTO, ON, TORCH }
 
-enum class VaultVideoQuality(val targetLongEdge: Int, val bitrate: Int) {
-    HD(1280, 8_000_000),
-    FHD(1920, 16_000_000),
-    UHD(3840, 45_000_000),
+enum class VaultVideoQuality(val targetLongEdge: Int, val bitrateH264: Int, val bitrateHevc: Int) {
+    HD(1280, 8_000_000, 5_000_000),
+    FHD(1920, 16_000_000, 10_000_000),
+    UHD(3840, 45_000_000, 25_000_000),
 }
 
 private data class RawLens(

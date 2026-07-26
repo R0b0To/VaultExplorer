@@ -1,6 +1,8 @@
 package com.aeidolon.vaultexplorer.camera
 
 import android.content.Context
+import android.media.MediaCodecList
+import android.media.MediaFormat
 import android.media.MediaRecorder
 import android.os.Build
 import android.view.Surface
@@ -51,6 +53,27 @@ data class RecordingResult(val durationMs: Long)
 
 private const val TAG = "VaultVideoRecorder"
 
+// HEVC (H.265) needs roughly 40% less bitrate than H264 for the same
+// perceived quality, which is the actual fix for large 1080p file sizes --
+// checked once and cached, since enumerating MediaCodecList takes a few ms
+// and this doesn't change while the process is alive. Falls back to H264 on
+// the rare device with no hardware HEVC encoder rather than eating a
+// software-encode performance/battery hit.
+private val hevcEncoderAvailable: Boolean by lazy {
+    if (Build.VERSION.SDK_INT < 24) {
+        false
+    } else {
+        try {
+            MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.any { info ->
+                info.isEncoder && info.supportedTypes.any { it.equals(MediaFormat.MIMETYPE_VIDEO_HEVC, ignoreCase = true) }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "HEVC capability probe failed, falling back to H264", e)
+            false
+        }
+    }
+}
+
 class VaultVideoRecorder(
     private val width: Int,
     private val height: Int,
@@ -70,7 +93,9 @@ class VaultVideoRecorder(
         releaseEncoder()
         val temp = File.createTempFile("vx_vid_", ".mp4", cacheDir)
         tempFile = temp
-        android.util.Log.d(TAG, "prepareEncoder: ${width}x$height quality=$quality orientation=$orientationDegrees audio=$recordAudio")
+        val useHevc = hevcEncoderAvailable
+        val bitrate = if (useHevc) quality.bitrateHevc else quality.bitrateH264
+        android.util.Log.d(TAG, "prepareEncoder: ${width}x$height quality=$quality codec=${if (useHevc) "HEVC" else "H264"} bitrate=$bitrate orientation=$orientationDegrees audio=$recordAudio")
 
         @Suppress("DEPRECATION")
         val recorder = MediaRecorder()
@@ -86,14 +111,14 @@ class VaultVideoRecorder(
         // because prepare() has already moved it past the state where
         // parameter setters are allowed.
         recorder.setOrientationHint(orientationDegrees)
-        recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+        recorder.setVideoEncoder(if (useHevc) MediaRecorder.VideoEncoder.HEVC else MediaRecorder.VideoEncoder.H264)
         if (recordAudio) {
             recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             recorder.setAudioEncodingBitRate(128_000)
             recorder.setAudioSamplingRate(44100)
         }
         recorder.setVideoSize(width, height)
-        recorder.setVideoEncodingBitRate(quality.bitrate)
+        recorder.setVideoEncodingBitRate(bitrate)
         recorder.setVideoFrameRate(30)
         recorder.setOutputFile(temp.absolutePath)
 

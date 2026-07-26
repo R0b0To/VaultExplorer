@@ -5,9 +5,11 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.FileInputStream
 import java.io.InputStream
 import java.util.concurrent.ExecutorService
 
@@ -111,6 +113,16 @@ class ImportExportHandlers(
         return count
     }
 
+    /**
+     * Resolves [uri] (single-document or tree) to a raw [File] when "All
+     * Files Access" (MANAGE_EXTERNAL_STORAGE) is granted and the document
+     * lives on local external storage. Returns null otherwise — including
+     * on API < 30 legacy-storage devices where this simply isn't needed
+     * because [UriToPath] itself skips the check — signaling every caller
+     * to fall back to the SAF (ContentResolver) path.
+     */
+    private fun rawFileFor(uri: Uri): File? = UriToPath.getRawFile(activity, uri)
+
     private fun countEntriesRecursive(srcDoc: DocumentFile): Int {
         if (!srcDoc.isDirectory) return 1
         var count = 0
@@ -125,6 +137,30 @@ class ImportExportHandlers(
         var bytes = 0L
         for (child in srcDoc.listFiles()) {
             bytes += countBytesRecursive(child)
+        }
+        return bytes
+    }
+
+    // ── Raw-file fast path (All Files Access) ──────────────────────────────
+    // Mirrors the two functions above but walks java.io.File directly —
+    // no Binder/ContentResolver round trip per node — for the common case
+    // of importing from local external storage with MANAGE_EXTERNAL_STORAGE
+    // granted. Falls back to the SAF versions per-item wherever it isn't.
+
+    private fun countEntriesRaw(file: File): Int {
+        if (!file.isDirectory) return 1
+        var count = 0
+        for (child in file.listFiles() ?: emptyArray()) {
+            count += countEntriesRaw(child)
+        }
+        return count
+    }
+
+    private fun countBytesRaw(file: File): Long {
+        if (!file.isDirectory) return file.length()
+        var bytes = 0L
+        for (child in file.listFiles() ?: emptyArray()) {
+            bytes += countBytesRaw(child)
         }
         return bytes
     }
@@ -231,6 +267,62 @@ class ImportExportHandlers(
         return 1
     }
 
+    /**
+     * Raw-file counterpart of [importEntryRecursive]: same behavior, but
+     * reads directly from [java.io.File] instead of going through
+     * [DocumentFile]/[android.content.ContentResolver]. Used whenever
+     * [rawFileFor] can resolve the picked document to a real path.
+     */
+    private fun importEntryRecursiveRaw(
+        srcFile: File, targetFatPath: String, volId: Int,
+        opId: Int, total: Int, doneCounter: java.util.concurrent.atomic.AtomicInteger,
+        totalBytes: Long, transferredCounter: java.util.concurrent.atomic.AtomicLong,
+    ): Int {
+        if (ImportCancellation.isCancelled(opId)) {
+            throw ImportCancelledException("Import cancelled")
+        }
+        if (srcFile.isDirectory) {
+            val ok = ContainerFileSystem.createDirectory(volId, targetFatPath)
+            if (!ok) {
+                throw java.io.IOException("Failed to create directory: $targetFatPath. Storage might be full or write-protected.")
+            }
+            val lastModified = srcFile.lastModified() / 1000L
+            if (lastModified > 0) {
+                ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
+            }
+            var count = 0
+            for (child in srcFile.listFiles() ?: emptyArray()) {
+                val childName = FatFileNameSanitizer.sanitize(child.name)
+                count += importEntryRecursiveRaw(
+                    child, "$targetFatPath/$childName", volId,
+                    opId, total, doneCounter, totalBytes, transferredCounter,
+                )
+            }
+            return count
+        }
+
+        val progressStream = ProgressInputStream(
+            FileInputStream(srcFile), opId, doneCounter, total, srcFile.name,
+            transferredCounter, totalBytes
+        )
+        val ok = progressStream.use { inp ->
+            ContainerFileSystem.importStream(volId, targetFatPath, inp)
+        }
+        if (!ok) {
+            throw java.io.IOException("Failed to write file to container: $targetFatPath. Storage might be full.")
+        }
+        val lastModified = srcFile.lastModified() / 1000L
+        if (lastModified > 0) {
+            ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
+        }
+        val done = doneCounter.incrementAndGet()
+        ImportProgressBridge.reportProgress(
+            opId, done, total, srcFile.name,
+            transferredCounter.get(), totalBytes
+        )
+        return 1
+    }
+
     private val importFileLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -247,20 +339,32 @@ class ImportExportHandlers(
                 ImportSourceRegistry.recordFiles(pending.opId, uris)
                 ioExecutor.execute {
                     try {
-                        val srcDocs = uris.mapNotNull { DocumentFile.fromSingleUri(activity, it) }
-                        val total = srcDocs.sumOf { countEntriesRecursive(it) }
-                        val totalBytes = srcDocs.sumOf { countBytesRecursive(it) }
+                        data class PickedEntry(val doc: DocumentFile, val raw: File?)
+                        val entries = uris.mapNotNull { uri ->
+                            DocumentFile.fromSingleUri(activity, uri)?.let { doc ->
+                                PickedEntry(doc, rawFileFor(uri))
+                            }
+                        }
+                        val total = entries.sumOf { e -> e.raw?.let { countEntriesRaw(it) } ?: countEntriesRecursive(e.doc) }
+                        val totalBytes = entries.sumOf { e -> e.raw?.let { countBytesRaw(it) } ?: countBytesRecursive(e.doc) }
                         val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                         val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                         var successCount = 0
-                        for (srcDoc in srcDocs) {
-                            val rawName = FatFileNameSanitizer.sanitize(srcDoc.name ?: "imported_file")
+                        for (entry in entries) {
+                            val rawName = FatFileNameSanitizer.sanitize(entry.raw?.name ?: entry.doc.name ?: "imported_file")
                             val name = uniqueImportName(pending.volId, pending.targetDir, rawName)
                             val targetFatPath = if (pending.targetDir.isEmpty()) name else "${pending.targetDir}/$name"
-                            successCount += importEntryRecursive(
-                                srcDoc, pending.containerUri, targetFatPath, pending.volId,
-                                pending.opId, total, doneCounter, totalBytes, transferredCounter,
-                            )
+                            successCount += if (entry.raw != null) {
+                                importEntryRecursiveRaw(
+                                    entry.raw, targetFatPath, pending.volId,
+                                    pending.opId, total, doneCounter, totalBytes, transferredCounter,
+                                )
+                            } else {
+                                importEntryRecursive(
+                                    entry.doc, pending.containerUri, targetFatPath, pending.volId,
+                                    pending.opId, total, doneCounter, totalBytes, transferredCounter,
+                                )
+                            }
                         }
                         activity.runOnUiThread { res.success(successCount) }
                     } catch (e: Exception) {
@@ -329,19 +433,27 @@ class ImportExportHandlers(
             val srcRoot = DocumentFile.fromTreeUri(activity, treeUri)
             if (srcRoot != null) {
                 ImportSourceRegistry.recordFolder(pending.opId, treeUri)
-                val rawFolderName = FatFileNameSanitizer.sanitize(srcRoot.name ?: "imported_folder")
+                val rawRoot = rawFileFor(treeUri)
+                val rawFolderName = FatFileNameSanitizer.sanitize(rawRoot?.name ?: srcRoot.name ?: "imported_folder")
                 val folderName = uniqueImportName(pending.volId, pending.targetDir, rawFolderName)
                 val targetFatPath = if (pending.targetDir.isEmpty()) folderName else "${pending.targetDir}/$folderName"
                 ioExecutor.execute {
                     try {
-                        val total = countEntriesRecursive(srcRoot)
-                        val totalBytes = countBytesRecursive(srcRoot)
+                        val total = rawRoot?.let { countEntriesRaw(it) } ?: countEntriesRecursive(srcRoot)
+                        val totalBytes = rawRoot?.let { countBytesRaw(it) } ?: countBytesRecursive(srcRoot)
                         val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                         val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
-                        val count = importEntryRecursive(
-                            srcRoot, pending.containerUri, targetFatPath, pending.volId,
-                            pending.opId, total, doneCounter, totalBytes, transferredCounter,
-                        )
+                        val count = if (rawRoot != null) {
+                            importEntryRecursiveRaw(
+                                rawRoot, targetFatPath, pending.volId,
+                                pending.opId, total, doneCounter, totalBytes, transferredCounter,
+                            )
+                        } else {
+                            importEntryRecursive(
+                                srcRoot, pending.containerUri, targetFatPath, pending.volId,
+                                pending.opId, total, doneCounter, totalBytes, transferredCounter,
+                            )
+                        }
                         activity.runOnUiThread { res.success(count) }
                     } catch (e: Exception) {
                         activity.runOnUiThread { nativeOps.dispatchNativeError(e, res) }

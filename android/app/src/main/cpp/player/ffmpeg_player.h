@@ -248,5 +248,10 @@ private:
     // (non-atomic) is correct.
     int frame_notify_count = 0;
 
+    // Throttle for the temporary diagnostic trend log in onAudioReady --
+    // see LOGD_AUDIO/LOGD_SYNC comment in ffmpeg_player.cpp. Only ever
+    // touched from the audio callback thread.
+    int audio_ready_log_counter = 0;
+
     SwsContext* sws_ctx = nullptr;
 };

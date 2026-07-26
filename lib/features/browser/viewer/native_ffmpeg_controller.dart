@@ -63,6 +63,41 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
   StreamSubscription<dynamic>? _eventSub;
   bool _disposed = false;
 
+  // --- Seekbar smoothing ---
+  // timeChanged only fires every ~15 decoded video frames (native-side
+  // throttle, see kTimeChangedNotifyEveryNFrames in ffmpeg_player.h) --
+  // at 30fps that's roughly every 500ms with nothing updating value.position
+  // in between, which is what actually made the seekbar look like it moves
+  // in visible steps rather than a genuine native limitation on how often
+  // position *could* be reported. Rather than making native chattier (more
+  // JNI/event-channel traffic for a purely cosmetic problem), _positionTicker
+  // extrapolates value.position between real events using elapsed wall-clock
+  // time * current speed, and every timeChanged/playing event snaps the
+  // extrapolation anchor back to the authoritative value -- so it can never
+  // drift for more than one throttle interval before being corrected.
+  static const Duration _positionTickInterval = Duration(milliseconds: 66);
+  Timer? _positionTicker;
+  Duration _extrapolationAnchorPosition = Duration.zero;
+  DateTime _extrapolationAnchorWallClock = DateTime.now();
+  double _currentSpeed = 1.0;
+
+  void _resetExtrapolationAnchor() {
+    _extrapolationAnchorPosition = value.position;
+    _extrapolationAnchorWallClock = DateTime.now();
+  }
+
+  void _tickExtrapolatedPosition() {
+    if (_disposed || !value.isPlaying) return;
+    final elapsedMs = DateTime.now().difference(_extrapolationAnchorWallClock).inMilliseconds;
+    var extrapolatedMs = _extrapolationAnchorPosition.inMilliseconds + (elapsedMs * _currentSpeed).round();
+    final durationMs = value.duration.inMilliseconds;
+    if (durationMs > 0 && extrapolatedMs > durationMs) extrapolatedMs = durationMs;
+    if (extrapolatedMs < 0) extrapolatedMs = 0;
+    if (extrapolatedMs != value.position.inMilliseconds) {
+      value = value.copyWith(position: Duration(milliseconds: extrapolatedMs));
+    }
+  }
+
   NativeFFmpegController({required this.contentUriString, this.autoPlay = false}) : super(const NativeFFmpegValue());
 
   int? get textureId => _textureId;
@@ -83,6 +118,7 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
         value = value.copyWith(hasError: true, errorDescription: error.toString());
       },
     );
+    _positionTicker ??= Timer.periodic(_positionTickInterval, (_) => _tickExtrapolatedPosition());
 
     await _channel.invokeMethod('setDataSource', {
       'playerId': _playerId,
@@ -94,12 +130,18 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
   Future<void> switchTo(String newContentUriString, {bool autoPlay = false}) async {
     if (_playerId == null || _disposed) return;
     value = const NativeFFmpegValue();
+    _resetExtrapolationAnchor();
     await _channel.invokeMethod('setDataSource', {
       'playerId': _playerId,
       'contentUri': newContentUriString,
       'autoPlay': autoPlay,
     });
   }
+
+  // --- Temporary diagnostics for the seekbar-stepping investigation ---
+  // See the matching LOGD_SYNC/LOGD_AUDIO comment in ffmpeg_player.cpp.
+  // Remove alongside that once the root cause is confirmed.
+  DateTime? _lastTimeChangedLoggedAt;
 
   void _onEvent(dynamic raw) {
     if (_disposed) return;
@@ -123,17 +165,25 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
           size: (w != null && h != null && w > 0 && h > 0) ? Size(w, h) : value.size,
           duration: (durMs != null && durMs > 0) ? Duration(milliseconds: durMs) : value.duration,
         );
+        _resetExtrapolationAnchor();
         break;
       case 'paused':
       case 'stopped':
         value = value.copyWith(isPlaying: false);
         break;
       case 'timeChanged':
+        final newPositionMs = ((map['positionMs'] as num?) ?? 0).toInt();
+        final now = DateTime.now();
+        final sinceLastMs = _lastTimeChangedLoggedAt == null ? null : now.difference(_lastTimeChangedLoggedAt!).inMilliseconds;
+        final jumpMs = newPositionMs - value.position.inMilliseconds;
+        debugPrint('[FFmpegDebug] timeChanged pos=${newPositionMs}ms sinceLastEvent=${sinceLastMs}ms jump=${jumpMs}ms');
+        _lastTimeChangedLoggedAt = now;
         value = value.copyWith(
           isInitialized: true,
-          position: Duration(milliseconds: ((map['positionMs'] as num?) ?? 0).toInt()),
+          position: Duration(milliseconds: newPositionMs),
           duration: Duration(milliseconds: ((map['durationMs'] as num?) ?? 0).toInt()),
         );
+        _resetExtrapolationAnchor();
         break;
       case 'endReached':
         value = value.copyWith(isPlaying: false, position: value.duration);
@@ -154,6 +204,14 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
     if (!_disposed) await _channel.invokeMethod('setVolume', {'playerId': _playerId, 'volume': vol});
   }
   Future<void> setPlaybackSpeed(double speed) async {
+    debugPrint('[FFmpegDebug] setPlaybackSpeed($speed) at ${DateTime.now()}');
+    // Bring the extrapolated position up to date under the *old* speed
+    // before changing it, then re-anchor -- otherwise the ticker would
+    // retroactively apply the new speed to time that already elapsed under
+    // the old one, producing a visible jump.
+    _tickExtrapolatedPosition();
+    _resetExtrapolationAnchor();
+    _currentSpeed = speed;
     if (!_disposed) await _channel.invokeMethod('setRate', {'playerId': _playerId, 'rate': speed});
   }
   Future<void> setLooping(bool loop) async {
@@ -182,6 +240,7 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _positionTicker?.cancel();
     await _eventSub?.cancel();
     if (_playerId != null) {
       try { await _channel.invokeMethod('dispose', {'playerId': _playerId}); } catch (_) {}

@@ -5,6 +5,17 @@
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "FFmpegPlayer", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "FFmpegPlayer", __VA_ARGS__)
+// Temporary diagnostic instrumentation for the seekbar-stepping /
+// speed-hunting-during-2x-hold investigation. Filter logcat on these tags
+// specifically (they're deliberately separate from LOGI/LOGE above so they
+// can be grep'd out independently). NOTE: LOGD_SYNC in particular fires
+// from onAudioReady(), which runs on the real-time Oboe audio callback
+// thread -- __android_log_print() does I/O and is not real-time-safe, so
+// having this active can itself perturb timing. Treat results captured
+// while it's enabled as "probably indicative", not definitive, and pull
+// these calls back out once the root cause is confirmed.
+#define LOGD_SYNC(...) __android_log_print(ANDROID_LOG_DEBUG, "FFmpegPlayer.Sync", __VA_ARGS__)
+#define LOGD_AUDIO(...) __android_log_print(ANDROID_LOG_DEBUG, "FFmpegPlayer.Audio", __VA_ARGS__)
 
 FFmpegPlayer::FFmpegPlayer(JNIEnv* env, jobject plugin_instance, ANativeWindow* window) {
     env->GetJavaVM(&jvm);
@@ -387,6 +398,9 @@ void FFmpegPlayer::setPlaybackSpeed(float speed) {
     std::lock_guard<std::mutex> lock(audio_buf_mutex);
     if (speed_swr_ctx) swr_free(&speed_swr_ctx);
     speed_swr_ctx = newCtx;
+    LOGD_AUDIO("setPlaybackSpeed speed=%.2f swr_ctx=%s buffered_frames_at_switch=%zu",
+               speed, newCtx ? "reconfigured" : (speed == 1.0f ? "n/a(1x)" : "FAILED"),
+               audio_buffer.size() / kOutputChannels);
 }
 void FFmpegPlayer::setLooping(bool loop) { looping = loop; }
 
@@ -762,13 +776,21 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                 // instead of chasing it.
                 if (audio_stream_idx >= 0 && audio_clock > 0 && !input_eof.load()) {
                     double diff = pts - audio_clock;
-                    if (diff > kAvSyncMinDiffSec && diff < kAvSyncMaxDiffSec) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds((int)(diff * 1000 / playback_speed)));
+                    int sleepMs = 0;
+                    bool slept = (diff > kAvSyncMinDiffSec && diff < kAvSyncMaxDiffSec);
+                    if (slept) {
+                        sleepMs = (int)(diff * 1000 / playback_speed);
+                        std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
                     }
+                    LOGD_SYNC("mode=diff pts=%.3f audio_clock=%.3f diff=%.3f speed=%.2f sleep_ms=%d slept=%d",
+                              pts, audio_clock.load(), diff, playback_speed.load(), sleepMs, slept);
                 } else {
                     double fps = av_q2d(format_ctx->streams[video_stream_idx]->avg_frame_rate);
                     int delay_ms = (fps > 0) ? (int)(1000.0 / fps / playback_speed) : kFallbackFrameDelayMs;
                     std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+                    LOGD_SYNC("mode=fallback pts=%.3f audio_clock=%.3f fps=%.2f speed=%.2f sleep_ms=%d reason=%s",
+                              pts, audio_clock.load(), fps, playback_speed.load(), delay_ms,
+                              (audio_stream_idx < 0) ? "no_audio_stream" : (audio_clock <= 0 ? "audio_clock_not_set" : "input_eof"));
                 }
 
                 if (native_window && is_playing) {
@@ -806,6 +828,7 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                 }
                 
                 if (++frame_notify_count % kTimeChangedNotifyEveryNFrames == 0) {
+                    LOGD_SYNC("timeChanged fire pts=%.3f wall_clock_us=%lld", pts, (long long)av_gettime());
                     notifyEvent("timeChanged", pts * 1000, (double)format_ctx->duration / AV_TIME_BASE * 1000);
                 }
             }
@@ -874,6 +897,8 @@ void FFmpegPlayer::audioDecodeThreadFunc() {
                     double chunk_end_pts = frame_pts + (double)converted_samples / kOutputSampleRate;
                     double buffered_seconds = (double)(audio_buffer.size() / kOutputChannels) / kOutputSampleRate;
                     audio_clock = chunk_end_pts - buffered_seconds;
+                    LOGD_AUDIO("push frame_pts=%.3f converted_samples=%d buffered_frames=%zu buffered_sec=%.3f audio_clock=%.3f",
+                               frame_pts, converted_samples, audio_buffer.size() / kOutputChannels, buffered_seconds, audio_clock.load());
                 }
                 av_freep(&out_buffer);
             }
@@ -914,6 +939,8 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
             }
             audio_buffer.erase(audio_buffer.begin(), audio_buffer.begin() + numFloatsNeeded);
         } else {
+            LOGD_SYNC("onAudioReady UNDERRUN mode=1x have_frames=%zu need_frames=%d",
+                      audio_buffer.size() / kOutputChannels, numFrames);
             memset(out, 0, numFloatsNeeded * sizeof(float));
         }
         return oboe::DataCallbackResult::Continue;
@@ -926,6 +953,7 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
     // playback_speed's atomic store and setPlaybackSpeed() reaching its
     // lock below -- treat that the same as an underrun.
     if (!speed_swr_ctx) {
+        LOGD_SYNC("onAudioReady UNDERRUN mode=speed reason=null_swr_ctx speed=%.2f", speed);
         memset(out, 0, numFrames * kOutputChannels * sizeof(float));
         return oboe::DataCallbackResult::Continue;
     }
@@ -938,6 +966,8 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
     size_t availableFrames = audio_buffer.size() / kOutputChannels;
     size_t minFramesNeeded = (size_t)(numFrames * (double)speed);
     if (availableFrames < minFramesNeeded) {
+        LOGD_SYNC("onAudioReady UNDERRUN mode=speed speed=%.2f have_frames=%zu need_frames=%zu",
+                  speed, availableFrames, minFramesNeeded);
         memset(out, 0, numFrames * kOutputChannels * sizeof(float));
         return oboe::DataCallbackResult::Continue;
     }
@@ -977,8 +1007,17 @@ oboe::DataCallbackResult FFmpegPlayer::onAudioReady(oboe::AudioStream* audioStre
     }
 
     if (framesWritten < numFrames) {
+        LOGD_SYNC("onAudioReady UNDERRUN mode=speed speed=%.2f frames_written=%d frames_needed=%d remaining_buffer_frames=%zu",
+                  speed, framesWritten, numFrames, audio_buffer.size() / kOutputChannels);
         memset(out + framesWritten * kOutputChannels, 0,
                (numFrames - framesWritten) * kOutputChannels * sizeof(float));
+    } else if (++audio_ready_log_counter % 30 == 0) {
+        // Trend line, not a problem report -- throttled to roughly once
+        // every ~0.5-1s (30 callbacks) so it's readable rather than one
+        // line per callback, while still showing whether buffer headroom
+        // is trending down over the course of a 2x hold.
+        LOGD_SYNC("onAudioReady ok speed=%.2f frames_written=%d remaining_buffer_frames=%zu",
+                  speed, framesWritten, audio_buffer.size() / kOutputChannels);
     }
 
     if (vol != 1.0f) {

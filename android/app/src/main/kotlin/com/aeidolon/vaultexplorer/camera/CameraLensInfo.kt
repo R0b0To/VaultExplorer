@@ -31,6 +31,15 @@ data class CameraLensInfo(
 
 enum class VaultFlashMode { OFF, AUTO, ON, TORCH }
 
+// The frame rate the video encoder is configured for (see
+// VaultVideoRecorder.prepareEncoder). VaultCameraSession locks the sensor's
+// CONTROL_AE_TARGET_FPS_RANGE to match this same constant -- if the two
+// were to drift apart (someone changing one without the other), the sensor
+// would deliver frames at a different real rate than the encoder budgets
+// bits for, silently bloating the output bitrate again (see
+// VaultCameraSession.pickFixedFpsRange's comment for the mechanism).
+const val TARGET_RECORDING_FPS = 30
+
 enum class VaultVideoQuality(val targetLongEdge: Int, val bitrateH264: Int, val bitrateHevc: Int) {
     HD(1280, 8_000_000, 5_000_000),
     FHD(1920, 16_000_000, 10_000_000),

@@ -17,6 +17,7 @@ import android.media.MediaCodec
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Range
 import android.util.Size
 import android.view.Surface
 import io.flutter.view.TextureRegistry
@@ -66,6 +67,20 @@ class VaultCameraSession(
     private var zoomMaxCurrent = 1f
     private var currentZoom = 1f
     private var sensorArraySize: Rect? = null
+    // Locks the sensor to a fixed rate matching TARGET_RECORDING_FPS (see
+    // VaultVideoRecorder.prepareEncoder's setVideoFrameRate). Without an
+    // explicit CONTROL_AE_TARGET_FPS_RANGE, nothing constrains the actual
+    // capture rate, and in good lighting many HALs default
+    // TEMPLATE_RECORD/TEMPLATE_PREVIEW to a variable or higher range --
+    // observed on-device delivering close to double the configured frame
+    // rate. The encoder still allocates its target bitrate per frame
+    // assuming TARGET_RECORDING_FPS arrives, so when frames actually
+    // arrive faster than that, the output bitrate overshoots the
+    // configured target by roughly the same ratio (and playback duration
+    // metadata ends up inconsistent with the real frame count). Chosen
+    // once per open()/switchLens() via pickFixedFpsRange(), since it
+    // depends on this lens's CameraCharacteristics.
+    private var recordingFpsRange: Range<Int>? = null
 
     private var flashMode = VaultFlashMode.OFF
     private var minExposureSteps = 0
@@ -217,6 +232,12 @@ class VaultCameraSession(
         } else 1.0 / 6.0
         currentExposureSteps = 0
 
+        recordingFpsRange = pickFixedFpsRange(
+            chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES),
+            TARGET_RECORDING_FPS,
+        )
+        android.util.Log.d(TAG, "configureSizesAndSurfacesLocked: recordingFpsRange=$recordingFpsRange")
+
         val jpegSizes = map.getOutputSizes(ImageFormat.JPEG)?.toList().orEmpty().ifEmpty { listOf(Size(1920, 1080)) }
         photoSize = chooseSize(jpegSizes, 4000)
 
@@ -298,6 +319,7 @@ class VaultCameraSession(
         builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
         builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO)
         builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, currentExposureSteps)
+        recordingFpsRange?.let { builder.set(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE, it) }
         applyZoom(builder)
         applyFlash(builder)
     }
@@ -555,5 +577,23 @@ class VaultCameraSession(
             .minByOrNull { abs(maxOf(it.width, it.height) - targetLongEdge) }
             ?: candidates.firstOrNull()
             ?: Size(1920, 1080)
+    }
+
+    /** Picks a fixed (lower == upper) FPS range matching [desiredFps] if this
+     *  lens advertises one, else the closest fixed range, else -- some
+     *  lenses genuinely don't offer any fixed range -- the narrowest
+     *  variable range that still contains [desiredFps]. Always returns
+     *  something rather than leaving the range unset, since an unset range
+     *  is exactly what let the HAL pick a mismatched capture rate. */
+    private fun pickFixedFpsRange(available: Array<Range<Int>>?, desiredFps: Int): Range<Int>? {
+        val ranges = available?.toList().orEmpty()
+        if (ranges.isEmpty()) return null
+        ranges.firstOrNull { it.lower == desiredFps && it.upper == desiredFps }?.let { return it }
+        ranges.filter { it.lower == it.upper }
+            .minByOrNull { abs(it.lower - desiredFps) }
+            ?.let { return it }
+        return ranges.filter { desiredFps in it.lower..it.upper }
+            .minByOrNull { it.upper - it.lower }
+            ?: ranges.minByOrNull { abs(it.lower - desiredFps) + abs(it.upper - desiredFps) }
     }
 }

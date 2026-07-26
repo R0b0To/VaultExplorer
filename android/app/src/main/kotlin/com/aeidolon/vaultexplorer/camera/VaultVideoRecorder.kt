@@ -119,7 +119,7 @@ class VaultVideoRecorder(
         }
         recorder.setVideoSize(width, height)
         recorder.setVideoEncodingBitRate(bitrate)
-        recorder.setVideoFrameRate(30)
+        recorder.setVideoFrameRate(TARGET_RECORDING_FPS)
         recorder.setOutputFile(temp.absolutePath)
 
         recorder.prepare()

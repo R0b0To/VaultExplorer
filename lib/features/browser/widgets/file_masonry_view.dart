@@ -14,42 +14,6 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 import 'dart:ui' as ui;
 
-/// Pinterest-style, variable-height, multi-column file browser layout.
-///
-/// Shares its tap/selection/thumbnail plumbing with [FileGridView] — same
-/// constructor shape, same [AsyncThumbnail]-backed image/video previews, same
-/// [ThumbnailCacheService] read/write path — so it's a drop-in alternative
-/// layout rather than a parallel implementation with its own bugs to track.
-///
-/// Tile heights are driven by each thumbnail's *actual* content shape —
-/// portrait media renders tall, landscape media renders wide — rather than a
-/// deterministic-but-arbitrary ratio pulled from a lookup table. The true
-/// aspect ratio comes straight from native: `getImageThumbnailWithSize` /
-/// `getVideoThumbnailWithSize` report the source frame's pre-downscale
-/// width/height alongside the thumbnail bytes, values native already has in
-/// hand while generating the thumbnail itself (see `handleGetImageThumbnail
-/// WithSize` / `handleGetVideoThumbnailWithSize` in MainActivity.kt) — so
-/// there's no extra decode anywhere, native or Dart, over the byte-only path
-/// the grid view and viewer use.
-///
-/// A tile starts at a neutral 1:1 placeholder and reflows to its real ratio
-/// the moment a size becomes known and [MediaAspectRatioCache] has recorded
-/// it (see `_onSizeKnown`). The size comes from, in order of preference:
-///  1. [ThumbnailCacheService] — a cache hit now carries the width/height
-///     alongside the bytes (packed in by [ThumbnailCacheService.put] at
-///     write time), so a cached thumbnail reports its ratio with no extra
-///     decode, even across app restarts where [MediaAspectRatioCache]'s
-///     in-memory entries are gone.
-///  2. A fresh fetch — `getImageThumbnailWithSize` / `getVideoThumbnailWithSize`
-///     report the source frame's pre-downscale width/height alongside the
-///     thumbnail bytes, values native already has in hand while generating
-///     the thumbnail itself (see `handleGetImageThumbnailWithSize` /
-///     `handleGetVideoThumbnailWithSize` in MainActivity.kt).
-///  3. A last-resort Dart-side JPEG decode ([_checkAndReportSizeFromBytes]),
-///     only for cache entries written before size-tracking existed.
-/// Once recorded, the ratio is cached for the session (keyed like
-/// [ThumbnailCacheService]'s memory tier) so revisiting a directory or
-/// scrolling back doesn't reshuffle heights or ask native again.
 class FileMasonryView extends StatefulWidget {
   final MountedContainer container;
   final List<RawEntry> dirs;
@@ -122,6 +86,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     final scale = details.scale;
     final factor = scale / _baselineScale;
+
     if (factor > 1.35) {
       if (_columnCount > _minColumns) {
         setState(() {
@@ -139,25 +104,10 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     }
   }
 
-  // Clamp real decoded ratios so a pathological source (e.g. a panorama or a
-  // messaging-app strip crop) can't produce an unusably sliver-thin or
-  // absurdly tall tile. Still wide/tall enough to read as clearly portrait
-  // or landscape rather than looking clipped to a fixed shape.
-  static const _minRatio = 0.5; // tall cap (2:1 portrait)
-  static const _maxRatio = 2.2; // wide cap
-
-  // Folders and files with no visual preview (plain icon tiles) always
-  // render square — a varied height on an icon has no content to justify it
-  // and just makes the columns harder to scan.
+  static const _minRatio = 0.5;
+  static const _maxRatio = 2.2;
   static const _iconRatio = 1.0;
 
-  /// Resolves the ratio a tile should render at *right now*.
-  ///
-  /// Real image/video files: prefer [MediaAspectRatioCache]'s decoded value
-  /// (the file's true content shape). Until that resolves — nothing decoded
-  /// yet for this session — fall back to a neutral square placeholder rather
-  /// than a guessed shape, so a not-yet-loaded tile doesn't visually imply a
-  /// wrong orientation before snapping to the real one.
   double _aspectRatioFor(RawEntry entry, String fullPath,
       {required bool hasVisualPreview}) {
     if (!hasVisualPreview) return _iconRatio;
@@ -166,22 +116,19 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     return decoded.clamp(_minRatio, _maxRatio).toDouble();
   }
 
-  /// Called by a tile's thumbnail the moment a *fresh* fetch (i.e. an actual
-  /// native call, not a cache replay) reports the source frame's true
-  /// width/height. Records the ratio, then triggers one rebuild so this tile
-  /// (and the column packing around it) reflows from its placeholder square
-  /// to its real shape. A no-op if the ratio didn't actually change (e.g.
-  /// this path was already known from earlier in the session) to avoid
-  /// pointless rebuild churn while a directory's thumbnails are still
-  /// streaming in.
   void _onSizeKnown(String fullPath, int width, int height) {
     if (width <= 0 || height <= 0) return;
     final before = MediaAspectRatioCache.get(widget.container, fullPath);
     final ratio = width / height;
     if (before == ratio) return;
     MediaAspectRatioCache.put(widget.container, fullPath, width, height);
-    if (!mounted) return;
-    setState(() {});
+
+    // Update state safely after the build phase finishes to avoid "setState during build" errors
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -190,16 +137,10 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     final fileEntries = widget.files;
     final total = dirEntries.length + fileEntries.length;
 
-    // Distribute items into [_columnCount] buckets, always appending to
-    // whichever column currently has the least accumulated height — the
-    // standard greedy masonry-packing heuristic. Accumulated height is
-    // estimated from each tile's current aspect ratio (real once decoded,
-    // a neutral square guess until then — see _aspectRatioFor); still keeps
-    // columns visually balanced rather than a naive round-robin, and
-    // self-corrects as real ratios come in and this rebuilds.
     final columns = List.generate(_columnCount, (_) => <Widget>[]);
     final columnHeights = List.filled(_columnCount, 0.0);
-    const estimatedColumnWidth = 160.0; // relative unit; ratio is what matters
+
+    const estimatedColumnWidth = 160.0;
 
     for (var i = 0; i < total; i++) {
       final isDir = i < dirEntries.length;
@@ -207,11 +148,12 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       final fullPath = widget.currentDirPath.isEmpty
           ? entry.name
           : '${widget.currentDirPath}/${entry.name}';
+
       final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
       final ratio = _aspectRatioFor(entry, fullPath,
           hasVisualPreview: hasVisualPreview);
-      final estimatedTileHeight = estimatedColumnWidth / ratio;
 
+      final estimatedTileHeight = estimatedColumnWidth / ratio;
       var shortestColumn = 0;
       for (var c = 1; c < _columnCount; c++) {
         if (columnHeights[c] < columnHeights[shortestColumn]) {
@@ -229,6 +171,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
               : _buildFileCell(context, entry, fullPath),
         ),
       );
+
       columns[shortestColumn].add(tile);
       columnHeights[shortestColumn] +=
           estimatedTileHeight + 8; // + the bottom padding above
@@ -272,6 +215,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   Widget _buildDirCell(BuildContext context, RawEntry entry) {
     final isSelected = widget.selectedItems.contains(entry);
     final cs = Theme.of(context).colorScheme;
+
     return _MasonryCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -293,10 +237,12 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   Widget _buildFileCell(BuildContext context, RawEntry entry, String fullPath) {
     final cleanName = entry.name;
     final isSelected = widget.selectedItems.contains(entry);
+
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final vaultIcon = vaultIconForExt(ext);
     final vaultColor = vaultColorForExt(ext);
+
     if (vaultIcon != null) {
       final nameParts = cleanName.split('.');
       if (nameParts.length > 1) {
@@ -304,9 +250,12 @@ class _FileMasonryViewState extends State<FileMasonryView> {
         displayName = nameParts.join('.');
       }
     }
+
     final isImg = MediaViewerConstants.isImage(cleanName);
     final isVid = MediaViewerConstants.isVideo(cleanName);
+
     Widget previewWidget;
+
     if (vaultIcon != null) {
       previewWidget = Center(
         child: Icon(vaultIcon, size: AppIconSize.feature, color: vaultColor),
@@ -336,6 +285,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
         ),
       );
     }
+
     return _MasonryCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -378,6 +328,7 @@ class _MasonryCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -450,7 +401,9 @@ class _MasonryCell extends StatelessWidget {
 class _CheckBadge extends StatelessWidget {
   final Color color;
   final Color onColor;
+
   const _CheckBadge({required this.color, required this.onColor});
+
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(4),
@@ -512,15 +465,12 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
         if (width != null && height != null) {
           onSizeKnown(width, height);
         } else {
-          // Legacy entry cached before size tracking existed — fall back to
-          // reading it off the JPEG bytes this once. The next _fetch for
-          // this path (after the current write, below, or after this file's
-          // cache entry naturally expires) will carry a size and skip this.
           await _checkAndReportSizeFromBytes(container, path, bytes, onSizeKnown);
         }
         return bytes;
       }
     }
+
     final thumb = await vaultExplorerApi.getImageThumbnailWithSize(
       container,
       path,
@@ -528,6 +478,7 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       quality: quality.jpegQuality,
     );
     final thumbBytes = thumb?.bytes;
+
     if (thumbBytes == null || thumbBytes.isEmpty) {
       final size = await vaultExplorerApi.getFileSize(container, path);
       if (size <= 0) throw Exception('Empty file: $path');
@@ -544,10 +495,13 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       }
       return raw;
     }
+
     onSizeKnown(thumb!.width, thumb.height);
+
     ThumbnailCacheService.putInMemory(
       container, path, thumbBytes, quality, thumb.width, thumb.height,
     );
+
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(
@@ -567,6 +521,7 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
     final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(container, filePath, quality);
     final syncBytes = syncEntry?.$1;
     if (syncEntry != null && syncEntry.$1.isNotEmpty) {
@@ -577,6 +532,7 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
         _checkAndReportSizeFromBytes(container, filePath, bytes, onSizeKnown);
       }
     }
+
     return AsyncThumbnail(
       key: ValueKey('img:$filePath'),
       container: container,
@@ -676,6 +632,7 @@ class _VideoMasonryThumb extends StatelessWidget {
         return bytes;
       }
     }
+
     final thumb = await vaultExplorerApi.getVideoThumbnailWithSize(
       container,
       path,
@@ -683,11 +640,15 @@ class _VideoMasonryThumb extends StatelessWidget {
       targetSize: quality.scaledSize(180),
     );
     final data = thumb?.bytes;
+
     if (data == null || data.isEmpty) return Uint8List(0);
+
     onSizeKnown(thumb!.width, thumb.height);
+
     ThumbnailCacheService.putInMemory(
       container, path, data, quality, thumb.width, thumb.height,
     );
+
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(
@@ -707,6 +668,7 @@ class _VideoMasonryThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
     final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(container, filePath, quality);
     final syncBytes = syncEntry?.$1;
     if (syncEntry != null && syncEntry.$1.isNotEmpty) {
@@ -717,6 +679,7 @@ class _VideoMasonryThumb extends StatelessWidget {
         _checkAndReportSizeFromBytes(container, filePath, bytes, onSizeKnown);
       }
     }
+
     return Stack(
       fit: StackFit.expand,
       children: [

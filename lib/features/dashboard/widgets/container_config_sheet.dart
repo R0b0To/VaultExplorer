@@ -105,7 +105,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     _cipherId = _initialCipherId;
     _hashId = _initialHashId;
 
-    // Grant 1 minute window post-unlock to access security settings without re-authenticating
     final recentlyUnlocked = widget.mountedContainer != null &&
         DateTime.now().difference(widget.mountedContainer!.mountedAt) <
             const Duration(minutes: 1);
@@ -253,9 +252,11 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     final label = _labelCtrl.text.trim().isEmpty
         ? widget.currentLabel
         : _labelCtrl.text.trim();
+
     final needsPassword = _unlockMethodNeedsPassword;
     final shouldSavePassword =
         needsPassword && (_wasPasswordless || _changePassword);
+
     final record = ContainerRecord(
       uri: widget.uri,
       label: label,
@@ -274,10 +275,12 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
       hashId: _hashId,
       containerFormat: _containerFormat,
     );
+
     await ContainerRepository.instance.save(record);
     if (!_cacheDerivedKey) {
       await vaultExplorerApi.clearDerivedKey(widget.uri);
     }
+
     widget.onSaved(record);
     if (mounted) Navigator.pop(context);
   }
@@ -296,6 +299,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   Future<void> _authenticateSettings() async {
     final record = widget.existingRecord;
     if (record == null) return;
+
     if (record.unlockMethod == ContainerUnlockMethod.biometrics) {
       try {
         final localAuth = LocalAuthentication();
@@ -376,6 +380,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -812,6 +817,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> {
     final isModified = _isModified;
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
@@ -1139,6 +1145,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
       }
       return;
     }
+
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final keyfilePaths = keyfiles.map((k) => k.uri).toList();
@@ -1167,6 +1174,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
               cacheDerivedKey: widget.cacheDerivedKey,
               keyfilePaths: keyfilePaths,
             );
+
       if (result == null) {
         if (mounted) setState(() { _loading = false; _error = 'Incorrect credentials'; });
         return;
@@ -1191,6 +1199,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     return AlertDialog(
       title: const Text('Verify Credentials'),
       content: SingleChildScrollView(

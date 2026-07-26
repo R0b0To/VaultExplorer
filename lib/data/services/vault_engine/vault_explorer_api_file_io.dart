@@ -374,6 +374,23 @@ Future<bool> openWithApp(
     }
   }
 
+  /// Deletes the original device-storage files/folder that were picked
+  /// during the import identified by [opId] (the same [FileOperation.id]
+  /// passed into [importFiles]/[importFolder]). Returns the number of
+  /// items deleted. Best-effort — failures are swallowed and reported as 0.
+  Future<int> deleteImportSources(int opId) async {
+    try {
+      final result = await _channel.invokeMethod<int>(
+        ChannelMethods.deleteImportSources,
+        {'opId': opId},
+      );
+      return result ?? 0;
+    } catch (e) {
+      _logSwallowed('deleteImportSources', e, expected: true);
+      return 0;
+    }
+  }
+
   /// Requests a scaled video thumbnail from the native layer.
   /// Returns null on any error — callers should show a fallback icon.
   Future<Uint8List?> getVideoThumbnail(

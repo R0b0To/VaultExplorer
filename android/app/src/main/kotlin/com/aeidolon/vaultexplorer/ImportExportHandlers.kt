@@ -207,6 +207,7 @@ class ImportExportHandlers(
             data.clipData?.let { clip -> for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri) }
                 ?: data.data?.let { uris.add(it) }
             if (uris.isNotEmpty()) {
+                ImportSourceRegistry.recordFiles(pending.opId, uris)
                 ioExecutor.execute {
                     try {
                         val srcDocs = uris.mapNotNull { DocumentFile.fromSingleUri(activity, it) }
@@ -289,6 +290,7 @@ class ImportExportHandlers(
             )
             val srcRoot = DocumentFile.fromTreeUri(activity, treeUri)
             if (srcRoot != null) {
+                ImportSourceRegistry.recordFolder(pending.opId, treeUri)
                 val folderName = FatFileNameSanitizer.sanitize(srcRoot.name ?: "imported_folder")
                 val targetFatPath = if (pending.targetDir.isEmpty()) folderName else "${pending.targetDir}/$folderName"
                 ioExecutor.execute {
@@ -358,6 +360,38 @@ class ImportExportHandlers(
         }
         ImportCancellation.cancel(opId)
         result.success(true)
+    }
+
+    /**
+     * Deletes the original device-storage document(s) picked during the
+     * import identified by [opId] (single/multi files, or the one tree Uri
+     * for a folder import). Best-effort per item; returns the count deleted.
+     */
+    fun handleDeleteImportSources(call: MethodCall, result: MethodChannel.Result) {
+        val opId = call.argument<Number>("opId")?.toInt()
+        if (opId == null) {
+            result.error("INVALID_ARGS", "opId required", null)
+            return
+        }
+        val recorded = ImportSourceRegistry.take(opId)
+        if (recorded == null) {
+            result.success(0)
+            return
+        }
+        val (uris, isTree) = recorded
+        ioExecutor.execute {
+            var deleted = 0
+            for (uri in uris) {
+                try {
+                    val doc = if (isTree) DocumentFile.fromTreeUri(activity, uri)
+                              else DocumentFile.fromSingleUri(activity, uri)
+                    if (doc != null && doc.delete()) deleted++
+                } catch (_: Exception) {
+                    // Best-effort — skip and keep going.
+                }
+            }
+            activity.runOnUiThread { result.success(deleted) }
+        }
     }
 
     fun handleImportFile(call: MethodCall, result: MethodChannel.Result) {

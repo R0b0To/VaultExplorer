@@ -42,6 +42,10 @@ abstract final class ChannelMethods {
   static const importFile = 'importFile';
   static const importFolder = 'importFolder';
   static const cancelImport = 'cancelImport';
+  // Deletes the source files/folder from device storage that were picked
+  // during the import identified by opId. Native keeps the picked URIs
+  // in memory (keyed by opId) until this is called or the op is superseded.
+  static const deleteImportSources = 'deleteImportSources';
   static const getFileSize = 'getFileSize';
   static const getFolderSize = 'getFolderSize'; // recursive directory byte total
   static const readFileChunk = 'readFileChunk';

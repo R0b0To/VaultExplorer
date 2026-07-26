@@ -28,6 +28,7 @@ private object ChannelMethods {
     const val IMPORT_FILE               = "importFile"
     const val IMPORT_FOLDER             = "importFolder"
     const val CANCEL_IMPORT             = "cancelImport"
+    const val DELETE_IMPORT_SOURCES     = "deleteImportSources"
     const val GET_FILE_SIZE             = "getFileSize"
     const val READ_FILE_CHUNK           = "readFileChunk"
     const val GET_MEDIA_FILE_SIZE       = "getMediaFileSize"
@@ -246,6 +247,7 @@ vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(
                 ChannelMethods.FINISH_WRITE_IF_CRYPTOMATOR -> vaultUnlockHandlers.handleFinishWriteIfCryptomator(call, result)
                 ChannelMethods.CANCEL_UNLOCK -> vaultUnlockHandlers.handleCancelUnlock(call, result)
                 ChannelMethods.CANCEL_IMPORT -> importExportHandlers.handleCancelImport(call, result)
+                ChannelMethods.DELETE_IMPORT_SOURCES -> importExportHandlers.handleDeleteImportSources(call, result)
                 ChannelMethods.CHANGE_CONTAINER_PASSWORD -> vaultUnlockHandlers.handleChangeContainerPassword(call, result)
                 ChannelMethods.DERIVE_DERIVED_KEY -> derivedKeyHandlers.handleDeriveDerivedKey(call, result)
                 ChannelMethods.DOCUMENT_EXISTS -> vaultUnlockHandlers.handleDocumentExists(call, result)

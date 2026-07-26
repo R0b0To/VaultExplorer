@@ -1215,10 +1215,53 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             op.destDirPath == _currentDirPath) {
           _loadDirectoryContents(_currentDirPath);
         }
+        if (op.status == FileOperationStatus.completed ||
+            op.status == FileOperationStatus.completedWithErrors) {
+          _maybeDeleteImportSources(op, isFolder: false);
+        }
       }
     }
 
     op.addListener(listener);
+  }
+
+  Future<void> _maybeDeleteImportSources(
+    FileOperation op, {
+    required bool isFolder,
+  }) async {
+    if (!mounted) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete original?'),
+        content: Text(
+          isFolder
+              ? 'Delete the original folder from your device now that it has been imported?'
+              : 'Delete the original file(s) from your device now that they have been imported?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep original'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete original'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+    final deleted = await vaultExplorerApi.deleteImportSources(op.id);
+    if (!mounted) return;
+    _setStatus(
+      deleted > 0
+          ? 'Deleted $deleted original item(s)'
+          : 'Could not delete original(s)',
+      error: deleted == 0,
+      autoClear: const Duration(seconds: 3),
+    );
   }
 
   Future<void> _importFolderFromDevice() async {
@@ -1251,6 +1294,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         if (op.status == FileOperationStatus.completed &&
             op.destDirPath == _currentDirPath) {
           _loadDirectoryContents(_currentDirPath);
+        }
+        if (op.status == FileOperationStatus.completed ||
+            op.status == FileOperationStatus.completedWithErrors) {
+          _maybeDeleteImportSources(op, isFolder: true);
         }
       }
     }

@@ -5,6 +5,7 @@ import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
+import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:flutter/material.dart';
 export 'container_repository.dart'
@@ -32,6 +33,8 @@ class AppSettings {
   ThumbnailQuality defaultThumbnailQuality;
   Map<String, String> extensionPreferences;
   bool autoOpenOnUnlock;
+  SortBy defaultFileSortBy;
+  bool defaultFileSortAscending;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
 
@@ -52,10 +55,14 @@ class AppSettings {
     this.swapCardActions = false,
     this.themeMode = ThemeMode.system,
     this.autoOpenOnUnlock = false,
+    this.defaultFileSortBy = SortBy.name,
+    this.defaultFileSortAscending = true,
     Map<String, String>? extensionPreferences,
-    this._masterPasswordHash,
-    this._masterPasswordSalt,
-  }) : extensionPreferences = extensionPreferences ?? {};
+    String? masterPasswordHash,
+    String? masterPasswordSalt,
+  })  : extensionPreferences = extensionPreferences ?? {},
+        _masterPasswordHash = masterPasswordHash,
+        _masterPasswordSalt = masterPasswordSalt;
 
   String? get masterPasswordHash => _masterPasswordHash;
   String? get masterPasswordSalt => _masterPasswordSalt;
@@ -95,6 +102,8 @@ class AppSettings {
     bool? autoOpenOnUnlock,
     String? masterPasswordHash,
     String? masterPasswordSalt,
+    SortBy? defaultFileSortBy,
+    bool? defaultFileSortAscending,
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
@@ -116,6 +125,8 @@ class AppSettings {
       autoOpenOnUnlock: autoOpenOnUnlock ?? this.autoOpenOnUnlock,
       masterPasswordHash: masterPasswordHash ?? _masterPasswordHash,
       masterPasswordSalt: masterPasswordSalt ?? _masterPasswordSalt,
+      defaultFileSortBy: defaultFileSortBy ?? this.defaultFileSortBy,
+      defaultFileSortAscending: defaultFileSortAscending ?? this.defaultFileSortAscending,
     );
   }
 
@@ -137,6 +148,8 @@ class AppSettings {
     'themeMode': themeMode.index,
     'extensionPreferences': extensionPreferences,
     'autoOpenOnUnlock': autoOpenOnUnlock,
+    'defaultFileSortBy': defaultFileSortBy.toJson(),
+    'defaultFileSortAscending': defaultFileSortAscending,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
@@ -170,6 +183,8 @@ class AppSettings {
         ) ??
         {},
     autoOpenOnUnlock: j['autoOpenOnUnlock'] as bool? ?? false,
+    defaultFileSortBy: SortBy.fromJson(j['defaultFileSortBy'] as String?),
+    defaultFileSortAscending: j['defaultFileSortAscending'] as bool? ?? true,
   );
 }
 

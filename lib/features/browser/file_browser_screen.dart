@@ -144,15 +144,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               widget.thumbnailQuality ??
               record?.thumbnailQuality ??
               appSettings.defaultThumbnailQuality;
-        });
-      }
-
-      if (mounted) {
-        setState(() {
           _layoutMode = appSettings.defaultLayoutMode;
+          sortBy = appSettings.defaultFileSortBy;
+          sortAscending = appSettings.defaultFileSortAscending;
         });
       }
-
       if (mounted &&
           widget.container.readOnly &&
           _resolvedThumbnailCacheMode == ThumbnailCacheMode.inContainer) {
@@ -168,6 +164,65 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       debugPrint('Failed to resolve settings: $e');
     }
     await _loadDirectoryContents(_currentDirPath);
+  }
+
+  Future<void> _onSortChanged(SortBy field) async {
+    setSort(field);
+    try {
+      final settings = await AppSettingsService.loadSettings();
+      final updatedSettings = settings.copyWith(
+        defaultFileSortBy: sortBy,
+        defaultFileSortAscending: sortAscending,
+      );
+      await AppSettingsService.saveSettings(updatedSettings);
+    } catch (e) {
+      debugPrint('Failed to save sort settings: $e');
+    }
+  }
+
+  Widget _buildSortPopupButton(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return MenuAnchor(
+      builder: (context, controller, child) => IconButton(
+        icon: const Icon(Icons.sort_by_alpha_rounded),
+        tooltip: 'Sort options',
+        onPressed: () {
+          if (controller.isOpen) {
+            controller.close();
+          } else {
+            controller.open();
+          }
+        },
+      ),
+      onOpen: () => setState(() => _menuIsOpen = true),
+      onClose: () => setState(() => _menuIsOpen = false),
+      menuChildren: [
+        for (final (field, label, icon) in const [
+          (SortBy.name, 'Name', Icons.sort_by_alpha_rounded),
+          (SortBy.size, 'Size', Icons.data_usage_rounded),
+          (SortBy.extension, 'Type', Icons.category_outlined),
+          (SortBy.date, 'Date', Icons.schedule_rounded),
+        ])
+          MenuItemButton(
+            leadingIcon: Icon(icon, color: sortBy == field ? cs.primary : cs.onSurfaceVariant),
+            trailingIcon: sortBy == field
+                ? Icon(
+                    sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                    size: 16,
+                    color: cs.primary,
+                  )
+                : null,
+            onPressed: () => _onSortChanged(field),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: sortBy == field ? FontWeight.bold : FontWeight.normal,
+                color: sortBy == field ? cs.primary : null,
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   Future<void> _loadToolbarConfig() async {
@@ -1459,51 +1514,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               style: TextStyle(
                 fontWeight: _layoutMode == mode ? FontWeight.bold : FontWeight.normal,
                 color: _layoutMode == mode ? cs.primary : null,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildSortPopupButton(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return MenuAnchor(
-      builder: (context, controller, child) => IconButton(
-        icon: const Icon(Icons.sort_by_alpha_rounded),
-        tooltip: 'Sort options',
-        onPressed: () {
-          if (controller.isOpen) {
-            controller.close();
-          } else {
-            controller.open();
-          }
-        },
-      ),
-      onOpen: () => setState(() => _menuIsOpen = true),
-      onClose: () => setState(() => _menuIsOpen = false),
-      menuChildren: [
-        for (final (field, label, icon) in const [
-          (SortBy.name, 'Name', Icons.sort_by_alpha_rounded),
-          (SortBy.size, 'Size', Icons.data_usage_rounded),
-          (SortBy.extension, 'Type', Icons.category_outlined),
-          (SortBy.date, 'Date', Icons.schedule_rounded),
-        ])
-          MenuItemButton(
-            leadingIcon: Icon(icon, color: sortBy == field ? cs.primary : cs.onSurfaceVariant),
-            trailingIcon: sortBy == field
-                ? Icon(
-                    sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                    size: 16,
-                    color: cs.primary,
-                  )
-                : null,
-            onPressed: () => setSort(field),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: sortBy == field ? FontWeight.bold : FontWeight.normal,
-                color: sortBy == field ? cs.primary : null,
               ),
             ),
           ),

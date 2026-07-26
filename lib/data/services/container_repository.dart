@@ -1,5 +1,3 @@
-// File: lib/data/services/container_repository.dart
-
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -58,7 +56,6 @@ class ContainerRepository {
 
   static final ContainerRepository instance = ContainerRepository._();
   static const _secure = AppSecureStorage.instance;
-
   Map<String, ContainerRecord>? _cache;
 
   static Future<File> get _dataFile async {
@@ -75,6 +72,7 @@ class ContainerRepository {
   Future<void> save(ContainerRecord record) async {
     await _ensureLoaded();
     _cache![record.uri] = record;
+    
     final needsPassword = record.unlockMethod != ContainerUnlockMethod.password;
     if (needsPassword && record.pendingPassword != null) {
       await _secure.write(
@@ -84,6 +82,7 @@ class ContainerRepository {
     } else if (!needsPassword) {
       await _secure.delete(key: _keystoreKey(record.uri));
     }
+
     if (record.unlockMethod == ContainerUnlockMethod.pattern &&
         record.pendingPatternHash != null) {
       await _secure.write(
@@ -93,12 +92,14 @@ class ContainerRepository {
     } else if (record.unlockMethod != ContainerUnlockMethod.pattern) {
       await _secure.delete(key: _patternHashKey(record.uri));
     }
+
     await _persist();
   }
 
   Future<void> saveOrder(List<String> orderedUris) async {
     await _ensureLoaded();
     if (_cache == null) return;
+    
     final newCache = <String, ContainerRecord>{};
     for (final uri in orderedUris) {
       if (_cache!.containsKey(uri)) {
@@ -110,6 +111,7 @@ class ContainerRepository {
         newCache[entry.key] = entry.value;
       }
     }
+    
     _cache = newCache;
     await _persist();
   }
@@ -156,6 +158,7 @@ class ContainerRepository {
     try {
       final file = await _dataFile;
       if (!await file.exists()) return;
+
       final list = jsonDecode(await file.readAsString()) as List<dynamic>;
       for (final item in list) {
         final r = ContainerRecord.fromJson(item as Map<String, dynamic>);
@@ -194,6 +197,7 @@ class ContainerRecord {
   final int cipherId;
   final int hashId;
   final String containerFormat;
+  final List<Map<String, String>> keyfiles;
 
   const ContainerRecord({
     required this.uri,
@@ -211,6 +215,7 @@ class ContainerRecord {
     this.cipherId = 255,
     this.hashId = 255,
     this.containerFormat = 'veracrypt',
+    this.keyfiles = const [],
   });
 
   bool get isUsbSource => uri.startsWith('usb:');
@@ -230,6 +235,7 @@ class ContainerRecord {
     int? cipherId,
     int? hashId,
     String? containerFormat,
+    List<Map<String, String>>? keyfiles,
   }) {
     return ContainerRecord(
       uri: uri,
@@ -251,6 +257,7 @@ class ContainerRecord {
       cipherId: cipherId ?? this.cipherId,
       hashId: hashId ?? this.hashId,
       containerFormat: containerFormat ?? this.containerFormat,
+      keyfiles: keyfiles ?? this.keyfiles,
     );
   }
 
@@ -270,6 +277,7 @@ class ContainerRecord {
         'cipherId': cipherId,
         'hashId': hashId,
         'containerFormat': containerFormat,
+        'keyfiles': keyfiles,
       };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
@@ -292,6 +300,9 @@ class ContainerRecord {
       cipherId: j['cipherId'] as int? ?? 255,
       hashId: j['hashId'] as int? ?? 255,
       containerFormat: j['containerFormat'] as String? ?? 'veracrypt',
+      keyfiles: (j['keyfiles'] as List<dynamic>? ?? [])
+          .map((e) => Map<String, String>.from(e as Map))
+          .toList(),
     );
   }
 }

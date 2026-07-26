@@ -7,12 +7,14 @@ class ChangePasswordScreen extends StatefulWidget {
   final String uri;
   final int initialCipherId;
   final int initialHashId;
+  final List<Map<String, String>> initialKeyfiles;
 
   const ChangePasswordScreen({
     super.key,
     required this.uri,
     required this.initialCipherId,
     required this.initialHashId,
+    this.initialKeyfiles = const [],
   });
 
   @override
@@ -25,15 +27,26 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _confirmPasswordCtrl = TextEditingController();
   final _oldPimCtrl = TextEditingController();
   final _newPimCtrl = TextEditingController();
+
   final List<KeyfileRef> _oldKeyfiles = [];
   bool _pickingOldKeyfiles = false;
+
   final List<KeyfileRef> _newKeyfiles = [];
   bool _pickingNewKeyfiles = false;
+
   bool _oldObscure = true;
   bool _newObscure = true;
   bool _confirmObscure = true;
   bool _isProcessing = false;
   String? _errorMsg;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialKeyfiles.isNotEmpty) {
+      _oldKeyfiles.addAll(widget.initialKeyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
+    }
+  }
 
   @override
   void dispose() {
@@ -102,7 +115,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       setState(() => _errorMsg = 'New password or keyfiles are required.');
       return;
     }
-
     if (newPassword != confirmPassword) {
       setState(() => _errorMsg = 'New passwords do not match.');
       return;
@@ -132,7 +144,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       setState(() => _isProcessing = false);
       if (success) {
         showAppSnackBar(context, message: 'Password changed successfully.', tone: AppBannerTone.success);
-        Navigator.pop(context, true);
+        Navigator.pop(context, _newKeyfiles);
       } else {
         setState(() => _errorMsg = 'Failed to change password. Check old credentials.');
       }

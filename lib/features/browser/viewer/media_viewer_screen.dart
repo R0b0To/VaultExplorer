@@ -824,14 +824,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   onPageChanged: (index) {
                     if (!_transitionInProgress) {
                       _playlistController.updateIndex(index);
-                      // Fires as soon as the drag crosses the halfway point
-                      // to the next page — well before the finger lifts or
-                      // any fling-settle animation finishes. Switching the
-                      // shared player right here, instead of waiting for
-                      // ScrollEndNotification, is what actually removes the
-                      // ~1s "swipe, then wait" gap: the native open/decode
-                      // now runs *during* the rest of the swipe instead of
-                      // starting only once it's fully settled.
                       _activateCurrentMedia();
                       _prefetchDebounceTimer?.cancel();
                       _prefetchDebounceTimer = Timer(const Duration(milliseconds: 200), () {

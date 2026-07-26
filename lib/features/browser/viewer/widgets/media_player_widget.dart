@@ -671,21 +671,14 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
           ),
         );
       } else {
-        // Genuinely unknown (no prior thumbnail view, first time this
-        // file's ever been opened this session -- routine in playlist
-        // mode, where most files haven't been seen yet). Guessing a box
-        // size here -- the old fallback used a neutral square -- is
-        // virtually always going to be some amount wrong once the real
-        // video reports its true size, and that wrong guess sitting at a
-        // visibly different size than the real video is exactly the
-        // "preview is bigger than the player, then it readapts" layout
-        // shift. Filling the full frame edge-to-edge instead means there's
-        // nothing sized wrong to begin with -- just one clean transition
-        // into the correctly-letterboxed video once its real size is
-        // known, instead of a wrong-box-then-right-box double shift.
         posterContent = RotatedBox(
           quarterTurns: widget.rotationQuarterTurns,
-          child: Image.memory(poster, fit: BoxFit.cover),
+          child: Image.memory(
+            poster, 
+            fit: BoxFit.contain,
+            width: double.infinity,
+            height: double.infinity,
+          ),
         );
       }
     }

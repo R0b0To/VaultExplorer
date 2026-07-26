@@ -53,8 +53,8 @@ private:
     // buffering, polling, and A/V sync are named and visible in one place
     // instead of as bare literals scattered through the .cpp.
     static constexpr int kIoBufferSize = 32768;               // avio staging buffer, bytes
-    static constexpr size_t kMaxQueuedVideoPackets = 50;       // demux backpressure threshold
-    static constexpr size_t kMaxQueuedAudioPackets = 100;      // demux backpressure threshold
+    static constexpr size_t kMaxQueuedVideoPackets = 30;
+    static constexpr size_t kMaxQueuedAudioPackets = 30;
     static constexpr int kIdlePollIntervalMs = 10;             // paused / queues-full idle sleep
     static constexpr int kEofIdlePollIntervalMs = 50;          // idle sleep once input_eof is set
     static constexpr int kTimeChangedNotifyEveryNFrames = 15;  // "timeChanged" event throttle
@@ -63,10 +63,12 @@ private:
     static constexpr int kDrainGraceMs = 60;                   // post-drain settle time
     static constexpr double kAvSyncMinDiffSec = 0.005;         // below this, don't bother sleeping
     static constexpr double kAvSyncMaxDiffSec = 1.0;           // above this, audio_clock is untrusted
+    static constexpr double kAvSyncFrameDropThresholdSec = 0.3; // beyond this far behind, drop the frame instead of burst-rendering it
     static constexpr int kFallbackFrameDelayMs = 33;           // used when avg_frame_rate is unknown
     static constexpr double kFpsWindowSec = 1.0;               // measured_fps rolling window
     static constexpr int kOutputSampleRate = 48000;            // fixed oboe/swr output rate
     static constexpr int kOutputChannels = 2;                  // fixed oboe/swr output channel count
+    static constexpr size_t kMaxBufferedAudioFrames = 24000;   // 0.5s backpressure limit
 
     void demuxThreadFunc();
     void videoDecodeThreadFunc();
@@ -218,6 +220,7 @@ private:
     std::mutex audio_buf_mutex;
     std::vector<float> audio_buffer;
     std::atomic<double> audio_clock{0.0};
+    std::atomic<double> audio_chunk_end_pts{0.0};
     std::atomic<double> video_clock{0.0};
 
     // Diagnostics-only counters read by getDiagnosticsSnapshot(). Written
@@ -247,11 +250,6 @@ private:
     // Only ever touched from this instance's own video_thread, so plain
     // (non-atomic) is correct.
     int frame_notify_count = 0;
-
-    // Throttle for the temporary diagnostic trend log in onAudioReady --
-    // see LOGD_AUDIO/LOGD_SYNC comment in ffmpeg_player.cpp. Only ever
-    // touched from the audio callback thread.
-    int audio_ready_log_counter = 0;
 
     SwsContext* sws_ctx = nullptr;
 };

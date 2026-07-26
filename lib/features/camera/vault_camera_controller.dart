@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 class NativeCameraLens {
   final String cameraId;
@@ -129,22 +130,25 @@ class VaultCameraController {
   List<NativeCameraLens> get lenses => _lenses;
   bool get isInitialized => _sessionId != null && _textureId != null;
 
-  static Future<List<NativeCameraLens>> listLenses() async {
-    final res = await _channel.invokeMethod<Map<dynamic, dynamic>>('listLenses');
-    final lenses = (res?['lenses'] as List<dynamic>?)
-            ?.map((e) => NativeCameraLens.fromMap(e as Map<dynamic, dynamic>))
-            .toList() ??
-        [];
-    return lenses;
-  }
-
   static Future<bool> hasPermissions() async {
     final res = await _channel.invokeMethod<bool>('hasPermissions');
     return res ?? false;
   }
 
-  static Future<void> requestPermissions() async {
+  /// Requests camera + microphone permission and waits for the user to
+  /// actually answer the system dialog, returning whether it was granted.
+  /// Previously this only fired the request and returned immediately, so
+  /// callers proceeded to open the camera before the dialog was answered.
+  static Future<bool> requestPermissions() async {
+    final resultFuture = VaultExplorerApi.awaitCameraPermissionResult();
     await _channel.invokeMethod('requestPermissions');
+    try {
+      return await resultFuture.timeout(const Duration(seconds: 60));
+    } on TimeoutException {
+      // The user backgrounded the app / dismissed the dialog without it
+      // resolving (shouldn't normally happen, but don't hang forever).
+      return false;
+    }
   }
 
   Future<VaultCameraSessionInfo> open({

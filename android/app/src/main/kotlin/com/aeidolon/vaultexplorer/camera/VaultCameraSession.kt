@@ -277,15 +277,22 @@ class VaultCameraSession(
         }
     }
 
-    private fun buildRequest(): CaptureRequest {
+    /** Shared by buildRequest() and setFocusAndExposurePoint() -- both need
+     *  the same device/template/target-surface/control setup and previously
+     *  duplicated it, which meant a future control had to be remembered in
+     *  two places. Each caller adds whatever's specific to it (AF/AE region
+     *  overrides, etc.) on top of the returned builder. */
+    private fun newRequestBuilder(): CaptureRequest.Builder {
         val device = cameraDevice ?: throw IllegalStateException("no camera device")
         val template = if (isRecording) CameraDevice.TEMPLATE_RECORD else CameraDevice.TEMPLATE_PREVIEW
         val builder = device.createCaptureRequest(template)
         previewSurface?.let { builder.addTarget(it) }
         if (isRecording) videoRecorder?.inputSurface?.let { builder.addTarget(it) }
         applyControls(builder)
-        return builder.build()
+        return builder
     }
+
+    private fun buildRequest(): CaptureRequest = newRequestBuilder().build()
 
     private fun applyControls(builder: CaptureRequest.Builder) {
         builder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)
@@ -304,7 +311,6 @@ class VaultCameraSession(
     /** [nx]/[ny] normalized (0..1) tap position within the preview. */
     fun setFocusAndExposurePoint(nx: Float, ny: Float) {
         val rect = sensorArraySize ?: return
-        val device = cameraDevice ?: return
         val session = captureSession ?: return
         val halfW = (rect.width() * 0.05f).toInt().coerceAtLeast(1)
         val halfH = (rect.height() * 0.05f).toInt().coerceAtLeast(1)
@@ -316,11 +322,7 @@ class VaultCameraSession(
         val bottom = (cy + halfH).coerceIn(top + 1, rect.bottom)
         val region = MeteringRectangle(left, top, right - left, bottom - top, MeteringRectangle.METERING_WEIGHT_MAX)
         try {
-            val template = if (isRecording) CameraDevice.TEMPLATE_RECORD else CameraDevice.TEMPLATE_PREVIEW
-            val builder = device.createCaptureRequest(template)
-            previewSurface?.let { builder.addTarget(it) }
-            if (isRecording) videoRecorder?.inputSurface?.let { builder.addTarget(it) }
-            applyControls(builder)
+            val builder = newRequestBuilder()
             builder.set(CaptureRequest.CONTROL_AF_REGIONS, arrayOf(region))
             builder.set(CaptureRequest.CONTROL_AE_REGIONS, arrayOf(region))
             builder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START)
@@ -388,35 +390,39 @@ class VaultCameraSession(
         // it began with, which is correct for it; the rotation will be
         // picked up for the recording after it via the same post-stop path.
         if (!isRecording) {
-            reprepareVideoRecorderForCurrentOrientationLocked()
+            reprepareVideoRecorder(force = false, reason = "orientation changed")
         }
     }
 
     /**
-     * Re-prepares the (idle) video encoder with the current device
-     * orientation if it differs from what's already baked in, and
-     * reconfigures the capture session to point at the fresh encoder
-     * Surface. A MediaRecorder can't be started twice or have its
-     * orientation hint changed after prepare(), so a fresh instance +
-     * surface is required; doing it here (either right after a clip stops,
-     * mirroring the previous behavior, or as soon as the phone rotates
-     * while idle) hides that cost from the user instead of paying it the
-     * next time they press record.
+     * (Re)prepares the video encoder and reconfigures the capture session to
+     * point at its fresh output Surface. A MediaRecorder can't be started
+     * twice, or have its orientation hint changed, once prepare() has run --
+     * so both "the previous clip just stopped and needs a fresh instance"
+     * (called from stopRecording(), [force]=true since videoRecorder has
+     * already been torn down and MUST be replaced regardless of orientation)
+     * and "the phone rotated while idle and the baked-in orientation is now
+     * stale" (called from setOrientationDegrees(), [force]=false so it's a
+     * no-op when the orientation hasn't actually changed) need the same
+     * fresh-instance-plus-session-reconfigure dance. Doing it here -- right
+     * after a clip stops, or as soon as the phone rotates while idle --
+     * hides that cost from the user instead of paying it the next time they
+     * press record.
      */
-    private fun reprepareVideoRecorderForCurrentOrientationLocked() {
+    private fun reprepareVideoRecorder(force: Boolean, reason: String) {
         if (characteristics == null || cameraDevice == null) return
         val needed = computeCaptureOrientation()
-        if (needed == lastPreparedOrientationDegrees) return
+        if (!force && needed == lastPreparedOrientationDegrees) return
         try {
             val fresh = VaultVideoRecorder(videoSize.width, videoSize.height, pendingQuality, recordAudio = true, cacheDir = context.cacheDir)
             fresh.prepareEncoder(needed)
             videoRecorder?.releaseEncoder()
             videoRecorder = fresh
             lastPreparedOrientationDegrees = needed
-            android.util.Log.d(TAG, "reprepareVideoRecorderForCurrentOrientationLocked: orientation=$needed, reconfiguring session")
+            android.util.Log.d(TAG, "reprepareVideoRecorder($reason): orientation=$needed, reconfiguring session")
             createSessionLocked()
         } catch (e: Exception) {
-            android.util.Log.e(TAG, "reprepareVideoRecorderForCurrentOrientationLocked failed - next recording may have wrong rotation", e)
+            android.util.Log.e(TAG, "reprepareVideoRecorder($reason) failed - next recording may fail to start or have wrong rotation", e)
         }
     }
 
@@ -531,27 +537,15 @@ class VaultCameraSession(
 
     /**
      * A MediaRecorder can't be start()ed again once stopped -- it needs a
-     * fresh prepare(), which means a fresh output Surface. Since Camera2
-     * only accepts targets that were part of the session's surfaces at
-     * createCaptureSession() time, that means reconfiguring the capture
-     * session too. Doing this here, right after a recording finishes
+     * fresh prepare(), which means a fresh output Surface (see
+     * reprepareVideoRecorder()'s doc for why that also means a session
+     * reconfigure). Doing this here, right after a recording finishes
      * (while Dart is still showing its "encrypting..." overlay), hides
      * that cost instead of paying it the next time the user presses
      * record.
      */
     private fun rearmVideoRecorder() {
-        if (characteristics == null || cameraDevice == null) return
-        try {
-            val orientation = computeCaptureOrientation()
-            val fresh = VaultVideoRecorder(videoSize.width, videoSize.height, pendingQuality, recordAudio = true, cacheDir = context.cacheDir)
-            fresh.prepareEncoder(orientation)
-            videoRecorder = fresh
-            lastPreparedOrientationDegrees = orientation
-            android.util.Log.d(TAG, "rearmVideoRecorder: re-prepared, reconfiguring session")
-            createSessionLocked()
-        } catch (e: Exception) {
-            android.util.Log.e(TAG, "rearmVideoRecorder failed - next recording will fail to start", e)
-        }
+        reprepareVideoRecorder(force = true, reason = "post-recording rearm")
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

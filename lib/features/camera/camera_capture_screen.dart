@@ -65,6 +65,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   String? _currentRecordingPath;
 
   StreamSubscription<AccelerometerEvent>? _sensorSubscription;
+  StreamSubscription<Map<String, dynamic>>? _cameraEventSubscription;
   double _iconTurns = 0.0;
 
   @override
@@ -78,8 +79,20 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     _vaultService = CameraVaultService(container: widget.container, targetDirPath: widget.targetDirPath);
     WidgetsBinding.instance.addObserver(this);
 
+    _cameraEventSubscription = _cameraController.events.listen(_handleCameraEvent);
     _initCamera();
     _startSensorListener();
+  }
+
+  void _handleCameraEvent(Map<String, dynamic> event) {
+    if (event['event'] != 'error' || !mounted) return;
+    // The camera device dropped out from under us (another app took it,
+    // a HAL error, thermal shutdown, etc.) -- the preview would otherwise
+    // just sit there frozen with no indication anything went wrong.
+    setState(() {
+      _isInitialized = false;
+      _permissionError = 'Camera disconnected: ${event['message'] ?? 'unknown error'}';
+    });
   }
 
   void _startSensorListener() {
@@ -110,6 +123,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     _timer?.cancel();
     _exposureHideTimer?.cancel();
     _sensorSubscription?.cancel();
+    _cameraEventSubscription?.cancel();
     _cameraController.dispose();
 
     SystemChrome.setPreferredOrientations([
@@ -142,7 +156,16 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     try {
       final hasPerms = await VaultCameraController.hasPermissions();
       if (!hasPerms) {
-        await VaultCameraController.requestPermissions();
+        final granted = await VaultCameraController.requestPermissions();
+        if (!granted) {
+          if (mounted) {
+            setState(() {
+              _isInitialized = false;
+              _permissionError = 'Camera and microphone permissions are required to use the camera.';
+            });
+          }
+          return;
+        }
       }
 
       final info = await _cameraController.open(

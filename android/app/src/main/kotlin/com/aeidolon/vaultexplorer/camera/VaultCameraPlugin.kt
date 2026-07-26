@@ -43,10 +43,6 @@ class VaultCameraPlugin(
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         try {
             when (call.method) {
-                "listLenses" -> {
-                    val lenses = listCameraLenses(cameraManager)
-                    result.success(mapOf("lenses" to lenses.map { it.toMap() }))
-                }
                 "hasPermissions" -> result.success(hasCameraPermissions())
                 "requestPermissions" -> {
                     ActivityCompat.requestPermissions(

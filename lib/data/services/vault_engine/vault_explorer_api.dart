@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -94,6 +95,24 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
 
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;
+
+  // Resolved from 'onCameraPermissionResult', pushed by
+  // MainActivity.onRequestPermissionsResult once the user actually answers
+  // the system permission dialog. requestPermissions() itself only fires
+  // ActivityCompat.requestPermissions() and returns immediately -- without
+  // this, callers had no way to know whether the user granted or denied,
+  // and camera init used to proceed right away as if permission were
+  // already settled.
+  static Completer<bool>? _cameraPermissionCompleter;
+
+  /// Starts waiting for the next 'onCameraPermissionResult' push. Call this
+  /// immediately before triggering the native permission request so no
+  /// event can arrive before something is listening for it.
+  static Future<bool> awaitCameraPermissionResult() {
+    final completer = Completer<bool>();
+    _cameraPermissionCompleter = completer;
+    return completer.future;
+  }
 
 
   static final ListenerRegistry<int> _usbContainerDetachedRegistry =
@@ -233,6 +252,10 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
           );
           _importProgressRegistry.notify(progress);
         }
+      } else if (call.method == 'onCameraPermissionResult') {
+        final granted = call.arguments['granted'] as bool? ?? false;
+        _cameraPermissionCompleter?.complete(granted);
+        _cameraPermissionCompleter = null;
       }
     });
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -47,7 +48,14 @@ class CameraVaultService {
           .where((e) => !e.startsWith('System:'))
           .map((e) => RawEntry.parse(e).name)
           .toSet();
-    } catch (_) {
+    } catch (e) {
+      // Falling back to "treat as empty" is still the right behavior here
+      // (we'd rather offer a name than block saving the photo/video), but
+      // silently swallowing this used to make a real failure -- container
+      // locked, IO error -- indistinguishable from a genuinely empty
+      // directory, which could let the caller pick a name that collides
+      // with something it just couldn't see.
+      debugPrint('CameraVaultService: failed to list "$_normalizedTargetDir", assuming empty: $e');
       return {};
     }
   }

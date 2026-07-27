@@ -121,11 +121,14 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     _cipherId = _initialCipherId;
     _hashId = _initialHashId;
 
-    final isMounted = widget.mountedContainer != null;
-    _settingsLocked = rec != null && !isMounted;
-
+    final recentlyUnlocked = widget.mountedContainer != null &&
+        DateTime.now().difference(widget.mountedContainer!.mountedAt) <
+            const Duration(seconds: 30);
+    _settingsLocked = rec != null && !recentlyUnlocked;
     _initAsync();
   }
+
+  
 
   bool _clearingCache = false;
 

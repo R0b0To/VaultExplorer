@@ -7,14 +7,12 @@ class ChangePasswordScreen extends StatefulWidget {
   final String uri;
   final int initialCipherId;
   final int initialHashId;
-  final List<Map<String, String>> initialKeyfiles;
 
   const ChangePasswordScreen({
     super.key,
     required this.uri,
     required this.initialCipherId,
     required this.initialHashId,
-    this.initialKeyfiles = const [],
   });
 
   @override
@@ -27,13 +25,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _confirmPasswordCtrl = TextEditingController();
   final _oldPimCtrl = TextEditingController();
   final _newPimCtrl = TextEditingController();
-
   final List<KeyfileRef> _oldKeyfiles = [];
   bool _pickingOldKeyfiles = false;
-
   final List<KeyfileRef> _newKeyfiles = [];
   bool _pickingNewKeyfiles = false;
-
   bool _oldObscure = true;
   bool _newObscure = true;
   bool _confirmObscure = true;
@@ -43,9 +38,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.initialKeyfiles.isNotEmpty) {
-      _oldKeyfiles.addAll(widget.initialKeyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
-    }
   }
 
   @override
@@ -110,7 +102,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final oldPassword = _oldPasswordCtrl.text;
     final newPassword = _newPasswordCtrl.text;
     final confirmPassword = _confirmPasswordCtrl.text;
-
     if (newPassword.isEmpty && _newKeyfiles.isEmpty) {
       setState(() => _errorMsg = 'New password or keyfiles are required.');
       return;
@@ -119,15 +110,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       setState(() => _errorMsg = 'New passwords do not match.');
       return;
     }
-
     setState(() {
       _isProcessing = true;
       _errorMsg = null;
     });
-
     final oldKeyfilePaths = _oldKeyfiles.map((k) => k.uri).toList();
     final newKeyfilePaths = _newKeyfiles.map((k) => k.uri).toList();
-
     final success = await vaultExplorerApi.changeContainerPassword(
       uri: widget.uri,
       oldPassword: oldPassword,
@@ -139,7 +127,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       oldKeyfilePaths: oldKeyfilePaths,
       newKeyfilePaths: newKeyfilePaths,
     );
-
     if (mounted) {
       setState(() => _isProcessing = false);
       if (success) {
@@ -268,7 +255,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
@@ -286,7 +272,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         borderSide: BorderSide(color: cs.primary, width: 2),
       ),
     );
-
     final actionArea = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -316,7 +301,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         ),
       ],
     );
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,

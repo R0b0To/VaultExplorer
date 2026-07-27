@@ -762,18 +762,17 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                               );
                             } else {
                               final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ChangePasswordScreen(
-                                    uri: widget.uri,
-                                    initialCipherId:
-                                        widget.existingRecord!.cipherId,
-                                    initialHashId:
-                                        widget.existingRecord!.hashId,
-                                    initialKeyfiles: widget.existingRecord!.keyfiles,
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ChangePasswordScreen(
+                                      uri: widget.uri,
+                                      initialCipherId:
+                                          widget.existingRecord!.cipherId,
+                                      initialHashId:
+                                          widget.existingRecord!.hashId,
+                                    ),
                                   ),
-                                ),
-                              );
+                                );
                               if (result is List<KeyfileRef>) {
                                 setState(() {
                                   keyfiles.clear();

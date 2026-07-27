@@ -332,7 +332,7 @@ class _ListVideoThumb extends StatelessWidget {
             width: double.infinity,
             height: double.infinity,
             cacheHeight: cacheHeight,
-            errorBuilder: (_, __, ___) => _fallbackWidget(),
+            errorBuilder: (_, _, _) => _fallbackWidget(),
           ),
           loadingBuilder: (context) => Container(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,

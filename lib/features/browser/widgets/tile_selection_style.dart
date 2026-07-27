@@ -82,9 +82,9 @@ class FileRowShell extends StatelessWidget {
       FileDetailColumn.type => _getTypeLabel(entry),
     };
     final double width = switch (col) {
-      FileDetailColumn.date => 72,
-      FileDetailColumn.size => 72,
-      FileDetailColumn.type => 56,
+      FileDetailColumn.date => 70,
+      FileDetailColumn.size => 48,
+      FileDetailColumn.type => 46,
     };
     return SizedBox(
       width: width * zoomLevel,
@@ -114,7 +114,7 @@ class FileRowShell extends StatelessWidget {
     final squircleBackground =
         isSelected ? cs.primaryContainer : unselectedIconBackground;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 1, vertical: 2),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
@@ -162,18 +162,18 @@ class FileRowShell extends StatelessWidget {
                     ),
                 ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: HighlightedText(
-                  text: displayName,
-                  query: searchQuery,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleMedium?.copyWith(
-                    fontWeight: TileSelectionStyle.titleWeight(isSelected),
-                    letterSpacing: 0,
-                  ),
-                ),
+              const SizedBox(width: 10),
+                Expanded(
+                    child: HighlightedText(
+                      text: displayName.characters.join('\u200B'), 
+                      query: searchQuery,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: TileSelectionStyle.titleWeight(isSelected),
+                        letterSpacing: 0,
+                      ),
+                    ),
               ),
               if (!isCompact) ...[
                 for (final col in detailColumns) ...[

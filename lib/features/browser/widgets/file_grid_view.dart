@@ -22,14 +22,13 @@ class FileGridView extends StatefulWidget {
   final ThumbnailCacheMode thumbnailCacheMode;
   final ThumbnailQuality thumbnailQuality;
   final bool showFileNames;
+  final int initialColumns;
+  final ValueChanged<int>? onColumnCountChanged;
   final ValueChanged<RawEntry> onDirTap;
   final ValueChanged<RawEntry> onFileTap;
   final ValueChanged<RawEntry> onItemLongPress;
   final ValueChanged<RawEntry>? onFileLongMenu;
   final String? searchQuery;
-
-  /// Full paths (relative to the container root) currently exposed as their
-  /// own document-provider (SAF) root.
   final Set<String> mountedFolderPaths;
 
   const FileGridView({
@@ -43,6 +42,8 @@ class FileGridView extends StatefulWidget {
     required this.thumbnailCacheMode,
     required this.thumbnailQuality,
     this.showFileNames = true,
+    this.initialColumns = 3,
+    this.onColumnCountChanged,
     required this.onDirTap,
     required this.onFileTap,
     required this.onItemLongPress,
@@ -61,12 +62,26 @@ class _FileGridViewState extends State<FileGridView> {
   double _baselineScale = 1.0;
 
   @override
+  void initState() {
+    super.initState();
+    _crossAxisCount = widget.initialColumns;
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final orientation = MediaQuery.of(context).orientation;
     if (_lastOrientation != orientation) {
       _lastOrientation = orientation;
-      _crossAxisCount = orientation == Orientation.landscape ? 5 : 3;
+      _crossAxisCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant FileGridView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialColumns != widget.initialColumns) {
+      _crossAxisCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
     }
   }
 
@@ -115,6 +130,7 @@ class _FileGridViewState extends State<FileGridView> {
           _crossAxisCount--;
           _baselineScale = scale;
         });
+        widget.onColumnCountChanged?.call(_crossAxisCount);
       }
     } else if (factor < 0.75) {
       if (_crossAxisCount < _maxColumns) {
@@ -122,6 +138,7 @@ class _FileGridViewState extends State<FileGridView> {
           _crossAxisCount++;
           _baselineScale = scale;
         });
+        widget.onColumnCountChanged?.call(_crossAxisCount);
       }
     }
   }
@@ -173,7 +190,7 @@ class _FileGridViewState extends State<FileGridView> {
       showFileName: widget.showFileNames,
       onTap: () => widget.onDirTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
-            preview: Center(
+      preview: Center(
         child: Icon(
           isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
           size: _crossAxisCount == 1 ? AppIconSize.hero + 16 : AppIconSize.hero,

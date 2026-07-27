@@ -2276,7 +2276,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
     }
-
     if (_currentItems.isEmpty) {
       return AppEmptyState(
         icon: Icons.folder_open_rounded,
@@ -2287,7 +2286,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         onAction: _atRoot ? null : _navigateUp,
       );
     }
-
     if (_searchQuery.trim().isNotEmpty && dirs.isEmpty && files.isEmpty) {
       return AppEmptyState(
         icon: Icons.search_off_rounded,
@@ -2295,7 +2293,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         message: 'Nothing in this folder matches "${_searchQuery.trim()}".',
       );
     }
-
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     final content = switch (_layoutMode) {
       BrowserLayoutMode.grid => FileGridView(
           container: widget.container,
@@ -2307,6 +2306,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           thumbnailCacheMode: _resolvedThumbnailCacheMode,
           thumbnailQuality: _resolvedThumbnailQuality,
           showFileNames: _toolbarConfig.showGridFileNames,
+          initialColumns: isLandscape
+              ? _toolbarConfig.gridColumnsLandscape
+              : _toolbarConfig.gridColumnsPortrait,
+          onColumnCountChanged: (count) {
+            _toolbarConfig = isLandscape
+                ? _toolbarConfig.copyWith(gridColumnsLandscape: count)
+                : _toolbarConfig.copyWith(gridColumnsPortrait: count);
+            FileManagerToolbarService.instance.save(_toolbarConfig);
+          },
           onDirTap: _handleDirTap,
           onFileTap: _handleFileTap,
           onItemLongPress: _handleItemLongPress,
@@ -2323,13 +2331,22 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           thumbnailCacheMode: _resolvedThumbnailCacheMode,
           thumbnailQuality: _resolvedThumbnailQuality,
           showFileNames: _toolbarConfig.showGridFileNames,
+          initialColumns: isLandscape
+              ? _toolbarConfig.masonryColumnsLandscape
+              : _toolbarConfig.masonryColumnsPortrait,
+          onColumnCountChanged: (count) {
+            _toolbarConfig = isLandscape
+                ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
+                : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
+            FileManagerToolbarService.instance.save(_toolbarConfig);
+          },
           onDirTap: _handleDirTap,
           onFileTap: _handleFileTap,
           onItemLongPress: _handleItemLongPress,
           searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
           mountedFolderPaths: _mountedDocProviderFolders,
         ),
-BrowserLayoutMode.list ||
+      BrowserLayoutMode.list ||
       BrowserLayoutMode.compact =>
         FileListView(
           container: widget.container,
@@ -2355,19 +2372,15 @@ BrowserLayoutMode.list ||
           isFolderMounted: _isFolderMounted,
         ),
     };
-
     final refreshable = RefreshIndicator(
       onRefresh: () => _loadDirectoryContents(_currentDirPath),
       child: content,
     );
-
     if (!_isListingTruncated) return refreshable;
-
     return Column(
       children: [
         const TruncatedBanner(),
         Expanded(child: refreshable),
       ],
     );
-  }
-}
+  }}

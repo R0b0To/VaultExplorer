@@ -39,6 +39,10 @@ class FileManagerToolbarConfig {
   final bool showGridFileNames;
   final bool showListThumbnails;
   final double listZoomLevel;
+  final int gridColumnsPortrait;
+  final int gridColumnsLandscape;
+  final int masonryColumnsPortrait;
+  final int masonryColumnsLandscape;
 
   const FileManagerToolbarConfig({
     required this.order,
@@ -55,6 +59,10 @@ class FileManagerToolbarConfig {
     this.showGridFileNames = true,
     this.showListThumbnails = true,
     this.listZoomLevel = 1.0,
+    this.gridColumnsPortrait = 3,
+    this.gridColumnsLandscape = 5,
+    this.masonryColumnsPortrait = 2,
+    this.masonryColumnsLandscape = 4,
   });
 
   factory FileManagerToolbarConfig.defaults() => const FileManagerToolbarConfig(
@@ -78,6 +86,10 @@ class FileManagerToolbarConfig {
         showGridFileNames: true,
         showListThumbnails: true,
         listZoomLevel: 1.0,
+        gridColumnsPortrait: 3,
+        gridColumnsLandscape: 5,
+        masonryColumnsPortrait: 2,
+        masonryColumnsLandscape: 4,
       );
 
   List<FileManagerAction> get visible =>
@@ -98,6 +110,10 @@ class FileManagerToolbarConfig {
     bool? showGridFileNames,
     bool? showListThumbnails,
     double? listZoomLevel,
+    int? gridColumnsPortrait,
+    int? gridColumnsLandscape,
+    int? masonryColumnsPortrait,
+    int? masonryColumnsLandscape,
   }) =>
       FileManagerToolbarConfig(
         order: order ?? this.order,
@@ -110,6 +126,13 @@ class FileManagerToolbarConfig {
         showGridFileNames: showGridFileNames ?? this.showGridFileNames,
         showListThumbnails: showListThumbnails ?? this.showListThumbnails,
         listZoomLevel: listZoomLevel ?? this.listZoomLevel,
+        gridColumnsPortrait: gridColumnsPortrait ?? this.gridColumnsPortrait,
+        gridColumnsLandscape:
+            gridColumnsLandscape ?? this.gridColumnsLandscape,
+        masonryColumnsPortrait:
+            masonryColumnsPortrait ?? this.masonryColumnsPortrait,
+        masonryColumnsLandscape:
+            masonryColumnsLandscape ?? this.masonryColumnsLandscape,
       );
 
   Map<String, dynamic> toJson() => {
@@ -125,6 +148,10 @@ class FileManagerToolbarConfig {
         'showGridFileNames': showGridFileNames,
         'showListThumbnails': showListThumbnails,
         'listZoomLevel': listZoomLevel,
+        'gridColumnsPortrait': gridColumnsPortrait,
+        'gridColumnsLandscape': gridColumnsLandscape,
+        'masonryColumnsPortrait': masonryColumnsPortrait,
+        'masonryColumnsLandscape': masonryColumnsLandscape,
       };
 
   factory FileManagerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -170,6 +197,12 @@ class FileManagerToolbarConfig {
       showGridFileNames: j['showGridFileNames'] as bool? ?? true,
       showListThumbnails: j['showListThumbnails'] as bool? ?? true,
       listZoomLevel: (j['listZoomLevel'] as num?)?.toDouble() ?? 1.0,
+      gridColumnsPortrait: (j['gridColumnsPortrait'] as num?)?.toInt() ?? 3,
+      gridColumnsLandscape: (j['gridColumnsLandscape'] as num?)?.toInt() ?? 5,
+      masonryColumnsPortrait:
+          (j['masonryColumnsPortrait'] as num?)?.toInt() ?? 2,
+      masonryColumnsLandscape:
+          (j['masonryColumnsLandscape'] as num?)?.toInt() ?? 4,
     );
   }
 }

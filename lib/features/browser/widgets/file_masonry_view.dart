@@ -25,14 +25,13 @@ class FileMasonryView extends StatefulWidget {
   final ThumbnailCacheMode thumbnailCacheMode;
   final ThumbnailQuality thumbnailQuality;
   final bool showFileNames;
+  final int initialColumns;
+  final ValueChanged<int>? onColumnCountChanged;
   final ValueChanged<RawEntry> onDirTap;
   final ValueChanged<RawEntry> onFileTap;
   final ValueChanged<RawEntry> onItemLongPress;
   final ValueChanged<RawEntry>? onFileLongMenu;
   final String? searchQuery;
-
-  /// Full paths (relative to the container root) currently exposed as their
-  /// own document-provider (SAF) root.
   final Set<String> mountedFolderPaths;
 
   const FileMasonryView({
@@ -46,6 +45,8 @@ class FileMasonryView extends StatefulWidget {
     required this.thumbnailCacheMode,
     required this.thumbnailQuality,
     this.showFileNames = true,
+    this.initialColumns = 2,
+    this.onColumnCountChanged,
     required this.onDirTap,
     required this.onFileTap,
     required this.onItemLongPress,
@@ -64,12 +65,26 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   double _baselineScale = 1.0;
 
   @override
+  void initState() {
+    super.initState();
+    _columnCount = widget.initialColumns;
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final orientation = MediaQuery.of(context).orientation;
     if (_lastOrientation != orientation) {
       _lastOrientation = orientation;
-      _columnCount = orientation == Orientation.landscape ? 4 : 2;
+      _columnCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant FileMasonryView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialColumns != widget.initialColumns) {
+      _columnCount = widget.initialColumns.clamp(_minColumns, _maxColumns);
     }
   }
 
@@ -92,13 +107,13 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   void _handleScaleUpdate(ScaleUpdateDetails details) {
     final scale = details.scale;
     final factor = scale / _baselineScale;
-
     if (factor > 1.35) {
       if (_columnCount > _minColumns) {
         setState(() {
           _columnCount--;
           _baselineScale = scale;
         });
+        widget.onColumnCountChanged?.call(_columnCount);
       }
     } else if (factor < 0.75) {
       if (_columnCount < _maxColumns) {
@@ -106,6 +121,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
           _columnCount++;
           _baselineScale = scale;
         });
+        widget.onColumnCountChanged?.call(_columnCount);
       }
     }
   }
@@ -128,8 +144,6 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     final ratio = width / height;
     if (before == ratio) return;
     MediaAspectRatioCache.put(widget.container, fullPath, width, height);
-
-    // Update state safely after the build phase finishes to avoid "setState during build" errors
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() {});
@@ -142,11 +156,9 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     final dirEntries = widget.dirs;
     final fileEntries = widget.files;
     final total = dirEntries.length + fileEntries.length;
-
     if (total == 0) {
       return const SizedBox.shrink();
     }
-
     return GestureDetector(
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
@@ -170,11 +182,9 @@ class _FileMasonryViewState extends State<FileMasonryView> {
           final fullPath = widget.currentDirPath.isEmpty
               ? entry.name
               : '${widget.currentDirPath}/${entry.name}';
-
           final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
           final ratio = _aspectRatioFor(entry, fullPath,
               hasVisualPreview: hasVisualPreview);
-
           return AspectRatio(
             key: ValueKey(
                 '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}'),
@@ -199,7 +209,6 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     final isSelected = widget.selectedItems.contains(entry);
     final cs = Theme.of(context).colorScheme;
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
-
     return _MasonryCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -221,12 +230,10 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   Widget _buildFileCell(BuildContext context, RawEntry entry, String fullPath) {
     final cleanName = entry.name;
     final isSelected = widget.selectedItems.contains(entry);
-
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final vaultIcon = vaultIconForExt(ext);
     final vaultColor = vaultColorForExt(ext);
-
     if (vaultIcon != null) {
       final nameParts = cleanName.split('.');
       if (nameParts.length > 1) {
@@ -234,12 +241,9 @@ class _FileMasonryViewState extends State<FileMasonryView> {
         displayName = nameParts.join('.');
       }
     }
-
     final isImg = MediaViewerConstants.isImage(cleanName);
     final isVid = MediaViewerConstants.isVideo(cleanName);
-
     Widget previewWidget;
-
     if (vaultIcon != null) {
       previewWidget = Center(
         child: Icon(vaultIcon, size: AppIconSize.feature, color: vaultColor),
@@ -269,7 +273,6 @@ class _FileMasonryViewState extends State<FileMasonryView> {
         ),
       );
     }
-
     return _MasonryCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -312,7 +315,6 @@ class _MasonryCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -385,9 +387,7 @@ class _MasonryCell extends StatelessWidget {
 class _CheckBadge extends StatelessWidget {
   final Color color;
   final Color onColor;
-
   const _CheckBadge({required this.color, required this.onColor});
-
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(4),
@@ -454,7 +454,6 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
         return bytes;
       }
     }
-
     final thumb = await vaultExplorerApi.getImageThumbnailWithSize(
       container,
       path,
@@ -462,7 +461,6 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       quality: quality.jpegQuality,
     );
     final thumbBytes = thumb?.bytes;
-
     if (thumbBytes == null || thumbBytes.isEmpty) {
       final size = await vaultExplorerApi.getFileSize(container, path);
       if (size <= 0) throw Exception('Empty file: $path');
@@ -479,13 +477,10 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       }
       return raw;
     }
-
     onSizeKnown(thumb!.width, thumb.height);
-
     ThumbnailCacheService.putInMemory(
       container, path, thumbBytes, quality, thumb.width, thumb.height,
     );
-
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(
@@ -505,7 +500,6 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(container, filePath, quality);
     final syncBytes = syncEntry?.$1;
     if (syncEntry != null && syncEntry.$1.isNotEmpty) {
@@ -516,7 +510,6 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
         _checkAndReportSizeFromBytes(container, filePath, bytes, onSizeKnown);
       }
     }
-
     return AsyncThumbnail(
       key: ValueKey('img:$filePath'),
       container: container,
@@ -616,7 +609,6 @@ class _VideoMasonryThumb extends StatelessWidget {
         return bytes;
       }
     }
-
     final thumb = await vaultExplorerApi.getVideoThumbnailWithSize(
       container,
       path,
@@ -624,15 +616,11 @@ class _VideoMasonryThumb extends StatelessWidget {
       targetSize: quality.scaledSize(180),
     );
     final data = thumb?.bytes;
-
     if (data == null || data.isEmpty) return Uint8List(0);
-
     onSizeKnown(thumb!.width, thumb.height);
-
     ThumbnailCacheService.putInMemory(
       container, path, data, quality, thumb.width, thumb.height,
     );
-
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(
@@ -652,7 +640,6 @@ class _VideoMasonryThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     final syncEntry = ThumbnailCacheService.getWithSizeFromMemory(container, filePath, quality);
     final syncBytes = syncEntry?.$1;
     if (syncEntry != null && syncEntry.$1.isNotEmpty) {
@@ -663,7 +650,6 @@ class _VideoMasonryThumb extends StatelessWidget {
         _checkAndReportSizeFromBytes(container, filePath, bytes, onSizeKnown);
       }
     }
-
     return Stack(
       fit: StackFit.expand,
       children: [

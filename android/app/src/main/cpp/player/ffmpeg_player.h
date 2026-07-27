@@ -65,11 +65,14 @@ private:
     static constexpr double kAvSyncMinDiffSec = 0.005;         // below this, don't bother sleeping
     static constexpr double kAvSyncMaxDiffSec = 1.0;           // above this, audio_clock is untrusted
     static constexpr double kAvSyncFrameDropThresholdSec = 0.3; // beyond this far behind, drop the frame instead of burst-rendering it
+    static constexpr double kHurryUpExitDiffSec = 0.05;        // once caught up to within this, leave hurry-up decode mode
+    static constexpr size_t kQueueBackstopMultiplier = 5;       // hard per-queue ceiling (as a multiple of kMaxQueued*Packets) so a genuinely stalled stream can't grow unbounded while the *other* stream is still under its own cap -- see the admission-control comment in demuxThreadFunc
     static constexpr int kFallbackFrameDelayMs = 33;           // used when avg_frame_rate is unknown
     static constexpr double kFpsWindowSec = 1.0;               // measured_fps rolling window
     static constexpr int kOutputSampleRate = 48000;            // fixed oboe/swr output rate
     static constexpr int kOutputChannels = 2;                  // fixed oboe/swr output channel count
     static constexpr size_t kMaxBufferedAudioFrames = 24000;   // 0.5s backpressure limit
+    static constexpr int64_t kAudioStreamStopTimeoutNanos = 500LL * 1000 * 1000; // 500ms: how long stop() waits for the callback thread to actually finish before close()
 
     void demuxThreadFunc();
     void videoDecodeThreadFunc();
@@ -262,6 +265,19 @@ private:
     // Only ever touched from this instance's own video_thread, so plain
     // (non-atomic) is correct.
     int frame_notify_count = 0;
+
+    // "Hurry-up" decode state: only ever touched from video_thread, so
+    // plain (non-atomic) is correct -- see videoDecodeThreadFunc's A/V-sync
+    // block for where this is set/cleared. When the video is severely
+    // behind (the same condition that triggers the existing should_render
+    // = false frame-drop), decode itself -- not just presentation -- is the, 
+    // bottleneck on heavy content (e.g. 4K VP9), so on top of not
+    // presenting the frame this also asks the decoder to skip decoding
+    // non-reference frames entirely via AVDiscard, the same "hurry up"
+    // technique ffplay uses when falling behind. Cleared once caught back
+    // up (or on pause/seek) so steady-state playback always decodes at
+    // full quality.
+    bool hurry_up_active = false;
 
     SwsContext* sws_ctx = nullptr;
 };

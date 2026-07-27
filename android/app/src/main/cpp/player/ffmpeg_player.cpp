@@ -265,8 +265,42 @@ void FFmpegPlayer::stop() {
     is_playing = false;
 
     // 1. Stop audio callbacks BEFORE deleting resources to prevent SIGSEGV
+    //
+    // requestStop() is asynchronous -- it schedules the stop but does not
+    // itself guarantee onAudioReady() won't be invoked again before the
+    // underlying stream actually finishes stopping. On this app's "Legacy"
+    // AAudio path (used on devices/OS builds without MMAP support -- see
+    // the "got Legacy" log line), close() has been observed to return while
+    // the internal AudioTrack callback thread is still mid-callback, which
+    // then races the close/free below and crashes inside
+    // oboe::AudioStreamAAudio::callOnAudioReady with a SIGSEGV -- this is a
+    // known class of Oboe/AAudio teardown race (google/oboe#953, #1484),
+    // not something unique to this app's code. waitForStateChange() blocks
+    // (bounded by kAudioStreamStopTimeoutNanos) until AAudio itself confirms
+    // the stream has actually reached Stopped before close() runs, closing
+    // the race window close()/stop() alone left open. This is a mitigation,
+    // not an absolute guarantee -- some OEM audio HALs have their own races
+    // further down the stack that no amount of waiting here can fix.
     if (audio_stream) {
-        audio_stream->stop();
+        oboe::StreamState currentState = audio_stream->getState();
+        audio_stream->requestStop();
+        oboe::StreamState nextState = currentState;
+        oboe::Result waitResult = oboe::Result::OK;
+        // A loop, not one waitForStateChange() call: requestStop() usually
+        // passes through an intermediate Stopping state on the way to
+        // Stopped, and waitForStateChange() only guarantees the state is
+        // *different* from what's passed in -- a single call can return as
+        // soon as Started -> Stopping happens, before the stream has
+        // actually stopped. Bounded by kAudioStreamStopTimeoutNanos per
+        // iteration; a timeout (or the stream going Closed/Disconnected
+        // instead) breaks out rather than blocking indefinitely.
+        while (waitResult == oboe::Result::OK &&
+               nextState != oboe::StreamState::Stopped &&
+               nextState != oboe::StreamState::Closed &&
+               nextState != oboe::StreamState::Disconnected) {
+            waitResult = audio_stream->waitForStateChange(currentState, &nextState, kAudioStreamStopTimeoutNanos);
+            currentState = nextState;
+        }
         audio_stream->close();
         audio_stream.reset();
     }
@@ -583,6 +617,24 @@ void FFmpegPlayer::demuxThreadFunc() {
                 video_codec_ctx = avcodec_alloc_context3(codec);
             }
             avcodec_parameters_to_context(video_codec_ctx, codecpar);
+
+            // Explicitly request frame+slice multi-threaded decode. This
+            // was previously left at whatever avcodec_alloc_context3()
+            // zero-initializes (thread_count = 0, "auto"), which some
+            // vendored libavcodec builds interpret conservatively -- for
+            // heavy content (e.g. 3840x2160 VP9) single-threaded decode
+            // alone can be slower than real-time, which starves the whole
+            // pipeline (see the admission-control comment below) and shows
+            // up as the video freezing/slowing down rather than just
+            // dropping the occasional frame. hardware_concurrency() is 0 on
+            // a small number of platforms if it can't detect core count;
+            // fall back to 4 rather than passing 0 through (0 here means
+            // "single-threaded", not "auto", once thread_count is set
+            // explicitly).
+            unsigned hw_concurrency = std::thread::hardware_concurrency();
+            video_codec_ctx->thread_count = hw_concurrency > 0 ? (int)hw_concurrency : 4;
+            video_codec_ctx->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+
             avcodec_open2(video_codec_ctx, codec, NULL);
             
             // Set window geometry on the native window so ANativeWindow_lock works properly
@@ -650,32 +702,39 @@ void FFmpegPlayer::demuxThreadFunc() {
             continue;
         }
 
-        // Pause demuxing as soon as EITHER queue reaches its target depth.
+        // Pause demuxing once BOTH queues have reached their target depth,
+        // with a hard per-queue backstop ceiling (kQueueBackstopMultiplier x
+        // the target) so a genuinely stalled stream still can't grow
+        // unbounded.
         //
-        // This used to require BOTH queues to be full before pausing (with a
-        // 200-packet hard ceiling as a backstop), specifically to stop audio
-        // from starving while video was full. But that condition has no
-        // upper bound on a single queue as long as the other stays under its
-        // target: if video decode/present is ever the slower side (a heavy
-        // frame, a slow ANativeWindow_lock waiting on the compositor,
-        // thermal throttling), video_queue could grow all the way to the
-        // 200-packet ceiling -- several seconds of backlog -- while
-        // audio_queue stayed small, which is exactly the asymmetric-buffer
-        // skew this was supposed to prevent, just on the other queue.
-        //
-        // The reason audio could starve under a simple either-full condition
-        // was that video_thread paced itself 1:1 with real time even when
-        // badly behind, so a full video_queue could stay full for a long
-        // stretch and block new audio packets from being read too.
-        // videoDecodeThreadFunc now drops frames instead of pacing through a
-        // large backlog (see kAvSyncFrameDropThresholdSec there), so
-        // video_queue drains quickly even when video is struggling, and an
-        // either-full condition is safe again without reintroducing the
-        // starvation the both-full check was patching over.
+        // An earlier version of this paused as soon as EITHER queue reached
+        // its target, specifically to stop video_queue from growing
+        // unbounded while video_thread paced itself 1:1 with real time even
+        // when badly behind. videoDecodeThreadFunc no longer does that -- it
+        // drops frames instead of pacing through a large backlog (see
+        // kAvSyncFrameDropThresholdSec there) -- but the either-full
+        // condition has a different failure mode on CPU-bound heavy content
+        // (e.g. 3840x2160 VP9): if *decoding* itself (not presentation
+        // pacing) can't keep up with real time, video_queue sits at its
+        // target continuously, since it refills exactly as fast as the slow
+        // decoder drains it. Pausing on that alone blocks new audio packets
+        // from being read too, even though audio_queue has room and
+        // audio_thread is decoding cheaply and quickly -- audio_buffer runs
+        // dry waiting on packets that demuxing refuses to fetch, which is
+        // heard as stuttering/silence and, combined with the video itself
+        // barely advancing, presents as the whole player freezing. Requiring
+        // both queues to be full before pausing lets audio keep being fed
+        // independently of how slowly video is being consumed; the backstop
+        // ceiling below is what still bounds video_queue's own growth in
+        // that situation, rather than the audio queue's fullness.
+        size_t video_backstop = kMaxQueuedVideoPackets * kQueueBackstopMultiplier;
+        size_t audio_backstop = kMaxQueuedAudioPackets * kQueueBackstopMultiplier;
         bool video_full = (video_stream_idx >= 0) && (video_queue.size() > kMaxQueuedVideoPackets);
         bool audio_full = (audio_stream_idx >= 0) && (audio_queue.size() > kMaxQueuedAudioPackets);
+        bool video_at_backstop = (video_stream_idx >= 0) && (video_queue.size() > video_backstop);
+        bool audio_at_backstop = (audio_stream_idx >= 0) && (audio_queue.size() > audio_backstop);
 
-        if (video_full || audio_full) {
+        if ((video_full && audio_full) || video_at_backstop || audio_at_backstop) {
             std::this_thread::sleep_for(std::chrono::milliseconds(kIdlePollIntervalMs));
             continue;
         }
@@ -803,6 +862,16 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
             fps_window_start_sec = av_gettime_relative() / 1000000.0;
             fps_window_frame_count = 0;
             have_deadline = false;
+            // A seek invalidates any hurry-up decision made about the
+            // pre-seek position just as much as it invalidates the pacing
+            // deadline above -- start the new position at full decode
+            // quality and let the sync block below re-enter hurry-up on its
+            // own if the new position turns out to be behind too.
+            if (hurry_up_active) {
+                std::lock_guard<std::mutex> codecLock(video_codec_mutex);
+                if (video_codec_ctx) video_codec_ctx->skip_frame = AVDISCARD_DEFAULT;
+                hurry_up_active = false;
+            }
         }
 
         // Paused: don't pop and decode any *new* packet. Without this check,
@@ -816,6 +885,11 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
         // for the packet that was already in flight when pause() landed.
         if (!is_playing.load()) {
             have_deadline = false;
+            if (hurry_up_active) {
+                std::lock_guard<std::mutex> codecLock(video_codec_mutex);
+                if (video_codec_ctx) video_codec_ctx->skip_frame = AVDISCARD_DEFAULT;
+                hurry_up_active = false;
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(kIdlePollIntervalMs));
             continue;
         }
@@ -905,6 +979,20 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                     double delay = default_delay;
 
                     double diff = pts - audio_clock;
+
+                    // Leave hurry-up decode mode as soon as we're back
+                    // within kHurryUpExitDiffSec, regardless of which
+                    // branch below diff ends up in -- e.g. after a severe
+                    // backlog starts clearing, diff typically passes back
+                    // through the "moderately behind" branches on its way
+                    // to caught-up, and hurry-up needs to end there too,
+                    // not only once diff swings all the way to "ahead".
+                    if (hurry_up_active && diff > -kHurryUpExitDiffSec) {
+                        std::lock_guard<std::mutex> codecLock(video_codec_mutex);
+                        if (video_codec_ctx) video_codec_ctx->skip_frame = AVDISCARD_DEFAULT;
+                        hurry_up_active = false;
+                    }
+
                     if (diff > kAvSyncMinDiffSec && diff < kAvSyncMaxDiffSec) {
                         // Video is ahead: extend frame delay by at most +20%
                         double max_extra = default_delay * 0.2;
@@ -925,6 +1013,21 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                         // actually shown sped up.
                         should_render = false;
                         delay = 0.0;
+
+                        // On top of not presenting: if we're this far
+                        // behind, decoding itself may be the bottleneck
+                        // (heavy content like 4K VP9 can decode slower than
+                        // real time), not just presentation pacing -- so
+                        // also ask the decoder to skip non-reference frames
+                        // entirely (the same "hurry up" ffplay uses) to cut
+                        // decode cost while catching up. Skipped frames
+                        // never reach avcodec_receive_frame at all, so
+                        // there's nothing further to drop for them.
+                        if (!hurry_up_active) {
+                            std::lock_guard<std::mutex> codecLock(video_codec_mutex);
+                            if (video_codec_ctx) video_codec_ctx->skip_frame = AVDISCARD_NONREF;
+                            hurry_up_active = true;
+                        }
                     } else if (diff < -0.100) {
                         // Video is behind (>100ms but under the drop
                         // threshold): catch up by presenting immediately
@@ -943,6 +1046,15 @@ void FFmpegPlayer::videoDecodeThreadFunc() {
                 } else {
                     double fps = av_q2d(format_ctx->streams[video_stream_idx]->avg_frame_rate);
                     sleepMs = (fps > 0) ? (int)(1000.0 / fps / playback_speed) : kFallbackFrameDelayMs;
+                    // No audio_clock to compare against right now (no audio
+                    // stream, or it's no longer trustworthy at EOF) -- there's
+                    // nothing to "catch up" to, so don't leave decode stuck
+                    // skipping non-reference frames.
+                    if (hurry_up_active) {
+                        std::lock_guard<std::mutex> codecLock(video_codec_mutex);
+                        if (video_codec_ctx) video_codec_ctx->skip_frame = AVDISCARD_DEFAULT;
+                        hurry_up_active = false;
+                    }
                 }
 
                 if (!should_render) {

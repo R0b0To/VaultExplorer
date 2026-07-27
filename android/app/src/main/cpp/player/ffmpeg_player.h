@@ -80,7 +80,18 @@ private:
     static int readPacketCallback(void* opaque, uint8_t* buf, int buf_size);
     static int64_t seekCallback(void* opaque, int64_t offset, int whence);
 
-    void notifyEvent(const char* eventName, double positionMs = 0, double durationMs = 0, int width = 0, int height = 0, const char* errorMsg = nullptr);
+    void notifyEvent(const char* eventName, double positionMs = 0, double durationMs = 0, int width = 0, int height = 0, const char* errorMsg = nullptr, int rotationDegrees = -1);
+
+    // Shared by notifyEvent()'s "playing" call (so rotation rides along on
+    // the same event that already reliably delivers width/height, instead
+    // of requiring a second, independent fetch) and getDiagnosticsSnapshot()
+    // (for the debug overlay, kept as a fallback/cross-check). Reads the MP4
+    // "tkhd" rotation matrix straight off the AVStream that's actually being
+    // decoded -- see the .cpp definition for why this replaced a
+    // MediaMetadataRetriever-based read through the app's custom content://
+    // provider. Returns degrees clockwise in [0, 360), or -1 if the stream
+    // has no display-matrix side data (i.e. no rotation).
+    static int detectRotationDegrees(AVFormatContext* fmt, int videoStreamIdx);
     JNIEnv* getJniEnv();
 
     // java.util.HashMap/Double/Integer/Long and the plugin's

@@ -14,6 +14,13 @@ class NativeFFmpegValue {
   final Duration position;
   final Duration duration;
   final Size size;
+  // Degrees clockwise needed to display the frame correctly (0/90/180/270),
+  // read by native straight off the file's "tkhd" rotation matrix and sent
+  // as part of the same "playing" event that already reliably delivers
+  // width/height -- see ffmpeg_player.cpp's detectRotationDegrees() for why
+  // this replaced a separate, independent MediaMetadataRetriever fetch.
+  // Null until the first "playing" event with it arrives.
+  final int? rotationDegrees;
 
   const NativeFFmpegValue({
     this.isInitialized = false,
@@ -23,6 +30,7 @@ class NativeFFmpegValue {
     this.position = Duration.zero,
     this.duration = Duration.zero,
     this.size = Size.zero,
+    this.rotationDegrees,
   });
 
   double get aspectRatio {
@@ -39,6 +47,7 @@ class NativeFFmpegValue {
     Duration? position,
     Duration? duration,
     Size? size,
+    int? rotationDegrees,
   }) {
     return NativeFFmpegValue(
       isInitialized: isInitialized ?? this.isInitialized,
@@ -48,6 +57,7 @@ class NativeFFmpegValue {
       position: position ?? this.position,
       duration: duration ?? this.duration,
       size: size ?? this.size,
+      rotationDegrees: rotationDegrees ?? this.rotationDegrees,
     );
   }
 }
@@ -171,11 +181,13 @@ class NativeFFmpegController extends ValueNotifier<NativeFFmpegValue> {
         final w = (map['width'] as num?)?.toDouble();
         final h = (map['height'] as num?)?.toDouble();
         final durMs = (map['durationMs'] as num?)?.toInt();
+        final rotation = (map['rotationDegrees'] as num?)?.toInt();
         value = value.copyWith(
           isInitialized: true,
           isPlaying: true,
           size: (w != null && h != null && w > 0 && h > 0) ? Size(w, h) : value.size,
           duration: (durMs != null && durMs > 0) ? Duration(milliseconds: durMs) : value.duration,
+          rotationDegrees: rotation,
         );
         _resetExtrapolationAnchor();
         break;

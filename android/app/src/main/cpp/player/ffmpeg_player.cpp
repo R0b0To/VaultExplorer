@@ -95,7 +95,39 @@ JNIEnv* FFmpegPlayer::getJniEnv() {
     return env;
 }
 
-void FFmpegPlayer::notifyEvent(const char* eventName, double positionMs, double durationMs, int width, int height, const char* errorMsg) {
+// AVCodecParameters::coded_side_data is the current (non-deprecated) home
+// for per-stream side data as of the FFmpeg version this project vendors --
+// av_stream_get_side_data(), the older AVStream-level accessor, was removed
+// from it entirely (see git history for that build error). This reads the
+// display transformation matrix MOV/MP4 muxers store there for a rotated
+// "tkhd" -- the exact same rotation Android's MediaRecorder writes via
+// setOrientationHint() -- directly off the AVStream actively driving
+// playback, rather than through a second, independent
+// MediaMetadataRetriever pass over the same content:// URI (which is what
+// this used to depend on, and is a much less reliable path: it goes through
+// the app's custom content provider a second time, with its own seek/auth
+// behavior, instead of the file descriptor this player already has open
+// and is successfully decoding from).
+int FFmpegPlayer::detectRotationDegrees(AVFormatContext* fmt, int videoStreamIdx) {
+    if (!fmt || videoStreamIdx < 0 || videoStreamIdx >= (int)fmt->nb_streams) return -1;
+    const AVCodecParameters* par = fmt->streams[videoStreamIdx]->codecpar;
+    const int32_t* display_matrix = nullptr;
+    for (int sd = 0; sd < par->nb_coded_side_data; sd++) {
+        if (par->coded_side_data[sd].type == AV_PKT_DATA_DISPLAYMATRIX) {
+            display_matrix = reinterpret_cast<const int32_t*>(par->coded_side_data[sd].data);
+            break;
+        }
+    }
+    if (!display_matrix) return -1;
+    // av_display_rotation_get() returns degrees counterclockwise; Android's
+    // rotation convention (and this app's RotatedBox usage) is clockwise
+    // degrees needed to display the frame correctly, hence the negation.
+    double ccwDegrees = av_display_rotation_get(display_matrix);
+    if (std::isnan(ccwDegrees)) return -1;
+    return ((int)std::lround(-ccwDegrees) % 360 + 360) % 360;
+}
+
+void FFmpegPlayer::notifyEvent(const char* eventName, double positionMs, double durationMs, int width, int height, const char* errorMsg, int rotationDegrees) {
     JNIEnv* env = getJniEnv();
     if (!env || !plugin_instance_ref) return;
 
@@ -150,6 +182,14 @@ void FFmpegPlayer::notifyEvent(const char* eventName, double positionMs, double 
         env->CallObjectMethod(map, hashmap_put, errKey, errVal);
         env->DeleteLocalRef(errKey);
         env->DeleteLocalRef(errVal);
+    }
+
+    if (rotationDegrees >= 0) {
+        jstring rotKey = env->NewStringUTF("rotationDegrees");
+        jobject rotVal = env->NewObject(integer_class, integer_init, rotationDegrees);
+        env->CallObjectMethod(map, hashmap_put, rotKey, rotVal);
+        env->DeleteLocalRef(rotKey);
+        env->DeleteLocalRef(rotVal);
     }
 
     env->CallVoidMethod(plugin_instance_ref, on_event_method, map);
@@ -478,43 +518,13 @@ jobject FFmpegPlayer::getDiagnosticsSnapshot(JNIEnv* env) {
                 // MP4 (and similar) muxers store rotation as a display
                 // transformation matrix in the stream's side data -- the
                 // same "tkhd" rotation Android's MediaRecorder writes via
-                // setOrientationHint(), and what
-                // MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION reads
-                // on the Kotlin fallback path (see FFmpegPlayerEngine's
-                // collectNativeOnlyGaps/collectFallbackDiagnostics). Reading
-                // it here, straight off the AVStream that's already open
-                // and actively driving playback, doesn't depend on a
-                // second, independent MediaMetadataRetriever pass
-                // succeeding against whatever custom content:// provider
-                // fed this player its file descriptor in the first place --
-                // and per this function's own merge-precedence doc, this
-                // value wins over the Kotlin fallback's whenever both are
-                // present.
-                //
-                // av_stream_get_side_data() (the older AVStream-level
-                // accessor) was removed from this vendored FFmpeg build --
-                // side data now lives on AVCodecParameters directly, so
-                // it's read straight from there instead.
-                const AVCodecParameters* video_par = format_ctx->streams[video_stream_idx]->codecpar;
-                const int32_t* display_matrix = nullptr;
-                for (int sd = 0; sd < video_par->nb_coded_side_data; sd++) {
-                    if (video_par->coded_side_data[sd].type == AV_PKT_DATA_DISPLAYMATRIX) {
-                        display_matrix = reinterpret_cast<const int32_t*>(video_par->coded_side_data[sd].data);
-                        break;
-                    }
-                }
-                if (display_matrix) {
-                    // av_display_rotation_get() returns degrees
-                    // counterclockwise; Android's rotation convention (and
-                    // this app's RotatedBox usage) is clockwise degrees
-                    // needed to display the frame correctly, hence the
-                    // negation.
-                    double ccwDegrees = av_display_rotation_get(display_matrix);
-                    if (!std::isnan(ccwDegrees)) {
-                        int rotation = ((int)std::lround(-ccwDegrees) % 360 + 360) % 360;
-                        putInt("rotationDegrees", rotation);
-                    }
-                }
+                // setOrientationHint(). See detectRotationDegrees()'s doc
+                // for why this (and the "playing" event, which is the path
+                // actually driving playback) reads it straight from here
+                // rather than through a second, independent
+                // MediaMetadataRetriever pass.
+                int rotation = detectRotationDegrees(format_ctx, video_stream_idx);
+                if (rotation >= 0) putInt("rotationDegrees", rotation);
             }
 
             if (audio_stream_idx >= 0 && audio_codec_ctx) {
@@ -581,7 +591,8 @@ void FFmpegPlayer::demuxThreadFunc() {
             }
 
             video_thread = std::thread(&FFmpegPlayer::videoDecodeThreadFunc, this);
-            notifyEvent("playing", 0, (double)format_ctx->duration / AV_TIME_BASE * 1000, codecpar->width, codecpar->height);
+            notifyEvent("playing", 0, (double)format_ctx->duration / AV_TIME_BASE * 1000, codecpar->width, codecpar->height,
+                        nullptr, detectRotationDegrees(format_ctx, video_stream_idx));
         }
     }
     

@@ -62,12 +62,14 @@ class MediaPlayerWidget extends StatefulWidget {
   final double playbackSpeed;
   final int rotationQuarterTurns;
   // Called at most once per file, the first time this video's actual
-  // embedded rotation is known (from cache or freshly read via
-  // getDiagnostics()) -- see MediaRotationCache's doc for why this is
-  // needed at all: nothing else auto-applies it, so without this callback
-  // rotationQuarterTurns would stay stuck at whatever the caller
-  // hardcoded (previously always 0) until the user manually rotated the
-  // file themselves.
+  // embedded rotation is known -- from cache, or from the native "playing"
+  // event's rotationDegrees field (see NativeFFmpegValue.rotationDegrees's
+  // doc: it rides on the same event that already reliably delivers
+  // width/height, rather than a separate async fetch through the app's
+  // custom content:// provider, which is what this depended on before and
+  // turned out not to be reliable). Without this callback,
+  // rotationQuarterTurns stays stuck at whatever the caller hardcoded
+  // (previously always 0) until the user manually rotates the file.
   final void Function(String fileName, int quarterTurns)? onRotationDetected;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
@@ -124,9 +126,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   double? _knownAspectRatio;
   Uint8List? _localPosterBytes;
 
-  // Guards _detectRotationIfNeeded() to at most one attempt per file --
-  // this State is keyed per-fileName (see media_viewer_screen.dart's
-  // _getMediaKey), so it never needs resetting for a different file.
+  // Guards _reportRotationIfNeeded() to at most one onRotationDetected
+  // call per file -- this State is keyed per-fileName (see
+  // media_viewer_screen.dart's _getMediaKey), so it never needs resetting
+  // for a different file.
   bool _rotationDetectionStarted = false;
 
   @override
@@ -273,7 +276,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       });
     }
 
-    if (!widget.isAudio) _detectRotationIfNeeded();
+    if (!widget.isAudio) _reportRotationIfNeeded();
 
     if (!_isActive) return;
 
@@ -295,36 +298,30 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   // Reads this file's actual embedded rotation and reports it up via
   // onRotationDetected -- see MediaRotationCache's doc for why this needs
   // to happen at all (nothing in the decode pipeline applies it on its
-  // own). Cache-hit path is just a map lookup; the cache-miss path costs
-  // one getDiagnostics() round trip (native FFmpeg display-matrix read,
-  // falling back to MediaMetadataRetriever), the same cost the diagnostics
-  // sheet already pays, just moved earlier and made to actually affect
-  // what's rendered.
-  Future<void> _detectRotationIfNeeded() async {
+  // own). Cache-hit path is available immediately, even before the native
+  // controller has emitted anything. The cache-miss path just reads
+  // controller.value.rotationDegrees -- native populates that as part of
+  // the same "playing" event that already reliably delivers width/height
+  // (see NativeFFmpegValue.rotationDegrees's doc), so no separate round
+  // trip is needed; if it's not there yet, this just no-ops and tries
+  // again on the next tick.
+  void _reportRotationIfNeeded() {
     if (_rotationDetectionStarted) return;
-    _rotationDetectionStarted = true;
 
     final fileName = widget.fileName;
     final cached = MediaRotationCache.get(widget.container, fileName);
     if (cached != null) {
+      _rotationDetectionStarted = true;
       widget.onRotationDetected?.call(fileName, cached);
       return;
     }
 
-    final controller = _boundController;
-    if (controller == null) return;
-    try {
-      final diagnostics = await controller.getDiagnostics();
-      if (!mounted) return;
-      final degrees = diagnostics['rotationDegrees'] as int?;
-      if (degrees == null) return;
-      final quarterTurns = (degrees ~/ 90) % 4;
-      MediaRotationCache.put(widget.container, fileName, quarterTurns);
-      widget.onRotationDetected?.call(fileName, quarterTurns);
-    } catch (e) {
-      // Best-effort, same as the diagnostics sheet's own handling of this
-      // call -- rotation just stays at whatever it already defaulted to.
-    }
+    final degrees = _boundController?.value.rotationDegrees;
+    if (degrees == null) return;
+    _rotationDetectionStarted = true;
+    final quarterTurns = ((degrees ~/ 90) % 4 + 4) % 4;
+    MediaRotationCache.put(widget.container, fileName, quarterTurns);
+    widget.onRotationDetected?.call(fileName, quarterTurns);
   }
 
   Future<CaptionTrack?> _loadCaptions(String videoPath) async {

@@ -586,6 +586,25 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
+                           SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text('Enable JavaScript in HTML Viewer',
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                              _settings.htmlEnableJavaScript
+                                  ? 'JavaScript enabled for local HTML files'
+                                  : 'JavaScript disabled for local HTML files',
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: _settings.htmlEnableJavaScript,
+                            onChanged: (v) {
+                              setState(() => _settings.htmlEnableJavaScript = v);
+                              _persist();
+                            },
+                          ),
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),

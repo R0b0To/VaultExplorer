@@ -35,9 +35,9 @@ class AppSettings {
   bool autoOpenOnUnlock;
   SortBy defaultFileSortBy;
   bool defaultFileSortAscending;
+  bool htmlEnableJavaScript;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
-
   AppSettings({
     this.useMasterPassword = false,
     this.masterPasswordIsFingerprint = false,
@@ -57,6 +57,7 @@ class AppSettings {
     this.autoOpenOnUnlock = false,
     this.defaultFileSortBy = SortBy.name,
     this.defaultFileSortAscending = true,
+    this.htmlEnableJavaScript = false,
     Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
     String? masterPasswordSalt,
@@ -104,6 +105,7 @@ class AppSettings {
     String? masterPasswordSalt,
     SortBy? defaultFileSortBy,
     bool? defaultFileSortAscending,
+    bool? htmlEnableJavaScript,
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
@@ -127,6 +129,7 @@ class AppSettings {
       masterPasswordSalt: masterPasswordSalt ?? _masterPasswordSalt,
       defaultFileSortBy: defaultFileSortBy ?? this.defaultFileSortBy,
       defaultFileSortAscending: defaultFileSortAscending ?? this.defaultFileSortAscending,
+      htmlEnableJavaScript: htmlEnableJavaScript ?? this.htmlEnableJavaScript,
     );
   }
 
@@ -150,8 +153,8 @@ class AppSettings {
     'autoOpenOnUnlock': autoOpenOnUnlock,
     'defaultFileSortBy': defaultFileSortBy.toJson(),
     'defaultFileSortAscending': defaultFileSortAscending,
+    'htmlEnableJavaScript': htmlEnableJavaScript,
   };
-
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
     useMasterPassword: j['useMasterPassword'] as bool? ?? false,
     masterPasswordIsFingerprint: j['masterPasswordIsFingerprint'] as bool? ?? false,
@@ -183,8 +186,9 @@ class AppSettings {
         ) ??
         {},
     autoOpenOnUnlock: j['autoOpenOnUnlock'] as bool? ?? false,
-    defaultFileSortBy: SortBy.fromJson(j['defaultFileSortBy'] as String?),
+   defaultFileSortBy: SortBy.fromJson(j['defaultFileSortBy'] as String?),
     defaultFileSortAscending: j['defaultFileSortAscending'] as bool? ?? true,
+    htmlEnableJavaScript: j['htmlEnableJavaScript'] as bool? ?? false,
   );
 }
 

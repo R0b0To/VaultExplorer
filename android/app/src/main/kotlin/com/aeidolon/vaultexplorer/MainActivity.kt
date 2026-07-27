@@ -148,6 +148,10 @@ vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(
     flutterEngine.dartExecutor.binaryMessenger,
     flutterEngine.renderer,
 )
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
+            com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
+        )
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel
         UnlockProgressBridge.channel = channel

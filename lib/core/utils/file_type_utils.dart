@@ -30,6 +30,9 @@ IconData iconForFile(String name) {
     case 'md':
     case 'csv':
       return Icons.article_outlined;
+    case 'html':
+    case 'htm':
+      return Icons.language_rounded;
     case 'zip':
     case 'gz':
     case 'tar':
@@ -71,6 +74,9 @@ Color colorForFile(String name) {
     case 'md':
     case 'csv':
       return const Color(0xFF78909C);
+    case 'html':
+    case 'htm':
+      return const Color(0xFFFF7043);
     case 'zip':
     case 'gz':
     case 'tar':

@@ -25,6 +25,7 @@ import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
@@ -538,6 +539,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       _openMediaViewer(entry.name, fullPath);
     } else if (pref == 'pdf') {
       await _openPdfViewer(fullPath);
+    } else if (pref == 'html') {
+      _openHtmlViewer(fullPath);
     } else if (pref != null && pref.startsWith('package:')) {
       _openFileWithApp(entry.name, fullPath, packageName: pref.substring(8));
     } else if (pref == 'external') {
@@ -547,6 +550,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _openMediaViewer(entry.name, fullPath);
       } else if (ext == 'pdf') {
         await _openPdfViewer(fullPath);
+      } else if (ext == 'html' || ext == 'htm') {
+        _openHtmlViewer(fullPath);
       } else {
         if (!mounted) return;
         await _showOpenWithDialog(entry.name, fullPath, ext, settings);
@@ -563,6 +568,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       ),
     );
     _loadDirectoryContents(_currentDirPath);
+  }
+
+  void _openHtmlViewer(String fullPath) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            HtmlViewerScreen(container: widget.container, filePath: fullPath),
+      ),
+    );
   }
 
   void _openMediaViewer(String fileName, String fullPath) {

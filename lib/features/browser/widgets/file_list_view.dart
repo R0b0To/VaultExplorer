@@ -21,6 +21,7 @@ class FileListView extends StatefulWidget {
   final ValueChanged<RawEntry>? onFileLongMenu;
   final String? searchQuery;
   final bool Function(RawEntry entry)? isFolderMounted;
+  final bool Function(RawEntry entry)? isPinned;
   final MountedContainer? container;
   final String currentDirPath;
   final ThumbnailCacheMode thumbnailCacheMode;
@@ -43,6 +44,7 @@ class FileListView extends StatefulWidget {
     this.onFileLongMenu,
     this.searchQuery,
     this.isFolderMounted,
+    this.isPinned,
     this.container,
     this.currentDirPath = '',
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
@@ -120,6 +122,7 @@ class _FileListViewState extends State<FileListView> {
                       ? widget.dirs[index]
                       : widget.files[index - widget.dirs.length];
                   final isSelected = widget.selectedItems.contains(entry);
+                  final isPinned = widget.isPinned?.call(entry) ?? false;
                   if (isDir) {
                     return DirectoryTile(
                       key: ValueKey('dir:${entry.raw}'),
@@ -132,6 +135,7 @@ class _FileListViewState extends State<FileListView> {
                       searchQuery: widget.searchQuery,
                       isDocumentProviderMounted:
                           widget.isFolderMounted?.call(entry) ?? false,
+                      isPinned: isPinned,
                       onTap: () => widget.onDirTap(entry),
                       onLongPress: () => widget.onItemLongPress(entry),
                     );
@@ -150,6 +154,7 @@ class _FileListViewState extends State<FileListView> {
                     thumbnailCacheMode: widget.thumbnailCacheMode,
                     thumbnailQuality: widget.thumbnailQuality,
                     showThumbnail: widget.showThumbnails,
+                    isPinned: isPinned,
                     onTap: () => widget.onFileTap(entry),
                     onLongPress: () => widget.onItemLongPress(entry),
                     onLongMenu: widget.onFileLongMenu,

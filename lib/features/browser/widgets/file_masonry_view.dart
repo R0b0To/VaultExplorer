@@ -33,6 +33,7 @@ class FileMasonryView extends StatefulWidget {
   final ValueChanged<RawEntry>? onFileLongMenu;
   final String? searchQuery;
   final Set<String> mountedFolderPaths;
+  final bool Function(RawEntry entry)? isPinned;
 
   const FileMasonryView({
     super.key,
@@ -53,6 +54,7 @@ class FileMasonryView extends StatefulWidget {
     this.onFileLongMenu,
     this.searchQuery,
     this.mountedFolderPaths = const {},
+    this.isPinned,
   });
 
   @override
@@ -207,12 +209,14 @@ class _FileMasonryViewState extends State<FileMasonryView> {
 
   Widget _buildDirCell(BuildContext context, RawEntry entry, String fullPath) {
     final isSelected = widget.selectedItems.contains(entry);
+    final isPinned = widget.isPinned?.call(entry) ?? false;
     final cs = Theme.of(context).colorScheme;
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
     return _MasonryCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
+      isPinned: isPinned,
       onTap: () => widget.onDirTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       preview: Center(
@@ -230,6 +234,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   Widget _buildFileCell(BuildContext context, RawEntry entry, String fullPath) {
     final cleanName = entry.name;
     final isSelected = widget.selectedItems.contains(entry);
+    final isPinned = widget.isPinned?.call(entry) ?? false;
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final vaultIcon = vaultIconForExt(ext);
@@ -277,6 +282,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
+      isPinned: isPinned,
       onTap: () => widget.onFileTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       onMoreTap:
@@ -298,6 +304,7 @@ class _MasonryCell extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
+  final bool isPinned;
 
   const _MasonryCell({
     required this.preview,
@@ -309,6 +316,7 @@ class _MasonryCell extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     this.onMoreTap,
+    this.isPinned = false,
   });
 
   @override
@@ -339,6 +347,25 @@ class _MasonryCell extends StatelessWidget {
               DecoratedBox(
                 decoration: BoxDecoration(
                   color: cs.primary.withValues(alpha: 0.12),
+                ),
+              ),
+            if (isPinned && !isSelected)
+              Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.push_pin_rounded,
+                      size: 14,
+                      color: cs.primary,
+                    ),
+                  ),
                 ),
               ),
             if (isSelected)
@@ -403,7 +430,6 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
   final void Function(int width, int height) onSizeKnown;
-
   const _EncryptedImageMasonryThumb({
     required this.container,
     required this.filePath,
@@ -558,7 +584,6 @@ class _VideoMasonryThumb extends StatelessWidget {
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
   final void Function(int width, int height) onSizeKnown;
-
   const _VideoMasonryThumb({
     required this.container,
     required this.filePath,

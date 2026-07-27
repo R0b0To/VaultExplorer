@@ -13,10 +13,8 @@ class DirectoryTile extends StatelessWidget {
   final bool isCompact;
   final double zoomLevel;
   final List<FileDetailColumn> detailColumns;
-
-  /// True when this folder is currently exposed as its own document-provider
-  /// (SAF) root — shown with a distinct icon color so it stands out.
   final bool isDocumentProviderMounted;
+  final bool isPinned;
 
   const DirectoryTile({
     super.key,
@@ -30,6 +28,7 @@ class DirectoryTile extends StatelessWidget {
     this.zoomLevel = 1.0,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     this.isDocumentProviderMounted = false,
+    this.isPinned = false,
   });
 
   @override
@@ -39,6 +38,24 @@ class DirectoryTile extends StatelessWidget {
     final iconBackground = isDocumentProviderMounted
         ? cs.tertiaryContainer.withValues(alpha: 0.4)
         : cs.secondaryContainer.withValues(alpha: 0.4);
+
+    Widget? pinBadge;
+    if (isPinned && !isSelected) {
+      pinBadge = Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: cs.primaryContainer,
+          shape: BoxShape.circle,
+          border: Border.all(color: cs.surface, width: 1.5),
+        ),
+        child: Icon(
+          Icons.push_pin_rounded,
+          size: 10 * zoomLevel,
+          color: cs.onPrimaryContainer,
+        ),
+      );
+    }
+
     return FileRowShell(
       icon: isDocumentProviderMounted
           ? Icons.folder_shared_rounded
@@ -57,6 +74,7 @@ class DirectoryTile extends StatelessWidget {
       onLongPress: onLongPress,
       isCompact: isCompact,
       zoomLevel: zoomLevel,
+      iconBadge: pinBadge,
     );
   }
 }

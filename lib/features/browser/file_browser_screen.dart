@@ -61,7 +61,6 @@ class FileBrowserScreen extends StatefulWidget {
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
   final VoidCallback? onUserActivity;
-
   const FileBrowserScreen({
     super.key,
     required this.container,
@@ -70,7 +69,6 @@ class FileBrowserScreen extends StatefulWidget {
     this.onUserActivity,
     this.resolveContainer,
   });
-
   @override
   State<FileBrowserScreen> createState() => _FileBrowserScreenState();
 }
@@ -79,32 +77,25 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     with SelectionMixin<FileBrowserScreen>, SortMixin<FileBrowserScreen> {
   final List<PathSegment> _pathStack = [const PathSegment('Root', '')];
   List<RawEntry> _currentItems = [];
-
   bool _isLoading = false;
   int _freeSpace = 0;
   bool _isListingTruncated = false;
-
   String? _statusMessage;
   bool _statusIsError = false;
-
   CrossContainerClipboard get _clip => CrossContainerClipboard.instance;
   FileOperationService get _opSvc => FileOperationService.instance;
-
   bool _searchActive = false;
   String _searchQuery = '';
-
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
   String? _currentFilter;
   bool _menuIsOpen = false;
   ArchiveContext? _archiveContext;
-
   ThumbnailCacheMode _resolvedThumbnailCacheMode = ThumbnailCacheMode.appCache;
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.defaultQuality;
-
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
+  Set<String> _pinnedPaths = {};
 
   static const int _maxScanDepth = 20;
-
   static const _documentExts = {
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf',
     'csv', 'zip', 'tar', 'gz', 'json', 'xml',
@@ -112,16 +103,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
-
-  /// Paths (relative to the container root) currently exposed as their own
-  /// document-provider (SAF) root for this container's active session.
   Set<String> _mountedDocProviderFolders = {};
-
   String _fullPathOf(RawEntry entry) =>
       _currentDirPath.isEmpty ? entry.name : '$_currentDirPath/${entry.name}';
-
   bool _isFolderMounted(RawEntry entry) =>
       entry.isDir && _mountedDocProviderFolders.contains(_fullPathOf(entry));
+  bool _isPinned(RawEntry entry) => _pinnedPaths.contains(_fullPathOf(entry));
 
   Future<void> _refreshMountedDocProviderFolders() async {
     final paths =
@@ -191,6 +178,36 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
+  Future<void> _togglePinSelected({required bool pin}) async {
+    _signalActivity();
+    final pathsToToggle = selectedItems.map((e) => _fullPathOf(e)).toList();
+    setState(() {
+      if (pin) {
+        _pinnedPaths.addAll(pathsToToggle);
+      } else {
+        _pinnedPaths.removeAll(pathsToToggle);
+      }
+    });
+
+    final records = await ContainerRepository.instance.loadAll();
+    var record = records[widget.container.uri];
+    record ??= ContainerRecord(
+      uri: widget.container.uri,
+      label: widget.container.displayName,
+      containerFormat: widget.container.containerFormat,
+    );
+    record = record.copyWith(pinnedPaths: _pinnedPaths.toList());
+    await ContainerRepository.instance.save(record);
+
+    final count = pathsToToggle.length;
+    _setStatus(
+      pin
+          ? 'Pinned $count item${count == 1 ? '' : 's'}'
+          : 'Unpinned $count item${count == 1 ? '' : 's'}',
+    );
+    exitSelectionMode();
+  }
+
   bool get _isReadOnly => widget.container.readOnly;
 
   @override
@@ -221,31 +238,27 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     setState(() => _isLoading = true);
     try {
       final appSettings = await AppSettingsService.loadSettings();
-
-      ContainerRecord? record;
-      if (widget.thumbnailCacheMode == null || widget.thumbnailQuality == null) {
-        final records = await ContainerRepository.instance.loadAll();
-        record = records[widget.container.uri];
-      }
+      final records = await ContainerRepository.instance.loadAll();
+      final record = records[widget.container.uri];
 
       if (mounted) {
         setState(() {
+          if (record != null) {
+            _pinnedPaths = Set<String>.from(record.pinnedPaths);
+          }
           _resolvedThumbnailCacheMode =
               widget.thumbnailCacheMode ??
               record?.thumbnailCacheMode ??
               appSettings.defaultThumbnailCacheMode;
-
           _resolvedThumbnailQuality =
               widget.thumbnailQuality ??
               record?.thumbnailQuality ??
               appSettings.defaultThumbnailQuality;
-
           _layoutMode = appSettings.defaultLayoutMode;
           sortBy = appSettings.defaultFileSortBy;
           sortAscending = appSettings.defaultFileSortAscending;
         });
       }
-
       if (mounted &&
           widget.container.readOnly &&
           _resolvedThumbnailCacheMode == ThumbnailCacheMode.inContainer) {
@@ -292,25 +305,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Future<void> _loadDirectoryContents(String path) async {
     setState(() => _isLoading = true);
     _signalActivity();
-
     if (_archiveContext != null) {
       _loadArchiveContents(path);
       return;
     }
-
     try {
       final items = await vaultExplorerApi.listDirectory(widget.container, path);
-
       List<int>? space;
       try {
         space = await vaultExplorerApi.getSpaceInfo(widget.container);
       } catch (_) {
         space = null;
       }
-
       if (mounted) {
         final isTruncated = items?.any((f) => f == 'System:TRUNCATED') ?? false;
-
         setState(() {
           _currentItems = items
                   ?.where((f) => !f.startsWith('System:'))
@@ -339,7 +347,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       if (subPath.startsWith('/')) subPath = subPath.substring(1);
     }
     final items = _archiveContext!.listDirectory(subPath);
-
     if (mounted) {
       setState(() {
         _currentItems = items.map(RawEntry.parse).toList();
@@ -445,13 +452,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       toggleSelectItem(entry);
       return;
     }
-
     final fullPath = _currentDirPath.isEmpty
         ? entry.name
         : '$_currentDirPath/${entry.name}';
     final parts = entry.name.split('.');
     final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
-
     if (ArchiveService.isArchive(ext)) {
       if (ArchiveService.isSupported(ext)) {
         await _openArchive(fullPath, entry.name);
@@ -460,7 +465,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return;
     }
-
     if (_archiveContext != null) {
       _signalActivity();
       setState(() => _isLoading = true);
@@ -472,7 +476,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           if (subPath.startsWith('/')) subPath = subPath.substring(1);
         }
         final tempFilePath = await _archiveContext!.extractEntry(subPath);
-
         if (mounted) {
           setState(() => _isLoading = false);
           if (tempFilePath != null) {
@@ -497,7 +500,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return;
     }
-
     if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
       final item = await VaultItemsService.instance.loadItem(widget.container, fullPath);
       if (item != null) {
@@ -521,10 +523,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return;
     }
-
     final settings = await AppSettingsService.loadSettings();
     final pref = settings.extensionPreferences[ext];
-
     if (pref == 'editor') {
       if (!mounted) return;
       await Navigator.push(
@@ -606,7 +606,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isMedia = _isSupportedMedia(fileName);
-
     final result = await showDialog<String>(
       context: context,
       builder: (context) {
@@ -625,7 +624,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-
                   InkWell(
                     onTap: () =>
                         Navigator.of(context).pop(isMedia ? 'media' : 'editor'),
@@ -678,9 +676,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   InkWell(
                     onTap: () => Navigator.of(context).pop('external'),
                     borderRadius: BorderRadius.circular(12),
@@ -726,9 +722,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   InkWell(
                     onTap: () => Navigator.of(context).pop('open_as'),
                     borderRadius: BorderRadius.circular(12),
@@ -774,7 +768,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -809,7 +802,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         );
       },
     );
-
     if (result == 'editor') {
       if (remember) {
         settings.extensionPreferences[ext] = 'editor';
@@ -886,7 +878,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           );
         },
       );
-
       if (mimeType != null) {
         _openFileWithApp(
           fileName,
@@ -899,20 +890,24 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
+    int compareWithPin(RawEntry ea, RawEntry eb) {
+      final aPinned = _isPinned(ea);
+      final bPinned = _isPinned(eb);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return compareItems(ea, eb);
+    }
 
     final sortedItems = _currentItems.where((e) => !e.isDir).toList()
-      ..sort(compareItems);
-
+      ..sort(compareWithPin);
     final localMedia = sortedItems
         .map((e) => e.name)
         .where(_isSupportedMedia)
         .toList();
-
     if (localMedia.isNotEmpty) {
       final resolvedPaths = localMedia
           .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
           .toList();
-
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -928,17 +923,14 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       );
       return;
     }
-
     setState(() => _isLoading = true);
     _setStatus(
       'Scanning subfolders for media…',
       autoClear: const Duration(seconds: 15),
     );
-
     try {
       final recursiveMedia = await _scanMediaRecursively(_currentDirPath);
       if (!mounted) return;
-
       if (recursiveMedia.isNotEmpty) {
         _clearStatus();
         Navigator.push(
@@ -993,7 +985,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (depth > _maxScanDepth) return [];
     final foundFiles = <String>[];
     final subdirNames = <String>[];
-
     try {
       final items = await vaultExplorerApi.listDirectory(
         widget.container,
@@ -1088,14 +1079,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         modifiedSecs: entry.modifiedSecs,
       );
     }).toList();
-
     _clip.set(
       volId: widget.container.volId,
       displayName: widget.container.displayName,
       cut: cut,
       clipItems: clipItems,
     );
-
     exitSelectionMode();
   }
 
@@ -1109,17 +1098,14 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       return;
     }
     _signalActivity();
-
     final srcVolId = _clip.sourceVolId;
     if (srcVolId == null) {
       _setStatus('Clipboard source is invalid', error: true);
       _clip.clear();
       return;
     }
-
     final isCrossContainer = !_clip.isFromVolume(widget.container.volId);
     MountedContainer? srcContainer;
-
     if (isCrossContainer) {
       if (widget.resolveContainer == null) {
         _setStatus('Cross-container paste is not configured.', error: true);
@@ -1138,19 +1124,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     } else {
       srcContainer = widget.container;
     }
-
     final items = List<ClipboardItem>.from(_clip.items);
     final isCut = _clip.isCutOperation;
-
     final existingRaw =
         await vaultExplorerApi.listDirectory(
           widget.container,
           _currentDirPath,
         ) ??
         [];
-
     if (!mounted) return;
-
     final existingNames = <String>{};
     final existingDirs = <String>{};
     for (final raw in existingRaw) {
@@ -1158,12 +1140,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       existingNames.add(e.name.toLowerCase());
       if (e.isDir) existingDirs.add(e.name.toLowerCase());
     }
-
     final conflicts = <ConflictEntry>[];
     for (final item in items) {
       final fileName = item.name;
       if (!existingNames.contains(fileName.toLowerCase())) continue;
-
       final wouldBeSamePath =
           !isCrossContainer &&
           item.path ==
@@ -1171,7 +1151,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   ? fileName
                   : '$_currentDirPath/$fileName');
       if (wouldBeSamePath) continue;
-
       conflicts.add(
         ConflictEntry(
           item: item,
@@ -1179,7 +1158,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ),
       );
     }
-
     ConflictPlan conflictPlan = const {};
     if (conflicts.isNotEmpty) {
       if (!mounted) return;
@@ -1191,7 +1169,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       if (result == null) return;
       conflictPlan = result;
     }
-
     final op = _opSvc.enqueue(
       isCut: isCut,
       source: srcContainer,
@@ -1200,9 +1177,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       items: items,
       conflictPlan: conflictPlan,
     );
-
     _clip.clear();
-
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
@@ -1218,7 +1193,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     }
-
     op.addListener(listener);
   }
 
@@ -1237,14 +1211,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       toDelete: List<RawEntry>.from(selectedItems),
       onConfirmed: (entries) async {
         setState(() => _isLoading = true);
-
         final clipItems = entries.map((e) {
           final path = _currentDirPath.isEmpty
               ? e.name
               : '$_currentDirPath/${e.name}';
           return ClipboardItem(path: path, isDir: e.isDir);
         }).toList();
-
         int failCount = 0;
         final deleted = await _opSvc.deleteItems(
           container: widget.container,
@@ -1253,9 +1225,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         );
         failCount = clipItems.length - deleted;
 
+        final deletedPaths = clipItems.map((i) => i.path).toSet();
+        if (_pinnedPaths.any((p) => deletedPaths.contains(p))) {
+          _pinnedPaths.removeWhere((p) => deletedPaths.contains(p));
+          final records = await ContainerRepository.instance.loadAll();
+          var record = records[widget.container.uri];
+          if (record != null) {
+            await ContainerRepository.instance.save(
+              record.copyWith(pinnedPaths: _pinnedPaths.toList()),
+            );
+          }
+        }
+
         exitSelectionMode();
         await _loadDirectoryContents(_currentDirPath);
-
         _setStatus(
           failCount == 0
               ? 'Deleted $deleted item(s)'
@@ -1274,9 +1257,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           : '$_currentDirPath/${e.name}';
       return <String, dynamic>{'path': path, 'isDir': e.isDir};
     }).toList();
-
     if (items.isEmpty) return;
-
     setState(() => _isLoading = true);
     try {
       final count = await vaultExplorerApi.exportSelectedToFolder(
@@ -1292,7 +1273,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-
     exitSelectionMode();
   }
 
@@ -1312,7 +1292,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         opId,
       ),
     );
-
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
@@ -1333,7 +1312,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     }
-
     op.addListener(listener);
   }
 
@@ -1363,7 +1341,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ],
       ),
     );
-
     if (confirm != true || !mounted) return;
     final deleted = await vaultExplorerApi.deleteImportSources(op.id);
     if (!mounted) return;
@@ -1392,7 +1369,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         opId,
       ),
     );
-
     void listener() {
       if (!mounted) {
         op.removeListener(listener);
@@ -1413,7 +1389,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     }
-
     op.addListener(listener);
   }
 
@@ -1433,9 +1408,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           ),
         ),
       );
-
       if (captured == null || !mounted) return;
-
       await _loadDirectoryContents(_currentDirPath);
       _setStatus(
         captured.isVideo
@@ -1515,7 +1488,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ],
       ),
     );
-
     if (confirm != true || !mounted) return;
     setState(() => _isLoading = true);
     try {
@@ -1558,7 +1530,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         onPressed: _extractArchive,
       );
     }
-
     return MenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: const Icon(Icons.add_rounded, size: 28),
@@ -1645,7 +1616,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       BrowserLayoutMode.grid => Icons.grid_view_rounded,
       BrowserLayoutMode.masonry => Icons.dashboard_rounded,
     };
-
     return MenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: Icon(currentIcon),
@@ -1760,7 +1730,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         .any(_isSupportedMedia);
     final hasSubfolders = _currentItems.any((e) => e.isDir);
     final canPlayMedia = hasLocalMedia || hasSubfolders;
-
     return {
       FileManagerAction.search: (context) => IconButton(
             icon: Icon(_searchActive ? Icons.search_off_rounded : Icons.search_rounded),
@@ -1784,7 +1753,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Widget _buildSettingsMenuButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return MenuAnchor(
       builder: (ctx, controller, child) => IconButton(
         onPressed: () =>
@@ -1822,13 +1790,19 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   @override
   Widget build(BuildContext context) {
+    int compareWithPin(RawEntry ea, RawEntry eb) {
+      final aPinned = _isPinned(ea);
+      final bPinned = _isPinned(eb);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return compareItems(ea, eb);
+    }
+
     final dirs = _currentItems.where((e) => e.isDir).toList()
-      ..sort(compareItems);
+      ..sort(compareWithPin);
     final files = _currentItems.where((e) => !e.isDir).toList()
-      ..sort(compareItems);
-
+      ..sort(compareWithPin);
     final query = _searchQuery.trim().toLowerCase();
-
     final filteredDirs = (query.isEmpty && _currentFilter == null)
         ? dirs
         : (query.isEmpty
@@ -1838,18 +1812,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                       (d) => d.name.toLowerCase().contains(query),
                     )
                     .toList());
-
     final filteredFiles = files.where((f) {
       final name = f.name;
       if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
       return _matchesFilter(name);
     }).toList();
-
     final cs = Theme.of(context).colorScheme;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final actionBuilders = _buildActionBuilders();
     final showActionBar = !_searchActive;
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -1944,25 +1915,23 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !_searchActive;
     final actionBuilders = _buildActionBuilders();
-
     if (isSelectionMode) {
       final single = selectedItems.length == 1;
       final singleFile = single && !selectedItems.first.isDir;
       final singleFolder = single && selectedItems.first.isDir;
       final folderDocProviderMounted =
           singleFolder && _isFolderMounted(selectedItems.first);
+      final showPinOption = selectedItems.any((item) => !_isPinned(item));
+      final showUnpinOption = selectedItems.any((item) => _isPinned(item));
       final totalBytes = selectedTotalBytes;
       final isPending = hasPendingFolderSizes;
-
       final sizeLabel = isPending
           ? (totalBytes > 0
                 ? '${formatBytes(totalBytes)} (calculating…)'
                 : 'calculating…')
           : formatBytes(totalBytes);
-
       void doRename() {
         final entries = selectedItems.toList();
-
         for (final entry in entries) {
           final parts = entry.name.split('.');
           final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
@@ -1972,10 +1941,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
              return;
           }
         }
-
         final oldNames = entries.map((e) => e.name).toList();
         final existingNames = allItems.map((e) => e.name).toSet();
-
         BrowserDialogs.showRename(
           context,
           container: widget.container,
@@ -1996,12 +1963,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         final parts = entry.name.split('.');
         final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
         exitSelectionMode();
-
         if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
            _setStatus('Vault items cannot be opened in external apps', error: true);
            return;
         }
-
         final settings = await AppSettingsService.loadSettings();
         if (mounted) {
           await _showOpenWithDialog(entry.name, path, ext, settings);
@@ -2027,6 +1992,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           singleFolderSelected: singleFolder,
           folderDocumentProviderMounted: folderDocProviderMounted,
           readOnly: _isReadOnly,
+          showPinOption: showPinOption,
+          showUnpinOption: showUnpinOption,
+          onPin: () => _togglePinSelected(pin: true),
+          onUnpin: () => _togglePinSelected(pin: false),
           onClose: exitSelectionMode,
           onSelectAll: () => setState(() => selectedItems.addAll(allItems)),
           onRename: doRename,
@@ -2109,6 +2078,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             tooltip: 'More options',
             onSelected: (value) {
               if (value == 'export') _exportSelectedToStorage();
+              if (value == 'pin') _togglePinSelected(pin: true);
+              if (value == 'unpin') _togglePinSelected(pin: false);
               if (value == 'open_with_app') doOpenWithApp();
               if (value == 'doc_provider') doToggleDocProvider();
               if (value == 'select_all') {
@@ -2134,6 +2105,36 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   ],
                 ),
               ),
+              if (showPinOption)
+                PopupMenuItem<String>(
+                  value: 'pin',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.push_pin_rounded,
+                        color: cs.primary,
+                        size: AppIconSize.small,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(selectedItems.length > 1 ? 'Pin selected' : 'Pin'),
+                    ],
+                  ),
+                ),
+              if (showUnpinOption)
+                PopupMenuItem<String>(
+                  value: 'unpin',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.push_pin_outlined,
+                        color: cs.onSurfaceVariant,
+                        size: AppIconSize.small,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(selectedItems.length > 1 ? 'Unpin selected' : 'Unpin'),
+                    ],
+                  ),
+                ),
               if (singleFile)
                 PopupMenuItem<String>(
                   value: 'open_with_app',
@@ -2179,10 +2180,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ],
       );
     }
-
     final query = _searchQuery.trim().toLowerCase();
     final isFiltered = query.isNotEmpty || _currentFilter != null;
-
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
@@ -2258,12 +2257,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final style = textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant);
-
     final parts = <String>[
       if (_freeSpace >= 0) '${formatBytes(_freeSpace)} free',
       if (isFiltered) 'filtered',
     ];
-
     return Text(
       parts.join(' · '),
       maxLines: 1,
@@ -2320,6 +2317,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onItemLongPress: _handleItemLongPress,
           searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
           mountedFolderPaths: _mountedDocProviderFolders,
+          isPinned: _isPinned,
         ),
       BrowserLayoutMode.masonry => FileMasonryView(
           container: widget.container,
@@ -2345,6 +2343,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onItemLongPress: _handleItemLongPress,
           searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
           mountedFolderPaths: _mountedDocProviderFolders,
+          isPinned: _isPinned,
         ),
       BrowserLayoutMode.list ||
       BrowserLayoutMode.compact =>
@@ -2370,6 +2369,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onItemLongPress: _handleItemLongPress,
           searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
           isFolderMounted: _isFolderMounted,
+          isPinned: _isPinned,
         ),
     };
     final refreshable = RefreshIndicator(
@@ -2383,4 +2383,5 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         Expanded(child: refreshable),
       ],
     );
-  }}
+  }
+}

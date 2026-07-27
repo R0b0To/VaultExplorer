@@ -18,6 +18,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onOpenWithApp;
   final VoidCallback? onToggleDocumentProvider;
   final bool readOnly;
+  final bool showPinOption;
+  final bool showUnpinOption;
+  final VoidCallback onPin;
+  final VoidCallback onUnpin;
 
   const SelectionAppBar({
     super.key,
@@ -37,6 +41,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onOpenWithApp,
     this.onToggleDocumentProvider,
     this.readOnly = false,
+    required this.showPinOption,
+    required this.showUnpinOption,
+    required this.onPin,
+    required this.onUnpin,
   });
 
   @override
@@ -47,8 +55,6 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
-
-    // Dynamically show actions to prevent truncating the title on narrow screens
     final bool showCopy = screenWidth >= 350;
     final bool showCut = screenWidth >= 390;
     final bool showRename = screenWidth >= 430;
@@ -161,6 +167,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             if (value == 'cut') onCut();
             if (value == 'rename') onRename();
             if (value == 'export') onExport();
+            if (value == 'pin') onPin();
+            if (value == 'unpin') onUnpin();
             if (value == 'open_with_app') onOpenWithApp();
             if (value == 'doc_provider') onToggleDocumentProvider?.call();
           },
@@ -226,6 +234,36 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ],
               ),
             ),
+            if (showPinOption)
+              PopupMenuItem<String>(
+                value: 'pin',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.push_pin_rounded,
+                      color: cs.primary,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(selectedCount > 1 ? 'Pin selected' : 'Pin'),
+                  ],
+                ),
+              ),
+            if (showUnpinOption)
+              PopupMenuItem<String>(
+                value: 'unpin',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.push_pin_outlined,
+                      color: cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(selectedCount > 1 ? 'Unpin selected' : 'Unpin'),
+                  ],
+                ),
+              ),
             if (singleFileSelected)
               PopupMenuItem<String>(
                 value: 'open_with_app',

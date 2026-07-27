@@ -30,6 +30,7 @@ class FileTile extends StatelessWidget {
   final ThumbnailCacheMode thumbnailCacheMode;
   final ThumbnailQuality thumbnailQuality;
   final bool showThumbnail;
+  final bool isPinned;
 
   const FileTile({
     super.key,
@@ -48,6 +49,7 @@ class FileTile extends StatelessWidget {
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.showThumbnail = true,
+    this.isPinned = false,
   });
 
   @override
@@ -84,13 +86,11 @@ class FileTile extends StatelessWidget {
         ),
       );
     }
-
     Widget? customLeading;
     final fullPath =
         currentDirPath.isEmpty ? entry.name : '$currentDirPath/${entry.name}';
     final isImg = MediaViewerConstants.isImage(entry.name);
     final isVid = MediaViewerConstants.isVideo(entry.name);
-
     if (showThumbnail && container != null && vaultIcon == null) {
       if (isImg) {
         customLeading = _ListImageThumb(
@@ -115,6 +115,22 @@ class FileTile extends StatelessWidget {
       }
     }
 
+    Widget? pinBadge;
+    if (isPinned && !isSelected) {
+      pinBadge = Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.push_pin_rounded,
+          size: 10 * zoomLevel,
+          color: cs.onPrimaryContainer,
+        ),
+      );
+    }
+
     return FileRowShell(
       icon: displayIcon,
       iconColor: iconColor,
@@ -130,6 +146,7 @@ class FileTile extends StatelessWidget {
       isCompact: isCompact,
       zoomLevel: zoomLevel,
       customLeading: customLeading,
+      iconBadge: pinBadge,
     );
   }
 }
@@ -142,7 +159,6 @@ class _ListImageThumb extends StatelessWidget {
   final IconData fallbackIcon;
   final Color fallbackColor;
   final double zoomLevel;
-
   const _ListImageThumb({
     required this.container,
     required this.filePath,
@@ -262,7 +278,6 @@ class _ListVideoThumb extends StatelessWidget {
   final IconData fallbackIcon;
   final Color fallbackColor;
   final double zoomLevel;
-
   const _ListVideoThumb({
     required this.container,
     required this.filePath,

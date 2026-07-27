@@ -156,8 +156,8 @@ class FileRowShell extends StatelessWidget {
                   ),
                   if (iconBadge != null && !isSelected)
                     Positioned(
-                      right: -2,
-                      bottom: -2,
+                      left: -6,
+                      top: -6,
                       child: iconBadge!,
                     ),
                 ],

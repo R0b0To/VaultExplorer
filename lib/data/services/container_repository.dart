@@ -12,42 +12,26 @@ void _logSwallowed(String method, Object error) {
   debugPrint('[ContainerRepository] $method failed: $error');
 }
 
-/// A single folder inside a container that has been exposed as its own
-/// Storage Access Framework root (independent from the container-wide
-/// [ContainerRecord.documentProvider] toggle).
 @immutable
 class DocumentProviderFolder {
-  /// Path of the folder relative to the container root (never empty —
-  /// the container root itself is controlled by [ContainerRecord.documentProvider]).
   final String path;
-
-  /// Whether this folder should be re-exposed automatically the next
-  /// time the container is unlocked.
   final bool autoMount;
-
   const DocumentProviderFolder({required this.path, this.autoMount = false});
-
-  /// Display name is just the last path segment.
   String get name => path.contains('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
-
   DocumentProviderFolder copyWith({bool? autoMount}) => DocumentProviderFolder(
         path: path,
         autoMount: autoMount ?? this.autoMount,
       );
-
   Map<String, dynamic> toJson() => {'path': path, 'autoMount': autoMount};
-
   factory DocumentProviderFolder.fromJson(Map<String, dynamic> j) =>
       DocumentProviderFolder(
         path: j['path'] as String? ?? '',
         autoMount: j['autoMount'] as bool? ?? false,
       );
-
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is DocumentProviderFolder && other.path == path && other.autoMount == autoMount;
-
   @override
   int get hashCode => Object.hash(path, autoMount);
 }
@@ -57,14 +41,12 @@ enum ContainerUnlockMethod {
   rememberPassword,
   biometrics,
   pattern;
-
   String get label => switch (this) {
         ContainerUnlockMethod.password => 'Manual Password',
         ContainerUnlockMethod.rememberPassword => 'Remember Password',
         ContainerUnlockMethod.biometrics => 'Biometric Unlock',
         ContainerUnlockMethod.pattern => 'Pattern Unlock',
       };
-
   String get subtitle => switch (this) {
         ContainerUnlockMethod.password => 'Type the password every time',
         ContainerUnlockMethod.rememberPassword =>
@@ -72,16 +54,13 @@ enum ContainerUnlockMethod {
         ContainerUnlockMethod.biometrics => 'Use fingerprint or face to unlock',
         ContainerUnlockMethod.pattern => 'Draw a pattern to unlock',
       };
-
   IconData get icon => switch (this) {
         ContainerUnlockMethod.password => Icons.key_rounded,
         ContainerUnlockMethod.rememberPassword => Icons.lock_open_rounded,
         ContainerUnlockMethod.biometrics => Icons.fingerprint,
         ContainerUnlockMethod.pattern => Icons.pattern,
       };
-
   String toJson() => name;
-
   static ContainerUnlockMethod fromJson(String? value) => switch (value) {
         'password' => ContainerUnlockMethod.password,
         'rememberPassword' => ContainerUnlockMethod.rememberPassword,
@@ -93,11 +72,9 @@ enum ContainerUnlockMethod {
 
 class ContainerRepository {
   ContainerRepository._();
-
   static final ContainerRepository instance = ContainerRepository._();
   static const _secure = AppSecureStorage.instance;
   Map<String, ContainerRecord>? _cache;
-
   static Future<File> get _dataFile async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/containers_v2.json');
@@ -112,7 +89,6 @@ class ContainerRepository {
   Future<void> save(ContainerRecord record) async {
     await _ensureLoaded();
     _cache![record.uri] = record;
-    
     final needsPassword = record.unlockMethod != ContainerUnlockMethod.password;
     if (needsPassword && record.pendingPassword != null) {
       await _secure.write(
@@ -122,7 +98,6 @@ class ContainerRepository {
     } else if (!needsPassword) {
       await _secure.delete(key: _keystoreKey(record.uri));
     }
-
     if (record.unlockMethod == ContainerUnlockMethod.pattern &&
         record.pendingPatternHash != null) {
       await _secure.write(
@@ -132,14 +107,12 @@ class ContainerRepository {
     } else if (record.unlockMethod != ContainerUnlockMethod.pattern) {
       await _secure.delete(key: _patternHashKey(record.uri));
     }
-
     await _persist();
   }
 
   Future<void> saveOrder(List<String> orderedUris) async {
     await _ensureLoaded();
     if (_cache == null) return;
-    
     final newCache = <String, ContainerRecord>{};
     for (final uri in orderedUris) {
       if (_cache!.containsKey(uri)) {
@@ -151,7 +124,6 @@ class ContainerRepository {
         newCache[entry.key] = entry.value;
       }
     }
-    
     _cache = newCache;
     await _persist();
   }
@@ -169,10 +141,6 @@ class ContainerRepository {
     await _persist();
   }
 
-  /// Records that [path] (relative to the container root) is now exposed
-  /// as its own document-provider root, or clears that record when
-  /// [exposed] is false. Does not touch the mount itself — the caller is
-  /// expected to have already called the native mount/unmount API.
   Future<void> setFolderExposed(
     String uri,
     String path, {
@@ -192,7 +160,6 @@ class ContainerRepository {
     await _persist();
   }
 
-  /// Updates just the auto-mount flag for an already-exposed folder.
   Future<void> setFolderAutoMount(String uri, String path, bool autoMount) async {
     await _ensureLoaded();
     final existing = _cache![uri];
@@ -206,10 +173,8 @@ class ContainerRepository {
 
   Future<String?> getPassword(String uri) =>
       _secure.read(key: _keystoreKey(uri));
-
   Future<String?> getPatternHash(String uri) =>
       _secure.read(key: _patternHashKey(uri));
-
   void invalidate() => _cache = null;
 
   static String _keystoreKey(String uri) {
@@ -233,7 +198,6 @@ class ContainerRepository {
     try {
       final file = await _dataFile;
       if (!await file.exists()) return;
-
       final list = jsonDecode(await file.readAsString()) as List<dynamic>;
       for (final item in list) {
         final r = ContainerRecord.fromJson(item as Map<String, dynamic>);
@@ -274,6 +238,7 @@ class ContainerRecord {
   final int hashId;
   final String containerFormat;
   final List<Map<String, String>> keyfiles;
+  final List<String> pinnedPaths;
 
   const ContainerRecord({
     required this.uri,
@@ -293,6 +258,7 @@ class ContainerRecord {
     this.hashId = 255,
     this.containerFormat = 'veracrypt',
     this.keyfiles = const [],
+    this.pinnedPaths = const [],
   });
 
   bool get isUsbSource => uri.startsWith('usb:');
@@ -314,6 +280,7 @@ class ContainerRecord {
     int? hashId,
     String? containerFormat,
     List<Map<String, String>>? keyfiles,
+    List<String>? pinnedPaths,
   }) {
     return ContainerRecord(
       uri: uri,
@@ -337,6 +304,7 @@ class ContainerRecord {
       hashId: hashId ?? this.hashId,
       containerFormat: containerFormat ?? this.containerFormat,
       keyfiles: keyfiles ?? this.keyfiles,
+      pinnedPaths: pinnedPaths ?? this.pinnedPaths,
     );
   }
 
@@ -359,6 +327,7 @@ class ContainerRecord {
         'hashId': hashId,
         'containerFormat': containerFormat,
         'keyfiles': keyfiles,
+        'pinnedPaths': pinnedPaths,
       };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
@@ -387,6 +356,7 @@ class ContainerRecord {
       keyfiles: (j['keyfiles'] as List<dynamic>? ?? [])
           .map((e) => Map<String, String>.from(e as Map))
           .toList(),
+      pinnedPaths: (j['pinnedPaths'] as List<dynamic>? ?? []).cast<String>(),
     );
   }
 }

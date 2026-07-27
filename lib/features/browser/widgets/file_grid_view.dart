@@ -30,6 +30,7 @@ class FileGridView extends StatefulWidget {
   final ValueChanged<RawEntry>? onFileLongMenu;
   final String? searchQuery;
   final Set<String> mountedFolderPaths;
+  final bool Function(RawEntry entry)? isPinned;
 
   const FileGridView({
     super.key,
@@ -50,6 +51,7 @@ class FileGridView extends StatefulWidget {
     this.onFileLongMenu,
     this.searchQuery,
     this.mountedFolderPaths = const {},
+    this.isPinned,
   });
 
   @override
@@ -179,6 +181,7 @@ class _FileGridViewState extends State<FileGridView> {
 
   Widget _buildDirCell(BuildContext context, RawEntry entry) {
     final isSelected = widget.selectedItems.contains(entry);
+    final isPinned = widget.isPinned?.call(entry) ?? false;
     final cs = Theme.of(context).colorScheme;
     final fullPath = widget.currentDirPath.isEmpty
         ? entry.name
@@ -188,6 +191,7 @@ class _FileGridViewState extends State<FileGridView> {
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
+      isPinned: isPinned,
       onTap: () => widget.onDirTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       preview: Center(
@@ -208,6 +212,7 @@ class _FileGridViewState extends State<FileGridView> {
         ? cleanName
         : '${widget.currentDirPath}/$cleanName';
     final isSelected = widget.selectedItems.contains(entry);
+    final isPinned = widget.isPinned?.call(entry) ?? false;
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final vaultIcon = vaultIconForExt(ext);
@@ -257,6 +262,7 @@ class _FileGridViewState extends State<FileGridView> {
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
+      isPinned: isPinned,
       onTap: () => widget.onFileTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       onMoreTap: widget.isSelectionMode
@@ -279,6 +285,7 @@ class _GridCell extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
+  final bool isPinned;
 
   const _GridCell({
     required this.preview,
@@ -290,6 +297,7 @@ class _GridCell extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     this.onMoreTap,
+    this.isPinned = false,
   });
 
   @override
@@ -323,6 +331,25 @@ class _GridCell extends StatelessWidget {
                     DecoratedBox(
                       decoration: BoxDecoration(
                         color: cs.primary.withValues(alpha: 0.12),
+                      ),
+                    ),
+                  if (isPinned && !isSelected)
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.push_pin_rounded,
+                            size: 14,
+                            color: cs.primary,
+                          ),
+                        ),
                       ),
                     ),
                   if (isSelected)
@@ -387,7 +414,6 @@ class _EncryptedImageGridThumb extends StatelessWidget {
   final String filePath;
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
-
   const _EncryptedImageGridThumb({
     required this.container,
     required this.filePath,
@@ -497,7 +523,6 @@ class _VideoThumb extends StatelessWidget {
   final String filePath;
   final ThumbnailCacheMode cacheMode;
   final ThumbnailQuality quality;
-
   const _VideoThumb({
     required this.container,
     required this.filePath,

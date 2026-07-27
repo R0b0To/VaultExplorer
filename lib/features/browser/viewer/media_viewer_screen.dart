@@ -83,6 +83,23 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   final Set<String> _prefetchingActive = {};
   final Set<String> _prefetchingFullRes = {};
   final Map<String, int> _rotations = {};
+  // Files the user explicitly rotated via the advanced settings sheet --
+  // _onRotationDetected must never overwrite these with an auto-detected
+  // value (e.g. if the page is swiped away and rebuilt, re-triggering
+  // detection against MediaRotationCache's now-populated entry).
+  final Set<String> _manuallyRotatedFiles = {};
+
+  // Videos default to their actual embedded rotation (read once by
+  // MediaPlayerWidget and reported back here) instead of always opening
+  // sideways until the user manually rotates them -- see
+  // MediaRotationCache's doc for why nothing does this automatically
+  // further down the pipeline.
+  void _onRotationDetected(String fileName, int quarterTurns) {
+    if (_manuallyRotatedFiles.contains(fileName)) return;
+    if (_rotations[fileName] == quarterTurns) return;
+    if (!mounted) return;
+    setState(() => _rotations[fileName] = quarterTurns);
+  }
   
   final Map<String, GlobalKey> _mediaKeys = {};
 
@@ -519,6 +536,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _prefetchedImages.remove(fileToDelete);
       _mediaKeys.remove(fileToDelete);
       _rotations.remove(fileToDelete);
+      _manuallyRotatedFiles.remove(fileToDelete);
       
       _playlistController.removeFile(fileToDelete);
 
@@ -671,6 +689,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           onRotationChanged: (rot) {
             _startHideTimer();
             setState(() {
+              _manuallyRotatedFiles.add(_playlistController.currentFile);
               _rotations[_playlistController.currentFile] = rot;
             });
           },
@@ -875,6 +894,7 @@ onPageChanged: (index) {
                               subtitlesEnabled: _subtitlesEnabled,
                               playbackSpeed: _playbackSpeed,
                               rotationQuarterTurns: _rotations[fileName] ?? 0,
+                              onRotationDetected: _onRotationDetected,
                               progressNotifier: _videoProgressNotifier,
                               onSubtitlesAvailableChanged: (val) {
                                 _playbackManager.updateSubtitleStatus(fileName, val);

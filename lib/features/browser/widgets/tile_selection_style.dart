@@ -51,12 +51,8 @@ class FileRowShell extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-
-  /// Optional small badge stacked on the bottom-right corner of the leading
-  /// icon (e.g. a "shared" indicator). Kept independent of [iconColor] so
-  /// the state reads clearly even if the two colors are close in a given
-  /// theme.
   final Widget? iconBadge;
+  final Widget? customLeading;
 
   const FileRowShell({
     super.key,
@@ -74,24 +70,22 @@ class FileRowShell extends StatelessWidget {
     this.isCompact = false,
     this.zoomLevel = 1.0,
     this.iconBadge,
+    this.customLeading,
   });
 
   Widget _buildColumnWidget(FileDetailColumn col, BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     final String text = switch (col) {
       FileDetailColumn.date => formatEntryDate(entry.modifiedSecs),
       FileDetailColumn.size => entry.isDir ? '' : formatBytes(entry.sizeBytes),
       FileDetailColumn.type => _getTypeLabel(entry),
     };
-
     final double width = switch (col) {
       FileDetailColumn.date => 72,
       FileDetailColumn.size => 72,
       FileDetailColumn.type => 56,
     };
-
     return SizedBox(
       width: width * zoomLevel,
       child: Text(
@@ -148,15 +142,17 @@ class FileRowShell extends StatelessWidget {
                       color: squircleBackground,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                      icon,
-                      size: AppIconSize.action * zoomLevel,
-                      color: TileSelectionStyle.leadingIconColor(
-                        cs,
-                        selected: isSelected,
-                        unselectedColor: iconColor,
-                      ),
-                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: customLeading ??
+                        Icon(
+                          icon,
+                          size: AppIconSize.action * zoomLevel,
+                          color: TileSelectionStyle.leadingIconColor(
+                            cs,
+                            selected: isSelected,
+                            unselectedColor: iconColor,
+                          ),
+                        ),
                   ),
                   if (iconBadge != null && !isSelected)
                     Positioned(

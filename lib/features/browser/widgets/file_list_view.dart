@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
 
@@ -17,10 +20,12 @@ class FileListView extends StatefulWidget {
   final ValueChanged<RawEntry> onItemLongPress;
   final ValueChanged<RawEntry>? onFileLongMenu;
   final String? searchQuery;
-
-  /// True when a given directory entry is currently exposed as its own
-  /// document-provider (SAF) root.
   final bool Function(RawEntry entry)? isFolderMounted;
+  final MountedContainer? container;
+  final String currentDirPath;
+  final ThumbnailCacheMode thumbnailCacheMode;
+  final ThumbnailQuality thumbnailQuality;
+  final bool showThumbnails;
 
   const FileListView({
     super.key,
@@ -36,6 +41,11 @@ class FileListView extends StatefulWidget {
     this.onFileLongMenu,
     this.searchQuery,
     this.isFolderMounted,
+    this.container,
+    this.currentDirPath = '',
+    this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
+    this.thumbnailQuality = ThumbnailQuality.defaultQuality,
+    this.showThumbnails = true,
   });
 
   @override
@@ -96,7 +106,8 @@ class _FileListViewState extends State<FileListView> {
                       zoomLevel: _zoomLevel,
                       detailColumns: widget.detailColumns,
                       searchQuery: widget.searchQuery,
-                      isDocumentProviderMounted: widget.isFolderMounted?.call(entry) ?? false,
+                      isDocumentProviderMounted:
+                          widget.isFolderMounted?.call(entry) ?? false,
                       onTap: () => widget.onDirTap(entry),
                       onLongPress: () => widget.onItemLongPress(entry),
                     );
@@ -110,6 +121,11 @@ class _FileListViewState extends State<FileListView> {
                     zoomLevel: _zoomLevel,
                     detailColumns: widget.detailColumns,
                     searchQuery: widget.searchQuery,
+                    container: widget.container,
+                    currentDirPath: widget.currentDirPath,
+                    thumbnailCacheMode: widget.thumbnailCacheMode,
+                    thumbnailQuality: widget.thumbnailQuality,
+                    showThumbnail: widget.showThumbnails,
                     onTap: () => widget.onFileTap(entry),
                     onLongPress: () => widget.onItemLongPress(entry),
                     onLongMenu: widget.onFileLongMenu,

@@ -11,6 +11,7 @@ import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dar
 
 import '../caption_track.dart';
 import '../native_ffmpeg_controller.dart';
+import 'media_rotation_cache.dart';
 
 class VideoPlaybackProgress {
   final Duration position;
@@ -60,6 +61,14 @@ class MediaPlayerWidget extends StatefulWidget {
   final bool subtitlesEnabled;
   final double playbackSpeed;
   final int rotationQuarterTurns;
+  // Called at most once per file, the first time this video's actual
+  // embedded rotation is known (from cache or freshly read via
+  // getDiagnostics()) -- see MediaRotationCache's doc for why this is
+  // needed at all: nothing else auto-applies it, so without this callback
+  // rotationQuarterTurns would stay stuck at whatever the caller
+  // hardcoded (previously always 0) until the user manually rotated the
+  // file themselves.
+  final void Function(String fileName, int quarterTurns)? onRotationDetected;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
   final VoidCallback? onError;
@@ -79,6 +88,7 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.subtitlesEnabled,
     required this.playbackSpeed,
     required this.rotationQuarterTurns,
+    this.onRotationDetected,
     required this.onSubtitlesAvailableChanged,
     required this.progressNotifier,
     required this.playbackManager,
@@ -113,6 +123,11 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   double? _knownAspectRatio;
   Uint8List? _localPosterBytes;
+
+  // Guards _detectRotationIfNeeded() to at most one attempt per file --
+  // this State is keyed per-fileName (see media_viewer_screen.dart's
+  // _getMediaKey), so it never needs resetting for a different file.
+  bool _rotationDetectionStarted = false;
 
   @override
   void initState() {
@@ -258,6 +273,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       });
     }
 
+    if (!widget.isAudio) _detectRotationIfNeeded();
+
     if (!_isActive) return;
 
     final newProgress = widget.progressNotifier.value.copyWith(
@@ -272,6 +289,41 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
           widget.progressNotifier.value = newProgress;
         }
       });
+    }
+  }
+
+  // Reads this file's actual embedded rotation and reports it up via
+  // onRotationDetected -- see MediaRotationCache's doc for why this needs
+  // to happen at all (nothing in the decode pipeline applies it on its
+  // own). Cache-hit path is just a map lookup; the cache-miss path costs
+  // one getDiagnostics() round trip (native FFmpeg display-matrix read,
+  // falling back to MediaMetadataRetriever), the same cost the diagnostics
+  // sheet already pays, just moved earlier and made to actually affect
+  // what's rendered.
+  Future<void> _detectRotationIfNeeded() async {
+    if (_rotationDetectionStarted) return;
+    _rotationDetectionStarted = true;
+
+    final fileName = widget.fileName;
+    final cached = MediaRotationCache.get(widget.container, fileName);
+    if (cached != null) {
+      widget.onRotationDetected?.call(fileName, cached);
+      return;
+    }
+
+    final controller = _boundController;
+    if (controller == null) return;
+    try {
+      final diagnostics = await controller.getDiagnostics();
+      if (!mounted) return;
+      final degrees = diagnostics['rotationDegrees'] as int?;
+      if (degrees == null) return;
+      final quarterTurns = (degrees ~/ 90) % 4;
+      MediaRotationCache.put(widget.container, fileName, quarterTurns);
+      widget.onRotationDetected?.call(fileName, quarterTurns);
+    } catch (e) {
+      // Best-effort, same as the diagnostics sheet's own handling of this
+      // call -- rotation just stays at whatever it already defaulted to.
     }
   }
 

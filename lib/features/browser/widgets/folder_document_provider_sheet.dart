@@ -2,13 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
 
-/// Result of [FolderDocumentProviderSheet.show].
 enum FolderDocumentProviderAction { unmount }
 
-/// Shown when the person re-opens "More options" on a folder that is
-/// already exposed as its own document-provider (SAF) root. Lets them
-/// unmount it, or set whether it should come back automatically next time
-/// the container unlocks.
 class FolderDocumentProviderSheet extends StatefulWidget {
   final String folderName;
   final bool initialAutoMount;
@@ -21,10 +16,6 @@ class FolderDocumentProviderSheet extends StatefulWidget {
     required this.onAutoMountChanged,
   });
 
-  /// Shows the sheet. Returns [FolderDocumentProviderAction.unmount] if the
-  /// person chose to unmount, or `null` if they just dismissed the sheet
-  /// (any auto-mount change made along the way has already been reported
-  /// via [onAutoMountChanged] regardless of how the sheet closes).
   static Future<FolderDocumentProviderAction?> show(
     BuildContext context, {
     required String folderName,
@@ -55,23 +46,11 @@ class _FolderDocumentProviderSheetState
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return AppBottomSheet(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
           Row(
             children: [
               Container(
@@ -121,14 +100,6 @@ class _FolderDocumentProviderSheetState
               label: const Text('Unmount'),
               onPressed: () => Navigator.of(context)
                   .pop(FolderDocumentProviderAction.unmount),
-            ),
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
             ),
           ),
         ],

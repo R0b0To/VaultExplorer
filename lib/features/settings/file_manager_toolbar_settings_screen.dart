@@ -205,6 +205,31 @@ class _FileManagerToolbarSettingsScreenState
                         },
                       ),
                       const SizedBox(height: 16),
+                      SectionHeader('List View Options'),
+                      SectionCard(
+                        children: [
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: _config.showListThumbnails,
+                            onChanged: (v) {
+                              setState(() => _config =
+                                  _config.copyWith(showListThumbnails: v));
+                              _persist();
+                            },
+                            title: Text('Show Media Thumbnails',
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                                'Display thumbnail previews for images and videos in list view',
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant)),
+                            secondary: Icon(Icons.image_outlined,
+                                color: cs.primary),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
                       SectionHeader('Detailed List View Columns'),
                       ReorderableListView.builder(
                         shrinkWrap: true,

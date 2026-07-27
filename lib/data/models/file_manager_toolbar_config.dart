@@ -37,6 +37,7 @@ class FileManagerToolbarConfig {
   final List<FileDetailColumn> detailColumnsOrder;
   final Set<FileDetailColumn> hiddenDetailColumns;
   final bool showGridFileNames;
+  final bool showListThumbnails;
 
   const FileManagerToolbarConfig({
     required this.order,
@@ -51,6 +52,7 @@ class FileManagerToolbarConfig {
     ],
     this.hiddenDetailColumns = const {FileDetailColumn.type},
     this.showGridFileNames = true,
+    this.showListThumbnails = true,
   });
 
   factory FileManagerToolbarConfig.defaults() => const FileManagerToolbarConfig(
@@ -72,6 +74,7 @@ class FileManagerToolbarConfig {
         ],
         hiddenDetailColumns: {FileDetailColumn.type},
         showGridFileNames: true,
+        showListThumbnails: true,
       );
 
   List<FileManagerAction> get visible =>
@@ -90,6 +93,7 @@ class FileManagerToolbarConfig {
     List<FileDetailColumn>? detailColumnsOrder,
     Set<FileDetailColumn>? hiddenDetailColumns,
     bool? showGridFileNames,
+    bool? showListThumbnails,
   }) =>
       FileManagerToolbarConfig(
         order: order ?? this.order,
@@ -100,6 +104,7 @@ class FileManagerToolbarConfig {
         detailColumnsOrder: detailColumnsOrder ?? this.detailColumnsOrder,
         hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
         showGridFileNames: showGridFileNames ?? this.showGridFileNames,
+        showListThumbnails: showListThumbnails ?? this.showListThumbnails,
       );
 
   Map<String, dynamic> toJson() => {
@@ -113,6 +118,7 @@ class FileManagerToolbarConfig {
         'hiddenDetailColumns':
             hiddenDetailColumns.map((c) => c.toJson()).toList(),
         'showGridFileNames': showGridFileNames,
+        'showListThumbnails': showListThumbnails,
       };
 
   factory FileManagerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -128,7 +134,6 @@ class FileManagerToolbarConfig {
         .map((v) => FileManagerAction.fromJson(v as String?))
         .whereType<FileManagerAction>()
         .toSet();
-
     final rawDetailColumns = (j['detailColumnsOrder'] as List<dynamic>? ?? [])
         .map((v) => FileDetailColumn.fromJson(v as String?))
         .whereType<FileDetailColumn>()
@@ -136,14 +141,12 @@ class FileManagerToolbarConfig {
     for (final c in FileDetailColumn.values) {
       if (!rawDetailColumns.contains(c)) rawDetailColumns.add(c);
     }
-
     final hiddenDetailColumns = j.containsKey('hiddenDetailColumns')
         ? (j['hiddenDetailColumns'] as List<dynamic>? ?? [])
             .map((v) => FileDetailColumn.fromJson(v as String?))
             .whereType<FileDetailColumn>()
             .toSet()
         : const {FileDetailColumn.type};
-
     return FileManagerToolbarConfig(
       order: rawOrder,
       hidden: hidden,
@@ -159,6 +162,7 @@ class FileManagerToolbarConfig {
           : rawDetailColumns,
       hiddenDetailColumns: hiddenDetailColumns,
       showGridFileNames: j['showGridFileNames'] as bool? ?? true,
+      showListThumbnails: j['showListThumbnails'] as bool? ?? true,
     );
   }
 }

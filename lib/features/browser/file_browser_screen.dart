@@ -2332,6 +2332,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       BrowserLayoutMode.list ||
       BrowserLayoutMode.compact =>
         FileListView(
+          container: widget.container,
+          currentDirPath: _currentDirPath,
+          thumbnailCacheMode: _resolvedThumbnailCacheMode,
+          thumbnailQuality: _resolvedThumbnailQuality,
+          showThumbnails: _toolbarConfig.showListThumbnails,
           dirs: dirs,
           files: files,
           isSelectionMode: isSelectionMode,

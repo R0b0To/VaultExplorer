@@ -554,6 +554,9 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
     FileOperation op,
     int modifiedSecs,
   ) async {
+    op._setActivity(
+      '${op.isCut ? "Moving" : "Copying"} ${destPath.split('/').last}…',
+    );
     try {
       final size = await vaultExplorerApi.getFileSize(src, srcPath);
       if (size < 0) return false;

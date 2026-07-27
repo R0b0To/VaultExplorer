@@ -2329,7 +2329,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
           mountedFolderPaths: _mountedDocProviderFolders,
         ),
-      BrowserLayoutMode.list ||
+BrowserLayoutMode.list ||
       BrowserLayoutMode.compact =>
         FileListView(
           container: widget.container,
@@ -2337,6 +2337,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           thumbnailCacheMode: _resolvedThumbnailCacheMode,
           thumbnailQuality: _resolvedThumbnailQuality,
           showThumbnails: _toolbarConfig.showListThumbnails,
+          initialZoomLevel: _toolbarConfig.listZoomLevel,
+          onZoomLevelChanged: (newZoom) {
+            _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
+            FileManagerToolbarService.instance.save(_toolbarConfig);
+          },
           dirs: dirs,
           files: files,
           isSelectionMode: isSelectionMode,

@@ -38,6 +38,7 @@ class FileManagerToolbarConfig {
   final Set<FileDetailColumn> hiddenDetailColumns;
   final bool showGridFileNames;
   final bool showListThumbnails;
+  final double listZoomLevel;
 
   const FileManagerToolbarConfig({
     required this.order,
@@ -53,6 +54,7 @@ class FileManagerToolbarConfig {
     this.hiddenDetailColumns = const {FileDetailColumn.type},
     this.showGridFileNames = true,
     this.showListThumbnails = true,
+    this.listZoomLevel = 1.0,
   });
 
   factory FileManagerToolbarConfig.defaults() => const FileManagerToolbarConfig(
@@ -75,6 +77,7 @@ class FileManagerToolbarConfig {
         hiddenDetailColumns: {FileDetailColumn.type},
         showGridFileNames: true,
         showListThumbnails: true,
+        listZoomLevel: 1.0,
       );
 
   List<FileManagerAction> get visible =>
@@ -94,6 +97,7 @@ class FileManagerToolbarConfig {
     Set<FileDetailColumn>? hiddenDetailColumns,
     bool? showGridFileNames,
     bool? showListThumbnails,
+    double? listZoomLevel,
   }) =>
       FileManagerToolbarConfig(
         order: order ?? this.order,
@@ -105,6 +109,7 @@ class FileManagerToolbarConfig {
         hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
         showGridFileNames: showGridFileNames ?? this.showGridFileNames,
         showListThumbnails: showListThumbnails ?? this.showListThumbnails,
+        listZoomLevel: listZoomLevel ?? this.listZoomLevel,
       );
 
   Map<String, dynamic> toJson() => {
@@ -119,6 +124,7 @@ class FileManagerToolbarConfig {
             hiddenDetailColumns.map((c) => c.toJson()).toList(),
         'showGridFileNames': showGridFileNames,
         'showListThumbnails': showListThumbnails,
+        'listZoomLevel': listZoomLevel,
       };
 
   factory FileManagerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -163,6 +169,7 @@ class FileManagerToolbarConfig {
       hiddenDetailColumns: hiddenDetailColumns,
       showGridFileNames: j['showGridFileNames'] as bool? ?? true,
       showListThumbnails: j['showListThumbnails'] as bool? ?? true,
+      listZoomLevel: (j['listZoomLevel'] as num?)?.toDouble() ?? 1.0,
     );
   }
 }

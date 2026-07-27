@@ -26,6 +26,8 @@ class FileListView extends StatefulWidget {
   final ThumbnailCacheMode thumbnailCacheMode;
   final ThumbnailQuality thumbnailQuality;
   final bool showThumbnails;
+  final double initialZoomLevel;
+  final ValueChanged<double>? onZoomLevelChanged;
 
   const FileListView({
     super.key,
@@ -46,6 +48,8 @@ class FileListView extends StatefulWidget {
     this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.showThumbnails = true,
+    this.initialZoomLevel = 1.0,
+    this.onZoomLevelChanged,
   });
 
   @override
@@ -54,7 +58,22 @@ class FileListView extends StatefulWidget {
 
 class _FileListViewState extends State<FileListView> {
   double _baselineScale = 1.0;
-  double _zoomLevel = 1.0;
+  late double _zoomLevel;
+
+  @override
+  void initState() {
+    super.initState();
+    _zoomLevel = widget.initialZoomLevel;
+  }
+
+  @override
+  void didUpdateWidget(covariant FileListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialZoomLevel != widget.initialZoomLevel &&
+        _zoomLevel != widget.initialZoomLevel) {
+      _zoomLevel = widget.initialZoomLevel;
+    }
+  }
 
   void _handleScaleStart(ScaleStartDetails details) {
     _baselineScale = _zoomLevel;
@@ -64,6 +83,10 @@ class _FileListViewState extends State<FileListView> {
     setState(() {
       _zoomLevel = (_baselineScale * details.scale).clamp(0.75, 2.0);
     });
+  }
+
+  void _handleScaleEnd(ScaleEndDetails details) {
+    widget.onZoomLevelChanged?.call(_zoomLevel);
   }
 
   @override
@@ -77,6 +100,7 @@ class _FileListViewState extends State<FileListView> {
             behavior: HitTestBehavior.opaque,
             onScaleStart: _handleScaleStart,
             onScaleUpdate: _handleScaleUpdate,
+            onScaleEnd: _handleScaleEnd,
             child: MediaQuery(
               data: MediaQuery.of(context).copyWith(
                 textScaler: TextScaler.linear(

@@ -208,7 +208,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       onLongPress: () => widget.onItemLongPress(entry),
       preview: Center(
         child: Icon(
-          Icons.folder_rounded,
+          isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
           size: AppIconSize.hero,
           color: isSelected ? cs.primary : (isMounted ? cs.tertiary : cs.secondary),
         ),

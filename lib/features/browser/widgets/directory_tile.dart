@@ -40,7 +40,9 @@ class DirectoryTile extends StatelessWidget {
         ? cs.tertiaryContainer.withValues(alpha: 0.4)
         : cs.secondaryContainer.withValues(alpha: 0.4);
     return FileRowShell(
-      icon: Icons.folder_rounded,
+      icon: isDocumentProviderMounted
+          ? Icons.folder_shared_rounded
+          : Icons.folder_rounded,
       iconColor: iconColor,
       unselectedIconBackground: iconBackground,
       displayName: entry.name,

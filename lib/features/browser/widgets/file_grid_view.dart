@@ -173,9 +173,9 @@ class _FileGridViewState extends State<FileGridView> {
       showFileName: widget.showFileNames,
       onTap: () => widget.onDirTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
-      preview: Center(
+            preview: Center(
         child: Icon(
-          Icons.folder_rounded,
+          isMounted ? Icons.folder_shared_rounded : Icons.folder_rounded,
           size: _crossAxisCount == 1 ? AppIconSize.hero + 16 : AppIconSize.hero,
           color: isSelected ? cs.primary : (isMounted ? cs.tertiary : cs.secondary),
         ),

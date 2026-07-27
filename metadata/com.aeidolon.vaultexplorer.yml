@@ -1,0 +1,41 @@
+Categories:
+  - Security
+  - System
+License: GPL-3.0-only
+SourceCode: https://github.com/R0b0To/VaultExplorer
+IssueTracker: https://github.com/R0b0To/VaultExplorer/issues
+
+# No ads, no tracking, no non-free dependencies, no prebuilt binaries --
+# ffmpeg is compiled from source during the build (see below).
+#
+# KNOWN BLOCKER (see /NOTICE.md "Confirmed blocker"): the vendored VeraCrypt
+# Common/Tcdefs.h and Common/Endian.c/.h carry a TrueCrypt License 3.0 /
+# Apache-2.0 mixed notice. TrueCrypt License 3.0 is non-free per the FSF/
+# F-Droid's own inclusion criteria. Do not submit to F-Droid until this is
+# resolved -- it will be rejected on review otherwise.
+AntiFeatures:
+
+RepoType: git
+Repo: https://github.com/R0b0To/VaultExplorer.git
+
+Builds:
+  - versionName: '1.0.0'
+    versionCode: 1
+    commit: v1.0.0
+    subdir: android
+    sudo:
+      - apt-get update
+      - apt-get install -y wget unzip nasm pkg-config
+    prebuild:
+      # Builds ffmpeg (LGPL, no --enable-gpl/--enable-nonfree, no network
+      # protocols) from source for every ABI. Same script Gradle's preBuild
+      # calls locally -- see ../scripts/build_ffmpeg_android.sh.
+      - cd .. && bash scripts/build_ffmpeg_android.sh
+    gradle:
+      - yes
+    ndk: r26d
+
+AutoUpdateMode: None
+UpdateCheckMode: Tags
+CurrentVersion: '1.0.0'
+CurrentVersionCode: 1

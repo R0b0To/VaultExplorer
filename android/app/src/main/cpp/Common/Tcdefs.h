@@ -16,7 +16,7 @@
  * fail to compile with an ordinary "undeclared identifier" error rather
  * than silently miscompiling -- nothing here guesses at unverified needs.
  *
- * Copyright (c) 2026, project contributors.
+ * Copyright (c) 2026, project contributors.a
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -27,6 +27,21 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <string.h>
+
+/* MSVC built-in types used by VeraCrypt's crypto primitives */
+#ifndef __int8
+#define __int8  char
+#endif
+#ifndef __int16
+#define __int16 short
+#endif
+#ifndef __int32
+#define __int32 int
+#endif
+#ifndef __int64
+#define __int64 long long
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -150,4 +165,4 @@ static inline void FAST_ERASE64(volatile void *mem, size_t size)
 }
 #endif
 
-#endif /* TCDEFS_H */
+#endif

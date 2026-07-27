@@ -7,7 +7,7 @@ include(FetchContent)
 FetchContent_Declare(
         mbedtls
         GIT_REPOSITORY https://github.com/Mbed-TLS/mbedtls.git
-        GIT_TAG        v3.6.0
+        GIT_TAG        2ca6c285a0dd3f33982dd57299012dacab1ff206 # v3.6.0
 )
 set(ENABLE_TESTING OFF CACHE BOOL "Disable mbedtls tests")
 set(ENABLE_PROGRAMS OFF CACHE BOOL "Disable mbedtls programs")
@@ -31,7 +31,7 @@ endif()
 FetchContent_Declare(
         fatfs
         GIT_REPOSITORY https://github.com/stm32duino/FatFs.git
-        GIT_TAG        4.0.4
+        GIT_TAG        cef1acad37d563e6b7dfd1c4fd3d48e7ff348947 # 4.0.4
 )
 FetchContent_MakeAvailable(fatfs)
 
@@ -178,7 +178,7 @@ target_link_libraries(e2fs_ext2fs PRIVATE e2fs_com_err e2fs_uuid)
 FetchContent_Declare(
         cjson
         GIT_REPOSITORY https://github.com/DaveGamble/cJSON.git
-        GIT_TAG        v1.7.18
+        GIT_TAG        acc76239bee01d8e9c858ae2cab296704e52d916 # v1.7.18
 )
 set(ENABLE_CJSON_TEST OFF CACHE BOOL "Disable cJSON tests")
 set(BUILD_SHARED_AND_STATIC_LIBS OFF CACHE BOOL "Build only static cJSON")
@@ -353,7 +353,7 @@ set_target_properties(swresample PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/
 FetchContent_Declare(
         oboe
         GIT_REPOSITORY https://github.com/google/oboe.git
-        GIT_TAG        1.10.0
+        GIT_TAG        a81bb9f87d4105b84b682685d3bfbb5beca371d1 # 1.10.0
 )
 FetchContent_MakeAvailable(oboe)
 
@@ -409,15 +409,7 @@ add_library(
         ${VC_CRYPTO_DIR}/Streebog.c
         ${VC_CRYPTO_DIR}/blake2s.c
         ${VC_CRYPTO_DIR}/cpu.c
-        # Clean-room, Android-only replacement for the upstream VeraCrypt
-        # Common/Endian.c (which itself derives from the TrueCrypt-License-3.0
-        # -tainted TrueCrypt 7.1a). See NOTICE.md and cpp/Common/AUDIT.md.
-        # ${CMAKE_CURRENT_SOURCE_DIR} is listed first in
-        # target_include_directories() below, so every vendored source's
-        # #include "Common/Endian.h" / "Common/Tcdefs.h" resolves to this
-        # directory before falling back to ${VC_SRC_DIR}'s copies -- no
-        # further changes are needed for the swap to take effect.
-        ${CMAKE_CURRENT_SOURCE_DIR}/Common/Endian.c
+        ${VC_COMMON_DIR}/Endian.c
         ${VC_ARGON2_DIR}/src/argon2.c
         ${VC_ARGON2_DIR}/src/core.c
         ${VC_ARGON2_DIR}/src/ref.c

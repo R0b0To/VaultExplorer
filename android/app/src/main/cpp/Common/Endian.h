@@ -119,4 +119,4 @@ uint64_t MirrorBytes64(uint64_t x);
 }
 #endif
 
-#endif /* TC_ENDIAN_H */
+#endif

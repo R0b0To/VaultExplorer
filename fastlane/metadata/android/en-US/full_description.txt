@@ -1,0 +1,14 @@
+Vault Explorer opens and browses encrypted disk containers directly on
+your device -- VeraCrypt/TrueCrypt volumes, LUKS, BitLocker, and raw
+VHD/VHDX images -- without exporting your files unencrypted to shared
+storage.
+
+Features:
+* Read/write NTFS, FAT, and ext2/3/4 filesystems inside a container
+* VeraCrypt/LUKS/BitLocker unlock, including cascaded ciphers
+* Built-in media preview for photos and video stored inside a vault
+* Create new encrypted containers and USB volumes
+* Biometric unlock
+
+Vault Explorer does not collect or transmit any data. All decryption
+happens locally on your device.

@@ -11,6 +11,18 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val buildFfmpeg = tasks.register<Exec>("buildFfmpegAndroid") {
+    description = "Builds libavcodec/avformat/avutil/swscale/swresample from source " +
+            "for every target ABI (scripts/build_ffmpeg_android.sh). No-op if already built. " +
+            "This replaces manually copying prebuilt .so files into cpp/ffmpeg/ -- required " +
+            "so the app can be built entirely from source (F-Droid) and so CI/Play builds " +
+            "don't depend on a binary that isn't in version control."
+    workingDir = rootProject.file("..")
+    commandLine("bash", "scripts/build_ffmpeg_android.sh")
+    inputs.file("../../scripts/build_ffmpeg_android.sh")
+    outputs.dir("src/main/cpp/ffmpeg")
+}
+
 android {
     namespace = "com.aeidolon.vaultexplorer"
     compileSdk = flutter.compileSdkVersion
@@ -94,3 +106,7 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation("junit:junit:4.13.2")
 }
+
+tasks.matching { it.name.startsWith("externalNativeBuild") || it.name.startsWith("configureCMake") }
+    .configureEach { dependsOn(buildFfmpeg) }
+tasks.named("preBuild").configure { dependsOn(buildFfmpeg) }

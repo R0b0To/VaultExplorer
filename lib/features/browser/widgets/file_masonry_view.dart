@@ -31,6 +31,10 @@ class FileMasonryView extends StatefulWidget {
   final ValueChanged<RawEntry>? onFileLongMenu;
   final String? searchQuery;
 
+  /// Full paths (relative to the container root) currently exposed as their
+  /// own document-provider (SAF) root.
+  final Set<String> mountedFolderPaths;
+
   const FileMasonryView({
     super.key,
     required this.container,
@@ -47,6 +51,7 @@ class FileMasonryView extends StatefulWidget {
     required this.onItemLongPress,
     this.onFileLongMenu,
     this.searchQuery,
+    this.mountedFolderPaths = const {},
   });
 
   @override
@@ -175,7 +180,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
                 '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}'),
             aspectRatio: ratio,
             child: isDir
-                ? _buildDirCell(context, entry)
+                ? _buildDirCell(context, entry, fullPath)
                 : _buildFileCell(context, entry, fullPath),
           );
         },
@@ -190,9 +195,10 @@ class _FileMasonryViewState extends State<FileMasonryView> {
         MediaViewerConstants.isVideo(fileName);
   }
 
-  Widget _buildDirCell(BuildContext context, RawEntry entry) {
+  Widget _buildDirCell(BuildContext context, RawEntry entry, String fullPath) {
     final isSelected = widget.selectedItems.contains(entry);
     final cs = Theme.of(context).colorScheme;
+    final isMounted = widget.mountedFolderPaths.contains(fullPath);
 
     return _MasonryCell(
       isSelected: isSelected,
@@ -204,7 +210,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
         child: Icon(
           Icons.folder_rounded,
           size: AppIconSize.hero,
-          color: isSelected ? cs.primary : cs.secondary,
+          color: isSelected ? cs.primary : (isMounted ? cs.tertiary : cs.secondary),
         ),
       ),
       label: entry.name,

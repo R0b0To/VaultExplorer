@@ -28,6 +28,10 @@ class FileGridView extends StatefulWidget {
   final ValueChanged<RawEntry>? onFileLongMenu;
   final String? searchQuery;
 
+  /// Full paths (relative to the container root) currently exposed as their
+  /// own document-provider (SAF) root.
+  final Set<String> mountedFolderPaths;
+
   const FileGridView({
     super.key,
     required this.container,
@@ -44,6 +48,7 @@ class FileGridView extends StatefulWidget {
     required this.onItemLongPress,
     this.onFileLongMenu,
     this.searchQuery,
+    this.mountedFolderPaths = const {},
   });
 
   @override
@@ -158,6 +163,10 @@ class _FileGridViewState extends State<FileGridView> {
   Widget _buildDirCell(BuildContext context, RawEntry entry) {
     final isSelected = widget.selectedItems.contains(entry);
     final cs = Theme.of(context).colorScheme;
+    final fullPath = widget.currentDirPath.isEmpty
+        ? entry.name
+        : '${widget.currentDirPath}/${entry.name}';
+    final isMounted = widget.mountedFolderPaths.contains(fullPath);
     return _GridCell(
       isSelected: isSelected,
       isSelectionMode: widget.isSelectionMode,
@@ -168,7 +177,7 @@ class _FileGridViewState extends State<FileGridView> {
         child: Icon(
           Icons.folder_rounded,
           size: _crossAxisCount == 1 ? AppIconSize.hero + 16 : AppIconSize.hero,
-          color: isSelected ? cs.primary : cs.secondary,
+          color: isSelected ? cs.primary : (isMounted ? cs.tertiary : cs.secondary),
         ),
       ),
       label: entry.name,

@@ -312,6 +312,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
       unlockMethod: _unlockMethod,
       autoCloseMins: _autoCloseMins,
       documentProvider: _documentProvider,
+      documentProviderFolders: widget.existingRecord?.documentProviderFolders ?? const [],
       thumbnailCacheMode: _thumbnailCacheMode,
       thumbnailQuality: _thumbnailQuality,
       cacheDerivedKey: _cacheDerivedKey,

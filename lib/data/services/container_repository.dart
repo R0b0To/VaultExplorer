@@ -12,6 +12,46 @@ void _logSwallowed(String method, Object error) {
   debugPrint('[ContainerRepository] $method failed: $error');
 }
 
+/// A single folder inside a container that has been exposed as its own
+/// Storage Access Framework root (independent from the container-wide
+/// [ContainerRecord.documentProvider] toggle).
+@immutable
+class DocumentProviderFolder {
+  /// Path of the folder relative to the container root (never empty —
+  /// the container root itself is controlled by [ContainerRecord.documentProvider]).
+  final String path;
+
+  /// Whether this folder should be re-exposed automatically the next
+  /// time the container is unlocked.
+  final bool autoMount;
+
+  const DocumentProviderFolder({required this.path, this.autoMount = false});
+
+  /// Display name is just the last path segment.
+  String get name => path.contains('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
+
+  DocumentProviderFolder copyWith({bool? autoMount}) => DocumentProviderFolder(
+        path: path,
+        autoMount: autoMount ?? this.autoMount,
+      );
+
+  Map<String, dynamic> toJson() => {'path': path, 'autoMount': autoMount};
+
+  factory DocumentProviderFolder.fromJson(Map<String, dynamic> j) =>
+      DocumentProviderFolder(
+        path: j['path'] as String? ?? '',
+        autoMount: j['autoMount'] as bool? ?? false,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DocumentProviderFolder && other.path == path && other.autoMount == autoMount;
+
+  @override
+  int get hashCode => Object.hash(path, autoMount);
+}
+
 enum ContainerUnlockMethod {
   password,
   rememberPassword,
@@ -129,6 +169,41 @@ class ContainerRepository {
     await _persist();
   }
 
+  /// Records that [path] (relative to the container root) is now exposed
+  /// as its own document-provider root, or clears that record when
+  /// [exposed] is false. Does not touch the mount itself — the caller is
+  /// expected to have already called the native mount/unmount API.
+  Future<void> setFolderExposed(
+    String uri,
+    String path, {
+    required bool exposed,
+    bool autoMount = false,
+  }) async {
+    await _ensureLoaded();
+    final existing = _cache![uri];
+    if (existing == null) return;
+    final folders = existing.documentProviderFolders
+        .where((f) => f.path != path)
+        .toList();
+    if (exposed) {
+      folders.add(DocumentProviderFolder(path: path, autoMount: autoMount));
+    }
+    _cache![uri] = existing.copyWith(documentProviderFolders: folders);
+    await _persist();
+  }
+
+  /// Updates just the auto-mount flag for an already-exposed folder.
+  Future<void> setFolderAutoMount(String uri, String path, bool autoMount) async {
+    await _ensureLoaded();
+    final existing = _cache![uri];
+    if (existing == null) return;
+    final folders = existing.documentProviderFolders
+        .map((f) => f.path == path ? f.copyWith(autoMount: autoMount) : f)
+        .toList();
+    _cache![uri] = existing.copyWith(documentProviderFolders: folders);
+    await _persist();
+  }
+
   Future<String?> getPassword(String uri) =>
       _secure.read(key: _keystoreKey(uri));
 
@@ -188,6 +263,7 @@ class ContainerRecord {
   final ContainerUnlockMethod unlockMethod;
   final int autoCloseMins;
   final bool documentProvider;
+  final List<DocumentProviderFolder> documentProviderFolders;
   final ThumbnailCacheMode? thumbnailCacheMode;
   final ThumbnailQuality? thumbnailQuality;
   final bool cacheDerivedKey;
@@ -206,6 +282,7 @@ class ContainerRecord {
     this.unlockMethod = ContainerUnlockMethod.password,
     this.autoCloseMins = 0,
     this.documentProvider = false,
+    this.documentProviderFolders = const [],
     this.thumbnailCacheMode,
     this.thumbnailQuality,
     this.readOnly = false,
@@ -226,6 +303,7 @@ class ContainerRecord {
     ContainerUnlockMethod? unlockMethod,
     int? autoCloseMins,
     bool? documentProvider,
+    List<DocumentProviderFolder>? documentProviderFolders,
     Object? thumbnailCacheMode = _keep,
     Object? thumbnailQuality = _keep,
     bool? cacheDerivedKey,
@@ -244,6 +322,7 @@ class ContainerRecord {
       unlockMethod: unlockMethod ?? this.unlockMethod,
       autoCloseMins: autoCloseMins ?? this.autoCloseMins,
       documentProvider: documentProvider ?? this.documentProvider,
+      documentProviderFolders: documentProviderFolders ?? this.documentProviderFolders,
       thumbnailCacheMode: thumbnailCacheMode == _keep
           ? this.thumbnailCacheMode
           : thumbnailCacheMode as ThumbnailCacheMode?,
@@ -268,6 +347,8 @@ class ContainerRecord {
         'unlockMethod': unlockMethod.toJson(),
         'autoCloseMins': autoCloseMins,
         'documentProvider': documentProvider,
+        'documentProviderFolders':
+            documentProviderFolders.map((f) => f.toJson()).toList(),
         if (thumbnailCacheMode != null)
           'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
         if (thumbnailQuality != null)
@@ -289,6 +370,9 @@ class ContainerRecord {
       unlockMethod: method,
       autoCloseMins: j['autoCloseMins'] as int? ?? 0,
       documentProvider: j['documentProvider'] as bool? ?? false,
+      documentProviderFolders: (j['documentProviderFolders'] as List<dynamic>? ?? [])
+          .map((e) => DocumentProviderFolder.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(),
       thumbnailCacheMode: j.containsKey('thumbnailCacheMode')
           ? ThumbnailCacheMode.fromJson(j['thumbnailCacheMode'] as String?)
           : null,

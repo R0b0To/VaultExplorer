@@ -76,6 +76,9 @@ private object ChannelMethods {
     const val UNLOCK_CRYFS_VAULT        = "unlockCryfsVault"
     const val CREATE_CRYFS_VAULT        = "createCryfsVault"
     const val IS_CRYFS_VAULT            = "isCryfsVault"
+    const val MOUNT_CONTAINER_FOLDER    = "mountContainerFolder"
+    const val UNMOUNT_CONTAINER_FOLDER  = "unmountContainerFolder"
+    const val GET_MOUNTED_CONTAINER_FOLDERS = "getMountedContainerFolders"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -106,6 +109,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val importExportHandlers = ImportExportHandlers(this, pendingResult, ioExecutor, nativeOps)
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
+    private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
 
     override fun onDestroy() {
         chooserReceiver?.let { unregisterReceiver(it) }
@@ -282,6 +286,9 @@ vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(
                 ChannelMethods.IMPORT_FOLDER -> importExportHandlers.handleImportFolder(call, result)
                 ChannelMethods.EXPORT_FILE -> importExportHandlers.handleExportFile(call, result)
                 ChannelMethods.WRITE_FILE_CHUNK -> fileOperationHandlers.handleWriteFileChunk(call, result)
+                ChannelMethods.MOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleMountContainerFolder(call, result)
+                ChannelMethods.UNMOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleUnmountContainerFolder(call, result)
+                ChannelMethods.GET_MOUNTED_CONTAINER_FOLDERS -> folderDocumentProviderHandlers.handleGetMountedContainerFolders(call, result)
                 else -> result.notImplemented()
             }
         }

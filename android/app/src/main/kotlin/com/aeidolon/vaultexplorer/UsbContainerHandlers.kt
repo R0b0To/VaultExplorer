@@ -101,6 +101,7 @@ class UsbContainerHandlers(
         val pim           = call.argument<Number>("pim")?.toInt() ?: 0
         val displayName   = call.argument<String>("displayName")
         val docProvider   = call.argument<Boolean>("documentProvider") ?: false
+        val autoMountFolders = call.argument<List<String>>("autoMountFolders")
         val cipherId      = call.argument<Number>("cipherId")?.toInt() ?: 255
         val hashId        = call.argument<Number>("hashId")?.toInt() ?: 255
         val preservedKeyBase64 = call.argument<String>("preservedKey")
@@ -177,7 +178,10 @@ class UsbContainerHandlers(
                             isUsbSource = true,
                             readOnly = readOnly,
                         )
-                        if (docProvider) {
+                        ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
+                        val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
+                            ?.subFolderMounts?.isNotEmpty() == true
+                        if (docProvider || hasFolderMounts) {
                             activity.contentResolver.notifyChange(
                                 DocumentsContract.buildRootsUri(
                                     "com.aeidolon.vaultexplorer.documents"), null)

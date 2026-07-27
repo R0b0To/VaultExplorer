@@ -39,6 +39,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
+import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/truncated_banner.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
@@ -110,6 +111,85 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
+
+  /// Paths (relative to the container root) currently exposed as their own
+  /// document-provider (SAF) root for this container's active session.
+  Set<String> _mountedDocProviderFolders = {};
+
+  String _fullPathOf(RawEntry entry) =>
+      _currentDirPath.isEmpty ? entry.name : '$_currentDirPath/${entry.name}';
+
+  bool _isFolderMounted(RawEntry entry) =>
+      entry.isDir && _mountedDocProviderFolders.contains(_fullPathOf(entry));
+
+  Future<void> _refreshMountedDocProviderFolders() async {
+    final paths =
+        await vaultExplorerApi.getMountedContainerFolders(widget.container.uri);
+    if (!mounted) return;
+    setState(() => _mountedDocProviderFolders = paths.toSet());
+  }
+
+  Future<void> _toggleFolderDocumentProvider(RawEntry entry) async {
+    final path = _fullPathOf(entry);
+    final ok = await vaultExplorerApi.mountContainerFolder(
+      widget.container.uri,
+      path,
+      displayName: entry.name,
+    );
+    if (!mounted) return;
+    if (!ok) {
+      showAppSnackBar(context, message: 'Could not expose "${entry.name}".');
+      return;
+    }
+    setState(() => _mountedDocProviderFolders = {..._mountedDocProviderFolders, path});
+    await ContainerRepository.instance
+        .setFolderExposed(widget.container.uri, path, exposed: true);
+    if (!mounted) return;
+    showAppSnackBar(
+      context,
+      message: '"${entry.name}" is now available to other apps.',
+    );
+  }
+
+  Future<void> _unmountFolderDocumentProvider(RawEntry entry) async {
+    final path = _fullPathOf(entry);
+    final ok = await vaultExplorerApi.unmountContainerFolder(widget.container.uri, path);
+    if (!mounted) return;
+    if (!ok) {
+      showAppSnackBar(context, message: 'Could not unmount "${entry.name}".');
+      return;
+    }
+    setState(() {
+      _mountedDocProviderFolders = {..._mountedDocProviderFolders}..remove(path);
+    });
+    await ContainerRepository.instance
+        .setFolderExposed(widget.container.uri, path, exposed: false);
+  }
+
+  Future<void> _setFolderAutoMount(RawEntry entry, bool autoMount) async {
+    final path = _fullPathOf(entry);
+    await ContainerRepository.instance
+        .setFolderAutoMount(widget.container.uri, path, autoMount);
+  }
+
+  Future<void> _showFolderDocumentProviderSheet(RawEntry entry) async {
+    final path = _fullPathOf(entry);
+    final records = await ContainerRepository.instance.loadAll();
+    final record = records[widget.container.uri];
+    final matches = record?.documentProviderFolders.where((f) => f.path == path) ?? const [];
+    final existing = matches.isEmpty ? null : matches.first;
+    if (!mounted) return;
+    final action = await FolderDocumentProviderSheet.show(
+      context,
+      folderName: entry.name,
+      initialAutoMount: existing?.autoMount ?? false,
+      onAutoMountChanged: (value) => _setFolderAutoMount(entry, value),
+    );
+    if (action == FolderDocumentProviderAction.unmount) {
+      await _unmountFolderDocumentProvider(entry);
+    }
+  }
+
   bool get _isReadOnly => widget.container.readOnly;
 
   @override
@@ -118,6 +198,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _freeSpace = widget.container.freeSpace;
     _initSettingsAndContents();
     _loadToolbarConfig();
+    _refreshMountedDocProviderFolders();
     VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
   }
 
@@ -1852,6 +1933,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (isSelectionMode) {
       final single = selectedItems.length == 1;
       final singleFile = single && !selectedItems.first.isDir;
+      final singleFolder = single && selectedItems.first.isDir;
+      final folderDocProviderMounted =
+          singleFolder && _isFolderMounted(selectedItems.first);
       final totalBytes = selectedTotalBytes;
       final isPending = hasPendingFolderSizes;
 
@@ -1909,12 +1993,24 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
 
+      Future<void> doToggleDocProvider() async {
+        final entry = selectedItems.first;
+        exitSelectionMode();
+        if (folderDocProviderMounted) {
+          await _showFolderDocumentProviderSheet(entry);
+        } else {
+          await _toggleFolderDocumentProvider(entry);
+        }
+      }
+
       if (!isLandscape) {
         return SelectionAppBar(
           selectedCount: selectedItems.length,
           selectionLabel: sizeLabel,
           singleSelected: single,
           singleFileSelected: singleFile,
+          singleFolderSelected: singleFolder,
+          folderDocumentProviderMounted: folderDocProviderMounted,
           readOnly: _isReadOnly,
           onClose: exitSelectionMode,
           onSelectAll: () => setState(() => selectedItems.addAll(allItems)),
@@ -1924,6 +2020,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onExport: _exportSelectedToStorage,
           onDelete: _batchDelete,
           onOpenWithApp: doOpenWithApp,
+          onToggleDocumentProvider: doToggleDocProvider,
         );
       }
 
@@ -1998,6 +2095,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             onSelected: (value) {
               if (value == 'export') _exportSelectedToStorage();
               if (value == 'open_with_app') doOpenWithApp();
+              if (value == 'doc_provider') doToggleDocProvider();
               if (value == 'select_all') {
                 setState(() => selectedItems.addAll(allItems));
               }
@@ -2033,6 +2131,25 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                       ),
                       const SizedBox(width: 12),
                       const Text('Open with App'),
+                    ],
+                  ),
+                ),
+              if (singleFolder)
+                PopupMenuItem<String>(
+                  value: 'doc_provider',
+                  child: Row(
+                    children: [
+                      Icon(
+                        folderDocProviderMounted
+                            ? Icons.folder_shared_rounded
+                            : Icons.folder_shared_outlined,
+                        color: folderDocProviderMounted ? cs.tertiary : cs.onSurfaceVariant,
+                        size: AppIconSize.small,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(folderDocProviderMounted
+                          ? 'Document Provider Settings'
+                          : 'Expose as Document Provider'),
                     ],
                   ),
                 ),
@@ -2179,6 +2296,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onFileTap: _handleFileTap,
           onItemLongPress: _handleItemLongPress,
           searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
+          mountedFolderPaths: _mountedDocProviderFolders,
         ),
       BrowserLayoutMode.masonry => FileMasonryView(
           container: widget.container,
@@ -2194,6 +2312,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onFileTap: _handleFileTap,
           onItemLongPress: _handleItemLongPress,
           searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
+          mountedFolderPaths: _mountedDocProviderFolders,
         ),
       BrowserLayoutMode.list ||
       BrowserLayoutMode.compact =>
@@ -2208,6 +2327,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onFileTap: _handleFileTap,
           onItemLongPress: _handleItemLongPress,
           searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
+          isFolderMounted: _isFolderMounted,
         ),
     };
 

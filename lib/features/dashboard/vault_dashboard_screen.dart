@@ -314,6 +314,11 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
     final record = uri != null ? _records[uri] : null;
     final docProvider = record?.documentProvider ?? _appSettings.defaultDocumentProvider;
+    final autoMountFolders = record?.documentProviderFolders
+            .where((f) => f.autoMount)
+            .map((f) => f.path)
+            .toList() ??
+        const <String>[];
     MountedContainer? newlyMountedContainer;
     try {
       if (!mounted) return;
@@ -329,6 +334,7 @@ class _VaultDashboardState extends State<VaultDashboard>
             initialName: name,
             prefillPassword: rememberedPassword,
             documentProvider: docProvider,
+            autoMountFolders: autoMountFolders,
             mountedUris: _mounted.map((c) => c.uri).toList(),
           ),
         ),
@@ -365,6 +371,11 @@ class _VaultDashboardState extends State<VaultDashboard>
               newlyMountedContainer = container;
             },
             documentProvider: existingRecord?.documentProvider ?? _appSettings.defaultDocumentProvider,
+            autoMountFolders: existingRecord?.documentProviderFolders
+                    .where((f) => f.autoMount)
+                    .map((f) => f.path)
+                    .toList() ??
+                const <String>[],
             existingRecord: existingRecord,
             prefillPassword: rememberedPassword,
           ),

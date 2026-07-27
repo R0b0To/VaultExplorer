@@ -16,6 +16,7 @@ import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 class UsbUnlockSheet extends StatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
   final bool documentProvider;
+  final List<String> autoMountFolders;
   final ContainerRecord? existingRecord;
   final String? prefillPassword;
   final void Function(MountedContainer container, ContainerRecord migratedRecord, String oldUri)? onReconnected;
@@ -25,6 +26,7 @@ class UsbUnlockSheet extends StatefulWidget {
     super.key,
     required this.onMounted,
     this.documentProvider = false,
+    this.autoMountFolders = const [],
     this.existingRecord,
     this.prefillPassword,
     this.onReconnected,
@@ -446,6 +448,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
               pim,
               displayName: displayName,
               documentProvider: widget.documentProvider,
+              autoMountFolders: widget.autoMountFolders,
               cipherId: _cipherId,
               hashId: _hashId,
               preservedKey: resolvedPreservedKey,
@@ -459,6 +462,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
               pim,
               displayName: displayName,
               documentProvider: widget.documentProvider,
+              autoMountFolders: widget.autoMountFolders,
               cipherId: _cipherId,
               hashId: _hashId,
               preservedKey: resolvedPreservedKey,
@@ -480,6 +484,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
             pim,
             displayName: displayName,
             documentProvider: widget.documentProvider,
+            autoMountFolders: widget.autoMountFolders,
             cipherId: _cipherId,
             hashId: _hashId,
             preservedKey: null,
@@ -533,6 +538,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
           unlockMethod: existing.unlockMethod,
           autoCloseMins: existing.autoCloseMins,
           documentProvider: existing.documentProvider,
+          documentProviderFolders: existing.documentProviderFolders,
           thumbnailCacheMode: existing.thumbnailCacheMode,
           cacheDerivedKey: shouldCacheDerivedKey,
           readOnly: _readOnly,

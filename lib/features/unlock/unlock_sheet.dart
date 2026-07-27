@@ -20,6 +20,7 @@ class UnlockSheet extends StatefulWidget {
   final String? initialName;
   final String? prefillPassword;
   final bool documentProvider;
+  final List<String> autoMountFolders;
   final List<String> mountedUris;
 
   const UnlockSheet({
@@ -29,6 +30,7 @@ class UnlockSheet extends StatefulWidget {
     this.initialName,
     this.prefillPassword,
     this.documentProvider = false,
+    this.autoMountFolders = const [],
     this.mountedUris = const [],
   });
 
@@ -258,6 +260,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         unlockMethod: existing.unlockMethod,
         autoCloseMins: existing.autoCloseMins,
         documentProvider: existing.documentProvider,
+        documentProviderFolders: existing.documentProviderFolders,
         thumbnailCacheMode: existing.thumbnailCacheMode,
         cacheDerivedKey: existing.cacheDerivedKey,
         pendingPassword: savedPassword,
@@ -572,6 +575,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                 effectivePassword,
                 displayName: name,
                 documentProvider: widget.documentProvider,
+                autoMountFolders: widget.autoMountFolders,
                 readOnly: _readOnly,
               )
             : _isGocryptfs
@@ -580,6 +584,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                     effectivePassword,
                     displayName: name,
                     documentProvider: widget.documentProvider,
+                    autoMountFolders: widget.autoMountFolders,
                     readOnly: _readOnly,
                   )
                 : resolvedPreservedKey == null
@@ -588,6 +593,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                         effectivePassword,
                         displayName: name,
                         documentProvider: widget.documentProvider,
+                        autoMountFolders: widget.autoMountFolders,
                         readOnly: _readOnly,
                         cacheDerivedKey: shouldCacheDerivedKey,
                       )
@@ -596,6 +602,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                           effectivePassword,
                           displayName: name,
                           documentProvider: widget.documentProvider,
+                          autoMountFolders: widget.autoMountFolders,
                           readOnly: _readOnly,
                           preservedKey: resolvedPreservedKey,
                           cacheDerivedKey: shouldCacheDerivedKey,
@@ -613,6 +620,7 @@ class _UnlockSheetState extends State<UnlockSheet>
               effectivePassword,
               displayName: name,
               documentProvider: widget.documentProvider,
+              autoMountFolders: widget.autoMountFolders,
               readOnly: _readOnly,
               cacheDerivedKey: shouldCacheDerivedKey,
             );
@@ -710,6 +718,7 @@ class _UnlockSheetState extends State<UnlockSheet>
               pim,
               displayName: name,
               documentProvider: widget.documentProvider,
+              autoMountFolders: widget.autoMountFolders,
               cipherId: _cipherId,
               hashId: _hashId,
               preservedKey: resolvedPreservedKey,
@@ -723,6 +732,7 @@ class _UnlockSheetState extends State<UnlockSheet>
               pim,
               displayName: name,
               documentProvider: widget.documentProvider,
+              autoMountFolders: widget.autoMountFolders,
               cipherId: _cipherId,
               hashId: _hashId,
               preservedKey: resolvedPreservedKey,
@@ -744,6 +754,7 @@ class _UnlockSheetState extends State<UnlockSheet>
             pim,
             displayName: name,
             documentProvider: widget.documentProvider,
+            autoMountFolders: widget.autoMountFolders,
             cipherId: _cipherId,
             hashId: _hashId,
             preservedKey: null,

@@ -52,6 +52,12 @@ class FileRowShell extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
+  /// Optional small badge stacked on the bottom-right corner of the leading
+  /// icon (e.g. a "shared" indicator). Kept independent of [iconColor] so
+  /// the state reads clearly even if the two colors are close in a given
+  /// theme.
+  final Widget? iconBadge;
+
   const FileRowShell({
     super.key,
     required this.icon,
@@ -67,6 +73,7 @@ class FileRowShell extends StatelessWidget {
     required this.onLongPress,
     this.isCompact = false,
     this.zoomLevel = 1.0,
+    this.iconBadge,
   });
 
   Widget _buildColumnWidget(FileDetailColumn col, BuildContext context) {
@@ -131,22 +138,33 @@ class FileRowShell extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: (isCompact ? 32 : 44) * zoomLevel,
-                height: (isCompact ? 32 : 44) * zoomLevel,
-                decoration: BoxDecoration(
-                  color: squircleBackground,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: AppIconSize.action * zoomLevel,
-                  color: TileSelectionStyle.leadingIconColor(
-                    cs,
-                    selected: isSelected,
-                    unselectedColor: iconColor,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: (isCompact ? 32 : 44) * zoomLevel,
+                    height: (isCompact ? 32 : 44) * zoomLevel,
+                    decoration: BoxDecoration(
+                      color: squircleBackground,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      icon,
+                      size: AppIconSize.action * zoomLevel,
+                      color: TileSelectionStyle.leadingIconColor(
+                        cs,
+                        selected: isSelected,
+                        unselectedColor: iconColor,
+                      ),
+                    ),
                   ),
-                ),
+                  if (iconBadge != null && !isSelected)
+                    Positioned(
+                      right: -2,
+                      bottom: -2,
+                      child: iconBadge!,
+                    ),
+                ],
               ),
               const SizedBox(width: 16),
               Expanded(

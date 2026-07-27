@@ -14,6 +14,12 @@ abstract final class ChannelMethods {
   static const cancelUnlock = 'cancelUnlock';
   static const changeContainerPassword = 'changeContainerPassword';
 
+  // Exposes/unmounts a single folder inside an unlocked container as its
+  // own SAF root, independent of the container-wide documentProvider flag.
+  static const mountContainerFolder = 'mountContainerFolder';
+  static const unmountContainerFolder = 'unmountContainerFolder';
+  static const getMountedContainerFolders = 'getMountedContainerFolders';
+
   static const hasAllFilesAccess = 'hasAllFilesAccess';
   static const requestAllFilesAccess = 'requestAllFilesAccess';
   

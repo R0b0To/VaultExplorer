@@ -14,6 +14,10 @@ class DirectoryTile extends StatelessWidget {
   final double zoomLevel;
   final List<FileDetailColumn> detailColumns;
 
+  /// True when this folder is currently exposed as its own document-provider
+  /// (SAF) root — shown with a distinct icon color so it stands out.
+  final bool isDocumentProviderMounted;
+
   const DirectoryTile({
     super.key,
     required this.entry,
@@ -25,15 +29,20 @@ class DirectoryTile extends StatelessWidget {
     this.isCompact = false,
     this.zoomLevel = 1.0,
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
+    this.isDocumentProviderMounted = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final iconColor = isDocumentProviderMounted ? cs.tertiary : cs.secondary;
+    final iconBackground = isDocumentProviderMounted
+        ? cs.tertiaryContainer.withValues(alpha: 0.4)
+        : cs.secondaryContainer.withValues(alpha: 0.4);
     return FileRowShell(
       icon: Icons.folder_rounded,
-      iconColor: cs.secondary,
-      unselectedIconBackground: cs.secondaryContainer.withValues(alpha: 0.4),
+      iconColor: iconColor,
+      unselectedIconBackground: iconBackground,
       displayName: entry.name,
       searchQuery: searchQuery,
       entry: entry,

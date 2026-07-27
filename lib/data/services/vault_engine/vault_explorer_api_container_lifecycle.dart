@@ -211,6 +211,7 @@ mixin _ContainerLifecycleOps {
     String password, {
     String? displayName,
     bool documentProvider = false,
+    List<String> autoMountFolders = const [],
     bool readOnly = false,
   }) async {
     final raw = await _channel
@@ -219,6 +220,7 @@ mixin _ContainerLifecycleOps {
           'password': password,
           'displayName': displayName,
           'documentProvider': documentProvider,
+          'autoMountFolders': autoMountFolders,
           'readOnly': readOnly,
         });
     if (raw == null) return null;
@@ -281,6 +283,7 @@ mixin _ContainerLifecycleOps {
     String password, {
     String? displayName,
     bool documentProvider = false,
+    List<String> autoMountFolders = const [],
     bool readOnly = false,
   }) async {
     final raw = await _channel
@@ -289,6 +292,7 @@ mixin _ContainerLifecycleOps {
           'password': password,
           'displayName': displayName,
           'documentProvider': documentProvider,
+          'autoMountFolders': autoMountFolders,
           'readOnly': readOnly,
         });
     if (raw == null) return null;
@@ -351,6 +355,7 @@ mixin _ContainerLifecycleOps {
     String password, {
     String? displayName,
     bool documentProvider = false,
+    List<String> autoMountFolders = const [],
     bool readOnly = false,
     Uint8List? preservedKey,
     bool cacheDerivedKey = false,
@@ -361,6 +366,7 @@ mixin _ContainerLifecycleOps {
           'password': password,
           'displayName': displayName,
           'documentProvider': documentProvider,
+          'autoMountFolders': autoMountFolders,
           'readOnly': readOnly,
           if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
           'cacheDerivedKey': cacheDerivedKey,
@@ -421,6 +427,7 @@ mixin _ContainerLifecycleOps {
     int pim, {
     String? displayName,
     bool documentProvider = false,
+    List<String> autoMountFolders = const [],
     int? cipherId,
     int? hashId,
     Uint8List? preservedKey,
@@ -435,6 +442,7 @@ mixin _ContainerLifecycleOps {
           'pim': pim,
           'displayName': displayName,
           'documentProvider': documentProvider,
+          'autoMountFolders': autoMountFolders,
           'cipherId': cipherId ?? 255,
           'hashId': hashId ?? 255,
           if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
@@ -511,6 +519,7 @@ mixin _ContainerLifecycleOps {
     int pim, {
     String? displayName,
     bool documentProvider = false,
+    List<String> autoMountFolders = const [],
     int? cipherId,
     int? hashId,
     Uint8List? preservedKey,
@@ -526,6 +535,7 @@ mixin _ContainerLifecycleOps {
         'pim': pim,
         'displayName': displayName,
         'documentProvider': documentProvider,
+        'autoMountFolders': autoMountFolders,
         'cipherId': cipherId ?? 255,
         'hashId': hashId ?? 255,
         if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
@@ -570,5 +580,54 @@ mixin _ContainerLifecycleOps {
           'documentProvider': documentProvider,
         });
     return result ?? false;
+  }
+
+  /// Exposes [path] (relative to the container root) as its own SAF root.
+  /// Requires the container to already be unlocked.
+  Future<bool> mountContainerFolder(
+    String filePath,
+    String path, {
+    String? displayName,
+  }) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.mountContainerFolder,
+        {'filePath': filePath, 'path': path, 'displayName': displayName},
+      );
+      return result ?? false;
+    } catch (e) {
+      _logSwallowed('mountContainerFolder', e);
+      return false;
+    }
+  }
+
+  /// Removes the SAF root created by [mountContainerFolder]. The container
+  /// itself stays unlocked.
+  Future<bool> unmountContainerFolder(String filePath, String path) async {
+    try {
+      final result = await _channel.invokeMethod<bool>(
+        ChannelMethods.unmountContainerFolder,
+        {'filePath': filePath, 'path': path},
+      );
+      return result ?? false;
+    } catch (e) {
+      _logSwallowed('unmountContainerFolder', e);
+      return false;
+    }
+  }
+
+  /// Paths (relative to the container root) currently exposed as their own
+  /// SAF root for this container's active session.
+  Future<List<String>> getMountedContainerFolders(String filePath) async {
+    try {
+      final result = await _channel.invokeMethod<List<Object?>>(
+        ChannelMethods.getMountedContainerFolders,
+        {'filePath': filePath},
+      );
+      return (result ?? const []).cast<String>();
+    } catch (e) {
+      _logSwallowed('getMountedContainerFolders', e);
+      return const [];
+    }
   }
 }

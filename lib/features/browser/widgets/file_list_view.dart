@@ -18,6 +18,10 @@ class FileListView extends StatefulWidget {
   final ValueChanged<RawEntry>? onFileLongMenu;
   final String? searchQuery;
 
+  /// True when a given directory entry is currently exposed as its own
+  /// document-provider (SAF) root.
+  final bool Function(RawEntry entry)? isFolderMounted;
+
   const FileListView({
     super.key,
     required this.dirs,
@@ -31,6 +35,7 @@ class FileListView extends StatefulWidget {
     required this.onItemLongPress,
     this.onFileLongMenu,
     this.searchQuery,
+    this.isFolderMounted,
   });
 
   @override
@@ -91,6 +96,7 @@ class _FileListViewState extends State<FileListView> {
                       zoomLevel: _zoomLevel,
                       detailColumns: widget.detailColumns,
                       searchQuery: widget.searchQuery,
+                      isDocumentProviderMounted: widget.isFolderMounted?.call(entry) ?? false,
                       onTap: () => widget.onDirTap(entry),
                       onLongPress: () => widget.onItemLongPress(entry),
                     );

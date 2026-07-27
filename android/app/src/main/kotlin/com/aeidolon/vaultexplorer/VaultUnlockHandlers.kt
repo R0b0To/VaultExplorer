@@ -30,6 +30,7 @@ class VaultUnlockHandlers(
         val pim         = call.argument<Number>("pim")?.toInt() ?: 0
         val displayName = call.argument<String>("displayName")
         val docProvider = call.argument<Boolean>("documentProvider") ?: false
+        val autoMountFolders = call.argument<List<String>>("autoMountFolders")
         val cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255
         val hashId      = call.argument<Number>("hashId")?.toInt() ?: 255
         val preservedKeyBase64 = call.argument<String>("preservedKey")
@@ -91,7 +92,10 @@ class VaultUnlockHandlers(
                             documentProvider = docProvider,
                             readOnly = readOnly,
                         )
-                        if (docProvider) {
+                        ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
+                        val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
+                            ?.subFolderMounts?.isNotEmpty() == true
+                        if (docProvider || hasFolderMounts) {
                             activity.contentResolver.notifyChange(
                                 DocumentsContract.buildRootsUri(
                                     "com.aeidolon.vaultexplorer.documents"), null)
@@ -127,6 +131,7 @@ class VaultUnlockHandlers(
         val password = call.argument<String>("password")
         val displayName = call.argument<String>("displayName")
         val docProvider = call.argument<Boolean>("documentProvider") ?: false
+        val autoMountFolders = call.argument<List<String>>("autoMountFolders")
         val readOnly = call.argument<Boolean>("readOnly") ?: false
         if (uriString == null || password == null) {
             result.error("INVALID_ARGS", "filePath and password required", null)
@@ -166,7 +171,10 @@ class VaultUnlockHandlers(
                                 documentProvider = docProvider,
                                 readOnly = readOnly,
                             )
-                            if (docProvider) {
+                            ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
+                            val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
+                                ?.subFolderMounts?.isNotEmpty() == true
+                            if (docProvider || hasFolderMounts) {
                                 activity.contentResolver.notifyChange(
                                     DocumentsContract.buildRootsUri(
                                         "com.aeidolon.vaultexplorer.documents"), null)
@@ -198,6 +206,7 @@ class VaultUnlockHandlers(
         val password = call.argument<String>("password")
         val displayName = call.argument<String>("displayName")
         val docProvider = call.argument<Boolean>("documentProvider") ?: false
+        val autoMountFolders = call.argument<List<String>>("autoMountFolders")
         val readOnly = call.argument<Boolean>("readOnly") ?: false
         if (uriString == null || password == null) {
             result.error("INVALID_ARGS", "filePath and password required", null)
@@ -237,7 +246,10 @@ class VaultUnlockHandlers(
                                 documentProvider = docProvider,
                                 readOnly = readOnly,
                             )
-                            if (docProvider) {
+                            ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
+                            val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
+                                ?.subFolderMounts?.isNotEmpty() == true
+                            if (docProvider || hasFolderMounts) {
                                 activity.contentResolver.notifyChange(
                                     DocumentsContract.buildRootsUri(
                                         "com.aeidolon.vaultexplorer.documents"), null)
@@ -269,6 +281,7 @@ class VaultUnlockHandlers(
         val password = call.argument<String>("password")
         val displayName = call.argument<String>("displayName")
         val docProvider = call.argument<Boolean>("documentProvider") ?: false
+        val autoMountFolders = call.argument<List<String>>("autoMountFolders")
         val readOnly = call.argument<Boolean>("readOnly") ?: false
         val preservedKeyBase64 = call.argument<String>("preservedKey")
         val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
@@ -320,7 +333,10 @@ class VaultUnlockHandlers(
                                 documentProvider = docProvider,
                                 readOnly = readOnly,
                             )
-                            if (docProvider) {
+                            ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
+                            val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
+                                ?.subFolderMounts?.isNotEmpty() == true
+                            if (docProvider || hasFolderMounts) {
                                 activity.contentResolver.notifyChange(
                                     DocumentsContract.buildRootsUri(
                                         "com.aeidolon.vaultexplorer.documents"), null)

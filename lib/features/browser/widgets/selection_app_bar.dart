@@ -6,6 +6,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String selectionLabel;
   final bool singleSelected;
   final bool singleFileSelected;
+  final bool singleFolderSelected;
+  final bool folderDocumentProviderMounted;
   final VoidCallback onClose;
   final VoidCallback onSelectAll;
   final VoidCallback onRename;
@@ -14,6 +16,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback onExport;
   final VoidCallback onDelete;
   final VoidCallback onOpenWithApp;
+  final VoidCallback? onToggleDocumentProvider;
   final bool readOnly;
 
   const SelectionAppBar({
@@ -22,6 +25,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.selectionLabel,
     required this.singleSelected,
     required this.singleFileSelected,
+    this.singleFolderSelected = false,
+    this.folderDocumentProviderMounted = false,
     required this.onClose,
     required this.onSelectAll,
     required this.onRename,
@@ -30,6 +35,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.onExport,
     required this.onDelete,
     required this.onOpenWithApp,
+    this.onToggleDocumentProvider,
     this.readOnly = false,
   });
 
@@ -156,6 +162,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             if (value == 'rename') onRename();
             if (value == 'export') onExport();
             if (value == 'open_with_app') onOpenWithApp();
+            if (value == 'doc_provider') onToggleDocumentProvider?.call();
           },
           itemBuilder: (context) => [
             if (!showCopy)
@@ -231,6 +238,25 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                     const SizedBox(width: 12),
                     const Text('Open with App'),
+                  ],
+                ),
+              ),
+            if (singleFolderSelected)
+              PopupMenuItem<String>(
+                value: 'doc_provider',
+                child: Row(
+                  children: [
+                    Icon(
+                      folderDocumentProviderMounted
+                          ? Icons.folder_shared_rounded
+                          : Icons.folder_shared_outlined,
+                      color: folderDocumentProviderMounted ? cs.tertiary : cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(folderDocumentProviderMounted
+                        ? 'Document Provider Settings'
+                        : 'Expose as Document Provider'),
                   ],
                 ),
               ),

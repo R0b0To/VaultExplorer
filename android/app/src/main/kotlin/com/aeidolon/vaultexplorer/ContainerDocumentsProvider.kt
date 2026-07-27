@@ -93,6 +93,35 @@ class ContainerDocumentsProvider : DocumentsProvider() {
                 }
             }
         }
+
+        // Folder-level roots: one extra SAF root per exposed subfolder,
+        // independent of whether the whole-container root above is shown.
+        for ((volId, session) in ContainerSessionRegistry.activeSessions) {
+            for (mount in session.subFolderMounts.values) {
+                var flags = DocumentsContract.Root.FLAG_LOCAL_ONLY or
+                        DocumentsContract.Root.FLAG_SUPPORTS_EJECT or
+                        DocumentsContract.Root.FLAG_SUPPORTS_IS_CHILD
+                if (!session.readOnly) {
+                    flags = flags or DocumentsContract.Root.FLAG_SUPPORTS_CREATE
+                }
+                val containerTitle = session.displayName
+                    ?: UriNameResolver.resolve(context?.contentResolver, Uri.parse(session.uri))
+
+                val row = cursor.newRow()
+                for (col in resolvedProjection) {
+                    when (col) {
+                        DocumentsContract.Root.COLUMN_ROOT_ID -> row.add("subfolder:$volId:${mount.fatPath}")
+                        DocumentsContract.Root.COLUMN_MIME_TYPES -> row.add("*/*")
+                        DocumentsContract.Root.COLUMN_DOCUMENT_ID -> row.add(DocumentId(volId, "dir", mount.fatPath).toString())
+                        DocumentsContract.Root.COLUMN_TITLE -> row.add(mount.displayName)
+                        DocumentsContract.Root.COLUMN_SUMMARY -> row.add("Folder in $containerTitle")
+                        DocumentsContract.Root.COLUMN_FLAGS -> row.add(flags)
+                        DocumentsContract.Root.COLUMN_ICON -> row.add(android.R.drawable.ic_lock_idle_charging)
+                        else -> row.add(null)
+                    }
+                }
+            }
+        }
         return cursor
     }
 
@@ -111,7 +140,23 @@ class ContainerDocumentsProvider : DocumentsProvider() {
     }
 
     override fun ejectRoot(rootId: String?) {
-        val volId = rootId?.toIntOrNull()
+        if (rootId == null) return
+
+        if (rootId.startsWith("subfolder:")) {
+            // Unmount just this folder's SAF root — the container stays unlocked.
+            val rest = rootId.removePrefix("subfolder:")
+            val volId = rest.substringBefore(":").toIntOrNull()
+                ?.takeIf { it in 0 until ContainerSessionRegistry.MAX_VOLUMES }
+                ?: return
+            val fatPath = rest.substringAfter(":", "")
+            ContainerSessionRegistry.activeSessions[volId]?.subFolderMounts?.remove(fatPath)
+            context?.contentResolver?.notifyChange(
+                DocumentsContract.buildRootsUri(AUTHORITY), null
+            )
+            return
+        }
+
+        val volId = rootId.toIntOrNull()
             ?.takeIf { it in 0 until ContainerSessionRegistry.MAX_VOLUMES }
             ?: return
         val session = ContainerSessionRegistry.activeSessions[volId]
@@ -177,6 +222,8 @@ class ContainerDocumentsProvider : DocumentsProvider() {
 
         ContainerFileSystem.requireSession(volId)
         val readOnly = ContainerSessionRegistry.activeSessions[volId]?.readOnly == true
+        val isSubfolderRoot =
+            ContainerSessionRegistry.activeSessions[volId]?.subFolderMounts?.containsKey(fatPath) == true
 
         var actualIsDir = doc.isDir
         var actualSize = 0L
@@ -220,7 +267,7 @@ val mimeType = doc.mimeTypeOverride ?: (
 
 addDocumentRow(
     cursor, resolvedProjection, doc.toString(), displayName,
-    mimeType, actualSize, actualIsDir, fatPath.isEmpty(), readOnly
+    mimeType, actualSize, actualIsDir, fatPath.isEmpty() || isSubfolderRoot, readOnly
 )
         return cursor
     }

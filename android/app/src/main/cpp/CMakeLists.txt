@@ -409,7 +409,15 @@ add_library(
         ${VC_CRYPTO_DIR}/Streebog.c
         ${VC_CRYPTO_DIR}/blake2s.c
         ${VC_CRYPTO_DIR}/cpu.c
-        ${VC_COMMON_DIR}/Endian.c
+        # Clean-room, Android-only replacement for the upstream VeraCrypt
+        # Common/Endian.c (which itself derives from the TrueCrypt-License-3.0
+        # -tainted TrueCrypt 7.1a). See NOTICE.md and cpp/Common/AUDIT.md.
+        # ${CMAKE_CURRENT_SOURCE_DIR} is listed first in
+        # target_include_directories() below, so every vendored source's
+        # #include "Common/Endian.h" / "Common/Tcdefs.h" resolves to this
+        # directory before falling back to ${VC_SRC_DIR}'s copies -- no
+        # further changes are needed for the swap to take effect.
+        ${CMAKE_CURRENT_SOURCE_DIR}/Common/Endian.c
         ${VC_ARGON2_DIR}/src/argon2.c
         ${VC_ARGON2_DIR}/src/core.c
         ${VC_ARGON2_DIR}/src/ref.c

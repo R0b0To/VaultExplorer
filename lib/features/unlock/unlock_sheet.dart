@@ -319,7 +319,8 @@ class _UnlockSheetState extends State<UnlockSheet>
 
       final ok = await localAuth.authenticate(
         localizedReason: 'Authenticate to unlock container',
-        options: const AuthenticationOptions(biometricOnly: false, stickyAuth: true),
+        biometricOnly: false,
+        persistAcrossBackgrounding: true,
       );
 
       if (ok && mounted) {
@@ -355,6 +356,17 @@ class _UnlockSheetState extends State<UnlockSheet>
             _showPasswordFallback = true;
           });
         }
+      }
+    } on LocalAuthException catch (e) {
+      final desc = e.description?.toLowerCase() ?? '';
+      if (e.code.name.toLowerCase().contains('progress') || desc.contains('progress')) {
+        return;
+      }
+      if (mounted) {
+        setState(() {
+          _error = 'Biometric error: ${e.code.name}';
+          _showPasswordFallback = true;
+        });
       }
     } on PlatformException catch (e) {
       if (e.code == 'auth_in_progress' ||

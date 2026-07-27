@@ -263,16 +263,12 @@ class FileOperation extends ChangeNotifier {
     _importTransferredBytes = transferredBytes;
     _importTotalBytes = totalBytes;
 
-    if (totalBytes > 0) {
-      final pct = ((transferredBytes / totalBytes) * 100).clamp(0, 100).round();
-      _currentActivity = currentName.isNotEmpty
-          ? 'Importing $currentName (${formatBytes(transferredBytes)} / ${formatBytes(totalBytes)} · $pct%)'
-          : 'Importing… ($pct%)';
-    } else if (currentName.isNotEmpty) {
-      _currentActivity = 'Importing $currentName…';
-    } else {
-      _currentActivity = 'Importing…';
-    }
+    // Byte/percent stats are surfaced separately by the UI (progress ring +
+    // sublabel), so currentActivity only needs to name what's in flight —
+    // mirrors how copy/move set theirs via _setActivity.
+    _currentActivity = currentName.isNotEmpty
+        ? 'Importing $currentName…'
+        : 'Importing…';
     notifyListeners();
   }
 

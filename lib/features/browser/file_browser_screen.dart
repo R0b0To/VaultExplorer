@@ -28,6 +28,7 @@ import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
+import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/mixins/selection_mixin.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
@@ -454,6 +455,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       _loadDirectoryContents(_currentDirPath);
     } else if (pref == 'media') {
       _openMediaViewer(entry.name, fullPath);
+    } else if (pref == 'pdf') {
+      await _openPdfViewer(fullPath);
     } else if (pref != null && pref.startsWith('package:')) {
       _openFileWithApp(entry.name, fullPath, packageName: pref.substring(8));
     } else if (pref == 'external') {
@@ -461,11 +464,24 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     } else {
       if (_isSupportedMedia(entry.name)) {
         _openMediaViewer(entry.name, fullPath);
+      } else if (ext == 'pdf') {
+        await _openPdfViewer(fullPath);
       } else {
         if (!mounted) return;
         await _showOpenWithDialog(entry.name, fullPath, ext, settings);
       }
     }
+  }
+
+  Future<void> _openPdfViewer(String fullPath) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            PdfViewerScreen(container: widget.container, filePath: fullPath),
+      ),
+    );
+    _loadDirectoryContents(_currentDirPath);
   }
 
   void _openMediaViewer(String fileName, String fullPath) {

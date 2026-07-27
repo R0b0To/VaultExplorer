@@ -355,7 +355,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
         final localAuth = LocalAuthentication();
         final ok = await localAuth.authenticate(
           localizedReason: 'Authenticate to modify settings',
-          options: const AuthenticationOptions(stickyAuth: true),
+          persistAcrossBackgrounding: true,
         );
         if (ok && mounted) {
           setState(() => _settingsLocked = false);

@@ -109,12 +109,17 @@ class _LockGateScreenState extends State<LockGateScreen> {
       }
       final ok = await _localAuth.authenticate(
         localizedReason: 'Unlock VaultExplorer',
-        options: const AuthenticationOptions(
-          biometricOnly: false,
-          stickyAuth: true,
-        ),
+        biometricOnly: false,
+        persistAcrossBackgrounding: true,
       );
       if (ok && mounted) _goToDashboard();
+    } on LocalAuthException catch (e) {
+      final desc = e.description?.toLowerCase() ?? '';
+      if (e.code.name.toLowerCase().contains('progress') || desc.contains('progress')) {
+        // Silently ignore race condition errors on startup/transitions
+        return;
+      }
+      if (mounted) setState(() => _error = 'Biometric error: ${e.code.name}');
     } on PlatformException catch (e) {
       if (e.code == 'auth_in_progress' ||
           e.code == 'AuthenticationInProgress' ||

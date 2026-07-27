@@ -10,18 +10,20 @@ dependencies:
   flutter:
     sdk: flutter
   path_provider: ^2.1.3
-  local_auth: ^2.3.0
+  local_auth: ^3.0.2
   pointycastle: ^3.6.2
   flutter_secure_storage: 10.3.1
   encrypt: ^5.0.3
   url_launcher:  ^6.3.2
   wakelock_plus: ^1.5.2
-  package_info_plus: ^9.0.1
+  package_info_plus: ^10.2.1
   vector_math: ^2.1.4
   archive: ^4.0.4      
   path: ^1.9.0
   sensors_plus: ^7.1.0
   flutter_staggered_grid_view: ^0.7.0
+  syncfusion_flutter_pdfviewer: ^34.1.32
+  syncfusion_flutter_pdf: ^34.1.32
 
 dev_dependencies:
   flutter_test:

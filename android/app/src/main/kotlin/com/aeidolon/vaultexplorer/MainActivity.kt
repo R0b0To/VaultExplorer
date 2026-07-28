@@ -96,7 +96,6 @@ class MainActivity : FlutterFragmentActivity() {
     private val fullResExecutor = Executors.newFixedThreadPool(2)
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
-    private var ffmpegPlayerPlugin: com.aeidolon.vaultexplorer.ffmpegplayer.FFmpegPlayerPlugin? = null
     private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
     private val pendingResult = PendingActivityResult()
     private val nativeOps = NativeOpSupport(this, ioExecutor)
@@ -116,8 +115,6 @@ class MainActivity : FlutterFragmentActivity() {
         usbPermissionReceiver?.let { unregisterReceiver(it) }
         usbDetachReceiver?.let { unregisterReceiver(it) }
         screenOffReceiver?.let { unregisterReceiver(it) }
-        ffmpegPlayerPlugin?.disposeAll()
-        ffmpegPlayerPlugin = null
         vaultCameraPlugin?.disposeAll()
         vaultCameraPlugin = null
         super.onDestroy()
@@ -138,16 +135,8 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-ffmpegPlayerPlugin = com.aeidolon.vaultexplorer.ffmpegplayer.FFmpegPlayerPlugin(
-    applicationContext,
-    flutterEngine.dartExecutor.binaryMessenger,
-    flutterEngine.renderer,
-)
-vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(
-    this,
-    flutterEngine.dartExecutor.binaryMessenger,
-    flutterEngine.renderer,
-)
+
+    vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(this,flutterEngine.dartExecutor.binaryMessenger,flutterEngine.renderer,)
         flutterEngine.platformViewsController.registry.registerViewFactory(
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),

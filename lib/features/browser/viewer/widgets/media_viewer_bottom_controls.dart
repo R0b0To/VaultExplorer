@@ -6,7 +6,7 @@ import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
 
-import '../native_ffmpeg_controller.dart';
+import '../native_video_controller.dart';
 
 class MediaViewerBottomControls extends StatelessWidget {
   final PlaylistController playlistController;
@@ -367,7 +367,7 @@ class MediaViewerBottomControls extends StatelessWidget {
     final bool isLast =
         playlistController.currentIndex == playlistController.playlist.length - 1;
 
-    return ValueListenableBuilder<NativeFFmpegController?>(
+    return ValueListenableBuilder<NativeVideoController?>(
       valueListenable: playbackManager.activeControllerNotifier,
       builder: (context, activeCtrl, _) {
         if (isImage || activeCtrl == null) {
@@ -380,7 +380,7 @@ class MediaViewerBottomControls extends StatelessWidget {
           );
         }
 
-        return ValueListenableBuilder<NativeFFmpegValue>(
+        return ValueListenableBuilder<NativeVideoValue>(
           valueListenable: activeCtrl,
           builder: (context, playerValue, _) {
             final bool isPlayingState = playerValue.isPlaying;

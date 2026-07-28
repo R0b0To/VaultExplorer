@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:vaultexplorer/features/browser/viewer/native_ffmpeg_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
 
 class VideoPlaybackManager {
-  final Map<String, NativeFFmpegController> _controllers = {};
+  final Map<String, NativeVideoController> _controllers = {};
   
   final ValueNotifier<String?> currentFileNotifier = ValueNotifier<String?>(null);
   String? get currentFileName => currentFileNotifier.value;
 
-  final ValueNotifier<NativeFFmpegController?> activeControllerNotifier =
-      ValueNotifier<NativeFFmpegController?>(null);
-  NativeFFmpegController? get activeController => activeControllerNotifier.value;
+  final ValueNotifier<NativeVideoController?> activeControllerNotifier =
+      ValueNotifier<NativeVideoController?>(null);
+  NativeVideoController? get activeController => activeControllerNotifier.value;
 
   final Map<String, bool> _subtitlesAvailableMap = {};
   bool isSubtitleAvailable(String fileName) => _subtitlesAvailableMap[fileName] ?? false;
@@ -19,7 +19,7 @@ class VideoPlaybackManager {
     _subtitlesAvailableMap[fileName] = available;
   }
 
-  NativeFFmpegController? getControllerFor(String fileName) {
+  NativeVideoController? getControllerFor(String fileName) {
     return _controllers[fileName];
   }
 
@@ -43,13 +43,13 @@ class VideoPlaybackManager {
       _scheduleDisposal(previousFile, prevCtrl);
     }
 
-    NativeFFmpegController controller;
+    NativeVideoController controller;
     if (_controllers.containsKey(fileName)) {
       controller = _controllers[fileName]!;
       await controller.setPlaybackSpeed(playbackSpeed);
       if (autoPlay) await controller.play();
     } else {
-      controller = NativeFFmpegController(
+      controller = NativeVideoController(
         contentUriString: contentUriString,
         autoPlay: autoPlay,
         initialSpeed: playbackSpeed,
@@ -73,7 +73,7 @@ class VideoPlaybackManager {
     _cleanupOldControllers(keepFiles: {fileName, if (previousFile != null) previousFile});
   }
 
-  void _scheduleDisposal(String fileName, NativeFFmpegController? controller) {
+  void _scheduleDisposal(String fileName, NativeVideoController? controller) {
     if (controller == null) return;
     Future.delayed(const Duration(milliseconds: 750), () {
       if (currentFileNotifier.value != fileName && _controllers[fileName] == controller) {

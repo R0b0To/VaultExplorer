@@ -20,7 +20,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
-import 'native_ffmpeg_controller.dart';
+import 'native_video_controller.dart';
 
 enum VideoPlaybackMode { playOnce, loop, playAndAdvance }
 
@@ -82,28 +82,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   final Map<String, Uint8List> _prefetchedImages = {};
   final Set<String> _prefetchingActive = {};
   final Set<String> _prefetchingFullRes = {};
+  // Per-file manual rotation override, set via the advanced settings sheet's
+  // rotate control -- video_player (ExoPlayer on Android) already applies a
+  // video's embedded rotation metadata automatically when rendering, so
+  // this only ever holds user-requested overrides, not an auto-detected
+  // value. Defaults to 0 (no extra rotation) for any file not in the map.
   final Map<String, int> _rotations = {};
-  // Files the user explicitly rotated via the advanced settings sheet --
-  // _onRotationDetected must never overwrite these with an auto-detected
-  // value (e.g. if the page is swiped away and rebuilt, re-triggering
-  // detection against MediaRotationCache's now-populated entry).
-  final Set<String> _manuallyRotatedFiles = {};
 
-  // Videos default to their actual embedded rotation (read once by
-  // MediaPlayerWidget and reported back here) instead of always opening
-  // sideways until the user manually rotates them -- see
-  // MediaRotationCache's doc for why nothing does this automatically
-  // further down the pipeline.
-  void _onRotationDetected(String fileName, int quarterTurns) {
-    if (_manuallyRotatedFiles.contains(fileName)) return;
-    if (_rotations[fileName] == quarterTurns) return;
-    if (!mounted) return;
-    setState(() => _rotations[fileName] = quarterTurns);
-  }
-  
   final Map<String, GlobalKey> _mediaKeys = {};
 
-  NativeFFmpegController? _lastListenedController;
+  NativeVideoController? _lastListenedController;
   bool _wakelockEnabled = false;
 
   int _transitionToken = 0;
@@ -536,8 +524,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _prefetchedImages.remove(fileToDelete);
       _mediaKeys.remove(fileToDelete);
       _rotations.remove(fileToDelete);
-      _manuallyRotatedFiles.remove(fileToDelete);
-      
+
       _playlistController.removeFile(fileToDelete);
 
       if (_playlistController.isEmpty) {
@@ -689,7 +676,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           onRotationChanged: (rot) {
             _startHideTimer();
             setState(() {
-              _manuallyRotatedFiles.add(_playlistController.currentFile);
               _rotations[_playlistController.currentFile] = rot;
             });
           },
@@ -894,7 +880,6 @@ onPageChanged: (index) {
                               subtitlesEnabled: _subtitlesEnabled,
                               playbackSpeed: _playbackSpeed,
                               rotationQuarterTurns: _rotations[fileName] ?? 0,
-                              onRotationDetected: _onRotationDetected,
                               progressNotifier: _videoProgressNotifier,
                               onSubtitlesAvailableChanged: (val) {
                                 _playbackManager.updateSubtitleStatus(fileName, val);

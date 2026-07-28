@@ -7,8 +7,9 @@
 // in an entire second video-playback engine's dependency surface (and
 // reading, to anyone unfamiliar with the history, as if a second player
 // were involved) just for its caption-parsing types. Actual playback here
-// is handled exclusively by the native FFmpeg engine -- see
-// native_ffmpeg_controller.dart.
+// is handled by the video_player plugin -- see native_video_controller.dart
+// -- but this parser stays as-is since it works fine independent of
+// whichever engine is doing the decoding.
 
 import 'package:flutter/material.dart';
 

@@ -325,37 +325,6 @@ file(WRITE ${MKNTFS_EMBEDDED_SOURCE}
 "#include <ntfs-3g/device.h>\nextern struct ntfs_device_operations vExplorer_ntfs_ops;\n#undef ntfs_device_default_io_ops\n#define ntfs_device_default_io_ops vExplorer_ntfs_ops\n#define VERSION \"embedded\"\n#define main vaultexplorer_mkntfs_main\n#include \"${ntfs3g_SOURCE_DIR}/ntfsprogs/mkntfs.c\"\n")
 
 
-# --- FFmpeg & Oboe Player Engine ---
-# The .so files under ffmpeg/<ABI>/ are prebuilt, not fetched/built by this
-# CMake project -- They're produced by scripts/build_ffmpeg_android.sh, which
-# pins FFMPEG_VERSION and lists every --enable-decoder/--enable-demuxer/
-# --enable-hwaccel explicitly (--disable-everything + allowlist, so the
-# binary's decode surface is no bigger than native_ffmpeg_controller.dart
-# actually uses). To rebuild after bumping FFMPEG_VERSION in that script,
-# rerun it and commit the regenerated libs under ffmpeg/<ABI>/.
-set(FFMPEG_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ffmpeg/${ANDROID_ABI})
-
-add_library(avcodec SHARED IMPORTED)
-set_target_properties(avcodec PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavcodec.so)
-
-add_library(avformat SHARED IMPORTED)
-set_target_properties(avformat PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavformat.so)
-
-add_library(avutil SHARED IMPORTED)
-set_target_properties(avutil PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavutil.so)
-
-add_library(swscale SHARED IMPORTED)
-set_target_properties(swscale PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libswscale.so)
-
-add_library(swresample SHARED IMPORTED)
-set_target_properties(swresample PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libswresample.so)
-
-FetchContent_Declare(
-        oboe
-        GIT_REPOSITORY https://github.com/google/oboe.git
-        GIT_TAG        a81bb9f87d4105b84b682685d3bfbb5beca371d1 # 1.10.0
-)
-FetchContent_MakeAvailable(oboe)
 
 
 
@@ -400,6 +369,8 @@ add_library(
         crypto/siv.cpp             # SIV filename encryption
         ${fatfs_SOURCE_DIR}/src/ff.c
         ${fatfs_SOURCE_DIR}/src/ffunicode.c
+        # ── Local clean-room implementations ──
+        Common/Endian.c
         # ── VeraCrypt primitives (pinned FetchContent source) ──
         ${VC_CRYPTO_DIR}/Twofish.c
         ${VC_CRYPTO_DIR}/Serpent.c
@@ -409,7 +380,6 @@ add_library(
         ${VC_CRYPTO_DIR}/Streebog.c
         ${VC_CRYPTO_DIR}/blake2s.c
         ${VC_CRYPTO_DIR}/cpu.c
-        ${VC_COMMON_DIR}/Endian.c
         ${VC_ARGON2_DIR}/src/argon2.c
         ${VC_ARGON2_DIR}/src/core.c
         ${VC_ARGON2_DIR}/src/ref.c
@@ -420,11 +390,6 @@ add_library(
         # ── NTFS-3G Sources ──
         ${NTFS_3G_SOURCES}
         ${MKNTFS_EMBEDDED_SOURCE}
-)
-
-target_sources(vaultexplorer PRIVATE
-    player/ffmpeg_player.cpp
-    player/jni_player_bridge.cpp
 )
 
 # 16 KB page-size ELF alignment for the LOAD segments of this .so, so it
@@ -465,6 +430,7 @@ target_compile_definitions(vaultexplorer PRIVATE
 target_include_directories(
         vaultexplorer PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Common
         ${CMAKE_CURRENT_SOURCE_DIR}/crypto
         ${CMAKE_CURRENT_SOURCE_DIR}/jni
         ${CMAKE_CURRENT_SOURCE_DIR}/io
@@ -477,7 +443,6 @@ target_include_directories(
         ${ntfs3g_SOURCE_DIR}/include/ntfs-3g
         ${ntfs3g_SOURCE_DIR}/ntfsprogs
         ${CMAKE_CURRENT_BINARY_DIR} # config.h location
-        ${FFMPEG_DIR}/include
         ${VC_CRYPTO_DIR}
         ${VC_SRC_DIR}
         ${VC_ARGON2_DIR}/include
@@ -498,7 +463,6 @@ target_link_libraries(
         e2fs_ext2fs
         e2fs_com_err
         e2fs_uuid
-        avcodec avformat avutil swscale swresample oboe android
         cjson
         dislocker_lib)
 

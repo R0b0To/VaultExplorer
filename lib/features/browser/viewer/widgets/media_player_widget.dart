@@ -10,8 +10,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
 
 import '../caption_track.dart';
-import '../native_ffmpeg_controller.dart';
-import 'media_rotation_cache.dart';
+import '../native_video_controller.dart';
 
 class VideoPlaybackProgress {
   final Duration position;
@@ -61,16 +60,6 @@ class MediaPlayerWidget extends StatefulWidget {
   final bool subtitlesEnabled;
   final double playbackSpeed;
   final int rotationQuarterTurns;
-  // Called at most once per file, the first time this video's actual
-  // embedded rotation is known -- from cache, or from the native "playing"
-  // event's rotationDegrees field (see NativeFFmpegValue.rotationDegrees's
-  // doc: it rides on the same event that already reliably delivers
-  // width/height, rather than a separate async fetch through the app's
-  // custom content:// provider, which is what this depended on before and
-  // turned out not to be reliable). Without this callback,
-  // rotationQuarterTurns stays stuck at whatever the caller hardcoded
-  // (previously always 0) until the user manually rotates the file.
-  final void Function(String fileName, int quarterTurns)? onRotationDetected;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
   final VoidCallback? onError;
@@ -90,7 +79,6 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.subtitlesEnabled,
     required this.playbackSpeed,
     required this.rotationQuarterTurns,
-    this.onRotationDetected,
     required this.onSubtitlesAvailableChanged,
     required this.progressNotifier,
     required this.playbackManager,
@@ -103,7 +91,7 @@ class MediaPlayerWidget extends StatefulWidget {
 }
 
 class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
-  NativeFFmpegController? _boundController;
+  NativeVideoController? _boundController;
   bool _isActive = false;
   bool _initialized = false;
   String? _playerError;
@@ -126,11 +114,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   double? _knownAspectRatio;
   Uint8List? _localPosterBytes;
 
-  // Guards _reportRotationIfNeeded() to at most one onRotationDetected
-  // call per file -- this State is keyed per-fileName (see
-  // media_viewer_screen.dart's _getMediaKey), so it never needs resetting
-  // for a different file.
-  bool _rotationDetectionStarted = false;
 
   @override
   void initState() {
@@ -276,8 +259,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       });
     }
 
-    if (!widget.isAudio) _reportRotationIfNeeded();
-
     if (!_isActive) return;
 
     final newProgress = widget.progressNotifier.value.copyWith(
@@ -293,35 +274,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         }
       });
     }
-  }
-
-  // Reads this file's actual embedded rotation and reports it up via
-  // onRotationDetected -- see MediaRotationCache's doc for why this needs
-  // to happen at all (nothing in the decode pipeline applies it on its
-  // own). Cache-hit path is available immediately, even before the native
-  // controller has emitted anything. The cache-miss path just reads
-  // controller.value.rotationDegrees -- native populates that as part of
-  // the same "playing" event that already reliably delivers width/height
-  // (see NativeFFmpegValue.rotationDegrees's doc), so no separate round
-  // trip is needed; if it's not there yet, this just no-ops and tries
-  // again on the next tick.
-  void _reportRotationIfNeeded() {
-    if (_rotationDetectionStarted) return;
-
-    final fileName = widget.fileName;
-    final cached = MediaRotationCache.get(widget.container, fileName);
-    if (cached != null) {
-      _rotationDetectionStarted = true;
-      widget.onRotationDetected?.call(fileName, cached);
-      return;
-    }
-
-    final degrees = _boundController?.value.rotationDegrees;
-    if (degrees == null) return;
-    _rotationDetectionStarted = true;
-    final quarterTurns = ((degrees ~/ 90) % 4 + 4) % 4;
-    MediaRotationCache.put(widget.container, fileName, quarterTurns);
-    widget.onRotationDetected?.call(fileName, quarterTurns);
   }
 
   Future<CaptionTrack?> _loadCaptions(String videoPath) async {
@@ -589,7 +541,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             if (!widget.isAudio && controller != null && isVideoReady)
               RotatedBox(
                 quarterTurns: widget.rotationQuarterTurns,
-                child: NativeFFmpegPlayerView(controller: controller),
+                child: NativeVideoPlayerView(controller: controller),
               ),
 
             // 3. Subtitles / Audio Visualizer

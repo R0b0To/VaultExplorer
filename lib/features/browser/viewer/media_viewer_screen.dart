@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -100,10 +101,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   @override
   void initState() {
     super.initState();
+    // Flush queued background video thumbnail jobs to release MediaCodec hardware memory for ExoPlayer
+    ThumbnailConcurrency.videoLimiter.cancelAll();
+
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-
     VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
-
     _playlistController = PlaylistController(
       container: widget.container,
       initialMediaFiles: widget.mediaFiles,
@@ -314,25 +316,24 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final isImg = MediaViewerConstants.isImage(fileName);
     final isVid = MediaViewerConstants.isVideo(fileName);
     if (!isImg && !isVid) return;
+    // Skip video thumbnail prefetching during media viewer session.
+    // Video thumbnail generation spins up native MediaMetadataRetriever / MediaCodec
+    // instances, which contend with ExoPlayer's active video decoder for system
+    // MediaCodec slots and trigger 'Released by resource manager' (Error 0xffffffe0) on 4K videos.
+    if (isVid) return;
+
     if (_prefetchedImages.containsKey(fileName) ||
         _prefetchingActive.contains(fileName)) {
       return;
     }
-
     _prefetchingActive.add(fileName);
     try {
-      final thumbBytes = isImg
-          ? await vaultExplorerApi.getImageThumbnail(
-              widget.container,
-              fileName,
-              targetSize: MediaViewerConstants.thumbnailTargetSize,
-              quality: widget.thumbnailQuality.jpegQuality,
-            )
-          : await vaultExplorerApi.getVideoThumbnail(
-              widget.container,
-              fileName,
-              targetSize: MediaViewerConstants.thumbnailTargetSize,
-            );
+      final thumbBytes = await vaultExplorerApi.getImageThumbnail(
+        widget.container,
+        fileName,
+        targetSize: MediaViewerConstants.thumbnailTargetSize,
+        quality: widget.thumbnailQuality.jpegQuality,
+      );
       if (thumbBytes != null && thumbBytes.isNotEmpty && mounted) {
         setState(() {
           _prefetchedImages[fileName] = thumbBytes;

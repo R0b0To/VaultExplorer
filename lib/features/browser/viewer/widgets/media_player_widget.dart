@@ -5,10 +5,10 @@ import 'package:vector_math/vector_math_64.dart' show Vector3;
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dart';
-
 import '../caption_track.dart';
 import '../native_video_controller.dart';
 
@@ -65,7 +65,6 @@ class MediaPlayerWidget extends StatefulWidget {
   final VoidCallback? onError;
   final VideoPlaybackManager playbackManager;
   final Uint8List? posterBytes;
-
   const MediaPlayerWidget({
     super.key,
     required this.container,
@@ -85,7 +84,6 @@ class MediaPlayerWidget extends StatefulWidget {
     this.posterBytes,
     this.onError,
   });
-
   @override
   State<MediaPlayerWidget> createState() => _MediaPlayerWidgetState();
 }
@@ -110,18 +108,19 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   double _videoScale = _minZoomScale;
   TapDownDetails? _videoDoubleTapDetails;
   Size _lastKnownVideoSize = Size.zero;
-
   double? _knownAspectRatio;
   Uint8List? _localPosterBytes;
-
 
   @override
   void initState() {
     super.initState();
-    _localPosterBytes = widget.posterBytes;
-    if (_localPosterBytes == null && !widget.isAudio) {
-      _loadLocalPoster();
-    }
+    // Synchronously check in-memory thumbnail cache for poster frame instead of invoking
+    // async native getVideoThumbnail frame extractions that compete for MediaCodec slots.
+    _localPosterBytes = widget.posterBytes ??
+        ThumbnailCacheService.getFromMemory(
+          widget.container,
+          widget.fileName,
+        );
     widget.playbackManager.activeControllerNotifier.addListener(_onSharedControllerChanged);
     widget.playbackManager.currentFileNotifier.addListener(_onCurrentFileChanged);
     _knownAspectRatio =
@@ -129,27 +128,15 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     _syncBoundController();
   }
 
-  Future<void> _loadLocalPoster() async {
-    try {
-      final data = await vaultExplorerApi.getVideoThumbnail(
-        widget.container,
-        widget.fileName,
-        targetSize: MediaViewerConstants.thumbnailTargetSize,
-      );
-      if (data != null && data.isNotEmpty && mounted) {
-        setState(() => _localPosterBytes = data);
-      }
-    } catch (_) {}
-  }
-
   @override
   void didUpdateWidget(covariant MediaPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.fileName != widget.fileName) {
-      _localPosterBytes = widget.posterBytes;
-      if (_localPosterBytes == null && !widget.isAudio) {
-        _loadLocalPoster();
-      }
+      _localPosterBytes = widget.posterBytes ??
+          ThumbnailCacheService.getFromMemory(
+            widget.container,
+            widget.fileName,
+          );
       _knownAspectRatio =
           MediaAspectRatioCache.get(widget.container, widget.fileName);
     }
@@ -169,18 +156,13 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     final shouldBeActive = widget.playbackManager.currentFileName == widget.fileName;
     final target = widget.playbackManager.getControllerFor(widget.fileName) ??
         (shouldBeActive ? widget.playbackManager.activeController : null);
-
     if (shouldBeActive == _isActive && identical(target, _boundController)) return;
-
     final becameActive = shouldBeActive && !_isActive;
     final becameInactive = !shouldBeActive && _isActive;
-
     _boundController?.removeListener(_onControllerTick);
     _boundController = target;
     target?.addListener(_onControllerTick);
-
     final nowInitialized = target?.value.isInitialized ?? false;
-
     _isActive = shouldBeActive;
     _initialized = nowInitialized;
     _playerError = null;
@@ -191,13 +173,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       _videoScale = _minZoomScale;
       _videoTransformationController.value = Matrix4.identity();
     }
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) setState(() {});
     });
-
     _onControllerTick();
-
     if (becameActive) {
       _loadCaptionsForThisFile();
     } else if (becameInactive) {
@@ -220,7 +199,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     if (!mounted) return;
     final controller = _boundController;
     if (controller == null) return;
-
     if (controller.value.hasError) {
       if (_playerError == null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -236,7 +214,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       }
       return;
     }
-
     if (!_initialized && controller.value.isInitialized) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && !_initialized) {
@@ -244,7 +221,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         }
       });
     }
-
     final newSize = controller.value.size;
     if (newSize.width > 0 && newSize.height > 0 && newSize != _lastKnownVideoSize) {
       _lastKnownVideoSize = newSize;
@@ -258,14 +234,11 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         if (mounted) setState(() {});
       });
     }
-
     if (!_isActive) return;
-
     final newProgress = widget.progressNotifier.value.copyWith(
       position: controller.value.position,
       duration: controller.value.duration,
     );
-
     if (widget.progressNotifier.value.position != newProgress.position ||
         widget.progressNotifier.value.duration != newProgress.duration) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -430,7 +403,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     final effectiveKnownRatio = (knownRatio != null && isRotated)
         ? 1.0 / knownRatio
         : knownRatio;
-
     Widget? posterContent;
     if (poster != null && poster.isNotEmpty) {
       if (widget.isAudio) {
@@ -465,7 +437,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         );
       }
     }
-
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -513,12 +484,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         ),
       );
     }
-
     final controller = _boundController;
     final bool isVideoReady = controller != null &&
         _initialized &&
         (widget.isAudio || (controller.value.size.width > 0 && controller.value.size.height > 0));
-
     final isRotated = widget.rotationQuarterTurns % 2 != 0;
     final double computedAspectRatio = widget.isAudio
         ? 0.8
@@ -527,7 +496,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             : ((_knownAspectRatio != null && isRotated)
                 ? 1.0 / _knownAspectRatio!
                 : (_knownAspectRatio ?? 16 / 9)));
-
     Widget corePlayerWidget = Center(
       child: AspectRatio(
         aspectRatio: computedAspectRatio,
@@ -536,14 +504,12 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
           children: [
             // 1. Poster thumbnail ALWAYS rendered as base layer to prevent 1-frame black flash
             _buildPoster(cs, isLoading: _isActive),
-
             // 2. Native Video Texture rendered ON TOP of thumbnail when ready
             if (!widget.isAudio && controller != null && isVideoReady)
               RotatedBox(
                 quarterTurns: widget.rotationQuarterTurns,
                 child: NativeVideoPlayerView(controller: controller),
               ),
-
             // 3. Subtitles / Audio Visualizer
             if (widget.isAudio && controller != null && isVideoReady)
               _buildAudioCenterVisual(cs, isPlaying: controller.value.isPlaying)
@@ -572,7 +538,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                   },
                 ),
               ),
-
             // 4. Gesture detector overlay
             Positioned.fill(
               child: LayoutBuilder(
@@ -603,7 +568,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         ),
       ),
     );
-
     if (!widget.isAudio) {
       corePlayerWidget = InteractiveViewer(
         key: _interactiveViewerKey,
@@ -625,7 +589,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         child: corePlayerWidget,
       );
     }
-
     return ClipRect(
       child: Stack(
         clipBehavior: Clip.none,
@@ -774,7 +737,6 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   final List<double> _heights = [0.2, 0.5, 0.8, 0.4, 0.9, 0.3, 0.7, 0.5, 0.2];
-
   @override
   void initState() {
     super.initState();
@@ -784,7 +746,6 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
     );
     if (widget.isPlaying) _controller.repeat(reverse: true);
   }
-
   @override
   void didUpdateWidget(covariant _AudioVisualizer oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -794,13 +755,11 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
       _controller.stop();
     }
   }
-
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

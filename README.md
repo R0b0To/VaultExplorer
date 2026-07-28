@@ -5,85 +5,106 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Donate](https://img.shields.io/badge/Ko--Fi-Support%20Project-FF5E5B?style=flat&logo=ko-fi)](https://ko-fi.com/K3K2ND3Y8)
 
-> **An Android file manager for encrypted containers, drives, and directory vaults — no PC required.**
+> **An Android file manager, and viewer for encrypted containers, drives, and directory vaults — no PC required.**
 
-**VaultExplorer** allows you to mount, browse, create, and manage encrypted volumes directly on your Android device. It supports **VeraCrypt**, **LUKS1 / LUKS2**, **BitLocker**, **Cryptomator**, **gocryptfs**, and **CryFS** volumes, as well as **VHD / VHDX** disk image files. Built with Flutter and powered by a custom C++ native engine (*mbedTLS + FatFs + NTFS-3G + libext2fs + Dislocker*), everything is decrypted and re-encrypted on-the-fly in memory with zero unencrypted temporary files written to disk.
+**VaultExplorer** allows you to mount, browse, create, edit, and manage encrypted volumes directly on your Android device. It supports **VeraCrypt**, **LUKS1 / LUKS2**, **BitLocker**, **Cryptomator**, **gocryptfs**, and **CryFS** volumes, as well as **VHD / VHDX** virtual disk images. Built with Flutter and powered by a custom high-performance C++ native engine (*mbedTLS + FatFs + NTFS-3G + libext2fs + Dislocker*), everything is decrypted and re-encrypted on-the-fly in memory with zero unencrypted temporary files written to host storage.
 
 ---
 
 ## 📸 Screenshots
 
 <p align="center">
-  <img width="250" alt="Screenshot_1" src="https://github.com/user-attachments/assets/a8dea29c-260e-43cf-9853-9e3f6f3a2f2c" />
-  <img width="250" alt="Screenshot_3" src="https://github.com/user-attachments/assets/cb4f4c35-82cc-40ba-9303-ccdc1ae7b105" />
-  <img width="250" alt="Screenshot_2" src="https://github.com/user-attachments/assets/ed55b96a-5fee-4b65-bc81-f0345e3c208f" /> 
+  <img width="250" alt="Dashboard" src="https://github.com/user-attachments/assets/a8dea29c-260e-43cf-9853-9e3f6f3a2f2c" />
+  <img width="250" alt="File Explorer" src="https://github.com/user-attachments/assets/cb4f4c35-82cc-40ba-9303-ccdc1ae7b105" />
+  <img width="250" alt="Media Viewer" src="https://github.com/user-attachments/assets/ed55b96a-5fee-4b65-bc81-f0345e3c208f" /> 
 </p>
 
 ---
 
 ## ✨ Features & Architecture
 
-### 🔐 Supported Formats & Encryption Systems
+### 🔐 Volume & Encryption Systems
 
 #### Block-Level Containers & Disk Images
-*   **VeraCrypt (`.hc`)**: Standard & embedded Hidden Volume support, custom PIM, additive keyfiles, and volume password changes.
-*   **LUKS1 & LUKS2**: Full support for `xts-plain64` volumes. Keyslots backed by **PBKDF2** or memory-hard **Argon2id / Argon2i**. Supports passphrase or keyfile substitution (`cryptsetup --key-file`).
-*   **BitLocker**: Decrypt and re-encrypt BitLocker partitions and BitLocker To Go volumes using user passwords or 48-digit numerical recovery keys (powered by an integrated `dislocker` backend).
-*   **VHD & VHDX Images**: Native Block Allocation Table (BAT) translation for both **fixed** and **dynamic (expandable)** virtual hard disk images containing VeraCrypt, LUKS, or BitLocker partitions.
+*   **VeraCrypt (`.hc`)**: Standard & embedded Hidden Volume support, custom PIM, additive keyfiles, multi-layer cipher cascades, and in-place password modification.
+*   **LUKS1 & LUKS2**: Full support for `xts-plain64` volumes. Keyslots backed by **PBKDF2** or memory-hard **Argon2id / Argon2i**. Supports passphrases or binary keyfiles (`cryptsetup --key-file`).
+*   **BitLocker**: Decrypt and re-encrypt BitLocker partitions and BitLocker To Go volumes using user passwords or 48-digit numerical recovery keys (powered by a custom `dislocker` C++ virtual I/O engine).
+*   **VHD & VHDX Images**: Native Block Allocation Table (BAT) translation for both **fixed** and **dynamic (expandable)** virtual hard disk images hosting VeraCrypt, LUKS, or BitLocker filesystems.
 
 #### Directory-Based Vaults
-*   **Cryptomator**: Supports **Vault Format 7 & 8** (cipher combos `SIV_GCM` and `SIV_CTRMAC`). Handles masterkey scrypt unwrapping, base32 directory ID hashing, and long-filename shortening (`.c9s` / `name.c9r`).
-*   **gocryptfs**: Modern default vault format support (`GCMIV128`, `DirIV`, `EMENames`, `LongNames`, `Raw64`, `HKDF`). EME filename encryption and 4KB chunk-level AES-GCM streaming.
-*   **CryFS**: Full format support (`0.10`). Dual-layer scrypt configuration decryption, block sharding storage, Merkle data tree indexing (`CryfsDataTree`), and directory blob serialization (`CryfsDirBlob`). Supports `xchacha20-poly1305`, `aes-256-gcm`, `aes-128-gcm`, `aes-256-cfb`, and `aes-128-cfb`.
+*   **Cryptomator**: Full support for **Vault Formats 7 & 8** (ciphers `SIV_GCM` and `SIV_CTRMAC`). Handles masterkey scrypt unwrapping, base32 directory ID hashing, and long-filename shortening (`.c9s` / `name.c9r`).
+*   **gocryptfs**: Modern default format support (`GCMIV128`, `DirIV`, `EMENames`, `LongNames`, `Raw64`, `HKDF`). Features EME filename encryption and 4KB chunk-level AES-GCM streaming.
+*   **CryFS**: Format `0.10` support with dual-layer scrypt config unwrapping, block sharding storage, Merkle data tree indexing (`CryfsDataTree`), and directory blob serialization (`CryfsDirBlob`). Supports `xchacha20-poly1305`, `aes-256-gcm`, `aes-128-gcm`, `aes-256-cfb`, and `aes-128-cfb`.
 
 ---
 
-### 🗝️ Cryptographic Algorithms & Ciphers
+### 🗝️ Cryptographic Algorithms & Native Primitives
 
 *   **Block & Stream Ciphers**: AES-256, AES-128, Serpent, Twofish, Camellia, Kuznyechik, and XChaCha20-Poly1305.
-*   **Cipher Modes**: XTS, GCM, CTR, CFB, EME (filename encryption), and AES-SIV (synthetic IV).
+*   **Cipher Modes**: XTS, GCM, CTR, CFB, EME (wide-block filename encryption), and AES-SIV (synthetic IV).
 *   **VeraCrypt Cascades**: All 15 single and multi-layer cipher combinations (e.g., AES-Twofish-Serpent, Kuznyechik-Serpent-Camellia, Camellia-Kuznyechik).
-*   **Key Derivation Functions (KDF)**: PBKDF2 with SHA-512, SHA-256, Whirlpool, Streebog (512-bit), or BLAKE2s-256, alongside Argon2id and scrypt.
-*   **Parallel Auto-Detect Engine**: Multi-threaded C++ header derivation testing fast algorithms concurrently before memory-hard Argon2id iterations, with real-time UI progress.
+*   **Key Derivation Functions (KDF)**: PBKDF2 with SHA-512, SHA-256, Whirlpool, Streebog (512-bit), or BLAKE2s-256, alongside Argon2id/i and scrypt.
+*   **Hardware Acceleration**: Built with ARMv8 Cryptography Extensions (`-march=armv8-a+crypto+sha2`) in mbedTLS for near-instant PBKDF2/AES execution on modern ARM CPUs.
+*   **Parallel Auto-Detect Engine**: Multi-threaded C++ header derivation testing candidate KDFs and ciphers concurrently with real-time progress callbacks to the UI.
 
 ---
 
-### 🚀 Fast Direct Storage Access (POSIX Acceleration)
+### 🚀 POSIX Storage Acceleration
 
-*   **POSIX File System Bypass**: Folder-based vaults (Cryptomator, gocryptfs, CryFS) can operate using direct POSIX file operations via Android's `MANAGE_EXTERNAL_STORAGE` permission, bypassing slow Storage Access Framework (SAF) document trees.
-*   **Up to 1000x Speedup**: Dramatically improves block reading, writing, and directory listing speeds—especially critical for CryFS vaults containing thousands of small block files.
-
----
-
-### 💾 Filesystems & USB OTG Integration
-
-*   **Filesystem Drivers**: Native C++ implementations of **FAT32**, **exFAT** (via ChaN FatFs), **NTFS** (via Tuxera NTFS-3G), and **ext2 / ext3 / ext4** (via e2fsprogs `libext2fs`).
-*   **Custom USB OTG Mass Storage Driver**: Built-in SCSI Bulk-Only Transport (BOT) driver operating over Android’s USB Host API. No root required. Parses MBR/GPT partition tables and auto-locks volumes on device ejection.
-*   **On-Device Format & Creation**: Create and format brand-new VeraCrypt, LUKS1, LUKS2, Cryptomator, gocryptfs, or CryFS containers/vaults directly on internal storage or raw USB flash drives (with Quick Format or Full zero-fill options).
-*   **Multi-Mount Manager**: Mount up to **8 active volume slots** simultaneously.
+*   **POSIX File System Bypass**: Directory vaults (Cryptomator, gocryptfs, CryFS) automatically use direct POSIX file I/O when `MANAGE_EXTERNAL_STORAGE` or direct path access is granted, bypassing slow Android Storage Access Framework (SAF) document tree queries.
+*   **Up to 1000x Speedup**: Massive performance gains for directory listing, reading, and writing—essential for CryFS vaults with tens of thousands of sharded block files.
 
 ---
 
-### 📁 Explorer, Media Streaming & Built-In Password Manager
+### 💾 Filesystems & USB OTG Driver
 
-*   **File Explorer**: Grid, detailed list, and compact view modes with breadcrumb navigation, instant search text highlighting, folder-size calculation, and custom sorting.
-*   **In-Vault ZIP Archive Browser**: Directly view and extract `.zip` archive contents inside an encrypted container without decrypting the archive to host storage.
-*   **Background File Operations**: Multi-threaded copy, move, import, and delete engine with LIFO queue prioritisation, pre-flight free-space calculation, conflict resolution sheets, and rollback on disk-full.
-*   **Integrated Media Viewer**: On-the-fly streaming for video/audio (FFmpeg-backed `fvp` engine, `.srt`/`.vtt` closed captions, playback speed, double-tap seek, audio visualizers) and images (pinch-to-zoom, 90° rotation, slideshow, gallery carousel) using virtual file handles.
-*   **Encrypted Item Vault**: Store logins, payment cards, secure notes, identities, bank accounts, and software licenses directly inside the vault as encrypted native JSON objects.
-*   **Android SAF Provider**: Integrates with Android's Storage Access Framework (`ContainerDocumentsProvider`), allowing third-party apps to securely open and save files inside unlocked containers via AppFuse proxy descriptors.
+*   **Native Filesystem Engines**:
+    *   **FAT12 / FAT16 / FAT32 & exFAT** via ChaN's FatFs.
+    *   **NTFS** via Tuxera NTFS-3G (includes embedded `mkntfs` formatter).
+    *   **ext2 / ext3 / ext4** via e2fsprogs `libext2fs`.
+*   **Custom USB OTG Mass Storage Driver**: Built-in SCSI Bulk-Only Transport (BOT) driver operating directly over Android's USB Host API (no root required). Supports 10-byte and 16-byte CDBs with dynamic sector-chunk backoff (1024 down to 8 sectors) for maximum hardware compatibility, MBR partition parsing, and instant auto-locking upon drive disconnection.
+*   **On-Device Volume Creation**: Format and initialize brand-new VeraCrypt, LUKS1, LUKS2, Cryptomator, gocryptfs, or CryFS containers directly on device storage or raw USB drives (Quick Format or Full zero-fill).
+*   **Multi-Mount Manager**: Simultaneously mount up to **8 active volume slots**.
 
 ---
 
-### 🛡️ App Security & Privacy
+### 📁 In-Vault Studio, Media Streaming & Editors
 
-*   **Zero Internet Permission**: The app does not request or require network access (`android.permission.INTERNET` is absent).
-*   **Master Lock**: App-wide access protection with Master Password, Biometric Unlock (Fingerprint / Face via Android Keystore), or Pattern Lock, backed by exponential lockout backoff surviving app force-kills.
-*   **Hardware-Bound Key Caching**: Fast re-unlocks via AES-256-GCM derived key caching stored in the hardware-backed Android Keystore.
-*   **3-Tier Thumbnail Cache**: In-Memory LRU $\rightarrow$ AES-GCM Encrypted Disk/In-Container Cache $\rightarrow$ Native Generation. Can be completely disabled for total privacy.
-*   **Screen & Clipboard Protection**: Screenshot/task-switcher preview blocking (`FLAG_SECURE`) and automatic clipboard sanitisation.
+*   **Multi-Layout File Explorer**: Detailed List, Grid, and Masonry view modes with gesture-based pinch-to-zoom column adjustments, breadcrumbs, search term highlighting, and instant folder size calculations.
+*   **Direct Vault Camera**: Capture photos and record video (H.264 / HEVC) directly into encrypted containers without writing unencrypted temporary files to host storage.
+*   **PDF Annotator & Editor**: View PDF documents, draw markup annotations (highlights, underlines, sticky notes), rotate pages, delete pages, undo/redo edits, and commit changes back to the vault.
+*   **Web & HTML Viewer**: Isolated `WebView` platform view rendering HTML, CSS, JavaScript, and linked web assets directly out of the vault via a local secure origin (`https://vault-local.internal`).
+*   **Built-In Text Editor**: Create, edit, and save plain text, code, or markdown files directly inside encrypted volumes.
+*   **In-Vault ZIP Archive Browser**: Inspect and extract `.zip` archive contents directly inside an encrypted volume without unencrypting archives to the host filesystem.
+*   **Advanced Media Streaming**: Stream video and audio (FFmpeg-backed `fvp` engine, `.srt`/`.vtt` subtitles, custom speed, double-tap seek, audio visualizer) and view photos (pinch-to-zoom, 90° rotation, slideshow, gallery carousel overlay, diagnostics sheet).
+*   **Encrypted Item Vault**: Store Passwords, Bank Accounts, Payment Cards, Secure Notes, Identities, and Software Licenses directly inside the volume as encrypted JSON objects with customizable key-value fields and secret masking.
+*   **Android SAF Provider & Subfolder Mounts**: Expose entire mounted containers or specific subfolders (`subFolderMounts`) as Android Storage Access Framework (SAF) roots (`ContainerDocumentsProvider`), allowing third-party Android apps to open and save files inside unlocked volumes via AppFuse proxy descriptors.
 
+---
 
+### 🛡️ Security & Privacy
+
+*   **Zero Internet Permission**: The application binary does not request or possess network access (`android.permission.INTERNET` is absent).
+*   **Master Lock**: Protect the entire app with a Master Password, Biometric Unlock (Fingerprint / Face via Android Keystore), or Pattern Lock backed by exponential lockout backoff surviving app force-kills.
+*   **Hardware-Bound Key Caching**: Optional AES-256-GCM key caching stored securely in the hardware-backed Android Keystore for instant re-unlocks.
+*   **3-Tier Thumbnail Cache**: In-Memory LRU $\rightarrow$ AES-256-GCM Encrypted Disk/In-Container Cache $\rightarrow$ Native Generation. Can be completely disabled for maximum privacy.
+*   **Screen & Clipboard Protection**: Prevents screenshots and task-switcher previews (`FLAG_SECURE`) with automatic corrupt clipboard clearing upon app focus.
+
+---
+
+## 🛠️ Native C++ Engine Dependencies
+
+VaultExplorer pins and compiles all C++ native dependencies directly during build time:
+
+| Library | Version / Commit | Purpose |
+| :--- | :--- | :--- |
+| **mbedTLS** | v3.6.0 | AES, SHA-1/2, HMAC, PBKDF2, Argon2id, hardware crypto extensions |
+| **FatFs** | 4.0.4 | FAT12 / FAT16 / FAT32 / exFAT filesystem backend |
+| **NTFS-3G** | Release Tag | Full read/write NTFS filesystem driver & `mkntfs` volume formatter |
+| **e2fsprogs** | v1.47.4 (`libext2fs`) | Full read/write ext2, ext3, and ext4 filesystem engine |
+| **Dislocker** | Patch overlay | BitLocker FVE & BitLocker To Go decryption and re-encryption |
+| **VeraCrypt** | 1.26.29 (Primitives) | Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s |
+| **cJSON** | v1.7.18 | High-speed JSON parsing for LUKS2 & Cryptomator metadata |
 
 ---
 
@@ -92,7 +113,7 @@
 ### Prerequisites
 *   **Flutter SDK**: `>= 3.12.0`
 *   **Android SDK**: API level 26+ (Android 8.0 Oreo or newer)
-*   **Android NDK**: Installed via Android Studio SDK Manager (version specified in Gradle)
+*   **Android NDK**: Installed via Android Studio SDK Manager
 *   **CMake**: `3.18.0+`
 
 ### Build Steps
@@ -113,7 +134,7 @@
     flutter build apk --release
     ```
 
-> *Note: During the build, CMake will automatically pull and compile the native C++ dependencies (`mbedTLS`, `FatFs`, `NTFS-3G`, `libext2fs`, `Dislocker`, `cJSON`, and `VeraCrypt 1.26.29` source primitives).*
+> *Note: CMake will automatically fetch and compile all native C++ libraries during the build step.*
 
 ---
 

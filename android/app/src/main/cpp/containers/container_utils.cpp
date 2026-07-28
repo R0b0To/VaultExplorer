@@ -72,7 +72,7 @@ bool sanitizeUtf8InPlace(std::string& value) {
 void sanitizeString(std::string& value) {
     if (hasControlChar(value)) {
         std::replace_if(value.begin(), value.end(),
-            [](unsigned char c) { return c < 32 || c == 127; }, '?');
+            [](unsigned char c) { return c < 32 || c == 127; }, '_');
     }
     sanitizeUtf8InPlace(value);
 }

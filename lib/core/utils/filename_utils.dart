@@ -28,16 +28,20 @@
 /// far more common path for creating a plain file or folder — did no
 /// sanitization at all. This is now the one place that logic lives.
 String sanitizeFatFileName(String name) {
-  // FAT/exFAT-invalid characters, plus `|` — not a FAT restriction, but
-  // just as fatal to this app's own wire-format parser.
-  var result = name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+  // Replace illegal characters (\ / : * ? " < > |) and control chars (0x00-0x1F, 0x7F) with '_'
+  var result = name.replaceAll(RegExp(r'[\x00-\x1F\x7F\\/:*?"<>|]'), '_');
+  
+  // Trim trailing dots and spaces (invalid in FAT/NTFS)
+  result = result.replaceAll(RegExp(r'[\s.]+$'), '');
 
-  // A name starting with the native listing's own directory marker would
-  // be misread as `[DIR] <name>` by RawEntry.parse — break the collision
-  // by neutralizing the leading bracket rather than rejecting the name.
   if (result.startsWith('[DIR] ')) {
     result = '(DIR) ${result.substring(6)}';
   }
-
+  
+  // Ensure name is not empty or single hyphen
+  if (result.isEmpty || result == '-') {
+    result = 'unnamed';
+  }
+  
   return result;
 }

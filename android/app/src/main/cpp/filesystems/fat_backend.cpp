@@ -169,9 +169,33 @@ bool fatExtractFile(int volumeId, const std::string& targetPath, const std::stri
     return success;
 }
 
+static FRESULT fatRemoveRecursive(const char* path) {
+    DIR dir;
+    FILINFO fno;
+    FRESULT fr = f_opendir(&dir, path);
+    if (fr == FR_OK) {
+        while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
+            if (strcmp(fno.fname, ".") == 0 || strcmp(fno.fname, "..") == 0) continue;
+            std::string childPath = std::string(path) + "/" + fno.fname;
+            if (fno.fattrib & AM_DIR) {
+                fatRemoveRecursive(childPath.c_str());
+            } else {
+                f_unlink(childPath.c_str());
+            }
+        }
+        f_closedir(&dir);
+    }
+    return f_unlink(path);
+}
+
 bool fatDeleteFile(int volumeId, const std::string& path) {
     std::string fatPath = std::string(drivePaths[volumeId]) + "/" + path;
-    return f_unlink(fatPath.c_str()) == FR_OK;
+    FRESULT fr = f_unlink(fatPath.c_str());
+    if (fr == FR_DENIED) {
+        // Folder is not empty (contains hidden or leftover .tmp files), force recursive removal
+        fr = fatRemoveRecursive(fatPath.c_str());
+    }
+    return fr == FR_OK;
 }
 
 bool fatCreateDirectory(int volumeId, const std::string& path) {

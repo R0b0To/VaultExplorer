@@ -145,36 +145,50 @@ class _FileGridViewState extends State<FileGridView> {
     }
   }
 
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta?.abs() ?? 0.0;
+      if (delta > 25.0) {
+        ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
+        ThumbnailConcurrency.videoLimiter.cancelTier(TaskPriority.visible);
+      }
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final total = widget.dirs.length + widget.files.length;
     return GestureDetector(
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
-      child: GridView.builder(
-        padding: EdgeInsets.fromLTRB(
-          10,
-          12,
-          10,
-          AppSpacing.floatingStackClearance +
-              MediaQuery.paddingOf(context).bottom,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _onScrollNotification,
+        child: GridView.builder(
+          padding: EdgeInsets.fromLTRB(
+            10,
+            12,
+            10,
+            AppSpacing.floatingStackClearance +
+                MediaQuery.paddingOf(context).bottom,
+          ),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _crossAxisCount,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: _getAspectRatio(_crossAxisCount),
+          ),
+          itemCount: total,
+          itemBuilder: (context, index) {
+            if (index < widget.dirs.length) {
+              return _buildDirCell(context, widget.dirs[index]);
+            }
+            return _buildFileCell(
+              context,
+              widget.files[index - widget.dirs.length],
+            );
+          },
         ),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: _crossAxisCount,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: _getAspectRatio(_crossAxisCount),
-        ),
-        itemCount: total,
-        itemBuilder: (context, index) {
-          if (index < widget.dirs.length) {
-            return _buildDirCell(context, widget.dirs[index]);
-          }
-          return _buildFileCell(
-            context,
-            widget.files[index - widget.dirs.length],
-          );
-        },
       ),
     );
   }

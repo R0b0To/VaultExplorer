@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -495,6 +496,9 @@ static Future<void> put({
       await tmp.writeAsBytes(encrypted, flush: true);
 
       await tmp.rename(file.path);
+      if (++_putWriteCount % 25 == 0) {
+        unawaited(enforceDiskBudget());
+      }
     } else {
       final cachePath =
           '$inContainerDir/${_encodeKey(_qualifiedPath(filePath, quality))}';
@@ -589,6 +593,53 @@ static Future<void> put({
       if (await dir.exists()) await dir.delete(recursive: true);
     } catch (_) {}
     _memoryCache.clear();
+  }
+
+  // Default maximum on-disk app cache budget (100 MB) — ADR-014, Finding F-08
+  static const int defaultMaxAppCacheBytes = 100 * 1024 * 1024;
+  static int _putWriteCount = 0;
+
+  /// Enforces L2 disk cache byte budget (ADR-014, Finding F-08).
+  ///
+  /// Scans all thumbnail files under the app cache directory, and if total
+  /// usage exceeds [maxBytes], evicts the oldest files by modification time
+  /// (`stat.modified`) until usage drops down to 80% of [maxBytes].
+  static Future<void> enforceDiskBudget([
+    int maxBytes = defaultMaxAppCacheBytes,
+  ]) async {
+    try {
+      final rootPath = await _getAppCacheRoot();
+      final root = Directory('$rootPath/thumbs');
+      if (!await root.exists()) return;
+
+      final files = <({File file, int size, DateTime modified})>[];
+      var totalBytes = 0;
+
+      await for (final entity in root.list(recursive: true)) {
+        if (entity is! File) continue;
+        if (entity.path.endsWith('.tmp')) continue;
+        try {
+          final stat = await entity.stat();
+          files.add((file: entity, size: stat.size, modified: stat.modified));
+          totalBytes += stat.size;
+        } catch (_) {}
+      }
+
+      if (totalBytes <= maxBytes) return;
+
+      final targetBytes = (maxBytes * 0.8).toInt();
+      files.sort((a, b) => a.modified.compareTo(b.modified));
+
+      for (final entry in files) {
+        if (totalBytes <= targetBytes) break;
+        try {
+          await entry.file.delete();
+          totalBytes -= entry.size;
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('ThumbnailCacheService.enforceDiskBudget: $e');
+    }
   }
 
   /// Deletes on-disk thumbnail directories for containers whose URIs are not

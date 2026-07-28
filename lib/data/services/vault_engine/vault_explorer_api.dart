@@ -10,6 +10,7 @@ import 'package:vaultexplorer/data/models/thumbnail_with_size.dart';
 import 'package:vaultexplorer/core/utils/listener_registry.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
+import 'package:vaultexplorer/core/services/cache_coordinator.dart';
 
 part 'vault_explorer_api_crypto.dart';
 part 'vault_explorer_api_container_lifecycle.dart';
@@ -256,6 +257,14 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
         final granted = call.arguments['granted'] as bool? ?? false;
         _cameraPermissionCompleter?.complete(granted);
         _cameraPermissionCompleter = null;
+      } else if (call.method == ChannelMethods.onTrimMemory) {
+        final level = (call.arguments as Map<Object?, Object?>?)?['level'] as int? ?? 0;
+        // Map Android's TRIM_MEMORY_* constants to TrimLevel (ADR-011, ADR-018, Finding F-15):
+        // TRIM_MEMORY_RUNNING_LOW (10), TRIM_MEMORY_RUNNING_CRITICAL (15), TRIM_MEMORY_COMPLETE (80)
+        final trimLevel = (level >= 10 || level == 80)
+            ? TrimLevel.severe
+            : TrimLevel.moderate;
+        CacheCoordinator.trimAll(trimLevel);
       }
     });
   }

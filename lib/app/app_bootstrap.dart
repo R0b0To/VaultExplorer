@@ -8,9 +8,13 @@ import 'package:fvp/fvp.dart' as fvp;
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/services/memory_pressure_observer.dart';
+import 'package:vaultexplorer/core/services/device_capability_service.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
 void configurePlatformIntegrations() {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  MemoryPressureObserver.register();
   PlatformDispatcher.instance.onError = (error, stack) {
     final errStr = error.toString();
     if (errStr.contains('Cannot add event after closing')) {
@@ -33,6 +37,11 @@ void configurePlatformIntegrations() {
 /// settings itself to build its UI, so this pass mainly handles the
 /// side effects (theme notifier, secure screen, version string, cleanup).
 Future<void> runDeferredStartupWork() async {
+  // Query native device profile and adjust memory budgets/concurrency (ADR-011, ADR-019).
+  unawaited(DeviceCapabilityService.init());
+  // Run disk cache janitor pass (ADR-014, F-08).
+  unawaited(ThumbnailCacheService.enforceDiskBudget());
+
   try {
     final settings = await AppSettingsService.loadSettings();
     appThemeModeNotifier.value = settings.themeMode;

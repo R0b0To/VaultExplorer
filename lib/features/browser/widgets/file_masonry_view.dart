@@ -153,6 +153,17 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     });
   }
 
+  bool _onScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollUpdateNotification) {
+      final delta = notification.scrollDelta?.abs() ?? 0.0;
+      if (delta > 25.0) {
+        ThumbnailConcurrency.imageLimiter.cancelTier(TaskPriority.visible);
+        ThumbnailConcurrency.videoLimiter.cancelTier(TaskPriority.visible);
+      }
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final dirEntries = widget.dirs;
@@ -164,38 +175,41 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     return GestureDetector(
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
-      child: MasonryGridView.count(
-        crossAxisCount: _columnCount,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        cacheExtent: 800,
-        padding: EdgeInsets.fromLTRB(
-          10,
-          12,
-          10,
-          AppSpacing.floatingStackClearance +
-              MediaQuery.paddingOf(context).bottom,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _onScrollNotification,
+        child: MasonryGridView.count(
+          crossAxisCount: _columnCount,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          cacheExtent: 800,
+          padding: EdgeInsets.fromLTRB(
+            10,
+            12,
+            10,
+            AppSpacing.floatingStackClearance +
+                MediaQuery.paddingOf(context).bottom,
+          ),
+          itemCount: total,
+          itemBuilder: (context, i) {
+            final isDir = i < dirEntries.length;
+            final entry =
+                isDir ? dirEntries[i] : fileEntries[i - dirEntries.length];
+            final fullPath = widget.currentDirPath.isEmpty
+                ? entry.name
+                : '${widget.currentDirPath}/${entry.name}';
+            final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
+            final ratio = _aspectRatioFor(entry, fullPath,
+                hasVisualPreview: hasVisualPreview);
+            return AspectRatio(
+              key: ValueKey(
+                  '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}'),
+              aspectRatio: ratio,
+              child: isDir
+                  ? _buildDirCell(context, entry, fullPath)
+                  : _buildFileCell(context, entry, fullPath),
+            );
+          },
         ),
-        itemCount: total,
-        itemBuilder: (context, i) {
-          final isDir = i < dirEntries.length;
-          final entry =
-              isDir ? dirEntries[i] : fileEntries[i - dirEntries.length];
-          final fullPath = widget.currentDirPath.isEmpty
-              ? entry.name
-              : '${widget.currentDirPath}/${entry.name}';
-          final hasVisualPreview = !isDir && _hasVisualPreview(entry.name);
-          final ratio = _aspectRatioFor(entry, fullPath,
-              hasVisualPreview: hasVisualPreview);
-          return AspectRatio(
-            key: ValueKey(
-                '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}'),
-            aspectRatio: ratio,
-            child: isDir
-                ? _buildDirCell(context, entry, fullPath)
-                : _buildFileCell(context, entry, fullPath),
-          );
-        },
       ),
     );
   }

@@ -83,27 +83,14 @@ class ByteBudgetCache {
     }
   }
 
-  /// Changes the byte budget in place, evicting oldest-first immediately if
-  /// the new budget is smaller than what's currently held. Used by
-  /// [DeviceCapabilityProfiler]-driven sizing (ADR-011) and
-  /// `CacheCoordinator.trimAll` (ADR-011, ADR-013) — see [LruCache.resize]
-  /// for the equivalent entry-count-based primitive and the same "only
-  /// these two callers" convention.
+
   void resize(int newMaxTotalBytes) {
     assert(newMaxTotalBytes > 0, 'maxTotalBytes must be > 0');
     _maxTotalBytes = newMaxTotalBytes;
     _evictToBudget();
   }
 
-  /// Evicts [fraction] (0.0-1.0) of *currently held* bytes, oldest-first,
-  /// without permanently changing [maxTotalBytes]. `fraction` is "how much
-  /// to remove," matching [LruCache.trimToFraction]'s convention exactly —
-  /// `CacheCoordinator.trimAll` applies the same [fraction] to every cache
-  /// in Section 4 regardless of type, so the two primitives must agree on
-  /// what the argument means. (This used to mean "trim down to `fraction`
-  /// of `maxTotalBytes`" — the inverse of [LruCache]'s convention and of
-  /// what "moderate vs. severe" trim levels need — see Finding F-17;
-  /// fixed as part of building `CacheCoordinator`.)
+
   void trimToFraction(double fraction) {
     assert(fraction >= 0.0 && fraction <= 1.0);
     final target = (_currentBytes * (1.0 - fraction)).round();

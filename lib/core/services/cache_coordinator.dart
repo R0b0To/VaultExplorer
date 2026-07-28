@@ -27,19 +27,7 @@ enum TrimLevel {
   severe,
 }
 
-/// Single fan-out point for "the OS says memory is tight, shed what you can
-/// spare" — Findings F-14/F-15, ADR-011.
-///
-/// Before this existed, [LruCache.trimToFraction] and
-/// [ByteBudgetCache.trimToFraction] were added to every memory-tier cache
-/// in anticipation of exactly this class (their own doc comments already
-/// forward-referenced `CacheCoordinator.trimAll`), but nothing actually
-/// called them and no memory-pressure signal existed anywhere in the app.
-/// This class is that caller, and [MainActivity.onTrimMemory] /
-/// `WidgetsBindingObserver.didHaveMemoryPressure` (see
-/// `lib/app/memory_pressure_observer.dart`) are the two signals that invoke
-/// it.
-///
+
 /// Deliberately trims every cache in Section 4 of architecture.md that has
 /// a memory-tier component — [ThumbnailConcurrency.inFlightThumbnails],
 /// [ThumbnailCacheService]'s in-memory tier, and [FullResImageCache] — with

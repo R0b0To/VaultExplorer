@@ -17,24 +17,6 @@ typedef ThumbnailFetchFn = Future<Uint8List> Function(MountedContainer, String);
 typedef ThumbnailSyncLookup = Uint8List? Function();
 
 /// Generic async thumbnail loader.
-///
-/// Handles the full lifecycle shared by every thumbnail-bearing surface in
-/// the app:
-///  - a synchronous fast path via [syncLookup] (e.g. an in-memory cache hit)
-///  - de-duplicating concurrent requests for the same file via [cache],
-///    a shared [LruCache] of in-flight `Future`s keyed by container + path
-///  - a scroll [debounce] that bails out before firing the real fetch if the
-///    tile has already been scrolled past
-///  - a [limiter] gate (priority-tiered LIFO + cancellable, see
-///    [PriorityTaskQueue] / ADR-010) so fast flings don't burn queue turns
-///    on tiles the user never stops on
-///  - a bounded exponential-backoff retry (Finding F-11) around the actual
-///    fetch, so a transient failure (USB hiccup, container I/O glitch)
-///    doesn't surface straight to [errorBuilder] on the first hiccup
-///
-/// Visuals are fully delegated to the caller via [imageBuilder],
-/// [loadingBuilder], and [errorBuilder], so each surface can keep its own
-/// styling while sharing all of the above machinery.
 class AsyncThumbnail extends StatefulWidget {
   final MountedContainer container;
   final String filePath;
@@ -45,7 +27,7 @@ class AsyncThumbnail extends StatefulWidget {
   final ThumbnailSyncLookup? syncLookup;
   final int? cacheHeight;
 
-  /// Which [PriorityTaskQueue] tier this request competes at (ADR-010).
+  /// Which [PriorityTaskQueue] tier this request competes at.
   /// Defaults to [TaskPriority.visible] — every pre-existing call site
   /// (grid/masonry/list tiles) is exactly that: an on-screen tile. Callers
   /// rendering an off-screen neighbor (e.g. `PlaylistCarouselOverlay`,

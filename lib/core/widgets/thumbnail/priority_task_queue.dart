@@ -7,9 +7,6 @@ import 'package:vaultexplorer/core/utils/task_priority.dart';
 export 'package:vaultexplorer/core/utils/task_priority.dart';
 
 /// A concurrency gate with three priority tiers, replacing the old flat
-/// `ConcurrencyLimiter` — ADR-010.
-///
-/// ### Why this exists (Findings F-04, F-05, F-13)
 ///
 /// The previous `ConcurrencyLimiter` served every caller identically: an
 /// on-screen grid tile, the media viewer's off-screen next/prev prefetch,
@@ -30,8 +27,6 @@ export 'package:vaultexplorer/core/utils/task_priority.dart';
 /// there is no cancellable native `MethodChannel` call, so "preemption"
 /// here only ever means "dequeue a higher-priority *waiting* request
 /// first," never "interrupt work already in progress."
-///
-/// ### Playback awareness (ADR-012, Finding F-06)
 ///
 /// Every admission decision also consults
 /// [PlaybackThrottleController.isPlaybackActive]. While a video decode
@@ -118,9 +113,6 @@ class PriorityTaskQueue {
     _drainNext();
   }
 
-  /// Adjusts [maxConcurrency] in place — used by
-  /// `DeviceCapabilityProfiler`-driven sizing (ADR-011) so a low-RAM/low-
-  /// core device and a flagship tablet don't get identical queue depths.
   void resize(int newMaxConcurrency) {
     assert(newMaxConcurrency > 0);
     maxConcurrency = newMaxConcurrency;

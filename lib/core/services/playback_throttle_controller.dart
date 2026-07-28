@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// Gates background image/thumbnail decoding while a `MediaCodec` video
-/// session (ExoPlayer/VLC) is active — ADR-012.
-///
+
 /// Finding F-06: `MediaMetadataRetriever` (used to generate video
 /// thumbnails) contends with an active video decoder for system
 /// `MediaCodec` slots and can throw `Released by resource manager
@@ -17,8 +15,6 @@ import 'package:flutter/foundation.dart';
 /// [PriorityTaskQueue] consults on every admission decision, regardless of
 /// which surface (grid, carousel, viewer prefetch) is asking. No caller
 /// needs its own "am I competing with video playback" awareness.
-///
-/// Process-wide singleton by design, matching ADR-001's pattern for
 /// [ThumbnailConcurrency] and [FullResImageCache] — there is exactly one
 /// shared native video player for the whole app (see
 /// `VideoPlaybackManager`), so "is a video decode session active" is a

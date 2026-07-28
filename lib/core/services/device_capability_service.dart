@@ -4,8 +4,7 @@ import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
-/// Dart-side service for device capability profiling and cache/queue sizing (ADR-011, ADR-019).
-///
+
 /// Queries [DeviceCapabilityProfiler] on the native platform via MethodChannel and
 /// scales Dart-side concurrency gates and memory budgets according to device hardware tier
 /// (`LOW`, `MEDIUM`, or `HIGH`).

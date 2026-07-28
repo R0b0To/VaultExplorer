@@ -19,7 +19,6 @@ import 'package:vaultexplorer/data/services/app_cache_encryption.dart';
 ///
 /// Tier 1 — static in-memory [ByteBudgetCache] ([_memoryCache])
 ///   Synchronous O(1). Survives widget dispose/recreate within a session.
-///   Budgeted by total bytes, not entry count (Finding F-01 / ADR-013): a
 ///   payload whose size is a user-adjustable setting (see
 ///   `ThumbnailQuality`) shouldn't be able to swing effective memory use by
 ///   an order of magnitude the way a fixed entry cap did. See
@@ -64,25 +63,12 @@ class ThumbnailCacheService {
   static const _inContainerReadCap = 8 * 1024 * 1024; // 8 MB
 
   // ── Tier 1: static in-memory, byte-budgeted LRU (Finding F-01) ─────────────
-  //
-  // 24 MB comfortably covers the documented worst case (~150 KB per
-  // thumbnail at max ThumbnailQuality × a few hundred resident entries)
-  // without capping raw entry count the way the old 120-entry LruCache did
-  // — a user on the lowest quality setting can now hold far more thumbnails
-  // resident than one on the highest, which is the point: memory scales
-  // with actual bytes held, not an arbitrary count that meant wildly
-  // different things depending on a setting this cache doesn't control.
   static const int _memoryMaxBytes = 24 * 1024 * 1024;
   static final _memoryCache = ByteBudgetCache(_memoryMaxBytes);
 
-  /// Applies device-tier-scaled sizing (ADR-011) — see
-  /// `DeviceCapabilityProfiler`/`runDeferredStartupWork()`.
   static void resizeMemoryBudget(int newMaxBytes) =>
       _memoryCache.resize(newMaxBytes);
 
-  /// Evicts [fraction] of currently-held bytes, oldest-first, without
-  /// permanently lowering the budget — the thumbnail-memory-tier half of
-  /// `CacheCoordinator.trimAll` (Finding F-15 / ADR-011).
   static void trimMemoryToFraction(double fraction) =>
       _memoryCache.trimToFraction(fraction);
 
@@ -595,12 +581,9 @@ static Future<void> put({
     _memoryCache.clear();
   }
 
-  // Default maximum on-disk app cache budget (100 MB) — ADR-014, Finding F-08
   static const int defaultMaxAppCacheBytes = 100 * 1024 * 1024;
   static int _putWriteCount = 0;
 
-  /// Enforces L2 disk cache byte budget (ADR-014, Finding F-08).
-  ///
   /// Scans all thumbnail files under the app cache directory, and if total
   /// usage exceeds [maxBytes], evicts the oldest files by modification time
   /// (`stat.modified`) until usage drops down to 80% of [maxBytes].

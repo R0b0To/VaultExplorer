@@ -7,8 +7,8 @@ import 'dart:collection';
 /// Every [operator []] call that hits promotes the entry to most-recent.
 ///
 /// Capacity is mutable (see [resize]) rather than `final` so that
-/// [DeviceCapabilityProfiler]-driven sizing (ADR-011) and
-/// [CacheCoordinator.trimAll] (ADR-011 §"memory-pressure response",
+/// [DeviceCapabilityProfiler]-driven sizing and
+/// [CacheCoordinator.trimAll] "memory-pressure response",
 /// ADR-013) can adjust it after construction — every other part of this
 /// codebase should still treat capacity as fixed for the lifetime of a
 /// given cache instance and only call [resize] via those two sanctioned

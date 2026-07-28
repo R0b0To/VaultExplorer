@@ -259,8 +259,7 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
         _cameraPermissionCompleter = null;
       } else if (call.method == ChannelMethods.onTrimMemory) {
         final level = (call.arguments as Map<Object?, Object?>?)?['level'] as int? ?? 0;
-        // Map Android's TRIM_MEMORY_* constants to TrimLevel (ADR-011, ADR-018, Finding F-15):
-        // TRIM_MEMORY_RUNNING_LOW (10), TRIM_MEMORY_RUNNING_CRITICAL (15), TRIM_MEMORY_COMPLETE (80)
+
         final trimLevel = (level >= 10 || level == 80)
             ? TrimLevel.severe
             : TrimLevel.moderate;

@@ -31,15 +31,10 @@ void configurePlatformIntegrations() {
   } catch (_) {}
 }
 
-/// Settings load, secure-screen setup, package info, and temp-file cleanup —
-/// none of this needs to finish before the first frame, so it happens after
-/// [runApp] instead of blocking it. [LockGateScreen] independently loads
-/// settings itself to build its UI, so this pass mainly handles the
-/// side effects (theme notifier, secure screen, version string, cleanup).
+
 Future<void> runDeferredStartupWork() async {
-  // Query native device profile and adjust memory budgets/concurrency (ADR-011, ADR-019).
+
   unawaited(DeviceCapabilityService.init());
-  // Run disk cache janitor pass (ADR-014, F-08).
   unawaited(ThumbnailCacheService.enforceDiskBudget());
 
   try {

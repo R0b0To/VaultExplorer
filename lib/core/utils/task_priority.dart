@@ -1,9 +1,6 @@
-/// Admission tiers for [PriorityTaskQueue] (ADR-010).
-///
 /// Ordered highest-to-lowest priority. A [visible] request always preempts
 /// queued [adjacent]/[background] slots up to the queue's max concurrency —
-/// it does not preempt work already `FETCHING` (there is no cancellable
-/// native round trip; see architecture.md Section 5).
+/// it does not preempt work already `FETCHING`
 enum TaskPriority {
   /// An on-screen tile (grid/masonry/list) or the media viewer's current
   /// page. The thing the user is looking at right now.

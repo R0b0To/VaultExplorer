@@ -48,16 +48,7 @@ mixin _ContainerLifecycleOps {
     }
   }
 
-  /// Queries `DeviceCapabilityProfiler` (Kotlin, ADR-019) once for the
-  /// device's LOW/MEDIUM/HIGH tier plus the raw signals it was computed
-  /// from. Native caches its own answer for the process lifetime, so this
-  /// is cheap to call more than once, but callers (currently just
-  /// `runDeferredStartupWork()`) should still only need to call it once.
-  ///
-  /// Falls back to `tier: 'MEDIUM'` on any channel failure so a caller
-  /// that feeds this straight into `resizeForDevice()`/`resize()` gets the
-  /// same defaults those primitives already ship with, rather than a
-  /// null/crash path.
+
   Future<({String tier, int cores, int memoryClassMb, bool isLowRamDevice})>
       getDeviceCapabilityProfile() async {
     try {

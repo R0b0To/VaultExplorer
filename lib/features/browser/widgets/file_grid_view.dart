@@ -14,8 +14,7 @@ import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 
 class FileGridView extends StatefulWidget {
   final MountedContainer container;
-  final List<RawEntry> dirs;
-  final List<RawEntry> files;
+  final List<RawEntry> items;
   final bool isSelectionMode;
   final Set<RawEntry> selectedItems;
   final String currentDirPath;
@@ -35,8 +34,7 @@ class FileGridView extends StatefulWidget {
   const FileGridView({
     super.key,
     required this.container,
-    required this.dirs,
-    required this.files,
+    required this.items,
     required this.isSelectionMode,
     required this.selectedItems,
     required this.currentDirPath,
@@ -158,13 +156,17 @@ class _FileGridViewState extends State<FileGridView> {
 
   @override
   Widget build(BuildContext context) {
-    final total = widget.dirs.length + widget.files.length;
+    final total = widget.items.length;
+    final gridKey = ValueKey(
+      widget.items.map((e) => '${e.raw}:${widget.isPinned?.call(e)}').join(';'),
+    );
     return GestureDetector(
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: GridView.builder(
+          key: gridKey,
           padding: EdgeInsets.fromLTRB(
             10,
             12,
@@ -180,13 +182,11 @@ class _FileGridViewState extends State<FileGridView> {
           ),
           itemCount: total,
           itemBuilder: (context, index) {
-            if (index < widget.dirs.length) {
-              return _buildDirCell(context, widget.dirs[index]);
+            final entry = widget.items[index];
+            if (entry.isDir) {
+              return _buildDirCell(context, entry);
             }
-            return _buildFileCell(
-              context,
-              widget.files[index - widget.dirs.length],
-            );
+            return _buildFileCell(context, entry);
           },
         ),
       ),
@@ -300,7 +300,6 @@ class _GridCell extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
   final bool isPinned;
-
   const _GridCell({
     required this.preview,
     required this.label,
@@ -313,7 +312,6 @@ class _GridCell extends StatelessWidget {
     this.onMoreTap,
     this.isPinned = false,
   });
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -434,7 +432,6 @@ class _EncryptedImageGridThumb extends StatelessWidget {
     required this.cacheMode,
     required this.quality,
   });
-
   static Future<Uint8List> _fetch(
     MountedContainer container,
     String path,
@@ -485,7 +482,6 @@ class _EncryptedImageGridThumb extends StatelessWidget {
     }
     return thumbBytes;
   }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -522,7 +518,6 @@ class _EncryptedImageGridThumb extends StatelessWidget {
       errorBuilder: (context) => _errorPlaceholder(cs),
     );
   }
-
   Widget _errorPlaceholder(ColorScheme cs) => Container(
         color: cs.surfaceContainerLow,
         child: Center(
@@ -543,7 +538,6 @@ class _VideoThumb extends StatelessWidget {
     required this.cacheMode,
     required this.quality,
   });
-
   static Future<Uint8List> _fetch(
     MountedContainer container,
     String path,
@@ -580,7 +574,6 @@ class _VideoThumb extends StatelessWidget {
     }
     return data;
   }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -633,7 +626,6 @@ class _VideoThumb extends StatelessWidget {
       ],
     );
   }
-
   Widget _errorPlaceholder(ColorScheme cs) => Container(
         color: cs.surfaceContainerLow,
         child: Center(

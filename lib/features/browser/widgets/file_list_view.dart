@@ -9,8 +9,7 @@ import 'package:vaultexplorer/features/browser/widgets/directory_tile.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_tile.dart';
 
 class FileListView extends StatefulWidget {
-  final List<RawEntry> dirs;
-  final List<RawEntry> files;
+  final List<RawEntry> items;
   final bool isSelectionMode;
   final bool isCompact;
   final Set<RawEntry> selectedItems;
@@ -32,8 +31,7 @@ class FileListView extends StatefulWidget {
 
   const FileListView({
     super.key,
-    required this.dirs,
-    required this.files,
+    required this.items,
     required this.isSelectionMode,
     this.isCompact = false,
     required this.selectedItems,
@@ -93,7 +91,10 @@ class _FileListViewState extends State<FileListView> {
 
   @override
   Widget build(BuildContext context) {
-    final total = widget.dirs.length + widget.files.length;
+    final total = widget.items.length;
+    final listKey = ValueKey(
+      widget.items.map((e) => '${e.raw}:${widget.isPinned?.call(e)}').join(';'),
+    );
     return Column(
       children: [
         const SizedBox(height: 8),
@@ -110,6 +111,7 @@ class _FileListViewState extends State<FileListView> {
                 ),
               ),
               child: ListView.builder(
+                key: listKey,
                 padding: EdgeInsets.only(
                   top: 0,
                   bottom: AppSpacing.floatingStackClearance +
@@ -117,15 +119,12 @@ class _FileListViewState extends State<FileListView> {
                 ),
                 itemCount: total,
                 itemBuilder: (_, index) {
-                  final isDir = index < widget.dirs.length;
-                  final entry = isDir
-                      ? widget.dirs[index]
-                      : widget.files[index - widget.dirs.length];
+                  final entry = widget.items[index];
                   final isSelected = widget.selectedItems.contains(entry);
                   final isPinned = widget.isPinned?.call(entry) ?? false;
-                  if (isDir) {
+                  if (entry.isDir) {
                     return DirectoryTile(
-                      key: ValueKey('dir:${entry.raw}'),
+                      key: ValueKey('dir:${entry.raw}:$isPinned'),
                       entry: entry,
                       isSelectionMode: widget.isSelectionMode,
                       isSelected: isSelected,
@@ -141,7 +140,7 @@ class _FileListViewState extends State<FileListView> {
                     );
                   }
                   return FileTile(
-                    key: ValueKey('file:${entry.raw}'),
+                    key: ValueKey('file:${entry.raw}:$isPinned'),
                     entry: entry,
                     isSelectionMode: widget.isSelectionMode,
                     isSelected: isSelected,

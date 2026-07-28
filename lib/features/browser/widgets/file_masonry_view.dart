@@ -17,8 +17,7 @@ import 'dart:ui' as ui;
 
 class FileMasonryView extends StatefulWidget {
   final MountedContainer container;
-  final List<RawEntry> dirs;
-  final List<RawEntry> files;
+  final List<RawEntry> items;
   final bool isSelectionMode;
   final Set<RawEntry> selectedItems;
   final String currentDirPath;
@@ -38,8 +37,7 @@ class FileMasonryView extends StatefulWidget {
   const FileMasonryView({
     super.key,
     required this.container,
-    required this.dirs,
-    required this.files,
+    required this.items,
     required this.isSelectionMode,
     required this.selectedItems,
     required this.currentDirPath,
@@ -166,18 +164,20 @@ class _FileMasonryViewState extends State<FileMasonryView> {
 
   @override
   Widget build(BuildContext context) {
-    final dirEntries = widget.dirs;
-    final fileEntries = widget.files;
-    final total = dirEntries.length + fileEntries.length;
+    final total = widget.items.length;
     if (total == 0) {
       return const SizedBox.shrink();
     }
+    final gridKey = ValueKey(
+      widget.items.map((e) => '${e.raw}:${widget.isPinned?.call(e)}').join(';'),
+    );
     return GestureDetector(
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
       child: NotificationListener<ScrollNotification>(
         onNotification: _onScrollNotification,
         child: MasonryGridView.count(
+          key: gridKey,
           crossAxisCount: _columnCount,
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
@@ -191,9 +191,9 @@ class _FileMasonryViewState extends State<FileMasonryView> {
           ),
           itemCount: total,
           itemBuilder: (context, i) {
-            final isDir = i < dirEntries.length;
-            final entry =
-                isDir ? dirEntries[i] : fileEntries[i - dirEntries.length];
+            final entry = widget.items[i];
+            final isDir = entry.isDir;
+            final isPinned = widget.isPinned?.call(entry) ?? false;
             final fullPath = widget.currentDirPath.isEmpty
                 ? entry.name
                 : '${widget.currentDirPath}/${entry.name}';
@@ -202,7 +202,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
                 hasVisualPreview: hasVisualPreview);
             return AspectRatio(
               key: ValueKey(
-                  '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}'),
+                  '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}:$isPinned'),
               aspectRatio: ratio,
               child: isDir
                   ? _buildDirCell(context, entry, fullPath)
@@ -319,7 +319,6 @@ class _MasonryCell extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
   final bool isPinned;
-
   const _MasonryCell({
     required this.preview,
     required this.label,
@@ -332,7 +331,6 @@ class _MasonryCell extends StatelessWidget {
     this.onMoreTap,
     this.isPinned = false,
   });
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -451,7 +449,6 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
     required this.quality,
     required this.onSizeKnown,
   });
-
   static Future<void> _checkAndReportSizeFromBytes(
     MountedContainer container,
     String path,
@@ -469,7 +466,6 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       } catch (_) {}
     }
   }
-
   static Future<Uint8List> _fetch(
     MountedContainer container,
     String path,
@@ -536,7 +532,6 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
     }
     return thumbBytes;
   }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -582,7 +577,6 @@ class _EncryptedImageMasonryThumb extends StatelessWidget {
       errorBuilder: (context) => _errorPlaceholder(cs),
     );
   }
-
   Widget _errorPlaceholder(ColorScheme cs) => Container(
         color: cs.surfaceContainerLow,
         child: Center(
@@ -605,7 +599,6 @@ class _VideoMasonryThumb extends StatelessWidget {
     required this.quality,
     required this.onSizeKnown,
   });
-
   static Future<void> _checkAndReportSizeFromBytes(
     MountedContainer container,
     String path,
@@ -623,7 +616,6 @@ class _VideoMasonryThumb extends StatelessWidget {
       } catch (_) {}
     }
   }
-
   static Future<Uint8List> _fetch(
     MountedContainer container,
     String path,
@@ -675,7 +667,6 @@ class _VideoMasonryThumb extends StatelessWidget {
     }
     return data;
   }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -737,7 +728,6 @@ class _VideoMasonryThumb extends StatelessWidget {
       ],
     );
   }
-
   Widget _errorPlaceholder(ColorScheme cs) => Container(
         color: cs.surfaceContainerLow,
         child: Center(

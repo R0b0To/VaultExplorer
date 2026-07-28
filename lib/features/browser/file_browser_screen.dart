@@ -94,13 +94,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.defaultQuality;
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
   Set<String> _pinnedPaths = {};
-
   static const int _maxScanDepth = 20;
   static const _documentExts = {
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf',
     'csv', 'zip', 'tar', 'gz', 'json', 'xml',
   };
-
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
   Set<String> _mountedDocProviderFolders = {};
@@ -188,7 +186,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _pinnedPaths.removeAll(pathsToToggle);
       }
     });
-
     final records = await ContainerRepository.instance.loadAll();
     var record = records[widget.container.uri];
     record ??= ContainerRecord(
@@ -198,7 +195,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
     record = record.copyWith(pinnedPaths: _pinnedPaths.toList());
     await ContainerRepository.instance.save(record);
-
     final count = pathsToToggle.length;
     _setStatus(
       pin
@@ -240,7 +236,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       final appSettings = await AppSettingsService.loadSettings();
       final records = await ContainerRepository.instance.loadAll();
       final record = records[widget.container.uri];
-
       if (mounted) {
         setState(() {
           if (record != null) {
@@ -890,16 +885,19 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _startMediaViewerFromCurrentLocation() async {
     _signalActivity();
-    int compareWithPin(RawEntry ea, RawEntry eb) {
+    int compareOverall(RawEntry ea, RawEntry eb) {
       final aPinned = _isPinned(ea);
       final bPinned = _isPinned(eb);
-      if (aPinned && !bPinned) return -1;
-      if (!aPinned && bPinned) return 1;
+      if (aPinned != bPinned) {
+        return aPinned ? -1 : 1;
+      }
+      if (ea.isDir != eb.isDir) {
+        return ea.isDir ? -1 : 1;
+      }
       return compareItems(ea, eb);
     }
-
     final sortedItems = _currentItems.where((e) => !e.isDir).toList()
-      ..sort(compareWithPin);
+      ..sort(compareOverall);
     final localMedia = sortedItems
         .map((e) => e.name)
         .where(_isSupportedMedia)
@@ -1224,7 +1222,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onProgress: (done, total) {},
         );
         failCount = clipItems.length - deleted;
-
         final deletedPaths = clipItems.map((i) => i.path).toSet();
         if (_pinnedPaths.any((p) => deletedPaths.contains(p))) {
           _pinnedPaths.removeWhere((p) => deletedPaths.contains(p));
@@ -1236,7 +1233,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             );
           }
         }
-
         exitSelectionMode();
         await _loadDirectoryContents(_currentDirPath);
         _setStatus(
@@ -1790,36 +1786,34 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   @override
   Widget build(BuildContext context) {
-    int compareWithPin(RawEntry ea, RawEntry eb) {
+    int compareOverall(RawEntry ea, RawEntry eb) {
       final aPinned = _isPinned(ea);
       final bPinned = _isPinned(eb);
-      if (aPinned && !bPinned) return -1;
-      if (!aPinned && bPinned) return 1;
+      if (aPinned != bPinned) {
+        return aPinned ? -1 : 1;
+      }
+      if (ea.isDir != eb.isDir) {
+        return ea.isDir ? -1 : 1;
+      }
       return compareItems(ea, eb);
     }
 
-    final dirs = _currentItems.where((e) => e.isDir).toList()
-      ..sort(compareWithPin);
-    final files = _currentItems.where((e) => !e.isDir).toList()
-      ..sort(compareWithPin);
     final query = _searchQuery.trim().toLowerCase();
-    final filteredDirs = (query.isEmpty && _currentFilter == null)
-        ? dirs
-        : (query.isEmpty
-              ? <RawEntry>[]
-              : dirs
-                    .where(
-                      (d) => d.name.toLowerCase().contains(query),
-                    )
-                    .toList());
-    final filteredFiles = files.where((f) {
-      final name = f.name;
+    final filteredItems = _currentItems.where((item) {
+      final name = item.name;
       if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
+      if (item.isDir) {
+        if (query.isEmpty && _currentFilter != null) return false;
+        return true;
+      }
       return _matchesFilter(name);
-    }).toList();
-    final cs = Theme.of(context).colorScheme;
+    }).toList()
+      ..sort(compareOverall);
+
+    final dirCount = filteredItems.where((e) => e.isDir).length;
+    final fileCount = filteredItems.where((e) => !e.isDir).length;
+
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final actionBuilders = _buildActionBuilders();
     final showActionBar = !_searchActive;
     return PopScope(
       canPop: false,
@@ -1837,12 +1831,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
-        appBar: _buildAppBar(context, filteredDirs, filteredFiles),
+        appBar: _buildAppBar(context, filteredItems, dirCount, fileCount),
         bottomNavigationBar: (!isLandscape && showActionBar)
             ? FileManagerActionBar(
                 axis: Axis.horizontal,
                 actions: _toolbarConfig.visible,
-                builders: actionBuilders,
+                builders: _buildActionBuilders(),
               )
             : null,
         body: Stack(
@@ -1853,7 +1847,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
                   const Divider(),
                 ],
-                Expanded(child: _buildBody(filteredDirs, filteredFiles)),
+                Expanded(child: _buildBody(filteredItems)),
               ],
             ),
             Positioned(
@@ -1907,10 +1901,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   PreferredSizeWidget _buildAppBar(
     BuildContext context,
-    List<RawEntry> dirs,
-    List<RawEntry> files,
+    List<RawEntry> filteredItems,
+    int dirCount,
+    int fileCount,
   ) {
-    final allItems = [...dirs, ...files];
+    final allItems = filteredItems;
     final cs = Theme.of(context).colorScheme;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !_searchActive;
@@ -1954,7 +1949,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         );
         exitSelectionMode();
       }
-
       Future<void> doOpenWithApp() async {
         final entry = selectedItems.first;
         final path = _currentDirPath.isEmpty
@@ -1972,7 +1966,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           await _showOpenWithDialog(entry.name, path, ext, settings);
         }
       }
-
       Future<void> doToggleDocProvider() async {
         final entry = selectedItems.first;
         exitSelectionMode();
@@ -1982,7 +1975,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           await _toggleFolderDocumentProvider(entry);
         }
       }
-
       if (!isLandscape) {
         return SelectionAppBar(
           selectedCount: selectedItems.length,
@@ -2007,7 +1999,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onToggleDocumentProvider: doToggleDocProvider,
         );
       }
-
       final textTheme = Theme.of(context).textTheme;
       return AppBar(
         leading: IconButton(
@@ -2234,8 +2225,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           ),
           if (_toolbarConfig.showStatsBar)
             _buildAppBarStatsSubtitle(
-              dirCount: dirs.length,
-              fileCount: files.length,
+              dirCount: dirCount,
+              fileCount: fileCount,
               isFiltered: isFiltered,
             ),
         ],
@@ -2269,7 +2260,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 
-  Widget _buildBody(List<RawEntry> dirs, List<RawEntry> files) {
+  Widget _buildBody(List<RawEntry> items) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
     }
@@ -2283,7 +2274,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         onAction: _atRoot ? null : _navigateUp,
       );
     }
-    if (_searchQuery.trim().isNotEmpty && dirs.isEmpty && files.isEmpty) {
+    if (_searchQuery.trim().isNotEmpty && items.isEmpty) {
       return AppEmptyState(
         icon: Icons.search_off_rounded,
         title: 'No results',
@@ -2295,8 +2286,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final content = switch (_layoutMode) {
       BrowserLayoutMode.grid => FileGridView(
           container: widget.container,
-          dirs: dirs,
-          files: files,
+          items: items,
           isSelectionMode: isSelectionMode,
           selectedItems: selectedItems,
           currentDirPath: _currentDirPath,
@@ -2321,8 +2311,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ),
       BrowserLayoutMode.masonry => FileMasonryView(
           container: widget.container,
-          dirs: dirs,
-          files: files,
+          items: items,
           isSelectionMode: isSelectionMode,
           selectedItems: selectedItems,
           currentDirPath: _currentDirPath,
@@ -2358,8 +2347,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
             FileManagerToolbarService.instance.save(_toolbarConfig);
           },
-          dirs: dirs,
-          files: files,
+          items: items,
           isSelectionMode: isSelectionMode,
           isCompact: _layoutMode == BrowserLayoutMode.compact,
           selectedItems: selectedItems,

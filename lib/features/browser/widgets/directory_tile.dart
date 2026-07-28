@@ -44,9 +44,8 @@ class DirectoryTile extends StatelessWidget {
       pinBadge = Container(
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: cs.primaryContainer,
+          color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
           shape: BoxShape.circle,
-          border: Border.all(color: cs.surface, width: 1.5),
         ),
         child: Icon(
           Icons.push_pin_rounded,

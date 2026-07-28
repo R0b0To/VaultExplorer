@@ -197,12 +197,25 @@ class _AsyncThumbnailState extends State<AsyncThumbnail> {
         _bytes = data;
         _isLoading = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (targetPath == _loadingPath && mounted && !_disposed) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
+        final errStr = e.toString();
+        final isCancellation =
+            errStr.contains('Cancelled') || errStr.contains('cancelled');
+        if (isCancellation) {
+          // Dequeued/cancelled due to rapid scrolling, not a missing or corrupt file.
+          // Retry after a brief delay if this tile remains mounted and wanted on screen.
+          Future.delayed(const Duration(milliseconds: 150), () {
+            if (targetPath == _loadingPath && mounted && !_disposed) {
+              _load();
+            }
+          });
+        } else {
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+          });
+        }
       }
     }
   }

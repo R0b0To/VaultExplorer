@@ -23,7 +23,6 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-
 import 'native_video_controller.dart';
 
 enum VideoPlaybackMode { playOnce, loop, playAndAdvance }
@@ -54,24 +53,18 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   late final PlaylistController _playlistController;
   late final VideoPlaybackManager _playbackManager;
   late PageController _pageController;
-
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
-
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
       ValueNotifier<VideoPlaybackProgress>(const VideoPlaybackProgress());
-
   bool _showUI = false;
   int _activeMenuCount = 0;
   bool _isCarouselVisible = false;
   bool _enableCarousel = true;
-
   late bool _wasEmpty;
-
   Timer? _slideshowTimer;
   Timer? _hideTimer;
   Timer? _prefetchDebounceTimer;
-
   final bool _autoPlay = true;
   bool _autoAdvance = false;
   int _slideshowDelaySeconds = 4;
@@ -82,29 +75,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   BoxFit _imageFit = BoxFit.contain;
   bool _isMuted = false;
   bool _isSwiping = false;
-
   final Set<String> _prefetchingFullRes = {};
-  // Per-file manual rotation override, set via the advanced settings sheet's
-  // rotate control -- video_player (ExoPlayer on Android) already applies a
-  // video's embedded rotation metadata automatically when rendering, so
-  // this only ever holds user-requested overrides, not an auto-detected
-  // value. Defaults to 0 (no extra rotation) for any file not in the map.
   final Map<String, int> _rotations = {};
-
   final Map<String, GlobalKey> _mediaKeys = {};
-
   NativeVideoController? _lastListenedController;
   bool _wakelockEnabled = false;
-
   int _transitionToken = 0;
-  bool _transitionInProgress = false;
 
   @override
   void initState() {
     super.initState();
-    // Flush queued background video thumbnail jobs to release MediaCodec hardware memory for ExoPlayer
     ThumbnailConcurrency.videoLimiter.cancelAll();
-
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
     _playlistController = PlaylistController(
@@ -114,10 +95,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       startingFolder: widget.startingFolder,
     );
     _wasEmpty = _playlistController.isEmpty;
-
     _playbackManager = VideoPlaybackManager();
     _pageController = PageController(initialPage: widget.initialIndex);
-
     _playlistController.addListener(_onPlaylistUpdate);
     _playbackManager.activeControllerNotifier.addListener(
       _onActiveVideoControllerChanged,
@@ -125,9 +104,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _playbackManager.currentFileNotifier.addListener(
       _onCurrentMediaFileChanged,
     );
-
     _loadConfig();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startSlideshowTimerIfNeeded();
       _prefetchSurroundingItems();
@@ -135,20 +112,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     });
   }
 
-  /// Points the single shared native player (owned by [_playbackManager])
-  /// at whatever the playlist's current file is right now, or pauses it if
-  /// the current page isn't a video/audio file. This is the sole place
-  /// that decides "what should the player be showing" — call it the
-  /// instant a navigation target is known (button press, or mid-swipe once
-  /// `PageView` settles on a new index), not after any page-turn animation
-  /// finishes. Mirrors VLC's `PlaylistManager.playIndex()`, which starts
-  /// `PlayerController.startPlayback()` synchronously the moment `next()`/
-  /// `previous()` is called rather than waiting on any UI transition.
-  ///
-  /// Cheap to call redundantly — [VideoPlaybackManager.activate] no-ops if
-  /// the target file is already loaded — so this is called defensively
-  /// from several navigation-adjacent spots as a resync, not just the one
-  /// "real" trigger.
   void _activateCurrentMedia() {
     if (_playlistController.isEmpty) return;
     final file = _playlistController.currentFile;
@@ -162,13 +125,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     } else {
       _playbackManager.pauseActive();
     }
-    // ADR-012 / Finding F-06: scoped to *video* specifically (not audio --
-    // see PlaybackThrottleController's doc comment for why audio doesn't
-    // contend with MediaMetadataRetriever the way active video decode
-    // does). This is the single signal every PriorityTaskQueue admission
-    // check consults, replacing the old per-call-site "if (isVid) return"
-    // skip that only protected this screen's own prefetch and was silently
-    // bypassed by PlaylistCarouselOverlay.
     PlaybackThrottleController.setActive(MediaViewerConstants.isVideo(file));
   }
 
@@ -218,13 +174,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
-  // Fires once, the first time _playbackManager creates its one shared
-  // controller (subsequent navigations reuse that same instance, so this
-  // notifier doesn't fire again) — this is just where we attach our own
-  // tick listener to it. Per-navigation resets (progress bar, playback
-  // speed) live in _onCurrentMediaFileChanged below, since the controller
-  // identity itself no longer changes on every swipe the way it did when
-  // each file got its own controller.
   void _onActiveVideoControllerChanged() {
     if (_lastListenedController != null) {
       try {
@@ -241,12 +190,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _updateWakelock(controller.value.isPlaying);
   }
 
-  // Fires on every navigation that switches the player to a different file
-  // (see VideoPlaybackManager.activate). Just resets the progress display —
-  // playback speed is applied inside activate() itself, to whichever
-  // controller (new or reused) it actually resolves for the target file,
-  // rather than here via activeController (which, at the moment this
-  // listener runs, could still be pointing at the previous file).
   void _onCurrentMediaFileChanged() {
     _videoProgressNotifier.value = const VideoPlaybackProgress();
   }
@@ -256,28 +199,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     if (controller == null || controller.value.hasError) return;
     _updateWakelock(controller.value.isPlaying);
     final isInitialized = controller.value.isInitialized;
-    // Read straight off the controller rather than _videoProgressNotifier:
-    // that notifier is only updated by MediaPlayerWidget's own listener,
-    // deferred to a postFrameCallback, so at the instant this handler runs
-    // (synchronously, in the same notifyListeners() call as the native
-    // endReached event) it still reflects the *previous* frame's position —
-    // never quite caught up to duration yet. Checking controller.value
-    // directly means this fires reliably the moment endReached lands,
-    // instead of only on whatever later event happens to fire next (e.g.
-    // pressing play, which is what made it look like a manual press was
-    // required to advance).
     final position = controller.value.position;
     final duration = controller.value.duration;
-    // Looping itself is handled natively now (VlcPlayerEngine bakes
-    // input-repeat into the Media whenever setLooping(true) is in
-    // effect) — this listener only needs to care about auto-advance.
     if (isInitialized &&
         _videoPlaybackMode == VideoPlaybackMode.playAndAdvance &&
         duration > Duration.zero &&
         position >= duration) {
-      if (!_transitionInProgress) {
-        _navigateToNext();
-      }
+      _navigateToNext();
     }
   }
 
@@ -292,31 +220,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final index = _playlistController.currentIndex;
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty) return;
-
     final next = index + 1;
     final prev = index - 1;
     final nextFile = next < playlist.length ? playlist[next] : null;
     final prevFile = prev >= 0 ? playlist[prev] : null;
-
-    // Still-image thumbnails for images, poster frames for video — both
-    // just a small decoded/decrypted preview, so this is cheap regardless
-    // of what the current item's type is. This is also what a non-current
-    // video page now shows instead of a live decode (see
-    // MediaPlayerWidget's doc comment): there's exactly one native player
-    // for the whole session, so any neighbor kept alive by PageView's
-    // cache extent needs *something* to show that isn't a black box.
     if (nextFile != null) _prefetchThumbnail(nextFile);
     if (prevFile != null) _prefetchThumbnail(prevFile);
-
     final currentFile = _playlistController.currentFile;
     if (MediaViewerConstants.isImage(currentFile) && nextFile != null) {
-      // Warm full-resolution bytes for the very next image only (not prev —
-      // swiping back re-hits the native ChunkedFileEngine's own decrypted-
-      // chunk cache and open-handle LRU cheaply, and isn't worth doubling
-      // the concurrent background transfer load). This hides the decrypt +
-      // platform-channel cost behind however long the user spends looking
-      // at the current image, instead of paying it synchronously on swipe.
-      // No-ops on its own if nextFile isn't an image.
       _prefetchFullRes(nextFile);
     }
   }
@@ -325,7 +236,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final isImg = MediaViewerConstants.isImage(fileName);
     final isVid = MediaViewerConstants.isVideo(fileName);
     if (!isImg && !isVid) return;
-
     if (ThumbnailCacheService.getFromMemory(
           widget.container,
           fileName,
@@ -334,14 +244,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         null) {
       return;
     }
-
-    // Same key scheme AsyncThumbnail uses for its own in-flight map, so a
-    // grid tile or carousel neighbor already fetching this exact file is
-    // de-duplicated against instead of racing it with a second native call
-    // (Finding F-12).
     final key = '${widget.container.volId}:'
         '${widget.container.mountedAt.millisecondsSinceEpoch}:$fileName';
-
     final existing = ThumbnailConcurrency.inFlightThumbnails[key];
     if (existing != null) {
       try {
@@ -350,22 +254,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       if (mounted) setState(() {});
       return;
     }
-
     final limiter = isVid
         ? ThumbnailConcurrency.videoLimiter
         : ThumbnailConcurrency.imageLimiter;
     final completer = Completer<void>();
     final future = _gatedFetchThumbnail(fileName, isVid, limiter, completer);
     ThumbnailConcurrency.inFlightThumbnails[key] = future;
-
     try {
       await future;
-      // Not strictly necessary for the page the user is already on (it
-      // rebuilds on navigation regardless), but a neighbor page PageView
-      // has already materialized via cacheExtent may be sitting on a
-      // loading placeholder built before this prefetch resolved -- this
-      // nudges it to pick up the now-cached bytes without waiting for some
-      // unrelated rebuild.
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Failed to prefetch thumbnail: $e');
@@ -386,8 +282,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     try {
       await limiter.acquire(completer, priority: TaskPriority.adjacent);
       acquired = true;
-      // Exponential-backoff retry (Finding F-11), shared with every other
-      // thumbnail consumer.
       return await retryWithBackoff<Uint8List>(
         (attempt) => isVid
             ? _fetchVideoThumbnailForPrefetch(fileName)
@@ -398,13 +292,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
-  /// Mirrors the fetch-then-cache shape used by the grid/list/carousel
-  /// tiles' own private `_fetch` methods (see e.g. file_tile.dart) --
-  /// deliberately not the widest possible dedup (extracting one shared
-  /// top-level helper for all five call sites is a reasonable further step,
-  /// tracked for a future CacheCoordinator pass) but this call site no
-  /// longer bypasses ThumbnailCacheService's disk tier or the concurrency
-  /// gate the way it used to.
   Future<Uint8List> _fetchImageThumbnailForPrefetch(String fileName) async {
     final mode = widget.thumbnailCacheMode;
     final quality = widget.thumbnailQuality;
@@ -473,34 +360,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     return bytes;
   }
 
-  /// Background-warms the full-resolution decrypted bytes for [fileName]
-  /// into [FullResImageCache], so that when the user actually swipes there,
-  /// [EncryptedImageWidget] finds it already cached instead of decrypting
-  /// and transferring the whole file synchronously on the swipe.
-  ///
-  /// Deliberately low-priority: skipped entirely if the file isn't an
-  /// image, is already cached, or is already being prefetched, and the
-  /// result is discarded (without erroring) if the user has swiped away
-  /// from being adjacent to [fileName] by the time the read completes —
-  /// no point holding a large buffer for a target the user already passed.
   Future<void> _prefetchFullRes(String fileName) async {
     if (!MediaViewerConstants.isImage(fileName)) return;
     if (FullResImageCache.contains(widget.container, fileName)) return;
     if (_prefetchingFullRes.contains(fileName)) return;
-
     _prefetchingFullRes.add(fileName);
     final completer = Completer<void>();
     try {
-      // Goes through the same shared limiter + in-flight de-dup that
-      // EncryptedImageWidget's own load uses (see full_res_image_cache.dart)
-      // rather than calling vaultExplorerApi directly: if the widget for
-      // this page is *also* loading it (e.g. the user already swiped there
-      // before this prefetch got a turn), the two collapse into one native
-      // call instead of racing each other. isStillWanted re-checks that
-      // fileName is still adjacent to the current index once a turn is
-      // granted, so a prefetch that waited through the queue doesn't pay
-      // for the native round trip for a page the user has since moved
-      // well past.
       await FullResImageCache.fetch(
         widget.container,
         fileName,
@@ -520,46 +386,31 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   Future<void> _transitionTo(int index, {bool animate = true}) async {
-    if (_transitionInProgress) return;
     if (index < 0 || index >= _playlistController.playlist.length) return;
-    if (index == _playlistController.currentIndex &&
-        _pageController.hasClients &&
-        _pageController.page?.round() == index) return;
-    _transitionInProgress = true;
     final token = ++_transitionToken;
-    try {
-      _cancelSlideshowTimer();
-      _startHideTimer();
+    _cancelSlideshowTimer();
+    _startHideTimer();
+    _playbackManager.pauseActive();
+    _playlistController.updateIndex(index);
 
-      // Activate immediately at t = 0ms so video starts loading instantly
-      _playlistController.updateIndex(index);
-      _activateCurrentMedia();
-      _prefetchSurroundingItems();
-
-      if (_pageController.hasClients) {
-        if (animate) {
-          await _pageController.animateToPage(
-            index,
-            duration: MediaViewerConstants.pageTransitionDuration,
-            curve: Curves.easeInOut,
-          );
-        } else {
-          _pageController.jumpToPage(index);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted && _transitionToken == token) {
-              _onScrollEnd();
-            }
-          });
-        }
-      }
-    } finally {
-      if (_transitionToken == token) {
-        _transitionInProgress = false;
+    if (_pageController.hasClients) {
+      if (animate) {
+        await _pageController.animateToPage(
+          index,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _pageController.jumpToPage(index);
       }
     }
+
+    if (mounted && _transitionToken == token) {
+      _onScrollEnd();
+    }
   }
+
   void _navigateToNext() {
-    if (_transitionInProgress) return;
     final index = _playlistController.currentIndex;
     if (index < _playlistController.playlist.length - 1) {
       HapticFeedback.lightImpact();
@@ -568,7 +419,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   void _navigateToPrev() {
-    if (_transitionInProgress) return;
     final index = _playlistController.currentIndex;
     if (index > 0) {
       HapticFeedback.lightImpact();
@@ -579,7 +429,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   void _startSlideshowTimerIfNeeded() {
     _cancelSlideshowTimer();
     if (!_autoAdvance || _playlistController.isEmpty) return;
-
     final currentFile = _playlistController.currentFile;
     if (MediaViewerConstants.isImage(currentFile)) {
       _slideshowTimer = Timer(Duration(seconds: _slideshowDelaySeconds), () {
@@ -599,16 +448,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   void _onScrollEnd() {
     _isSwiping = false;
     _activateCurrentMedia();
-
     final currentFile = _playlistController.currentFile;
     if (MediaViewerConstants.isImage(currentFile)) {
       _startSlideshowTimerIfNeeded();
     }
-
     if (mounted) setState(() {});
-
     if (_showUI) {
-      _startHideTimer(); 
+      _startHideTimer();
     }
   }
 
@@ -633,7 +479,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       ),
     );
     if (confirm != true) return;
-
     final fileToDelete = _playlistController.currentFile;
     bool success = false;
     try {
@@ -644,18 +489,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     } catch (e) {
       debugPrint('Deletion error operation failed: $e');
     }
-
     if (success && mounted) {
       _mediaKeys.remove(fileToDelete);
       _rotations.remove(fileToDelete);
-
       _playlistController.removeFile(fileToDelete);
-
       if (_playlistController.isEmpty) {
         Navigator.pop(context);
         return;
       }
-
       if (_pageController.hasClients) {
         final oldController = _pageController;
         _pageController = PageController(initialPage: _playlistController.currentIndex);
@@ -663,16 +504,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           oldController.dispose();
         });
       }
-
       setState(() {});
-
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           _prefetchSurroundingItems();
           _onScrollEnd();
         }
       });
-
       if (mounted) {
         showAppSnackBar(
           context,
@@ -691,11 +529,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   void _handleMediaError(String fileName) {
     if (fileName != _playlistController.currentFile) return;
-    
     Future.delayed(MediaViewerConstants.brokenMediaSkipDelay, () {
       if (!mounted) return;
       if (fileName != _playlistController.currentFile) return;
-      
       if (_playlistController.currentIndex < _playlistController.playlist.length - 1) {
         _transitionTo(_playlistController.currentIndex + 1, animate: true);
       }
@@ -710,7 +546,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   void _startHideTimer() {
     _hideTimer?.cancel();
     if (_activeMenuCount > 0) return;
-
     _hideTimer = Timer(MediaViewerConstants.uiHideDelay, () {
       final controller = _playbackManager.activeController;
       if (mounted &&
@@ -762,7 +597,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   void _updatePlaybackMode(VideoPlaybackMode mode) {
-    _startHideTimer(); 
+    _startHideTimer();
     setState(() {
       _videoPlaybackMode = mode;
       _autoAdvance = (mode == VideoPlaybackMode.playAndAdvance);
@@ -772,17 +607,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _cancelSlideshowTimer();
       }
     });
-    // Only meaningful while a video is active (the loop toggle in
-    // MediaViewerBottomControls only shows for videos), but harmless to
-    // call regardless — this is what makes VlcPlayerEngine bake
-    // `input-repeat` into the next Media it opens, and turns it back off
-    // the moment the mode changes away from loop.
     _playbackManager.activeController?.setLooping(mode == VideoPlaybackMode.loop);
   }
 
   void _showAdvancedSettings(BuildContext context, bool isImage) {
     _menuOpened();
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -839,7 +668,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final controller = _playbackManager.activeController;
     if (controller == null) return;
     _menuOpened();
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -884,7 +712,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _playbackManager.dispose();
     _swipePhysicsNotifier.dispose();
     _videoProgressNotifier.dispose();
-
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
@@ -893,7 +720,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     if (_playlistController.isEmpty) {
       return Scaffold(
         backgroundColor: Colors.black,
@@ -905,10 +731,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         ),
       );
     }
-
     final isCurrentAnImage =
         MediaViewerConstants.isImage(_playlistController.currentFile);
-
     bool isPlayingState = false;
     if (isCurrentAnImage) {
       isPlayingState = _autoAdvance;
@@ -917,7 +741,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           _playbackManager.activeController?.value.isPlaying ?? false;
     }
     _updateWakelock(isPlayingState);
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -928,14 +751,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               return NotificationListener<ScrollNotification>(
                 onNotification: (ScrollNotification notification) {
                   if (notification.depth == 0) {
-                    // dragDetails is only non-null for a scroll the user's
-                    // finger actually started — animateToPage (arrow-press
-                    // navigation) and jumpToPage also emit a
-                    // ScrollStartNotification, but with dragDetails null.
-                    // Without this check, _onScrollStart's pause-on-touch
-                    // would immediately re-pause the item _activateCurrentMedia
-                    // just started playing for a button-triggered transition,
-                    // right as its own animation began.
                     if (notification is ScrollStartNotification &&
                         notification.dragDetails != null) {
                       _onScrollStart();
@@ -954,24 +769,19 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   controller: _pageController,
                   physics: physics,
                   itemCount: _playlistController.playlist.length,
-onPageChanged: (index) {
-    if (!_transitionInProgress) {
-      _playlistController.updateIndex(index);
-      _activateCurrentMedia();
-      _prefetchDebounceTimer?.cancel();
-      _prefetchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
-        if (mounted) _prefetchSurroundingItems();
-      });
-    }
-  },
+                  onPageChanged: (index) {
+                    _playlistController.updateIndex(index);
+                    _prefetchDebounceTimer?.cancel();
+                    _prefetchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+                      if (mounted) _prefetchSurroundingItems();
+                    });
+                  },
                   itemBuilder: (context, index) {
                     final fileName = _playlistController.playlist[index];
                     final contentUriString = _contentUriFor(fileName);
                     final prefetchedBytes = _prefetchedBytesFor(fileName);
-
                     final isImg = MediaViewerConstants.isImage(fileName);
                     final isAudio = MediaViewerConstants.isAudio(fileName);
-
                     return Container(
                         color: Colors.black,
                         child: isImg
@@ -1019,14 +829,12 @@ onPageChanged: (index) {
                               },
                               onError: () => _handleMediaError(fileName),
                             ),
-
                     );
                   },
                 ),
               );
             },
           ),
-
           AnimatedPositioned(
             duration: MediaViewerConstants.animationDuration,
             curve: Curves.easeOut,
@@ -1046,14 +854,13 @@ onPageChanged: (index) {
                 },
                 onDeletePressed: _deleteCurrentFile,
                 onPlaylistChanged: () {
-                  _startHideTimer(); 
+                  _startHideTimer();
                   if (!_playlistController.isPlaylistMode) {
                     if (_isCarouselVisible) _toggleCarousel();
                     if (_autoAdvance) {
                       _updatePlaybackMode(VideoPlaybackMode.playOnce);
                     }
                   }
-
                   if (_pageController.hasClients) {
                     final oldController = _pageController;
                     _pageController = PageController(initialPage: _playlistController.currentIndex);
@@ -1061,9 +868,7 @@ onPageChanged: (index) {
                       oldController.dispose();
                     });
                   }
-
                   setState(() {});
-                  
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (mounted) _onScrollEnd();
                   });
@@ -1071,7 +876,6 @@ onPageChanged: (index) {
               ),
             ),
           ),
-
           AnimatedPositioned(
             duration: MediaViewerConstants.animationDuration,
             curve: Curves.easeOut,
@@ -1116,7 +920,7 @@ onPageChanged: (index) {
                   onPlaybackModeChanged: _updatePlaybackMode,
                   onToggleMute: () {
                     HapticFeedback.lightImpact();
-                    _startHideTimer(); 
+                    _startHideTimer();
                     setState(() => _isMuted = !_isMuted);
                     _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
                   },
@@ -1130,7 +934,6 @@ onPageChanged: (index) {
               },
             ),
           ),
-
           if (_enableCarousel)
             AnimatedPositioned(
               duration: MediaViewerConstants.animationDuration,

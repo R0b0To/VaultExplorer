@@ -59,6 +59,17 @@ class ByteBudgetCache {
     if (removed != null) _currentBytes -= removed.length;
   }
 
+  /// Removes every entry whose key matches [test] — e.g. every entry for
+  /// one container's `volId` prefix on lock (F-16), without discarding
+  /// other still-mounted containers' cached bytes the way a blanket
+  /// [clear] would.
+  void removeWhere(bool Function(String key) test) {
+    final toRemove = _map.keys.where(test).toList(growable: false);
+    for (final key in toRemove) {
+      remove(key);
+    }
+  }
+
   void clear() {
     _map.clear();
     _currentBytes = 0;
@@ -84,12 +95,18 @@ class ByteBudgetCache {
     _evictToBudget();
   }
 
-  /// Temporarily evicts down to [fraction] (0.0-1.0) of the *current*
-  /// budget, without permanently changing [maxTotalBytes]. Used for the
-  /// `TrimLevel.moderate` step of `CacheCoordinator.trimAll`.
+  /// Evicts [fraction] (0.0-1.0) of *currently held* bytes, oldest-first,
+  /// without permanently changing [maxTotalBytes]. `fraction` is "how much
+  /// to remove," matching [LruCache.trimToFraction]'s convention exactly —
+  /// `CacheCoordinator.trimAll` applies the same [fraction] to every cache
+  /// in Section 4 regardless of type, so the two primitives must agree on
+  /// what the argument means. (This used to mean "trim down to `fraction`
+  /// of `maxTotalBytes`" — the inverse of [LruCache]'s convention and of
+  /// what "moderate vs. severe" trim levels need — see Finding F-17;
+  /// fixed as part of building `CacheCoordinator`.)
   void trimToFraction(double fraction) {
     assert(fraction >= 0.0 && fraction <= 1.0);
-    final target = (_maxTotalBytes * fraction).round();
+    final target = (_currentBytes * (1.0 - fraction)).round();
     while (_currentBytes > target && _map.isNotEmpty) {
       final oldestKey = _map.keys.first;
       final oldest = _map.remove(oldestKey);

@@ -78,6 +78,7 @@ private object ChannelMethods {
     const val MOUNT_CONTAINER_FOLDER    = "mountContainerFolder"
     const val UNMOUNT_CONTAINER_FOLDER  = "unmountContainerFolder"
     const val GET_MOUNTED_CONTAINER_FOLDERS = "getMountedContainerFolders"
+    const val GET_DEVICE_CAPABILITY_PROFILE = "getDeviceCapabilityProfile"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -130,6 +131,23 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) systemHandlers.sanitizeClipboard()
+    }
+
+    /**
+     * Android's low-memory signal (Finding F-15, ADR-011) — forwarded to
+     * Dart's `CacheCoordinator.trimAll` via the platform channel rather than
+     * acted on here, since every cache this needs to shrink lives on the
+     * Dart side. `methodChannel` can be null if this somehow fires before
+     * [configureFlutterEngine] has run; nothing to forward to in that case.
+     *
+     * Deliberately forwards the raw Android `level` int rather than
+     * pre-classifying it into `TrimLevel` here — keeps the
+     * moderate/severe mapping in one place (`vault_explorer_api.dart`)
+     * instead of splitting it across both platform layers.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        methodChannel?.invokeMethod("onTrimMemory", mapOf("level" to level))
     }
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
@@ -280,6 +298,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.MOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleMountContainerFolder(call, result)
                 ChannelMethods.UNMOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleUnmountContainerFolder(call, result)
                 ChannelMethods.GET_MOUNTED_CONTAINER_FOLDERS -> folderDocumentProviderHandlers.handleGetMountedContainerFolders(call, result)
+                ChannelMethods.GET_DEVICE_CAPABILITY_PROFILE -> DeviceCapabilityProfiler.handleGetDeviceCapabilityProfile(this, call, result)
                 else -> result.notImplemented()
             }
         }

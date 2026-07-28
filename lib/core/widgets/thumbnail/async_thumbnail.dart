@@ -169,16 +169,24 @@ class _AsyncThumbnailState extends State<AsyncThumbnail> {
 
       future = widget.cache[cacheKey];
       if (future == null) {
-        future = _fetchWithQueue(widget.container, targetPath).then(
-          (data) => data,
-          onError: (err) {
-            if (widget.cache[cacheKey] == future) {
+        future = _fetchWithQueue(widget.container, targetPath);
+        widget.cache[cacheKey] = future;
+        final storedFuture = future;
+        // De-dup only needs to cover the async *window*; once this settles
+        // (success or error) the decoded bytes are already durably held by
+        // ThumbnailCacheService's own memory tier (every fetchFn
+        // implementation calls putInMemory), so there's no reason for this
+        // entry to keep occupying a slot in the shared in-flight map until
+        // it's eventually evicted by LRU/byte-budget pressure (Finding
+        // F-01). A later request for the same key just falls through to a
+        // fresh sync/L1 lookup instead, which is the fast path anyway.
+        unawaited(
+          storedFuture.then((_) => null, onError: (_) => null).whenComplete(() {
+            if (widget.cache[cacheKey] == storedFuture) {
               widget.cache.remove(cacheKey);
             }
-            throw err;
-          },
+          }),
         );
-        widget.cache[cacheKey] = future;
       }
     }
 

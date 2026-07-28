@@ -62,6 +62,18 @@ class FullResImageCache {
   /// eviction or process death.
   static void clear() => _cache.clear();
 
+  /// Applies device-tier-scaled sizing (ADR-011) — see
+  /// `DeviceCapabilityProfiler`/`runDeferredStartupWork()`. `FullResImageCache`
+  /// is the one cache in this subsystem that was already byte-budgeted
+  /// correctly from the start (ADR-002); this just exposes that primitive
+  /// for the same profiler-driven sizing every other cache now has.
+  static void resize(int newMaxTotalBytes) => _cache.resize(newMaxTotalBytes);
+
+  /// Evicts [fraction] of currently-held bytes, oldest-first, without
+  /// permanently lowering the budget — the full-res half of
+  /// `CacheCoordinator.trimAll` (Finding F-15 / ADR-011).
+  static void trimToFraction(double fraction) => _cache.trimToFraction(fraction);
+
   // --------------------------------------------------------------------
   // Concurrency gate
   // --------------------------------------------------------------------

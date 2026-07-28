@@ -99,4 +99,12 @@ abstract final class ChannelMethods {
   // ── System Utilities ─────────────────────────────────────────────────────
   static const documentExists = 'documentExists';
   static const warmContainer = 'warmContainer';
+
+  // Native → Dart only (invoked by MainActivity, never called from Dart):
+  // Android's onTrimMemory forwarded as-is (ADR-011, Finding F-15) — see
+  // VaultExplorerApi.initMethodCallHandler and CacheCoordinator.
+  static const onTrimMemory = 'onTrimMemory';
+
+  // ── Device capability profiling (ADR-011) ────────────────────────────────
+  static const getDeviceCapabilityProfile = 'getDeviceCapabilityProfile';
 }

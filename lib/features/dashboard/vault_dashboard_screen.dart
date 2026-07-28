@@ -10,6 +10,7 @@ import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -265,8 +266,22 @@ class _VaultDashboardState extends State<VaultDashboard>
     _cancelAutoClose(volId);
     final idx = _mounted.indexWhere((c) => c.volId == volId);
     if (idx != -1) {
-      final uri = _mounted[idx].uri;
-      AppSecureStorage.instance.delete(key: 'temp_pw_$uri');
+      final container = _mounted[idx];
+      AppSecureStorage.instance.delete(key: 'temp_pw_${container.uri}');
+      // F-16: appCache-mode disk thumbnails are decryptable at any time via
+      // a device-level key (AppCacheEncryption), independent of this
+      // container's own mount/lock state — a materially different privacy
+      // posture than inContainer-mode thumbnails (only reachable while
+      // mounted) or disabled mode (nothing persisted). Clear that tier on
+      // lock. Deliberately do NOT call clearInContainerCacheByUri() here:
+      // those bytes are keyed by the container's own URI, stay valid and
+      // inert across a relock/re-mount of the *same* container, and are
+      // only ever reachable while it's mounted anyway — eagerly wiping them
+      // would only cost regeneration time with no privacy or correctness
+      // upside, the same reasoning Rule 5 already gives for not clearing
+      // MediaAspectRatioCache/MediaRotationCache. A no-op if this container
+      // was never in appCache mode.
+      unawaited(ThumbnailCacheService.clearAppCacheFor(container));
     }
     final clip = CrossContainerClipboard.instance;
     if (clip.hasItems && clip.sourceVolId == volId) {

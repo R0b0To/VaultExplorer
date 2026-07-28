@@ -78,7 +78,6 @@ abstract final class ChannelMethods {
   // frame's pre-downscale width/height — see ThumbnailWithSize.
   static const getImageThumbnailWithSize = 'getImageThumbnailWithSize';
   static const getVideoThumbnailWithSize = 'getVideoThumbnailWithSize';
-  static const generateAndCacheThumbnail = 'generateAndCacheThumbnail';
 
   // ── Crypto ───────────────────────────────────────────────────────────────
   static const hashPassword = 'hashPassword';

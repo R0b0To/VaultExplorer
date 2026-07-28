@@ -3,12 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
+import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 
 // Barrel export: this file used to also define ConcurrencyLimiter and
 // ThumbnailConcurrency directly. They now live in thumbnail_concurrency.dart
-// — re-exported here (along with the unawaited() helper) so existing
-// imports of 'async_thumbnail.dart' keep working unchanged.
+// (and priority_task_queue.dart) — re-exported here (along with the
+// unawaited() helper and TaskPriority) so existing imports of
+// 'async_thumbnail.dart' keep working unchanged.
 export 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 
 typedef ThumbnailFetchFn = Future<Uint8List> Function(MountedContainer, String);
@@ -20,11 +22,15 @@ typedef ThumbnailSyncLookup = Uint8List? Function();
 /// the app:
 ///  - a synchronous fast path via [syncLookup] (e.g. an in-memory cache hit)
 ///  - de-duplicating concurrent requests for the same file via [cache],
-///    an [LruCache] of in-flight `Future`s keyed by container + path
+///    a shared [LruCache] of in-flight `Future`s keyed by container + path
 ///  - a scroll [debounce] that bails out before firing the real fetch if the
 ///    tile has already been scrolled past
-///  - a [limiter] gate (LIFO + cancellable) so fast flings don't burn queue
-///    turns on tiles the user never stops on
+///  - a [limiter] gate (priority-tiered LIFO + cancellable, see
+///    [PriorityTaskQueue] / ADR-010) so fast flings don't burn queue turns
+///    on tiles the user never stops on
+///  - a bounded exponential-backoff retry (Finding F-11) around the actual
+///    fetch, so a transient failure (USB hiccup, container I/O glitch)
+///    doesn't surface straight to [errorBuilder] on the first hiccup
 ///
 /// Visuals are fully delegated to the caller via [imageBuilder],
 /// [loadingBuilder], and [errorBuilder], so each surface can keep its own
@@ -33,11 +39,19 @@ class AsyncThumbnail extends StatefulWidget {
   final MountedContainer container;
   final String filePath;
   final LruCache<String, Future<Uint8List>> cache;
-  final ConcurrencyLimiter limiter;
+  final PriorityTaskQueue limiter;
   final ThumbnailFetchFn fetchFn;
   final Duration debounce;
   final ThumbnailSyncLookup? syncLookup;
   final int? cacheHeight;
+
+  /// Which [PriorityTaskQueue] tier this request competes at (ADR-010).
+  /// Defaults to [TaskPriority.visible] — every pre-existing call site
+  /// (grid/masonry/list tiles) is exactly that: an on-screen tile. Callers
+  /// rendering an off-screen neighbor (e.g. `PlaylistCarouselOverlay`,
+  /// which shows during an active viewer session) should pass
+  /// [TaskPriority.adjacent] explicitly.
+  final TaskPriority priority;
   final Widget Function(BuildContext context, Uint8List bytes, int? cacheHeight)
   imageBuilder;
   final WidgetBuilder? loadingBuilder;
@@ -54,6 +68,7 @@ class AsyncThumbnail extends StatefulWidget {
     this.debounce = const Duration(milliseconds: 100),
     this.syncLookup,
     this.cacheHeight,
+    this.priority = TaskPriority.visible,
     this.loadingBuilder,
     this.errorBuilder,
   });
@@ -193,17 +208,26 @@ class _AsyncThumbnailState extends State<AsyncThumbnail> {
     bool acquired = false;
 
     try {
-      await widget.limiter.acquire(completer);
+      await widget.limiter.acquire(completer, priority: widget.priority);
       acquired = true;
 
       if (targetPath != _loadingPath || !mounted || _disposed) {
         throw Exception('Cancelled before processing');
       }
 
-      return await widget.fetchFn(container, targetPath);
+      // Bounded exponential-backoff retry (Finding F-11) — re-checks
+      // "still wanted" between attempts so a request that's gone stale
+      // while retrying doesn't keep burning native round trips for a tile
+      // the user has long since scrolled past.
+      return await retryWithBackoff<Uint8List>((attempt) {
+        if (targetPath != _loadingPath || !mounted || _disposed) {
+          throw Exception('Cancelled before retry attempt $attempt');
+        }
+        return widget.fetchFn(container, targetPath);
+      });
     } finally {
       if (_limiterCompleter == completer) _limiterCompleter = null;
-      if (acquired) widget.limiter.release();
+      if (acquired) widget.limiter.release(completer);
     }
   }
 

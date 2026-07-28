@@ -179,28 +179,6 @@ Future<bool> openWithApp(
     }
   }
 
-  /// Triggers thumbnail generation and encryption entirely on native threads,
-  /// bypassing Dart and saving directly to local App Cache [ThumbnailCacheMode.appCache].
-  Future<void> generateAndCacheThumbnail({
-    required MountedContainer container,
-    required String filePath,
-    required List<int> keyBytes,
-    int quality = 70,
-    int targetSize = 180,
-  }) async {
-    try {
-      await _channel.invokeMethod<void>('generateAndCacheThumbnail', {
-        'filePath': container.uri,
-        'fileName': filePath,
-        'keyBytes': Uint8List.fromList(keyBytes),
-        'quality': quality,
-        'targetSize': targetSize,
-      });
-    } catch (e) {
-      _logSwallowed('generateAndCacheThumbnail', e, expected: true);
-    }
-  }
-
   Future<List<String>?> listDirectory(
     MountedContainer container,
     String dirPath,

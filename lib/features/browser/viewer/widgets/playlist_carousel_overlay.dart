@@ -409,8 +409,9 @@ class _CarouselThumb extends StatelessWidget {
       key: ValueKey('carousel:$fileName'),
       container: container,
       filePath: fileName,
-      cache: isVideo ? ThumbnailConcurrency.videoCache : ThumbnailConcurrency.imageCache,
+      cache: ThumbnailConcurrency.inFlightThumbnails,
       limiter: isVideo ? ThumbnailConcurrency.videoLimiter : ThumbnailConcurrency.imageLimiter,
+      priority: TaskPriority.adjacent,
       fetchFn: (c, p) => isVideo
           ? _fetchVideo(c, p, thumbnailQuality, thumbnailCacheMode)
           : _fetchImage(c, p, thumbnailQuality, thumbnailCacheMode),

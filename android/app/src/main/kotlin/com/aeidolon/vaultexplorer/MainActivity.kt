@@ -46,7 +46,6 @@ private object ChannelMethods {
     const val GET_IMAGE_THUMBNAIL       = "getImageThumbnail"
     const val GET_IMAGE_THUMBNAIL_WITH_SIZE = "getImageThumbnailWithSize"
     const val GET_VIDEO_THUMBNAIL_WITH_SIZE = "getVideoThumbnailWithSize"
-    const val GENERATE_AND_CACHE_THUMBNAIL = "generateAndCacheThumbnail"
     const val GET_FOLDER_SIZE           = "getFolderSize"
     const val HASH_PASSWORD             = "hashPassword"
     const val DERIVE_DERIVED_KEY        = "deriveDerivedKey"
@@ -257,7 +256,6 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_IMAGE_THUMBNAIL -> thumbnailHandlers.handleGetImageThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetImageThumbnailWithSize(call, result)
                 ChannelMethods.GET_VIDEO_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetVideoThumbnailWithSize(call, result)
-                ChannelMethods.GENERATE_AND_CACHE_THUMBNAIL -> thumbnailHandlers.handleGenerateAndCacheThumbnail(call, result)
                 ChannelMethods.LOCK_CONTAINER -> vaultUnlockHandlers.handleLockContainer(call, result)
                 ChannelMethods.UPDATE_CONTAINER_SETTINGS -> vaultUnlockHandlers.handleUpdateContainerSettings(call, result)
                 ChannelMethods.DECRYPT_FILE -> fileOperationHandlers.handleDecryptFile(call, result)

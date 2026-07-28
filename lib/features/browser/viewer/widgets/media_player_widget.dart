@@ -398,6 +398,16 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
     final poster = _localPosterBytes ?? widget.posterBytes;
+    // Finding F-10 (lower severity here since poster bytes are already
+    // thumbnail-sized JPEGs, not full-res source files): cap the decode
+    // target to the physical viewport width so Skia never has a reason to
+    // decode past what's actually rendered. Single dimension only (no
+    // cacheHeight) so the decoder preserves the poster's aspect ratio
+    // automatically instead of stretching it.
+    final posterCacheWidth =
+        (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio)
+            .round()
+            .clamp(1, 1 << 20);
     final isRotated = widget.rotationQuarterTurns % 2 != 0;
     final knownRatio = _knownAspectRatio;
     final effectiveKnownRatio = (knownRatio != null && isRotated)
@@ -411,7 +421,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             aspectRatio: 0.8,
             child: RotatedBox(
               quarterTurns: widget.rotationQuarterTurns,
-              child: Image.memory(poster, fit: BoxFit.cover),
+              child: Image.memory(poster, fit: BoxFit.cover, cacheWidth: posterCacheWidth),
             ),
           ),
         );
@@ -421,7 +431,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             aspectRatio: effectiveKnownRatio,
             child: RotatedBox(
               quarterTurns: widget.rotationQuarterTurns,
-              child: Image.memory(poster, fit: BoxFit.cover),
+              child: Image.memory(poster, fit: BoxFit.cover, cacheWidth: posterCacheWidth),
             ),
           ),
         );
@@ -433,6 +443,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             fit: BoxFit.contain,
             width: double.infinity,
             height: double.infinity,
+            cacheWidth: posterCacheWidth,
           ),
         );
       }

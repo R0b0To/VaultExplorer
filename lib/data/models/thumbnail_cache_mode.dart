@@ -6,9 +6,11 @@ enum ThumbnailCacheMode {
   /// Store in the OS app-cache directory (default).
   ///
   /// Fast, disposable, and transparent to the container. The OS may purge
-  /// this folder under storage pressure. Thumbnails are stored **unencrypted**
-  /// on the device — acceptable for most threat models, but users who require
-  /// full at-rest encryption should choose [inContainer].
+  /// this folder under storage pressure. Thumbnails are stored **encrypted**
+  /// (AES-GCM, per-container key) in the app cache directory — see
+  /// [ThumbnailCacheService]. Users who require the container itself to be
+  /// the only thing holding the bytes (e.g. so nothing survives outside it
+  /// even in encrypted form) should choose [inContainer] instead.
   appCache,
 
   /// Store inside the VeraCrypt container under a hidden `.thumbcache/` dir.

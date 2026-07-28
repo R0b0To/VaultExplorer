@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 
 class EncryptedImageWidget extends StatefulWidget {
   final MountedContainer container;
@@ -200,8 +201,28 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       );
     }
 
-    return Image.memory(
-      _bytes!,
+    final mq = MediaQuery.of(context);
+    final dpr = mq.devicePixelRatio;
+    final headroom = MediaViewerConstants.fullResDecodeZoomHeadroom;
+    // Physical-pixel viewport size x zoom headroom, recomputed on every
+    // build — so a device rotation (which changes MediaQuery.size) picks up
+    // a new cap automatically without any extra plumbing. ResizeImagePolicy
+    // .fit (rather than Image.memory's cacheWidth/cacheHeight, which is
+    // always "exact" and would stretch a mismatched aspect ratio) scales
+    // the *longer* source edge down to fit within this box and preserves
+    // aspect ratio on the other edge — correct for both a wide landscape
+    // photo and a tall portrait one without knowing the source's native
+    // dimensions ahead of the decode.
+    final capWidth = (mq.size.width * dpr * headroom).round().clamp(1, 1 << 20);
+    final capHeight = (mq.size.height * dpr * headroom).round().clamp(1, 1 << 20);
+
+    return Image(
+      image: ResizeImage(
+        MemoryImage(_bytes!),
+        width: capWidth,
+        height: capHeight,
+        policy: ResizeImagePolicy.fit,
+      ),
       fit: widget.fit,
       width: double.infinity,
       height: double.infinity,

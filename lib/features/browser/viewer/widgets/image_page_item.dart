@@ -52,8 +52,14 @@ class _ImagePageItemState extends State<ImagePageItem> {
 
   void _loadImageSize() {
     if (widget.prefetchedBytes != null && widget.prefetchedBytes!.isNotEmpty) {
-      decodeImageFromList(widget.prefetchedBytes!).then((image) {
-        if (mounted) {
+      final targetBytes = widget.prefetchedBytes!;
+      decodeImageFromList(targetBytes).then((image) {
+        // Staleness guard (Finding F-07): didUpdateWidget may have swapped
+        // widget.prefetchedBytes for a different file while this decode was
+        // in flight (e.g. fast A -> B -> A swiping resolving out of order).
+        // Only apply the result if it's still for the bytes we started
+        // decoding.
+        if (mounted && identical(widget.prefetchedBytes, targetBytes)) {
           setState(() {
             _imageSize = Size(image.width.toDouble(), image.height.toDouble());
           });

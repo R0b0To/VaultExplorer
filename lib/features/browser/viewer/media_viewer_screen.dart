@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
+import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
@@ -80,8 +83,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _isMuted = false;
   bool _isSwiping = false;
 
-  final Map<String, Uint8List> _prefetchedImages = {};
-  final Set<String> _prefetchingActive = {};
   final Set<String> _prefetchingFullRes = {};
   // Per-file manual rotation override, set via the advanced settings sheet's
   // rotate control -- video_player (ExoPlayer on Android) already applies a
@@ -161,6 +162,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     } else {
       _playbackManager.pauseActive();
     }
+    // ADR-012 / Finding F-06: scoped to *video* specifically (not audio --
+    // see PlaybackThrottleController's doc comment for why audio doesn't
+    // contend with MediaMetadataRetriever the way active video decode
+    // does). This is the single signal every PriorityTaskQueue admission
+    // check consults, replacing the old per-call-site "if (isVid) return"
+    // skip that only protected this screen's own prefetch and was silently
+    // bypassed by PlaylistCarouselOverlay.
+    PlaybackThrottleController.setActive(MediaViewerConstants.isVideo(file));
   }
 
   Future<void> _loadConfig() async {
@@ -188,11 +197,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   Uint8List? _prefetchedBytesFor(String fileName) {
-    final bytes = _prefetchedImages.remove(fileName);
-    if (bytes != null) {
-      _prefetchedImages[fileName] = bytes;
-    }
-    return bytes;
+    return ThumbnailCacheService.getFromMemory(
+      widget.container,
+      fileName,
+      widget.thumbnailQuality,
+    );
   }
 
   void _onContainerDetached(int volId) {
@@ -316,38 +325,152 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final isImg = MediaViewerConstants.isImage(fileName);
     final isVid = MediaViewerConstants.isVideo(fileName);
     if (!isImg && !isVid) return;
-    // Skip video thumbnail prefetching during media viewer session.
-    // Video thumbnail generation spins up native MediaMetadataRetriever / MediaCodec
-    // instances, which contend with ExoPlayer's active video decoder for system
-    // MediaCodec slots and trigger 'Released by resource manager' (Error 0xffffffe0) on 4K videos.
-    if (isVid) return;
 
-    if (_prefetchedImages.containsKey(fileName) ||
-        _prefetchingActive.contains(fileName)) {
+    if (ThumbnailCacheService.getFromMemory(
+          widget.container,
+          fileName,
+          widget.thumbnailQuality,
+        ) !=
+        null) {
       return;
     }
-    _prefetchingActive.add(fileName);
-    try {
-      final thumbBytes = await vaultExplorerApi.getImageThumbnail(
-        widget.container,
-        fileName,
-        targetSize: MediaViewerConstants.thumbnailTargetSize,
-        quality: widget.thumbnailQuality.jpegQuality,
-      );
-      if (thumbBytes != null && thumbBytes.isNotEmpty && mounted) {
-        setState(() {
-          _prefetchedImages[fileName] = thumbBytes;
-          if (_prefetchedImages.length >
-              MediaViewerConstants.maxPrefetchCacheSize) {
-            _prefetchedImages.remove(_prefetchedImages.keys.first);
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('Failed to prefetch image content: $e');
-    } finally {
-      _prefetchingActive.remove(fileName);
+
+    // Same key scheme AsyncThumbnail uses for its own in-flight map, so a
+    // grid tile or carousel neighbor already fetching this exact file is
+    // de-duplicated against instead of racing it with a second native call
+    // (Finding F-12).
+    final key = '${widget.container.volId}:'
+        '${widget.container.mountedAt.millisecondsSinceEpoch}:$fileName';
+
+    final existing = ThumbnailConcurrency.inFlightThumbnails[key];
+    if (existing != null) {
+      try {
+        await existing;
+      } catch (_) {}
+      if (mounted) setState(() {});
+      return;
     }
+
+    final limiter = isVid
+        ? ThumbnailConcurrency.videoLimiter
+        : ThumbnailConcurrency.imageLimiter;
+    final completer = Completer<void>();
+    final future = _gatedFetchThumbnail(fileName, isVid, limiter, completer);
+    ThumbnailConcurrency.inFlightThumbnails[key] = future;
+
+    try {
+      await future;
+      // Not strictly necessary for the page the user is already on (it
+      // rebuilds on navigation regardless), but a neighbor page PageView
+      // has already materialized via cacheExtent may be sitting on a
+      // loading placeholder built before this prefetch resolved -- this
+      // nudges it to pick up the now-cached bytes without waiting for some
+      // unrelated rebuild.
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Failed to prefetch thumbnail: $e');
+    } finally {
+      if (ThumbnailConcurrency.inFlightThumbnails[key] == future) {
+        ThumbnailConcurrency.inFlightThumbnails.remove(key);
+      }
+    }
+  }
+
+  Future<Uint8List> _gatedFetchThumbnail(
+    String fileName,
+    bool isVid,
+    PriorityTaskQueue limiter,
+    Completer<void> completer,
+  ) async {
+    bool acquired = false;
+    try {
+      await limiter.acquire(completer, priority: TaskPriority.adjacent);
+      acquired = true;
+      // Exponential-backoff retry (Finding F-11), shared with every other
+      // thumbnail consumer.
+      return await retryWithBackoff<Uint8List>(
+        (attempt) => isVid
+            ? _fetchVideoThumbnailForPrefetch(fileName)
+            : _fetchImageThumbnailForPrefetch(fileName),
+      );
+    } finally {
+      if (acquired) limiter.release(completer);
+    }
+  }
+
+  /// Mirrors the fetch-then-cache shape used by the grid/list/carousel
+  /// tiles' own private `_fetch` methods (see e.g. file_tile.dart) --
+  /// deliberately not the widest possible dedup (extracting one shared
+  /// top-level helper for all five call sites is a reasonable further step,
+  /// tracked for a future CacheCoordinator pass) but this call site no
+  /// longer bypasses ThumbnailCacheService's disk tier or the concurrency
+  /// gate the way it used to.
+  Future<Uint8List> _fetchImageThumbnailForPrefetch(String fileName) async {
+    final mode = widget.thumbnailCacheMode;
+    final quality = widget.thumbnailQuality;
+    if (mode != ThumbnailCacheMode.disabled) {
+      final cached = await ThumbnailCacheService.get(
+        container: widget.container,
+        filePath: fileName,
+        mode: mode,
+        quality: quality,
+      );
+      if (cached != null && cached.isNotEmpty) return cached;
+    }
+    final data = await vaultExplorerApi.getImageThumbnail(
+      widget.container,
+      fileName,
+      targetSize: MediaViewerConstants.thumbnailTargetSize,
+      quality: quality.jpegQuality,
+    );
+    final bytes = (data == null || data.isEmpty) ? Uint8List(0) : data;
+    if (bytes.isNotEmpty) {
+      ThumbnailCacheService.putInMemory(widget.container, fileName, bytes, quality);
+      if (mode != ThumbnailCacheMode.disabled) {
+        unawaited(ThumbnailCacheService.put(
+          container: widget.container,
+          filePath: fileName,
+          data: bytes,
+          mode: mode,
+          quality: quality,
+        ));
+      }
+    }
+    return bytes;
+  }
+
+  Future<Uint8List> _fetchVideoThumbnailForPrefetch(String fileName) async {
+    final mode = widget.thumbnailCacheMode;
+    final quality = widget.thumbnailQuality;
+    if (mode != ThumbnailCacheMode.disabled) {
+      final cached = await ThumbnailCacheService.get(
+        container: widget.container,
+        filePath: fileName,
+        mode: mode,
+        quality: quality,
+      );
+      if (cached != null && cached.isNotEmpty) return cached;
+    }
+    final data = await vaultExplorerApi.getVideoThumbnail(
+      widget.container,
+      fileName,
+      targetSize: MediaViewerConstants.thumbnailTargetSize,
+      quality: quality.jpegQuality,
+    );
+    final bytes = (data == null || data.isEmpty) ? Uint8List(0) : data;
+    if (bytes.isNotEmpty) {
+      ThumbnailCacheService.putInMemory(widget.container, fileName, bytes, quality);
+      if (mode != ThumbnailCacheMode.disabled) {
+        unawaited(ThumbnailCacheService.put(
+          container: widget.container,
+          filePath: fileName,
+          data: bytes,
+          mode: mode,
+          quality: quality,
+        ));
+      }
+    }
+    return bytes;
   }
 
   /// Background-warms the full-resolution decrypted bytes for [fileName]
@@ -387,6 +510,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           final idx = _playlistController.playlist.indexOf(fileName);
           return idx != -1 && (idx - _playlistController.currentIndex).abs() <= 1;
         },
+        priority: TaskPriority.adjacent,
       );
     } catch (e) {
       debugPrint('Failed to prefetch full-resolution image: $e');
@@ -522,7 +646,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
 
     if (success && mounted) {
-      _prefetchedImages.remove(fileToDelete);
       _mediaKeys.remove(fileToDelete);
       _rotations.remove(fileToDelete);
 
@@ -739,6 +862,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   @override
   void dispose() {
+    PlaybackThrottleController.setActive(false);
     VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
     _playlistController.removeListener(_onPlaylistUpdate);
     if (_lastListenedController != null) {

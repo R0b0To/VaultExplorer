@@ -4,8 +4,12 @@ import 'dart:typed_data';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/byte_budget_cache.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
-import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart' show ConcurrencyLimiter;
+import 'package:vaultexplorer/core/utils/retry.dart';
+import 'package:vaultexplorer/core/widgets/thumbnail/priority_task_queue.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+
+export 'package:vaultexplorer/core/widgets/thumbnail/priority_task_queue.dart'
+    show TaskPriority;
 
 /// In-memory cache for full-resolution decrypted image bytes, keyed per
 /// container session (see [_key]).
@@ -80,8 +84,12 @@ class FullResImageCache {
 
   /// Kept small (2) since each request here is a whole decrypted file, not
   /// a thumbnail -- this bounds how many stale swiped-past requests can
-  /// ever sit ahead of the current page in the native queue.
-  static final limiter = ConcurrencyLimiter(2);
+  /// ever sit ahead of the current page in the native queue. Priority-
+  /// tiered (ADR-010) and playback-aware (ADR-012) like
+  /// `ThumbnailConcurrency`'s limiters -- the media viewer's current page
+  /// should use [TaskPriority.visible] (the default) and its next/prev
+  /// prefetch should pass [TaskPriority.adjacent] explicitly.
+  static final limiter = PriorityTaskQueue(2);
 
   /// In-flight de-dup so a widget-triggered load and a screen-triggered
   /// prefetch for the same file collapse into one native call instead of
@@ -109,6 +117,7 @@ class FullResImageCache {
     String filePath,
     Completer<void> completer, {
     required bool Function() isStillWanted,
+    TaskPriority priority = TaskPriority.visible,
   }) {
     final cached = get(container, filePath);
     if (cached != null) return Future.value(cached);
@@ -118,7 +127,7 @@ class FullResImageCache {
     if (existing != null) return existing;
 
     final future =
-        _runGated(container, filePath, key, completer, isStillWanted);
+        _runGated(container, filePath, key, completer, isStillWanted, priority);
     _inFlight[key] = future;
     return future;
   }
@@ -129,39 +138,48 @@ class FullResImageCache {
     String key,
     Completer<void> completer,
     bool Function() isStillWanted,
+    TaskPriority priority,
   ) async {
     bool acquired = false;
     try {
-      await limiter.acquire(completer);
+      await limiter.acquire(completer, priority: priority);
       acquired = true;
       if (!isStillWanted()) return null;
 
-      const maxAttempts = 3;
-      for (int attempt = 0; attempt < maxAttempts; attempt++) {
-        if (!isStillWanted()) return null;
-        try {
+      // Bounded exponential-backoff retry (Finding F-11) -- this used to be
+      // a flat 300ms delay between all 3 attempts, unlike the thumbnail
+      // path's retry helper. Both now share the same backoff curve. A
+      // genuine failure that survives every retry still propagates to the
+      // caller (existing callers already catch this); going stale
+      // (isStillWanted() turning false) short-circuits to null instead of
+      // being reported as a fetch error.
+      Uint8List? result;
+      try {
+        result = await retryWithBackoff<Uint8List>((attempt) async {
+          if (!isStillWanted()) throw _StaleRequestException();
           final size =
               await vaultExplorerApi.getMediaFileSize(container, filePath);
           if (size <= 0) throw Exception('File size is empty');
-          if (!isStillWanted()) return null;
+          if (!isStillWanted()) throw _StaleRequestException();
 
           final data = await vaultExplorerApi.readMediaFileChunk(
               container, filePath, 0, size);
           if (data == null || data.isEmpty) {
             throw Exception('File returned no content bytes');
           }
-
-          put(container, filePath, data);
           return data;
-        } catch (e) {
-          if (attempt == maxAttempts - 1) rethrow;
-          await Future.delayed(const Duration(milliseconds: 300));
-        }
+        }, retryIf: (e) => e is! _StaleRequestException);
+      } on _StaleRequestException {
+        return null;
       }
-      return null; // unreachable
+
+      put(container, filePath, result);
+      return result;
     } finally {
-      if (acquired) limiter.release();
+      if (acquired) limiter.release(completer);
       _inFlight.remove(key);
     }
   }
 }
+
+class _StaleRequestException implements Exception {}

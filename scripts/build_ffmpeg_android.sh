@@ -133,7 +133,7 @@ build_arch() {
           --enable-decoder=aac,mp3,opus,vorbis,flac,pcm_s16le,pcm_s24le,ac3,eac3,dts \
           --enable-demuxer=mp4,matroska,avi,mov,webm,flv,mpegts,ogg,wav,flac,mp3,aac \
           --enable-parser=h264,hevc,vp8,vp9,av1,mpegaudio,aac \
-          --enable-hwaccel=h264_mediacodec,hevc_mediacodec,vp8_mediacodec,vp9_mediacodec,av1_mediacodec \
+          --enable-decoder=h264_mediacodec,hevc_mediacodec,vp8_mediacodec,vp9_mediacodec,av1_mediacodec,mpeg4_mediacodec \
           --enable-mediacodec \
           --enable-jni \
           --enable-protocol=file,pipe \

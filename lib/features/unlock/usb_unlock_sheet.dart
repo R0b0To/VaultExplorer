@@ -152,8 +152,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     try {
       _unlockMethod = record.unlockMethod;
       _readOnly = record.readOnly;
-      
-      if (record.keyfiles.isNotEmpty) {
+      if (record.unlockMethod == ContainerUnlockMethod.rememberPassword &&
+          record.keyfiles.isNotEmpty) {
         keyfiles.addAll(record.keyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
       }
 
@@ -228,10 +228,16 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
           return;
         }
 
-        final pw = await ContainerRepository.instance.getPassword(record.uri);
-        if (pw != null || keyfiles.isNotEmpty) {
+       final pw = await ContainerRepository.instance.getPassword(record.uri);
+        final savedKeyfiles = record.keyfiles;
+        final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
+        if (pw != null || savedKeyfilePaths.isNotEmpty) {
           _passwordCtrl.text = pw ?? '';
-          await _unlock(shouldCacheDerivedKeyOverride: shouldUseCachedKey, passwordOverride: pw ?? '');
+          await _unlock(
+            shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+            passwordOverride: pw ?? '',
+            keyfilePathsOverride: savedKeyfilePaths,
+          );
         } else {
           setState(() {
             _error = 'No saved password found. Please enter it manually.';
@@ -297,9 +303,15 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
       }
 
       final pw = await ContainerRepository.instance.getPassword(record.uri);
-      if (pw != null || keyfiles.isNotEmpty) {
+      final savedKeyfiles = record.keyfiles;
+      final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
+      if (pw != null || savedKeyfilePaths.isNotEmpty) {
         _passwordCtrl.text = pw ?? '';
-        await _unlock(shouldCacheDerivedKeyOverride: shouldUseCachedKey, passwordOverride: pw ?? '');
+        await _unlock(
+          shouldCacheDerivedKeyOverride: shouldUseCachedKey,
+          passwordOverride: pw ?? '',
+          keyfilePathsOverride: savedKeyfilePaths,
+        );
       } else {
         setState(() {
           _error = 'No saved password found. Please enter it manually.';
@@ -384,10 +396,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     }
   }
 
-  Future<void> _unlock({
+ Future<void> _unlock({
     Uint8List? preservedKey,
     bool? shouldCacheDerivedKeyOverride,
     String? passwordOverride,
+    List<String>? keyfilePathsOverride,
   }) async {
     final device = _selected;
     if (device == null) {
@@ -401,8 +414,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
       return;
     }
 
-    var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
-    if (effectivePassword.isEmpty && preservedKey == null && keyfiles.isEmpty) {
+   var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
+    final effectiveKeyfilePaths =
+        keyfilePathsOverride ?? keyfiles.map((k) => k.uri).toList();
+    if (effectivePassword.isEmpty && preservedKey == null && effectiveKeyfilePaths.isEmpty) {
       setState(() => _error = 'Password or keyfiles required');
       return;
     }
@@ -421,26 +436,20 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
 
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final displayName = widget.existingRecord?.label ?? device.productName;
-      final keyfilePaths = keyfiles.map((k) => k.uri).toList();
       final appSettings = await AppSettingsService.loadSettings();
-      
       final isReconnect = widget.existingRecord != null;
       final shouldCacheDerivedKey = shouldCacheDerivedKeyOverride ??
           ((isReconnect || _remember) &&
               ((widget.existingRecord?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled));
-
       final shouldPreloadCachedKey = preservedKey == null &&
           _unlockMethod == ContainerUnlockMethod.rememberPassword &&
           _passwordPrefilled &&
           (widget.existingRecord?.cacheDerivedKey ?? false);
-
       final resolvedPreservedKey = preservedKey ??
           (shouldPreloadCachedKey
               ? await vaultExplorerApi.loadDerivedKey(device.deviceName)
               : null);
-
       debugPrint('usb unlock: method=$_unlockMethod shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
-
       var result = resolvedPreservedKey == null
           ? await vaultExplorerApi.unlockUsbContainer(
               device.deviceName,
@@ -453,7 +462,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
               hashId: _hashId,
               preservedKey: resolvedPreservedKey,
               cacheDerivedKey: shouldCacheDerivedKey,
-              keyfilePaths: keyfilePaths,
+              keyfilePaths: effectiveKeyfilePaths,
               readOnly: _readOnly,
             )
           : await _unlockSwallowingStaleAuthFail(() => vaultExplorerApi.unlockUsbContainer(
@@ -467,17 +476,16 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
               hashId: _hashId,
               preservedKey: resolvedPreservedKey,
               cacheDerivedKey: shouldCacheDerivedKey,
-              keyfilePaths: keyfilePaths,
+              keyfilePaths: effectiveKeyfilePaths,
               readOnly: _readOnly,
             ));
-
       if (result == null && resolvedPreservedKey != null) {
         await vaultExplorerApi.clearDerivedKey(device.deviceName);
         if (effectivePassword.isEmpty && widget.existingRecord != null) {
           effectivePassword =
               (await ContainerRepository.instance.getPassword(widget.existingRecord!.uri))?.trim() ?? '';
         }
-        if (effectivePassword.isNotEmpty || keyfilePaths.isNotEmpty) {
+        if (effectivePassword.isNotEmpty || effectiveKeyfilePaths.isNotEmpty) {
           result = await vaultExplorerApi.unlockUsbContainer(
             device.deviceName,
             effectivePassword,
@@ -489,7 +497,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
             hashId: _hashId,
             preservedKey: null,
             cacheDerivedKey: shouldCacheDerivedKey,
-            keyfilePaths: keyfilePaths,
+            keyfilePaths: effectiveKeyfilePaths,
             readOnly: _readOnly,
           );
         }
@@ -523,14 +531,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         freeSpace: free,
       );
 
-      final existing = widget.existingRecord;
+     final existing = widget.existingRecord;
       final newKeyfiles = keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList();
-
       if (existing != null && existing.uri != newUri) {
         final savedPassword = await ContainerRepository.instance.getPassword(existing.uri);
         final savedPatternHash = await ContainerRepository.instance.getPatternHash(existing.uri);
         await ContainerRepository.instance.remove(existing.uri);
-        
+        final shouldSaveKeyfiles = existing.unlockMethod == ContainerUnlockMethod.rememberPassword;
+        final migratedKeyfiles = shouldSaveKeyfiles ? newKeyfiles : existing.keyfiles;
         final migrated = ContainerRecord(
           uri: newUri,
           label: existing.label,
@@ -547,25 +555,26 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
           cipherId: result.matchedCipherId,
           hashId: result.matchedHashId,
           containerFormat: result.containerFormat,
-          keyfiles: newKeyfiles,
+          keyfiles: migratedKeyfiles,
         );
-        
         await ContainerRepository.instance.save(migrated);
         widget.onReconnected?.call(finalContainer, migrated, existing.uri);
       } else if (existing != null) {
+        final shouldSaveKeyfiles = existing.unlockMethod == ContainerUnlockMethod.rememberPassword;
+        final effectiveKeyfiles = shouldSaveKeyfiles ? newKeyfiles : existing.keyfiles;
         var effectiveExisting = existing;
         if (existing.cipherId != result.matchedCipherId ||
             existing.hashId != result.matchedHashId ||
             existing.containerFormat != result.containerFormat ||
-            existing.readOnly != _readOnly) {
-          
+            existing.readOnly != _readOnly ||
+            existing.keyfiles != effectiveKeyfiles) {
           effectiveExisting = existing.copyWith(
             cacheDerivedKey: shouldCacheDerivedKey,
             readOnly: _readOnly,
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
             containerFormat: result.containerFormat,
-            keyfiles: newKeyfiles,
+            keyfiles: effectiveKeyfiles,
           );
           await ContainerRepository.instance.save(effectiveExisting);
         }
@@ -582,7 +591,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
             cipherId: result.matchedCipherId,
             hashId: result.matchedHashId,
             containerFormat: result.containerFormat,
-            keyfiles: newKeyfiles,
+            keyfiles: const [],
           );
           await ContainerRepository.instance.save(savedRecord);
         }

@@ -92,11 +92,11 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
   void initState() {
     super.initState();
     final rec = widget.existingRecord;
-    
-    if (rec != null && rec.keyfiles.isNotEmpty) {
+    if (rec != null &&
+        rec.unlockMethod != ContainerUnlockMethod.password &&
+        rec.keyfiles.isNotEmpty) {
       keyfiles.addAll(rec.keyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
     }
-
     _initialLabel = rec?.label.isNotEmpty == true ? rec!.label : widget.currentLabel;
     _initialUnlockMethod = rec?.unlockMethod ?? ContainerUnlockMethod.password;
     _initialAutoCloseMins = rec?.autoCloseMins ?? 0;
@@ -256,13 +256,20 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     if (_hashId != _initialHashId) return true;
     if (_changePassword) return true;
     if (_patternHash != _initialPatternHash) return true;
-    
-    final initialKeyfilesCount = widget.existingRecord?.keyfiles.length ?? 0;
-    if (keyfiles.length != initialKeyfilesCount) return true;
-    final initialUris = widget.existingRecord?.keyfiles.map((k) => k['uri']).toSet() ?? {};
-    final currentUris = keyfiles.map((k) => k.uri).toSet();
-    if (initialUris.difference(currentUris).isNotEmpty || currentUris.difference(initialUris).isNotEmpty) return true;
-
+    final initialKeyfilesCount =
+        (widget.existingRecord?.unlockMethod != ContainerUnlockMethod.password)
+            ? (widget.existingRecord?.keyfiles.length ?? 0)
+            : 0;
+    final currentKeyfilesCount =
+        (_unlockMethod != ContainerUnlockMethod.password) ? keyfiles.length : 0;
+    if (currentKeyfilesCount != initialKeyfilesCount) return true;
+    if (_unlockMethod != ContainerUnlockMethod.password && initialKeyfilesCount > 0) {
+      final initialUris =
+          widget.existingRecord?.keyfiles.map((k) => k['uri']).toSet() ?? {};
+      final currentUris = keyfiles.map((k) => k.uri).toSet();
+      if (initialUris.difference(currentUris).isNotEmpty ||
+          currentUris.difference(initialUris).isNotEmpty) return true;
+    }
     return false;
   }
 
@@ -308,7 +315,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     final shouldSavePassword =
         needsPassword && (_wasPasswordless || _changePassword);
 
-    final record = ContainerRecord(
+ final record = ContainerRecord(
       uri: widget.uri,
       label: label,
       rememberPassword: needsPassword,
@@ -326,7 +333,9 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
       cipherId: _cipherId,
       hashId: _hashId,
       containerFormat: _containerFormat,
-      keyfiles: keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList(),
+      keyfiles: needsPassword
+          ? keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList()
+          : const [],
     );
 
     await ContainerRepository.instance.save(record);
@@ -350,10 +359,9 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     }
   }
 
-  Future<void> _authenticateSettings() async {
+Future<void> _authenticateSettings() async {
     final record = widget.existingRecord;
     if (record == null) return;
-
     if (record.unlockMethod == ContainerUnlockMethod.biometrics) {
       try {
         final localAuth = LocalAuthentication();
@@ -362,7 +370,11 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
           persistAcrossBackgrounding: true,
         );
         if (ok && mounted) {
-          setState(() => _settingsLocked = false);
+          final savedPassword = await ContainerRepository.instance.getPassword(widget.uri);
+          setState(() {
+            _settingsLocked = false;
+            if (savedPassword != null) _passwordCtrl.text = savedPassword;
+          });
         }
       } catch (_) {}
     } else if (record.unlockMethod == ContainerUnlockMethod.pattern) {
@@ -378,25 +390,17 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
         ),
       );
       if (hash != null && mounted) {
-        setState(() => _settingsLocked = false);
+        final savedPassword = await ContainerRepository.instance.getPassword(widget.uri);
+        setState(() {
+          _settingsLocked = false;
+          if (savedPassword != null) _passwordCtrl.text = savedPassword;
+        });
       }
-    } else if (record.unlockMethod == ContainerUnlockMethod.rememberPassword) {
-      final savedPassword =
-          await ContainerRepository.instance.getPassword(widget.uri);
-      if (savedPassword == null && record.keyfiles.isEmpty) {
-        if (mounted) setState(() => _settingsLocked = false);
-        return;
-      }
+    } else {
+      final savedPassword = await ContainerRepository.instance.getPassword(widget.uri);
       if (!mounted) return;
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (context) => _PasswordVerifyDialog(uri: widget.uri),
-      );
-      if (ok == true && mounted) {
-        setState(() => _settingsLocked = false);
-      }
-    } else if (record.unlockMethod == ContainerUnlockMethod.password) {
-      final verified = await showDialog<({String password, int cipherId, int hashId})>(
+      final verified = await showDialog<
+          ({String password, List<KeyfileRef> keyfiles, int cipherId, int hashId})>(
         context: context,
         builder: (context) => _RealPasswordGateDialog(
           uri: widget.uri,
@@ -406,12 +410,15 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
           cacheDerivedKey: _cacheDerivedKey,
           containerFormat: record.containerFormat,
           initialKeyfiles: record.keyfiles,
+          initialPassword: savedPassword,
         ),
       );
       if (verified != null && mounted) {
         setState(() {
           _settingsLocked = false;
           _passwordCtrl.text = verified.password;
+          keyfiles.clear();
+          keyfiles.addAll(verified.keyfiles);
           _cipherId = verified.cipherId;
           _hashId = verified.hashId;
         });
@@ -555,11 +562,12 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                                 );
                               })
                               .toList(),
-                          onChanged: (v) {
+                            onChanged: (v) {
                             setState(() {
                               _unlockMethod = v;
                               if (v == ContainerUnlockMethod.password) {
                                 _passwordCtrl.clear();
+                                keyfiles.clear();
                               }
                             });
                           },
@@ -1037,91 +1045,6 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
   }
 }
 
-class _PasswordVerifyDialog extends StatefulWidget {
-  final String uri;
-  const _PasswordVerifyDialog({required this.uri});
-
-  @override
-  State<_PasswordVerifyDialog> createState() => _PasswordVerifyDialogState();
-}
-
-class _PasswordVerifyDialogState extends State<_PasswordVerifyDialog> {
-  final _ctrl = TextEditingController();
-  String? _error;
-  bool _obscure = true;
-  bool _loading = false;
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _verify() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
-    final saved = await ContainerRepository.instance.getPassword(widget.uri);
-    if (saved == _ctrl.text) {
-      if (mounted) Navigator.pop(context, true);
-    } else {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = 'Incorrect password';
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Verify Password'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _ctrl,
-            obscureText: _obscure,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: 'Current password',
-              suffixIcon: PasswordVisibilityToggle(
-                obscured: _obscure,
-                onToggle: () => setState(() => _obscure = !_obscure),
-              ),
-              errorText: _error,
-            ),
-            onSubmitted: (_) => _verify(),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _loading ? null : _verify,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size(0, 40),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: _loading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Verify'),
-        ),
-      ],
-    );
-  }
-}
-
 class _RealPasswordGateDialog extends StatefulWidget {
   final String uri;
   final int cipherId;
@@ -1130,7 +1053,7 @@ class _RealPasswordGateDialog extends StatefulWidget {
   final bool cacheDerivedKey;
   final String containerFormat;
   final List<Map<String, String>> initialKeyfiles;
-
+  final String? initialPassword;
   const _RealPasswordGateDialog({
     required this.uri,
     required this.cipherId,
@@ -1139,12 +1062,11 @@ class _RealPasswordGateDialog extends StatefulWidget {
     required this.cacheDerivedKey,
     this.containerFormat = 'veracrypt',
     this.initialKeyfiles = const [],
+    this.initialPassword,
   });
-
   @override
   State<_RealPasswordGateDialog> createState() => _RealPasswordGateDialogState();
 }
-
 class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
     with KeyfilePickerMixin {
   final _pwCtrl = TextEditingController();
@@ -1152,23 +1074,22 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
   String? _error;
   bool _obscure = true;
   bool _loading = false;
-
   @override
   void onKeyfilePickError(String message) => setState(() => _error = message);
-
   bool get _isUsb => widget.uri.startsWith('usb:');
   String get _usbDeviceName => widget.uri.substring(4);
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(widget.containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(widget.containerFormat);
   bool get _isCryfs => ContainerFormat.isCryfsWire(widget.containerFormat);
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(widget.containerFormat);
-
   int? _activeVolId;
   late final void Function(int) _onUnlockStarted;
-
   @override
   void initState() {
     super.initState();
+    if (widget.initialPassword != null && widget.initialPassword!.isNotEmpty) {
+      _pwCtrl.text = widget.initialPassword!;
+    }
     if (widget.initialKeyfiles.isNotEmpty) {
       keyfiles.addAll(widget.initialKeyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
     }
@@ -1226,9 +1147,10 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
         }
 
         await vaultExplorerApi.lockContainer(widget.uri);
-        if (mounted) {
+       if (mounted) {
           Navigator.pop(context, (
             password: _pwCtrl.text,
+            keyfiles: List<KeyfileRef>.from(keyfiles),
             cipherId: 255,
             hashId: 255,
           ));
@@ -1281,6 +1203,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
       if (mounted) {
         Navigator.pop(context, (
           password: _pwCtrl.text,
+          keyfiles: List<KeyfileRef>.from(keyfiles),
           cipherId: result.matchedCipherId,
           hashId: result.matchedHashId,
         ));

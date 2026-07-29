@@ -596,9 +596,18 @@ class ThumbnailHandlers(
             var inputDone = false
             var outputFrame: Bitmap? = null
             val timeoutUs = 10_000L
+            // 30 attempts (~300ms) was too tight for slower software decoders
+            // to reliably yield a first frame; 100 (~1s worst case) gives
+            // real headroom without risking a multi-second stall. Note this
+            // budget matters beyond just this one request: handleGetVideoThumbnail
+            // and handleSetPlaybackActive(active=true) both run on the same
+            // single-thread videoExecutor, so a slow extraction here also
+            // delays how long ExoPlayer's initialize() has to wait — keep
+            // this bounded, don't just crank it up further.
+            val maxAttempts = 100
             var attempts = 0
 
-            while (outputFrame == null && attempts < 30) {
+            while (outputFrame == null && attempts < maxAttempts) {
                 attempts++
                 if (!inputDone) {
                     val inputIndex = codec.dequeueInputBuffer(timeoutUs)
@@ -652,7 +661,11 @@ class ThumbnailHandlers(
 
     private fun findSoftwareDecoderName(mimeType: String): String? {
         try {
-            val codecList = MediaCodecList(MediaCodecList.ALL_CODECS)
+            // REGULAR_CODECS (not ALL_CODECS): ALL_CODECS can surface
+            // vendor/restricted codecs that aren't safely instantiable
+            // through normal MediaCodec.createByCodecName calls, which
+            // defeats the point of asking for a *reliable* software path.
+            val codecList = MediaCodecList(MediaCodecList.REGULAR_CODECS)
             for (info in codecList.codecInfos) {
                 if (info.isEncoder) continue
                 val types = info.supportedTypes
@@ -696,8 +709,16 @@ class ThumbnailHandlers(
         val uvRowStride = uPlane.rowStride
         val uvPixelStride = uPlane.pixelStride
 
-        // NV21 requires exactly width * height Y bytes followed by (width * height) / 2 interleaved V and U bytes.
-        val nv21 = ByteArray(width * height * 3 / 2)
+        // Ceiling division: 4:2:0 chroma planes still exist for odd
+        // width/height (e.g. a cropped or user-generated source), just
+        // rounded up by one sample. width/2, height/2 (floor) would
+        // under-size the NV21 buffer and silently drop the last chroma
+        // row/column for such videos.
+        val chromaWidth = (width + 1) / 2
+        val chromaHeight = (height + 1) / 2
+        // NV21 requires exactly width * height Y bytes followed by
+        // 2 * chromaWidth * chromaHeight interleaved V and U bytes.
+        val nv21 = ByteArray(width * height + chromaWidth * chromaHeight * 2)
 
         // 1. Copy Y plane, stripping row padding if yRowStride > width
         var nvIndex = 0
@@ -717,9 +738,6 @@ class ThumbnailHandlers(
         }
 
         // 2. Interleave V and U planes into NV21 format (V0, U0, V1, U1...)
-        val chromaWidth = width / 2
-        val chromaHeight = height / 2
-
         val vRow = ByteArray(uvRowStride)
         val uRow = ByteArray(uvRowStride)
 
@@ -764,4 +782,4 @@ class ThumbnailHandlers(
     }
 
 
-}
+}

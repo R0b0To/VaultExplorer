@@ -115,8 +115,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     );
     _loadConfig();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // 1. Activate ExoPlayer first so PlaybackThrottleController locks thumbnail queues
-      _activateCurrentMedia();
+      await _activateCurrentMedia();
       _startSlideshowTimerIfNeeded();
 
       // 2. Wait for ExoPlayer initialization to complete before background prefetching starts
@@ -125,12 +124,23 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     });
   }
 
+  // Monotonically-increasing token guarding against overlapping
+  // _activateCurrentMedia() calls (e.g. if some future caller fires it
+  // twice in quick succession before the first call's awaits resolve).
+  // Without this, two concurrent calls could both pass VideoPlaybackManager
+  // .activate()'s "already active" check on stale state and each spin up
+  // their own hardware decoder for the same or different files at once --
+  // exactly the kind of overlap this whole fix is meant to prevent.
+  int _activateToken = 0;
+
   Future<void> _activateCurrentMedia() async {
     if (_playlistController.isEmpty) return;
     final file = _playlistController.currentFile;
+    final token = ++_activateToken;
 
     // Set throttle active FIRST so thumbnail queues block new video thumbnail jobs
     await PlaybackThrottleController.setActive(MediaViewerConstants.isVideo(file));
+    if (!mounted || token != _activateToken) return; // superseded by a newer call
 
     if (MediaViewerConstants.isVideo(file) || MediaViewerConstants.isAudio(file)) {
       PlaybackThrottleController.setInitializing();
@@ -144,7 +154,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _playbackManager.pauseActive();
     }
   }
-
 
 
   Future<void> _loadConfig() async {
@@ -806,7 +815,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   itemCount: _playlistController.playlist.length,
                   onPageChanged: (index) {
                     _playlistController.updateIndex(index);
-                    _activateCurrentMedia();
+                    // Activation is handled by _onScrollEnd (fired via the
+                    // ScrollEndNotification below for swipes, and directly
+                    // by _transitionTo for programmatic navigation) --
+                    // calling _activateCurrentMedia() here too would race
+                    // a second concurrent activation against it.
                     _prefetchDebounceTimer?.cancel();
                     _prefetchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
                       if (mounted) _prefetchSurroundingItems();

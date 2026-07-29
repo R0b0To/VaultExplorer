@@ -69,60 +69,54 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
   VideoPlayerController? get playerController => _inner;
 
   Future<void> initialize() async {
-  if (_inner != null || _disposed) return;
-  await PlaybackThrottleController.setActive(true);
-  PlaybackThrottleController.setInitializing();
+    if (_inner != null || _disposed) return;
+    PlaybackThrottleController.setInitializing();
 
-  var controller = VideoPlayerController.contentUri(Uri.parse(contentUriString));
-  _inner = controller;
-  controller.addListener(_onTick);
-  
-  try {
-    await controller.initialize();
-    PlaybackThrottleController.setInitialized();
-  } catch (e) {
-    // If the native hardware video codec was temporarily occupied (e.g. from
-    // a background thumbnail extractor releasing or rapid navigation),
-    // dispose the stale handle, wait 400ms for Android OS to release the MediaCodec instance,
-    // and retry with a fresh controller.
-    controller.removeListener(_onTick);
-    await controller.dispose();
-    if (_disposed) {
-      PlaybackThrottleController.setInitialized();
-      return;
-    }
-
-    await Future.delayed(const Duration(milliseconds: 400));
-    if (_disposed) {
-      PlaybackThrottleController.setInitialized();
-      return;
-    }
-
-    controller = VideoPlayerController.contentUri(Uri.parse(contentUriString));
+    var controller = VideoPlayerController.contentUri(Uri.parse(contentUriString));
     _inner = controller;
     controller.addListener(_onTick);
+
     try {
       await controller.initialize();
-    } catch (_) {
       PlaybackThrottleController.setInitialized();
-      value = const NativeVideoValue(
-        hasError: true,
-        errorDescription: 'Video decoder unavailable — hardware codec contention',
-      );
-      return;
+    } catch (e) {
+      controller.removeListener(_onTick);
+      await controller.dispose();
+      if (_disposed) {
+        PlaybackThrottleController.setInitialized();
+        return;
+      }
+
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (_disposed) {
+        PlaybackThrottleController.setInitialized();
+        return;
+      }
+
+      controller = VideoPlayerController.contentUri(Uri.parse(contentUriString));
+      _inner = controller;
+      controller.addListener(_onTick);
+      try {
+        await controller.initialize();
+      } catch (_) {
+        PlaybackThrottleController.setInitialized();
+        value = const NativeVideoValue(
+          hasError: true,
+          errorDescription: 'Video decoder unavailable — hardware codec contention',
+        );
+        return;
+      }
+      PlaybackThrottleController.setInitialized();
     }
-    PlaybackThrottleController.setInitialized();
-  }
 
-
-  if (_disposed) return;
-  if (_currentSpeed != 1.0) {
-    try {
-      await controller.setPlaybackSpeed(_currentSpeed);
-    } catch (_) {}
+    if (_disposed) return;
+    if (_currentSpeed != 1.0) {
+      try {
+        await controller.setPlaybackSpeed(_currentSpeed);
+      } catch (_) {}
+    }
+    if (autoPlay && !_disposed) await play();
   }
-  if (autoPlay && !_disposed) await play();
-}
 
 
   void _onTick() {
@@ -201,4 +195,3 @@ class NativeVideoPlayerView extends StatelessWidget {
     );
   }
 }
-

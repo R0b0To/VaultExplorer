@@ -138,70 +138,72 @@ class _OperationPillContent extends StatelessWidget {
     return FloatingPill(
       color: color,
       onTap: () => FileOperationsSheet.show(context),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (hasActive)
-            SizedBox(
-              width: AppIconSize.standard,
-              height: AppIconSize.standard,
-              child: CircularProgressIndicator(
-                value: primary.progressFraction,
-                strokeWidth: 2,
-                color: onColor,
-                backgroundColor: onColor.withValues(alpha: 0.25),
-              ),
-            )
-          else
-            Icon(
-              switch (primary.status) {
-                FileOperationStatus.completed => Icons.check_circle_rounded,
-                FileOperationStatus.cancelled => Icons.cancel_outlined,
-                _ => Icons.error_outline_rounded,
-              },
-              size: AppIconSize.standard,
-              color: onColor,
-            ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: onColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+      child: SizedBox(
+        width: 290,
+        child: Row(
+          children: [
+            if (hasActive)
+              SizedBox(
+                width: AppIconSize.standard,
+                height: AppIconSize.standard,
+                child: CircularProgressIndicator(
+                  value: primary.progressFraction,
+                  strokeWidth: 2,
+                  color: onColor,
+                  backgroundColor: onColor.withValues(alpha: 0.25),
                 ),
-                if (sublabel.isNotEmpty)
+              )
+            else
+              Icon(
+                switch (primary.status) {
+                  FileOperationStatus.completed => Icons.check_circle_rounded,
+                  FileOperationStatus.cancelled => Icons.cancel_outlined,
+                  _ => Icons.error_outline_rounded,
+                },
+                size: AppIconSize.standard,
+                color: onColor,
+              ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    sublabel,
-                    style: textTheme.labelSmall?.copyWith(
-                      color: onColor.withValues(alpha: 0.8),
+                    label,
+                    style: textTheme.labelLarge?.copyWith(
+                      color: onColor,
+                      fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-              ],
+                  if (sublabel.isNotEmpty)
+                    Text(
+                      sublabel,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: onColor.withValues(alpha: 0.8),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 6),
-          if (hasActive)
-            Icon(Icons.chevron_right_rounded, size: AppIconSize.standard, color: onColor.withValues(alpha: 0.8))
-          else
-            IconButton(
-              icon: Icon(Icons.close_rounded, size: AppIconSize.standard, color: onColor),
-              tooltip: 'Dismiss',
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              padding: EdgeInsets.zero,
-              onPressed: () => FileOperationService.instance.clearFinished(),
-            ),
-        ],
+            const SizedBox(width: 6),
+            if (hasActive)
+              Icon(Icons.chevron_right_rounded, size: AppIconSize.standard, color: onColor.withValues(alpha: 0.8))
+            else
+              IconButton(
+                icon: Icon(Icons.close_rounded, size: AppIconSize.standard, color: onColor),
+                tooltip: 'Dismiss',
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
+                onPressed: () => FileOperationService.instance.clearFinished(),
+              ),
+          ],
+        ),
       ),
     );
   }

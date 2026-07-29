@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 
 import '../../../data/models/file_operation.dart';
 import 'floating_activity_stack.dart';
@@ -11,26 +10,13 @@ import 'floating_activity_stack.dart';
 export 'package:vaultexplorer/core/widgets/activity/floating_pill.dart';
 export 'package:vaultexplorer/core/widgets/activity/clipboard_activity_pill.dart';
 export 'package:vaultexplorer/core/widgets/activity/operation_activity_pill.dart';
+export 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
 
-/// Vertically stacks the operation pill above the clipboard pill (when
-/// present), with consistent spacing, centered and width-capped for tablets.
-///
-/// FIX: previously this widget's visibility of the clipboard pill was driven
-/// by the *caller* passing a nullable [clipboardPill] built from whatever
-/// state the caller happened to have at its last build — but neither
-/// FileBrowserScreen nor VaultDashboard actually listen to
-/// [CrossContainerClipboard], so calling `_clip.clear()` after enqueueing a
-/// paste didn't trigger a rebuild here. The result: the clipboard pill kept
-/// showing (stale) at the same time the new operation pill appeared, instead
-/// of being replaced by it. FloatingActivityStack now listens to
-/// [CrossContainerClipboard.instance] itself and decides on its own whether
-/// to render the clipboard pill, so it can never go stale relative to the
-/// operation pill sitting right above it.
+/// Renders floating activity pills centered at the bottom of the screen.
+/// Modern UI pattern: floating pill is used strictly for active background
+/// file operations/transfers, while clipboard copy/cut status is displayed
+/// directly in the Top AppBar header.
 class FloatingActivityStack extends StatelessWidget {
-  /// Optional restriction so a screen can show the clipboard pill only when
-  /// relevant to it (e.g. the dashboard never offers a "Paste" action).
-  /// When null, the clipboard pill renders as soon as the clipboard has
-  /// items, with an onPaste callback if provided.
   final VoidCallback? onPaste;
   final bool showClipboard;
 
@@ -47,30 +33,15 @@ class FloatingActivityStack extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: ListenableBuilder(
-          listenable: Listenable.merge([
-            FileOperationService.instance,
-            CrossContainerClipboard.instance,
-          ]),
+          listenable: FileOperationService.instance,
           builder: (context, _) {
             final hasOps = FileOperationService.instance.operations.isNotEmpty;
-            final clip = CrossContainerClipboard.instance;
-            final showClip = showClipboard && clip.hasItems;
+            if (!hasOps) return const SizedBox.shrink();
 
-            if (!hasOps && !showClip) return const SizedBox.shrink();
-
-            return Column(
+            return const Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (hasOps) const OperationActivityPill(),
-                if (hasOps && showClip) const SizedBox(height: 10),
-                if (showClip)
-                  ClipboardActivityPill(
-                    isCutOperation: clip.isCutOperation,
-                    itemCount: clip.items.length,
-                    sourceLabel: clip.sourceDisplayName,
-                    onCancel: clip.clear,
-                    onPaste: onPaste,
-                  ),
+                OperationActivityPill(),
               ],
             );
           },
@@ -79,3 +50,4 @@ class FloatingActivityStack extends StatelessWidget {
     );
   }
 }
+

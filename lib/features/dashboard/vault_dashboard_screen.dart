@@ -836,6 +836,7 @@ class _VaultDashboardState extends State<VaultDashboard>
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
           actions: [
+            const AppBarClipboardButton(),
             IconButton(
               icon: const Icon(Icons.settings_rounded),
               tooltip: 'Settings',

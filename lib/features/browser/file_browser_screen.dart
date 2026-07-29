@@ -1915,9 +1915,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                       }),
                     )
                   else
-                    Align(
+                    const Align(
                       alignment: Alignment.centerRight,
-                      child: FloatingActivityStack(onPaste: _paste),
+                      child: FloatingActivityStack(),
                     ),
                 ],
               ),
@@ -2259,6 +2259,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ],
       ),
       actions: [
+        AppBarClipboardButton(onPaste: _isReadOnly ? null : _paste),
         if (isLandscape && showActionBar) ...[
           ..._toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
         ],

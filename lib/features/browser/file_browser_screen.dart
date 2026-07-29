@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -47,6 +49,8 @@ import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart'
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+
+import '../../core/widgets/thumbnail/thumbnail_concurrency.dart';
 
 class PathSegment {
   final String label;
@@ -453,11 +457,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   Future<void> _handleFileTap(RawEntry entry) async {
+    ThumbnailConcurrency.videoLimiter.cancelAll();
+    if (MediaViewerConstants.isVideo(entry.name)) {
+      await PlaybackThrottleController.setActive(true);
+    }
     _signalActivity();
     if (isSelectionMode) {
       toggleSelectItem(entry);
       return;
     }
+
     final fullPath = _currentDirPath.isEmpty
         ? entry.name
         : '$_currentDirPath/${entry.name}';

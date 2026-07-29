@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -294,6 +295,9 @@ class _ListVideoThumb extends StatelessWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
   ) async {
+    if (PlaybackThrottleController.isPlaybackActive.value) {
+      return Uint8List(0);
+    }
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await ThumbnailCacheService.get(
         container: container,

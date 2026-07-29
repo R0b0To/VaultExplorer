@@ -423,6 +423,20 @@ Future<bool> openWithApp(
     }
   }
 
+  /// Notifies the native layer whether video playback is active so native
+  /// background video thumbnail extractions yield immediately to ExoPlayer.
+  Future<void> setPlaybackActive(bool active) async {
+    try {
+      await _channel.invokeMethod(
+        ChannelMethods.setPlaybackActive,
+        {'active': active},
+      );
+    } catch (e) {
+      _logSwallowed('setPlaybackActive', e, expected: true);
+    }
+  }
+
+
   Future<bool> setSecureScreen(bool enabled) async {
     try {
       final bool? success = await _channel.invokeMethod<bool>(

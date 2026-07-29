@@ -59,11 +59,21 @@ class PriorityTaskQueue {
     _tierOf[completer] = priority;
     if (_canAdmit(priority)) {
       _grant(completer, priority);
-      return;
+    } else {
+      _waiting[priority]!.addLast(completer);
+      await completer.future;
     }
-    _waiting[priority]!.addLast(completer);
-    await completer.future;
+    // When playback is active, adjacent-tier tasks (e.g. carousel / prefetch
+    // video thumbnails) must wait until ExoPlayer's MediaCodec initialization
+    // finishes before actually starting their own decoder work. The task
+    // already holds a concurrency slot at this point, but the real hardware
+    // contention hasn't started yet — the caller hasn't invoked native code.
+    if (priority == TaskPriority.adjacent &&
+        PlaybackThrottleController.isPlaybackActive.value) {
+      await PlaybackThrottleController.initGate;
+    }
   }
+
 
   /// Drops [completer] from the *waiting* queue if it's still there
   /// (no-op if it's already been granted a turn or already completed).

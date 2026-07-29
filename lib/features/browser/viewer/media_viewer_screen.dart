@@ -114,17 +114,26 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       _onCurrentMediaFileChanged,
     );
     _loadConfig();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startSlideshowTimerIfNeeded();
-      _prefetchSurroundingItems();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // 1. Activate ExoPlayer first so PlaybackThrottleController locks thumbnail queues
       _activateCurrentMedia();
+      _startSlideshowTimerIfNeeded();
+
+      // 2. Wait for ExoPlayer initialization to complete before background prefetching starts
+      await PlaybackThrottleController.initGate;
+      if (mounted) _prefetchSurroundingItems();
     });
   }
 
-  void _activateCurrentMedia() {
+  Future<void> _activateCurrentMedia() async {
     if (_playlistController.isEmpty) return;
     final file = _playlistController.currentFile;
+
+    // Set throttle active FIRST so thumbnail queues block new video thumbnail jobs
+    await PlaybackThrottleController.setActive(MediaViewerConstants.isVideo(file));
+
     if (MediaViewerConstants.isVideo(file) || MediaViewerConstants.isAudio(file)) {
+      PlaybackThrottleController.setInitializing();
       _playbackManager.activate(
         fileName: file,
         contentUriString: _contentUriFor(file),
@@ -134,8 +143,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     } else {
       _playbackManager.pauseActive();
     }
-    PlaybackThrottleController.setActive(MediaViewerConstants.isVideo(file));
   }
+
+
 
   Future<void> _loadConfig() async {
     final config = await FileManagerToolbarService.instance.load();
@@ -242,17 +252,24 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   Future<void> _prefetchThumbnail(String fileName) async {
-    final isImg = MediaViewerConstants.isImage(fileName);
-    final isVid = MediaViewerConstants.isVideo(fileName);
-    if (!isImg && !isVid) return;
-    if (ThumbnailCacheService.getFromMemory(
-          widget.container,
-          fileName,
-          widget.thumbnailQuality,
-        ) !=
-        null) {
-      return;
-    }
+  final isImg = MediaViewerConstants.isImage(fileName);
+  final isVid = MediaViewerConstants.isVideo(fileName);
+  if (!isImg && !isVid) return;
+
+  // NEVER prefetch video thumbnails in the background during playback.
+  // Hardware video decoders cannot handle concurrent 4K decoding contexts.
+  if (isVid && PlaybackThrottleController.isPlaybackActive.value) {
+    return;
+  }
+
+  if (ThumbnailCacheService.getFromMemory(
+        widget.container,
+        fileName,
+        widget.thumbnailQuality,
+      ) !=
+      null) {
+    return;
+  }
     final key = '${widget.container.volId}:'
         '${widget.container.mountedAt.millisecondsSinceEpoch}:$fileName';
     final existing = ThumbnailConcurrency.inFlightThumbnails[key];
@@ -538,13 +555,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   void _handleMediaError(String fileName) {
     if (fileName != _playlistController.currentFile) return;
-    Future.delayed(MediaViewerConstants.brokenMediaSkipDelay, () {
-      if (!mounted) return;
-      if (fileName != _playlistController.currentFile) return;
-      if (_playlistController.currentIndex < _playlistController.playlist.length - 1) {
-        _transitionTo(_playlistController.currentIndex + 1, animate: true);
-      }
-    });
+    // Leave the current item in place and let its error overlay stay on
+    // screen so the user can see what failed, rather than automatically
+    // skipping to the next file. Auto-skipping here previously triggered
+    // a cascading loop: it advanced (and began initializing the next
+    // file's decoder) while the failed video's hardware decoder was still
+    // being torn down, which on single-decoder-pipeline devices produced
+    // another NO_MEMORY failure, which skipped again, and so on.
+    _cancelSlideshowTimer();
+    _playbackManager.pauseActive();
   }
 
   void _cancelSlideshowTimer() {
@@ -950,7 +969,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               },
             ),
           ),
-          if (_enableCarousel)
+          if (_enableCarousel && _isCarouselVisible && _showUI)
             AnimatedPositioned(
               duration: MediaViewerConstants.animationDuration,
               curve: Curves.easeOut,
@@ -969,6 +988,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 onClose: _toggleCarousel,
               ),
             ),
+
         ],
       ),
     );

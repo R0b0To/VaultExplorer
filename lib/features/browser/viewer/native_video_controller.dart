@@ -1,9 +1,9 @@
 // File: lib/features/browser/viewer/native_video_controller.dart
 import 'dart:async';
-import 'dart:ui' show Size;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:video_player/video_player.dart';
+
 
 @immutable
 class NativeVideoValue {
@@ -69,33 +69,61 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
   VideoPlayerController? get playerController => _inner;
 
   Future<void> initialize() async {
-    if (_inner != null || _disposed) return;
-    final controller = VideoPlayerController.contentUri(Uri.parse(contentUriString));
+  if (_inner != null || _disposed) return;
+  await PlaybackThrottleController.setActive(true);
+  PlaybackThrottleController.setInitializing();
+
+  var controller = VideoPlayerController.contentUri(Uri.parse(contentUriString));
+  _inner = controller;
+  controller.addListener(_onTick);
+  
+  try {
+    await controller.initialize();
+    PlaybackThrottleController.setInitialized();
+  } catch (e) {
+    // If the native hardware video codec was temporarily occupied (e.g. from
+    // a background thumbnail extractor releasing or rapid navigation),
+    // dispose the stale handle, wait 400ms for Android OS to release the MediaCodec instance,
+    // and retry with a fresh controller.
+    controller.removeListener(_onTick);
+    await controller.dispose();
+    if (_disposed) {
+      PlaybackThrottleController.setInitialized();
+      return;
+    }
+
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (_disposed) {
+      PlaybackThrottleController.setInitialized();
+      return;
+    }
+
+    controller = VideoPlayerController.contentUri(Uri.parse(contentUriString));
     _inner = controller;
     controller.addListener(_onTick);
-
     try {
       await controller.initialize();
     } catch (_) {
-      // Failure already lands in controller.value.hasError/errorDescription
-      // and is picked up by _onTick -- nothing further to do here.
+      PlaybackThrottleController.setInitialized();
+      value = const NativeVideoValue(
+        hasError: true,
+        errorDescription: 'Video decoder unavailable — hardware codec contention',
+      );
       return;
     }
-    if (_disposed) return;
-
-    // Apply whichever speed the previous item in this playlist was playing
-    // at (initialSpeed) so a freshly-created controller doesn't silently
-    // reset to 1x. Safe to call before play(): video_player stores the
-    // speed on .value regardless of playback state and (re)applies it the
-    // next time play() actually starts the platform player.
-    if (_currentSpeed != 1.0) {
-      try {
-        await controller.setPlaybackSpeed(_currentSpeed);
-      } catch (_) {}
-    }
-
-    if (autoPlay && !_disposed) await play();
+    PlaybackThrottleController.setInitialized();
   }
+
+
+  if (_disposed) return;
+  if (_currentSpeed != 1.0) {
+    try {
+      await controller.setPlaybackSpeed(_currentSpeed);
+    } catch (_) {}
+  }
+  if (autoPlay && !_disposed) await play();
+}
+
 
   void _onTick() {
     if (_disposed) return;

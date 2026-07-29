@@ -153,22 +153,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.13"
-  device_info_plus:
-    dependency: transitive
-    description:
-      name: device_info_plus
-      sha256: "0891702f96b2e465fe567b7ec448380e6b1c14f60af552a8536d9f583b6b8442"
-      url: "https://pub.dev"
-    source: hosted
-    version: "13.2.0"
-  device_info_plus_platform_interface:
-    dependency: transitive
-    description:
-      name: device_info_plus_platform_interface
-      sha256: "04b173a92e2d9161dfead145667037c8d834db725ce2e7b942bfe18fd2f45a46"
-      url: "https://pub.dev"
-    source: hosted
-    version: "8.1.0"
   encrypt:
     dependency: "direct main"
     description:
@@ -209,14 +193,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.1"
-  fixnum:
-    dependency: transitive
-    description:
-      name: fixnum
-      sha256: b6dc7065e46c974bc7c5f143080a6764ec7a4be6da1285ececdc37be96de53be
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.1"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -640,6 +616,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.0"
+  pdfium_dart:
+    dependency: transitive
+    description:
+      name: pdfium_dart
+      sha256: "86e95c66b09f3245b95c4924f2edce8d4f7c9786876e5c5ee8e36b104a94bbb0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.5"
+  pdfium_flutter:
+    dependency: transitive
+    description:
+      name: pdfium_flutter
+      sha256: "0b115c0917aef9cf6bb9c4d47d0efc61d97f44844cd76287c921f997c26cf15d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.3"
+  pdfrx:
+    dependency: "direct main"
+    description:
+      name: pdfrx
+      sha256: acce61944c31bd36f0c3031b1bbf41f59d0b0d4e5e27614fbdc74ff093d55464
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.4.7"
+  pdfrx_engine:
+    dependency: transitive
+    description:
+      name: pdfrx_engine
+      sha256: ef8f8cfa64255bfc91a559dd2d32d7cfe7a0f8003bac297bbf9a0aed1182fae5
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.6"
   petitparser:
     dependency: transitive
     description:
@@ -704,6 +712,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.0"
+  rxdart:
+    dependency: transitive
+    description:
+      name: rxdart
+      sha256: "5c3004a4a8dbb94bd4bf5412a4def4acdaa12e12f269737a5751369e12d1a962"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.28.0"
   sensors_plus:
     dependency: "direct main"
     description:
@@ -805,78 +821,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
-  syncfusion_flutter_core:
+  synchronized:
     dependency: transitive
     description:
-      name: syncfusion_flutter_core
-      sha256: "3e557e1c8cc9a5b4e4f05059d2f618c00c6501f65b8832c766ca68b6785eca2d"
+      name: synchronized
+      sha256: "61894a1956de6b4fc1aefd0892e109514a1a706cbece3ac59decd90ff5a7a423"
       url: "https://pub.dev"
     source: hosted
-    version: "34.1.33"
-  syncfusion_flutter_pdf:
-    dependency: "direct main"
-    description:
-      name: syncfusion_flutter_pdf
-      sha256: ce5af3ec97c60583b58f95a377e08d5c99a91335a79df937ca757afc78dda793
-      url: "https://pub.dev"
-    source: hosted
-    version: "34.1.33"
-  syncfusion_flutter_pdfviewer:
-    dependency: "direct main"
-    description:
-      name: syncfusion_flutter_pdfviewer
-      sha256: "2d12a6653386f4a153ee782a8c9b697e4a0eac8f482adf7053a93ffbd2571e5f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "34.1.33"
-  syncfusion_flutter_signaturepad:
-    dependency: transitive
-    description:
-      name: syncfusion_flutter_signaturepad
-      sha256: "12c58f3df9ac8d9f5389359fca2e14cf4d4e7f7fc98cb9170468313201a7786f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "34.1.33"
-  syncfusion_pdfviewer_linux:
-    dependency: transitive
-    description:
-      name: syncfusion_pdfviewer_linux
-      sha256: "930ed6cc18551cac441946d56d3210b5f387bd5f3c7a27067c507bd788360a78"
-      url: "https://pub.dev"
-    source: hosted
-    version: "34.1.33"
-  syncfusion_pdfviewer_macos:
-    dependency: transitive
-    description:
-      name: syncfusion_pdfviewer_macos
-      sha256: "9b855c03c02031422dd228510b98b173298667cec9520ad2975f0e460c1898e5"
-      url: "https://pub.dev"
-    source: hosted
-    version: "34.1.33"
-  syncfusion_pdfviewer_platform_interface:
-    dependency: transitive
-    description:
-      name: syncfusion_pdfviewer_platform_interface
-      sha256: d6140726b00975a5b32d115900b089c638a584e9b671d46a11577612fc145b87
-      url: "https://pub.dev"
-    source: hosted
-    version: "34.1.33"
-  syncfusion_pdfviewer_web:
-    dependency: transitive
-    description:
-      name: syncfusion_pdfviewer_web
-      sha256: "6ad8b6e14b1ba496480e94c60d47caf54267ad4ec55a43c72be23f06eea7e3b4"
-      url: "https://pub.dev"
-    source: hosted
-    version: "34.1.33"
-  syncfusion_pdfviewer_windows:
-    dependency: transitive
-    description:
-      name: syncfusion_pdfviewer_windows
-      sha256: "4564fbc96cad9f6a7743a7513b22ea083d8db2b776ddbe460d39a1150f976728"
-      url: "https://pub.dev"
-    source: hosted
-    version: "34.1.33"
+    version: "3.4.1+1"
   term_glyph:
     dependency: transitive
     description:
@@ -981,14 +933,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.5"
-  uuid:
-    dependency: transitive
-    description:
-      name: uuid
-      sha256: "9b129329f58692f6e6578329498a8fe9fbe98f090beb764ffbb8ee2eadd01dcd"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.6.0"
   vector_math:
     dependency: "direct main"
     description:
@@ -1109,14 +1053,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.3.0"
-  win32_registry:
-    dependency: transitive
-    description:
-      name: win32_registry
-      sha256: "73b1d78920a9d6e03f8b4e43e612b87bf3152a0e5c5e5150267762b7c4116904"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.0.3"
   xdg_directories:
     dependency: transitive
     description:

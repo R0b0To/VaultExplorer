@@ -2,8 +2,10 @@ package com.aeidolon.vaultexplorer
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaCodec
 import android.media.MediaMetadataRetriever
 import android.os.Build
+import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.BufferedInputStream
@@ -16,6 +18,79 @@ class ThumbnailHandlers(
     private val videoExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
 ) {
+    /**
+     * Serialises access to the hardware video decoder between thumbnail
+     * extraction ([extractVideoFrame]) and ExoPlayer playback.
+     *
+     * - Thumbnail extraction holds the lock for the duration of
+     *   `MediaMetadataRetriever.getScaledFrameAtTime` / `getFrameAtTime`.
+     * - [handleSetPlaybackActive] acquires the lock on the **calling
+     *   thread** (the videoExecutor) when `active = true`.  Because the
+     *   executor is a single-thread pool, this blocks until the in-flight
+     *   thumbnail extraction finishes and releases its `MediaMetadataRetriever`,
+     *   which guarantees the hardware decoder is free before the method
+     *   returns to Flutter.
+     *
+     * The lock is fair so waiters are served in FIFO order, preventing
+     * starvation.
+     */
+    private val videoDecoderLock = java.util.concurrent.locks.ReentrantLock(true)
+
+    @Volatile
+    private var isPlaybackActive: Boolean = false
+
+    companion object {
+        private const val TAG = "ThumbnailHandlers"
+        /** Fallback target dimension when the primary extraction fails due to
+         *  hardware decoder resource exhaustion. 180px is small enough that
+         *  most SoCs will route to a software decoder path. */
+        private const val FALLBACK_TARGET_SIZE = 180
+    }
+
+    /**
+     * Called from Flutter when video playback starts or stops.
+     *
+     * When `active = true`:
+     *  1. Sets the volatile flag so any *new* thumbnail extraction bails
+     *     out immediately.
+     *  2. Purges queued (not-yet-started) thumbnail tasks from the executor.
+     *  3. Acquires [videoDecoderLock] — this **blocks** until the
+     *     currently-running thumbnail extraction (if any) finishes and
+     *     releases its hardware decoder.
+     *  4. Immediately releases the lock (we only needed to wait, not hold it).
+     *  5. Returns `success(null)` to Flutter.
+     *
+     * When `active = false`:
+     *  1. Clears the flag so thumbnail extraction can resume.
+     */
+    fun handleSetPlaybackActive(call: MethodCall, result: MethodChannel.Result) {
+        val active = call.argument<Boolean>("active") ?: false
+        if (active) {
+            isPlaybackActive = true
+            // Purge any queued thumbnail tasks that haven't started yet.
+            runCatching {
+                (videoExecutor as? java.util.concurrent.ThreadPoolExecutor)?.queue?.clear()
+            }
+            // Run on the videoExecutor so we queue behind any in-flight task
+            // and block until it finishes (the executor is a single-thread pool).
+            videoExecutor.execute {
+                // Acquire the lock — this blocks until the in-flight
+                // extractVideoFrame releases it.
+                videoDecoderLock.lock()
+                try {
+                    Log.d(TAG, "Playback active: hardware decoder is now free for ExoPlayer")
+                } finally {
+                    videoDecoderLock.unlock()
+                }
+                activity.runOnUiThread { result.success(null) }
+            }
+        } else {
+            isPlaybackActive = false
+            Log.d(TAG, "Playback inactive, thumbnail extraction may resume")
+            result.success(null)
+        }
+    }
+
     private fun calculateInSampleSize(width: Int, height: Int, targetSize: Int): Int {
         var inSampleSize = 1
         if (width > targetSize || height > targetSize) {
@@ -38,6 +113,186 @@ class ThumbnailHandlers(
         return Bitmap.createScaledBitmap(src, dstW, dstH, true)
     }
 
+    /** Returns true if [e] looks like a hardware video decoder resource
+     *  exhaustion error (OMX_ErrorInsufficientResources / NO_MEMORY). */
+    private fun isCodecResourceError(e: Throwable): Boolean {
+        if (e is MediaCodec.CodecException) return true
+        val msg = e.message?.lowercase() ?: return false
+        return msg.contains("omx_errorinsufficientresources") ||
+               msg.contains("no_memory") ||
+               msg.contains("codec") ||
+               msg.contains("0x80001000") // OMX_ErrorInsufficientResources hex
+    }
+
+    // ── Shared video frame extraction with codec-failure fallback ───────────
+
+    /**
+     * Result holder for [extractVideoFrame] — bundles the compressed JPEG
+     * bytes with the *pre-scale* frame dimensions (needed by the
+     * "WithSize" variant).
+     */
+    private data class VideoFrameResult(
+        val bytes: ByteArray,
+        val sourceWidth: Int,
+        val sourceHeight: Int,
+    )
+
+    /**
+     * Extracts a single video frame, compresses it to JPEG, and returns
+     * the result.  Holds [videoDecoderLock] for the entire extraction so
+     * [handleSetPlaybackActive] can wait for the decoder to be released.
+     *
+     * If [isPlaybackActive] is already true when we enter, we bail out
+     * immediately without touching the decoder.
+     *
+     * On hardware decoder resource exhaustion the retriever is released and
+     * a **fallback** extraction is attempted at [FALLBACK_TARGET_SIZE].
+     *
+     * @return a [VideoFrameResult], or `null` if extraction failed or was
+     *         skipped because playback is active.
+     */
+    private fun extractVideoFrame(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        targetSize: Int,
+        quality: Int,
+    ): VideoFrameResult? {
+        // Fast bail-out before trying to acquire the lock.
+        if (isPlaybackActive) {
+            Log.d(TAG, "Skipping video thumbnail: playback is active (pre-lock)")
+            return null
+        }
+
+        videoDecoderLock.lock()
+        try {
+            // Re-check after acquiring: playback may have been requested
+            // while we were waiting.
+            if (isPlaybackActive) {
+                Log.d(TAG, "Skipping video thumbnail: playback is active (post-lock)")
+                return null
+            }
+
+            return extractVideoFrameInner(uriString, fileName, volId, targetSize, quality)
+        } finally {
+            videoDecoderLock.unlock()
+        }
+    }
+
+    /** Does the actual extraction work while the caller holds [videoDecoderLock]. */
+    private fun extractVideoFrameInner(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        targetSize: Int,
+        quality: Int,
+    ): VideoFrameResult? {
+        var retriever: MediaMetadataRetriever? = null
+        try {
+            retriever = MediaMetadataRetriever()
+            val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+            retriever.setDataSource(dataSource)
+
+            val durationMs = retriever
+                .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toLongOrNull() ?: 10_000L
+            val timeMs = minOf(1000L, durationMs / 4)
+            val timeUs = timeMs * 1000L
+
+            val frame = tryExtractFrame(retriever, timeUs, targetSize)
+            if (frame != null) {
+                return compressFrame(frame, targetSize, quality)
+            }
+            return null
+        } catch (e: Exception) {
+            if (!isCodecResourceError(e)) throw e
+            Log.w(TAG, "Primary frame extraction hit codec resource limit, " +
+                       "retrying at ${FALLBACK_TARGET_SIZE}p: ${e.message}")
+            runCatching { retriever?.release() }
+            retriever = null
+            return extractFrameFallback(uriString, fileName, volId, quality)
+        } finally {
+            runCatching { retriever?.release() }
+        }
+    }
+
+
+    /**
+     * Attempts frame extraction at [FALLBACK_TARGET_SIZE] with a fresh
+     * [MediaMetadataRetriever]. Returns null on any failure — the caller
+     * will surface the appropriate error to Flutter.
+     */
+    private fun extractFrameFallback(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        quality: Int,
+    ): VideoFrameResult? {
+        var fallbackRetriever: MediaMetadataRetriever? = null
+        try {
+            fallbackRetriever = MediaMetadataRetriever()
+            val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+            fallbackRetriever.setDataSource(dataSource)
+
+            val durationMs = fallbackRetriever
+                .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                ?.toLongOrNull() ?: 10_000L
+            val timeMs = minOf(1000L, durationMs / 4)
+            val timeUs = timeMs * 1000L
+
+            val frame = tryExtractFrame(fallbackRetriever, timeUs, FALLBACK_TARGET_SIZE)
+            if (frame != null) {
+                return compressFrame(frame, FALLBACK_TARGET_SIZE, quality)
+            }
+            return null
+        } catch (e2: Exception) {
+            Log.e(TAG, "Fallback frame extraction also failed: ${e2.message}")
+            return null
+        } finally {
+            runCatching { fallbackRetriever?.release() }
+        }
+    }
+
+    /** Attempts [getScaledFrameAtTime] first, falls back to [getFrameAtTime]. */
+    private fun tryExtractFrame(
+        retriever: MediaMetadataRetriever,
+        timeUs: Long,
+        size: Int,
+    ): Bitmap? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            runCatching {
+                retriever.getScaledFrameAtTime(
+                    timeUs,
+                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                    size,
+                    size,
+                )
+            }.getOrNull()
+                ?: retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        } else {
+            retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        }
+    }
+
+    /** Scales the frame, compresses to JPEG, recycles bitmaps, returns result. */
+    private fun compressFrame(
+        frame: Bitmap,
+        targetSize: Int,
+        quality: Int,
+    ): VideoFrameResult {
+        val sourceWidth = frame.width
+        val sourceHeight = frame.height
+        val scaledFrame = scaledToFit(frame, targetSize)
+        val stream = ByteArrayOutputStream()
+        scaledFrame.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
+        val bytes = stream.toByteArray()
+        if (scaledFrame != frame) scaledFrame.recycle()
+        frame.recycle()
+        return VideoFrameResult(bytes, sourceWidth, sourceHeight)
+    }
+
+    // ── Public handlers ─────────────────────────────────────────────────────
+
     fun handleGetVideoThumbnail(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val fileName  = call.argument<String>("fileName")
@@ -49,7 +304,6 @@ class ThumbnailHandlers(
         }
 
         videoExecutor.execute {
-            var retriever: MediaMetadataRetriever? = null
             try {
                 val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                     ?: run {
@@ -59,49 +313,21 @@ class ThumbnailHandlers(
                         return@execute
                     }
 
-                retriever = MediaMetadataRetriever()
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
-                    retriever.setDataSource(dataSource)
-
-                    val durationMs = retriever
-                        .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                        ?.toLongOrNull() ?: 10_000L
-                    val timeMs = minOf(1000L, durationMs / 4)
-
-                    val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                        runCatching {
-                            retriever.getScaledFrameAtTime(
-                                timeMs * 1000L,
-                                MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                                targetSize,
-                                targetSize
-                            )
-                        }.getOrNull() ?: retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    } else {
-                        retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    }
-
-                    if (frame != null) {
-                        val scaledFrame = scaledToFit(frame, targetSize)
-                        val quality = (call.argument<Int>("quality") ?: 60).coerceIn(1, 100)
-                        val stream = ByteArrayOutputStream()
-                        scaledFrame.compress(Bitmap.CompressFormat.JPEG, quality, stream)
-                        val bytes = stream.toByteArray()
-                        if (scaledFrame != frame) scaledFrame.recycle()
-                        frame.recycle()
-                        activity.runOnUiThread { result.success(bytes) }
-                    } else {
-                        activity.runOnUiThread { result.error("FRAME_FAILED", "Failed to extract frame", null) }
-                    }
-                } else {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
                     activity.runOnUiThread { result.error("UNSUPPORTED_OS", "Requires Android 6.0+", null) }
+                    return@execute
+                }
+
+                val quality = call.argument<Int>("quality") ?: 60
+                val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality)
+
+                if (frameResult != null) {
+                    activity.runOnUiThread { result.success(frameResult.bytes) }
+                } else {
+                    activity.runOnUiThread { result.error("FRAME_FAILED", "Failed to extract frame", null) }
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
-            } finally {
-                runCatching { retriever?.release() }
             }
         }
     }
@@ -128,7 +354,6 @@ class ThumbnailHandlers(
         }
 
         videoExecutor.execute {
-            var retriever: MediaMetadataRetriever? = null
             try {
                 val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                     ?: run {
@@ -138,57 +363,27 @@ class ThumbnailHandlers(
                         return@execute
                     }
 
-                retriever = MediaMetadataRetriever()
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+                    activity.runOnUiThread { result.error("UNSUPPORTED_OS", "Requires Android 6.0+", null) }
+                    return@execute
+                }
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
-                    retriever.setDataSource(dataSource)
+                val quality = call.argument<Int>("quality") ?: 60
+                val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality)
 
-                    val durationMs = retriever
-                        .extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                        ?.toLongOrNull() ?: 10_000L
-                    val timeMs = minOf(1000L, durationMs / 4)
-
-                    val frame = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                        runCatching {
-                            retriever.getScaledFrameAtTime(
-                                timeMs * 1000L,
-                                MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-                                targetSize,
-                                targetSize
-                            )
-                        }.getOrNull() ?: retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    } else {
-                        retriever.getFrameAtTime(timeMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    }
-
-                    if (frame != null) {
-                        val sourceWidth = frame.width
-                        val sourceHeight = frame.height
-                        val scaledFrame = scaledToFit(frame, targetSize)
-                        val quality = (call.argument<Int>("quality") ?: 60).coerceIn(1, 100)
-                        val stream = ByteArrayOutputStream()
-                        scaledFrame.compress(Bitmap.CompressFormat.JPEG, quality, stream)
-                        val bytes = stream.toByteArray()
-                        if (scaledFrame != frame) scaledFrame.recycle()
-                        frame.recycle()
-                        activity.runOnUiThread {
-                            result.success(mapOf(
-                                "bytes" to bytes,
-                                "width" to sourceWidth,
-                                "height" to sourceHeight
-                            ))
-                        }
-                    } else {
-                        activity.runOnUiThread { result.error("FRAME_FAILED", "Failed to extract frame", null) }
+                if (frameResult != null) {
+                    activity.runOnUiThread {
+                        result.success(mapOf(
+                            "bytes" to frameResult.bytes,
+                            "width" to frameResult.sourceWidth,
+                            "height" to frameResult.sourceHeight,
+                        ))
                     }
                 } else {
-                    activity.runOnUiThread { result.error("UNSUPPORTED_OS", "Requires Android 6.0+", null) }
+                    activity.runOnUiThread { result.error("FRAME_FAILED", "Failed to extract frame", null) }
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
-            } finally {
-                runCatching { retriever?.release() }
             }
         }
     }

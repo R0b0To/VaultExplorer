@@ -23,9 +23,7 @@ dependencies:
   path: ^1.9.0
   sensors_plus: ^7.1.0
   flutter_staggered_grid_view: ^0.7.0
-  syncfusion_flutter_pdfviewer: ^34.1.32
-  syncfusion_flutter_pdf: ^34.1.32
-  fvp: ^0.37.3
+  pdfrx: ^2.4.7
 
 dev_dependencies:
   flutter_test:

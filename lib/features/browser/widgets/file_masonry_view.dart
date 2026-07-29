@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -623,6 +624,9 @@ class _VideoMasonryThumb extends StatelessWidget {
     ThumbnailQuality quality,
     void Function(int width, int height) onSizeKnown,
   ) async {
+    if (PlaybackThrottleController.isPlaybackActive.value) {
+      return Uint8List(0);
+    }
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await ThumbnailCacheService.getWithSize(
         container: container,

@@ -38,9 +38,17 @@ class VideoPlaybackManager {
 
     final previousFile = currentFileNotifier.value;
     if (previousFile != null && previousFile != fileName) {
-      final prevCtrl = _controllers[previousFile];
-      prevCtrl?.pause();
-      _scheduleDisposal(previousFile, prevCtrl);
+      final prevCtrl = _controllers.remove(previousFile);
+      if (prevCtrl != null) {
+        prevCtrl.pause();
+        // Mobile SoCs typically expose only a single active hardware video
+        // decoding pipeline (e.g. one 4K-capable c2.qti.vp9.decoder
+        // instance). The previous controller must be fully torn down
+        // *before* the next one is created below -- deferring this via a
+        // timer let two decoders be briefly alive at once, which exceeded
+        // hardware buffer limits and threw NO_MEMORY on 4K playback.
+        await prevCtrl.dispose();
+      }
     }
 
     NativeVideoController controller;
@@ -70,17 +78,9 @@ class VideoPlaybackManager {
     activeControllerNotifier.value = controller;
     currentFileNotifier.value = fileName;
 
-    _cleanupOldControllers(keepFiles: {fileName, if (previousFile != null) previousFile});
-  }
-
-  void _scheduleDisposal(String fileName, NativeVideoController? controller) {
-    if (controller == null) return;
-    Future.delayed(const Duration(milliseconds: 750), () {
-      if (currentFileNotifier.value != fileName && _controllers[fileName] == controller) {
-        _controllers.remove(fileName);
-        controller.dispose();
-      }
-    });
+    // The previous controller is already disposed and removed above, so
+    // only the newly-active controller needs to be kept alive here.
+    _cleanupOldControllers(keepFiles: {fileName});
   }
 
   void _cleanupOldControllers({required Set<String> keepFiles}) {

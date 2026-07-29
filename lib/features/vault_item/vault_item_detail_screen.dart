@@ -13,32 +13,43 @@ class VaultItemDetailScreen extends StatefulWidget {
   final MountedContainer container;
   final VaultItem item;
   final String filePath;
-
   const VaultItemDetailScreen({
     super.key,
     required this.container,
     required this.item,
     required this.filePath,
   });
-
   @override
   State<VaultItemDetailScreen> createState() => _VaultItemDetailScreenState();
 }
+
 class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
   late VaultItem _item;
   late String _currentFilePath;
   final Map<String, bool> _revealed = {};
+  bool _isContainerLocked = false;
 
+  void _onContainerLockedEvent(int volId) {
+    if (volId == widget.container.volId && mounted) {
+      setState(() => _isContainerLocked = true);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
     _item = widget.item;
     _currentFilePath = widget.filePath;
   }
 
-  Future<void> _delete() async {
+  @override
+  void dispose() {
+    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
+    super.dispose();
+  }
 
+  Future<void> _delete() async {
     final confirm = await showAppConfirmDialog(
       context,
       title: 'Delete item?',
@@ -47,7 +58,6 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
       isDestructive: true,
     );
     if (!confirm || !mounted) return;
-
     await vaultExplorerApi.deleteFile(widget.container, _currentFilePath);
     if (mounted) Navigator.pop(context, true);
   }
@@ -93,11 +103,15 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isContainerLocked) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: SizedBox.expand(),
+      );
+    }
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     final fields = _item.vaultFields.where((f) => f.value.isNotEmpty).toList();
-
     return PopScope(
       canPop: true,
       child: Scaffold(
@@ -136,9 +150,7 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
           padding: AppSpacing.pagePadding,
           children: [
             _HeaderCard(item: _item),
-
             const SizedBox(height: 20),
-
             if (fields.isEmpty)
               Center(
                 child: Padding(
@@ -167,7 +179,6 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
                     .toList(),
               ),
             ],
-
             const SizedBox(height: 20),
             const SectionLabel('Info'),
             AppCard.rows(
@@ -192,20 +203,15 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
 }
 
 // ── Header card ───────────────────────────────────────────────────────────────
-
 class _HeaderCard extends StatelessWidget {
   final VaultItem item;
   const _HeaderCard({required this.item});
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    // Delegates to the shared helpers; type.name matches the extension key
-    // (VaultItemType.password.name == 'password', etc.).
     final icon  = vaultIconForExt(item.type.name)  ?? Icons.lock_rounded;
     final color = vaultColorForExt(item.type.name) ?? cs.primary;
-
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -261,21 +267,17 @@ class _HeaderCard extends StatelessWidget {
   }
 }
 
-// ── Field row ─────────────────────────────────────────────────────────────────
-
 class _FieldRow extends StatelessWidget {
   final VaultField field;
   final bool revealed;
   final VoidCallback onReveal;
   final VoidCallback onCopy;
-
   const _FieldRow({
     required this.field,
     required this.revealed,
     required this.onReveal,
     required this.onCopy,
   });
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -284,7 +286,6 @@ class _FieldRow extends StatelessWidget {
     final displayValue = isSecret && !revealed
         ? '•' * (field.value.length.clamp(6, 16))
         : field.value;
-
     return InkWell(
       onLongPress: onCopy,
       child: Padding(
@@ -314,11 +315,6 @@ class _FieldRow extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // FIX: previously a bespoke IconButton pair — now routed
-                // through the shared PasswordVisibilityToggle so the
-                // reveal/hide glyph pair can never diverge from the other
-                // secret-reveal controls in the app (vault_item_edit_screen,
-                // password fields, etc).
                 if (isSecret)
                   PasswordVisibilityToggle(
                     obscured: !revealed,
@@ -339,13 +335,10 @@ class _FieldRow extends StatelessWidget {
   }
 }
 
-// ── Meta row ──────────────────────────────────────────────────────────────────
-
 class _MetaRow extends StatelessWidget {
   final String label;
   final String value;
   const _MetaRow({required this.label, required this.value});
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

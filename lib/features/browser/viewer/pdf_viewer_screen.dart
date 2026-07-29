@@ -45,6 +45,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _isSaving = false;
   bool _isDirty = false;
   bool _hasError = false;
+  bool _isContainerLocked = false;
   String _errorMessage = '';
 
   bool _isEditMode = false;
@@ -57,14 +58,23 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   bool get _isReadOnly => widget.container.readOnly;
 
+  void _onContainerLockedEvent(int volId) {
+    if (volId == widget.container.volId && mounted) {
+      setState(() => _isContainerLocked = true);
+    }
+  }
+
+
   @override
   void initState() {
     super.initState();
+    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
     _loadFile();
   }
 
   @override
   void dispose() {
+    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     _cleanTempFile();
     super.dispose();
   }
@@ -361,6 +371,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isContainerLocked) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: SizedBox.expand(),
+      );
+    }
+
     final cs = Theme.of(context).colorScheme;
 
     return PopScope(

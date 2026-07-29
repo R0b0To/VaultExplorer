@@ -116,12 +116,15 @@ class _VaultDashboardState extends State<VaultDashboard>
     navigator.popUntil((route) => route.isFirst);
     if (_appSettings.useMasterPassword && _appSettings.masterPasswordHash != null) {
       navigator.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LockGateScreen()),
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const LockGateScreen(),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+        ),
         (route) => false,
       );
     }
   }
-
   Future<void> _lockAllMountedContainers() async {
     for (final c in List<MountedContainer>.from(_mounted)) {
       if (!vaultExplorerApi.acquireLockGuard(c.volId)) continue;
@@ -291,25 +294,12 @@ class _VaultDashboardState extends State<VaultDashboard>
     ContainerRepository.instance.saveOrder(_recordsOrder);
   }
 
- void _onContainerLocked(int volId) {
+  void _onContainerLocked(int volId) {
     _cancelAutoClose(volId);
     final idx = _mounted.indexWhere((c) => c.volId == volId);
     if (idx != -1) {
       final container = _mounted[idx];
       AppSecureStorage.instance.delete(key: 'temp_pw_${container.uri}');
-      // F-16: appCache-mode disk thumbnails are decryptable at any time via
-      // a device-level key (AppCacheEncryption), independent of this
-      // container's own mount/lock state — a materially different privacy
-      // posture than inContainer-mode thumbnails (only reachable while
-      // mounted) or disabled mode (nothing persisted). Clear that tier on
-      // lock. Deliberately do NOT call clearInContainerCacheByUri() here:
-      // those bytes are keyed by the container's own URI, stay valid and
-      // inert across a relock/re-mount of the *same* container, and are
-      // only ever reachable while it's mounted anyway — eagerly wiping them
-      // would only cost regeneration time with no privacy or correctness
-      // upside, the same reasoning Rule 5 already gives for not clearing
-      // MediaAspectRatioCache/MediaRotationCache. A no-op if this container
-      // was never in appCache mode.
       unawaited(ThumbnailCacheService.clearAppCacheFor(container));
     }
     final clip = CrossContainerClipboard.instance;
@@ -317,8 +307,10 @@ class _VaultDashboardState extends State<VaultDashboard>
       clip.clear();
     }
     FullResImageCache.clear();
+    VaultExplorerApi.notifyContainerLocked(volId);
     if (mounted) {
       setState(() => _mounted.removeWhere((c) => c.volId == volId));
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
     _syncSecureScreen();
   }

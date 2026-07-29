@@ -5,6 +5,8 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 
+import '../../../data/services/vault_engine/vault_explorer_api.dart';
+
 /// Must match HTML_VIEWER_VIEW_TYPE in
 /// kotlin/.../htmlviewer/HtmlViewerPlugin.kt
 const String _kHtmlViewerViewType = 'com.aeidolon.vaultexplorer/html_viewer';
@@ -41,13 +43,21 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
   bool _canGoBack = false;
   bool _canGoForward = false;
   bool _jsEnabled = false;
+  bool _isContainerLocked = false;
   bool _isFullscreen = false;
   bool _isSettingsLoaded = false;
   String get _fileName => widget.filePath.split('/').last;
 
+  void _onContainerLockedEvent(int volId) {
+    if (volId == widget.container.volId && mounted) {
+      setState(() => _isContainerLocked = true);
+    }
+  }
+  
   @override
   void initState() {
     super.initState();
+     VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
     _loadSettings();
   }
 
@@ -123,6 +133,7 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
 
   @override
   void dispose() {
+    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     _eventSub?.cancel();
     if (_isFullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -132,6 +143,13 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isContainerLocked) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: SizedBox.expand(),
+      );
+    }
+    
     final cs = Theme.of(context).colorScheme;
 
     return PopScope(

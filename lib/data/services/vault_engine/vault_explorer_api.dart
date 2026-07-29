@@ -16,20 +16,7 @@ part 'vault_explorer_api_crypto.dart';
 part 'vault_explorer_api_container_lifecycle.dart';
 part 'vault_explorer_api_file_io.dart';
 
-/// A single keyfile picked via [VaultExplorerApi.pickKeyfiles]: [uri] is
-/// what gets sent back to native (and round-tripped through
-/// [VaultExplorerApi.unlockContainer]/[unlockUsbContainer]/[deriveDerivedKey]/
-/// [createContainer] as a `keyfilePaths` entry); [displayName] is purely for
-/// showing a chip or list entry in the unlock/create UI.
 typedef KeyfileRef = ({String uri, String displayName});
-
-/// One "onUnlockProgress" push from native during cipher/hash auto-detect.
-/// [attempted]/[total] count hash-algorithm rounds tried so far (auto-detect
-/// runs up to 5 in parallel, each then tries up to 8 ciphers against it very
-/// quickly) — suitable for a "trying combination 2 of 5" style indicator.
-/// [hashId]/[cipherId] are whichever combination was just attempted (-1 for
-/// cipherId if that hash's PBKDF2 itself hadn't finished yet); see
-/// [hashAlgorithmName]/[cipherAlgorithmName] to render them.
 typedef UnlockProgress = ({
   int volId,
   int attempted,
@@ -39,17 +26,9 @@ typedef UnlockProgress = ({
   String containerFormat,
   int slot,
 });
-
 String hashAlgorithmName(int hashId) => HashAlgo.nameFor(hashId);
 String cipherAlgorithmName(int cipherId) => CipherAlgo.nameFor(cipherId);
 
-/// One "onImportProgress" push from native while importing files/folders
-/// from device storage (see [VaultExplorerApi.importFiles]/[importFolder]).
-/// [opId] is the [FileOperation.id] passed into that call — listeners
-/// should filter on it themselves if more than one import could be in
-/// flight. [done]/[total] count files written so far vs. the total native
-/// discovered during its pre-count pass; [currentName] is the leaf name of
-/// the file most recently written.
 typedef ImportProgress = ({
   int opId,
   int done,
@@ -59,21 +38,6 @@ typedef ImportProgress = ({
   int totalBytes,
 });
 
-
-/// Logs an exception this method is about to swallow (return a default
-/// value instead of rethrowing) so a real native/channel failure is at
-/// least visible in the debug console instead of silently degrading to
-/// "false"/"null"/"0" — which looks identical to a legitimate empty
-/// result at every call site.
-///
-/// [method] is the channel method name (or a short description) so the
-/// log line identifies *what* failed without needing a stack trace.
-/// [expected] marks a catch that's already documented as intentionally
-/// best-effort (e.g. [VaultExplorerApi.cancelUnlock] racing a call that's
-/// about to resolve on its own) — those still get logged, but tagged
-/// separately so they don't read as equally alarming as a genuine
-/// unexpected failure such as a corrupted container header or a revoked
-/// SAF permission.
 void _logSwallowed(String method, Object error, {bool expected = false}) {
   debugPrint(
     '${expected ? '[VaultExplorerApi:expected]' : '[VaultExplorerApi]'} '
@@ -81,75 +45,52 @@ void _logSwallowed(String method, Object error, {bool expected = false}) {
   );
 }
 
-/// The single platform channel used by every VaultExplorerApi operation,
-/// including those implemented across the _CryptoOps / _ContainerLifecycleOps
-/// / _FileIoOps mixins in the sibling part files below. Declared at library
-/// (not class) level -- rather than as a `static` member of
-/// [VaultExplorerApi] -- because those mixins aren't subclasses of
-/// VaultExplorerApi and so can't reach a class-static member unqualified;
-/// a top-level private is visible, unqualified, to every part file in this
-/// library instead.
 const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
 
 class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
   const VaultExplorerApi();
 
-
   static void Function(String ext, String pkg)? onAppSelectedCallback;
-
-  // Resolved from 'onCameraPermissionResult', pushed by
-  // MainActivity.onRequestPermissionsResult once the user actually answers
-  // the system permission dialog. requestPermissions() itself only fires
-  // ActivityCompat.requestPermissions() and returns immediately -- without
-  // this, callers had no way to know whether the user granted or denied,
-  // and camera init used to proceed right away as if permission were
-  // already settled.
   static Completer<bool>? _cameraPermissionCompleter;
 
-  /// Starts waiting for the next 'onCameraPermissionResult' push. Call this
-  /// immediately before triggering the native permission request so no
-  /// event can arrive before something is listening for it.
   static Future<bool> awaitCameraPermissionResult() {
     final completer = Completer<bool>();
     _cameraPermissionCompleter = completer;
     return completer.future;
   }
 
-
   static final ListenerRegistry<int> _usbContainerDetachedRegistry =
       ListenerRegistry<int>();
-
   static void addUsbContainerDetachedListener(
     void Function(int volId) listener,
   ) {
     _usbContainerDetachedRegistry.add(listener);
   }
-
   static void removeUsbContainerDetachedListener(
     void Function(int volId) listener,
   ) {
     _usbContainerDetachedRegistry.remove(listener);
   }
 
+  static final ListenerRegistry<int> _containerLockedRegistry =
+      ListenerRegistry<int>();
+  static void addContainerLockedListener(void Function(int volId) listener) {
+    _containerLockedRegistry.add(listener);
+  }
+  static void removeContainerLockedListener(void Function(int volId) listener) {
+    _containerLockedRegistry.remove(listener);
+  }
+  static void notifyContainerLocked(int volId) {
+    _containerLockedRegistry.notify(volId);
+  }
 
   static final List<void Function()> _screenOffListeners = [];
-
   static void addScreenOffListener(void Function() listener) {
     _screenOffListeners.add(listener);
   }
-
   static void removeScreenOffListener(void Function() listener) {
     _screenOffListeners.remove(listener);
   }
-
-  // ── Unlock progress / cancellation ──────────────────────────────────────
-  //
-  // "onUnlockStarted" fires once, synchronously from the native method call
-  // handler, as soon as a volId has been allocated for this attempt — before
-  // the (potentially several-second) auto-detect search actually begins.
-  // "onUnlockProgress" then fires repeatedly during that search. Listeners
-  // should filter on volId themselves if more than one unlock could be in
-  // flight (in practice: at most one per UnlockSheet/UsbUnlockSheet instance).
 
   static final ListenerRegistry<int> _unlockStartedRegistry =
       ListenerRegistry<int>();
@@ -159,7 +100,6 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
   static void addUnlockStartedListener(void Function(int volId) listener) {
     _unlockStartedRegistry.add(listener);
   }
-
   static void removeUnlockStartedListener(void Function(int volId) listener) {
     _unlockStartedRegistry.remove(listener);
   }
@@ -169,29 +109,19 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
   ) {
     _unlockProgressRegistry.add(listener);
   }
-
   static void removeUnlockProgressListener(
     void Function(UnlockProgress progress) listener,
   ) {
     _unlockProgressRegistry.remove(listener);
   }
 
-  // ── Import progress ───────────────────────────────────────────────────
-  //
-  // "onImportProgress" fires repeatedly from native while importFile/
-  // importFolder is running. Listeners should filter on opId themselves if
-  // more than one import could be in flight (see FileOperationService, the
-  // only current subscriber).
-
   static final ListenerRegistry<ImportProgress> _importProgressRegistry =
       ListenerRegistry<ImportProgress>();
-
   static void addImportProgressListener(
     void Function(ImportProgress progress) listener,
   ) {
     _importProgressRegistry.add(listener);
   }
-
   static void removeImportProgressListener(
     void Function(ImportProgress progress) listener,
   ) {
@@ -237,7 +167,7 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
           );
           _unlockProgressRegistry.notify(progress);
         }
-} else if (call.method == 'onImportProgress') {
+      } else if (call.method == 'onImportProgress') {
         final args = call.arguments as Map<Object?, Object?>;
         final opId = args['opId'] as int?;
         final done = args['done'] as int?;
@@ -259,7 +189,6 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
         _cameraPermissionCompleter = null;
       } else if (call.method == ChannelMethods.onTrimMemory) {
         final level = (call.arguments as Map<Object?, Object?>?)?['level'] as int? ?? 0;
-
         final trimLevel = level >= 15 ? TrimLevel.severe : TrimLevel.moderate;
         CacheCoordinator.trimAll(trimLevel);
       }
@@ -278,15 +207,6 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
   }
 
   bool hasActiveBatch(int volId) => _activeBatches.contains(volId);
-
-  /// Attempts to acquire the lock guard for [volId].
-  ///
-  /// Returns `true` if:
-  /// - No batch is active for [volId], AND
-  /// - No lock is already pending for [volId].
-  ///
-  /// If this returns `true` the caller MUST call [releaseLockGuard] after
-  /// the lock operation completes (success or failure).
 
   bool acquireLockGuard(int volId) {
     if (_activeBatches.contains(volId) || _lockPending.contains(volId)) {

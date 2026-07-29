@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+
 class SessionLockController {
   SessionLockController({
     required this._settings,
@@ -11,7 +12,6 @@ class SessionLockController {
   final AppSettings Function() _settings;
   final Future<void> Function() _lockAllMountedContainers;
   final VoidCallback _enforceAppLock;
-
   Timer? _autoLockTimer;
   DateTime? _pausedAt;
 
@@ -24,17 +24,14 @@ class SessionLockController {
     _autoLockTimer?.cancel();
   }
 
-  /// Call this from the widget's `didChangeAppLifecycleState`.
   void handleAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       final pausedAt = _pausedAt;
       _pausedAt = null;
-
       final mins = _settings().autoLockMins;
       final wasAwayTooLong = pausedAt != null &&
           mins > 0 &&
           DateTime.now().difference(pausedAt) >= Duration(minutes: mins);
-
       if (wasAwayTooLong) {
         performAutoLock();
       } else {
@@ -45,17 +42,14 @@ class SessionLockController {
     }
   }
 
-  /// Call this from `VaultExplorerApi`'s screen-off listener.
   void handleScreenOff() {
     final s = _settings();
-    if (s.lockContainersOnScreenLock && s.autoLockMins == 0) {
+    final mins = s.autoLockMins;
+    if ((s.lockContainersOnScreenLock || _hasMasterPassword) && mins == 0) {
       performAutoLock();
     }
   }
 
-  /// Call this any time user activity should push the auto-lock deadline
-  /// out (app resume, pointer-down on the dashboard, settings changed,
-  /// after `_loadAll`, etc).
   void scheduleAutoLock() {
     _autoLockTimer?.cancel();
     final s = _settings();
@@ -69,11 +63,11 @@ class SessionLockController {
   Future<void> performAutoLock() async {
     _autoLockTimer?.cancel();
     final s = _settings();
-    if (s.lockContainersOnScreenLock) {
-      await _lockAllMountedContainers();
-    }
     if (s.lockContainersOnScreenLock || _hasMasterPassword) {
       _enforceAppLock();
+    }
+    if (s.lockContainersOnScreenLock) {
+      await _lockAllMountedContainers();
     }
   }
 }

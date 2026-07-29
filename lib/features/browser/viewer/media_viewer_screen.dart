@@ -58,6 +58,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
       ValueNotifier<VideoPlaybackProgress>(const VideoPlaybackProgress());
   bool _showUI = false;
+  bool _isContainerLocked = false;
   int _activeMenuCount = 0;
   bool _isCarouselVisible = false;
   bool _enableCarousel = true;
@@ -82,9 +83,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _wakelockEnabled = false;
   int _transitionToken = 0;
 
+    void _onContainerLockedEvent(int volId) {
+    if (volId == widget.container.volId && mounted) {
+      setState(() => _isContainerLocked = true);
+    }
+  }
+
+
   @override
   void initState() {
     super.initState();
+    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
     ThumbnailConcurrency.videoLimiter.cancelAll();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
@@ -690,6 +699,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   @override
   void dispose() {
+    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     PlaybackThrottleController.setActive(false);
     VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
     _playlistController.removeListener(_onPlaylistUpdate);
@@ -719,6 +729,12 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
+        if (_isContainerLocked) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: SizedBox.expand(),
+      );
+    }
     final cs = Theme.of(context).colorScheme;
     if (_playlistController.isEmpty) {
       return Scaffold(

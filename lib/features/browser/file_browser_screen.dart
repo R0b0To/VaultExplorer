@@ -94,11 +94,14 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.defaultQuality;
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
   Set<String> _pinnedPaths = {};
+  bool _isContainerLocked = false;
+
   static const int _maxScanDepth = 20;
   static const _documentExts = {
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf',
     'csv', 'zip', 'tar', 'gz', 'json', 'xml',
   };
+
   bool get _atRoot => _pathStack.length == 1;
   String get _currentDirPath => _pathStack.last.fatPath;
   Set<String> _mountedDocProviderFolders = {};
@@ -107,6 +110,31 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   bool _isFolderMounted(RawEntry entry) =>
       entry.isDir && _mountedDocProviderFolders.contains(_fullPathOf(entry));
   bool _isPinned(RawEntry entry) => _pinnedPaths.contains(_fullPathOf(entry));
+
+  void _onContainerLockedEvent(int volId) {
+    if (volId == widget.container.volId && mounted) {
+      setState(() => _isContainerLocked = true);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
+    _freeSpace = widget.container.freeSpace;
+    _initSettingsAndContents();
+    _loadToolbarConfig();
+    _refreshMountedDocProviderFolders();
+    VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
+  }
+
+  @override
+  void dispose() {
+    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
+    _closeArchive();
+    VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
+    super.dispose();
+  }
 
   Future<void> _refreshMountedDocProviderFolders() async {
     final paths =
@@ -205,23 +233,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   bool get _isReadOnly => widget.container.readOnly;
-
-  @override
-  void initState() {
-    super.initState();
-    _freeSpace = widget.container.freeSpace;
-    _initSettingsAndContents();
-    _loadToolbarConfig();
-    _refreshMountedDocProviderFolders();
-    VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
-  }
-
-  @override
-  void dispose() {
-    _closeArchive();
-    VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
-    super.dispose();
-  }
 
   void _signalActivity() => widget.onUserActivity?.call();
 
@@ -1789,6 +1800,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_isContainerLocked) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: SizedBox.expand(),
+      );
+    }
+
     int compareOverall(RawEntry ea, RawEntry eb) {
       final aPinned = _isPinned(ea);
       final bPinned = _isPinned(eb);
@@ -1815,7 +1833,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
     final dirCount = filteredItems.where((e) => e.isDir).length;
     final fileCount = filteredItems.where((e) => !e.isDir).length;
-
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !_searchActive;
     return PopScope(

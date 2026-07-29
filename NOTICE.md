@@ -21,7 +21,7 @@ All entries below were checked directly against the actual pinned commits
 | FFmpeg (avcodec/avformat/avutil/swscale/swresample) | ffmpeg.org | LGPL-2.1-or-later -- built here with no `--enable-gpl`/`--enable-nonfree`, no libx264/fdk-aac, dynamically linked as `.so` | 8.1.2, built from source by `scripts/build_ffmpeg_android.sh` | OK |
 | AndroidX DocumentFile | androidx.documentfile | Apache-2.0 | via Gradle | OK |
 | VeraCrypt crypto primitives -- `Twofish.c`, `Serpent.c`, `Camellia.c`, `kuznyechik.c`, `Whirlpool.c`, `blake2s.c`, `cpu.c`, Argon2 | veracrypt/VeraCrypt | Per-file permissive: Twofish (Gladman permissive), Serpent/Whirlpool/kuznyechik/cpu.c (public domain), Camellia (BSD-2-clause/NTT), blake2/Argon2 (CC0 or Apache-2.0, at your option) | d26216c2 (1.26.29) | OK, individually |
-| `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo, see `cpp/Common/AUDIT.md` | **OK -- replaced 2026-07-27** |
+| `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo| **OK -- replaced 2026-07-27** |
 
 ## Resolved: `Tcdefs.h` / `Endian.h` / `Endian.c`
 
@@ -33,10 +33,7 @@ remediation option 2 from the previous version of this notice: a clean-room
 reimplementation of exactly the symbols the compiled crypto sources use,
 scoped by reading the actual upstream source at the pinned commit (not
 guessed), verified against independent test vectors, and wired into the
-build via a one-line `CMakeLists.txt` change. See `cpp/Common/AUDIT.md` for
-the full scoping methodology, including an explicit note on where a true
-compiler-driven `-M`/`-MM` audit wasn't possible in the environment this
-rewrite was produced in and what was done in its place.
+build via a one-line `CMakeLists.txt` change.
 
 As a side effect of being Android-only, the replacement also drops:
 - All Windows/UEFI/NT-kernel-driver branches of the original header (this

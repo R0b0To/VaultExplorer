@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import '../../data/services/vault_engine/vault_explorer_api.dart';
 import 'camera_vault_service.dart';
 import 'vault_camera_controller.dart';
 
@@ -28,7 +29,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   List<NativeCameraLens> _lenses = [];
   String _selectedCameraId = '';
   bool _isInitialized = false;
-
+  bool _isContainerLocked = false;
   bool _isVideoMode = false;
   bool _isRecording = false;
   bool _isEncrypting = false;
@@ -68,8 +69,16 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   StreamSubscription<Map<String, dynamic>>? _cameraEventSubscription;
   double _iconTurns = 0.0;
 
+    void _onContainerLockedEvent(int volId) {
+    if (volId == widget.container.volId && mounted) {
+      setState(() => _isContainerLocked = true);
+    }
+  }
+
+
   @override
   void initState() {
+    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
     super.initState();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -119,6 +128,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
   @override
   void dispose() {
+    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _exposureHideTimer?.cancel();
@@ -441,6 +451,12 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
   @override
   Widget build(BuildContext context) {
+        if (_isContainerLocked) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: SizedBox.expand(),
+      );
+    }
     return PopScope(
       canPop: !_isRecording && !_isEncrypting && !_isCountingDown,
       child: Scaffold(

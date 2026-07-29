@@ -20,6 +20,7 @@ class VaultItemEditScreen extends StatefulWidget {
   final VaultItemType type;
   final VaultItem? existing; // null = new item
   
+  
   final String? filePath; // Path if editing existing
   final String currentDirPath; // Destination dir if creating new
 
@@ -43,15 +44,22 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
   final Map<String, bool> _revealed = {};
   bool _saving = false;
   late final FilesystemType _fsType;
+  bool _isContainerLocked = false;
   
   // Track initial values to determine if actual text edits occurred
   late final String _initialTitle;
   late final Map<String, String> _initialFieldValues;
   bool _wasDirty = false;
+  void _onContainerLockedEvent(int volId) {
+    if (volId == widget.container.volId && mounted) {
+      setState(() => _isContainerLocked = true);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
     final existing = widget.existing;
     
     _fsType = resolveFilesystemType(widget.container);
@@ -77,6 +85,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
   @override
   void dispose() {
+     VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     _titleCtrl.removeListener(_onTextChanged);
     _titleCtrl.dispose();
     for (final c in _ctrls.values) {
@@ -211,6 +220,12 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+     if (_isContainerLocked) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: SizedBox.expand(),
+      );
+    }
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 

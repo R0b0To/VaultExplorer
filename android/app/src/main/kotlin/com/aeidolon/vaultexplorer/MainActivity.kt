@@ -13,6 +13,7 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
+import java.util.concurrent.ThreadPoolExecutor
 
 private object ChannelMethods {
     const val PICK_CONTAINER            = "pickContainer"
@@ -91,9 +92,11 @@ class MainActivity : FlutterFragmentActivity() {
     }
     private val ACTION_USB_PERMISSION = "com.aeidolon.vaultexplorer.USB_PERMISSION"
     private var usbPermissionReceiver: BroadcastReceiver? = null
-    private val ioExecutor = Executors.newFixedThreadPool(4)
-    private val thumbnailExecutor = Executors.newFixedThreadPool(3)
-    private val fullResExecutor = Executors.newFixedThreadPool(2)
+
+    private val ioExecutor = Executors.newFixedThreadPool(4) as ThreadPoolExecutor
+    private val imageThumbnailExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
+    private val videoThumbnailExecutor = Executors.newFixedThreadPool(1) as ThreadPoolExecutor
+    private val fullResExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
     private var usbDetachReceiver: BroadcastReceiver? = null
     private var screenOffReceiver: BroadcastReceiver? = null
     private var vaultCameraPlugin: com.aeidolon.vaultexplorer.camera.VaultCameraPlugin? = null
@@ -104,7 +107,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val vaultPickerHandlers = VaultPickerHandlers(this, pendingResult, ioExecutor)
     private val vaultCreationHandlers = VaultCreationHandlers(this, pendingResult, ioExecutor, nativeOps)
     private val vaultUnlockHandlers = VaultUnlockHandlers(this, ioExecutor, nativeOps, derivedKeyHandlers)
-    private val thumbnailHandlers = ThumbnailHandlers(this, thumbnailExecutor, nativeOps)
+    private val thumbnailHandlers = ThumbnailHandlers(this, imageThumbnailExecutor, videoThumbnailExecutor, nativeOps)
     private val importExportHandlers = ImportExportHandlers(this, pendingResult, ioExecutor, nativeOps)
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
@@ -134,6 +137,26 @@ class MainActivity : FlutterFragmentActivity() {
     }
 
 
+    private fun resizeExecutorPools() {
+        val sizes = DeviceCapabilityProfiler.executorSizesFor(DeviceCapabilityProfiler.tierFor(this))
+        resizeThreadPool(ioExecutor, sizes.io)
+        resizeThreadPool(imageThumbnailExecutor, sizes.imageThumbnail)
+        resizeThreadPool(videoThumbnailExecutor, sizes.videoThumbnail)
+        resizeThreadPool(fullResExecutor, sizes.fullRes)
+    }
+
+
+    private fun resizeThreadPool(executor: ThreadPoolExecutor, newSize: Int) {
+        if (newSize >= executor.corePoolSize) {
+            executor.maximumPoolSize = newSize
+            executor.corePoolSize = newSize
+        } else {
+            executor.corePoolSize = newSize
+            executor.maximumPoolSize = newSize
+        }
+    }
+
+
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         methodChannel?.invokeMethod("onTrimMemory", mapOf("level" to level))
@@ -141,6 +164,8 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        resizeExecutorPools()
 
     vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(this,flutterEngine.dartExecutor.binaryMessenger,flutterEngine.renderer,)
         flutterEngine.platformViewsController.registry.registerViewFactory(

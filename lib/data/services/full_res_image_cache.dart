@@ -66,14 +66,12 @@ class FullResImageCache {
 
   /// Evicts [fraction] of currently-held bytes, oldest-first, without
   /// permanently lowering the budget — the full-res half of
+  /// `CacheCoordinator.trimAll` (Finding F-15 / ADR-011).
   static void trimToFraction(double fraction) => _cache.trimToFraction(fraction);
 
   // --------------------------------------------------------------------
   // Concurrency gate
   // --------------------------------------------------------------------
-  /// `ThumbnailConcurrency`'s limiters -- the media viewer's current page
-  /// should use [TaskPriority.visible] (the default) and its next/prev
-  /// prefetch should pass [TaskPriority.adjacent] explicitly.
   static final limiter = PriorityTaskQueue(2);
 
   /// In-flight de-dup so a widget-triggered load and a screen-triggered

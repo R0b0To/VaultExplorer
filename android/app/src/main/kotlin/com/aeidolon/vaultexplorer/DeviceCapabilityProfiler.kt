@@ -10,6 +10,14 @@ object DeviceCapabilityProfiler {
 
     enum class Tier { LOW, MEDIUM, HIGH }
 
+    /** Per-executor pool sizes for a given [Tier] — see [executorSizesFor]. */
+    data class ExecutorSizes(
+        val io: Int,
+        val imageThumbnail: Int,
+        val videoThumbnail: Int,
+        val fullRes: Int,
+    )
+
     /** Computed once and cached — the underlying signals don't change for
      *  the lifetime of the process. */
     private var cachedTier: Tier? = null
@@ -29,6 +37,15 @@ object DeviceCapabilityProfiler {
         }
         cachedTier = tier
         return tier
+    }
+
+
+    fun tierFor(context: Context): Tier = classify(context)
+
+    fun executorSizesFor(tier: Tier): ExecutorSizes = when (tier) {
+        Tier.LOW -> ExecutorSizes(io = 2, imageThumbnail = 1, videoThumbnail = 1, fullRes = 1)
+        Tier.MEDIUM -> ExecutorSizes(io = 4, imageThumbnail = 2, videoThumbnail = 1, fullRes = 2)
+        Tier.HIGH -> ExecutorSizes(io = 6, imageThumbnail = 3, videoThumbnail = 2, fullRes = 3)
     }
 
     fun handleGetDeviceCapabilityProfile(

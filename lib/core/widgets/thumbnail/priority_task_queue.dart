@@ -113,6 +113,9 @@ class PriorityTaskQueue {
     _drainNext();
   }
 
+  /// Adjusts [maxConcurrency] in place — used by
+  /// `DeviceCapabilityProfiler`-driven sizing (ADR-011) so a low-RAM/low-
+  /// core device and a flagship tablet don't get identical queue depths.
   void resize(int newMaxConcurrency) {
     assert(newMaxConcurrency > 0);
     maxConcurrency = newMaxConcurrency;

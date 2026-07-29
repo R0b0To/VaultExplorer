@@ -6,11 +6,6 @@ import 'package:vaultexplorer/core/utils/lru_cache.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 
-// Barrel export: this file used to also define ConcurrencyLimiter and
-// ThumbnailConcurrency directly. They now live in thumbnail_concurrency.dart
-// (and priority_task_queue.dart) — re-exported here (along with the
-// unawaited() helper and TaskPriority) so existing imports of
-// 'async_thumbnail.dart' keep working unchanged.
 export 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 
 typedef ThumbnailFetchFn = Future<Uint8List> Function(MountedContainer, String);
@@ -27,12 +22,6 @@ class AsyncThumbnail extends StatefulWidget {
   final ThumbnailSyncLookup? syncLookup;
   final int? cacheHeight;
 
-  /// Which [PriorityTaskQueue] tier this request competes at.
-  /// Defaults to [TaskPriority.visible] — every pre-existing call site
-  /// (grid/masonry/list tiles) is exactly that: an on-screen tile. Callers
-  /// rendering an off-screen neighbor (e.g. `PlaylistCarouselOverlay`,
-  /// which shows during an active viewer session) should pass
-  /// [TaskPriority.adjacent] explicitly.
   final TaskPriority priority;
   final Widget Function(BuildContext context, Uint8List bytes, int? cacheHeight)
   imageBuilder;
@@ -154,14 +143,6 @@ class _AsyncThumbnailState extends State<AsyncThumbnail> {
         future = _fetchWithQueue(widget.container, targetPath);
         widget.cache[cacheKey] = future;
         final storedFuture = future;
-        // De-dup only needs to cover the async *window*; once this settles
-        // (success or error) the decoded bytes are already durably held by
-        // ThumbnailCacheService's own memory tier (every fetchFn
-        // implementation calls putInMemory), so there's no reason for this
-        // entry to keep occupying a slot in the shared in-flight map until
-        // it's eventually evicted by LRU/byte-budget pressure (Finding
-        // F-01). A later request for the same key just falls through to a
-        // fresh sync/L1 lookup instead, which is the fast path anyway.
         unawaited(
           storedFuture.then((_) => null, onError: (_) => null).whenComplete(() {
             if (widget.cache[cacheKey] == storedFuture) {
@@ -218,10 +199,6 @@ class _AsyncThumbnailState extends State<AsyncThumbnail> {
         throw Exception('Cancelled before processing');
       }
 
-      // Bounded exponential-backoff retry (Finding F-11) — re-checks
-      // "still wanted" between attempts so a request that's gone stale
-      // while retrying doesn't keep burning native round trips for a tile
-      // the user has long since scrolled past.
       return await retryWithBackoff<Uint8List>((attempt) {
         if (targetPath != _loadingPath || !mounted || _disposed) {
           throw Exception('Cancelled before retry attempt $attempt');

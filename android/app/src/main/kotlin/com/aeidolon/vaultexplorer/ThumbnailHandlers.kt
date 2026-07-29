@@ -10,17 +10,10 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ExecutorService
 
-/**
- * Thumbnail generation for images/video inside a mounted container: a quick
- * preview thumbnail for the file browser grid (image `inSampleSize` decode,
- * video `MediaMetadataRetriever` frame extraction). The on-disk thumbnail
- * cache itself is owned entirely by the Dart-side `ThumbnailCacheService`
- * (see architecture.md Ownership Rule 2) — this class only ever returns raw
- * bytes to the platform channel and never writes to disk itself.
- */
 class ThumbnailHandlers(
     private val activity: MainActivity,
-    private val thumbnailExecutor: ExecutorService,
+    private val imageExecutor: ExecutorService,
+    private val videoExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
 ) {
     private fun calculateInSampleSize(width: Int, height: Int, targetSize: Int): Int {
@@ -55,7 +48,7 @@ class ThumbnailHandlers(
             return
         }
 
-        thumbnailExecutor.execute {
+        videoExecutor.execute {
             var retriever: MediaMetadataRetriever? = null
             try {
                 val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
@@ -134,7 +127,7 @@ class ThumbnailHandlers(
             return
         }
 
-        thumbnailExecutor.execute {
+        videoExecutor.execute {
             var retriever: MediaMetadataRetriever? = null
             try {
                 val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
@@ -211,7 +204,7 @@ class ThumbnailHandlers(
             return
         }
 
-        thumbnailExecutor.execute {
+        imageExecutor.execute {
             try {
                 val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                     ?: run {
@@ -282,7 +275,7 @@ class ThumbnailHandlers(
             return
         }
 
-        thumbnailExecutor.execute {
+        imageExecutor.execute {
             try {
                 val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                     ?: run {

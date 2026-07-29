@@ -1,18 +1,6 @@
 import 'dart:collection';
 
-/// A capacity-bounded cache that evicts the least-recently-used entry when
-/// full.
-///
-/// Backed by a [LinkedHashMap] whose insertion order tracks recency.
-/// Every [operator []] call that hits promotes the entry to most-recent.
-///
-/// Capacity is mutable (see [resize]) rather than `final` so that
-/// [DeviceCapabilityProfiler]-driven sizing and
-/// [CacheCoordinator.trimAll] "memory-pressure response",
-/// ADR-013) can adjust it after construction — every other part of this
-/// codebase should still treat capacity as fixed for the lifetime of a
-/// given cache instance and only call [resize] via those two sanctioned
-/// paths, not as a general-purpose setter sprinkled through call sites.
+
 class LruCache<K, V> {
   int _capacity;
   final _map = <K, V>{};

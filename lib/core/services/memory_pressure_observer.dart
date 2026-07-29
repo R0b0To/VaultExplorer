@@ -1,10 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/core/services/cache_coordinator.dart';
 
-
-/// Listens to [WidgetsBindingObserver.didHaveMemoryPressure] (triggered by iOS
-/// OS memory pressure or Flutter engine memory warnings) and dispatches a
-/// severe memory trim across all memory-tier caches via [CacheCoordinator.trimAll].
 class MemoryPressureObserver with WidgetsBindingObserver {
   static MemoryPressureObserver? _instance;
 

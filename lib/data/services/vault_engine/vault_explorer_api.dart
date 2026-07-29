@@ -260,9 +260,7 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
       } else if (call.method == ChannelMethods.onTrimMemory) {
         final level = (call.arguments as Map<Object?, Object?>?)?['level'] as int? ?? 0;
 
-        final trimLevel = (level >= 10 || level == 80)
-            ? TrimLevel.severe
-            : TrimLevel.moderate;
+        final trimLevel = level >= 15 ? TrimLevel.severe : TrimLevel.moderate;
         CacheCoordinator.trimAll(trimLevel);
       }
     });

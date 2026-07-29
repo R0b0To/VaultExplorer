@@ -16,30 +16,6 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 import 'package:vaultexplorer/data/services/app_cache_encryption.dart';
 
 /// Three-tier thumbnail cache.
-///
-/// Tier 1 — static in-memory [ByteBudgetCache] ([_memoryCache])
-///   Synchronous O(1). Survives widget dispose/recreate within a session.
-///   payload whose size is a user-adjustable setting (see
-///   `ThumbnailQuality`) shouldn't be able to swing effective memory use by
-///   an order of magnitude the way a fixed entry cap did. See
-///   [_memoryMaxBytes] for the current budget.
-///
-/// Tier 2 — encrypted disk file (appCache) or container file (inContainer).
-///   AES-GCM runs inline for small thumbnails (< [_computeThresholdBytes])
-///   and is offloaded to a background isolate via [compute()] for larger data.
-///
-/// Tier 3 — full container read (handled by callers on a complete miss).
-///
-/// ### Cache isolation across container lock/unlock cycles
-///
-/// Memory keys include [MountedContainer.mountedAt] so that a different
-/// container mounted into the same volume slot always gets a fresh key —
-/// stale entries from the previous session are never served and are evicted
-/// naturally by LRU.
-///
-/// Disk cache directories are keyed by the container's URI (base64-encoded)
-/// rather than by volId, so two different container files that happen to share
-/// a slot at different times never collide on disk.
 class ThumbnailCacheService {
   ThumbnailCacheService._();
 
@@ -63,6 +39,14 @@ class ThumbnailCacheService {
   static const _inContainerReadCap = 8 * 1024 * 1024; // 8 MB
 
   // ── Tier 1: static in-memory, byte-budgeted LRU (Finding F-01) ─────────────
+  //
+  // 24 MB comfortably covers the documented worst case (~150 KB per
+  // thumbnail at max ThumbnailQuality × a few hundred resident entries)
+  // without capping raw entry count the way the old 120-entry LruCache did
+  // — a user on the lowest quality setting can now hold far more thumbnails
+  // resident than one on the highest, which is the point: memory scales
+  // with actual bytes held, not an arbitrary count that meant wildly
+  // different things depending on a setting this cache doesn't control.
   static const int _memoryMaxBytes = 24 * 1024 * 1024;
   static final _memoryCache = ByteBudgetCache(_memoryMaxBytes);
 
@@ -514,6 +498,9 @@ static Future<void> put({
         // vaultExplorerApi.renameFile supports overwriting existing files.
         await vaultExplorerApi.deleteFile(container, cachePath);
         await vaultExplorerApi.renameFile(container, tmpPath, cachePath);
+        if (++_inContainerPutWriteCount % 25 == 0) {
+          unawaited(enforceInContainerDiskBudget(container));
+        }
       } else {
         await vaultExplorerApi.deleteFile(container, tmpPath);
         debugPrint(
@@ -581,9 +568,12 @@ static Future<void> put({
     _memoryCache.clear();
   }
 
+  // Default maximum on-disk app cache budget (100 MB) — ADR-014, Finding F-08
   static const int defaultMaxAppCacheBytes = 100 * 1024 * 1024;
   static int _putWriteCount = 0;
 
+  /// Enforces L2 disk cache byte budget (ADR-014, Finding F-08).
+  ///
   /// Scans all thumbnail files under the app cache directory, and if total
   /// usage exceeds [maxBytes], evicts the oldest files by modification time
   /// (`stat.modified`) until usage drops down to 80% of [maxBytes].
@@ -622,6 +612,51 @@ static Future<void> put({
       }
     } catch (e) {
       debugPrint('ThumbnailCacheService.enforceDiskBudget: $e');
+    }
+  }
+
+
+  static const int defaultMaxInContainerCacheBytes = 50 * 1024 * 1024;
+  static int _inContainerPutWriteCount = 0;
+
+
+  static Future<void> enforceInContainerDiskBudget(
+    MountedContainer container, [
+    int maxBytes = defaultMaxInContainerCacheBytes,
+  ]) async {
+    try {
+      final totalBytes = await vaultExplorerApi.getFolderSize(
+        container,
+        inContainerDir,
+      );
+      if (totalBytes <= maxBytes) return;
+
+      final rawEntries = await vaultExplorerApi.listDirectory(
+        container,
+        inContainerDir,
+      );
+      if (rawEntries == null || rawEntries.isEmpty) return;
+
+      final entries = rawEntries
+          .where((raw) => !raw.startsWith('System:'))
+          .map(RawEntry.parse)
+          .where((e) => !e.isDir && !e.name.endsWith('.tmp'))
+          .toList()
+        ..sort((a, b) => a.modifiedSecs.compareTo(b.modifiedSecs));
+
+      final targetBytes = (maxBytes * 0.8).toInt();
+      var runningBytes = totalBytes;
+
+      for (final entry in entries) {
+        if (runningBytes <= targetBytes) break;
+        final deleted = await vaultExplorerApi.deleteFile(
+          container,
+          '$inContainerDir/${entry.name}',
+        );
+        if (deleted) runningBytes -= entry.sizeBytes;
+      }
+    } catch (e) {
+      debugPrint('ThumbnailCacheService.enforceInContainerDiskBudget: $e');
     }
   }
 

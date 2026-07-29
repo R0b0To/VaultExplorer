@@ -4,7 +4,6 @@ import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
-
 /// Queries [DeviceCapabilityProfiler] on the native platform via MethodChannel and
 /// scales Dart-side concurrency gates and memory budgets according to device hardware tier
 /// (`LOW`, `MEDIUM`, or `HIGH`).

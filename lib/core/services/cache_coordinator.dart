@@ -4,40 +4,12 @@ import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 
 /// How aggressively [CacheCoordinator.trimAll] should shed memory-tier
 /// cache contents.
-///
-/// Deliberately just two levels rather than mirroring Android's full
-/// `TRIM_MEMORY_*` granularity (5 levels) or iOS's single
-/// `didHaveMemoryPressure` signal 1:1 — every caller maps its own native
-/// signal down to whichever of these two best matches "shed some, we might
-/// need it again soon" vs. "shed nearly all of it, this is serious."
 enum TrimLevel {
-  /// A temporary, partial trim — e.g. Android's `TRIM_MEMORY_RUNNING_LOW`/
-  /// `TRIM_MEMORY_RUNNING_MODERATE`, or the app moving to the background.
-  /// Sheds roughly half of what's currently resident in each memory-tier
-  /// cache; on-disk tiers and anything needed for correctness (not just
-  /// convenience) are untouched.
   moderate,
 
-  /// A severe trim — e.g. Android's `TRIM_MEMORY_RUNNING_CRITICAL`/
-  /// `TRIM_MEMORY_COMPLETE`, or iOS's `didHaveMemoryPressure`. Sheds nearly
-  /// everything reclaimable from every memory-tier cache. Still never
-  /// touches disk (that's what [ThumbnailCacheMode.disabled]'s privacy
-  /// guarantee and the on-disk eviction policy in `ThumbnailCacheService`
-  /// are for, not this).
   severe,
 }
 
-
-/// Deliberately trims every cache in Section 4 of architecture.md that has
-/// a memory-tier component — [ThumbnailConcurrency.inFlightThumbnails],
-/// [ThumbnailCacheService]'s in-memory tier, and [FullResImageCache] — with
-/// the *same* [fraction] semantics ("fraction of what's currently held,"
-/// see Finding F-17), so one call here has a predictable, uniform effect
-/// regardless of which underlying cache type backs a given tier.
-/// [MediaAspectRatioCache]/[MediaRotationCache] are deliberately excluded:
-/// they're small (capped at 2000 entries of a double/int each — a few tens
-/// of KB, not worth the churn) and Ownership Rule 5 already treats them as
-/// harmless to keep warm.
 class CacheCoordinator {
   CacheCoordinator._();
 

@@ -165,12 +165,17 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     if (!_disposed) await _inner?.setLooping(loop);
   }
 
+  bool get isDisposed => _disposed;
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    value = const NativeVideoValue(isInitialized: false);
     _inner?.removeListener(_onTick);
-    await _inner?.dispose();
+    final toDispose = _inner;
+    _inner = null;
+    await toDispose?.dispose();
     super.dispose();
   }
 }
@@ -185,11 +190,15 @@ class NativeVideoPlayerView extends StatelessWidget {
     return ValueListenableBuilder<NativeVideoValue>(
       valueListenable: controller,
       builder: (context, value, child) {
+        if (controller.isDisposed) return const SizedBox.shrink();
         final inner = controller.playerController;
-        if (inner == null || !value.isInitialized) return const SizedBox.shrink();
+        if (inner == null || !value.isInitialized || !inner.value.isInitialized) {
+          return const SizedBox.shrink();
+        }
         if (value.size.width <= 0 || value.size.height <= 0) return const SizedBox.shrink();
         return VideoPlayer(inner);
       },
     );
   }
 }
+

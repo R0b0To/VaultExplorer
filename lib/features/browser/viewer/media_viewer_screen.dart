@@ -806,11 +806,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   itemCount: _playlistController.playlist.length,
                   onPageChanged: (index) {
                     _playlistController.updateIndex(index);
+                    _activateCurrentMedia();
                     _prefetchDebounceTimer?.cancel();
                     _prefetchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
                       if (mounted) _prefetchSurroundingItems();
                     });
                   },
+
                   itemBuilder: (context, index) {
                     final fileName = _playlistController.playlist[index];
                     final contentUriString = _contentUriFor(fileName);

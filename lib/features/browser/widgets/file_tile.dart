@@ -295,10 +295,8 @@ class _ListVideoThumb extends StatelessWidget {
     ThumbnailCacheMode mode,
     ThumbnailQuality quality,
   ) async {
-    if (PlaybackThrottleController.isPlaybackActive.value) {
-      return Uint8List(0);
-    }
     if (mode != ThumbnailCacheMode.disabled) {
+
       final cached = await ThumbnailCacheService.get(
         container: container,
         filePath: path,
@@ -313,8 +311,11 @@ class _ListVideoThumb extends StatelessWidget {
       quality: quality.jpegQuality,
       targetSize: quality.scaledSize(180),
     );
-    if (data == null || data.isEmpty) return Uint8List(0);
+    if (data == null || data.isEmpty) {
+      throw StateError('Video thumbnail unavailable for $path');
+    }
     ThumbnailCacheService.putInMemory(container, path, data, quality);
+
     if (mode != ThumbnailCacheMode.disabled) {
       unawaited(
         ThumbnailCacheService.put(

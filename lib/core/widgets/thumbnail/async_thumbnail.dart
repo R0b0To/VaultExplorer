@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/lru_cache.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
+
 
 export 'package:vaultexplorer/core/widgets/thumbnail/thumbnail_concurrency.dart';
 
@@ -61,6 +63,7 @@ class _AsyncThumbnailState extends State<AsyncThumbnail> {
   @override
   void initState() {
     super.initState();
+    PlaybackThrottleController.isPlaybackActive.addListener(_onPlaybackActiveChanged);
     final syncBytes = widget.syncLookup?.call();
     if (syncBytes != null) {
       _bytes = syncBytes;
@@ -69,6 +72,23 @@ class _AsyncThumbnailState extends State<AsyncThumbnail> {
       _load();
     }
   }
+
+  void _onPlaybackActiveChanged() {
+    if (!PlaybackThrottleController.isPlaybackActive.value) {
+      if (mounted && !_disposed && (_bytes == null || _bytes!.isEmpty || _hasError)) {
+        final cacheKey =
+            '${widget.container.volId}:${widget.container.mountedAt.millisecondsSinceEpoch}:${widget.filePath}';
+        widget.cache.remove(cacheKey);
+        setState(() {
+          _bytes = null;
+          _hasError = false;
+          _isLoading = true;
+        });
+        _load();
+      }
+    }
+  }
+
 
   @override
   void didUpdateWidget(AsyncThumbnail oldWidget) {
@@ -96,9 +116,11 @@ class _AsyncThumbnailState extends State<AsyncThumbnail> {
   @override
   void dispose() {
     _disposed = true;
+    PlaybackThrottleController.isPlaybackActive.removeListener(_onPlaybackActiveChanged);
     _cancel();
     super.dispose();
   }
+
 
   void _cancel() {
     if (_limiterCompleter != null) {

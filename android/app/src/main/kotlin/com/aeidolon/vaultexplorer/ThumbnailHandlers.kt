@@ -2,7 +2,13 @@ package com.aeidolon.vaultexplorer
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageFormat
+import android.graphics.Rect
+import android.graphics.YuvImage
 import android.media.MediaCodec
+import android.media.MediaCodecList
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.util.Log
@@ -139,17 +145,13 @@ class ThumbnailHandlers(
 
     /**
      * Extracts a single video frame, compresses it to JPEG, and returns
-     * the result.  Holds [videoDecoderLock] for the entire extraction so
-     * [handleSetPlaybackActive] can wait for the decoder to be released.
+     * the result.
      *
-     * If [isPlaybackActive] is already true when we enter, we bail out
-     * immediately without touching the decoder.
-     *
-     * On hardware decoder resource exhaustion the retriever is released and
-     * a **fallback** extraction is attempted at [FALLBACK_TARGET_SIZE].
-     *
-     * @return a [VideoFrameResult], or `null` if extraction failed or was
-     *         skipped because playback is active.
+     * When [isPlaybackActive] is true, this method routes directly to an
+     * explicit **Software-Only [MediaCodec]** (`c2.android.*` / `OMX.google.*`).
+     * Because software codecs run on CPU without allocating hardware decoder
+     * instances, thumbnails (e.g. for the carousel) can extract safely while
+     * ExoPlayer plays a 4K video on the hardware decoder.
      */
     private fun extractVideoFrame(
         uriString: String,
@@ -158,26 +160,27 @@ class ThumbnailHandlers(
         targetSize: Int,
         quality: Int,
     ): VideoFrameResult? {
-        // Fast bail-out before trying to acquire the lock.
         if (isPlaybackActive) {
-            Log.d(TAG, "Skipping video thumbnail: playback is active (pre-lock)")
+            Log.d(TAG, "Playback active: attempting software MediaCodec frame extraction for $fileName")
+            val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality)
+            if (swResult != null) return swResult
+            Log.d(TAG, "Software extraction unavailable or failed for $fileName while playing")
             return null
         }
 
         videoDecoderLock.lock()
         try {
-            // Re-check after acquiring: playback may have been requested
-            // while we were waiting.
             if (isPlaybackActive) {
-                Log.d(TAG, "Skipping video thumbnail: playback is active (post-lock)")
-                return null
+                return extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality)
             }
-
             return extractVideoFrameInner(uriString, fileName, volId, targetSize, quality)
         } finally {
             videoDecoderLock.unlock()
         }
     }
+
+
+
 
     /** Does the actual extraction work while the caller holds [videoDecoderLock]. */
     private fun extractVideoFrameInner(
@@ -530,4 +533,235 @@ class ThumbnailHandlers(
         }
     }
 
-}
+    /**
+     * Attempts frame extraction using an explicit Software-Only [MediaCodec]
+     * decoder (`c2.android.*` or `OMX.google.*`).
+     *
+     * Because this explicitly selects Google's CPU software decoder, it
+     * **does not allocate or contend for hardware video decoder instances**
+     * (such as Qualcomm `c2.qti.vp9.decoder` or `OMX.qcom...`), allowing video
+     * thumbnails to be extracted safely while ExoPlayer is actively playing
+     * 4K videos on the GPU/HW decoder.
+     */
+    private fun extractVideoFrameSoftware(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        targetSize: Int,
+        quality: Int,
+    ): VideoFrameResult? {
+        var extractor: MediaExtractor? = null
+        var codec: MediaCodec? = null
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return null
+            val dataSource = ContainerMediaDataSource(activity, uriString, fileName, volId)
+            extractor = MediaExtractor()
+            extractor.setDataSource(dataSource)
+
+            var videoTrackIndex = -1
+            var format: MediaFormat? = null
+            var mimeType: String? = null
+
+            for (i in 0 until extractor.trackCount) {
+                val trackFormat = extractor.getTrackFormat(i)
+                val mime = trackFormat.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("video/")) {
+                    videoTrackIndex = i
+                    format = trackFormat
+                    mimeType = mime
+                    break
+                }
+            }
+
+            if (videoTrackIndex < 0 || format == null || mimeType == null) {
+                return null
+            }
+
+            val swCodecName = findSoftwareDecoderName(mimeType) ?: return null
+            Log.d(TAG, "Using software video decoder '$swCodecName' for thumbnail: $fileName")
+
+            extractor.selectTrack(videoTrackIndex)
+
+            val durationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) {
+                format.getLong(MediaFormat.KEY_DURATION)
+            } else 10_000_000L
+            val seekTimeUs = minOf(1_000_000L, durationUs / 4)
+            extractor.seekTo(seekTimeUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+
+            codec = MediaCodec.createByCodecName(swCodecName)
+            codec.configure(format, null, null, 0)
+            codec.start()
+
+            val info = MediaCodec.BufferInfo()
+            var inputDone = false
+            var outputFrame: Bitmap? = null
+            val timeoutUs = 10_000L
+            var attempts = 0
+
+            while (outputFrame == null && attempts < 30) {
+                attempts++
+                if (!inputDone) {
+                    val inputIndex = codec.dequeueInputBuffer(timeoutUs)
+                    if (inputIndex >= 0) {
+                        val inputBuffer = codec.getInputBuffer(inputIndex)
+                        if (inputBuffer != null) {
+                            val sampleSize = extractor.readSampleData(inputBuffer, 0)
+                            if (sampleSize < 0) {
+                                codec.queueInputBuffer(inputIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                                inputDone = true
+                            } else {
+                                val presentationTimeUs = extractor.sampleTime
+                                codec.queueInputBuffer(inputIndex, 0, sampleSize, presentationTimeUs, 0)
+                                extractor.advance()
+                            }
+                        }
+                    }
+                }
+
+                val outputIndex = codec.dequeueOutputBuffer(info, timeoutUs)
+                if (outputIndex >= 0) {
+                    if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        break
+                    }
+                    if (info.size > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        val image = codec.getOutputImage(outputIndex)
+                        if (image != null) {
+                            outputFrame = yuv420ToBitmap(image)
+                            image.close()
+                        }
+                    }
+                    codec.releaseOutputBuffer(outputIndex, false)
+                }
+            }
+
+            if (outputFrame != null) {
+                return compressFrame(outputFrame, targetSize, quality)
+            }
+            return null
+        } catch (e: Exception) {
+            Log.w(TAG, "Software MediaCodec extraction failed for $fileName: ${e.message}")
+            return null
+        } finally {
+            runCatching {
+                codec?.stop()
+                codec?.release()
+            }
+            runCatching { extractor?.release() }
+        }
+    }
+
+    private fun findSoftwareDecoderName(mimeType: String): String? {
+        try {
+            val codecList = MediaCodecList(MediaCodecList.ALL_CODECS)
+            for (info in codecList.codecInfos) {
+                if (info.isEncoder) continue
+                val types = info.supportedTypes
+                var matches = false
+                for (t in types) {
+                    if (t.equals(mimeType, ignoreCase = true)) {
+                        matches = true
+                        break
+                    }
+                }
+                if (!matches) continue
+                val name = info.name
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && info.isSoftwareOnly) {
+                    return name
+                }
+                if (name.startsWith("c2.android.", ignoreCase = true) ||
+                    name.startsWith("OMX.google.", ignoreCase = true)) {
+                    return name
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error listing software decoders: ${e.message}")
+        }
+        return null
+    }
+
+    private fun yuv420ToBitmap(image: android.media.Image): Bitmap {
+        val width = image.width
+        val height = image.height
+        val planes = image.planes
+
+        val yPlane = planes[0]
+        val uPlane = planes[1]
+        val vPlane = planes[2]
+
+        val yBuffer = yPlane.buffer
+        val uBuffer = uPlane.buffer
+        val vBuffer = vPlane.buffer
+
+        val yRowStride = yPlane.rowStride
+        val uvRowStride = uPlane.rowStride
+        val uvPixelStride = uPlane.pixelStride
+
+        // NV21 requires exactly width * height Y bytes followed by (width * height) / 2 interleaved V and U bytes.
+        val nv21 = ByteArray(width * height * 3 / 2)
+
+        // 1. Copy Y plane, stripping row padding if yRowStride > width
+        var nvIndex = 0
+        if (yRowStride == width) {
+            yBuffer.get(nv21, 0, width * height)
+            nvIndex = width * height
+        } else {
+            val yRow = ByteArray(yRowStride)
+            for (row in 0 until height) {
+                val toRead = minOf(yRowStride, yBuffer.remaining())
+                if (toRead <= 0) break
+                yBuffer.get(yRow, 0, toRead)
+                val copyLen = minOf(width, toRead)
+                System.arraycopy(yRow, 0, nv21, nvIndex, copyLen)
+                nvIndex += width
+            }
+        }
+
+        // 2. Interleave V and U planes into NV21 format (V0, U0, V1, U1...)
+        val chromaWidth = width / 2
+        val chromaHeight = height / 2
+
+        val vRow = ByteArray(uvRowStride)
+        val uRow = ByteArray(uvRowStride)
+
+        for (row in 0 until chromaHeight) {
+            val vPos = row * uvRowStride
+            val uPos = row * uvRowStride
+
+            if (vPos < vBuffer.capacity() && uPos < uBuffer.capacity()) {
+                vBuffer.position(vPos)
+                uBuffer.position(uPos)
+
+                val vRead = minOf(uvRowStride, vBuffer.remaining())
+                val uRead = minOf(uvRowStride, uBuffer.remaining())
+
+                if (vRead > 0 && uRead > 0) {
+                    vBuffer.get(vRow, 0, vRead)
+                    uBuffer.get(uRow, 0, uRead)
+
+                    for (col in 0 until chromaWidth) {
+                        val vIdx = col * uvPixelStride
+                        val uIdx = col * uvPixelStride
+                        if (vIdx < vRead && uIdx < uRead && nvIndex + 1 < nv21.size) {
+                            nv21[nvIndex++] = vRow[vIdx]
+                            nv21[nvIndex++] = uRow[uIdx]
+                        }
+                    }
+                }
+            }
+        }
+
+        val yuvImage = YuvImage(
+            nv21,
+            ImageFormat.NV21,
+            width,
+            height,
+            null
+        )
+        val out = ByteArrayOutputStream()
+        yuvImage.compressToJpeg(Rect(0, 0, width, height), 90, out)
+        val jpegBytes = out.toByteArray()
+        return BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
+    }
+
+
+}

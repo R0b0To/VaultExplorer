@@ -624,10 +624,8 @@ class _VideoMasonryThumb extends StatelessWidget {
     ThumbnailQuality quality,
     void Function(int width, int height) onSizeKnown,
   ) async {
-    if (PlaybackThrottleController.isPlaybackActive.value) {
-      return Uint8List(0);
-    }
     if (mode != ThumbnailCacheMode.disabled) {
+
       final cached = await ThumbnailCacheService.getWithSize(
         container: container,
         filePath: path,
@@ -651,8 +649,11 @@ class _VideoMasonryThumb extends StatelessWidget {
       targetSize: quality.scaledSize(180),
     );
     final data = thumb?.bytes;
-    if (data == null || data.isEmpty) return Uint8List(0);
+    if (data == null || data.isEmpty) {
+      throw StateError('Video thumbnail unavailable for $path');
+    }
     onSizeKnown(thumb!.width, thumb.height);
+
     ThumbnailCacheService.putInMemory(
       container, path, data, quality, thumb.width, thumb.height,
     );

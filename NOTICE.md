@@ -1,13 +1,26 @@
 # Third-party components
 
 Vault Explorer itself is licensed under the GNU General Public License v3.0
-(see LICENSE). It statically links the components below into a single
-native library (`libvaultexplorer.so`); all of them must therefore be
-GPL-compatible.
+(see LICENSE).
 
-All entries below were checked directly against the actual pinned commits
-(not just repo-level README claims) via `raw.githubusercontent.com` on
-2026-07-27.
+This covers two different kinds of dependency, checked differently:
+
+- **Native code compiled directly into `libvaultexplorer.so`** (the
+  `android/app/src/main/cpp` tree) must be GPL-compatible, because it
+  becomes part of one combined binary work.
+- **Flutter/Dart packages** (`pubspec.yaml`) are linked at the Dart/Flutter
+  level, mostly calling into their own separately-compiled native code
+  (e.g. via platform channels or FFI) rather than being compiled into
+  `libvaultexplorer.so` itself. They still all need to be genuinely free
+  software for the F-Droid "all bundled code must be free software"
+  requirement, and for the project's own GPLv3 claim to mean what it says,
+  even where the GPL's linking rules are looser than for the native code
+  above.
+
+All entries below were checked directly against upstream sources/licenses
+(not just pub.dev's summary badge or a repo's README claim).
+
+## Native (`cpp/`) -- compiled into `libvaultexplorer.so`
 
 | Component | Upstream | License | Pinned | Status |
 |---|---|---|---|---|
@@ -18,42 +31,65 @@ All entries below were checked directly against the actual pinned commits
 | dislocker (BitLocker) | Aorimn/dislocker | GPL-2.0-or-later | 38dab031 | OK |
 | cJSON | DaveGamble/cJSON | MIT | acc76239 (v1.7.18) | OK |
 | Oboe | google/oboe | Apache-2.0 | a81bb9f8 (1.10.0) | OK |
-| FFmpeg (avcodec/avformat/avutil/swscale/swresample) | ffmpeg.org | LGPL-2.1-or-later -- built here with no `--enable-gpl`/`--enable-nonfree`, no libx264/fdk-aac, dynamically linked as `.so` | 8.1.2, built from source by `scripts/build_ffmpeg_android.sh` | OK |
 | AndroidX DocumentFile | androidx.documentfile | Apache-2.0 | via Gradle | OK |
 | VeraCrypt crypto primitives -- `Twofish.c`, `Serpent.c`, `Camellia.c`, `kuznyechik.c`, `Whirlpool.c`, `blake2s.c`, `cpu.c`, Argon2 | veracrypt/VeraCrypt | Per-file permissive: Twofish (Gladman permissive), Serpent/Whirlpool/kuznyechik/cpu.c (public domain), Camellia (BSD-2-clause/NTT), blake2/Argon2 (CC0 or Apache-2.0, at your option) | d26216c2 (1.26.29) | OK, individually |
-| `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo| **OK -- replaced 2026-07-27** |
+| `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo, see `cpp/Common/AUDIT.md` | **OK -- see `cpp/Common/AUDIT.md` for two rewrite regressions found & fixed here** |
 
-## Resolved: `Tcdefs.h` / `Endian.h` / `Endian.c`
+**FFmpeg has been removed entirely** (previously vendored/built from source
+by `scripts/build_ffmpeg_android.sh`; video playback is now handled by the
+`video_player` Flutter plugin below instead). If ffmpeg is ever
+reintroduced, re-add its row here and re-verify the build script this
+notice used to reference no longer exists in this repo.
 
-The three files above previously compiled the TrueCrypt-License-3.0-tainted
-text verbatim into `libvaultexplorer.so` (`CMakeLists.txt` built
-`${VC_COMMON_DIR}/Endian.c` directly, and `Common/Tcdefs.h` was transitively
-`#include`d by every file under `VC_CRYPTO_DIR`). That has been fixed by
-remediation option 2 from the previous version of this notice: a clean-room
-reimplementation of exactly the symbols the compiled crypto sources use,
-scoped by reading the actual upstream source at the pinned commit (not
-guessed), verified against independent test vectors, and wired into the
-build via a one-line `CMakeLists.txt` change.
+## Flutter/Dart (`pubspec.yaml`)
 
-As a side effect of being Android-only, the replacement also drops:
-- All Windows/UEFI/NT-kernel-driver branches of the original header (this
-  project never builds for those targets).
-- All big-endian byte-order detection logic (every Android ABI this
-  project ships for -- `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` -- is
-  little-endian, so the detection collapsed to a single hard-coded answer,
-  with a loud `#error` if that assumption is ever violated).
+| Package | License | Notes |
+|---|---|---|
+| `video_player` | BSD-3-Clause | Official Flutter plugin. On Android, backed by AndroidX Media3/ExoPlayer (Apache-2.0), which decodes via the OS's own `MediaCodec` -- no bundled codec binaries of any kind. |
+| `pdfrx` | MIT | Built on PDFium (Apache-2.0, Google/Chromium). Genuinely free software, no commercial/community-license gate -- a real fix over the two packages below. |
+| `path_provider`, `local_auth`, `flutter_secure_storage`, `url_launcher`, `wakelock_plus`, `package_info_plus`, `sensors_plus`, `flutter_staggered_grid_view`, `archive`, `path`, `vector_math`, `flutter_launcher_icons` | BSD-3-Clause / MIT (each individually) | Standard Flutter-community/AOSP-adjacent packages. No proprietary or copyleft-incompatible terms. |
+| `pointycastle`, `encrypt` | BSD-3-Clause / MIT | Pure-Dart crypto libraries (`encrypt` wraps `pointycastle`). |
 
-With this fixed, no remaining bundled component is flagged non-free, so
-this repo's GPLv3 LICENSE claim and F-Droid "all bundled code must be free
-software" requirement both hold as of this commit.
+**Removed, and why:**
+- **`fvp`** (was: video playback). BSD-3-Clause itself, but it's a thin
+  wrapper around `libmdk` ("mdk-sdk"), which is a **prebuilt, closed-source,
+  license-key-gated binary SDK** downloaded from a third party at build
+  time -- proprietary software, not free software, regardless of there
+  being a no-cost tier for Flutter apps. It also bundles its own opaque
+  FFmpeg build internally, so removing FFmpeg from this project and adding
+  `fvp` would have net *reintroduced* an FFmpeg dependency with less
+  visibility into it than the from-source build this project used to have.
+- **`syncfusion_flutter_pdfviewer`, `syncfusion_flutter_pdf`** (were: PDF
+  viewing). Proprietary. Usable only under a paid commercial license or
+  Syncfusion's "Community License," which is conditioned on the licensee
+  having under $1M annual revenue, under 5 developers, and under 10 total
+  employees -- a legal eligibility gate, not a price tag. A GPLv3 project
+  depending on a revenue/headcount-gated SDK is incoherent as free
+  software: anyone exercising their GPLv3 right to fork and rebuild this
+  repo would also need to independently qualify for or purchase that
+  license. Replaced by `pdfrx`, above.
+
+**Known residual item, not a license problem:** `pdfrx` (via
+`pdfium_dart`/`pdfium_flutter`) downloads a **prebuilt PDFium binary** at
+build time on every platform including Android, rather than building
+PDFium from source. Unlike the two removed packages above, this is not a
+proprietary-license issue -- PDFium's own license is clean (Apache-2.0) --
+it's the same category of concern the original vendored FFmpeg had before
+this project switched to building it from source: F-Droid's "build
+everything from source" inclusion policy, not GPL/free-software status.
+Building PDFium from source yourself is a much heavier lift than FFmpeg
+was (Chromium's own GN/depot_tools build system, multi-hour CI, gigabytes
+of toolchain), so treat this as "verify F-Droid's current stance on
+PDFium-based apps before submission," not as a blocker on the level the
+two removed packages were.
 
 ## Distribution notes
 
-- All GPL/LGPL components are built from their original, unmodified upstream
-  source at the pinned commit via CMake `FetchContent`
-  (`android/app/src/main/cpp/CMakeLists.txt`) or the dedicated build script
-  (`scripts/build_ffmpeg_android.sh`) -- nothing is shipped as a prebuilt
-  binary in this repository, satisfying GPL "source availability" and
-  F-Droid's "buildable from source" requirement simultaneously.
+- All GPL/LGPL native components are built from their original, unmodified
+  upstream source at the pinned commit via CMake `FetchContent`
+  (`android/app/src/main/cpp/CMakeLists.txt`) -- nothing is shipped as a
+  prebuilt binary in the native (`cpp/`) part of this repository,
+  satisfying GPL "source availability" and F-Droid's "buildable from
+  source" requirement simultaneously.
 - If you fork this project and modify any GPL-licensed component in place,
   you must publish your modified source per the GPL's terms.

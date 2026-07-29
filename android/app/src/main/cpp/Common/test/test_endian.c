@@ -31,6 +31,22 @@ static int failures = 0;
 
 int main(void)
 {
+	/* ---- BYTE_ORDER/LITTLE_ENDIAN/BIG_ENDIAN must be real, distinct,
+	   defined macros -- NOT just derivable from LE*/BE* above.
+	   Whirlpool.c and blake2s.c test `#if BYTE_ORDER == ...` directly; if
+	   these are left undefined, that evaluates as `0 == 0` (true) for
+	   *every* comparison, silently taking the wrong branch on our actual
+	   little-endian targets. This exact regression has happened twice
+	   already during rewrites of this header -- see AUDIT.md -- so this
+	   is a compile-time #error, not just a runtime CHECK, precisely so a
+	   future rewrite that drops these three lines fails the build instead
+	   of failing silently in the field. ---- */
+#if !defined(BYTE_ORDER) || !defined(LITTLE_ENDIAN) || !defined(BIG_ENDIAN)
+#error "BYTE_ORDER/LITTLE_ENDIAN/BIG_ENDIAN missing from Common/Endian.h -- see the comment right above this #error, and AUDIT.md"
+#endif
+	CHECK(BYTE_ORDER == LITTLE_ENDIAN, "BYTE_ORDER == LITTLE_ENDIAN on this target");
+	CHECK(LITTLE_ENDIAN != BIG_ENDIAN, "LITTLE_ENDIAN and BIG_ENDIAN are distinct values");
+
 	/* ---- MirrorBytes16: 0x1234 -> 0x3412 (swap the two bytes) ---- */
 	CHECK(MirrorBytes16(0x1234) == 0x3412, "MirrorBytes16(0x1234) == 0x3412");
 	CHECK(MirrorBytes16(0x0000) == 0x0000, "MirrorBytes16(0x0000) == 0x0000");

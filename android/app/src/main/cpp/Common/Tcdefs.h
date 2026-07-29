@@ -16,7 +16,7 @@
  * fail to compile with an ordinary "undeclared identifier" error rather
  * than silently miscompiling -- nothing here guesses at unverified needs.
  *
- * Copyright (c) 2026, project contributors.a
+ * Copyright (c) 2026, project contributors.
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 

@@ -33,6 +33,17 @@ extern "C" {
 #error "Common/Endian.h has only been written and verified for Android/Linux little-endian targets; port it deliberately before reusing it elsewhere."
 #endif
 
+
+#ifndef LITTLE_ENDIAN
+#define LITTLE_ENDIAN 1234
+#endif
+#ifndef BIG_ENDIAN
+#define BIG_ENDIAN 4321
+#endif
+#ifndef BYTE_ORDER
+#define BYTE_ORDER LITTLE_ENDIAN
+#endif
+
 /* Independent reimplementation of the three byte-mirroring primitives.
  * Each uses a distinct decomposition strategy from the others -- there's
  * exactly one correct output for a given input, but how you get there is

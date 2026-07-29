@@ -36,6 +36,13 @@ class AdvancedParamsPanel extends StatelessWidget {
   final List<DropdownMenuItem<int>>? cipherItems;
   final List<DropdownMenuItem<int>>? hashItems;
 
+  /// Forwarded to [ExpansionTile.onExpansionChanged] — fires whenever the
+  /// panel is expanded *or* collapsed. Optional and unused by the creation/
+  /// config call sites; the unlock sheets (ADR-020) pass it to dismiss the
+  /// on-screen keyboard when the user taps the header to open/close this
+  /// panel while the password field still has focus.
+  final ValueChanged<bool>? onExpansionChanged;
+
   const AdvancedParamsPanel({
     super.key,
     this.pimController,
@@ -49,6 +56,7 @@ class AdvancedParamsPanel extends StatelessWidget {
     this.extraFields = const [],
     this.cipherItems,
     this.hashItems,
+    this.onExpansionChanged,
   });
 
   List<SelectOption<int>> _convertToSelectOptions(
@@ -83,6 +91,7 @@ class AdvancedParamsPanel extends StatelessWidget {
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
+        onExpansionChanged: onExpansionChanged,
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         shape: const RoundedRectangleBorder(),

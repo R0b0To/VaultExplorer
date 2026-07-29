@@ -343,6 +343,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     super.dispose();
   }
 
+  /// Dismisses the on-screen keyboard (ADR-020). Called whenever the user
+  /// interacts with a control other than the password/PIM text fields —
+  /// read-only, remember-drive, the advanced-parameters header, or a tap
+  /// on empty space — while one of those fields still has focus. Cheap
+  /// no-op if nothing is focused, so every call site can invoke it
+  /// unconditionally rather than checking focus state first.
+  void _dismissKeyboard() => FocusScope.of(context).unfocus();
+
   Future<void> _loadDevices() async {
     setState(() => _loadingDevices = true);
     try {
@@ -659,560 +667,572 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         data: Theme.of(context).copyWith(
           inputDecorationTheme: inputDecorationTheme,
         ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_loadingDevices)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 40),
-                      child: CircularProgressIndicator(strokeWidth: 3),
-                    ),
-                  )
-                else ...[
-                  if (isReconnect && _reconnectTargetMissing) ...[
-                    Card(
-                      elevation: 0,
-                      color: cs.tertiaryContainer.withValues(alpha: 0.35),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        side: BorderSide(color: cs.tertiary.withValues(alpha: 0.25)),
-                      ),
+        // Tap-anywhere-else-to-dismiss (ADR-020) — see unlock_sheet.dart
+        // for why this is safe alongside the password/PIM text fields.
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _dismissKeyboard,
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_loadingDevices)
+                    const Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: cs.tertiaryContainer,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Icons.usb_off_rounded, size: 28, color: cs.onTertiaryContainer),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Couldn\'t find "${widget.existingRecord!.label}"',
-                              style: textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: cs.onTertiaryContainer,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Plug the drive back in and tap Retry, or select it below if it shows up under a different name.',
-                              style: textTheme.bodySmall?.copyWith(
-                                color: cs.onTertiaryContainer.withValues(alpha: 0.85),
-                                height: 1.35,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            FilledButton.tonalIcon(
-                              onPressed: _loadDevices,
-                              icon: const Icon(Icons.refresh_rounded, size: 16),
-                              label: const Text('Retry Connection'),
-                              style: FilledButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                backgroundColor: cs.surfaceContainerHighest,
-                                foregroundColor: cs.primary,
-                              ),
-                            ),
-                          ],
-                        ),
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: CircularProgressIndicator(strokeWidth: 3),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  if (_devices.isEmpty) ...[
-                    Card(
-                      elevation: 0,
-                      color: cs.surfaceContainerHigh,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: cs.surfaceContainerHighest,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Icons.usb_off_rounded, size: 36, color: cs.onSurfaceVariant),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No USB Storage Detected',
-                              style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Connect an OTG flash drive to mount',
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 20),
-                            FilledButton.icon(
-                              onPressed: _loadDevices,
-                              icon: const Icon(Icons.refresh_rounded, size: 18),
-                              label: const Text('Refresh Devices'),
-                              style: FilledButton.styleFrom(shape: const StadiumBorder()),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ] else ...[
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12, left: 4),
-                          child: Text(
-                            'Select USB Drive',
-                            style: textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: cs.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                        RadioGroup<UsbDeviceInfo>(
-                          groupValue: _selected,
-                          onChanged: (v) => setState(() => _selected = v),
-                          child: ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _devices.length,
-                            separatorBuilder: (_, _) => const SizedBox(height: 10),
-                            itemBuilder: (context, index) {
-                              final d = _devices[index];
-                              final deviceUri = 'usb:${d.deviceName}';
-                              final isAlreadyMounted = widget.mountedUris.contains(deviceUri);
-                              final isSelected = _selected?.deviceName == d.deviceName;
-                              
-                              return GestureDetector(
-                                onTap: (busy || isAlreadyMounted) ? null : () => setState(() => _selected = d),
-                                child: Card(
-                                  elevation: 0,
-                                  color: isAlreadyMounted
-                                      ? cs.surfaceContainerHigh.withValues(alpha: 0.5)
-                                      : isSelected
-                                          ? cs.primaryContainer.withValues(alpha: 0.15)
-                                          : cs.surfaceContainerHigh,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                    side: BorderSide(
-                                      color: isAlreadyMounted
-                                          ? cs.outlineVariant.withValues(alpha: 0.2)
-                                          : isSelected
-                                              ? cs.primary
-                                              : cs.outlineVariant.withValues(alpha: 0.35),
-                                      width: isSelected ? 1.5 : 1,
-                                    ),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(10),
-                                          decoration: BoxDecoration(
-                                            color: isAlreadyMounted
-                                                ? cs.surfaceContainer
-                                                : isSelected
-                                                    ? cs.primaryContainer
-                                                    : cs.surfaceContainerHighest,
-                                            borderRadius: BorderRadius.circular(14),
-                                          ),
-                                          child: Icon(
-                                            isAlreadyMounted
-                                                ? Icons.lock_outline_rounded
-                                                : Icons.usb_rounded,
-                                            size: 22,
-                                            color: isAlreadyMounted
-                                                ? cs.onSurfaceVariant.withValues(alpha: 0.5)
-                                                : isSelected
-                                                    ? cs.onPrimaryContainer
-                                                    : cs.primary,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 14),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                d.productName,
-                                                style: textTheme.bodyLarge?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                  color: isAlreadyMounted
-                                                      ? cs.onSurfaceVariant.withValues(alpha: 0.5)
-                                                      : cs.onSurface,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                isAlreadyMounted
-                                                    ? 'Already active'
-                                                    : d.hasPermission
-                                                        ? 'Ready to unlock'
-                                                        : 'Permission required',
-                                                style: textTheme.bodySmall?.copyWith(
-                                                  color: isAlreadyMounted
-                                                      ? cs.error
-                                                      : d.hasPermission
-                                                          ? cs.primary
-                                                          : cs.onSurfaceVariant,
-                                                  fontWeight: isAlreadyMounted || d.hasPermission
-                                                      ? FontWeight.w500
-                                                      : null,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        if (isAlreadyMounted) ...[
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              color: cs.surfaceContainerHighest,
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Text(
-                                              'Active',
-                                              style: textTheme.labelSmall?.copyWith(
-                                                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ] else ...[
-                                          Radio<UsbDeviceInfo>(
-                                            value: d,
-                                            enabled: !busy,
-                                            activeColor: cs.primary,
-                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                            visualDensity: VisualDensity.compact,
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        )
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    if (_loadingAuth)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 24),
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    else if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
+                    )
+                  else ...[
+                    if (isReconnect && _reconnectTargetMissing) ...[
                       Card(
                         elevation: 0,
-                        color: cs.surfaceContainerHigh,
+                        color: cs.tertiaryContainer.withValues(alpha: 0.35),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24),
-                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                          side: BorderSide(color: cs.tertiary.withValues(alpha: 0.25)),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(28),
+                          padding: const EdgeInsets.all(20),
                           child: Column(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                padding: const EdgeInsets.all(20),
+                                padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: cs.primaryContainer.withValues(alpha: 0.5),
+                                  color: cs.tertiaryContainer,
                                   shape: BoxShape.circle,
                                 ),
-                                child: Icon(
-                                  Icons.fingerprint_rounded,
-                                  size: 56,
-                                  color: cs.primary,
-                                ),
+                                child: Icon(Icons.usb_off_rounded, size: 28, color: cs.onTertiaryContainer),
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 12),
                               Text(
-                                'Biometric Authentication',
-                                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                'Couldn\'t find "${widget.existingRecord!.label}"',
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: cs.onTertiaryContainer,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Authenticate to unlock and mount this USB device',
-                                style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                                'Plug the drive back in and tap Retry, or select it below if it shows up under a different name.',
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: cs.onTertiaryContainer.withValues(alpha: 0.85),
+                                  height: 1.35,
+                                ),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 28),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: FilledButton.tonal(
-                                      onPressed: () => setState(() => _showPasswordFallback = true),
-                                      style: FilledButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        backgroundColor: cs.surfaceContainerHighest,
-                                        foregroundColor: cs.primary,
-                                      ),
-                                      child: const Text('Use Password'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: FilledButton(
-                                      onPressed: _tryBiometric,
-                                      style: FilledButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                      ),
-                                      child: const Text('Authenticate'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ]
-                    else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
-                      Card(
-                        elevation: 0,
-                        color: cs.surfaceContainerHigh,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Draw Unlock Pattern',
-                                style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                _patternError ? 'Wrong pattern — try again' : 'Connect your pattern sequence to mount',
-                                style: textTheme.bodyMedium?.copyWith(
-                                  color: _patternError ? cs.error : cs.onSurfaceVariant,
-                                  fontWeight: _patternError ? FontWeight.bold : null,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              PatternLockView(
-                                key: ValueKey(_patternResetKey),
-                                onPatternComplete: _onPatternComplete,
-                                showError: _patternError,
-                              ),
-                              const SizedBox(height: 20),
-                              FilledButton.tonal(
-                                onPressed: () => setState(() => _showPasswordFallback = true),
+                              const SizedBox(height: 16),
+                              FilledButton.tonalIcon(
+                                onPressed: _loadDevices,
+                                icon: const Icon(Icons.refresh_rounded, size: 16),
+                                label: const Text('Retry Connection'),
                                 style: FilledButton.styleFrom(
-                                  minimumSize: const Size.fromHeight(48),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                   backgroundColor: cs.surfaceContainerHighest,
                                   foregroundColor: cs.primary,
                                 ),
-                                child: const Text('Use Password instead'),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ]
-                    else ...[
-                      SectionCard(
+                      const SizedBox(height: 16),
+                    ],
+
+                    if (_devices.isEmpty) ...[
+                      Card(
+                        elevation: 0,
+                        color: cs.surfaceContainerHigh,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: cs.surfaceContainerHighest,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.usb_off_rounded, size: 36, color: cs.onSurfaceVariant),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No USB Storage Detected',
+                                style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Connect an OTG flash drive to mount',
+                                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 20),
+                              FilledButton.icon(
+                                onPressed: _loadDevices,
+                                icon: const Icon(Icons.refresh_rounded, size: 18),
+                                label: const Text('Refresh Devices'),
+                                style: FilledButton.styleFrom(shape: const StadiumBorder()),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: TextField(
-                              controller: _passwordCtrl,
-                              obscureText: _obscure,
-                              enabled: !busy,
-                              decoration: InputDecoration(
-                                labelText: 'Password',
-                                hintText: _isBitlocker
-                                    ? 'Enter password or recovery key'
-                                    : 'Enter USB partition password',
-                                prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
-                                suffixIcon: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                            padding: const EdgeInsets.only(bottom: 12, left: 4),
+                            child: Text(
+                              'Select USB Drive',
+                              style: textTheme.labelLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          RadioGroup<UsbDeviceInfo>(
+                            groupValue: _selected,
+                            onChanged: (v) => setState(() => _selected = v),
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _devices.length,
+                              separatorBuilder: (_, _) => const SizedBox(height: 10),
+                              itemBuilder: (context, index) {
+                                final d = _devices[index];
+                                final deviceUri = 'usb:${d.deviceName}';
+                                final isAlreadyMounted = widget.mountedUris.contains(deviceUri);
+                                final isSelected = _selected?.deviceName == d.deviceName;
+                              
+                                return GestureDetector(
+                                  onTap: (busy || isAlreadyMounted) ? null : () => setState(() => _selected = d),
+                                  child: Card(
+                                    elevation: 0,
+                                    color: isAlreadyMounted
+                                        ? cs.surfaceContainerHigh.withValues(alpha: 0.5)
+                                        : isSelected
+                                            ? cs.primaryContainer.withValues(alpha: 0.15)
+                                            : cs.surfaceContainerHigh,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                      side: BorderSide(
+                                        color: isAlreadyMounted
+                                            ? cs.outlineVariant.withValues(alpha: 0.2)
+                                            : isSelected
+                                                ? cs.primary
+                                                : cs.outlineVariant.withValues(alpha: 0.35),
+                                        width: isSelected ? 1.5 : 1,
+                                      ),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                              color: isAlreadyMounted
+                                                  ? cs.surfaceContainer
+                                                  : isSelected
+                                                      ? cs.primaryContainer
+                                                      : cs.surfaceContainerHighest,
+                                              borderRadius: BorderRadius.circular(14),
+                                            ),
+                                            child: Icon(
+                                              isAlreadyMounted
+                                                  ? Icons.lock_outline_rounded
+                                                  : Icons.usb_rounded,
+                                              size: 22,
+                                              color: isAlreadyMounted
+                                                  ? cs.onSurfaceVariant.withValues(alpha: 0.5)
+                                                  : isSelected
+                                                      ? cs.onPrimaryContainer
+                                                      : cs.primary,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 14),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  d.productName,
+                                                  style: textTheme.bodyLarge?.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: isAlreadyMounted
+                                                        ? cs.onSurfaceVariant.withValues(alpha: 0.5)
+                                                        : cs.onSurface,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  isAlreadyMounted
+                                                      ? 'Already active'
+                                                      : d.hasPermission
+                                                          ? 'Ready to unlock'
+                                                          : 'Permission required',
+                                                  style: textTheme.bodySmall?.copyWith(
+                                                    color: isAlreadyMounted
+                                                        ? cs.error
+                                                        : d.hasPermission
+                                                            ? cs.primary
+                                                            : cs.onSurfaceVariant,
+                                                    fontWeight: isAlreadyMounted || d.hasPermission
+                                                        ? FontWeight.w500
+                                                        : null,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          if (isAlreadyMounted) ...[
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: cs.surfaceContainerHighest,
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                'Active',
+                                                style: textTheme.labelSmall?.copyWith(
+                                                  color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ] else ...[
+                                            Radio<UsbDeviceInfo>(
+                                              value: d,
+                                              enabled: !busy,
+                                              activeColor: cs.primary,
+                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              visualDensity: VisualDensity.compact,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          )
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      if (_loadingAuth)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else if (_unlockMethod == ContainerUnlockMethod.biometrics && !_showPasswordFallback) ...[
+                        Card(
+                          elevation: 0,
+                          color: cs.surfaceContainerHigh,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(28),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: cs.primaryContainer.withValues(alpha: 0.5),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.fingerprint_rounded,
+                                    size: 56,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                Text(
+                                  'Biometric Authentication',
+                                  style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Authenticate to unlock and mount this USB device',
+                                  style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 28),
+                                Row(
                                   children: [
-                                    if (_passwordPrefilled)
-                                      Padding(
-                                        padding: const EdgeInsets.only(right: 4),
-                                        child: Tooltip(
-                                          message: 'Using saved password',
-                                          child: Icon(
-                                            Icons.bookmark_rounded,
-                                            size: 20,
-                                            color: cs.primary,
+                                    Expanded(
+                                      child: FilledButton.tonal(
+                                        onPressed: () => setState(() => _showPasswordFallback = true),
+                                        style: FilledButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 14),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          backgroundColor: cs.surfaceContainerHighest,
+                                          foregroundColor: cs.primary,
+                                        ),
+                                        child: const Text('Use Password'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: FilledButton(
+                                        onPressed: _tryBiometric,
+                                        style: FilledButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 14),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
                                           ),
                                         ),
+                                        child: const Text('Authenticate'),
                                       ),
-                                    PasswordVisibilityToggle(
-                                      obscured: _obscure,
-                                      onToggle: () => setState(() => _obscure = !_obscure),
                                     ),
-                                    const SizedBox(width: 8),
                                   ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ]
+                      else if (_unlockMethod == ContainerUnlockMethod.pattern && !_showPasswordFallback) ...[
+                        Card(
+                          elevation: 0,
+                          color: cs.surfaceContainerHigh,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Draw Unlock Pattern',
+                                  style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _patternError ? 'Wrong pattern — try again' : 'Connect your pattern sequence to mount',
+                                  style: textTheme.bodyMedium?.copyWith(
+                                    color: _patternError ? cs.error : cs.onSurfaceVariant,
+                                    fontWeight: _patternError ? FontWeight.bold : null,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                PatternLockView(
+                                  key: ValueKey(_patternResetKey),
+                                  onPatternComplete: _onPatternComplete,
+                                  showError: _patternError,
+                                ),
+                                const SizedBox(height: 20),
+                                FilledButton.tonal(
+                                  onPressed: () => setState(() => _showPasswordFallback = true),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(48),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    backgroundColor: cs.surfaceContainerHighest,
+                                    foregroundColor: cs.primary,
+                                  ),
+                                  child: const Text('Use Password instead'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ]
+                      else ...[
+                        SectionCard(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: TextField(
+                                controller: _passwordCtrl,
+                                obscureText: _obscure,
+                                enabled: !busy,
+                                decoration: InputDecoration(
+                                  labelText: 'Password',
+                                  hintText: _isBitlocker
+                                      ? 'Enter password or recovery key'
+                                      : 'Enter USB partition password',
+                                  prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
+                                  suffixIcon: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (_passwordPrefilled)
+                                        Padding(
+                                          padding: const EdgeInsets.only(right: 4),
+                                          child: Tooltip(
+                                            message: 'Using saved password',
+                                            child: Icon(
+                                              Icons.bookmark_rounded,
+                                              size: 20,
+                                              color: cs.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      PasswordVisibilityToggle(
+                                        obscured: _obscure,
+                                        onToggle: () => setState(() => _obscure = !_obscure),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          if (!_isBitlocker)
-                            Padding(
-                              padding: const EdgeInsets.all(1),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  KeyfilesPicker(
-                                    keyfiles: keyfiles,
-                                    picking: pickingKeyfiles,
-                                    onPick: pickKeyfiles,
-                                    onRemove: removeKeyfile,
-                                    enabled: !busy,
-                                  ),
-                                  if (_isLuks && keyfiles.isNotEmpty) ...[
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      'For LUKS containers the keyfile replaces the password.',
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: cs.onSurfaceVariant,
-                                      ),
+                            if (!_isBitlocker)
+                              Padding(
+                                padding: const EdgeInsets.all(1),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    KeyfilesPicker(
+                                      keyfiles: keyfiles,
+                                      picking: pickingKeyfiles,
+                                      onPick: pickKeyfiles,
+                                      onRemove: removeKeyfile,
+                                      enabled: !busy,
                                     ),
+                                    if (_isLuks && keyfiles.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        'For LUKS containers the keyfile replaces the password.',
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: cs.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
-                            ),
-                          if (!_isLuks && !_isBitlocker)
-                            AdvancedParamsPanel(
-                              pimController: _pimCtrl,
-                              cipherId: _cipherId,
-                              hashId: _hashId,
-                              enabled: !busy,
-                              onCipherChanged: (val) => setState(() => _cipherId = val),
-                              onHashChanged: (val) => setState(() => _hashId = val),
-                            ),
-                          SwitchListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                            value: _readOnly,
-                            onChanged: busy ? null : (val) => setState(() => _readOnly = val),
-                            title: Text(
-                              'Read-only mode',
-                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                            subtitle: Text(
-                              'Mount without allowing changes to this drive',
-                              style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                            secondary: Icon(Icons.visibility_outlined, color: cs.primary),
-                          ),
-                          if (!isReconnect)
+                            if (!_isLuks && !_isBitlocker)
+                              AdvancedParamsPanel(
+                                pimController: _pimCtrl,
+                                cipherId: _cipherId,
+                                hashId: _hashId,
+                                enabled: !busy,
+                                onCipherChanged: (val) => setState(() => _cipherId = val),
+                                onHashChanged: (val) => setState(() => _hashId = val),
+                                onExpansionChanged: (_) => _dismissKeyboard(),
+                              ),
                             SwitchListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                              value: _remember,
-                              onChanged: busy ? null : (val) => setState(() => _remember = val),
+                              value: _readOnly,
+                              onChanged: busy
+                                  ? null
+                                  : (val) {
+                                      _dismissKeyboard();
+                                      setState(() => _readOnly = val);
+                                    },
                               title: Text(
-                                'Remember drive',
+                                'Read-only mode',
                                 style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               subtitle: Text(
-                                'Pin drive on dashboard for quick access',
+                                'Mount without allowing changes to this drive',
                                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                               ),
-                              secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
+                              secondary: Icon(Icons.visibility_outlined, color: cs.primary),
                             ),
-                        ],
-                      ),
-
-                      if (_error != null) ...[
-                        const SizedBox(height: 16),
-                        InlineErrorBanner(_error!),
-                      ],
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: busy || _devices.isEmpty || _selected == null ? null : _unlock,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(56),
-                          shape: const StadiumBorder(),
+                            if (!isReconnect)
+                              SwitchListTile(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                                value: _remember,
+                                onChanged: busy ? null : (val) => setState(() => _remember = val),
+                                title: Text(
+                                  'Remember drive',
+                                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: Text(
+                                  'Pin drive on dashboard for quick access',
+                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                                secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
+                              ),
+                          ],
                         ),
-                        child: busy
-                            ? Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: cs.onPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Flexible(
-                                    child: Text(
-                                      _unlocking ? _unlockProgressLabel : 'Requesting permission...',
-                                      overflow: TextOverflow.ellipsis,
-                                      style: textTheme.titleMedium?.copyWith(
-                                        color: cs.primary,
-                                        fontWeight: FontWeight.bold,
+
+                        if (_error != null) ...[
+                          const SizedBox(height: 16),
+                          InlineErrorBanner(_error!),
+                        ],
+                        const SizedBox(height: 24),
+                        FilledButton(
+                          onPressed: busy || _devices.isEmpty || _selected == null ? null : _unlock,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(56),
+                            shape: const StadiumBorder(),
+                          ),
+                          child: busy
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: cs.onPrimary,
                                       ),
                                     ),
+                                    const SizedBox(width: 12),
+                                    Flexible(
+                                      child: Text(
+                                        _unlocking ? _unlockProgressLabel : 'Requesting permission...',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: textTheme.titleMedium?.copyWith(
+                                          color: cs.primary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  isReconnect ? 'Unlock & Mount' : 'Unlock Drive',
+                                  style: textTheme.titleMedium?.copyWith(
+                                      color: cs.onPrimary,
+                                      fontWeight: FontWeight.bold,
                                   ),
-                                ],
-                              )
-                            : Text(
-                                isReconnect ? 'Unlock & Mount' : 'Unlock Drive',
-                                style: textTheme.titleMedium?.copyWith(
-                                    color: cs.onPrimary,
-                                    fontWeight: FontWeight.bold,
                                 ),
-                              ),
-                      ),
-                      if (_unlocking && _activeVolId != null) ...[
-                        const SizedBox(height: 8),
-                        Center(
-                          child: TextButton(
-                            onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
-                            child: const Text('Cancel Unlock'),
-                          ),
                         ),
-                      ],
+                        if (_unlocking && _activeVolId != null) ...[
+                          const SizedBox(height: 8),
+                          Center(
+                            child: TextButton(
+                              onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
+                              child: const Text('Cancel Unlock'),
+                            ),
+                          ),
+                        ],
+                        ],
                       ],
                     ],
                   ],
-                ],
+                ),
               ),
             ),
           ),

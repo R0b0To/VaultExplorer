@@ -4,7 +4,6 @@ import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pdfrx/pdfrx.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/services/device_capability_service.dart';
 import 'package:vaultexplorer/core/services/memory_pressure_observer.dart';
@@ -15,7 +14,6 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 void configurePlatformIntegrations() {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   MemoryPressureObserver.register();
-  pdfrxFlutterInitialize();
   PlatformDispatcher.instance.onError = (error, stack) {
     final errStr = error.toString();
     if (errStr.contains('Cannot add event after closing')) {

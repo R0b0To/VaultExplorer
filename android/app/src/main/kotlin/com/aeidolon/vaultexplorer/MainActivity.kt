@@ -174,6 +174,10 @@ class MainActivity : FlutterFragmentActivity() {
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            com.aeidolon.vaultexplorer.pdfviewer.PDF_VIEWER_VIEW_TYPE,
+            com.aeidolon.vaultexplorer.pdfviewer.PdfViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
+        )
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel
         UnlockProgressBridge.channel = channel

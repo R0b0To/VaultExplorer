@@ -1,25 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
-import 'package:syncfusion_flutter_pdf/pdf.dart' as sfpdf;
+import 'package:pdfrx/pdfrx.dart';
+import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 
-/// Which annotation tool (if any) is currently active while in edit mode.
-/// Only [note] needs a persistent "armed" state (tap-to-place); the markup
-/// tools act immediately on whatever text is currently selected.
-enum _PdfTool { none, note }
-
-/// In-app viewer/editor for PDF files stored in a vault.
-///
-/// Mirrors [TextEditorScreen]'s decrypt-to-temp / edit / write-back pattern:
-/// the encrypted file is decrypted into a scratch temp file, viewed and
-/// annotated there via Syncfusion's PDF viewer, and only written back into
-/// the vault when the user saves. Page rotate/delete go through the
-/// standalone `syncfusion_flutter_pdf` document engine, since those aren't
-/// exposed by the viewer's annotation API.
 class PdfViewerScreen extends StatefulWidget {
   final MountedContainer container;
   final String filePath;
@@ -36,25 +22,15 @@ class PdfViewerScreen extends StatefulWidget {
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
   final PdfViewerController _controller = PdfViewerController();
-  final GlobalKey<SfPdfViewerState> _viewerKey = GlobalKey();
-
   File? _tempFile;
   int _reloadToken = 0;
-
   bool _isLoading = true;
   bool _isSaving = false;
   bool _isDirty = false;
   bool _hasError = false;
   bool _isContainerLocked = false;
   String _errorMessage = '';
-
   bool _isEditMode = false;
-  _PdfTool _activeTool = _PdfTool.none;
-  bool _hasTextSelection = false;
-
-  // Simple in-session undo/redo over annotations added via the toolbar.
-  final List<Annotation> _undoStack = [];
-  final List<Annotation> _redoStack = [];
 
   bool get _isReadOnly => widget.container.readOnly;
 
@@ -63,7 +39,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       setState(() => _isContainerLocked = true);
     }
   }
-
 
   @override
   void initState() {
@@ -95,23 +70,19 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       _hasError = false;
       _errorMessage = '';
     });
-
     try {
       final tempDir = await getTemporaryDirectory();
       _tempFile = File(
         '${tempDir.path}/vx_pdf_${DateTime.now().microsecondsSinceEpoch}.pdf',
       );
-
       final ok = await vaultExplorerApi.decryptFile(
         widget.container,
         widget.filePath,
         _tempFile!.path,
       );
-
       if (!ok) {
         throw Exception('Failed to decrypt file from vault.');
       }
-
       setState(() {
         _isLoading = false;
         _isDirty = false;
@@ -125,37 +96,22 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     }
   }
 
-  /// Bakes any pending viewer annotations into the on-disk temp file so
-  /// subsequent page-level edits (via the standalone [sfpdf.PdfDocument]
-  /// engine) and the final vault write-back both see the latest state.
-  Future<void> _flushAnnotationsToTempFile() async {
-    if (_tempFile == null) return;
-    final bytes = await _controller.saveDocument();
-    await _tempFile!.writeAsBytes(bytes, flush: true);
-  }
-
   Future<bool> _saveFile() async {
     if (_tempFile == null) return false;
     setState(() => _isSaving = true);
-
     try {
-      await _flushAnnotationsToTempFile();
-
       final ok = await vaultExplorerApi.writeBackFile(
         widget.container,
         widget.filePath,
         _tempFile!.path,
       );
-
       if (!ok) {
         throw Exception('Failed to write file back to vault.');
       }
-
       setState(() {
         _isSaving = false;
         _isDirty = false;
       });
-
       if (mounted) {
         showAppSnackBar(
           context,
@@ -179,7 +135,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
   Future<bool> _onWillPop() async {
     if (!_isDirty) return true;
-
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -206,87 +161,25 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         ],
       ),
     );
-
     if (result == 'save') return _saveFile();
     if (result == 'discard') return true;
     return false;
   }
 
-  // ── Text-markup annotations (highlight / underline / strikethrough) ──────
-
-  void _onTextSelectionChanged(PdfTextSelectionChangedDetails details) {
-    final hasSelection = details.selectedText != null;
-    if (hasSelection != _hasTextSelection) {
-      setState(() => _hasTextSelection = hasSelection);
-    }
-  }
-
-  void _applyMarkup(String kind) {
-    final textLines = _viewerKey.currentState?.getSelectedTextLines();
-    if (textLines == null || textLines.isEmpty) return;
-
-    final Annotation annotation = switch (kind) {
-      'underline' => UnderlineAnnotation(textBoundsCollection: textLines),
-      'strikethrough' => StrikethroughAnnotation(textBoundsCollection: textLines),
-      _ => HighlightAnnotation(textBoundsCollection: textLines),
-    };
-
-    _controller.addAnnotation(annotation);
-    _controller.clearSelection();
-    _undoStack.add(annotation);
-    _redoStack.clear();
-    setState(() {
-      _isDirty = true;
-      _hasTextSelection = false;
-    });
-  }
-
-  void _onTap(PdfGestureDetails details) {
-    if (!_isEditMode || _activeTool != _PdfTool.note) return;
-
-    final note = StickyNoteAnnotation(
-      pageNumber: details.pageNumber,
-      position: details.pagePosition,
-      icon: PdfStickyNoteIcon.comment,
-      text: 'Note',
-    );
-    _controller.addAnnotation(note);
-    _undoStack.add(note);
-    _redoStack.clear();
-    setState(() => _isDirty = true);
-  }
-
-  void _undo() {
-    if (_undoStack.isEmpty) return;
-    final annotation = _undoStack.removeLast();
-    _controller.removeAnnotation(annotation);
-    _redoStack.add(annotation);
-    setState(() => _isDirty = true);
-  }
-
-  void _redo() {
-    if (_redoStack.isEmpty) return;
-    final annotation = _redoStack.removeLast();
-    _controller.addAnnotation(annotation);
-    _undoStack.add(annotation);
-    setState(() => _isDirty = true);
-  }
-
-  // ── Page management (rotate / delete current page) ───────────────────────
-
   Future<void> _rotateCurrentPage() async {
     await _mutatePages((doc, pageIndex) {
-      doc.pages[pageIndex].rotation = switch (doc.pages[pageIndex].rotation) {
-        sfpdf.PdfPageRotateAngle.rotateAngle0 => sfpdf.PdfPageRotateAngle.rotateAngle90,
-        sfpdf.PdfPageRotateAngle.rotateAngle90 => sfpdf.PdfPageRotateAngle.rotateAngle180,
-        sfpdf.PdfPageRotateAngle.rotateAngle180 => sfpdf.PdfPageRotateAngle.rotateAngle270,
-        sfpdf.PdfPageRotateAngle.rotateAngle270 => sfpdf.PdfPageRotateAngle.rotateAngle0,
-      };
+      final pages = List<PdfPage>.from(doc.pages);
+      if (pageIndex >= 0 && pageIndex < pages.length) {
+        pages[pageIndex] = pages[pageIndex].rotatedCW90();
+        doc.pages = pages;
+      }
     });
   }
 
   Future<void> _deleteCurrentPage() async {
-    if (_controller.pageCount <= 1) {
+    final pageCount = _controller.pageCount;
+    final currentPage = _controller.pageNumber ?? 1;
+    if (pageCount <= 1) {
       showAppSnackBar(
         context,
         message: 'Cannot delete the only page in this document',
@@ -294,12 +187,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       );
       return;
     }
-
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Page'),
-        content: Text('Remove page ${_controller.pageNumber}? This cannot be undone.'),
+        content: Text('Remove page $currentPage? This cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -313,28 +205,26 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
       ),
     );
     if (confirmed != true) return;
-
     await _mutatePages((doc, pageIndex) {
-      doc.pages.removeAt(pageIndex);
+      final pages = List<PdfPage>.from(doc.pages);
+      if (pageIndex >= 0 && pageIndex < pages.length) {
+        pages.removeAt(pageIndex);
+        doc.pages = pages;
+      }
     });
   }
 
-  /// Flushes pending viewer annotations, applies [mutate] to the current
-  /// page via the standalone PDF document engine, writes the result back to
-  /// the temp file, then forces the viewer to reload it.
   Future<void> _mutatePages(
-    void Function(sfpdf.PdfDocument doc, int pageIndex) mutate,
+    void Function(PdfDocument doc, int pageIndex) mutate,
   ) async {
     if (_tempFile == null) return;
     setState(() => _isSaving = true);
     try {
-      await _flushAnnotationsToTempFile();
-
-      final bytes = await _tempFile!.readAsBytes();
-      final doc = sfpdf.PdfDocument(inputBytes: bytes);
-      final pageIndex = _controller.pageNumber - 1;
+      final doc = await PdfDocument.openFile(_tempFile!.path);
+      final currentPageNumber = _controller.pageNumber ?? 1;
+      final pageIndex = (currentPageNumber - 1).clamp(0, doc.pages.length - 1);
       mutate(doc, pageIndex);
-      final List<int> newBytes = await doc.save();
+      final List<int> newBytes = await doc.encodePdf();
       doc.dispose();
 
       final tempDir = await getTemporaryDirectory();
@@ -342,11 +232,9 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         '${tempDir.path}/vx_pdf_${DateTime.now().microsecondsSinceEpoch}_${++_reloadToken}.pdf',
       );
       await newTempFile.writeAsBytes(newBytes, flush: true);
-
       final oldTempFile = _tempFile;
       _tempFile = newTempFile;
-      _undoStack.clear();
-      _redoStack.clear();
+
       if (oldTempFile != null && await oldTempFile.exists()) {
         try {
           await oldTempFile.delete();
@@ -354,7 +242,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           debugPrint('Error deleting stale temp PDF file: $e');
         }
       }
-
       setState(() {
         _isDirty = true;
         _isSaving = false;
@@ -362,7 +249,11 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
     } catch (e) {
       setState(() => _isSaving = false);
       if (mounted) {
-        showAppSnackBar(context, message: 'Edit failed: $e', tone: AppBannerTone.error);
+        showAppSnackBar(
+          context,
+          message: 'Edit failed: $e',
+          tone: AppBannerTone.error,
+        );
       }
     }
   }
@@ -377,9 +268,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         body: SizedBox.expand(),
       );
     }
-
     final cs = Theme.of(context).colorScheme;
-
     return PopScope(
       canPop: !_isDirty,
       onPopInvokedWithResult: (didPop, result) async {
@@ -403,7 +292,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
                   tooltip: _isEditMode ? 'Exit edit mode' : 'Edit PDF',
                   onPressed: () => setState(() {
                     _isEditMode = !_isEditMode;
-                    if (!_isEditMode) _activeTool = _PdfTool.none;
                   }),
                 ),
               if (!_isReadOnly)
@@ -436,9 +324,10 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           ],
         ),
         body: _buildBody(cs),
-        bottomNavigationBar: (!_isLoading && !_hasError && _isEditMode && !_isReadOnly)
-            ? _buildEditToolbar(cs)
-            : null,
+        bottomNavigationBar:
+            (!_isLoading && !_hasError && _isEditMode && !_isReadOnly)
+                ? _buildEditToolbar(cs)
+                : null,
       ),
     );
   }
@@ -456,7 +345,6 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         ),
       );
     }
-
     if (_hasError) {
       return Center(
         child: Padding(
@@ -489,18 +377,17 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         ),
       );
     }
-
     return Stack(
       children: [
-        SfPdfViewer.file(
-          _tempFile!,
-          key: _viewerKey,
+        PdfViewer.file(
+          _tempFile!.path,
+          key: ValueKey(_reloadToken),
           controller: _controller,
-          canShowScrollHead: true,
-          canShowScrollStatus: true,
-          enableTextSelection: true,
-          onTextSelectionChanged: _onTextSelectionChanged,
-          onTap: _onTap,
+          params: const PdfViewerParams(
+            textSelectionParams: PdfTextSelectionParams(
+              enabled: true,
+            ),
+          ),
         ),
         if (_isSaving)
           Container(
@@ -512,57 +399,24 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   }
 
   Widget _buildEditToolbar(ColorScheme cs) {
-    Widget markupButton(String kind, IconData icon, String label) {
-      return IconButton(
-        icon: Icon(icon, color: _hasTextSelection ? cs.primary : cs.onSurfaceVariant),
-        tooltip: label,
-        onPressed: _hasTextSelection ? () => _applyMarkup(kind) : null,
-      );
-    }
-
-    final noteActive = _activeTool == _PdfTool.note;
-
     return SafeArea(
       child: Container(
         decoration: BoxDecoration(
           color: cs.surfaceContainerLow,
           border: Border(top: BorderSide(color: cs.outlineVariant, width: 0.5)),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            markupButton('highlight', Icons.border_color_rounded, 'Highlight selected text'),
-            markupButton('underline', Icons.format_underlined_rounded, 'Underline selected text'),
-            markupButton('strikethrough', Icons.strikethrough_s_rounded, 'Strikethrough selected text'),
-            IconButton(
-              icon: Icon(
-                Icons.sticky_note_2_outlined,
-                color: noteActive ? cs.primary : cs.onSurfaceVariant,
-              ),
-              tooltip: noteActive ? 'Cancel sticky note' : 'Tap a page to add a sticky note',
-              onPressed: () => setState(() {
-                _activeTool = noteActive ? _PdfTool.none : _PdfTool.note;
-              }),
-            ),
-            IconButton(
-              icon: const Icon(Icons.undo_rounded),
-              tooltip: 'Undo last annotation',
-              onPressed: _undoStack.isEmpty ? null : _undo,
-            ),
-            IconButton(
-              icon: const Icon(Icons.redo_rounded),
-              tooltip: 'Redo',
-              onPressed: _redoStack.isEmpty ? null : _redo,
-            ),
-            IconButton(
+            TextButton.icon(
               icon: const Icon(Icons.rotate_right_rounded),
-              tooltip: 'Rotate page',
+              label: const Text('Rotate Page'),
               onPressed: _rotateCurrentPage,
             ),
-            IconButton(
+            TextButton.icon(
               icon: Icon(Icons.delete_outline_rounded, color: cs.error),
-              tooltip: 'Delete page',
+              label: Text('Delete Page', style: TextStyle(color: cs.error)),
               onPressed: _deleteCurrentPage,
             ),
           ],

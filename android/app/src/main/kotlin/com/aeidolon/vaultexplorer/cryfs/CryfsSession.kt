@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.cryfs
 import android.content.Context
 import android.net.Uri
 import com.aeidolon.vaultexplorer.ContainerFormat
+import com.aeidolon.vaultexplorer.DirEntryWire
 import com.aeidolon.vaultexplorer.VaultBackend
 import com.aeidolon.vaultexplorer.engine.VaultIOException
 import com.aeidolon.vaultexplorer.engine.VaultPathNotFoundException
@@ -36,11 +37,9 @@ override fun listDirectory(virtualPath: String): Array<String>? {
         return try {
             tree.listDirectory(normalize(virtualPath)).map { node ->
                 val entry = node.entry!!
-                if (entry.type == CryfsEntryType.DIR) {
-                    "[DIR] ${entry.name}|0|${entry.mtimeEpochSec}"
-                } else {
-                    "${entry.name}|${CryfsFsBlob.payloadSize(dataTree, entry.blobId)}|${entry.mtimeEpochSec}"
-                }
+                val isDir = entry.type == CryfsEntryType.DIR
+                val size = if (isDir) 0L else CryfsFsBlob.payloadSize(dataTree, entry.blobId)
+                DirEntryWire.encode(entry.name, isDir, size, entry.mtimeEpochSec)
             }.toTypedArray()
         } catch (e: Exception) {
             android.util.Log.e("CryfsSession", "listDirectory failed for path: \"$virtualPath\"", e)

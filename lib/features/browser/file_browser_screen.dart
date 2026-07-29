@@ -1134,6 +1134,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final existingNames = <String>{};
     final existingDirs = <String>{};
     for (final raw in existingRaw) {
+      if (raw.startsWith('System:')) continue;
       final e = RawEntry.parse(raw);
       existingNames.add(e.name.toLowerCase());
       if (e.isDir) existingDirs.add(e.name.toLowerCase());
@@ -1550,6 +1551,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               context,
               container: widget.container,
               currentDirPath: _currentDirPath,
+              existingEntries: _currentItems,
               onSuccess: () => _loadDirectoryContents(_currentDirPath),
               readOnly: _isReadOnly,
             );
@@ -1563,6 +1565,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               context,
               container: widget.container,
               currentDirPath: _currentDirPath,
+              existingEntries: _currentItems,
               onSuccess: () => _loadDirectoryContents(_currentDirPath),
               readOnly: _isReadOnly,
             );
@@ -1936,13 +1939,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
              return;
           }
         }
-        final oldNames = entries.map((e) => e.name).toList();
-        final existingNames = allItems.map((e) => e.name).toSet();
         BrowserDialogs.showRename(
           context,
           container: widget.container,
-          oldNames: oldNames,
-          existingNamesInDir: existingNames,
+          oldEntries: entries,
+          existingEntries: allItems,
           currentDirPath: _currentDirPath,
           onSuccess: () => _loadDirectoryContents(_currentDirPath),
           readOnly: _isReadOnly,

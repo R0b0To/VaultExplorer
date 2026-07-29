@@ -69,7 +69,7 @@ class ArchiveContext {
         if (knownDirs.add(dirPath)) {
           // Synthesize this directory entry in its parent
           final dirName = parts[i];
-          final wireEntry = '[DIR] $dirName|0|${entry.lastModTime ~/ 1000}';
+          final wireEntry = 'D|0|${entry.lastModTime ~/ 1000}|$dirName';
           tree.putIfAbsent(parentPath, () => <String>{}).add(wireEntry);
         }
       }
@@ -81,12 +81,12 @@ class ArchiveContext {
       final baseName = parts.last;
 
       if (entry.isFile) {
-        final wireEntry = '$baseName|${entry.size}|${entry.lastModTime ~/ 1000}';
+        final wireEntry = 'F|${entry.size}|${entry.lastModTime ~/ 1000}|$baseName';
         tree.putIfAbsent(parentDir, () => <String>{}).add(wireEntry);
       } else {
         // Explicit directory entry
         if (knownDirs.add(entryName)) {
-          final wireEntry = '[DIR] $baseName|0|${entry.lastModTime ~/ 1000}';
+          final wireEntry = 'D|0|${entry.lastModTime ~/ 1000}|$baseName';
           tree.putIfAbsent(parentDir, () => <String>{}).add(wireEntry);
         }
       }

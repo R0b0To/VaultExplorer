@@ -1,5 +1,7 @@
 #include "ext_backend.h"
 
+#include "dir_entry_wire.h"
+
 #include <algorithm>
 #include <android/log.h>
 #include <cstdio>
@@ -33,12 +35,9 @@ int extDirectoryEntry(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, c
     if (name == "." || name == "..") return 0;
     struct ext2_inode inode{};
     if (ext2fs_read_inode(context->fs, entry->inode, &inode) != 0) return 0;
-    if (LINUX_S_ISDIR(inode.i_mode)) {
-        context->results->push_back("[DIR] " + name + "|0|" + std::to_string(inode.i_mtime));
-    } else {
-        const uint64_t size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
-        context->results->push_back(name + "|" + std::to_string(size) + "|" + std::to_string(inode.i_mtime));
-    }
+    const bool isDir = LINUX_S_ISDIR(inode.i_mode);
+    const uint64_t size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
+    context->results->push_back(encodeDirEntryWire(name, isDir, size, inode.i_mtime));
     return 0;
 }
 
@@ -577,12 +576,16 @@ bool extRenameFile(int volumeId, const std::string& oldPath, const std::string& 
 
         ext2_ino_t destIno = 0;
         if (extResolvePath(v.extFs, newFull, &destIno) && destIno != srcIno) {
-            struct ext2_inode destInode{};
-            const bool destIsDir = ext2fs_read_inode(v.extFs, destIno, &destInode) == 0 &&
-                                    LINUX_S_ISDIR(destInode.i_mode);
-            if (ext2fs_unlink(v.extFs, newParentIno, newName.c_str(), destIno, 0) == 0) {
-                extReleaseInodeIfUnlinked(v.extFs, destIno, destIsDir);
-            }
+            // Fail closed if the destination name is already taken, by
+            // either a file or a folder -- matches FatFs's f_rename
+            // (FR_EXIST) and ntfs_backend.cpp's ntfsRenameFile. See
+            // docs/architecture.md ADR-004: this used to unlink (delete)
+            // whatever already existed at the destination before linking
+            // the source under that name, which could silently destroy an
+            // existing file, or an entire existing folder and everything
+            // in it, with no warning and no way to know it was about to
+            // happen.
+            return false;
         }
 
         errcode_t linkErr = ext2fs_link(v.extFs, newParentIno, newName.c_str(), srcIno, fileType);

@@ -28,9 +28,6 @@
 #include <vector>
 
 // ── Directory listing ──────────────────────────────────────────────────
-// Appends "name|size|mtime" entries to outResults ("[DIR] " prefix for
-// directories, matching the wire format the Kotlin side already parses).
-// pathSuffix is "" (or "/") for the container root.
 void fsListDirectory(int volId, const std::string& pathSuffix,
                       std::vector<std::string>& outResults);
 

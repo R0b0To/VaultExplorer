@@ -43,10 +43,7 @@ class ImportExportHandlers(
         val entries = ContainerFileSystem.listDirectory(volId, dirPath) ?: return emptySet()
         return entries.mapNotNull { entry ->
             if (entry.startsWith("System:")) return@mapNotNull null
-            val isDir = entry.startsWith("[DIR] ")
-            val name = if (isDir) entry.substringAfter("[DIR] ").substringBefore("|")
-                       else entry.substringBefore("|")
-            name.lowercase()
+            DirEntryWire.parse(entry)?.name?.lowercase()
         }.toSet()
     }
 
@@ -105,10 +102,8 @@ class ImportExportHandlers(
         var count = 0
         for (entry in children) {
             if (entry.startsWith("System:")) continue
-            val childIsDir = entry.startsWith("[DIR] ")
-            val childName = if (childIsDir) entry.substringAfter("[DIR] ").substringBefore("|")
-                            else entry.substringBefore("|")
-            count += exportEntryRecursive(destDir, "$fatPath/$childName", childIsDir, containerUri, volId)
+            val parsed = DirEntryWire.parse(entry) ?: continue
+            count += exportEntryRecursive(destDir, "$fatPath/${parsed.name}", parsed.isDir, containerUri, volId)
         }
         return count
     }
@@ -138,10 +133,8 @@ class ImportExportHandlers(
         var count = 0
         for (entry in children) {
             if (entry.startsWith("System:")) continue
-            val childIsDir = entry.startsWith("[DIR] ")
-            val childName = if (childIsDir) entry.substringAfter("[DIR] ").substringBefore("|")
-                            else entry.substringBefore("|")
-            count += exportEntryRecursiveRaw(destDir, "$fatPath/$childName", childIsDir, volId)
+            val parsed = DirEntryWire.parse(entry) ?: continue
+            count += exportEntryRecursiveRaw(destDir, "$fatPath/${parsed.name}", parsed.isDir, volId)
         }
         return count
     }
@@ -262,8 +255,14 @@ class ImportExportHandlers(
                 ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
             }
             var count = 0
+            val fsKind = FilesystemNameValidator.kindFor(volId)
             for (child in srcDoc.listFiles()) {
-                val childName = FatFileNameSanitizer.sanitize(child.name ?: continue)
+                val childName = child.name ?: continue
+                val issues = FilesystemNameValidator.validate(childName, fsKind)
+                if (issues.isNotEmpty()) {
+                    ImportProgressBridge.reportSkippedInvalidName(opId, childName, issues)
+                    continue
+                }
                 count += importEntryRecursive(
                     child, containerUri, "$targetFatPath/$childName", volId,
                     opId, total, doneCounter, totalBytes, transferredCounter,
@@ -324,8 +323,14 @@ class ImportExportHandlers(
                 ContainerFileSystem.setLastModifiedTime(volId, targetFatPath, lastModified)
             }
             var count = 0
+            val fsKind = FilesystemNameValidator.kindFor(volId)
             for (child in srcFile.listFiles() ?: emptyArray()) {
-                val childName = FatFileNameSanitizer.sanitize(child.name)
+                val childName = child.name
+                val issues = FilesystemNameValidator.validate(childName, fsKind)
+                if (issues.isNotEmpty()) {
+                    ImportProgressBridge.reportSkippedInvalidName(opId, childName, issues)
+                    continue
+                }
                 count += importEntryRecursiveRaw(
                     child, "$targetFatPath/$childName", volId,
                     opId, total, doneCounter, totalBytes, transferredCounter,
@@ -383,9 +388,15 @@ class ImportExportHandlers(
                         val doneCounter = java.util.concurrent.atomic.AtomicInteger(0)
                         val transferredCounter = java.util.concurrent.atomic.AtomicLong(0L)
                         var successCount = 0
+                        val fsKind = FilesystemNameValidator.kindFor(pending.volId)
                         for (entry in entries) {
-                            val rawName = FatFileNameSanitizer.sanitize(entry.raw?.name ?: entry.doc.name ?: "imported_file")
-                            val name = uniqueImportName(pending.volId, pending.targetDir, rawName)
+                            val pickedName = entry.raw?.name ?: entry.doc.name ?: "imported_file"
+                            val issues = FilesystemNameValidator.validate(pickedName, fsKind)
+                            if (issues.isNotEmpty()) {
+                                ImportProgressBridge.reportSkippedInvalidName(pending.opId, pickedName, issues)
+                                continue
+                            }
+                            val name = uniqueImportName(pending.volId, pending.targetDir, pickedName)
                             val targetFatPath = if (pending.targetDir.isEmpty()) name else "${pending.targetDir}/$name"
                             successCount += if (entry.raw != null) {
                                 importEntryRecursiveRaw(
@@ -476,8 +487,16 @@ class ImportExportHandlers(
             if (srcRoot != null) {
                 ImportSourceRegistry.recordFolder(pending.opId, treeUri)
                 val rawRoot = rawFileFor(treeUri)
-                val rawFolderName = FatFileNameSanitizer.sanitize(rawRoot?.name ?: srcRoot.name ?: "imported_folder")
-                val folderName = uniqueImportName(pending.volId, pending.targetDir, rawFolderName)
+                val pickedFolderName = rawRoot?.name ?: srcRoot.name ?: "imported_folder"
+                val fsKind = FilesystemNameValidator.kindFor(pending.volId)
+                val issues = FilesystemNameValidator.validate(pickedFolderName, fsKind)
+                if (issues.isNotEmpty()) {
+                    ImportProgressBridge.reportSkippedInvalidName(pending.opId, pickedFolderName, issues)
+                    ImportCancellation.clear(pending.opId)
+                    res.success(0)
+                    return@registerForActivityResult
+                }
+                val folderName = uniqueImportName(pending.volId, pending.targetDir, pickedFolderName)
                 val targetFatPath = if (pending.targetDir.isEmpty()) folderName else "${pending.targetDir}/$folderName"
                 ioExecutor.execute {
                     try {

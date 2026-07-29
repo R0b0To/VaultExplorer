@@ -314,6 +314,7 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
       final existingNames = <String>{};
       final existingDirs = <String>{};
       for (final raw in existingRaw) {
+        if (raw.startsWith('System:')) continue;
         final e = RawEntry.parse(raw);
         existingNames.add(e.name.toLowerCase());
         if (e.isDir) existingDirs.add(e.name.toLowerCase());

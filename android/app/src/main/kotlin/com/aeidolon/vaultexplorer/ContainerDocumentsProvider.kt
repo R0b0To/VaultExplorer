@@ -238,13 +238,12 @@ class ContainerDocumentsProvider : DocumentsProvider() {
             var found = false
             for (fileStr in siblings) {
                 if (fileStr.startsWith("System:")) continue
-                val isDirStr = fileStr.startsWith("[DIR] ")
-                val cleanName = if (isDirStr) fileStr.substringAfter("[DIR] ").substringBefore("|") else fileStr.substringBefore("|")
-                
-                if (cleanName == fileName) {
+                val parsed = DirEntryWire.parse(fileStr) ?: continue
+
+                if (parsed.name == fileName) {
                     found = true
-                    actualIsDir = isDirStr
-                    actualSize = if (isDirStr) 0L else fileStr.split("|").getOrNull(1)?.toLongOrNull() ?: 0L
+                    actualIsDir = parsed.isDir
+                    actualSize = parsed.sizeBytes
                     break
                 }
             }
@@ -296,9 +295,10 @@ addDocumentRow(
             
             files?.forEach { file ->
                 if (file.startsWith("System:")) return@forEach
-                val isDir     = file.startsWith("[DIR] ")
-                val cleanName = if (isDir) file.substringAfter("[DIR] ").substringBefore("|") else file.substringBefore("|")
-                val size      = if (isDir) 0L else file.split("|").getOrNull(1)?.toLongOrNull() ?: 0L
+                val parsed = DirEntryWire.parse(file) ?: return@forEach
+                val isDir     = parsed.isDir
+                val cleanName = parsed.name
+                val size      = parsed.sizeBytes
                 val childFatPath = if (parentFatPath.isEmpty()) cleanName else "$parentFatPath/$cleanName"
                 val childType    = if (isDir) "dir" else "file"
                 
@@ -364,11 +364,10 @@ addDocumentRow(
                 val children = ContainerFileSystem.listDirectory(volId, path)
                 children?.forEach { child ->
                     if (child.startsWith("System:")) return@forEach
-                    val childIsDir = child.startsWith("[DIR] ")
-                    val cleanName = if (childIsDir) child.substringAfter("[DIR] ").substringBefore("|") else child.substringBefore("|")
-                    val childPath = if (path.isEmpty()) cleanName else "$path/$cleanName"
-                    
-                    deleteRecursive(volId, childPath, childIsDir)
+                    val parsed = DirEntryWire.parse(child) ?: return@forEach
+                    val childPath = if (path.isEmpty()) parsed.name else "$path/${parsed.name}"
+
+                    deleteRecursive(volId, childPath, parsed.isDir)
                 }
             } catch (e: Exception) {
                 // Ignore directory listing failures and try to delete whatever we can

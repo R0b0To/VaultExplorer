@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
-import 'package:vaultexplorer/core/utils/filename_utils.dart';
+import 'package:vaultexplorer/core/filesystem/entry_conflict.dart';
+import 'package:vaultexplorer/core/filesystem/filesystem_type.dart';
+import 'package:vaultexplorer/core/filesystem/illegal_char_input_formatter.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
+import 'package:vaultexplorer/core/filesystem/name_validation.dart';
+import 'package:vaultexplorer/core/filesystem/path_components.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 
@@ -19,6 +24,7 @@ abstract class BrowserDialogs {
     BuildContext context, {
     required MountedContainer container,
     required String currentDirPath,
+    required List<RawEntry> existingEntries,
     required VoidCallback onSuccess,
     bool readOnly = false,
   }) {
@@ -31,6 +37,7 @@ abstract class BrowserDialogs {
       builder: (dialogContext) => _CreateFolderDialog(
         container: container,
         currentDirPath: currentDirPath,
+        existingEntries: existingEntries,
         onSuccess: onSuccess,
       ),
     );
@@ -40,6 +47,7 @@ abstract class BrowserDialogs {
     BuildContext context, {
     required MountedContainer container,
     required String currentDirPath,
+    required List<RawEntry> existingEntries,
     required VoidCallback onSuccess,
     bool readOnly = false,
   }) {
@@ -52,6 +60,7 @@ abstract class BrowserDialogs {
       builder: (dialogContext) => _CreateFileDialog(
         container: container,
         currentDirPath: currentDirPath,
+        existingEntries: existingEntries,
         onSuccess: onSuccess,
       ),
     );
@@ -60,8 +69,8 @@ abstract class BrowserDialogs {
   static void showRename(
     BuildContext context, {
     required MountedContainer container,
-    required List<String> oldNames,
-    required Set<String> existingNamesInDir,
+    required List<RawEntry> oldEntries,
+    required List<RawEntry> existingEntries,
     required String currentDirPath,
     required VoidCallback onSuccess,
     bool readOnly = false,
@@ -74,8 +83,8 @@ abstract class BrowserDialogs {
       context: context,
       builder: (dialogContext) => _RenameDialog(
         container: container,
-        oldNames: oldNames,
-        existingNamesInDir: existingNamesInDir,
+        oldEntries: oldEntries,
+        existingEntries: existingEntries,
         currentDirPath: currentDirPath,
         onSuccess: onSuccess,
       ),
@@ -106,14 +115,116 @@ abstract class BrowserDialogs {
   }
 }
 
+/// Shared "type a name, see every problem with it live" state machine used
+/// by the create-folder, create-file, and (per-item) rename dialogs below.
+/// See docs/architecture.md ADR-002: this never trims/mutates [text] before
+/// validating or submitting it, and the submit action stays disabled for as
+/// long as any issue remains — there is no "fix it for you" path.
+mixin _LiveNameValidation<T extends StatefulWidget> on State<T> {
+  List<NameValidationIssue> issues = [];
+  EntryConflictResult conflict = const EntryConflictResult(EntryConflictKind.none, null);
+
+  bool get isValid => issues.isEmpty && !conflict.isConflict;
+
+  /// Computes and stores the current issues/conflict for [text] without
+  /// calling [setState] — safe to call from `initState()` (before the
+  /// first build, when `setState()` isn't needed and would be redundant)
+  /// to seed a pre-filled field's initial validity, e.g. the rename
+  /// dialog's starting text. Interactive edits should call [revalidate]
+  /// instead, which wraps the same computation in `setState()`.
+  void _computeValidation({
+    required String text,
+    required FilesystemType fsType,
+    required EntryType entryType,
+    required List<RawEntry> existingEntries,
+    RawEntry? excluding,
+  }) {
+    final nameResult = validateEntryName(text, fsType, entryType: entryType);
+    final conflictResult = text.isEmpty
+        ? const EntryConflictResult(EntryConflictKind.none, null)
+        : checkEntryConflict(
+            candidateName: text,
+            candidateIsDir: entryType == EntryType.folder,
+            existingEntries: existingEntries,
+            caseSensitive: FilesystemRules.of(fsType).caseSensitive,
+            excluding: excluding,
+          );
+    issues = nameResult.issues;
+    conflict = conflictResult;
+  }
+
+  void seedValidation({
+    required String text,
+    required FilesystemType fsType,
+    required EntryType entryType,
+    required List<RawEntry> existingEntries,
+    RawEntry? excluding,
+  }) =>
+      _computeValidation(
+        text: text,
+        fsType: fsType,
+        entryType: entryType,
+        existingEntries: existingEntries,
+        excluding: excluding,
+      );
+
+  void revalidate({
+    required String text,
+    required FilesystemType fsType,
+    required EntryType entryType,
+    required List<RawEntry> existingEntries,
+    RawEntry? excluding,
+  }) =>
+      setState(() => _computeValidation(
+            text: text,
+            fsType: fsType,
+            entryType: entryType,
+            existingEntries: existingEntries,
+            excluding: excluding,
+          ));
+
+  /// All current problems, name issues first, then the conflict (if any) —
+  /// every one of them, not just the first, per ADR-002.
+  List<String> get allMessages => [
+        ...issues.map((i) => i.message),
+        if (conflict.isConflict) conflict.message('')!,
+      ];
+
+  Widget buildIssuesList(String candidateName) {
+    if (issues.isEmpty && !conflict.isConflict) return const SizedBox.shrink();
+    final messages = [
+      ...issues.map((i) => i.message),
+      if (conflict.isConflict) conflict.message(candidateName)!,
+    ];
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: messages
+            .map((m) => Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    m,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                  ),
+                ))
+            .toList(),
+      ),
+    );
+  }
+}
+
 class _CreateFolderDialog extends StatefulWidget {
   final MountedContainer container;
   final String currentDirPath;
+  final List<RawEntry> existingEntries;
   final VoidCallback onSuccess;
 
   const _CreateFolderDialog({
     required this.container,
     required this.currentDirPath,
+    required this.existingEntries,
     required this.onSuccess,
   });
 
@@ -121,13 +232,15 @@ class _CreateFolderDialog extends StatefulWidget {
   State<_CreateFolderDialog> createState() => _CreateFolderDialogState();
 }
 
-class _CreateFolderDialogState extends State<_CreateFolderDialog> {
+class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveNameValidation<_CreateFolderDialog> {
   late final TextEditingController _ctrl;
+  late final FilesystemType _fsType;
 
   @override
   void initState() {
     super.initState();
     _ctrl = TextEditingController();
+    _fsType = resolveFilesystemType(widget.container);
   }
 
   @override
@@ -136,17 +249,30 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> {
     super.dispose();
   }
 
+  void _onChanged(String text) => revalidate(
+        text: text,
+        fsType: _fsType,
+        entryType: EntryType.folder,
+        existingEntries: widget.existingEntries,
+      );
+
   Future<void> _onCreate() async {
-    final name = sanitizeFatFileName(_ctrl.text.trim());
-    if (name.isEmpty) return;
+    final name = _ctrl.text;
+    if (name.isEmpty || !isValid) return;
+
+    final parentSegments = widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
+    final built = PathComponents(
+      parentSegments: parentSegments,
+      name: name,
+      type: EntryType.folder,
+      fsType: _fsType,
+    ).validateAndBuild();
+    if (built is! PathBuildSuccess) return;
 
     final parentContext = context;
     Navigator.pop(context);
 
-    final full = widget.currentDirPath.isEmpty
-        ? name
-        : '${widget.currentDirPath}/$name';
-    final ok = await vaultExplorerApi.createDirectory(widget.container, full);
+    final ok = await vaultExplorerApi.createDirectory(widget.container, built.path);
     if (ok) {
       widget.onSuccess();
     } else if (parentContext.mounted) {
@@ -160,13 +286,23 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final name = _ctrl.text;
     return AlertDialog(
       title: const Text('New Folder'),
-      content: TextField(
-        controller: _ctrl,
-        decoration: const InputDecoration(hintText: 'Folder name'),
-        autofocus: true,
-        onSubmitted: (_) => _onCreate(),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _ctrl,
+            decoration: const InputDecoration(hintText: 'Folder name'),
+            autofocus: true,
+            inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
+            onChanged: _onChanged,
+            onSubmitted: (_) => _onCreate(),
+          ),
+          buildIssuesList(name),
+        ],
       ),
       actions: [
         TextButton(
@@ -174,7 +310,7 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> {
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: _onCreate,
+          onPressed: name.isNotEmpty && isValid ? _onCreate : null,
           child: const Text('Create'),
         ),
       ],
@@ -185,11 +321,13 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> {
 class _CreateFileDialog extends StatefulWidget {
   final MountedContainer container;
   final String currentDirPath;
+  final List<RawEntry> existingEntries;
   final VoidCallback onSuccess;
 
   const _CreateFileDialog({
     required this.container,
     required this.currentDirPath,
+    required this.existingEntries,
     required this.onSuccess,
   });
 
@@ -197,13 +335,15 @@ class _CreateFileDialog extends StatefulWidget {
   State<_CreateFileDialog> createState() => _CreateFileDialogState();
 }
 
-class _CreateFileDialogState extends State<_CreateFileDialog> {
+class _CreateFileDialogState extends State<_CreateFileDialog> with _LiveNameValidation<_CreateFileDialog> {
   late final TextEditingController _ctrl;
+  late final FilesystemType _fsType;
 
   @override
   void initState() {
     super.initState();
     _ctrl = TextEditingController();
+    _fsType = resolveFilesystemType(widget.container);
   }
 
   @override
@@ -212,17 +352,30 @@ class _CreateFileDialogState extends State<_CreateFileDialog> {
     super.dispose();
   }
 
+  void _onChanged(String text) => revalidate(
+        text: text,
+        fsType: _fsType,
+        entryType: EntryType.file,
+        existingEntries: widget.existingEntries,
+      );
+
   Future<void> _onCreate() async {
-    final name = sanitizeFatFileName(_ctrl.text.trim());
-    if (name.isEmpty) return;
+    final name = _ctrl.text;
+    if (name.isEmpty || !isValid) return;
+
+    final parentSegments = widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
+    final built = PathComponents(
+      parentSegments: parentSegments,
+      name: name,
+      type: EntryType.file,
+      fsType: _fsType,
+    ).validateAndBuild();
+    if (built is! PathBuildSuccess) return;
 
     final parentContext = context;
     Navigator.pop(context);
 
-    final full = widget.currentDirPath.isEmpty
-        ? name
-        : '${widget.currentDirPath}/$name';
-    final ok = await vaultExplorerApi.createEmptyFile(widget.container, full);
+    final ok = await vaultExplorerApi.createEmptyFile(widget.container, built.path);
     if (ok) {
       widget.onSuccess();
     } else if (parentContext.mounted) {
@@ -236,13 +389,23 @@ class _CreateFileDialogState extends State<_CreateFileDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final name = _ctrl.text;
     return AlertDialog(
       title: const Text('New Text File'),
-      content: TextField(
-        controller: _ctrl,
-        decoration: const InputDecoration(hintText: 'filename.txt'),
-        autofocus: true,
-        onSubmitted: (_) => _onCreate(),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _ctrl,
+            decoration: const InputDecoration(hintText: 'filename.txt'),
+            autofocus: true,
+            inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
+            onChanged: _onChanged,
+            onSubmitted: (_) => _onCreate(),
+          ),
+          buildIssuesList(name),
+        ],
       ),
       actions: [
         TextButton(
@@ -250,7 +413,7 @@ class _CreateFileDialogState extends State<_CreateFileDialog> {
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: _onCreate,
+          onPressed: name.isNotEmpty && isValid ? _onCreate : null,
           child: const Text('Create'),
         ),
       ],
@@ -260,15 +423,15 @@ class _CreateFileDialogState extends State<_CreateFileDialog> {
 
 class _RenameDialog extends StatefulWidget {
   final MountedContainer container;
-  final List<String> oldNames;
-  final Set<String> existingNamesInDir;
+  final List<RawEntry> oldEntries;
+  final List<RawEntry> existingEntries;
   final String currentDirPath;
   final VoidCallback onSuccess;
 
   const _RenameDialog({
     required this.container,
-    required this.oldNames,
-    required this.existingNamesInDir,
+    required this.oldEntries,
+    required this.existingEntries,
     required this.currentDirPath,
     required this.onSuccess,
   });
@@ -277,15 +440,28 @@ class _RenameDialog extends StatefulWidget {
   State<_RenameDialog> createState() => _RenameDialogState();
 }
 
-class _RenameDialogState extends State<_RenameDialog> {
+class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_RenameDialog> {
   late final TextEditingController _ctrl;
+  late final FilesystemType _fsType;
+
+  bool get _isSingle => widget.oldEntries.length == 1;
 
   @override
   void initState() {
     super.initState();
     _ctrl = TextEditingController(
-      text: widget.oldNames.length == 1 ? widget.oldNames.first : '',
+      text: _isSingle ? widget.oldEntries.first.name : '',
     );
+    _fsType = resolveFilesystemType(widget.container);
+    if (_isSingle) {
+      seedValidation(
+        text: _ctrl.text,
+        fsType: _fsType,
+        entryType: widget.oldEntries.first.isDir ? EntryType.folder : EntryType.file,
+        existingEntries: widget.existingEntries,
+        excluding: widget.oldEntries.first,
+      );
+    }
   }
 
   @override
@@ -294,83 +470,154 @@ class _RenameDialogState extends State<_RenameDialog> {
     super.dispose();
   }
 
+  void _onChanged(String text) {
+    if (_isSingle) {
+      revalidate(
+        text: text,
+        fsType: _fsType,
+        entryType: widget.oldEntries.first.isDir ? EntryType.folder : EntryType.file,
+        existingEntries: widget.existingEntries,
+        excluding: widget.oldEntries.first,
+      );
+    } else {
+      // Multi-rename: each item gets its own extension appended (see
+      // _onRename below), so there's no single "the" candidate name to
+      // conflict-check live here — only the base-name character legality
+      // is checked as the user types. Each computed final name is
+      // validated for real, individually, at submit time.
+      final result = validateEntryName(text, _fsType, entryType: EntryType.file);
+      setState(() => issues = result.issues);
+    }
+  }
+
   Future<void> _onRename() async {
-    final newNameBase = sanitizeFatFileName(_ctrl.text.trim());
+    final newNameBase = _ctrl.text;
     if (newNameBase.isEmpty) return;
 
-    final parentContext = context;
-    Navigator.pop(context);
+    if (_isSingle) {
+      if (!isValid) return;
+      final oldEntry = widget.oldEntries.first;
+      final oldName = oldEntry.name;
+      if (newNameBase == oldName) {
+        Navigator.pop(context);
+        return;
+      }
+      final parentSegments = widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
+      final built = PathComponents(
+        parentSegments: parentSegments,
+        name: newNameBase,
+        type: oldEntry.isDir ? EntryType.folder : EntryType.file,
+        fsType: _fsType,
+      ).validateAndBuild();
+      if (built is! PathBuildSuccess) return;
 
-    if (widget.oldNames.length == 1) {
-      final oldName = widget.oldNames.first;
-      if (newNameBase == oldName) return;
-      final oldFull = widget.currentDirPath.isEmpty
-          ? oldName
-          : '${widget.currentDirPath}/$oldName';
-      final newFull = widget.currentDirPath.isEmpty
-          ? newNameBase
-          : '${widget.currentDirPath}/$newNameBase';
-      final ok = await vaultExplorerApi.renameFile(
-        widget.container,
-        oldFull,
-        newFull,
-      );
+      final parentContext = context;
+      Navigator.pop(context);
+
+      final oldFull = widget.currentDirPath.isEmpty ? oldName : '${widget.currentDirPath}/$oldName';
+      final ok = await vaultExplorerApi.renameFile(widget.container, oldFull, built.path);
       if (ok) {
         widget.onSuccess();
       } else if (parentContext.mounted) {
         showAppSnackBar(
           parentContext,
-          message: 'Couldn\'t rename "$oldName" — a file with that name may already exist',
+          message: 'Couldn\'t rename "$oldName" — an item with that name may already exist',
           tone: AppBannerTone.error,
         );
       }
-    } else {
-      int successCount = 0;
-      int failCount = 0;
-      final existing = Set<String>.from(widget.existingNamesInDir);
-      for (final oldName in widget.oldNames) {
-        final parts = oldName.split('.');
-        final ext = parts.length > 1 ? '.${parts.last}' : '';
-        String desiredName;
-        if (newNameBase.toLowerCase().endsWith(ext.toLowerCase())) {
-          desiredName = newNameBase;
-        } else {
-          desiredName = '$newNameBase$ext';
-        }
-        final uniqueName = FileOperationService.makeUniqueName(desiredName, existing);
-        existing.add(uniqueName.toLowerCase());
-        final oldFull = widget.currentDirPath.isEmpty ? oldName : '${widget.currentDirPath}/$oldName';
-        final newFull = widget.currentDirPath.isEmpty ? uniqueName : '${widget.currentDirPath}/$uniqueName';
-        final ok = await vaultExplorerApi.renameFile(widget.container, oldFull, newFull);
-        if (ok) {
-          successCount++;
-        } else {
-          failCount++;
-        }
+      return;
+    }
+
+    // Multi-rename: each source item keeps its own extension unless the
+    // typed base name already ends with it. Same-type auto-dedup
+    // (" (2)", etc.) is the pre-existing, intentional
+    // FileOperationService.makeUniqueName behavior for this batch flow —
+    // see docs/architecture.md ADR-002's scope note — but every computed
+    // final name is now validated for real before being sent, and a
+    // cross-type collision (item name matches an existing entry of the
+    // *other* type) is rejected rather than silently colliding.
+    final parentContext = context;
+    Navigator.pop(context);
+
+    int successCount = 0;
+    int failCount = 0;
+    String? firstFailureReason;
+    final existingLower = Set<String>.from(widget.existingEntries.map((e) => e.name.toLowerCase()));
+    for (final oldEntry in widget.oldEntries) {
+      final oldName = oldEntry.name;
+      final parts = oldName.split('.');
+      final ext = parts.length > 1 ? '.${parts.last}' : '';
+      String desiredName;
+      if (newNameBase.toLowerCase().endsWith(ext.toLowerCase())) {
+        desiredName = newNameBase;
+      } else {
+        desiredName = '$newNameBase$ext';
       }
-      if (successCount > 0) widget.onSuccess();
-      if (failCount > 0 && parentContext.mounted) {
-        showAppSnackBar(
-          parentContext,
-          message: 'Couldn\'t rename $failCount items',
-          tone: AppBannerTone.error,
-        );
+      final uniqueName = FileOperationService.makeUniqueName(desiredName, existingLower);
+
+      final nameCheck = validateEntryName(uniqueName, _fsType, entryType: oldEntry.isDir ? EntryType.folder : EntryType.file);
+      if (nameCheck.issues.isNotEmpty) {
+        failCount++;
+        firstFailureReason ??= nameCheck.issues.first.message;
+        continue;
       }
+      final conflictCheck = checkEntryConflict(
+        candidateName: uniqueName,
+        candidateIsDir: oldEntry.isDir,
+        existingEntries: widget.existingEntries,
+        caseSensitive: FilesystemRules.of(_fsType).caseSensitive,
+        excluding: oldEntry,
+      );
+      if (conflictCheck.kind == EntryConflictKind.crossType) {
+        failCount++;
+        firstFailureReason ??= conflictCheck.message(uniqueName);
+        continue;
+      }
+
+      existingLower.add(uniqueName.toLowerCase());
+      final oldFull = widget.currentDirPath.isEmpty ? oldName : '${widget.currentDirPath}/$oldName';
+      final newFull = widget.currentDirPath.isEmpty ? uniqueName : '${widget.currentDirPath}/$uniqueName';
+      final ok = await vaultExplorerApi.renameFile(widget.container, oldFull, newFull);
+      if (ok) {
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+    if (successCount > 0) widget.onSuccess();
+    if (failCount > 0 && parentContext.mounted) {
+      showAppSnackBar(
+        parentContext,
+        message: firstFailureReason != null
+            ? 'Couldn\'t rename $failCount item(s): $firstFailureReason'
+            : 'Couldn\'t rename $failCount item(s)',
+        tone: AppBannerTone.error,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.oldNames.length == 1 ? 'Rename' : 'Rename ${widget.oldNames.length} items';
+    final title = _isSingle ? 'Rename' : 'Rename ${widget.oldEntries.length} items';
+    final name = _ctrl.text;
     return AlertDialog(
       title: Text(title),
-      content: TextField(
-        controller: _ctrl,
-        autofocus: true,
-        decoration: InputDecoration(
-          hintText: widget.oldNames.length == 1 ? 'New name' : 'Base name',
-        ),
-        onSubmitted: (_) => _onRename(),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: _isSingle ? 'New name' : 'Base name',
+            ),
+            inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
+            onChanged: _onChanged,
+            onSubmitted: (_) => _onRename(),
+          ),
+          buildIssuesList(name),
+        ],
       ),
       actions: [
         TextButton(
@@ -378,7 +625,7 @@ class _RenameDialogState extends State<_RenameDialog> {
           child: const Text('Cancel'),
         ),
         TextButton(
-          onPressed: _onRename,
+          onPressed: name.isNotEmpty && (_isSingle ? isValid : issues.isEmpty) ? _onRename : null,
           child: const Text('Rename'),
         ),
       ],

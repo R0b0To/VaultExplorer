@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.cryptomator
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.DirEntryWire
 import com.aeidolon.vaultexplorer.VaultBackend
 import com.aeidolon.vaultexplorer.engine.ChunkedEngineDelegate
 import com.aeidolon.vaultexplorer.engine.ChunkedFileEngine
@@ -78,14 +79,14 @@ class CryptomatorSession(
                 when (node) {
                     is VaultNode.VDir -> {
                         val mtime = node.physicalFolder.lastModified() / 1000L
-                        "[DIR] ${node.cleartextName}|0|$mtime"
+                        DirEntryWire.encode(node.cleartextName, true, 0L, mtime)
                     }
                     is VaultNode.VFile -> {
                         val ciphertextSize = node.physicalFile.length()
                         val withoutHeader = ciphertextSize - contentCryptor.headerSize
                         val cleartextSize = if (withoutHeader < 0) 0L else contentCryptor.cleartextSize(withoutHeader)
                         val mtime = node.physicalFile.lastModified() / 1000L
-                        "${node.cleartextName}|$cleartextSize|$mtime"
+                        DirEntryWire.encode(node.cleartextName, false, cleartextSize, mtime)
                     }
                 }
             }.toTypedArray()

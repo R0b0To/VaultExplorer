@@ -1,5 +1,7 @@
 #include "ntfs_backend.h"
 
+#include "dir_entry_wire.h"
+
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
@@ -341,11 +343,7 @@ int ntfsFilldir(void* dirent, const ntfschar* name, const int nameLength,
 
     ntfs_inode_close(ni);
 
-    if (isDir) {
-        context->results->push_back("[DIR] " + nameStr + "|0|" + std::to_string(ts));
-    } else {
-        context->results->push_back(nameStr + "|" + std::to_string(size) + "|" + std::to_string(ts));
-    }
+    context->results->push_back(encodeDirEntryWire(nameStr, isDir, size, ts));
     return 0;
 }
 
@@ -650,19 +648,16 @@ bool ntfsRenameFile(int volumeId, const std::string& oldPath, const std::string&
     int uNewLen = ntfs_mbstoucs(newChildName.c_str(), &uNew);
 
     if (uOldLen >= 0 && uNewLen >= 0) {
-        // Step 1: if something already exists at the destination, overwrite it
-        ntfs_inode* dest_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, newFullPath.c_str());
-        if (dest_ni) {
-            ntfs_inode* dest_dir_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentNewPath.c_str());
-            if (dest_dir_ni) {
-                ntfs_delete(v.ntfsVol, newFullPath.c_str(), dest_ni, dest_dir_ni,
-                            uNew, static_cast<u8>(uNewLen));
-            } else {
-                ntfs_inode_close(dest_ni);
-            }
+
+        ntfs_inode* existing_dest_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, newFullPath.c_str());
+        if (existing_dest_ni) {
+            ntfs_inode_close(existing_dest_ni);
+            if (uOld) free(uOld);
+            if (uNew) free(uNew);
+            return false;
         }
 
-        // Step 2: pre-open all necessary inodes
+        // Pre-open all necessary inodes
         ntfs_inode* old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, oldFullPath.c_str());
         ntfs_inode* dir_new_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentNewPath.c_str());
         ntfs_inode* dir_old_ni = ntfs_pathname_to_inode(v.ntfsVol, NULL, parentOldPath.c_str());

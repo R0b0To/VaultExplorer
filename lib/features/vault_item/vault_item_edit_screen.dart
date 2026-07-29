@@ -8,8 +8,12 @@ import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
-import 'package:vaultexplorer/core/utils/filename_utils.dart';
+import 'package:vaultexplorer/core/filesystem/illegal_char_input_formatter.dart';
+import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
+import 'package:vaultexplorer/core/filesystem/name_validation.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+
+import '../../core/filesystem/filesystem_type.dart';
 
 class VaultItemEditScreen extends StatefulWidget {
   final MountedContainer container;
@@ -38,6 +42,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
   final Map<String, TextEditingController> _ctrls = {};
   final Map<String, bool> _revealed = {};
   bool _saving = false;
+  late final FilesystemType _fsType;
   
   // Track initial values to determine if actual text edits occurred
   late final String _initialTitle;
@@ -49,6 +54,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
     super.initState();
     final existing = widget.existing;
     
+    _fsType = resolveFilesystemType(widget.container);
     _initialTitle = existing?.title ?? '';
     _titleCtrl = TextEditingController(text: _initialTitle);
     _titleCtrl.addListener(_onTextChanged);
@@ -103,9 +109,23 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
   bool get _isNew => widget.existing == null;
 
+  /// The title doubles as the on-disk file name (with `.{type}` appended —
+  /// see [_save]), so it's validated as one here rather than mutated. See
+  /// docs/architecture.md ADR-002: this used to run through
+  /// `sanitizeFatFileName`, which silently rewrote illegal characters —
+  /// the title displayed in the UI and the name actually saved to disk
+  /// were both derived from the user's input, but no longer matched each
+  /// other. Now an invalid title is rejected with the specific reason
+  /// instead.
   bool _validate() {
-    if (_titleCtrl.text.trim().isEmpty) {
+    if (_titleCtrl.text.isEmpty) {
       _showSnack('Title is required');
+      return false;
+    }
+    final desiredName = '${_titleCtrl.text}.${widget.type.name}';
+    final result = validateEntryName(desiredName, _fsType, entryType: EntryType.file);
+    if (result.issues.isNotEmpty) {
+      _showSnack(result.issues.first.message);
       return false;
     }
     return true;
@@ -119,8 +139,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
       for (final f in _fields) f.key: _ctrls[f.key]?.text.trim() ?? '',
     };
 
-    final newTitle = _titleCtrl.text.trim();
-    final safeTitle = sanitizeFatFileName(newTitle);
+    final newTitle = _titleCtrl.text;
 
     String finalPath = widget.filePath ?? '';
 
@@ -138,7 +157,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
         .toSet();
 
     if (_isNew) {
-      final desiredName = '$safeTitle.${widget.type.name}';
+      final desiredName = '$newTitle.${widget.type.name}';
       final uniqueName = FileOperationService.makeUniqueName(desiredName, existingNames);
       finalPath = destDirPath.isEmpty ? uniqueName : '$destDirPath/$uniqueName';
     } else if (widget.existing!.title != newTitle) {
@@ -149,7 +168,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
       final namesExcludingSelf = existingNames.difference({oldName.toLowerCase()});
 
-      final desiredName = '$safeTitle.${widget.type.name}';
+      final desiredName = '$newTitle.${widget.type.name}';
       final uniqueName = FileOperationService.makeUniqueName(desiredName, namesExcludingSelf);
       final newPath = destDirPath.isEmpty ? uniqueName : '$destDirPath/$uniqueName';
 
@@ -230,6 +249,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
               controller: _titleCtrl,
               autofocus: _isNew,
               textCapitalization: TextCapitalization.words,
+              inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
               decoration: InputDecoration(
                 hintText: '${widget.type.label} name',
                 prefixIcon: Icon(Icons.label_outline_rounded, size: AppIconSize.small, color: cs.onSurfaceVariant),

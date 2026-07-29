@@ -34,4 +34,30 @@ object ImportProgressBridge {
             )
         }
     }
+
+    /**
+     * Fired once per source entry whose name failed
+     * [FilesystemNameValidator] validation for the destination container.
+     * The entry is not written and its name is never mutated to "fix" it
+     * (see docs/architecture.md ADR-002) -- this is the only record that it
+     * was skipped, so the Dart side can summarize it for the user instead
+     * of the entry silently vanishing from the import.
+     *
+     * Additive to the existing "onImportProgress" event stream: does not
+     * change the `importFiles`/`importFolder` `Int`-count return contract.
+     */
+    @JvmStatic
+    fun reportSkippedInvalidName(opId: Int, name: String, reasons: List<String>) {
+        val ch = channel ?: return
+        mainHandler.post {
+            ch.invokeMethod(
+                "onImportItemSkipped",
+                mapOf(
+                    "opId" to opId,
+                    "name" to name,
+                    "reason" to reasons.joinToString("; "),
+                ),
+            )
+        }
+    }
 }

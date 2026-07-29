@@ -1,5 +1,7 @@
 #include "fat_backend.h"
 
+#include "dir_entry_wire.h"
+
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -63,11 +65,8 @@ void fatListDirectory(int volumeId, const std::string& pathSuffix, std::vector<s
             if (strcmp(name, "SYSTEM~1") == 0 || strcmp(name, "$RECYCLE.BIN") == 0) continue;
 
             const uint64_t ts = fatToUnixTimestamp(fno.fdate, fno.ftime);
-            if (fno.fattrib & AM_DIR) {
-                results.push_back("[DIR] " + std::string(name) + "|0|" + std::to_string(ts));
-            } else {
-                results.push_back(std::string(name) + "|" + std::to_string(fno.fsize) + "|" + std::to_string(ts));
-            }
+            const bool isDir = fno.fattrib & AM_DIR;
+            results.push_back(encodeDirEntryWire(name, isDir, fno.fsize, ts));
         }
         f_closedir(&dir);
     }

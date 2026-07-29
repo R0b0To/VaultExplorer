@@ -62,6 +62,11 @@ class FullResImageCache {
   /// eviction or process death.
   static void clear() => _cache.clear();
 
+  /// Applies device-tier-scaled sizing (ADR-011) — see
+  /// `DeviceCapabilityProfiler`/`runDeferredStartupWork()`. `FullResImageCache`
+  /// is the one cache in this subsystem that was already byte-budgeted
+  /// correctly from the start (ADR-002); this just exposes that primitive
+  /// for the same profiler-driven sizing every other cache now has.
   static void resize(int newMaxTotalBytes) => _cache.resize(newMaxTotalBytes);
 
   /// Evicts [fraction] of currently-held bytes, oldest-first, without
@@ -72,6 +77,30 @@ class FullResImageCache {
   // --------------------------------------------------------------------
   // Concurrency gate
   // --------------------------------------------------------------------
+  //
+  // Without this, both EncryptedImageWidget's on-demand load and
+  // MediaViewerScreen's background prefetch called vaultExplorerApi
+  // directly and unconditionally. Every page PageView.builder materializes
+  // during a fast swipe/fling fires a real decrypt+transfer immediately,
+  // with no cap and no way to cancel a request for a page the user has
+  // already scrolled past -- so those requests pile up FIFO on the native
+  // ioExecutor thread pool (see MainActivity.kt), and the page the user
+  // has actually landed on has to wait behind however many stale ones were
+  // queued ahead of it. There is no cancellation once invokeMethod is
+  // sent, so the only lever available from Dart is never submitting the
+  // call in the first place.
+  //
+  // This mirrors ThumbnailConcurrency/AsyncThumbnail's LIFO-with-
+  // cancellation gate (see widgets/async_thumbnail.dart) -- same shape,
+  // applied to the much heavier full-resolution path.
+
+  /// Kept small (2) since each request here is a whole decrypted file, not
+  /// a thumbnail -- this bounds how many stale swiped-past requests can
+  /// ever sit ahead of the current page in the native queue. Priority-
+  /// tiered (ADR-010) and playback-aware (ADR-012) like
+  /// `ThumbnailConcurrency`'s limiters -- the media viewer's current page
+  /// should use [TaskPriority.visible] (the default) and its next/prev
+  /// prefetch should pass [TaskPriority.adjacent] explicitly.
   static final limiter = PriorityTaskQueue(2);
 
   /// In-flight de-dup so a widget-triggered load and a screen-triggered

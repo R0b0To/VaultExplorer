@@ -81,17 +81,15 @@ class ThumbnailCacheService {
   // ── Filename / key encoding ────────────────────────────────────────────────
   static String _encodeKey(String value) {
     const int fnvPrime = 1099511628211;
-    const int offsetBasis = -2875151525287752661; // 0xcbf29ce484222325 as signed 64-bit int
+    const int offsetBasis = -2875151525287752661;
     const int mask64 = 0xFFFFFFFFFFFFFFFF;
-
     int hash = offsetBasis;
     final bytes = utf8.encode(value);
     for (final byte in bytes) {
       hash = (hash ^ byte) & mask64;
       hash = (hash * fnvPrime) & mask64;
     }
-    // Returns an extremely safe, unique 16-character hex filename
-    return hash.toRadixString(16);
+    return BigInt.from(hash).toUnsigned(64).toRadixString(16).padLeft(16, '0');
   }
 
   // ── Quality-qualified path key ─────────────────────────────────────────────

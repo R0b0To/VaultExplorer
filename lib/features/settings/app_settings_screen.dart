@@ -6,6 +6,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
+import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import '../../app/vault_explorer_app.dart';
@@ -466,7 +467,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             value: _settings.blockScreenshots,
                             onChanged: (v) async {
                               setState(() => _settings.blockScreenshots = v);
-                              await vaultExplorerApi.setSecureScreen(v);
+                              await SecureScreenPolicy.apply(preference: v);
                               await _persist();
                             },
                           ),

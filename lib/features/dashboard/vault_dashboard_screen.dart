@@ -9,6 +9,7 @@ import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
+import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
 import 'package:vaultexplorer/data/services/session_lock_controller.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -150,6 +151,7 @@ class _VaultDashboardState extends State<VaultDashboard>
       }
       _isLoading = false;
     });
+    _syncSecureScreen();
     _lockController.scheduleAutoLock();
   }
 
@@ -200,6 +202,31 @@ class _VaultDashboardState extends State<VaultDashboard>
     );
   }
 
+  /// FLAG_SECURE isn't only about blocking manual screenshots — it also
+  /// tells Android not to cache a real bitmap of this window for the
+  /// "resume" transition (the task-snapshot placeholder shown instantly
+  /// when a task returns to the foreground, including right after
+  /// dismissing the keyguard). That snapshot mechanism, not any timing
+  /// race in our own auto-lock code, is what actually caused the reported
+  /// bug: a container auto-locks on screen-off, but Android had already
+  /// cached its last-visible screen as this window's snapshot *before*
+  /// the lock could apply, and replayed that cached bitmap the instant the
+  /// device was unlocked — regardless of how fast our own lock logic ran.
+  /// With FLAG_SECURE set, Android skips that snapshot and shows a plain
+  /// placeholder instead, so there's nothing sensitive left to flash.
+  ///
+  /// So: force it on for as long as *any* container is unlocked, regardless
+  /// of the person's own "block screenshots" preference — there's decrypted
+  /// content on screen; hiding it from the OS's own snapshot cache isn't
+  /// optional the way manual screenshot-blocking is. Once nothing is
+  /// mounted, fall back to whatever they actually chose in Settings.
+  /// Idempotent and cheap enough to just call after every mount/unmount
+  /// rather than tracking 0↔1 transitions by hand.
+  void _syncSecureScreen() {
+    SecureScreenPolicy.anyContainerMounted = _mounted.isNotEmpty;
+    unawaited(SecureScreenPolicy.apply(preference: _appSettings.blockScreenshots));
+  }
+
   void _onUserActivityForContainer(int volId) {
     final idx = _mounted.indexWhere((c) => c.volId == volId);
     if (idx == -1) return;
@@ -225,6 +252,7 @@ class _VaultDashboardState extends State<VaultDashboard>
       }
       _ensureOrdered(container.uri);
     });
+    _syncSecureScreen();
     _scheduleAutoClose(container);
     _refreshContainerSpace(container.volId);
   }
@@ -258,6 +286,7 @@ class _VaultDashboardState extends State<VaultDashboard>
         _recordsOrder.add(container.uri);
       }
     });
+    _syncSecureScreen();
     _scheduleAutoClose(container);
     ContainerRepository.instance.saveOrder(_recordsOrder);
   }
@@ -291,6 +320,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (mounted) {
       setState(() => _mounted.removeWhere((c) => c.volId == volId));
     }
+    _syncSecureScreen();
   }
 
   Future<void> _refreshContainerSpace(int volId) async {

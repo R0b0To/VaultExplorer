@@ -100,7 +100,7 @@ abstract final class ChannelMethods {
   static const documentExists = 'documentExists';
   static const warmContainer = 'warmContainer';
 
-
+  // VaultExplorerApi.initMethodCallHandler and CacheCoordinator.
   static const onTrimMemory = 'onTrimMemory';
 
   // ── Device capability profiling ────────────────────────────────

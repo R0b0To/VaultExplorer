@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Build Signed APK + AAB
+    name: Build Signed APKs
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -48,7 +48,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          export PUB_CACHE=$(pwd)/.pub-cache
+          export PUB_CACHE=/tmp/.pub-cache
           flutter pub get
 
       # ── Keystore ────────────────────────────────────────────────────
@@ -68,14 +68,8 @@ jobs:
       # ── Build APKs (GitHub Releases / F-Droid direct install) ───────────────
       - name: Build release APKs (Split per ABI)
         run: |
-          export PUB_CACHE=$(pwd)/.pub-cache
+          export PUB_CACHE=/tmp/.pub-cache
           flutter build apk --release --split-per-abi
-
-      # ── Build AAB (Play Store) ─────────────────────────────────────────────
-      - name: Build release App Bundle (Play Store)
-        run: |
-          export PUB_CACHE=$(pwd)/.pub-cache
-          flutter build appbundle --release
 
       # ── Rename with version ───────────────────────────────────────────
       - name: Rename build outputs
@@ -84,7 +78,6 @@ jobs:
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
 
           mkdir -p release-apks
-          mkdir -p release-aab
 
           for apk in build/app/outputs/flutter-apk/app-*-release.apk; do
             filename=$(basename "$apk" .apk)
@@ -92,21 +85,12 @@ jobs:
             cp "$apk" "release-apks/vaultexplorer-${VERSION}-${abi}.apk"
           done
 
-          cp build/app/outputs/bundle/release/app-release.aab "release-aab/vaultexplorer-${VERSION}.aab"
-
       # ── Upload artifacts ───────────────────────────────────────────────
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: VaultExplorer-${{ env.APP_VERSION }}-APKs
           path: release-apks/*.apk
-          retention-days: 30
-
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: VaultExplorer-${{ env.APP_VERSION }}-AAB
-          path: release-aab/*.aab
           retention-days: 30
 
       # ── Create GitHub Release ───────────────────────────────────────────

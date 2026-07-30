@@ -12,6 +12,18 @@ plugins {
 }
 
 
+val buildPdfJs = tasks.register<Exec>("buildPdfJsAssets") {
+    description = "Builds the pdf.js viewer bundle from source " +
+            "(scripts/build_pdfjs.sh). No-op if already built. This is the " +
+            "single source of truth for pdf.js across local dev, the GitHub " +
+            "Actions release build, and F-Droid's build -- none of them " +
+            "vendor a prebuilt copy in the repo."
+    workingDir = rootProject.file("..")
+    commandLine("bash", "scripts/build_pdfjs.sh")
+    inputs.file(rootProject.file("../scripts/build_pdfjs.sh"))
+    outputs.dir("src/main/assets/pdfjs")
+}
+
 android {
     namespace = "com.aeidolon.vaultexplorer"
     compileSdk = flutter.compileSdkVersion
@@ -95,3 +107,5 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation("junit:junit:4.13.2")
 }
+
+tasks.named("preBuild").configure { dependsOn(buildPdfJs) }

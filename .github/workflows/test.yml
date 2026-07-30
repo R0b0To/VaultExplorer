@@ -61,6 +61,15 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
+      # ── Node.js (./gradlew testDebugUnitTest depends on Gradle's preBuild
+      #    task transitively, which now runs scripts/build_pdfjs.sh -- these
+      #    tests never touch pdf.js themselves, but the task graph doesn't
+      #    know that) ──────────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
       # ── Kotlin unit tests ────────────────────────────────────────────────────
       # JVM-only (src/test): does not build or run the native C++ engine, and
       # must not exercise anything that transitively calls

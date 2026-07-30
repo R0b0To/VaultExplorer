@@ -18,27 +18,12 @@ Description: |-
   video, and PDFs from inside it, and extract only what you need. All
   decryption happens on-device; nothing is uploaded anywhere.
 
-# No ads, no tracking, no non-free dependencies.
-#
-# TrueCrypt-License blocker: RESOLVED. The vendored VeraCrypt Common/Tcdefs.h
-# and Common/Endian.c/.h were clean-room rewritten (no longer sourced from
-# veracrypt/VeraCrypt) and are now GPL-3.0-or-later, matching this project's
-# own license. See /NOTICE.md and android/app/src/main/cpp/Common/AUDIT.md
-# for the full audit trail. The audit's initial textual/grep-based header
-# analysis has since been confirmed against a real Android NDK build, which
-# compiles and runs successfully -- see AUDIT.md's "Update" note.
-#
 AntiFeatures:
 
 RepoType: git
 Repo: https://github.com/R0b0To/VaultExplorer.git
 
 Builds:
-  # NOTE: this entry must point at a real annotated git tag that exists in
-  # the repo at submission time, with versionName/versionCode matching what
-  # that tag's pubspec.yaml actually says (pubspec.yaml is now 1.0.0+1 --
-  # update this whole block again, including CurrentVersion/
-  # CurrentVersionCode below, whenever you cut a further release).
   - versionName: '1.0.0'
     versionCode: 1
     commit: v1.0.0
@@ -47,16 +32,6 @@ Builds:
     sudo:
       - apt-get update
       - apt-get install -y nodejs npm
-
-    prebuild:
-      - PDFJS_TAG=v6.2.108
-      - rm -rf /tmp/pdfjs-src
-      - git clone --branch $PDFJS_TAG --depth 1 https://github.com/mozilla/pdf.js.git /tmp/pdfjs-src
-      - cd /tmp/pdfjs-src && npm ci && npx gulp minified
-      - cp /tmp/pdfjs-src/build/minified/build/pdf.min.mjs
-          /tmp/pdfjs-src/build/minified/build/pdf.worker.min.mjs
-          android/app/src/main/assets/pdfjs/
-
 
     srclibs:
       - flutter@stable

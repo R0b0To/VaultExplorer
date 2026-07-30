@@ -54,7 +54,8 @@ and why none of them ship in this project.
 
 | Component | Upstream | License | Version | Status |
 |---|---|---|---|---|
-| pdf.js (`pdfjs/pdf.min.mjs`, `pdfjs/pdf.worker.min.mjs`, `pdfjs/viewer.{html,css,js}`) | mozilla/pdf.js | Apache-2.0 (confirmed in the `@licstart` header of the vendored file itself) | 6.2.108 | Free license, but **vendored pre-minified** rather than built from source by this repo's build -- see the `AntiFeatures`/comment block in `metadata/com.aeidolon.vaultexplorer.yml` for the open F-Droid "build from source" question this raises. Loaded into a sandboxed, no-network `WebView` (`PdfViewerPlugin.kt`) with vault bytes streamed in over a method channel; nothing is fetched from the internet at runtime. |
+| pdf.js (`pdfjs/pdf.min.mjs`, `pdfjs/pdf.worker.min.mjs`) | mozilla/pdf.js | Apache-2.0 (confirmed in the `@licstart` header) | v6.2.108, pinned in `scripts/build_pdfjs.sh` | **Built from source**, not vendored -- `scripts/build_pdfjs.sh` clones the pinned tag and runs pdf.js's own `gulp minified` build, invoked automatically by `android/app/build.gradle.kts`'s `preBuild` task for every build (local, CI, and F-Droid alike). Nothing under this path is committed to the repo; see `android/app/src/main/assets/pdfjs/.gitignore`. Loaded into a sandboxed, no-network `WebView` (`PdfViewerPlugin.kt`) with vault bytes streamed in over a method channel; nothing is fetched from the internet at runtime. |
+| `pdfjs/viewer.{html,css,js}` | this project | GPL-3.0-or-later, matching this project's own LICENSE | n/a | Original code, not vendored -- the custom viewer chrome that loads pdf.js above and talks to `PdfViewerPlugin.kt`. Committed and tracked normally. |
 
 This is what actually backs the in-app PDF viewer
 (`lib/features/browser/viewer/pdf_viewer_screen.dart` + `PdfViewerPlugin.kt`).

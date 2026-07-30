@@ -32,6 +32,13 @@ jobs:
           channel: stable
           cache: true
 
+      # ── Node.js (needed by scripts/build_pdfjs.sh, run automatically
+      #    from Gradle's preBuild once `flutter build` invokes Gradle) ──────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
       - name: Install dependencies
         run: flutter pub get
 

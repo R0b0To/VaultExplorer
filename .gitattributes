@@ -1,5 +1,6 @@
 *.sh text eol=lf
 android/gradlew text eol=lf
+* text=auto eol=lf
 
 # Vendored third-party pdf.js build (Mozilla, Apache-2.0).
 android/app/src/main/assets/pdfjs/** linguist-vendored

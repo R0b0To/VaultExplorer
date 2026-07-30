@@ -42,6 +42,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
+import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/truncated_banner.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
@@ -1593,18 +1594,18 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
-          onPressed: _captureFromCamera,
           child: const Text('Camera'),
+          onPressed: _captureFromCamera,
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
-          onPressed: _importFilesFromDevice,
           child: const Text('Import Files'),
+          onPressed: _importFilesFromDevice,
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.secondary),
-          onPressed: _importFolderFromDevice,
           child: const Text('Import Folder'),
+          onPressed: _importFolderFromDevice,
         ),
         const PopupMenuDivider(),
         SubmenuButton(
@@ -1697,51 +1698,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  Widget _buildSortPopupButton(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return MenuAnchor(
-      builder: (context, controller, child) => IconButton(
-        icon: const Icon(Icons.sort_by_alpha_rounded),
-        tooltip: 'Sort options',
-        onPressed: () {
-          if (controller.isOpen) {
-            controller.close();
-          } else {
-            controller.open();
-          }
-        },
-      ),
-      onOpen: () => setState(() => _menuIsOpen = true),
-      onClose: () => setState(() => _menuIsOpen = false),
-      menuChildren: [
-        for (final (field, label, icon) in const [
-          (SortBy.name, 'Name', Icons.sort_by_alpha_rounded),
-          (SortBy.size, 'Size', Icons.data_usage_rounded),
-          (SortBy.extension, 'Type', Icons.category_outlined),
-          (SortBy.date, 'Date', Icons.schedule_rounded),
-        ])
-          MenuItemButton(
-            leadingIcon: Icon(icon, color: sortBy == field ? cs.primary : cs.onSurfaceVariant),
-            trailingIcon: sortBy == field
-                ? Icon(
-                    sortAscending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                    size: 16,
-                    color: cs.primary,
-                  )
-                : null,
-            onPressed: () => _onSortChanged(field),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: sortBy == field ? FontWeight.bold : FontWeight.normal,
-                color: sortBy == field ? cs.primary : null,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
   Map<FileManagerAction, WidgetBuilder> _buildActionBuilders() {
     final hasLocalMedia = _currentItems
         .where((e) => !e.isDir)
@@ -1760,7 +1716,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           ),
       FileManagerAction.add: (context) => _buildAddPopupButton(context),
       FileManagerAction.viewToggle: (context) => _buildViewTogglePopupButton(context),
-      FileManagerAction.sort: (context) => _buildSortPopupButton(context),
+      FileManagerAction.sort: (context) => SortMenuButton(
+            sortBy: sortBy,
+            sortAscending: sortAscending,
+            onSortChanged: _onSortChanged,
+          ),
       FileManagerAction.playMedia: (context) => IconButton(
             icon: const Icon(Icons.play_circle_outline_rounded),
             tooltip: 'Play media here',

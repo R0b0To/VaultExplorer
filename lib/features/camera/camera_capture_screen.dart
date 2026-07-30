@@ -134,7 +134,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     _exposureHideTimer?.cancel();
     _sensorSubscription?.cancel();
     _cameraEventSubscription?.cancel();
-    _cameraController.dispose();
+    unawaited(_cameraController.dispose());
 
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,

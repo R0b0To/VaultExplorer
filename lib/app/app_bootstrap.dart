@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -17,6 +18,13 @@ void configurePlatformIntegrations() {
   PlatformDispatcher.instance.onError = (error, stack) {
     final errStr = error.toString();
     if (errStr.contains('Cannot add event after closing')) {
+      // The one known source of this (VaultCameraController.dispose()
+      // racing its own StreamController.close() against a straggling
+      // native camera event) is fixed -- see docs/tech-debt.md TD-9. This
+      // is now a safety net, not a silent blanket suppression: if it fires
+      // again, that's a *new* instance of the same class of bug somewhere
+      // else, and it should be visible rather than invisible.
+      debugPrint('Suppressed stream-after-close error (see TD-9): $errStr');
       return true;
     }
     return false;

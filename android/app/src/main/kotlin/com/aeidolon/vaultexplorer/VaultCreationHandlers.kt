@@ -21,6 +21,21 @@ class VaultCreationHandlers(
     private val ioExecutor: ExecutorService,
     private val nativeOps: NativeOpSupport,
 ) {
+    companion object {
+        /**
+         * True if neither a password nor any keyfiles were supplied for a
+         * create-container call. Extracted as a pure function (no
+         * MainActivity/Android dependency) purely so it's directly testable
+         * from a plain JVM unit test — see
+         * PendingResultLeakTest's "invalid create call never stashes"
+         * case, which exercises this exact predicate to confirm
+         * [handleCreateContainer] replies and returns *before* calling
+         * [PendingActivityResult.stash], never after.
+         */
+        fun isMissingCredentials(password: String, keyfilePaths: List<String>?): Boolean =
+            password.isEmpty() && keyfilePaths.isNullOrEmpty()
+    }
+
     private val createContainerLock = Object()
 
     private data class PendingCreate(
@@ -88,7 +103,7 @@ class VaultCreationHandlers(
         val name = call.argument<String>("displayName") ?: "vault.hc"
         val password = call.argument<String>("password") ?: ""
         val keyfilePaths = call.argument<List<String>>("keyfilePaths")
-        if (password.isEmpty() && keyfilePaths.isNullOrEmpty()) {
+        if (isMissingCredentials(password, keyfilePaths)) {
             result.error("INVALID_ARGS", "password or keyfiles required", null)
             return
         }

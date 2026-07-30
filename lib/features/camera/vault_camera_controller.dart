@@ -320,8 +320,17 @@ class VaultCameraController {
     }
   }
 
-  void dispose() {
-    close();
-    _eventsController.close();
+  /// Awaited internally (not by callers, who fire-and-forget this from a
+  /// widget's synchronous dispose()) so that [close]'s
+  /// `_eventSubscription?.cancel()` is guaranteed to finish -- and so no
+  /// more native camera events can arrive -- strictly before
+  /// [_eventsController] itself closes. Getting this ordering wrong is
+  /// exactly what used to produce an intermittent "Cannot add event after
+  /// closing" StateError: a straggling event could land on
+  /// [_eventsController] in the gap between the two close calls. See
+  /// docs/tech-debt.md TD-9.
+  Future<void> dispose() async {
+    await close();
+    await _eventsController.close();
   }
 }

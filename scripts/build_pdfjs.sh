@@ -1,22 +1,10 @@
-#!/usr/bin/env bash
-# Builds the minified pdf.js viewer bundle from source and drops it into
-# android/app/src/main/assets/pdfjs/. Invoked automatically by
-# android/app/build.gradle.kts (preBuild) -- the output is NOT committed to
-# the repo (see android/app/src/main/assets/pdfjs/.gitignore), so this is
-# the single source of truth for every build: local `flutter run`/`flutter
-# build apk`, the GitHub Actions release workflow, and F-Droid's build all
-# go through this same script rather than each having their own copy of
-# the vendored files to keep in sync.
 set -euo pipefail
-
 cd "$(dirname "$0")/.."   # repo root
-
 PDFJS_TAG="v6.2.108"
 PDFJS_REPO="https://github.com/mozilla/pdf.js.git"
 OUT_DIR="android/app/src/main/assets/pdfjs"
-SRC_DIR="/tmp/pdfjs-src-${PDFJS_TAG}"
+SRC_DIR="${TMPDIR:-/tmp}/pdfjs-src-${PDFJS_TAG}"
 
-# --- Idempotency: skip entirely if the output already exists ---
 if [ -f "$OUT_DIR/pdf.min.mjs" ] && [ -f "$OUT_DIR/pdf.worker.min.mjs" ]; then
   echo "pdf.js already built at $OUT_DIR, skipping (delete that dir to force a rebuild)."
   exit 0
@@ -43,5 +31,4 @@ fi
 
 mkdir -p "$OUT_DIR"
 cp "$BUILT_DIR/pdf.min.mjs" "$BUILT_DIR/pdf.worker.min.mjs" "$OUT_DIR/"
-
 echo "pdf.js ${PDFJS_TAG} built and copied to $OUT_DIR"

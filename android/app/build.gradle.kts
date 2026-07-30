@@ -11,14 +11,6 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-
-// NOTE: pdf.js assets (pdf.min.mjs / pdf.worker.min.mjs) used to be built
-// from source here on every build via scripts/build_pdfjs.sh. That's now
-// a manual, occasionally-run maintenance script instead -- see the
-// comment at the top of that script. The built output is committed to
-// src/main/assets/pdfjs/ like any other asset, so there's nothing to
-// hook into preBuild anymore.
-
 android {
     namespace = "com.aeidolon.vaultexplorer"
     compileSdk = flutter.compileSdkVersion
@@ -52,11 +44,18 @@ android {
             cmake {
                 arguments(
                     "-DCMAKE_BUILD_TYPE=Release",
-                    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384",
-                    "-DCMAKE_MODULE_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
+                    "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,--build-id=none",
+                    "-DCMAKE_MODULE_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,--build-id=none"
                 )
-                cFlags("-O3", "-funroll-loops")
-                cppFlags("-O3", "-funroll-loops")
+                // -ffile-prefix-map normalizes the absolute source/build
+                // path baked into debug info and __FILE__/assert strings,
+                // so the same source produces byte-identical output
+                // whether it's checked out to /home/runner/work/... on
+                // GitHub Actions or /repo, /tmp/app, etc. elsewhere.
+                // Required for F-Droid Reproducible Builds verification.
+                val prefixMap = "-ffile-prefix-map=${rootProject.rootDir}=/build"
+                cFlags("-O3", "-funroll-loops", prefixMap)
+                cppFlags("-O3", "-funroll-loops", prefixMap)
             }
         }
     }

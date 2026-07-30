@@ -20,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0 # Required to read the git commit history
 
-              # ── Set SOURCE_DATE_EPOCH to match F-Droid ────────────────────────────
+      # ── Set SOURCE_DATE_EPOCH to match F-Droid ────────────────────────────
       - name: Set SOURCE_DATE_EPOCH for Reproducible Builds
         run: |
           COMMIT_TIMESTAMP=$(git log -1 --format=%ct)
@@ -47,7 +47,9 @@ jobs:
           node-version: '26'
 
       - name: Install dependencies
-        run: flutter pub get
+        run: |
+          export PUB_CACHE=$(pwd)/.pub-cache
+          flutter pub get
 
       # ── Keystore ────────────────────────────────────────────────────
       - name: Decode keystore
@@ -65,11 +67,15 @@ jobs:
 
       # ── Build APKs (GitHub Releases / F-Droid direct install) ───────────────
       - name: Build release APKs (Split per ABI)
-        run: flutter build apk --release --split-per-abi
+        run: |
+          export PUB_CACHE=$(pwd)/.pub-cache
+          flutter build apk --release --split-per-abi
 
       # ── Build AAB (Play Store) ─────────────────────────────────────────────
       - name: Build release App Bundle (Play Store)
-        run: flutter build appbundle --release
+        run: |
+          export PUB_CACHE=$(pwd)/.pub-cache
+          flutter build appbundle --release
 
       # ── Rename with version ───────────────────────────────────────────
       - name: Rename build outputs

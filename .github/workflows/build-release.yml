@@ -17,6 +17,14 @@ jobs:
       # ── Checkout ──────────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required to read the git commit history
+
+              # ── Set SOURCE_DATE_EPOCH to match F-Droid ────────────────────────────
+      - name: Set SOURCE_DATE_EPOCH for Reproducible Builds
+        run: |
+          COMMIT_TIMESTAMP=$(git log -1 --format=%ct)
+          echo "SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP" >> $GITHUB_ENV
 
       # ── Java ──────────────────────────────────────────────────────────
       - name: Set up Java 17

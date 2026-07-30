@@ -1,0 +1,103 @@
+name: Test & Analyze
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  flutter-checks:
+    name: Flutter analyze & test
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Flutter ─────────────────────────────────────────────────────────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # ── Static analysis ─────────────────────────────────────────────────────
+      - name: flutter analyze
+        run: flutter analyze
+
+      # ── Dart unit tests ─────────────────────────────────────────────────────
+      - name: flutter test
+        run: flutter test
+
+  kotlin-unit-tests:
+    name: Kotlin JVM unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Java ────────────────────────────────────────────────────────────────
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # ── Flutter (needed so the android/ Gradle project resolves against a
+      #    real Flutter SDK checkout, same as the release workflow) ───────────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      # ── Kotlin unit tests ────────────────────────────────────────────────────
+      # JVM-only (src/test): does not build or run the native C++ engine, and
+      # must not exercise anything that transitively calls
+      # NativeEngine.getMaxVolumesNative() or any other `external fun` --
+      # System.loadLibrary("vaultexplorer") has nothing to load here. See
+      # docs/tech-debt.md TD-3/TD-5 and the comment atop
+      # ContainerSessionRegistryTest.kt.
+      - name: Run Kotlin unit tests
+        working-directory: android
+        run: ./gradlew testDebugUnitTest
+
+      - name: Upload Kotlin test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-unit-test-report
+          path: android/app/build/reports/tests/testDebugUnitTest/
+          retention-days: 14
+
+  # ── TD-11: catch a repeat of docs/architecture.md silently going missing ──
+  # while dozens of comments still cite it by path. Not exhaustive (doesn't
+  # validate individual ADR numbers resolve to real entries), just makes sure
+  # the file itself can never again disappear without a red CI run.
+  architecture-doc-check:
+    name: architecture.md citation check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify docs/architecture.md exists if cited anywhere
+        run: |
+          if grep -rq "docs/architecture\.md" --include="*.dart" --include="*.kt" --include="*.cpp" --include="*.h" . ; then
+            if [ ! -f "docs/architecture.md" ]; then
+              echo "::error::Code comments cite docs/architecture.md but the file does not exist."
+              grep -rn "docs/architecture\.md" --include="*.dart" --include="*.kt" --include="*.cpp" --include="*.h" . | head -20
+              exit 1
+            fi
+          fi

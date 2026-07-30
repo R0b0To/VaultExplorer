@@ -29,7 +29,14 @@ object ContainerSessionRegistry {
     val locks: Array<java.util.concurrent.locks.ReentrantReadWriteLock> by lazy { 
         Array(MAX_VOLUMES) { java.util.concurrent.locks.ReentrantReadWriteLock(true) } 
     }
-    val activeSessions = mutableMapOf<Int, ContainerSession>()
+    // ConcurrentHashMap, not mutableMapOf: writes happen from the UI thread
+    // on unlock (VaultUnlockHandlers.kt) but from ioExecutor on lock
+    // (ContainerEngine.lock -> removeSession), and the per-volId locks in
+    // [locks] guard native calls only, not this map. Mirrors the same
+    // precedent already established by VaultBackendRegistry.sessions
+    // (VaultBackend.kt) for the pure-Kotlin backends. See docs/architecture.md
+    // ownership rule #8 and Finding TD-1 in docs/tech-debt.md.
+    val activeSessions = java.util.concurrent.ConcurrentHashMap<Int, ContainerSession>()
 
     fun isUnlocked(volId: Int) = activeSessions.containsKey(volId)
     fun hasAnyActiveSessions() = activeSessions.isNotEmpty()

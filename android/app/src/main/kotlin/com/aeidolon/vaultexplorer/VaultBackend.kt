@@ -18,6 +18,23 @@ package com.aeidolon.vaultexplorer
 interface VaultBackend {
     val format: ContainerFormat
 
+    /**
+     * Whether [ContainerFileSystem.getFileSize]/[ContainerFileSystem.readFileChunk]
+     * may skip the per-volId ReentrantReadWriteLock for this backend.
+     *
+     * Defaults to false (locked, same as every native FAT/NTFS/ext-backed
+     * volume) so a new backend is safe-by-default and must opt out
+     * deliberately, in code, rather than by having its class name happen to
+     * match a substring somewhere else -- see docs/tech-debt.md TD-6 for the
+     * bug this replaced: the previous check ran `session.javaClass
+     * .simpleName.contains("Cryptomator"/"Gocryptfs")`, but `session` there
+     * was always a `ContainerSession` (the generic per-volId registry
+     * entry), never a `CryptomatorSession`/`GocryptfsSession` -- so the
+     * check was permanently false and the intended carve-out never fired.
+     */
+    val skipsPerVolumeLock: Boolean
+        get() = false
+
     fun listDirectory(virtualPath: String): Array<String>?
     fun createDirectory(virtualPath: String): Boolean
     fun renameFile(oldVirtualPath: String, newVirtualPath: String): Boolean

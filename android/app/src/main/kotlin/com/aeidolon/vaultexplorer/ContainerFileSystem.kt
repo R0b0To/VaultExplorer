@@ -68,9 +68,8 @@ object ContainerFileSystem {
     // ── File I/O (Read-Only) ───────────────────────────────────────────────
 
     fun getFileSize(volId: Int, fatPath: String): Long {
-        val session = requireSession(volId)
-        val name = session.javaClass.simpleName
-        return if (name.contains("Cryptomator") || name.contains("Gocryptfs")) {
+        requireSession(volId)
+        return if (VaultBackendRegistry.get(volId)?.skipsPerVolumeLock == true) {
             ContainerEngine.getFileSize(fatPath, volId)
         } else {
             withReadLock(volId) { ContainerEngine.getFileSize(fatPath, volId) }
@@ -81,9 +80,8 @@ object ContainerFileSystem {
         withReadLock(volId) { ContainerEngine.getFolderSize(fatPath, volId) }
 
     fun readFileChunk(volId: Int, fatPath: String, offset: Long, length: Int): ByteArray? {
-        val session = requireSession(volId)
-        val name = session.javaClass.simpleName
-        return if (name.contains("Cryptomator") || name.contains("Gocryptfs")) {
+        requireSession(volId)
+        return if (VaultBackendRegistry.get(volId)?.skipsPerVolumeLock == true) {
             ContainerEngine.readFileChunk(fatPath, offset, length, volId)
         } else {
             withReadLock(volId) { ContainerEngine.readFileChunk(fatPath, offset, length, volId) }

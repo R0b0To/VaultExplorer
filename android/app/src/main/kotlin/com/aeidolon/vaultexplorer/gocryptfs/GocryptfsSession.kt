@@ -26,6 +26,7 @@ class GocryptfsSession(
     val readOnly: Boolean,
 ) : com.aeidolon.vaultexplorer.VaultBackend {
     override val format = com.aeidolon.vaultexplorer.ContainerFormat.GOCRYPTFS
+    override val skipsPerVolumeLock = true
     private val random = SecureRandom()
     private val safOps = SafDocumentOps(context)
     private val shorteningThreshold: Int = nameCryptor.effectiveLongNameMax

@@ -1,5 +1,5 @@
-# Vendored third-party pdf.js build (Mozilla, Apache-2.0). This is bundled
-# prebuilt output, not project code
-# linguist-vendored excludes it from GitHub's language statistics without
-# affecting git tracking or the actual build.
+*.sh text eol=lf
+android/gradlew text eol=lf
+
+# Vendored third-party pdf.js build (Mozilla, Apache-2.0).
 android/app/src/main/assets/pdfjs/** linguist-vendored

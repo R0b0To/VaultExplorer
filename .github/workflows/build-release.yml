@@ -50,6 +50,8 @@ jobs:
         run: |
           export PUB_CACHE=/tmp/.pub-cache
           flutter pub get
+          sed -i -E 's/--build-id=[a-z0-9]+/--build-id=none/g' /tmp/.pub-cache/hosted/pub.dev/jni-*/src/CMakeLists.txt 2>/dev/null || true
+          sed -i -E 's/--build-id=[a-z0-9]+/--build-id=none/g' /tmp/.pub-cache/hosted/pub.dev/jni-*/android/CMakeLists.txt 2>/dev/null || true
 
       # ── Keystore ────────────────────────────────────────────────────
       - name: Decode keystore

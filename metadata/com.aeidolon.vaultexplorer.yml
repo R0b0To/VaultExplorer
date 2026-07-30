@@ -3,10 +3,15 @@ Categories:
   - System
 License: GPL-3.0-or-later
 AuthorName: R0b0To
-AuthorEmail:  Aeidolon@proton.me
+AuthorEmail: Aeidolon@proton.me
 SourceCode: https://github.com/R0b0To/VaultExplorer
 IssueTracker: https://github.com/R0b0To/VaultExplorer/issues
 Donate: https://ko-fi.com/K3K2ND3Y8
+
+AutoUpdateMode: Version %v
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1
 
 Description: |-
   Vault Explorer opens and browses encrypted disk containers directly on
@@ -14,35 +19,25 @@ Description: |-
   VHD/VHDX images -- without exporting your files unencrypted to shared
   storage first.
 
-  Browse the volume's filesystem (NTFS, FAT, ext2/3/4), preview photos,
-  video, and PDFs from inside it, and extract only what you need. All
-  decryption happens on-device; nothing is uploaded anywhere.
-
-AntiFeatures:
-
 RepoType: git
 Repo: https://github.com/R0b0To/VaultExplorer.git
 
 Builds:
-  - versionName: '1.0.0'
+  - versionName: 1.0.0
     versionCode: 1
     commit: v1.0.0
     ndk: r26d
-
     sudo:
       - apt-get update
       - apt-get install -y nodejs npm
-
     srclibs:
-      - flutter@stable
-    output: build/app/outputs/flutter-apk/app-release.apk
+      - flutter@3.44.0
+    output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
     build:
       - export PUB_CACHE=$(pwd)/.pub-cache
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get
-      - $$flutter$$/bin/flutter build apk --release
+      - $$flutter$$/bin/flutter build apk --release --split-per-abi
 
-AutoUpdateMode: None
-UpdateCheckMode: Tags
-CurrentVersion: '1.0.0'
-CurrentVersionCode: 1
+# Enable Author Signature verification
+Binaries: https://github.com/R0b0To/VaultExplorer/releases/download/v%v/vaultexplorer-%v-1-arm64-v8a.apk

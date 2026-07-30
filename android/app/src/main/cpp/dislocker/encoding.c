@@ -152,7 +152,7 @@ char* getlocalcharset() {
 		return NULL;
 	}
 	/* A copy, otherwise not possible to set the locale back to original value */
-	strcpy(current_locale, cl);
+	memcpy(current_locale, cl, strlen(cl)+1);
 	dis_printf(L_DEBUG, "Program's locale: %s\n", current_locale);
 
 	/* Set the locale from environment */
@@ -169,7 +169,7 @@ char* getlocalcharset() {
 		return NULL;
 	}
 	/* A copy, otherwise not possible to use it */
-	strcpy(new_locale, nl);
+	memcpy(new_locale, nl, strlen(nl)+1);
 	dis_printf(L_DEBUG, "Environment's locale: %s\n", new_locale);
 
 	/* Sets program's original locale */
@@ -224,7 +224,7 @@ char* getlocalcharset() {
 		return NULL;
 	}
 	/* A copy, otherwise not possible to use it */
-	strcpy(local_charset, character_sets_list[local_charset_index]);
+	memcpy(local_charset, character_sets_list[local_charset_index], strlen(character_sets_list[local_charset_index])+1);
 
 	return local_charset;
 }

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -240,7 +239,7 @@ class _ListImageThumb extends StatelessWidget {
         width: double.infinity,
         height: double.infinity,
         cacheHeight: cacheHeight,
-        errorBuilder: (_, __, ___) => _fallbackWidget(),
+        errorBuilder: (_, _, _) => _fallbackWidget(),
       ),
       loadingBuilder: (context) => Container(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,

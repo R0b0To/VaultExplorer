@@ -1,31 +1,31 @@
-name: Build & Release APK
+name: Build & Release
 
 on:
   push:
     tags:
-      - 'v*'           # triggers on version tags like v1.0.0
+      - 'v*'           # triggers on version tags like v0.99.33
   workflow_dispatch:   # allows manual runs from the Actions tab
 
 jobs:
   build:
-    name: Build Signed APK
+    name: Build Signed APK + AAB
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      # ── Checkout ────────────────────────────────────────────────────────────
+      # ── Checkout ──────────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Java ────────────────────────────────────────────────────────────────
+      # ── Java ──────────────────────────────────────────────────────────
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # ── Flutter ─────────────────────────────────────────────────────────────
+      # ── Flutter ──────────────────────────────────────────────────────
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # ── Keystore ────────────────────────────────────────────────────────────
+      # ── Keystore ────────────────────────────────────────────────────
       - name: Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
@@ -49,33 +49,41 @@ jobs:
           storeFile=release.keystore
           EOF
 
-      # ── Build ────────────────────────────────────────────────────────────────
+      # ── Build APKs (GitHub Releases / F-Droid-style direct install) ───────────
       - name: Build release APKs (Split per ABI)
         run: flutter build apk --release --split-per-abi
 
-      # ── Rename with version ──────────────────────────────────────────────────
-      - name: Rename APKs
+      # ── Build AAB (required for Google Play Store uploads) ─────────────────
+      - name: Build release App Bundle (Play Store)
+        run: flutter build appbundle --release
+
+      # ── Rename with version ───────────────────────────────────────────
+      - name: Rename build outputs
         run: |
           # Extract version from pubspec.yaml
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr '+' '-')
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-          
-          # Create a directory to store the renamed APKs
+
+          # Create a directory to store the renamed build outputs
           mkdir -p release-apks
-          
+          mkdir -p release-aab
+
           # Loop through all generated ABI-specific APKs
           for apk in build/app/outputs/flutter-apk/app-*-release.apk; do
             # Extract filename without the .apk extension (e.g., app-arm64-v8a-release)
             filename=$(basename "$apk" .apk)
-            
+
             # Extract the ABI by removing the 'app-' prefix and '-release' suffix
             abi=$(echo "$filename" | sed 's/^app-//' | sed 's/-release$//')
-            
-            # Copy and rename: vaultexplorer-1.0.0-arm64-v8a.apk
+
+            # Copy and rename: vaultexplorer-0.99.33-arm64-v8a.apk
             cp "$apk" "release-apks/vaultexplorer-${VERSION}-${abi}.apk"
           done
 
-      # ── Upload artifact (always) ──────────────────────────────────────────────
+          # Copy and rename the App Bundle: vaultexplorer-0.99.33.aab
+          cp build/app/outputs/bundle/release/app-release.aab "release-aab/vaultexplorer-${VERSION}.aab"
+
+      # ── Upload artifacts (always) ───────────────────────────────────
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -83,7 +91,15 @@ jobs:
           path: release-apks/*.apk
           retention-days: 30
 
-      # ── Create GitHub Release (tag pushes only) ───────────────────────────────
+      - name: Upload AAB artifact (for manual Play Console upload)
+        uses: actions/upload-artifact@v4
+        with:
+          name: VaultExplorer-${{ env.APP_VERSION }}-AAB
+          path: release-aab/*.aab
+          retention-days: 30
+
+      # ── Create GitHub Release (tag pushes only, APKs only ── the AAB is for Play
+      # Console, not for people to sideload) ───────────────────────────
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -94,7 +110,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── Cleanup keystore ─────────────────────────────────────────────────────
+      # ── Cleanup keystore ────────────────────────────────────────────
       - name: Remove keystore
         if: always()
         run: |

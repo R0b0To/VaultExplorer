@@ -35,53 +35,29 @@ All entries below were checked directly against upstream sources/licenses
 | VeraCrypt crypto primitives -- `Twofish.c`, `Serpent.c`, `Camellia.c`, `kuznyechik.c`, `Whirlpool.c`, `blake2s.c`, `cpu.c`, Argon2 | veracrypt/VeraCrypt | Per-file permissive: Twofish (Gladman permissive), Serpent/Whirlpool/kuznyechik/cpu.c (public domain), Camellia (BSD-2-clause/NTT), blake2/Argon2 (CC0 or Apache-2.0, at your option) | d26216c2 (1.26.29) | OK, individually |
 | `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo, see `cpp/Common/AUDIT.md` | **OK -- see `cpp/Common/AUDIT.md` for two rewrite regressions found & fixed here** |
 
-**FFmpeg has been removed entirely** (previously vendored/built from source
-by `scripts/build_ffmpeg_android.sh`; video playback is now handled by the
-`video_player` Flutter plugin below instead). If ffmpeg is ever
-reintroduced, re-add its row here and re-verify the build script this
-notice used to reference no longer exists in this repo.
+See `docs/DECISIONS.md` for a note on FFmpeg, previously vendored here and
+since removed in favor of the `video_player` plugin below.
 
 ## Flutter/Dart (`pubspec.yaml`)
 
 | Package | License | Notes |
 |---|---|---|
 | `video_player` | BSD-3-Clause | Official Flutter plugin. On Android, backed by AndroidX Media3/ExoPlayer (Apache-2.0), which decodes via the OS's own `MediaCodec` -- no bundled codec binaries of any kind. |
-| `pdfrx` | MIT | Built on PDFium (Apache-2.0, Google/Chromium). Genuinely free software, no commercial/community-license gate -- a real fix over the two packages below. |
 | `path_provider`, `local_auth`, `flutter_secure_storage`, `url_launcher`, `wakelock_plus`, `package_info_plus`, `sensors_plus`, `flutter_staggered_grid_view`, `archive`, `path`, `vector_math`, `flutter_launcher_icons` | BSD-3-Clause / MIT (each individually) | Standard Flutter-community/AOSP-adjacent packages. No proprietary or copyleft-incompatible terms. |
 | `pointycastle`, `encrypt` | BSD-3-Clause / MIT | Pure-Dart crypto libraries (`encrypt` wraps `pointycastle`). |
 
-**Removed, and why:**
-- **`fvp`** (was: video playback). BSD-3-Clause itself, but it's a thin
-  wrapper around `libmdk` ("mdk-sdk"), which is a **prebuilt, closed-source,
-  license-key-gated binary SDK** downloaded from a third party at build
-  time -- proprietary software, not free software, regardless of there
-  being a no-cost tier for Flutter apps. It also bundles its own opaque
-  FFmpeg build internally, so removing FFmpeg from this project and adding
-  `fvp` would have net *reintroduced* an FFmpeg dependency with less
-  visibility into it than the from-source build this project used to have.
-- **`syncfusion_flutter_pdfviewer`, `syncfusion_flutter_pdf`** (were: PDF
-  viewing). Proprietary. Usable only under a paid commercial license or
-  Syncfusion's "Community License," which is conditioned on the licensee
-  having under $1M annual revenue, under 5 developers, and under 10 total
-  employees -- a legal eligibility gate, not a price tag. A GPLv3 project
-  depending on a revenue/headcount-gated SDK is incoherent as free
-  software: anyone exercising their GPLv3 right to fork and rebuild this
-  repo would also need to independently qualify for or purchase that
-  license. Replaced by `pdfrx`, above.
+See `docs/DECISIONS.md` for packages that were evaluated and rejected
+(`fvp`, `syncfusion_flutter_pdfviewer`/`syncfusion_flutter_pdf`, `pdfrx`)
+and why none of them ship in this project.
 
-**Known residual item, not a license problem:** `pdfrx` (via
-`pdfium_dart`/`pdfium_flutter`) downloads a **prebuilt PDFium binary** at
-build time on every platform including Android, rather than building
-PDFium from source. Unlike the two removed packages above, this is not a
-proprietary-license issue -- PDFium's own license is clean (Apache-2.0) --
-it's the same category of concern the original vendored FFmpeg had before
-this project switched to building it from source: F-Droid's "build
-everything from source" inclusion policy, not GPL/free-software status.
-Building PDFium from source yourself is a much heavier lift than FFmpeg
-was (Chromium's own GN/depot_tools build system, multi-hour CI, gigabytes
-of toolchain), so treat this as "verify F-Droid's current stance on
-PDFium-based apps before submission," not as a blocker on the level the
-two removed packages were.
+## Vendored web assets (`android/app/src/main/assets/`)
+
+| Component | Upstream | License | Version | Status |
+|---|---|---|---|---|
+| pdf.js (`pdfjs/pdf.min.mjs`, `pdfjs/pdf.worker.min.mjs`, `pdfjs/viewer.{html,css,js}`) | mozilla/pdf.js | Apache-2.0 (confirmed in the `@licstart` header of the vendored file itself) | 6.2.108 | Free license, but **vendored pre-minified** rather than built from source by this repo's build -- see the `AntiFeatures`/comment block in `metadata/com.aeidolon.vaultexplorer.yml` for the open F-Droid "build from source" question this raises. Loaded into a sandboxed, no-network `WebView` (`PdfViewerPlugin.kt`) with vault bytes streamed in over a method channel; nothing is fetched from the internet at runtime. |
+
+This is what actually backs the in-app PDF viewer
+(`lib/features/browser/viewer/pdf_viewer_screen.dart` + `PdfViewerPlugin.kt`).
 
 ## Distribution notes
 

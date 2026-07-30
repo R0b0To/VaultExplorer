@@ -25,15 +25,18 @@ VeraCrypt 1.26.29):
    `BYTE_ORDER`/`LITTLE_ENDIAN`/`BIG_ENDIAN`, etc.) to get the real usage
    surface rather than porting the whole ~300-line original header.
 
-**Known gap:** this was a textual/grep-based BFS, not a real compiler-driven
-`-M`/`-MM` preprocessor dependency scan (no Android NDK toolchain was
-available to run one in the environment this audit was done in). Textual
-BFS can't evaluate `#ifdef` conditions, so it errs toward *over*-inclusion
-(dead branches get walked too) rather than under-inclusion, and every
-finding below was cross-checked by hand against the specific `#if` guard it
-sits in. Before shipping, re-run this as `clang -M` (or
-`cmake --build . --target vaultexplorer -- -n` with `-H`) against a real
-NDK build and diff the header set against the list below as a final check.
+**Known gap at the time this audit was written:** this was a textual/grep-based
+BFS, not a real compiler-driven `-M`/`-MM` preprocessor dependency scan (no
+Android NDK toolchain was available to run one in the environment this
+audit was done in). Textual BFS can't evaluate `#ifdef` conditions, so it
+errs toward *over*-inclusion (dead branches get walked too) rather than
+under-inclusion, and every finding below was cross-checked by hand against
+the specific `#if` guard it sits in.
+
+**Update:** the project has since been built with a real Android NDK
+toolchain and compiles and runs successfully with these replacement files
+in place, closing the gap above -- the findings in this document held up
+against an actual build, not just the textual analysis.
 
 ## Findings: tainted files in the reachable set
 

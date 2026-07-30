@@ -73,8 +73,7 @@ class CaptionTrack {
     return _TimeRange(start, end);
   }
 
-  /// Parses "[H:]MM:SS<sep>mmm" (SRT uses ',' as sep, WebVTT uses '.';
-  /// WebVTT also permits omitting the hours component entirely).
+
   static Duration? _parseTimestamp(String raw, String timestampSeparator) {
     final sepIndex = raw.lastIndexOf(timestampSeparator);
     if (sepIndex == -1) return null;

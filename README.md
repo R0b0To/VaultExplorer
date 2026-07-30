@@ -76,7 +76,7 @@
 *   **Web & HTML Viewer**: Isolated `WebView` platform view rendering HTML, CSS, JavaScript, and linked web assets directly out of the vault via a local secure origin (`https://vault-local.internal`).
 *   **Built-In Text Editor**: Create, edit, and save plain text, code, or markdown files directly inside encrypted volumes.
 *   **In-Vault ZIP Archive Browser**: Inspect and extract `.zip` archive contents directly inside an encrypted volume without unencrypting archives to the host filesystem.
-*   **Advanced Media Streaming**: Stream video and audio (FFmpeg-backed `fvp` engine, `.srt`/`.vtt` subtitles, custom speed, double-tap seek, audio visualizer) and view photos (pinch-to-zoom, 90° rotation, slideshow, gallery carousel overlay, diagnostics sheet).
+*   **Advanced Media Streaming**: Stream video and audio (AndroidX Media3/ExoPlayer via the `video_player` plugin, `.srt`/`.vtt` subtitles, custom speed, double-tap seek, audio visualizer) and view photos (pinch-to-zoom, 90° rotation, slideshow, gallery carousel overlay, diagnostics sheet).
 *   **Encrypted Item Vault**: Store Passwords, Bank Accounts, Payment Cards, Secure Notes, Identities, and Software Licenses directly inside the volume as encrypted JSON objects with customizable key-value fields and secret masking.
 *   **Android SAF Provider & Subfolder Mounts**: Expose entire mounted containers or specific subfolders (`subFolderMounts`) as Android Storage Access Framework (SAF) roots (`ContainerDocumentsProvider`), allowing third-party Android apps to open and save files inside unlocked volumes via AppFuse proxy descriptors.
 

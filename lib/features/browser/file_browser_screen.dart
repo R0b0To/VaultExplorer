@@ -1593,18 +1593,18 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
-          child: const Text('Camera'),
           onPressed: _captureFromCamera,
+          child: const Text('Camera'),
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
-          child: const Text('Import Files'),
           onPressed: _importFilesFromDevice,
+          child: const Text('Import Files'),
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.secondary),
-          child: const Text('Import Folder'),
           onPressed: _importFolderFromDevice,
+          child: const Text('Import Folder'),
         ),
         const PopupMenuDivider(),
         SubmenuButton(

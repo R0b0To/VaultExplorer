@@ -268,7 +268,9 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
           widget.existingRecord?.keyfiles.map((k) => k['uri']).toSet() ?? {};
       final currentUris = keyfiles.map((k) => k.uri).toSet();
       if (initialUris.difference(currentUris).isNotEmpty ||
-          currentUris.difference(initialUris).isNotEmpty) return true;
+          currentUris.difference(initialUris).isNotEmpty) {
+        return true;
+      }
     }
     return false;
   }

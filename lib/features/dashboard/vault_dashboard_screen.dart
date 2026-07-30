@@ -117,7 +117,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (_appSettings.useMasterPassword && _appSettings.masterPasswordHash != null) {
       navigator.pushAndRemoveUntil(
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const LockGateScreen(),
+          pageBuilder: (_, _, _) => const LockGateScreen(),
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,
         ),

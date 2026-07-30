@@ -1,4 +1,3 @@
-import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 
 import 'filesystem_type.dart';

@@ -1,9 +1,3 @@
-/// Barrel file for the app's small, generic, cross-feature widgets.
-///
-/// This used to be one large "kitchen sink" file. Each widget now lives in
-/// its own focused file under core/widgets/<category>/ — this barrel exists
-/// so existing call sites can keep a single import while the app is
-/// migrated incrementally to importing the specific widget file it needs.
 library;
 
 export 'package:vaultexplorer/core/widgets/inputs/thumbnail_quality_picker.dart';

@@ -11,22 +11,18 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Fixed task output tracking so Gradle detects missing .mjs files automatically
-val buildPdfJs = tasks.register<Exec>("buildPdfJsAssets") {
-    description = "Builds the pdf.js viewer bundle from source (scripts/build_pdfjs.sh)."
-    workingDir = rootProject.file("..")
-    commandLine("bash", "scripts/build_pdfjs.sh")
-    inputs.file(rootProject.file("../scripts/build_pdfjs.sh"))
-    outputs.file(rootProject.file("src/main/assets/pdfjs/pdf.min.mjs"))
-    outputs.file(rootProject.file("src/main/assets/pdfjs/pdf.worker.min.mjs"))
-}
+
+// NOTE: pdf.js assets (pdf.min.mjs / pdf.worker.min.mjs) used to be built
+// from source here on every build via scripts/build_pdfjs.sh. That's now
+// a manual, occasionally-run maintenance script instead -- see the
+// comment at the top of that script. The built output is committed to
+// src/main/assets/pdfjs/ like any other asset, so there's nothing to
+// hook into preBuild anymore.
 
 android {
     namespace = "com.aeidolon.vaultexplorer"
     compileSdk = flutter.compileSdkVersion
-    
-    // Pinned exact NDK version (r26d) for F-Droid build reproducibility
-    ndkVersion = "26.3.11579264"
+    ndkVersion = flutter.ndkVersion
 
     externalNativeBuild {
         cmake {
@@ -106,5 +102,3 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation("junit:junit:4.13.2")
 }
-
-tasks.named("preBuild").configure { dependsOn(buildPdfJs) }

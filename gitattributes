@@ -1,0 +1,6 @@
+# Vendored third-party pdf.js build (Mozilla, Apache-2.0). This is bundled
+# prebuilt output, not project code -- see NOTICE.md for attribution and
+# docs/DECISIONS.md for why it's vendored rather than built from source.
+# linguist-vendored excludes it from GitHub's language statistics without
+# affecting git tracking or the actual build.
+android/app/src/main/assets/pdfjs/** linguist-vendored

@@ -7,6 +7,6 @@
     native <methods>;
 }
 
-# Force R8 to emit a constant SourceFile string instead of random r8-map-id-<hash> for Reproducible Builds
+# Force deterministic R8 obfuscation and constant SourceFile attribute for Reproducible Builds
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile

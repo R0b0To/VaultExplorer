@@ -69,7 +69,8 @@ val patchJniForReproducibility = tasks.register("patchJniForReproducibility") {
             .forEach { cmakeFile ->
                 val content = cmakeFile.readText()
                 if (!content.contains("-Wl,--build-id=none")) {
-                    cmakeFile.appendText("\nadd_link_options(\"-Wl,--build-id=none\")\n")
+                    // Prepend to TOP of CMakeLists.txt so CMake applies options BEFORE target creation
+                    cmakeFile.writeText("add_link_options(\"-Wl,--build-id=none\")\n" + content)
                     patchedCount++
                 }
             }

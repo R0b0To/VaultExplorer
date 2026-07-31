@@ -1,21 +1,7 @@
 #!/usr/bin/env bash
 # Builds the minified pdf.js viewer bundle from source and drops it into
 # android/app/src/main/assets/pdfjs/. Invoked automatically by
-# android/app/build.gradle.kts (preBuild) -- the output is NOT committed to
-# the repo (see android/app/src/main/assets/pdfjs/.gitignore), so this is
-# the single source of truth for every build: local `flutter run`/`flutter
-# build apk`, the GitHub Actions release workflow, and F-Droid's build all
-# go through this same script rather than each having their own copy of
-# the vendored files to keep in sync.
-#
-# Byte-for-byte reproducibility across build hosts depends on matching the
-# same Node.js major version everywhere this runs -- `npm ci` pins
-# *dependency* versions via package-lock.json, but not the Node/V8 runtime
-# itself, and different Node majors can produce different minifier output
-# from identical input. build-release.yml pins node-version: '26'
-# (actions/setup-node); metadata/com.aeidolon.vaultexplorer.yml pins the
-# same major via NodeSource in its `sudo:` block. If you bump one, bump
-# the other, or Reproducible Builds verification will mismatch again.
+# android/app/build.gradle.kts (preBuild).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."   # repo root
@@ -25,13 +11,13 @@ PDFJS_REPO="https://github.com/mozilla/pdf.js.git"
 OUT_DIR="android/app/src/main/assets/pdfjs"
 SRC_DIR="/tmp/pdfjs-src-${PDFJS_TAG}"
 
-# --- Idempotency: skip entirely if the output already exists ---
+# --- Idempotency: skip if output already exists ---
 if [ -f "$OUT_DIR/pdf.min.mjs" ] && [ -f "$OUT_DIR/pdf.worker.min.mjs" ]; then
-  echo "pdf.js already built at $OUT_DIR, skipping (delete that dir to force a rebuild)."
+  echo "pdf.js already built at $OUT_DIR, skipping (delete pdf.min.mjs to force a rebuild)."
   exit 0
 fi
 
-command -v node >/dev/null 2>&1 || { echo "error: node.js is required to build pdf.js from source (see README dev setup)" >&2; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "error: node.js is required to build pdf.js from source" >&2; exit 1; }
 command -v npm  >/dev/null 2>&1 || { echo "error: npm is required to build pdf.js from source" >&2; exit 1; }
 
 if [ ! -d "$SRC_DIR" ]; then
@@ -45,8 +31,6 @@ echo "Building pdf.js minified bundle (npm ci && npx gulp minified)..."
 BUILT_DIR="$SRC_DIR/build/minified/build"
 if [ ! -f "$BUILT_DIR/pdf.min.mjs" ] || [ ! -f "$BUILT_DIR/pdf.worker.min.mjs" ]; then
   echo "error: pdf.js build finished but expected output not found at $BUILT_DIR" >&2
-  echo "       (upstream may have moved the minified gulp task's output path --" >&2
-  echo "       check gulpfile.mjs at $PDFJS_TAG for the current MINIFIED_DIR layout)" >&2
   exit 1
 fi
 

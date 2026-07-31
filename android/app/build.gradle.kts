@@ -12,13 +12,7 @@ plugins {
 }
 
 // ── Patch JNI CMakeLists.txt during Gradle Configuration Phase ─────────────
-// Running this during configuration ensures that subprojects like `:jni` 
-// see the patched CMakeLists.txt BEFORE their native build tasks execute.
 fun patchJniInPubCache() {
-    logger.lifecycle("====================================================")
-    logger.lifecycle("=== Gradle patchJniInPubCache Diagnostic Start ===")
-    logger.lifecycle("====================================================")
-
     val pubCacheEnv = System.getenv("PUB_CACHE")
     val userHome = System.getProperty("user.home")
     val localAppData = System.getenv("LOCALAPPDATA")
@@ -32,11 +26,7 @@ fun patchJniInPubCache() {
         File(userHome, "AppData/Local/Pub/Cache")
     )
 
-    val existingDirs = possibleCacheDirs.filter { dir ->
-        val exists = dir.exists()
-        logger.lifecycle("Pub cache candidate '${dir.absolutePath}': exists=$exists")
-        exists
-    }
+    val existingDirs = possibleCacheDirs.filter { dir -> dir.exists() }
 
     var foundCount = 0
     var patchedCount = 0
@@ -46,8 +36,6 @@ fun patchJniInPubCache() {
             .filter { it.isFile && it.name == "CMakeLists.txt" && it.path.contains("jni-") }
             .forEach { cmakeFile ->
                 foundCount++
-                logger.lifecycle("Found JNI CMakeLists.txt ($foundCount): ${cmakeFile.absolutePath}")
-                
                 var text = cmakeFile.readText()
                     .replace("add_link_options(\"-Wl,--build-id=none\")\n", "")
                     .replace("add_link_options(\"-Wl,--build-id=none\")", "")
@@ -60,18 +48,10 @@ fun patchJniInPubCache() {
                     text = "$text\n$patch\n"
                     cmakeFile.writeText(text)
                     patchedCount++
-                    logger.lifecycle(" -> Status: PATCHED SUCCESSFULLY WITH CMAKE_SHARED_LINKER_FLAGS")
-                } else {
-                    logger.lifecycle(" -> Status: ALREADY HAS CMAKE_SHARED_LINKER_FLAGS")
+                    logger.lifecycle("patch_jni_reproducibility: patched ${cmakeFile.absolutePath}")
                 }
             }
     }
-
-    logger.lifecycle("====================================================")
-    logger.lifecycle("=== Gradle patchJniInPubCache Summary ==============")
-    logger.lifecycle("Total JNI CMakeLists.txt found: $foundCount")
-    logger.lifecycle("Total files newly patched:     $patchedCount")
-    logger.lifecycle("====================================================")
 }
 
 patchJniInPubCache()
@@ -122,7 +102,6 @@ android {
                     "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,--build-id=none",
                     "-DCMAKE_MODULE_LINKER_FLAGS=-Wl,-z,max-page-size=16384 -Wl,--build-id=none"
                 )
-                // Normalize entire repository root path for Reproducible Builds
                 val repoRootDir = rootProject.file("..").canonicalPath
                 val prefixMap = "-ffile-prefix-map=$repoRootDir=/build"
                 cFlags("-O3", "-funroll-loops", prefixMap)
@@ -145,11 +124,11 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
-            shrinkResources = true
+            isShrinkResources = true
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
-                null // Pure unsigned release build (matches F-Droid requirements)
+                null
             }
 
             proguardFiles(

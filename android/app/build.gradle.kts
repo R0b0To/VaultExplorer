@@ -76,7 +76,7 @@ val buildPdfJs = tasks.register<Exec>("buildPdfJsAssets") {
 android {
     namespace = "com.aeidolon.vaultexplorer"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
 
     externalNativeBuild {
         cmake {

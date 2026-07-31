@@ -37,11 +37,21 @@ Builds:
     commit: v1.0.0
     ndk: r28d
 
-    # nodejs/npm: needed by scripts/build_pdfjs.sh, invoked automatically
-    # from Gradle's preBuild -- not something this recipe calls directly.
+    # Pinned to Node.js 26, matching build-release.yml's
+    # actions/setup-node `node-version: '26'`. This has to match exactly --
+    # npm ci pins dependency versions via package-lock.json, but not the
+    # Node/V8 runtime itself, and pdf.js's minifier can produce different
+    # output from identical input under a different Node major. A bare
+    # `apt-get install nodejs` would pull whatever version the build
+    # image's default repo happens to carry, which is not this.
     sudo:
       - apt-get update
-      - apt-get install -y nodejs npm
+      - apt-get install -y ca-certificates curl gnupg
+      - mkdir -p /etc/apt/keyrings
+      - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+      - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+      - apt-get update
+      - apt-get install -y nodejs
 
     # Flutter project root is the repo root (pubspec.yaml lives there), not
     # android/ -- so no `subdir:`. `gradle:` doesn't apply to Flutter apps;

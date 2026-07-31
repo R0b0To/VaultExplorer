@@ -18,14 +18,10 @@ fun patchJniInPubCache() {
     logger.lifecycle("====================================================")
     logger.lifecycle("=== Gradle patchJniInPubCache Diagnostic Start ===")
     logger.lifecycle("====================================================")
-    
+
     val pubCacheEnv = System.getenv("PUB_CACHE")
     val userHome = System.getProperty("user.home")
     val localAppData = System.getenv("LOCALAPPDATA")
-
-    logger.lifecycle("PUB_CACHE env:  ${pubCacheEnv ?: "<not set>"}")
-    logger.lifecycle("user.home prop: $userHome")
-    logger.lifecycle("LOCALAPPDATA:   ${localAppData ?: "<not set>"}")
 
     val possibleCacheDirs = listOfNotNull(
         pubCacheEnv?.let { File(it) },
@@ -51,17 +47,22 @@ fun patchJniInPubCache() {
             .forEach { cmakeFile ->
                 foundCount++
                 logger.lifecycle("Found JNI CMakeLists.txt ($foundCount): ${cmakeFile.absolutePath}")
-                val content = cmakeFile.readText()
-                if (!content.contains("--build-id=none")) {
+                
+                var text = cmakeFile.readText()
+                    .replace("add_link_options(\"-Wl,--build-id=none\")\n", "")
+                    .replace("add_link_options(\"-Wl,--build-id=none\")", "")
+
+                if (!text.contains("CMAKE_SHARED_LINKER_FLAGS")) {
                     val patch = """
                         set(CMAKE_SHARED_LINKER_FLAGS "${'$'}{CMAKE_SHARED_LINKER_FLAGS} -Wl,--build-id=none")
                         add_compile_options("-ffile-prefix-map=${'$'}{CMAKE_SOURCE_DIR}=/jni")
                     """.trimIndent()
-                    cmakeFile.appendText("\n$patch\n")
+                    text = "$text\n$patch\n"
+                    cmakeFile.writeText(text)
                     patchedCount++
-                    logger.lifecycle(" -> Status: PATCHED SUCCESSFULLY")
+                    logger.lifecycle(" -> Status: PATCHED SUCCESSFULLY WITH CMAKE_SHARED_LINKER_FLAGS")
                 } else {
-                    logger.lifecycle(" -> Status: ALREADY PATCHED")
+                    logger.lifecycle(" -> Status: ALREADY HAS CMAKE_SHARED_LINKER_FLAGS")
                 }
             }
     }
@@ -70,14 +71,10 @@ fun patchJniInPubCache() {
     logger.lifecycle("=== Gradle patchJniInPubCache Summary ==============")
     logger.lifecycle("Total JNI CMakeLists.txt found: $foundCount")
     logger.lifecycle("Total files newly patched:     $patchedCount")
-    if (foundCount == 0) {
-        logger.warn("WARNING: 0 jni CMakeLists.txt files were found in pub cache!")
-    }
     logger.lifecycle("====================================================")
 }
 
 patchJniInPubCache()
-
 
 // ── From-source build steps ───────────────────────────────────────────────
 val buildPdfJs = tasks.register<Exec>("buildPdfJsAssets") {

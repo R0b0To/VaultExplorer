@@ -39,17 +39,16 @@ for cache_dir in "${SEARCH_DIRS[@]}"; do
     echo "----------------------------------------------------"
     echo "Found JNI CMakeLists.txt ($found): $cmakelists"
     
-    if grep -q -- "--build-id=none" "$cmakelists"; then
-      echo "Status: ALREADY PATCHED. Skipping."
+    # Check if already patched with the modern CMAKE_SHARED_LINKER_FLAGS fix
+    if grep -q "CMAKE_SHARED_LINKER_FLAGS.*--build-id=none" "$cmakelists"; then
+      echo "Status: ALREADY PATCHED with CMAKE_SHARED_LINKER_FLAGS. Skipping."
       continue
     fi
 
-    echo "Status: UNPATCHED. Applying patch..."
-    echo "--- [BEFORE PATCH (last 5 lines)] ---"
-    tail -n 5 "$cmakelists" || true
-    echo "------------------------------------"
+    # Clean old broken line-1 patches if restored from flutter-action cache
+    sed -i '/add_link_options("-Wl,--build-id=none")/d' "$cmakelists" 2>/dev/null || true
 
-    sed -i -e 's/-Wl,/-Wl,--build-id=none,/' "$cmakelists" 2>/dev/null || true
+    echo "Status: Applying fresh working CMAKE_SHARED_LINKER_FLAGS patch..."
     cat << 'EOF' >> "$cmakelists"
 
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--build-id=none")
@@ -68,7 +67,4 @@ echo "===================================================="
 echo "=== JNI Patch Diagnostic Summary ==================="
 echo "Total JNI CMakeLists.txt files found: $found"
 echo "Total files newly patched:            $patched"
-if [ $found -eq 0 ]; then
-  echo "::warning::CRITICAL: 0 jni-* CMakeLists.txt files were found in any pub cache directory!"
-fi
 echo "===================================================="

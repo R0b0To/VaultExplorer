@@ -13,3 +13,5 @@
 
 # Disable class/method symbol obfuscation to eliminate DEX naming divergences across CPU core counts
 -dontobfuscate
+-dontusemixedcaseclassnames
+-repackageclasses ''

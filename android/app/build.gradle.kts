@@ -37,8 +37,12 @@ fun patchJniInPubCache() {
             val content = cmakeFile.readText()
             if (!content.contains("--build-id=none")) {
                 val patch = """
-                    set(CMAKE_SHARED_LINKER_FLAGS "${'$'}{CMAKE_SHARED_LINKER_FLAGS} -Wl,--build-id=none")
-                    add_compile_options("-ffile-prefix-map=${'$'}{CMAKE_SOURCE_DIR}=/jni")
+                    if(TARGET dartjni)
+                      target_link_options(dartjni PRIVATE "-Wl,--build-id=none")
+                      target_compile_options(dartjni PRIVATE "-ffile-prefix-map=${'$'}{CMAKE_SOURCE_DIR}=/jni")
+                    else()
+                      string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,--build-id=none")
+                    endif()
                 """.trimIndent()
                 cmakeFile.appendText("\n$patch\n")
                 patchedCount++
@@ -48,6 +52,7 @@ fun patchJniInPubCache() {
 }
 
 patchJniInPubCache()
+
 
 // ── From-source build steps ───────────────────────────────────────────────
 val buildPdfJs = tasks.register<Exec>("buildPdfJsAssets") {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Appends CMAKE_SHARED_LINKER_FLAGS to jni pub package's CMakeLists.txt
+# Patches jni pub package's CMakeLists.txt to strip build-id at the target level
 set -euo pipefail
 
 PUB_CACHE_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
@@ -16,7 +16,16 @@ while IFS= read -r -d '' cmakelists; do
     continue   # already patched
   fi
   
-  echo -e '\nset(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--build-id=none")\nadd_compile_options("-ffile-prefix-map=${CMAKE_SOURCE_DIR}=/jni")\n' >> "$cmakelists"
+  cat << 'EOF' >> "$cmakelists"
+
+if(TARGET dartjni)
+  target_link_options(dartjni PRIVATE "-Wl,--build-id=none")
+  target_compile_options(dartjni PRIVATE "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=/jni")
+else()
+  string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,--build-id=none")
+endif()
+EOF
+
   patched=$((patched + 1))
 done < <(find "$HOSTED_DIR" -type f -name CMakeLists.txt -path "*/jni-*/*" -print0 2>/dev/null || true)
 

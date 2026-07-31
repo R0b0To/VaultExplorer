@@ -8,13 +8,15 @@ on:
 
 jobs:
   build:
-    name: Build Signed APKs
+    name: Build Signed APK
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      PUB_CACHE: /tmp/.pub-cache
 
     steps:
-      # ── Checkout ──────────────────────────────────────────────────────────
+      # ── Checkout ──────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -33,24 +35,23 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # ── Flutter (PINNED VERSION for Reproducible Builds) ─────────────────
+      # ── Flutter (PINNED VERSION for Reproducible Builds -- must match
+      #    `srclibs: [flutter@X.Y.Z]` in metadata/com.aeidolon.vaultexplorer.yml) ──
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.44.0'  # Pinned exact version for F-Droid reproducibility
+          flutter-version: '3.44.0'
           cache: true
 
-      # ── Node.js (PINNED VERSION for pdf.js build) ────────────────────────
+      # ── Node.js (needed by scripts/build_pdfjs.sh, run automatically from
+      #    Gradle's preBuild once `flutter build` invokes Gradle) ───────────
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '26'
 
       - name: Install dependencies
-        run: |
-          export PUB_CACHE=/tmp/.pub-cache
-          flutter pub get
-          find /tmp/.pub-cache/hosted/pub.dev/jni-* -name "CMakeLists.txt" -exec sh -c 'echo "add_link_options(\"-Wl,--build-id=none\")" >> "$1"' _ {} \;
+        run: flutter pub get
 
       # ── Keystore ────────────────────────────────────────────────────
       - name: Decode keystore
@@ -66,32 +67,29 @@ jobs:
           storeFile=release.keystore
           EOF
 
-      # ── Build APKs (GitHub Releases / F-Droid direct install) ───────────────
-      - name: Build release APKs (Split per ABI)
-        run: |
-          export PUB_CACHE=/tmp/.pub-cache
-          flutter build apk --release --split-per-abi
+      # ── Build ────────────────────────────────────────────────────────
+      # Universal APK (all ABIs in one file) -- matches the single Builds:
+      # entry in metadata/com.aeidolon.vaultexplorer.yml so the two are
+      # actually comparable for Reproducible Builds verification. Splitting
+      # per-ABI is a real feature to add later, not something to do on just
+      # one side of this pair without the other.
+      - name: Build release APK
+        run: flutter build apk --release
 
       # ── Rename with version ───────────────────────────────────────────
-      - name: Rename build outputs
+      - name: Rename build output
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr '+' '-')
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          mkdir -p release-apk
+          cp build/app/outputs/flutter-apk/app-release.apk "release-apk/vaultexplorer-${VERSION}.apk"
 
-          mkdir -p release-apks
-
-          for apk in build/app/outputs/flutter-apk/app-*-release.apk; do
-            filename=$(basename "$apk" .apk)
-            abi=$(echo "$filename" | sed 's/^app-//' | sed 's/-release$//')
-            cp "$apk" "release-apks/vaultexplorer-${VERSION}-${abi}.apk"
-          done
-
-      # ── Upload artifacts ───────────────────────────────────────────────
-      - name: Upload APK artifacts
+      # ── Upload artifact ─────────────────────────────────────────────────
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VaultExplorer-${{ env.APP_VERSION }}-APKs
-          path: release-apks/*.apk
+          name: VaultExplorer-${{ env.APP_VERSION }}-APK
+          path: release-apk/*.apk
           retention-days: 30
 
       # ── Create GitHub Release ───────────────────────────────────────────
@@ -100,7 +98,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: VaultExplorer ${{ github.ref_name }}
-          files: release-apks/*.apk
+          files: release-apk/*.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

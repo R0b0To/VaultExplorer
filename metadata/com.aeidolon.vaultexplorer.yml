@@ -8,38 +8,57 @@ SourceCode: https://github.com/R0b0To/VaultExplorer
 IssueTracker: https://github.com/R0b0To/VaultExplorer/issues
 Donate: https://ko-fi.com/K3K2ND3Y8
 
-AutoUpdateMode: Version %v
-UpdateCheckMode: Tags
-CurrentVersion: 1.0.1
-CurrentVersionCode: 1
-
 Description: |-
   Vault Explorer opens and browses encrypted disk containers directly on
   your device -- VeraCrypt/TrueCrypt volumes, LUKS, BitLocker, and raw
   VHD/VHDX images -- without exporting your files unencrypted to shared
   storage first.
 
+  Browse the volume's filesystem (NTFS, FAT, ext2/3/4), preview photos,
+  video, and PDFs from inside it, and extract only what you need. All
+  decryption happens on-device; nothing is uploaded anywhere.
+
+# No ads, no tracking, no non-free dependencies, no prebuilt binaries.
+# Nothing to list here -- omitted rather than left as an empty {}/[] , which
+# some fdroidserver lint versions flag as the wrong YAML type for this field.
+
 RepoType: git
 Repo: https://github.com/R0b0To/VaultExplorer.git
 
 Builds:
-  - versionName: 1.0.1
+  # NOTE: this entry must point at a real annotated git tag that exists in
+  # the repo at submission/build time, with versionName/versionCode matching
+  # what that tag's pubspec.yaml actually says. pubspec.yaml is 1.0.0+1, so
+  # versionCode here is 1 -- not something arbitrary, since
+  # `flutter build apk` will produce versionCode=1 unless overridden with an
+  # explicit --build-number flag, which nothing here does.
+  - versionName: '1.0.0'
     versionCode: 1
-    commit: v1.0.1
+    commit: v1.0.0
     ndk: r28d
+
+    # nodejs/npm: needed by scripts/build_pdfjs.sh, invoked automatically
+    # from Gradle's preBuild -- not something this recipe calls directly.
     sudo:
       - apt-get update
-      - apt-get install -y curl ca-certificates
-      - curl -fsSL https://deb.nodesource.com/setup_26.x | bash -
-      - apt-get install -y nodejs
+      - apt-get install -y nodejs npm
+
+    # Flutter project root is the repo root (pubspec.yaml lives there), not
+    # android/ -- so no `subdir:`. `gradle:` doesn't apply to Flutter apps;
+    # `flutter build apk` drives Gradle itself with the Dart toolchain wired
+    # in correctly, which a bare `gradle assembleRelease` wouldn't have.
+    # Pinned to the same version build-release.yml uses, so both pipelines'
+    # output is actually comparable for Reproducible Builds verification.
     srclibs:
       - flutter@3.44.0
-    output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+    output: build/app/outputs/flutter-apk/app-release.apk
     build:
       - export PUB_CACHE=$(pwd)/.pub-cache
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get
-      - $$flutter$$/bin/flutter build apk --release --split-per-abi
+      - $$flutter$$/bin/flutter build apk --release
 
-# Enable Author Signature verification
-Binaries: https://github.com/R0b0To/VaultExplorer/releases/download/v%v/vaultexplorer-%v-%c-arm64-v8a.apk
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: '1.0.0'
+CurrentVersionCode: 1

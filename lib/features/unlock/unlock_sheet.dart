@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
@@ -12,6 +11,8 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
+import 'unlock_biometric_mixin.dart';
+import 'unlock_biometric_source.dart';
 import '../lock/widgets/pattern_lock_view.dart';
 
 class UnlockSheet extends StatefulWidget {
@@ -39,7 +40,8 @@ class UnlockSheet extends StatefulWidget {
 }
 
 class _UnlockSheetState extends State<UnlockSheet>
-    with WidgetsBindingObserver, KeyfilePickerMixin {
+    with WidgetsBindingObserver, KeyfilePickerMixin, UnlockBiometricMixin<UnlockSheet>
+    implements UnlockBiometricSource {
   late TextEditingController _passwordCtrl;
   final _pimCtrl = TextEditingController();
   
@@ -79,6 +81,94 @@ class _UnlockSheetState extends State<UnlockSheet>
   bool _containerMissing = false;
 
   bool _isAuthenticating = false;
+
+  // --- UnlockBiometricMixin wiring: plain forwards to the fields above.
+  // Never wrapped in setState here -- the mixin's own code decides where
+  // setState is needed (matching where each assignment lived in the
+  // original, pre-extraction _tryBiometric/_onPatternComplete).
+  @override
+  UnlockBiometricSource get unlockSource => this;
+
+  @override
+  bool get isAuthenticating => _isAuthenticating;
+  @override
+  set isAuthenticating(bool value) => _isAuthenticating = value;
+
+  @override
+  String? get unlockError => _error;
+  @override
+  set unlockError(String? value) => _error = value;
+
+  @override
+  bool get showPasswordFallback => _showPasswordFallback;
+  @override
+  set showPasswordFallback(bool value) => _showPasswordFallback = value;
+
+  @override
+  bool get patternError => _patternError;
+  @override
+  set patternError(bool value) => _patternError = value;
+
+  @override
+  int get patternResetKey => _patternResetKey;
+  @override
+  set patternResetKey(int value) => _patternResetKey = value;
+
+  @override
+  String? get storedPatternHash => _storedPatternHash;
+
+  @override
+  TextEditingController get passwordCtrl => _passwordCtrl;
+
+  @override
+  Future<void> performUnlock({
+    Uint8List? preservedKey,
+    bool? shouldCacheDerivedKeyOverride,
+    String? passwordOverride,
+    List<String>? keyfilePathsOverride,
+  }) =>
+      _unlock(
+        preservedKey: preservedKey,
+        shouldCacheDerivedKeyOverride: shouldCacheDerivedKeyOverride,
+        passwordOverride: passwordOverride,
+        keyfilePathsOverride: keyfilePathsOverride,
+      );
+
+  // --- UnlockBiometricSource wiring: local-file-specific answers to every
+  // divergence point identified in docs/td7-unlock-flow-design.md.
+  // _tryBiometric had no pre-authentication guard at all in the original,
+  // so this always proceeds straight through.
+  @override
+  ({bool ready, String? blockMessage}) get preAuthReadiness => (ready: true, blockMessage: null);
+
+  @override
+  bool get isReadyForPattern => true;
+
+  @override
+  Future<ContainerRecord?> resolveRecord() async {
+    final records = await ContainerRepository.instance.loadAll();
+    return records[widget.initialUri!];
+  }
+
+  @override
+  String? get derivedKeyIdentifier => widget.initialUri;
+
+  @override
+  String get containerUri => widget.initialUri!;
+
+  @override
+  String get biometricPromptSubject => 'container';
+
+  @override
+  String get noSavedCredentialsForBiometricMessage =>
+      'Initializing secure credentials. Please unlock manually once to authorize biometric access.';
+
+  @override
+  String get noSavedCredentialsForPatternMessage =>
+      'Initializing secure credentials. Please unlock manually once to authorize pattern access.';
+
+  @override
+  String get debugLogTag => 'unlock';
 
   bool get _passwordPrefilled =>
       widget.prefillPassword != null &&
@@ -152,14 +242,6 @@ class _UnlockSheetState extends State<UnlockSheet>
     await _checkStoragePermission();
   }
 
-  /// Dismisses the on-screen keyboard (ADR-020). Called whenever the user
-  /// interacts with a control other than the password/PIM text fields —
-  /// read-only, remember-container, the advanced-parameters header, or a
-  /// tap on empty space — while one of those fields still has focus.
-  /// Cheap no-op if nothing is focused, so every call site can invoke it
-  /// unconditionally rather than checking focus state first.
-  void _dismissKeyboard() => FocusScope.of(context).unfocus();
-
   Future<void> _initUnlockMethod() async {
     if (widget.initialUri == null) {
       if (mounted) setState(() => _loadingAuth = false);
@@ -210,7 +292,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
         if (mounted) {
-          _tryBiometric();
+          tryBiometric();
         }
       }
     } catch (_) {
@@ -298,7 +380,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
         await Future<void>.delayed(const Duration(milliseconds: 300));
         if (mounted) {
-          _tryBiometric();
+          tryBiometric();
         }
       }
     } catch (e) {
@@ -308,150 +390,6 @@ class _UnlockSheetState extends State<UnlockSheet>
           _error = 'Could not update the container location: $e';
         });
       }
-    }
-  }
-
-  Future<void> _tryBiometric() async {
-    if (_isAuthenticating) return;
-    _isAuthenticating = true;
-    try {
-      final localAuth = LocalAuthentication();
-      final canCheck = await localAuth.canCheckBiometrics;
-      final isSupported = await localAuth.isDeviceSupported();
-      
-      if (!canCheck || !isSupported) {
-        if (mounted) {
-          setState(() {
-            _error = 'Biometrics not available on this device';
-            _showPasswordFallback = true;
-          });
-        }
-        return;
-      }
-
-      final ok = await localAuth.authenticate(
-        localizedReason: 'Authenticate to unlock container',
-        biometricOnly: false,
-        persistAcrossBackgrounding: true,
-      );
-
-      if (ok && mounted) {
-        final records = await ContainerRepository.instance.loadAll();
-        final record = records[widget.initialUri!];
-        
-        final appSettings = await AppSettingsService.loadSettings();
-        final shouldCacheGoingForward =
-            (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
-        final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
-
-        final cachedKey = shouldPreloadCachedKey
-            ? await vaultExplorerApi.loadDerivedKey(widget.initialUri!)
-            : null;
-
-        debugPrint('unlock: biometric cached-key present=${cachedKey != null && cachedKey.isNotEmpty} for ${widget.initialUri}');
-
-        if (cachedKey != null && cachedKey.isNotEmpty) {
-          await _unlock(
-            preservedKey: cachedKey,
-            shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
-          );
-          return;
-        }
-
-                final pw = await ContainerRepository.instance.getPassword(widget.initialUri!);
-        final savedKeyfiles = record?.keyfiles ?? [];
-        final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
-        if (pw != null || savedKeyfilePaths.isNotEmpty) {
-          _passwordCtrl.text = pw ?? '';
-          await _unlock(
-            shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
-            passwordOverride: pw ?? '',
-            keyfilePathsOverride: savedKeyfilePaths,
-          );
-        } else {
-          setState(() {
-            _error = 'Initializing secure credentials. Please unlock manually once to authorize biometric access.';
-            _showPasswordFallback = true;
-          });
-        }
-      }
-    } on LocalAuthException catch (e) {
-      final desc = e.description?.toLowerCase() ?? '';
-      if (e.code.name.toLowerCase().contains('progress') || desc.contains('progress')) {
-        return;
-      }
-      if (mounted) {
-        setState(() {
-          _error = 'Biometric error: ${e.code.name}';
-          _showPasswordFallback = true;
-        });
-      }
-    } on PlatformException catch (e) {
-      if (e.code == 'auth_in_progress' ||
-          e.code == 'AuthenticationInProgress' ||
-          (e.message?.contains('Authentication in progress') ?? false)) {
-        return;
-      }
-      if (mounted) {
-        setState(() {
-          _error = 'Biometric error: ${e.message}';
-          _showPasswordFallback = true;
-        });
-      }
-    } finally {
-      _isAuthenticating = false;
-    }
-  }
-
-  Future<void> _onPatternComplete(List<int> pattern) async {
-    if (_storedPatternHash == null) {
-      setState(() {
-        _error = 'No pattern configured. Please enter password manually.';
-        _showPasswordFallback = true;
-      });
-      return;
-    }
-
-    final attempt = hashPattern(pattern);
-    if (attempt == _storedPatternHash) {
-      final records = await ContainerRepository.instance.loadAll();
-      final record = records[widget.initialUri!];
-      
-      final appSettings = await AppSettingsService.loadSettings();
-      final shouldCacheGoingForward =
-          (record?.cacheDerivedKey ?? false) || appSettings.defaultDerivedKeyCacheEnabled;
-      final shouldPreloadCachedKey = record?.cacheDerivedKey ?? false;
-
-      final cachedKey = shouldPreloadCachedKey
-          ? await vaultExplorerApi.loadDerivedKey(widget.initialUri!)
-          : null;
-
-      if (cachedKey != null && cachedKey.isNotEmpty) {
-        await _unlock(preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldCacheGoingForward);
-        return;
-      }
-
-      final pw = await ContainerRepository.instance.getPassword(widget.initialUri!);
-      final savedKeyfiles = record?.keyfiles ?? [];
-      final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
-      if (pw != null || savedKeyfilePaths.isNotEmpty) {
-        _passwordCtrl.text = pw ?? '';
-        await _unlock(
-          shouldCacheDerivedKeyOverride: shouldCacheGoingForward,
-          passwordOverride: pw ?? '',
-          keyfilePathsOverride: savedKeyfilePaths,
-        );
-      } else {
-        setState(() {
-          _error = 'Initializing secure credentials. Please unlock manually once to authorize pattern access.';
-          _showPasswordFallback = true;
-        });
-      }
-    } else {
-      setState(() => _patternError = true);
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) setState(() { _patternError = false; _patternResetKey++; });
-      });
     }
   }
 
@@ -943,7 +881,7 @@ class _UnlockSheetState extends State<UnlockSheet>
           // so it never fights the password/PIM fields for focus.
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: _dismissKeyboard,
+            onTap: dismissKeyboard,
             child: SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1286,7 +1224,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: FilledButton(
-                                      onPressed: _tryBiometric,
+                                      onPressed: tryBiometric,
                                       style: FilledButton.styleFrom(
                                         padding: const EdgeInsets.symmetric(vertical: 14),
                                         shape: RoundedRectangleBorder(
@@ -1331,7 +1269,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                               const SizedBox(height: 20),
                               PatternLockView(
                                 key: ValueKey(_patternResetKey),
-                                onPatternComplete: _onPatternComplete,
+                                onPatternComplete: onPatternComplete,
                                 showError: _patternError,
                               ),
                               const SizedBox(height: 20),
@@ -1432,7 +1370,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                 enabled: !_loading,
                                 onCipherChanged: (val) => setState(() => _cipherId = val),
                                 onHashChanged: (val) => setState(() => _hashId = val),
-                                onExpansionChanged: (_) => _dismissKeyboard(),
+                                onExpansionChanged: (_) => dismissKeyboard(),
                               ),
                             SwitchListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1440,7 +1378,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                               onChanged: _loading
                                   ? null
                                   : (val) {
-                                      _dismissKeyboard();
+                                      dismissKeyboard();
                                       setState(() => _readOnly = val);
                                     },
                               title: Text(
@@ -1458,7 +1396,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                                 value: _remember,
                                 onChanged: (val) {
-                                  _dismissKeyboard();
+                                  dismissKeyboard();
                                   setState(() => _remember = val);
                                 },
                                 title: Text(

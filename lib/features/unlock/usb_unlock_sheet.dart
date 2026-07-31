@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
@@ -12,6 +11,8 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
+import 'unlock_biometric_mixin.dart';
+import 'unlock_biometric_source.dart';
 
 class UsbUnlockSheet extends StatefulWidget {
   final void Function(MountedContainer container, {ContainerRecord? record}) onMounted;
@@ -37,7 +38,9 @@ class UsbUnlockSheet extends StatefulWidget {
   State<UsbUnlockSheet> createState() => _UsbUnlockSheetState();
 }
 
-class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin {
+class _UsbUnlockSheetState extends State<UsbUnlockSheet>
+    with KeyfilePickerMixin, UnlockBiometricMixin<UsbUnlockSheet>
+    implements UnlockBiometricSource {
   final _passwordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
 
@@ -76,6 +79,95 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
   bool _reconnectTargetMissing = false;
 
   bool _isAuthenticating = false;
+
+  // --- UnlockBiometricMixin wiring: plain forwards, never wrapped in
+  // setState here -- see the matching comment in unlock_sheet.dart.
+  @override
+  UnlockBiometricSource get unlockSource => this;
+
+  @override
+  bool get isAuthenticating => _isAuthenticating;
+  @override
+  set isAuthenticating(bool value) => _isAuthenticating = value;
+
+  @override
+  String? get unlockError => _error;
+  @override
+  set unlockError(String? value) => _error = value;
+
+  @override
+  bool get showPasswordFallback => _showPasswordFallback;
+  @override
+  set showPasswordFallback(bool value) => _showPasswordFallback = value;
+
+  @override
+  bool get patternError => _patternError;
+  @override
+  set patternError(bool value) => _patternError = value;
+
+  @override
+  int get patternResetKey => _patternResetKey;
+  @override
+  set patternResetKey(int value) => _patternResetKey = value;
+
+  @override
+  String? get storedPatternHash => _storedPatternHash;
+
+  @override
+  TextEditingController get passwordCtrl => _passwordCtrl;
+
+  @override
+  Future<void> performUnlock({
+    Uint8List? preservedKey,
+    bool? shouldCacheDerivedKeyOverride,
+    String? passwordOverride,
+    List<String>? keyfilePathsOverride,
+  }) =>
+      _unlock(
+        preservedKey: preservedKey,
+        shouldCacheDerivedKeyOverride: shouldCacheDerivedKeyOverride,
+        passwordOverride: passwordOverride,
+        keyfilePathsOverride: keyfilePathsOverride,
+      );
+
+  // --- UnlockBiometricSource wiring: USB-specific answers. preAuthReadiness
+  // reproduces the original's two genuinely different guards exactly --
+  // no known record bails silently; a record but no selected device bails
+  // with 'Select a USB drive first'.
+  @override
+  ({bool ready, String? blockMessage}) get preAuthReadiness {
+    if (widget.existingRecord == null) return (ready: false, blockMessage: null);
+    if (_selected == null) return (ready: false, blockMessage: 'Select a USB drive first');
+    return (ready: true, blockMessage: null);
+  }
+
+  @override
+  bool get isReadyForPattern => widget.existingRecord != null;
+
+  @override
+  Future<ContainerRecord?> resolveRecord() async => widget.existingRecord;
+
+  @override
+  String? get derivedKeyIdentifier => _expectedDeviceName;
+
+  // Only ever read after preAuthReadiness/isReadyForPattern has already
+  // confirmed widget.existingRecord != null, matching the original code's
+  // own control flow -- safe to force-unwrap here for the same reason it
+  // was safe there.
+  @override
+  String get containerUri => widget.existingRecord!.uri;
+
+  @override
+  String get biometricPromptSubject => 'USB drive';
+
+  @override
+  String get noSavedCredentialsForBiometricMessage => 'No saved password found. Please enter it manually.';
+
+  @override
+  String get noSavedCredentialsForPatternMessage => 'No saved password found. Please enter it manually.';
+
+  @override
+  String get debugLogTag => 'usb unlock';
 
   String? get _expectedDeviceName {
     final uri = widget.existingRecord?.uri;
@@ -168,166 +260,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         }
         await Future<void>.delayed(const Duration(milliseconds: 300));
         if (mounted && _selected != null && !_reconnectTargetMissing) {
-          _tryBiometric();
+          tryBiometric();
         }
       }
     } catch (_) {
       if (mounted) setState(() => _loadingAuth = false);
-    }
-  }
-
-  Future<void> _tryBiometric() async {
-    if (_isAuthenticating) return;
-    _isAuthenticating = true;
-    final record = widget.existingRecord;
-    if (record == null) {
-      _isAuthenticating = false;
-      return;
-    }
-
-    if (_selected == null) {
-      if (mounted) setState(() => _error = 'Select a USB drive first');
-      _isAuthenticating = false;
-      return;
-    }
-
-    try {
-      final localAuth = LocalAuthentication();
-      final canCheck = await localAuth.canCheckBiometrics;
-      final isSupported = await localAuth.isDeviceSupported();
-      
-      if (!canCheck || !isSupported) {
-        if (mounted) {
-          setState(() {
-            _error = 'Biometrics not available on this device';
-            _showPasswordFallback = true;
-          });
-        }
-        return;
-      }
-
-      final ok = await localAuth.authenticate(
-        localizedReason: 'Authenticate to unlock USB drive',
-        biometricOnly: false,
-        persistAcrossBackgrounding: true,
-      );
-
-      if (ok && mounted) {
-        final appSettings = await AppSettingsService.loadSettings();
-        final shouldUseCachedKey = record.cacheDerivedKey || appSettings.defaultDerivedKeyCacheEnabled;
-        
-        final deviceName = _expectedDeviceName;
-        final cachedKey = shouldUseCachedKey && deviceName != null
-            ? await vaultExplorerApi.loadDerivedKey(deviceName)
-            : null;
-
-        debugPrint('usb unlock: biometric cached-key present=${cachedKey != null && cachedKey.isNotEmpty} for ${record.uri}');
-
-        if (cachedKey != null && cachedKey.isNotEmpty) {
-          await _unlock(preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldUseCachedKey);
-          return;
-        }
-
-       final pw = await ContainerRepository.instance.getPassword(record.uri);
-        final savedKeyfiles = record.keyfiles;
-        final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
-        if (pw != null || savedKeyfilePaths.isNotEmpty) {
-          _passwordCtrl.text = pw ?? '';
-          await _unlock(
-            shouldCacheDerivedKeyOverride: shouldUseCachedKey,
-            passwordOverride: pw ?? '',
-            keyfilePathsOverride: savedKeyfilePaths,
-          );
-        } else {
-          setState(() {
-            _error = 'No saved password found. Please enter it manually.';
-            _showPasswordFallback = true;
-          });
-        }
-      }
-    } on LocalAuthException catch (e) {
-      final desc = e.description?.toLowerCase() ?? '';
-      if (e.code.name.toLowerCase().contains('progress') || desc.contains('progress')) {
-        return;
-      }
-      if (mounted) {
-        setState(() {
-          _error = 'Biometric error: ${e.code.name}';
-          _showPasswordFallback = true;
-        });
-      }
-    } on PlatformException catch (e) {
-      if (e.code == 'auth_in_progress' ||
-          e.code == 'AuthenticationInProgress' ||
-          (e.message?.contains('Authentication in progress') ?? false)) {
-        return;
-      }
-      if (mounted) {
-        setState(() {
-          _error = 'Biometric error: ${e.message}';
-          _showPasswordFallback = true;
-        });
-      }
-    } finally {
-      _isAuthenticating = false;
-    }
-  }
-
-  Future<void> _onPatternComplete(List<int> pattern) async {
-    final record = widget.existingRecord;
-    if (record == null) return;
-
-    if (_storedPatternHash == null) {
-      setState(() {
-        _error = 'No pattern configured. Please enter password manually.';
-        _showPasswordFallback = true;
-      });
-      return;
-    }
-
-    final attempt = hashPattern(pattern);
-    if (attempt == _storedPatternHash) {
-      final appSettings = await AppSettingsService.loadSettings();
-      final shouldUseCachedKey = record.cacheDerivedKey || appSettings.defaultDerivedKeyCacheEnabled;
-      
-      final deviceName = _expectedDeviceName;
-      final cachedKey = shouldUseCachedKey && deviceName != null
-          ? await vaultExplorerApi.loadDerivedKey(deviceName)
-          : null;
-
-      debugPrint('usb unlock: pattern cached-key present=${cachedKey != null && cachedKey.isNotEmpty} for ${record.uri}');
-
-      if (cachedKey != null && cachedKey.isNotEmpty) {
-        await _unlock(preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldUseCachedKey);
-        return;
-      }
-
-      final pw = await ContainerRepository.instance.getPassword(record.uri);
-      final savedKeyfiles = record.keyfiles;
-      final savedKeyfilePaths = savedKeyfiles.map((k) => k['uri']!).toList();
-      if (pw != null || savedKeyfilePaths.isNotEmpty) {
-        _passwordCtrl.text = pw ?? '';
-        await _unlock(
-          shouldCacheDerivedKeyOverride: shouldUseCachedKey,
-          passwordOverride: pw ?? '',
-          keyfilePathsOverride: savedKeyfilePaths,
-        );
-      } else {
-        setState(() {
-          _error = 'No saved password found. Please enter it manually.';
-          _showPasswordFallback = true;
-        });
-      }
-    } else {
-      setState(() => _patternError = true);
-      Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          setState(() {
-            _patternError = false;
-            _patternResetKey++;
-          });
-        }
-      });
     }
   }
 
@@ -342,14 +279,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
     _pimCtrl.dispose();
     super.dispose();
   }
-
-  /// Dismisses the on-screen keyboard (ADR-020). Called whenever the user
-  /// interacts with a control other than the password/PIM text fields —
-  /// read-only, remember-drive, the advanced-parameters header, or a tap
-  /// on empty space — while one of those fields still has focus. Cheap
-  /// no-op if nothing is focused, so every call site can invoke it
-  /// unconditionally rather than checking focus state first.
-  void _dismissKeyboard() => FocusScope.of(context).unfocus();
 
   Future<void> _loadDevices() async {
     setState(() => _loadingDevices = true);
@@ -671,7 +600,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
         // for why this is safe alongside the password/PIM text fields.
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: _dismissKeyboard,
+          onTap: dismissKeyboard,
           child: SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -997,7 +926,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: FilledButton(
-                                        onPressed: _tryBiometric,
+                                        onPressed: tryBiometric,
                                         style: FilledButton.styleFrom(
                                           padding: const EdgeInsets.symmetric(vertical: 14),
                                           shape: RoundedRectangleBorder(
@@ -1042,7 +971,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                                 const SizedBox(height: 20),
                                 PatternLockView(
                                   key: ValueKey(_patternResetKey),
-                                  onPatternComplete: _onPatternComplete,
+                                  onPatternComplete: onPatternComplete,
                                   showError: _patternError,
                                 ),
                                 const SizedBox(height: 20),
@@ -1136,7 +1065,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                                 enabled: !busy,
                                 onCipherChanged: (val) => setState(() => _cipherId = val),
                                 onHashChanged: (val) => setState(() => _hashId = val),
-                                onExpansionChanged: (_) => _dismissKeyboard(),
+                                onExpansionChanged: (_) => dismissKeyboard(),
                               ),
                             SwitchListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1144,7 +1073,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet> with KeyfilePickerMixin
                               onChanged: busy
                                   ? null
                                   : (val) {
-                                      _dismissKeyboard();
+                                      dismissKeyboard();
                                       setState(() => _readOnly = val);
                                     },
                               title: Text(

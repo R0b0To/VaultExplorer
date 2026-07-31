@@ -85,16 +85,13 @@ jobs:
           unzip -q build/app/outputs/flutter-apk/app-release.apk -d /tmp/verify
           fail=0
           for so in /tmp/verify/lib/*/libdartjni.so; do
-            if readelf -S "$so" | grep -q '\.note\.gnu\.build-id'; then
+            if readelf -W -S "$so" | grep -q '\.note\.gnu\.build-id'; then
               echo "::error::$so still has .note.gnu.build-id -- reproducibility patch didn't apply"
               fail=1
             else
               echo "✅ OK: $so is clean (no build-id found)"
             fi
           done
-          if [ $fail -eq 0 ]; then
-            echo "🎉 SUCCESS: All native libraries verified clean of build-ids!"
-          fi
           exit $fail
 
       # ── Rename with version ───────────────────────────────────────────

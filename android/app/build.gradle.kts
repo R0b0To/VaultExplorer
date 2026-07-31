@@ -27,33 +27,26 @@ fun patchJniInPubCache() {
     )
 
     val pubCacheDir = possibleCacheDirs.firstOrNull { it.exists() } ?: return
+    val hostedDir = File(pubCacheDir, "hosted")
+    if (!hostedDir.exists()) return
 
-    val hostedDirs = listOf(
-        File(pubCacheDir, "hosted/pub.dev"),
-        File(pubCacheDir, "hosted/pub.dartlang.org")
-    )
-
-    hostedDirs.firstOrNull { it.exists() }
-        ?.listFiles { file -> file.isDirectory && file.name.startsWith("jni-") }
-        ?.forEach { jniDir ->
-            jniDir.walkTopDown()
-                .filter { it.isFile && it.name == "CMakeLists.txt" }
-                .forEach { cmakeFile ->
-                    val content = cmakeFile.readText()
-                    if (!content.contains("--build-id=none")) {
-                        val patchedContent = if (content.contains("-Wl,")) {
-                            content.replace("-Wl,", "-Wl,--build-id=none,")
-                        } else {
-                            "add_link_options(\"-Wl,--build-id=none\")\n" + content
-                        }
-                        cmakeFile.writeText(patchedContent)
-                        logger.lifecycle("patch_jni_reproducibility: patched ${cmakeFile.absolutePath}")
-                    }
-                }
+    var patchedCount = 0
+    hostedDir.walkTopDown()
+        .filter { it.isFile && it.name == "CMakeLists.txt" && it.path.contains("jni-") }
+        .forEach { cmakeFile ->
+            val content = cmakeFile.readText()
+            if (!content.contains("--build-id=none")) {
+                val patch = """
+                    set(CMAKE_SHARED_LINKER_FLAGS "${'$'}{CMAKE_SHARED_LINKER_FLAGS} -Wl,--build-id=none")
+                    add_compile_options("-ffile-prefix-map=${'$'}{CMAKE_SOURCE_DIR}=/jni")
+                """.trimIndent()
+                cmakeFile.appendText("\n$patch\n")
+                patchedCount++
+                logger.lifecycle("patch_jni_reproducibility: patched ${cmakeFile.absolutePath}")
+            }
         }
 }
 
-// Execute JNI patching immediately when Gradle loads
 patchJniInPubCache()
 
 // ── From-source build steps ───────────────────────────────────────────────

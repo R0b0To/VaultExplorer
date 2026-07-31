@@ -11,6 +11,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+tasks.whenTaskAdded {
+    if (name.contains("ArtProfile")) {
+        enabled = false
+    }
+}
+
+
 // ── Patch JNI CMakeLists.txt during Gradle Configuration Phase ─────────────
 fun patchJniInPubCache() {
     val pubCacheEnv = System.getenv("PUB_CACHE")

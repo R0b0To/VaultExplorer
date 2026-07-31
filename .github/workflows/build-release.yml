@@ -76,6 +76,11 @@ jobs:
           storeFile=release.keystore
           EOF
 
+
+      - name: Pin to single CPU core for R8 determinism
+        run: echo "TASKSET=taskset -c 0" >> $GITHUB_ENV
+
+
       # ── Build ────────────────────────────────────────────────────────
       # Universal APK (all ABIs in one file) -- matches the single Builds:
       # entry in metadata/com.aeidolon.vaultexplorer.yml so the two are
@@ -83,7 +88,7 @@ jobs:
       # per-ABI is a real feature to add later, not something to do on just
       # one side of this pair without the other.
       - name: Build release APK
-        run: flutter build apk --release
+        run: ${TASKSET:-} flutter build apk --release
 
       - name: Verify no build-id in native libs
         run: |

@@ -79,13 +79,27 @@ jobs:
       - name: Build release APK
         run: flutter build apk --release
 
+      - name: Verify no build-id in native libs
+        run: |
+          mkdir -p /tmp/verify
+          unzip -q build/app/outputs/flutter-apk/app-release.apk -d /tmp/verify
+          fail=0
+          for so in /tmp/verify/lib/*/libdartjni.so; do
+            if readelf -S "$so" | grep -q '\.note\.gnu\.build-id'; then
+              echo "::error::$so still has .note.gnu.build-id -- reproducibility patch didn't apply"
+              fail=1
+            fi
+          done
+          exit $fail
+
       # ── Rename with version ───────────────────────────────────────────
       - name: Rename build output
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr '+' '-')
+          SHA=$(git rev-parse --short HEAD)
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           mkdir -p release-apk
-          cp build/app/outputs/flutter-apk/app-release.apk "release-apk/vaultexplorer-${VERSION}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "release-apk/vaultexplorer-${VERSION}-${SHA}.apk"
 
       # ── Upload artifact ─────────────────────────────────────────────────
       - name: Upload APK artifact

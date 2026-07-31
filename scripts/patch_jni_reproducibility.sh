@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Appends -Wl,--build-id=none to jni pub package's CMakeLists.txt
-# so libdartjni.so doesn't embed a random build ID -- required for F-Droid.
 set -euo pipefail
 
 PUB_CACHE_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
@@ -22,8 +20,9 @@ if [ -z "$JNI_DIR" ]; then
   exit 0
 fi
 
-# Standard F-Droid patch: insert --build-id=none into jni's CMake link options
-sed -i -E 's/^(-Wl,)(--build-id=none,)?/\1--build-id=none,/' "$JNI_DIR/src/CMakeLists.txt" 2>/dev/null || \
-sed -i -e 's/-Wl,/-Wl,--build-id=none,/' "$JNI_DIR/src/CMakeLists.txt" 2>/dev/null || true
-
-echo "patch_jni_reproducibility: patched $JNI_DIR/src/CMakeLists.txt"
+if [ -f "$JNI_DIR/src/CMakeLists.txt" ]; then
+  if ! grep -q -- "--build-id=none" "$JNI_DIR/src/CMakeLists.txt"; then
+    echo -e '\nset(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--build-id=none")\n' >> "$JNI_DIR/src/CMakeLists.txt"
+    echo "patch_jni_reproducibility: successfully patched $JNI_DIR/src/CMakeLists.txt"
+  fi
+fi

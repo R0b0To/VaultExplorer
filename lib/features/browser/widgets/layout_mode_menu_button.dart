@@ -1,0 +1,84 @@
+import 'package:flutter/material.dart';
+import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+
+/// App-bar popup button for choosing the current file-list layout mode
+/// (list/compact/grid/masonry).
+///
+/// Extracted verbatim from `FileBrowserScreen`'s private
+/// `_buildViewTogglePopupButton` -- second slice of the
+/// `file_browser_screen.dart` decomposition (docs/tech-debt.md TD-8),
+/// following the same pattern as [SortMenuButton]. No behavior change,
+/// only a location change. [layoutMode] is read-only (it also drives the
+/// actual content rendering elsewhere in the parent, so it can't be owned
+/// locally here the way this widget's `_menuIsOpen` is);
+/// [onLayoutModeChanged] is invoked with the tapped mode, exactly as the
+/// parent's inline `onPressed` callback used to update `_layoutMode` and
+/// persist it directly.
+class LayoutModeMenuButton extends StatefulWidget {
+  final BrowserLayoutMode layoutMode;
+  final ValueChanged<BrowserLayoutMode> onLayoutModeChanged;
+
+  const LayoutModeMenuButton({
+    super.key,
+    required this.layoutMode,
+    required this.onLayoutModeChanged,
+  });
+
+  @override
+  State<LayoutModeMenuButton> createState() => _LayoutModeMenuButtonState();
+}
+
+class _LayoutModeMenuButtonState extends State<LayoutModeMenuButton> {
+  // Was `_menuIsOpen` on the parent's State, shared (and never actually
+  // read) across three different popup buttons -- see the identical note
+  // in sort_menu_button.dart. Kept local here for the same reason.
+  bool _menuIsOpen = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final currentIcon = switch (widget.layoutMode) {
+      BrowserLayoutMode.list => Icons.view_list_rounded,
+      BrowserLayoutMode.compact => Icons.list_rounded,
+      BrowserLayoutMode.grid => Icons.grid_view_rounded,
+      BrowserLayoutMode.masonry => Icons.dashboard_rounded,
+    };
+    return MenuAnchor(
+      builder: (context, controller, child) => IconButton(
+        icon: Icon(currentIcon),
+        tooltip: 'Layout options',
+        onPressed: () {
+          if (controller.isOpen) {
+            controller.close();
+          } else {
+            controller.open();
+          }
+        },
+      ),
+      onOpen: () => setState(() => _menuIsOpen = true),
+      onClose: () => setState(() => _menuIsOpen = false),
+      menuChildren: [
+        for (final (mode, label, icon) in const [
+          (BrowserLayoutMode.list, 'Detailed List', Icons.view_list_rounded),
+          (BrowserLayoutMode.compact, 'Compact List', Icons.list_rounded),
+          (BrowserLayoutMode.grid, 'Gallery Grid', Icons.grid_view_rounded),
+          (BrowserLayoutMode.masonry, 'Masonry', Icons.dashboard_rounded),
+        ])
+          MenuItemButton(
+            leadingIcon: Icon(icon, color: widget.layoutMode == mode ? cs.primary : cs.onSurfaceVariant),
+            trailingIcon: widget.layoutMode == mode
+                ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
+                : null,
+            onPressed: () => widget.onLayoutModeChanged(mode),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: widget.layoutMode == mode ? FontWeight.bold : FontWeight.normal,
+                color: widget.layoutMode == mode ? cs.primary : null,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}

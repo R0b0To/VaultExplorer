@@ -24,7 +24,6 @@ import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
-import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
 import 'package:vaultexplorer/features/browser/archive_file_viewer.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/viewer/html_viewer_screen.dart';
@@ -42,13 +41,15 @@ import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
+import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
+import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
+import 'package:vaultexplorer/features/browser/widgets/settings_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
 import 'package:vaultexplorer/features/browser/widgets/truncated_banner.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
-import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 
 import '../../core/widgets/thumbnail/thumbnail_concurrency.dart';
@@ -1458,33 +1459,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  Widget _buildFilterMenuButton(
-    String? value,
-    String label,
-    IconData icon,
-    ColorScheme cs,
-    TextTheme textTheme,
-  ) {
-    final isActive = _currentFilter == value;
-    return MenuItemButton(
-      onPressed: () => setState(() => _currentFilter = value),
-      leadingIcon: Icon(
-        icon,
-        size: 16,
-        color: isActive ? cs.primary : cs.onSurfaceVariant,
-      ),
-      trailingIcon: isActive
-          ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-          : null,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
-        ),
-      ),
-    );
-  }
-
   Future<void> _extractArchive() async {
     if (_archiveContext == null) return;
     if (_isReadOnly) {
@@ -1526,162 +1500,15 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  Widget _buildAddPopupButton(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    if (_isReadOnly) {
-      return IconButton(
-        icon: Icon(
-          Icons.lock_outline_rounded,
-          color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-        ),
-        tooltip: 'Read-only — can\'t add items',
-        onPressed: () => _setStatus(
-          'This container is mounted read-only.',
-          error: true,
-        ),
-      );
+  Future<void> _onLayoutModeChanged(BrowserLayoutMode mode) async {
+    setState(() => _layoutMode = mode);
+    try {
+      final settings = await AppSettingsService.loadSettings();
+      final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
+      await AppSettingsService.saveSettings(updatedSettings);
+    } catch (e) {
+      debugPrint('Failed to save layout mode: $e');
     }
-    if (_archiveContext != null) {
-      return IconButton(
-        icon: const Icon(Icons.unarchive_rounded, size: 28),
-        tooltip: 'Extract Archive',
-        onPressed: _extractArchive,
-      );
-    }
-    return MenuAnchor(
-      builder: (context, controller, child) => IconButton(
-        icon: const Icon(Icons.add_rounded, size: 28),
-        tooltip: 'New item',
-        onPressed: () {
-          _signalActivity();
-          if (controller.isOpen) {
-            controller.close();
-          } else {
-            controller.open();
-          }
-        },
-      ),
-      onOpen: () => setState(() => _menuIsOpen = true),
-      onClose: () => setState(() => _menuIsOpen = false),
-      menuChildren: [
-        MenuItemButton(
-          leadingIcon: Icon(Icons.create_new_folder_outlined, color: cs.primary),
-          child: const Text('New Folder'),
-          onPressed: () {
-            BrowserDialogs.showCreateFolder(
-              context,
-              container: widget.container,
-              currentDirPath: _currentDirPath,
-              existingEntries: _currentItems,
-              onSuccess: () => _loadDirectoryContents(_currentDirPath),
-              readOnly: _isReadOnly,
-            );
-          },
-        ),
-        MenuItemButton(
-          leadingIcon: Icon(Icons.insert_drive_file_outlined, color: cs.primary),
-          child: const Text('New Text File'),
-          onPressed: () {
-            BrowserDialogs.showCreateFile(
-              context,
-              container: widget.container,
-              currentDirPath: _currentDirPath,
-              existingEntries: _currentItems,
-              onSuccess: () => _loadDirectoryContents(_currentDirPath),
-              readOnly: _isReadOnly,
-            );
-          },
-        ),
-        MenuItemButton(
-          leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
-          child: const Text('Camera'),
-          onPressed: _captureFromCamera,
-        ),
-        MenuItemButton(
-          leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
-          child: const Text('Import Files'),
-          onPressed: _importFilesFromDevice,
-        ),
-        MenuItemButton(
-          leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.secondary),
-          child: const Text('Import Folder'),
-          onPressed: _importFolderFromDevice,
-        ),
-        const PopupMenuDivider(),
-        SubmenuButton(
-          leadingIcon: Icon(Icons.lock_rounded, color: cs.primary),
-          menuChildren: [
-            ...VaultItemType.values.map(
-              (type) => MenuItemButton(
-                leadingIcon: Icon(
-                  vaultIconForExt(type.name) ?? Icons.lock_rounded,
-                  color: vaultColorForExt(type.name) ?? cs.primary,
-                ),
-                child: Text(type.label),
-                onPressed: () => _addVaultItem(type),
-              ),
-            ),
-          ],
-          child: const Text('Secure Item'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildViewTogglePopupButton(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final currentIcon = switch (_layoutMode) {
-      BrowserLayoutMode.list => Icons.view_list_rounded,
-      BrowserLayoutMode.compact => Icons.list_rounded,
-      BrowserLayoutMode.grid => Icons.grid_view_rounded,
-      BrowserLayoutMode.masonry => Icons.dashboard_rounded,
-    };
-    return MenuAnchor(
-      builder: (context, controller, child) => IconButton(
-        icon: Icon(currentIcon),
-        tooltip: 'Layout options',
-        onPressed: () {
-          if (controller.isOpen) {
-            controller.close();
-          } else {
-            controller.open();
-          }
-        },
-      ),
-      onOpen: () => setState(() => _menuIsOpen = true),
-      onClose: () => setState(() => _menuIsOpen = false),
-      menuChildren: [
-        for (final (mode, label, icon) in const [
-          (BrowserLayoutMode.list, 'Detailed List', Icons.view_list_rounded),
-          (BrowserLayoutMode.compact, 'Compact List', Icons.list_rounded),
-          (BrowserLayoutMode.grid, 'Gallery Grid', Icons.grid_view_rounded),
-          (BrowserLayoutMode.masonry, 'Masonry', Icons.dashboard_rounded),
-        ])
-          MenuItemButton(
-            leadingIcon: Icon(icon, color: _layoutMode == mode ? cs.primary : cs.onSurfaceVariant),
-            trailingIcon: _layoutMode == mode
-                ? Icon(Icons.check_rounded, size: 16, color: cs.primary)
-                : null,
-            onPressed: () async {
-              setState(() => _layoutMode = mode);
-              try {
-                final settings = await AppSettingsService.loadSettings();
-                final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
-                await AppSettingsService.saveSettings(updatedSettings);
-              } catch (e) {
-                debugPrint('Failed to save layout mode: $e');
-              }
-            },
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: _layoutMode == mode ? FontWeight.bold : FontWeight.normal,
-                color: _layoutMode == mode ? cs.primary : null,
-              ),
-            ),
-          ),
-      ],
-    );
   }
 
   Future<void> _onSortChanged(SortBy field) async {
@@ -1714,8 +1541,25 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               if (!_searchActive) _searchQuery = '';
             }),
           ),
-      FileManagerAction.add: (context) => _buildAddPopupButton(context),
-      FileManagerAction.viewToggle: (context) => _buildViewTogglePopupButton(context),
+      FileManagerAction.add: (context) => AddItemMenuButton(
+            isReadOnly: _isReadOnly,
+            hasArchiveContext: _archiveContext != null,
+            container: widget.container,
+            currentDirPath: _currentDirPath,
+            currentItems: _currentItems,
+            onSetStatus: _setStatus,
+            onExtractArchive: _extractArchive,
+            onSignalActivity: _signalActivity,
+            onLoadDirectoryContents: _loadDirectoryContents,
+            onCaptureFromCamera: _captureFromCamera,
+            onImportFilesFromDevice: _importFilesFromDevice,
+            onImportFolderFromDevice: _importFolderFromDevice,
+            onAddVaultItem: _addVaultItem,
+          ),
+      FileManagerAction.viewToggle: (context) => LayoutModeMenuButton(
+            layoutMode: _layoutMode,
+            onLayoutModeChanged: _onLayoutModeChanged,
+          ),
       FileManagerAction.sort: (context) => SortMenuButton(
             sortBy: sortBy,
             sortAscending: sortAscending,
@@ -1727,44 +1571,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             onPressed: canPlayMedia ? _startMediaViewerFromCurrentLocation : null,
           ),
     };
-  }
-
-  Widget _buildSettingsMenuButton(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return MenuAnchor(
-      builder: (ctx, controller, child) => IconButton(
-        onPressed: () =>
-            controller.isOpen ? controller.close() : controller.open(),
-        icon: const Icon(Icons.settings_outlined),
-        tooltip: 'Settings',
-      ),
-      menuChildren: [
-        SubmenuButton(
-          leadingIcon: Icon(Icons.filter_alt_outlined, color: cs.onSurfaceVariant),
-          menuChildren: [
-            _buildFilterMenuButton(null, 'All Files', Icons.all_inclusive_rounded, cs, textTheme),
-            _buildFilterMenuButton('image', 'Images', Icons.image_outlined, cs, textTheme),
-            _buildFilterMenuButton('video', 'Videos', Icons.videocam_outlined, cs, textTheme),
-            _buildFilterMenuButton('audio', 'Audio', Icons.audiotrack_rounded, cs, textTheme),
-            _buildFilterMenuButton('document', 'Documents', Icons.description_outlined, cs, textTheme),
-          ],
-          child: const Text('Filters'),
-        ),
-        const PopupMenuDivider(),
-        MenuItemButton(
-          leadingIcon: Icon(Icons.tune_rounded, color: cs.onSurfaceVariant),
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FileManagerToolbarSettingsScreen()),
-            );
-            await _loadToolbarConfig();
-          },
-          child: const Text('Settings'),
-        ),
-      ],
-    );
   }
 
   @override
@@ -2223,7 +2029,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         if (isLandscape && showActionBar) ...[
           ..._toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
         ],
-        _buildSettingsMenuButton(context),
+        SettingsMenuButton(
+          currentFilter: _currentFilter,
+          onFilterChanged: (value) => setState(() => _currentFilter = value),
+          onSettingsClosed: _loadToolbarConfig,
+        ),
       ],
     );
   }

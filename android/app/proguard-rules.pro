@@ -1,4 +1,4 @@
-# Keep the entire package that interacts with your native C++ code
+# Keep the entire package that interacts with native C++ code
 -keep class com.aeidolon.vaultexplorer.** { *; }
 -keepclassmembers class com.aeidolon.vaultexplorer.** { *; }
 
@@ -7,6 +7,9 @@
     native <methods>;
 }
 
-# Force deterministic R8 obfuscation and constant SourceFile attribute for Reproducible Builds
+# Force deterministic R8 builds
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# Disable class/method symbol obfuscation to eliminate DEX naming divergences across CPU core counts
+-dontobfuscate

@@ -54,7 +54,13 @@ jobs:
         run: flutter pub get
 
       - name: Patch JNI for Reproducibility
-        run: bash scripts/patch_jni_reproducibility.sh
+        run: |
+          echo "Flutter action PUB-CACHE-PATH output: ${{ steps.flutter-action.outputs.PUB-CACHE-PATH }}"
+          echo "Disk inspection of hosted pub cache:"
+          find ~/.pub-cache /tmp/.pub-cache "${{ steps.flutter-action.outputs.PUB-CACHE-PATH }}" -maxdepth 3 2>/dev/null || true
+          
+          export PUB_CACHE="${{ steps.flutter-action.outputs.PUB-CACHE-PATH }}"
+          bash scripts/patch_jni_reproducibility.sh
 
       # ── Keystore ────────────────────────────────────────────────────
       - name: Decode keystore

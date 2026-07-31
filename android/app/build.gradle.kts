@@ -15,40 +15,65 @@ plugins {
 // Running this during configuration ensures that subprojects like `:jni` 
 // see the patched CMakeLists.txt BEFORE their native build tasks execute.
 fun patchJniInPubCache() {
+    logger.lifecycle("====================================================")
+    logger.lifecycle("=== Gradle patchJniInPubCache Diagnostic Start ===")
+    logger.lifecycle("====================================================")
+    
     val pubCacheEnv = System.getenv("PUB_CACHE")
     val userHome = System.getProperty("user.home")
     val localAppData = System.getenv("LOCALAPPDATA")
 
+    logger.lifecycle("PUB_CACHE env:  ${pubCacheEnv ?: "<not set>"}")
+    logger.lifecycle("user.home prop: $userHome")
+    logger.lifecycle("LOCALAPPDATA:   ${localAppData ?: "<not set>"}")
+
     val possibleCacheDirs = listOfNotNull(
         pubCacheEnv?.let { File(it) },
         File(userHome, ".pub-cache"),
+        File("/tmp/.pub-cache"),
+        rootProject.file("../.pub-cache"),
         if (localAppData != null) File(localAppData, "Pub/Cache") else null,
         File(userHome, "AppData/Local/Pub/Cache")
     )
 
-    val pubCacheDir = possibleCacheDirs.firstOrNull { it.exists() } ?: return
-    val hostedDir = File(pubCacheDir, "hosted")
-    if (!hostedDir.exists()) return
+    val existingDirs = possibleCacheDirs.filter { dir ->
+        val exists = dir.exists()
+        logger.lifecycle("Pub cache candidate '${dir.absolutePath}': exists=$exists")
+        exists
+    }
 
+    var foundCount = 0
     var patchedCount = 0
-    hostedDir.walkTopDown()
-        .filter { it.isFile && it.name == "CMakeLists.txt" && it.path.contains("jni-") }
-        .forEach { cmakeFile ->
-            val content = cmakeFile.readText()
-            if (!content.contains("--build-id=none")) {
-                val patch = """
-                    if(TARGET dartjni)
-                      target_link_options(dartjni PRIVATE "-Wl,--build-id=none")
-                      target_compile_options(dartjni PRIVATE "-ffile-prefix-map=${'$'}{CMAKE_SOURCE_DIR}=/jni")
-                    else()
-                      string(APPEND CMAKE_SHARED_LINKER_FLAGS " -Wl,--build-id=none")
-                    endif()
-                """.trimIndent()
-                cmakeFile.appendText("\n$patch\n")
-                patchedCount++
-                logger.lifecycle("patch_jni_reproducibility: patched ${cmakeFile.absolutePath}")
+
+    existingDirs.forEach { cacheDir ->
+        cacheDir.walkTopDown()
+            .filter { it.isFile && it.name == "CMakeLists.txt" && it.path.contains("jni-") }
+            .forEach { cmakeFile ->
+                foundCount++
+                logger.lifecycle("Found JNI CMakeLists.txt ($foundCount): ${cmakeFile.absolutePath}")
+                val content = cmakeFile.readText()
+                if (!content.contains("--build-id=none")) {
+                    val patch = """
+                        set(CMAKE_SHARED_LINKER_FLAGS "${'$'}{CMAKE_SHARED_LINKER_FLAGS} -Wl,--build-id=none")
+                        add_compile_options("-ffile-prefix-map=${'$'}{CMAKE_SOURCE_DIR}=/jni")
+                    """.trimIndent()
+                    cmakeFile.appendText("\n$patch\n")
+                    patchedCount++
+                    logger.lifecycle(" -> Status: PATCHED SUCCESSFULLY")
+                } else {
+                    logger.lifecycle(" -> Status: ALREADY PATCHED")
+                }
             }
-        }
+    }
+
+    logger.lifecycle("====================================================")
+    logger.lifecycle("=== Gradle patchJniInPubCache Summary ==============")
+    logger.lifecycle("Total JNI CMakeLists.txt found: $foundCount")
+    logger.lifecycle("Total files newly patched:     $patchedCount")
+    if (foundCount == 0) {
+        logger.warn("WARNING: 0 jni CMakeLists.txt files were found in pub cache!")
+    }
+    logger.lifecycle("====================================================")
 }
 
 patchJniInPubCache()

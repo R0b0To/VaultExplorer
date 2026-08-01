@@ -2,8 +2,22 @@
 # Canonical release-APK build procedure for single-ABI target builds.
 set -euo pipefail
 
-# Container Safeguard 1: Allow Git operations in Docker containers
-git config --global --add safe.directory '*' 2>/dev/null || true
+# Container Safeguard 1: mark every directory as git-safe, without ever
+# touching $HOME/.gitconfig as a file. `git config --global` does exactly
+# that (creates it if missing) -- and on the F-Droid buildserver, that file
+# path is a symlink the CI wrapper manages itself between builds in the
+# same job (`ln -s .../.gitconfig /home/vagrant/.gitconfig`). Once our
+# script materialized it as a real file during one build, that `ln -s` for
+# the *next* build in the same job hit "File exists" and aborted the whole
+# job -- even though the build itself had already succeeded. Since the
+# reproducibility work here already leans on treating environments as
+# hostile/uncontrolled rather than assuming a clean slate, avoid the
+# filesystem entirely: GIT_CONFIG_COUNT/KEY/VALUE inject config purely via
+# environment (Git 2.31+), with zero filesystem footprint.
+git_cfg_n="${GIT_CONFIG_COUNT:-0}"
+export GIT_CONFIG_KEY_$git_cfg_n=safe.directory
+export GIT_CONFIG_VALUE_$git_cfg_n='*'
+export GIT_CONFIG_COUNT=$((git_cfg_n + 1))
 
 # Container Safeguard 4: never let `flutter` write directly to a live pipe.
 # flutter_tools has a long-standing, still-unresolved bug where its stdout

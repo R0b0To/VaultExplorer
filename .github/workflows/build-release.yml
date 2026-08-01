@@ -64,22 +64,31 @@ jobs:
           EOF
 
       # Delegates SOURCE_DATE_EPOCH, PUB_CACHE, `flutter pub get`, the
-      # single-core taskset for R8 determinism, `flutter build apk
-      # --release`, and the build-id verification step to the same script
-      # metadata/com.aeidolon.vaultexplorer.yml calls, so CI and the
-      # F-Droid buildserver run the exact same build procedure rather than
-      # two independently-maintained step lists that can drift apart (see
-      # the Node version comment above for what that drift costs).
-      - name: Build release APK
-        run: bash ./scripts/reproducible_build.sh
+      # single-core taskset for R8 determinism, `flutter build apk --release
+      # --flavor <x>`, and the build-id/ABI verification checks to the same
+      # script metadata/com.aeidolon.vaultexplorer.yml calls per flavor, so
+      # CI and the F-Droid buildserver run the exact same build procedure
+      # rather than independently-maintained step lists that can drift
+      # apart (see the Node version comment above for what that drift
+      # costs). One APK per ABI, not a fat APK -- see the flavor comment in
+      # android/app/build.gradle.kts for why this can't be
+      # `--split-per-abi` instead.
+      - name: Build release APKs (arm64, armeabi, x64)
+        run: |
+          for flavor in arm64 armeabi x64; do
+            bash ./scripts/reproducible_build.sh "$flavor"
+          done
 
-      - name: Rename build output
+      - name: Rename build outputs
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr '+' '-')
           SHA=$(git rev-parse --short HEAD)
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           mkdir -p release-apk
-          cp build/app/outputs/flutter-apk/app-release.apk "release-apk/vaultexplorer-${VERSION}-${SHA}.apk"
+          for flavor in arm64 armeabi x64; do
+            cp "build/app/outputs/flutter-apk/app-${flavor}-release.apk" \
+               "release-apk/vaultexplorer-${VERSION}-${flavor}-${SHA}.apk"
+          done
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

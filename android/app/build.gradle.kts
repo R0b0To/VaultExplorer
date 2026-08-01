@@ -129,6 +129,41 @@ android {
         }
     }
 
+    // Per-ABI product flavors for F-Droid submission. F-Droid's build model
+    // is one metadata Build entry = one versionCode = one output APK -- it
+    // does not support a single build producing several simultaneous
+    // outputs the way `flutter build apk --split-per-abi` does (confirmed
+    // against the current Build Metadata Reference: `output:` is documented
+    // singular, and reports of --split-per-abi's multi-output failing the
+    // buildserver). The documented mechanism for multiple ABI-specific APKs
+    // is one Build entry per flavor, combined with `VercodeOperation` for
+    // distinct versionCodes -- see metadata/com.aeidolon.vaultexplorer.yml.
+    // Each entry's flavor is selected by passing its name as an argument to
+    // scripts/reproducible_build.sh, not via metadata's `gradle:` field --
+    // this project needs `flutter build apk`, not a bare
+    // `gradle assemble<Flavor>Release`, since only `flutter build` runs the
+    // Dart-side codegen/asset bundling a raw Gradle invocation wouldn't.
+    //
+    // Flavor names here must stay in sync with both of those.
+    flavorDimensions += "abi"
+    productFlavors {
+        create("arm64") {
+            dimension = "abi"
+            ndk { abiFilters += "arm64-v8a" }
+            externalNativeBuild { cmake { abiFilters += "arm64-v8a" } }
+        }
+        create("armeabi") {
+            dimension = "abi"
+            ndk { abiFilters += "armeabi-v7a" }
+            externalNativeBuild { cmake { abiFilters += "armeabi-v7a" } }
+        }
+        create("x64") {
+            dimension = "abi"
+            ndk { abiFilters += "x86_64" }
+            externalNativeBuild { cmake { abiFilters += "x86_64" } }
+        }
+    }
+
     if (keystorePropertiesFile.exists()) {
         signingConfigs {
             create("release") {
@@ -163,6 +198,26 @@ android {
             // guarantees a diff regardless of anything else here.
             // https://f-droid.org/docs/Reproducible_Builds/#vcs-info
             vcsInfo.include = false
+        }
+    }
+}
+
+// Must exactly match the multiplier/offsets in
+// metadata/com.aeidolon.vaultexplorer.yml's `VercodeOperation` list -- the
+// F-Droid buildserver checks the built APK's manifest versionCode against
+// what the metadata declares for that Build entry and fails the build on
+// a mismatch (this is not just cosmetic bookkeeping).
+val abiVersionCodeOffsets = mapOf(
+    "arm64" to 1,
+    "armeabi" to 2,
+    "x64" to 3,
+)
+
+androidComponents {
+    onVariants { variant ->
+        val offset = abiVersionCodeOffsets[variant.flavorName] ?: return@onVariants
+        variant.outputs.forEach { output ->
+            output.versionCode.set(flutter.versionCode * 100 + offset)
         }
     }
 }

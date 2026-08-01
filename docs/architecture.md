@@ -17,6 +17,16 @@
 > the companion `docs/tech-debt.md` Phase 0/1 items — this file is current
 > with the source tree as of those fixes, not just a historical
 > reconstruction.
+>
+> **Update (2026-08-01):** A follow-up audit re-verified every "✅ Done"
+> claim in `docs/tech-debt.md` against this source snapshot instead of
+> trusting the prior session's notes at face value. Two genuine new
+> decisions surfaced and are recorded below as **ADR-023** and **ADR-024**.
+> Not everything held up under re-verification, though — TD-2 (CI trigger),
+> TD-3 (old test file left in place), and TD-12 (pointycastle version) were
+> previously marked done but are not, in this snapshot. Those are
+> tracking/regression problems, not architecture decisions, so the detail
+> lives in `docs/tech-debt.md` rather than being duplicated here.
 
 ---
 
@@ -266,6 +276,8 @@ than replaces the reasoning already written at the call sites.
 | **020** | Unlock sheets dismiss the on-screen keyboard on tap-outside via an opaque overlay, applied identically to local and USB unlock flows | Accepted | `unlock_sheet.dart`, `usb_unlock_sheet.dart`, `advanced_params_panel.dart` |
 | **021** | `ContainerSessionRegistry.activeSessions` is a `ConcurrentHashMap`, not a plain map, because it's mutated from both the UI thread (unlock) and a background executor thread (lock) with no other synchronization covering it | Accepted (2026-07-30) | `ContainerSessionRegistry.kt`; mirrors the precedent already set by `VaultBackendRegistry.sessions` (`VaultBackend.kt`) |
 | **022** | Backend-specific lock-skip behavior (§3.2) is a `VaultBackend.skipsPerVolumeLock` property, not a runtime string match on a session's class name | Accepted (2026-07-30) | `VaultBackend.kt`, `CryptomatorSession.kt`, `GocryptfsSession.kt`, `ContainerFileSystem.kt` |
+| **023** | The native crypto/filesystem engine's first automated regression tests are plain host-side C++ binaries (`g++`-buildable, `assert`-based, zero Android toolchain), registered with CTest and gated behind `if(NOT ANDROID)` — not an instrumented/emulator test, to keep the feedback loop fast | Accepted (2026-08-01) | `CMakeLists.txt` (`add_executable`/`add_test` block), `crypto/test/kdf_table_test.cpp`, `io/test/sector_batching_test.cpp`, `test/fs_scan_test.cpp` |
+| **024** | `file_browser_screen.dart`'s selection-mode and sort-mode state live in reusable `SelectionMixin<T>`/`SortMixin<T>` mixins, not inline in the screen's `State` class — the first slice of the TD-8 decomposition, chosen because these two concerns were the most self-contained to extract without touching the rest of the widget | Accepted (2026-08-01) | `lib/features/browser/mixins/selection_mixin.dart`, `lib/features/browser/mixins/sort_mixin.dart`, `file_browser_screen.dart` (`with SelectionMixin<FileBrowserScreen>, SortMixin<FileBrowserScreen>`) |
 
 **Companion findings log** (referenced as `Finding F-NN` alongside some
 ADRs above, evidently a separate audit trail): **F-01** (byte-budgeted L1
@@ -279,8 +291,9 @@ F-12–F-14 are unrecovered** for the same reason as the ADR gaps above.
 
 > Recommendation: when this document is adopted as the real
 > `docs/architecture.md`, renumber nothing. Leave the gaps exactly as
-> listed — a future ADR-021 should stay ADR-021 — so existing code comments
-> that already cite specific numbers keep pointing at the right entries.
+> listed — ADR-021 should stay ADR-021 — so existing code comments that
+> already cite specific numbers keep pointing at the right entries. The
+> next unused number is now **025** (021–024 are taken).
 
 ---
 
@@ -423,6 +436,13 @@ handler in reverse — see `VaultExplorerApi.initMethodCallHandler`)
 This document's §4 numbering is the same numbering already used throughout
 the codebase — grep for `ADR-0` or `Finding F-` to find every call site that
 cites a specific entry. If you add a new architectural decision, give it the
-next unused number (currently **021**) rather than reusing any of the
-unrecovered gaps, and cite it the same way existing code does:
-`// See docs/architecture.md ADR-021.`
+next unused number (currently **025** — 021–024 are taken) rather than
+reusing any of the unrecovered gaps, and cite it the same way existing code
+does: `// See docs/architecture.md ADR-021.`
+
+**A caution for whoever adds ADR-025:** this pass found three cases where
+`docs/tech-debt.md` marked something "✅ Done" and the source snapshot said
+otherwise (TD-2, TD-3, TD-12 — see that file's 2026-08-01 update). Verify a
+fix against the actual tree before citing it here as Accepted; a status
+table is easy to update without the underlying change landing, and this
+document is only as trustworthy as the last person who checked.

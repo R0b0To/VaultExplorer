@@ -61,7 +61,7 @@ else
   echo "warning: taskset not found -- R8 output may not match a build that used it" >&2
 fi
 
-$TASKSET flutter build apk --release
+$TASKSET flutter build apk --release --target-platform android-arm64
 
 APK="build/app/outputs/flutter-apk/app-release.apk"
 echo "Built: $APK"

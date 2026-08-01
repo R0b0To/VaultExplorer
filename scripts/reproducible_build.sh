@@ -5,6 +5,28 @@ set -euo pipefail
 # Container Safeguard 1: Allow Git operations in Docker containers
 git config --global --add safe.directory '*' 2>/dev/null || true
 
+# Container Safeguard 4: never let `flutter` write directly to a live pipe.
+# flutter_tools has a long-standing, still-unresolved bug where its stdout
+# writer throws an unhandled exception and crashes the whole process the
+# moment the pipe it's writing to closes or hiccups mid-write
+# (flutter/flutter#8580, #99617, #51872, #81660 -- 2017 through present).
+# Buildserver/CI log capture is exactly the kind of pipe that triggers this
+# -- it hit us on the very first `flutter --version` call, while
+# flutter_tools was still bootstrapping itself. Buffering through a real
+# file and `cat`-ing it afterward sidesteps this entirely: `cat` exits
+# quietly on a closed pipe (default SIGPIPE handling) instead of throwing.
+run_flutter() {
+  local log
+  log="$(mktemp)"
+  set +e
+  "$@" >"$log" 2>&1
+  local rc=$?
+  set -e
+  cat "$log"
+  rm -f "$log"
+  return $rc
+}
+
 FLAVOR="${1:-}"
 case "$FLAVOR" in
   arm64)
@@ -54,13 +76,13 @@ echo "== Toolchain & Environment ============================="
 echo "Target             : $FLAVOR ($TARGET_PLATFORM / $TARGET_ABI)"
 echo "Working directory   : $(pwd)"
 java -version
-flutter --version
+run_flutter flutter --version
 node --version 2>/dev/null || echo "node: not on PATH (fine if assets/pdfjs is already built)"
 echo "========================================================"
 
 # Container Safeguard 3: Point Flutter at Android SDK if defined
 if [ -n "${ANDROID_HOME:-}" ]; then
-  flutter config --android-sdk "$ANDROID_HOME" >/dev/null 2>&1 || true
+  run_flutter flutter config --android-sdk "$ANDROID_HOME" >/dev/null 2>&1 || true
 fi
 
 # Pre-check: warn if CRLF line endings exist in static assets or scripts.
@@ -78,8 +100,8 @@ echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH ($(date -u -d "@$SOURCE_DATE_EPOCH" 2
 export PUB_CACHE="${PUB_CACHE:-$(pwd)/.pub-cache}"
 echo "PUB_CACHE=$PUB_CACHE"
 
-flutter config --no-analytics
-flutter pub get
+run_flutter flutter config --no-analytics
+run_flutter flutter pub get
 
 # Extract base build number from pubspec.yaml
 BASE_BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed -n 's/.*+\([0-9]*\)/\1/p')
@@ -103,7 +125,7 @@ else
 fi
 
 # Build release APK
-$TASKSET flutter build apk --release \
+run_flutter $TASKSET flutter build apk --release \
   --target-platform "$TARGET_PLATFORM" \
   --build-number "$VERSION_CODE"
 

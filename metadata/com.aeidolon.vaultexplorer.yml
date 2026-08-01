@@ -8,6 +8,7 @@ SourceCode: https://github.com/R0b0To/VaultExplorer
 IssueTracker: https://github.com/R0b0To/VaultExplorer/issues
 Donate: https://ko-fi.com/K3K2ND3Y8
 
+AutoName: Vault Explorer
 Description: |-
   Vault Explorer opens and browses encrypted disk containers directly on
   your device -- VeraCrypt/TrueCrypt volumes, LUKS, BitLocker, and raw
@@ -18,136 +19,79 @@ Description: |-
   video, and PDFs from inside it, and extract only what you need. All
   decryption happens on-device; nothing is uploaded anywhere.
 
-# No ads, no tracking, no non-free dependencies, no prebuilt binaries.
-# Nothing to list here -- omitted rather than left as an empty {}/[] , which
-# some fdroidserver lint versions flag as the wrong YAML type for this field.
-
 RepoType: git
 Repo: https://github.com/R0b0To/VaultExplorer.git
 
-# One ABI-specific APK per architecture instead of a fat APK. F-Droid's
-# build model is one metadata Build entry = one versionCode = one output
-# APK -- there's no way to have a single Build entry produce three
-# simultaneous outputs the way `flutter build apk --split-per-abi` does, so
-# this needs three Build entries (below) plus VercodeOperation to give each
-# a distinct, deterministic versionCode. This offset scheme
-# (100 * base + N) must exactly match android/app/build.gradle.kts's
-# `abiVersionCodeOffsets` map, or the buildserver will reject the built APK
-# with "Unexpected version/version code in output" -- it checks the
-# manifest's actual versionCode against what's declared here.
+Builds:
+  - versionName: 1.0.1
+    versionCode: 201
+    commit: v1.0.1
+    sudo:
+      - apt-get update
+      - apt-get install -y ca-certificates curl gnupg
+      - mkdir -p /etc/apt/keyrings
+      - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg
+        --dearmor -o /etc/apt/keyrings/nodesource.gpg
+      - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x
+        nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+      - apt-get update
+      - apt-get install -y nodejs
+    output: build/app/outputs/flutter-apk/app-arm64-release.apk
+    srclibs:
+      - flutter@3.44.0
+    build:
+      - export PATH="$$flutter$$/bin:$PATH"
+      - bash ./scripts/reproducible_build.sh arm64
+    ndk: r28d
+
+  - versionName: 1.0.1
+    versionCode: 202
+    commit: v1.0.1
+    sudo:
+      - apt-get update
+      - apt-get install -y ca-certificates curl gnupg
+      - mkdir -p /etc/apt/keyrings
+      - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg
+        --dearmor -o /etc/apt/keyrings/nodesource.gpg
+      - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x
+        nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+      - apt-get update
+      - apt-get install -y nodejs
+    output: build/app/outputs/flutter-apk/app-armeabi-release.apk
+    srclibs:
+      - flutter@3.44.0
+    build:
+      - export PATH="$$flutter$$/bin:$PATH"
+      - bash ./scripts/reproducible_build.sh armeabi
+    ndk: r28d
+
+  - versionName: 1.0.1
+    versionCode: 203
+    commit: v1.0.1
+    sudo:
+      - apt-get update
+      - apt-get install -y ca-certificates curl gnupg
+      - mkdir -p /etc/apt/keyrings
+      - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg
+        --dearmor -o /etc/apt/keyrings/nodesource.gpg
+      - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x
+        nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+      - apt-get update
+      - apt-get install -y nodejs
+    output: build/app/outputs/flutter-apk/app-x64-release.apk
+    srclibs:
+      - flutter@3.44.0
+    build:
+      - export PATH="$$flutter$$/bin:$PATH"
+      - bash ./scripts/reproducible_build.sh x64
+    ndk: r28d
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
 VercodeOperation:
   - 100 * %c + 1
   - 100 * %c + 2
   - 100 * %c + 3
-
-Builds:
-  # NOTE: each entry must point at a real annotated git tag that exists in
-  # the repo at submission/build time, with versionName matching what that
-  # tag's pubspec.yaml actually says (pubspec.yaml is 1.0.1+2, so the base
-  # version code is 2 -- versionCode below is that base run through the
-  # VercodeOperation above, not something arbitrary).
-  #
-  # All three share the same commit/srclibs/sudo/ndk -- they're the same
-  # source built three times, once per Gradle product flavor defined in
-  # android/app/build.gradle.kts. The flavor to build is passed as an
-  # argument to scripts/reproducible_build.sh (see `build:` below), not via
-  # a `gradle:` field -- this project has to invoke `flutter build apk`,
-  # not a bare `gradle assemble<Flavor>Release`, since only `flutter build`
-  # runs the Dart-side codegen/asset bundling that a raw Gradle invocation
-  # wouldn't.
-
-  # -- arm64-v8a -------------------------------------------------------
-  - versionName: '1.0.1'
-    versionCode: 201
-    commit: v1.0.1
-    ndk: r28d
-
-    # Pinned to Node.js 26, matching build-release.yml's
-    # actions/setup-node `node-version: '26'`. This has to match exactly --
-    # npm ci pins dependency versions via package-lock.json, but not the
-    # Node/V8 runtime itself, and pdf.js's minifier can produce different
-    # output from identical input under a different Node major. A bare
-    # `apt-get install nodejs` would pull whatever version the build
-    # image's default repo happens to carry, which is not this.
-    sudo:
-      - apt-get update
-      - apt-get install -y ca-certificates curl gnupg
-      - mkdir -p /etc/apt/keyrings
-      - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-      - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
-      - apt-get update
-      - apt-get install -y nodejs
-
-    # Flutter project root is the repo root (pubspec.yaml lives there), not
-    # android/ -- so no `subdir:`. Pinned to the same version
-    # build-release.yml uses, so both pipelines' output is actually
-    # comparable for Reproducible Builds verification.
-    srclibs:
-      - flutter@3.44.0
-    output: build/app/outputs/flutter-apk/app-arm64-release.apk
-    build:
-      # scripts/reproducible_build.sh is the same script
-      # .github/workflows/build-release.yml calls per flavor --
-      # SOURCE_DATE_EPOCH, PUB_CACHE, `pub get`, the single-core taskset
-      # for R8 determinism, `flutter build apk --release --flavor arm64`,
-      # and the build-id/ABI verification checks all live there once,
-      # instead of being copy-pasted into this recipe and GitHub Actions
-      # separately where they can silently drift apart (that already
-      # happened once: this recipe pinned Node 26 for the pdf.js minifier
-      # while CI was still on 22).
-      - export PATH="$$flutter$$/bin:$PATH"
-      - bash ./scripts/reproducible_build.sh arm64
-
-  # -- armeabi-v7a ------------------------------------------------------
-  - versionName: '1.0.1'
-    versionCode: 202
-    commit: v1.0.1
-    ndk: r28d
-    sudo:
-      - apt-get update
-      - apt-get install -y ca-certificates curl gnupg
-      - mkdir -p /etc/apt/keyrings
-      - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-      - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
-      - apt-get update
-      - apt-get install -y nodejs
-    srclibs:
-      - flutter@3.44.0
-    output: build/app/outputs/flutter-apk/app-armeabi-release.apk
-    build:
-      - export PATH="$$flutter$$/bin:$PATH"
-      - bash ./scripts/reproducible_build.sh armeabi
-
-  # -- x86_64 (mainly for emulators/x86 tablets) -------------------------
-  - versionName: '1.0.1'
-    versionCode: 203
-    commit: v1.0.1
-    ndk: r28d
-    sudo:
-      - apt-get update
-      - apt-get install -y ca-certificates curl gnupg
-      - mkdir -p /etc/apt/keyrings
-      - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
-      - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
-      - apt-get update
-      - apt-get install -y nodejs
-    srclibs:
-      - flutter@3.44.0
-    output: build/app/outputs/flutter-apk/app-x64-release.apk
-    build:
-      - export PATH="$$flutter$$/bin:$PATH"
-      - bash ./scripts/reproducible_build.sh x64
-
-AutoUpdateMode: Version
-UpdateCheckMode: Tags
-# Default Tags checking scrapes build.gradle/AndroidManifest.xml for a
-# literal versionCode/versionName -- this project has neither (versionCode
-# comes from flutter.versionCode, itself read from pubspec.yaml, then run
-# through the per-flavor offset in androidComponents.onVariants; none of
-# that is a static integer literal Tags' default scraping could find).
-# Point it at pubspec.yaml directly instead, extracting the *base*
-# version/build-number pair that VercodeOperation then multiplies out per
-# ABI. This is F-Droid's own documented pattern for Flutter apps.
-UpdateCheckData: 'pubspec.yaml|version:\s.+\+(\d+)|.|version:\s(.+)\+'
-CurrentVersion: '1.0.1'
+UpdateCheckData: pubspec.yaml|version:\s.+\+(\d+)|.|version:\s(.+)\+
+CurrentVersion: 1.0.1
 CurrentVersionCode: 203

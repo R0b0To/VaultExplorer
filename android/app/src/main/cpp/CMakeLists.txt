@@ -4,6 +4,7 @@ project("vaultexplorer")
 
 # Strip CMAKE_BINARY_DIR (which contains .cxx/release/<hash>) from compiled C/C++ binaries
 add_compile_options("-ffile-prefix-map=${CMAKE_BINARY_DIR}=/build_tree")
+add_compile_options("-ffile-prefix-map=${CMAKE_SOURCE_DIR}=/source_tree")
 
 # 1. Download mbedTLS (Encryption Engine)
 include(FetchContent)

@@ -81,19 +81,16 @@ jobs:
 
       - name: Rename build outputs
         run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr '+' '-')
-          SHA=$(git rev-parse --short HEAD)
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           mkdir -p release-apk
           for flavor in arm64 armeabi x64; do
             cp "build/app/outputs/flutter-apk/app-${flavor}-release.apk" \
-               "release-apk/vaultexplorer-${VERSION}-${flavor}-${SHA}.apk"
+               "release-apk/VaultExplorer-${{ github.ref_name }}-${flavor}.apk"
           done
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VaultExplorer-${{ env.APP_VERSION }}-APK
+          name: VaultExplorer-${{ github.ref_name }}-APK
           path: release-apk/*.apk
           retention-days: 30
 

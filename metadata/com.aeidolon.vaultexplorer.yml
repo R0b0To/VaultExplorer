@@ -66,7 +66,9 @@ Builds:
       - export PUB_CACHE=$(pwd)/.pub-cache
       - $$flutter$$/bin/flutter config --no-analytics
       - $$flutter$$/bin/flutter pub get
-      - bash scripts/patch_jni_reproducibility.sh
+      # jni build-id/file-prefix reproducibility patch now lives in
+      # android/app/build.gradle.kts (rootProject.subprojects block),
+      # applied automatically by Gradle -- no separate patch step needed.
       - $$flutter$$/bin/flutter build apk --release
 
 AutoUpdateMode: Version

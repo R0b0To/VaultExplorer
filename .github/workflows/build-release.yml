@@ -53,14 +53,13 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Patch JNI for Reproducibility
-        run: |
-          echo "Flutter action PUB-CACHE-PATH output: ${{ steps.flutter-action.outputs.PUB-CACHE-PATH }}"
-          echo "Disk inspection of hosted pub cache:"
-          find ~/.pub-cache /tmp/.pub-cache "${{ steps.flutter-action.outputs.PUB-CACHE-PATH }}" -maxdepth 3 2>/dev/null || true
-          
-          export PUB_CACHE="${{ steps.flutter-action.outputs.PUB-CACHE-PATH }}"
-          bash scripts/patch_jni_reproducibility.sh
+      # NOTE: the `jni` pub package's build-id/file-prefix reproducibility
+      # patch is no longer applied here as a separate step -- it's now
+      # configured directly in android/app/build.gradle.kts via
+      # `rootProject.subprojects { ... }`, so it runs automatically as part
+      # of Gradle's own configuration phase during "Build release APK"
+      # below. See that file for details. scripts/patch_jni_reproducibility.sh
+      # is no longer invoked by this workflow.
 
       # ── Keystore ────────────────────────────────────────────────────
       - name: Decode keystore

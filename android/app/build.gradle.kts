@@ -1,4 +1,5 @@
 import java.util.Properties
+import com.android.build.gradle.LibraryExtension
 
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
@@ -18,50 +19,31 @@ tasks.whenTaskAdded {
 }
 
 
-// ── Patch JNI CMakeLists.txt during Gradle Configuration Phase ─────────────
-fun patchJniInPubCache() {
-    val pubCacheEnv = System.getenv("PUB_CACHE")
-    val userHome = System.getProperty("user.home")
-    val localAppData = System.getenv("LOCALAPPDATA")
-
-    val possibleCacheDirs = listOfNotNull(
-        pubCacheEnv?.let { File(it) },
-        File(userHome, ".pub-cache"),
-        File("/tmp/.pub-cache"),
-        rootProject.file("../.pub-cache"),
-        if (localAppData != null) File(localAppData, "Pub/Cache") else null,
-        File(userHome, "AppData/Local/Pub/Cache")
-    )
-
-    val existingDirs = possibleCacheDirs.filter { dir -> dir.exists() }
-
-    var foundCount = 0
-    var patchedCount = 0
-
-    existingDirs.forEach { cacheDir ->
-        cacheDir.walkTopDown()
-            .filter { it.isFile && it.name == "CMakeLists.txt" && it.path.contains("jni-") }
-            .forEach { cmakeFile ->
-                foundCount++
-                var text = cmakeFile.readText()
-                    .replace("add_link_options(\"-Wl,--build-id=none\")\n", "")
-                    .replace("add_link_options(\"-Wl,--build-id=none\")", "")
-
-                if (!text.contains("CMAKE_SHARED_LINKER_FLAGS")) {
-                    val patch = """
-                        set(CMAKE_SHARED_LINKER_FLAGS "${'$'}{CMAKE_SHARED_LINKER_FLAGS} -Wl,--build-id=none")
-                        add_compile_options("-ffile-prefix-map=${'$'}{CMAKE_SOURCE_DIR}=/jni")
-                    """.trimIndent()
-                    text = "$text\n$patch\n"
-                    cmakeFile.writeText(text)
-                    patchedCount++
-                    logger.lifecycle("patch_jni_reproducibility: patched ${cmakeFile.absolutePath}")
+// ── Reproducibility fix for the `jni` pub package's native build ───────────
+// Replaces the old approach of walking the pub cache and rewriting
+// CMakeLists.txt in place (fragile: mutates a shared cache dir, depends on
+// matching a version-specific folder name, needs manual idempotency
+// bookkeeping). This is F-Droid's documented approach for this exact
+// package: https://f-droid.org/docs/Reproducible_Builds/#cmake -- configure
+// the `jni` library subproject's own externalNativeBuild directly through
+// Gradle's project graph instead of touching files on disk.
+rootProject.subprojects {
+    plugins.withId("com.android.library") {
+        if (name == "jni") {
+            extensions.configure<LibraryExtension>("android") {
+                defaultConfig {
+                    externalNativeBuild {
+                        cmake {
+                            arguments += "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--build-id=none"
+                            cFlags += "-ffile-prefix-map=${rootDir}=/jni"
+                            cppFlags += "-ffile-prefix-map=${rootDir}=/jni"
+                        }
+                    }
                 }
             }
+        }
     }
 }
-
-patchJniInPubCache()
 
 // ── From-source build steps ───────────────────────────────────────────────
 val buildPdfJs = tasks.register<Exec>("buildPdfJsAssets") {
@@ -77,6 +59,10 @@ android {
     namespace = "com.aeidolon.vaultexplorer"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+    // Pinned below compile-tools 35: apksigner from build-tools >=35.0.0-rc1
+    // produces APKs that fail apksigcopier verification even when byte-
+    // identical. https://f-droid.org/docs/Reproducible_Builds/#apksigner-from-build-tools--3500-rc1-outputs-unverifiable-apks
+    buildToolsVersion = "34.0.0"
 
     externalNativeBuild {
         cmake {

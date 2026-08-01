@@ -41,6 +41,7 @@ import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
+import 'package:vaultexplorer/features/browser/widgets/selection_app_bar_wide.dart';
 import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
@@ -50,6 +51,7 @@ import 'package:vaultexplorer/features/browser/widgets/truncated_banner.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
+import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 
 import '../../core/widgets/thumbnail/thumbnail_concurrency.dart';
@@ -1792,176 +1794,29 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onToggleDocumentProvider: doToggleDocProvider,
         );
       }
-      final textTheme = Theme.of(context).textTheme;
-      return AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close_rounded),
-          tooltip: 'Clear selection',
-          onPressed: exitSelectionMode,
-        ),
-        titleSpacing: 0,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(AppRadius.full),
-              ),
-              child: Text(
-                '${selectedItems.length}',
-                style: textTheme.labelLarge?.copyWith(
-                  color: cs.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                sizeLabel,
-                overflow: TextOverflow.ellipsis,
-                style: textTheme.titleSmall,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.delete_outline_rounded,
-              color: _isReadOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
-            ),
-            tooltip: _isReadOnly ? 'Read-only — can\'t delete' : 'Delete',
-            onPressed: _batchDelete,
-          ),
-          IconButton(
-            icon: const Icon(Icons.copy_rounded),
-            tooltip: 'Copy',
-            onPressed: () => _initClipboard(cut: false),
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.cut_rounded,
-              color: _isReadOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
-            ),
-            tooltip: _isReadOnly ? 'Read-only — can\'t move' : 'Move',
-            onPressed: () => _initClipboard(cut: true),
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.drive_file_rename_outline_rounded,
-              color: _isReadOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
-            ),
-            tooltip: _isReadOnly ? 'Read-only — can\'t rename' : 'Rename',
-            onPressed: doRename,
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded),
-            tooltip: 'More options',
-            onSelected: (value) {
-              if (value == 'export') _exportSelectedToStorage();
-              if (value == 'pin') _togglePinSelected(pin: true);
-              if (value == 'unpin') _togglePinSelected(pin: false);
-              if (value == 'open_with_app') doOpenWithApp();
-              if (value == 'doc_provider') doToggleDocProvider();
-              if (value == 'select_all') {
-                setState(() => selectedItems.addAll(allItems));
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem<String>(
-                value: 'select_all',
-                child: Text('Select All'),
-              ),
-              PopupMenuItem<String>(
-                value: 'export',
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.drive_folder_upload_rounded,
-                      color: cs.onSurfaceVariant,
-                      size: AppIconSize.small,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('Export to device'),
-                  ],
-                ),
-              ),
-              if (showPinOption)
-                PopupMenuItem<String>(
-                  value: 'pin',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.push_pin_rounded,
-                        color: cs.primary,
-                        size: AppIconSize.small,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(selectedItems.length > 1 ? 'Pin selected' : 'Pin'),
-                    ],
-                  ),
-                ),
-              if (showUnpinOption)
-                PopupMenuItem<String>(
-                  value: 'unpin',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.push_pin_outlined,
-                        color: cs.onSurfaceVariant,
-                        size: AppIconSize.small,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(selectedItems.length > 1 ? 'Unpin selected' : 'Unpin'),
-                    ],
-                  ),
-                ),
-              if (singleFile)
-                PopupMenuItem<String>(
-                  value: 'open_with_app',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.open_in_new_rounded,
-                        color: cs.onSurfaceVariant,
-                        size: AppIconSize.small,
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('Open with App'),
-                    ],
-                  ),
-                ),
-              if (singleFolder)
-                PopupMenuItem<String>(
-                  value: 'doc_provider',
-                  child: Row(
-                    children: [
-                      Icon(
-                        folderDocProviderMounted
-                            ? Icons.folder_shared_rounded
-                            : Icons.folder_shared_outlined,
-                        color: folderDocProviderMounted ? cs.tertiary : cs.onSurfaceVariant,
-                        size: AppIconSize.small,
-                      ),
-                      const SizedBox(width: 12),
-                      Text(folderDocProviderMounted
-                          ? 'Document Provider Settings'
-                          : 'Expose as Document Provider'),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 8),
-          VerticalDivider(width: 1, indent: 12, endIndent: 12, color: cs.outlineVariant),
-          const SizedBox(width: 4),
-          if (showActionBar)
-            ..._toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
-          const SizedBox(width: 4),
-        ],
+      return SelectionAppBarWide(
+        selectedCount: selectedItems.length,
+        selectionLabel: sizeLabel,
+        singleFileSelected: singleFile,
+        singleFolderSelected: singleFolder,
+        folderDocumentProviderMounted: folderDocProviderMounted,
+        readOnly: _isReadOnly,
+        showPinOption: showPinOption,
+        showUnpinOption: showUnpinOption,
+        showActionBar: showActionBar,
+        visibleActions: _toolbarConfig.visible,
+        actionBuilders: actionBuilders,
+        onClose: exitSelectionMode,
+        onSelectAll: () => setState(() => selectedItems.addAll(allItems)),
+        onRename: doRename,
+        onCopy: () => _initClipboard(cut: false),
+        onCut: () => _initClipboard(cut: true),
+        onExport: _exportSelectedToStorage,
+        onDelete: _batchDelete,
+        onOpenWithApp: doOpenWithApp,
+        onToggleDocumentProvider: doToggleDocProvider,
+        onPin: () => _togglePinSelected(pin: true),
+        onUnpin: () => _togglePinSelected(pin: false),
       );
     }
     final query = _searchQuery.trim().toLowerCase();

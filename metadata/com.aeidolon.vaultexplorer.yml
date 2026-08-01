@@ -43,8 +43,8 @@ VercodeOperation:
 Builds:
   # NOTE: each entry must point at a real annotated git tag that exists in
   # the repo at submission/build time, with versionName matching what that
-  # tag's pubspec.yaml actually says (pubspec.yaml is 1.0.0+1, so the base
-  # version code is 1 -- versionCode below is that base run through the
+  # tag's pubspec.yaml actually says (pubspec.yaml is 1.0.1+2, so the base
+  # version code is 2 -- versionCode below is that base run through the
   # VercodeOperation above, not something arbitrary).
   #
   # All three share the same commit/srclibs/sudo/ndk -- they're the same
@@ -57,9 +57,9 @@ Builds:
   # wouldn't.
 
   # -- arm64-v8a -------------------------------------------------------
-  - versionName: '1.0.0'
-    versionCode: 101
-    commit: v1.0.0
+  - versionName: '1.0.1'
+    versionCode: 201
+    commit: v1.0.1
     ndk: r28d
 
     # Pinned to Node.js 26, matching build-release.yml's
@@ -99,9 +99,9 @@ Builds:
       - bash ./scripts/reproducible_build.sh arm64
 
   # -- armeabi-v7a ------------------------------------------------------
-  - versionName: '1.0.0'
-    versionCode: 102
-    commit: v1.0.0
+  - versionName: '1.0.1'
+    versionCode: 202
+    commit: v1.0.1
     ndk: r28d
     sudo:
       - apt-get update
@@ -119,9 +119,9 @@ Builds:
       - bash ./scripts/reproducible_build.sh armeabi
 
   # -- x86_64 (mainly for emulators/x86 tablets) -------------------------
-  - versionName: '1.0.0'
-    versionCode: 103
-    commit: v1.0.0
+  - versionName: '1.0.1'
+    versionCode: 203
+    commit: v1.0.1
     ndk: r28d
     sudo:
       - apt-get update
@@ -140,5 +140,14 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: '1.0.0'
-CurrentVersionCode: 103
+# Default Tags checking scrapes build.gradle/AndroidManifest.xml for a
+# literal versionCode/versionName -- this project has neither (versionCode
+# comes from flutter.versionCode, itself read from pubspec.yaml, then run
+# through the per-flavor offset in androidComponents.onVariants; none of
+# that is a static integer literal Tags' default scraping could find).
+# Point it at pubspec.yaml directly instead, extracting the *base*
+# version/build-number pair that VercodeOperation then multiplies out per
+# ABI. This is F-Droid's own documented pattern for Flutter apps.
+UpdateCheckData: 'pubspec.yaml|version:\s.+\+(\d+)|.|version:\s(.+)\+'
+CurrentVersion: '1.0.1'
+CurrentVersionCode: 203

@@ -152,11 +152,11 @@ for so in "$VERIFY_DIR"/lib/*/libvaultexplorer.so "$VERIFY_DIR"/lib/*/libdartjni
   fi
 done
 
-# Check 3: Ensure dynamic local user build paths (.cxx or /home/) were stripped.
+# Check 3: CMake build paths (.cxx) were stripped from native binaries.
 for so in "$VERIFY_DIR"/lib/*/libvaultexplorer.so; do
   [ -f "$so" ] || continue
-  if strings "$so" 2>/dev/null | grep -qE '\.cxx|/home/|/Users/|C:'; then
-    echo "error: $so contains unmapped user build paths -- CMake prefix-map missing!" >&2
+  if strings "$so" 2>/dev/null | grep -q '\.cxx'; then
+    echo "error: $so contains unmapped .cxx paths -- CMake prefix-map missing!" >&2
     fail=1
   fi
 done

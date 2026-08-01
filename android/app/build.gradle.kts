@@ -50,7 +50,7 @@ val buildPdfJs = tasks.register<Exec>("buildPdfJsAssets") {
 android {
     namespace = "com.aeidolon.vaultexplorer"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "28.0.13004108" //  r28 -- see the NDK comment in .github/workflows/build-release.yml
+    ndkVersion = "28.0.13004108" // r28 -- see the NDK comment in .github/workflows/build-release.yml
     buildToolsVersion = "34.0.0"
 
     externalNativeBuild {
@@ -136,7 +136,7 @@ android {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }

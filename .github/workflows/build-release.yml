@@ -19,11 +19,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Java 17
+      - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       # ── Install Android NDK r28 (28.0.13004108) ────────────────────────
       # Pinned to bare r28, not a lettered point release: F-Droid's own
@@ -89,16 +89,19 @@ jobs:
 
       - name: Rename build outputs
         run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr '+' '-')
+          SHA=$(git rev-parse --short HEAD)
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           mkdir -p release-apk
           for flavor in arm64 armeabi x64; do
             cp "build/app/outputs/flutter-apk/app-${flavor}-release.apk" \
-               "release-apk/VaultExplorer-${{ github.ref_name }}-${flavor}.apk"
+               "release-apk/vaultexplorer-${VERSION}-${flavor}-${SHA}.apk"
           done
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VaultExplorer-${{ github.ref_name }}-APK
+          name: VaultExplorer-${{ env.APP_VERSION }}-APK
           path: release-apk/*.apk
           retention-days: 30
 

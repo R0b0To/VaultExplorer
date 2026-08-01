@@ -53,8 +53,8 @@ fi
 echo "== Toolchain & Environment ============================="
 echo "Target             : $FLAVOR ($TARGET_PLATFORM / $TARGET_ABI)"
 echo "Working directory   : $(pwd)"
-java -version 2>&1 | head -n 2
-flutter --version | head -n 2
+java -version
+flutter --version
 node --version 2>/dev/null || echo "node: not on PATH (fine if assets/pdfjs is already built)"
 echo "========================================================"
 

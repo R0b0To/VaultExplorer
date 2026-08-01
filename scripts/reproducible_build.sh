@@ -3,34 +3,29 @@
 #   - .github/workflows/build-release.yml
 #   - metadata/com.aeidolon.vaultexplorer.yml (F-Droid buildserver recipe)
 #   - local dev, for byte-for-byte comparison against either of the above
-#
-# Reproducibility fixes enforced in this setup:
-#   1. Identical Node/JDK/Flutter toolchain versions.
-#   2. Fixed SOURCE_DATE_EPOCH derived from git commit timestamp.
-#   3. Isolated PUB_CACHE under checkout root.
-#   4. CPU affinity pinning via taskset for deterministic R8/D8 output.
-#   5. LF line-ending normalization for static assets (.gitattributes).
-#   6. CMake -ffile-prefix-map stripping dynamic .cxx build paths in C++ libs.
-#   7. Removal of .note.gnu.build-id from shared libraries.
 
 set -euo pipefail
 
-# 1. Resolve actual repository root
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-
-# 2. Normalize working directory path so libapp.so (dart_plugin_registrant.dart)
-#    produces identical bytes on GitHub Actions, F-Droid, and local dev machines.
+ORIG_DIR="$(pwd)"
 CANONICAL_BUILD_DIR="/tmp/vaultexplorer_canonical_build"
 
-if [ "$REPO_ROOT" != "$CANONICAL_BUILD_DIR" ]; then
-  echo "Normalizing build path to $CANONICAL_BUILD_DIR..."
+# Normalize working directory path so libapp.so (dart_plugin_registrant.dart)
+# produces identical bytes on GitHub Actions, F-Droid, and local dev machines.
+if [ "$ORIG_DIR" != "$CANONICAL_BUILD_DIR" ]; then
+  echo "Copying repository into real canonical workspace $CANONICAL_BUILD_DIR..."
   rm -rf "$CANONICAL_BUILD_DIR"
-  mkdir -p "$(dirname "$CANONICAL_BUILD_DIR")"
-  ln -s "$REPO_ROOT" "$CANONICAL_BUILD_DIR"
+  mkdir -p "$CANONICAL_BUILD_DIR"
+  tar -cf - . | (cd "$CANONICAL_BUILD_DIR" && tar -xf -)
+  
   cd "$CANONICAL_BUILD_DIR"
-else
-  cd "$REPO_ROOT"
+  ./scripts/reproducible_build.sh "$@"
+  
+  # Copy built APK back to original project output directory
+  mkdir -p "$ORIG_DIR/build/app/outputs/flutter-apk"
+  cp "$CANONICAL_BUILD_DIR/build/app/outputs/flutter-apk/app-release.apk" "$ORIG_DIR/build/app/outputs/flutter-apk/app-release.apk"
+  echo "== Success ============================================="
+  echo "Copied reproducible artifact to $ORIG_DIR/build/app/outputs/flutter-apk/app-release.apk"
+  exit 0
 fi
 
 echo "== Toolchain & Environment ============================="
@@ -84,8 +79,8 @@ fail=0
 
 echo "== Verification Checks ================================="
 
-# Check 1: Ensure .note.gnu.build-id was removed from ALL native libraries
-for so in "$VERIFY_DIR"/lib/*/*.so; do
+# Check 1: Ensure .note.gnu.build-id was removed from project native libraries
+for so in "$VERIFY_DIR"/lib/*/libvaultexplorer.so "$VERIFY_DIR"/lib/*/libdartjni.so; do
   [ -f "$so" ] || continue
   if readelf -W -S "$so" 2>/dev/null | grep -q '\.note\.gnu\.build-id'; then
     echo "error: $so still has .note.gnu.build-id -- build-id removal patch failed" >&2

@@ -71,7 +71,7 @@ jobs:
       # two independently-maintained step lists that can drift apart (see
       # the Node version comment above for what that drift costs).
       - name: Build release APK
-        run: ./scripts/reproducible_build.sh
+        run: bash ./scripts/reproducible_build.sh
 
       - name: Rename build output
         run: |

@@ -12,29 +12,26 @@
 #   5. LF line-ending normalization for static assets (.gitattributes).
 #   6. CMake -ffile-prefix-map stripping dynamic .cxx build paths in C++ libs.
 #   7. Removal of .note.gnu.build-id from shared libraries.
-#
-# Prerequisites (infra/toolchain installs):
-#   - JDK 17 on PATH or JAVA_HOME set
-#   - Flutter 3.44.0 with `flutter` on PATH
-#   - Android NDK r28d (28.2.13676358) installed
-#   - Node.js 26 on PATH (optional if assets/pdfjs is already built)
 
+set -euo pipefail
 
-# Normalize working directory path so libapp.so (dart_plugin_registrant.dart)
-# produces identical bytes on GitHub Actions, F-Droid, and local dev machines.
+# 1. Resolve actual repository root
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# 2. Normalize working directory path so libapp.so (dart_plugin_registrant.dart)
+#    produces identical bytes on GitHub Actions, F-Droid, and local dev machines.
 CANONICAL_BUILD_DIR="/tmp/vaultexplorer_canonical_build"
-CURRENT_DIR="$(pwd)"
 
-if [ "$CURRENT_DIR" != "$CANONICAL_BUILD_DIR" ]; then
+if [ "$REPO_ROOT" != "$CANONICAL_BUILD_DIR" ]; then
   echo "Normalizing build path to $CANONICAL_BUILD_DIR..."
   rm -rf "$CANONICAL_BUILD_DIR"
   mkdir -p "$(dirname "$CANONICAL_BUILD_DIR")"
-  ln -s "$CURRENT_DIR" "$CANONICAL_BUILD_DIR"
+  ln -s "$REPO_ROOT" "$CANONICAL_BUILD_DIR"
   cd "$CANONICAL_BUILD_DIR"
+else
+  cd "$REPO_ROOT"
 fi
-
-set -euo pipefail
-cd "$(dirname "$0")/.."   # repo root
 
 echo "== Toolchain & Environment ============================="
 echo "Working directory : $(pwd)"

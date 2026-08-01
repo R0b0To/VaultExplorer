@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.18.0)
 
 project("vaultexplorer")
 
+# Strip CMAKE_BINARY_DIR (which contains .cxx/release/<hash>) from compiled C/C++ binaries
+add_compile_options("-ffile-prefix-map=${CMAKE_BINARY_DIR}=/build_tree")
+
 # 1. Download mbedTLS (Encryption Engine)
 include(FetchContent)
 FetchContent_Declare(

@@ -12,19 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    env:
-      PUB_CACHE: /tmp/.pub-cache
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set SOURCE_DATE_EPOCH for Reproducible Builds
-        run: |
-          COMMIT_TIMESTAMP=$(git log -1 --format=%ct)
-          echo "SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP" >> $GITHUB_ENV
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -45,21 +38,17 @@ jobs:
           flutter-version: '3.44.0'
           cache: true
 
+      # Must match metadata/com.aeidolon.vaultexplorer.yml's `sudo:` nodesource
+      # pin exactly -- npm ci fixes dependency versions via package-lock.json,
+      # but not the Node/V8 runtime itself, and pdf.js's minifier can emit
+      # different bytes from identical input under a different Node major.
+      # A drift here (this was '22' while the recipe pinned 26) is a
+      # reproducibility bug: it silently makes this workflow's APK
+      # unreproducible against the F-Droid buildserver's.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      # NOTE: the `jni` pub package's build-id/file-prefix reproducibility
-      # patch is no longer applied here as a separate step -- it's now
-      # configured directly in android/app/build.gradle.kts via
-      # `rootProject.subprojects { ... }`, so it runs automatically as part
-      # of Gradle's own configuration phase during "Build release APK"
-      # below. See that file for details. scripts/patch_jni_reproducibility.sh
-      # is no longer invoked by this workflow.
+          node-version: '26'
 
       - name: Decode keystore
         run: |
@@ -74,26 +63,15 @@ jobs:
           storeFile=release.keystore
           EOF
 
-      - name: Pin to single CPU core for R8 determinism
-        run: echo "TASKSET=taskset -c 0" >> $GITHUB_ENV
-
+      # Delegates SOURCE_DATE_EPOCH, PUB_CACHE, `flutter pub get`, the
+      # single-core taskset for R8 determinism, `flutter build apk
+      # --release`, and the build-id verification step to the same script
+      # metadata/com.aeidolon.vaultexplorer.yml calls, so CI and the
+      # F-Droid buildserver run the exact same build procedure rather than
+      # two independently-maintained step lists that can drift apart (see
+      # the Node version comment above for what that drift costs).
       - name: Build release APK
-        run: ${TASKSET:-} flutter build apk --release
-
-      - name: Verify no build-id in native libs
-        run: |
-          mkdir -p /tmp/verify
-          unzip -q build/app/outputs/flutter-apk/app-release.apk -d /tmp/verify
-          fail=0
-          for so in /tmp/verify/lib/*/libdartjni.so; do
-            if readelf -W -S "$so" | grep -q '\.note\.gnu\.build-id'; then
-              echo "::error::$so still has .note.gnu.build-id -- reproducibility patch didn't apply"
-              fail=1
-            else
-              echo "✅ OK: $so is clean (no build-id found)"
-            fi
-          done
-          exit $fail
+        run: ./scripts/reproducible_build.sh
 
       - name: Rename build output
         run: |

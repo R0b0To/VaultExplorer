@@ -63,13 +63,16 @@ Builds:
       - flutter@3.44.0
     output: build/app/outputs/flutter-apk/app-release.apk
     build:
-      - export PUB_CACHE=$(pwd)/.pub-cache
-      - $$flutter$$/bin/flutter config --no-analytics
-      - $$flutter$$/bin/flutter pub get
-      # jni build-id/file-prefix reproducibility patch now lives in
-      # android/app/build.gradle.kts (rootProject.subprojects block),
-      # applied automatically by Gradle -- no separate patch step needed.
-      - $$flutter$$/bin/flutter build apk --release
+      # scripts/reproducible_build.sh is the same script
+      # .github/workflows/build-release.yml calls -- SOURCE_DATE_EPOCH,
+      # PUB_CACHE, `pub get`, the single-core taskset for R8 determinism,
+      # and `flutter build apk --release` all live there once, instead of
+      # being copy-pasted into this recipe and GitHub Actions separately
+      # where they can silently drift apart (that already happened once:
+      # this recipe pinned Node 26 for the pdf.js minifier while CI was
+      # still on 22).
+      - export PATH="$$flutter$$/bin:$PATH"
+      - ./scripts/reproducible_build.sh
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags

@@ -132,6 +132,11 @@ static const uint32_t crc32ctable_le[1][256] = {{ 0 }};
 ]=])
 
 file(GLOB E2FS_EXT2FS_SOURCES ${E2FS_EXT2FS_DIR}/*.c)
+# file(GLOB) order reflects raw filesystem directory-entry order, which is
+# not stable across OSes/filesystems. Sort it explicitly (locale-independent
+# strcmp) so the source list -- and therefore the resulting static library's
+# member order -- is identical regardless of build host.
+list(SORT E2FS_EXT2FS_SOURCES COMPARE STRING)
 foreach(E2FS_SOURCE IN LISTS E2FS_EXT2FS_SOURCES)
     get_filename_component(E2FS_SOURCE_NAME ${E2FS_SOURCE} NAME)
     # These are host utilities or alternate device I/O backends.  The app

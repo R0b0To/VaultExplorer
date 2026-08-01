@@ -12,8 +12,13 @@ OUT_DIR="android/app/src/main/assets/pdfjs"
 SRC_DIR="/tmp/pdfjs-src-${PDFJS_TAG}"
 
 # --- Idempotency: skip if output already exists ---
-if [ -f "$OUT_DIR/pdf.min.mjs" ] && [ -f "$OUT_DIR/pdf.worker.min.mjs" ]; then
-  echo "pdf.js already built at $OUT_DIR, skipping (delete pdf.min.mjs to force a rebuild)."
+# Set FORCE_REBUILD_PDFJS=1 to bypass this, e.g. when doing reproducibility
+# testing on a checkout that's already built pdf.js once before -- otherwise
+# a stale local bundle from a previous run keeps getting reused silently,
+# which defeats the point of comparing a fresh build against another
+# environment's.
+if [ -f "$OUT_DIR/pdf.min.mjs" ] && [ -f "$OUT_DIR/pdf.worker.min.mjs" ] && [ "${FORCE_REBUILD_PDFJS:-0}" != "1" ]; then
+  echo "pdf.js already built at $OUT_DIR, skipping (set FORCE_REBUILD_PDFJS=1, or delete pdf.min.mjs, to force a rebuild)."
   exit 0
 fi
 

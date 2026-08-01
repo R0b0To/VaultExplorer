@@ -25,12 +25,20 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # ── Install Android NDK r28d (28.2.13676358) ───────────────────────
-      - name: Install Android NDK r28d
+      # ── Install Android NDK r28 (28.0.13004108) ────────────────────────
+      # Pinned to bare r28, not a lettered point release: F-Droid's own
+      # SDK transparency log (the curated package index its buildserver
+      # uses -- separate from Google's full sdkmanager repo, which GitHub
+      # Actions can reach) only has "ndk;r28" indexed, not "ndk;r28d". All
+      # three build environments have to resolve to the exact same NDK
+      # build for native library bytes to match, so this has to track
+      # whatever the buildserver's index actually has, not the newest
+      # point release available generally.
+      - name: Install Android NDK r28
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.2.13676358"
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.0.13004108"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.0.13004108" >> $GITHUB_ENV
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2

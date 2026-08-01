@@ -42,7 +42,7 @@ Builds:
     build:
       - export PATH="$$flutter$$/bin:$PATH"
       - bash ./scripts/reproducible_build.sh arm64
-    ndk: r28d
+    ndk: r28
 
   - versionName: 1.0.1
     versionCode: 202
@@ -63,7 +63,7 @@ Builds:
     build:
       - export PATH="$$flutter$$/bin:$PATH"
       - bash ./scripts/reproducible_build.sh armeabi
-    ndk: r28d
+    ndk: r28
 
   - versionName: 1.0.1
     versionCode: 203
@@ -84,7 +84,7 @@ Builds:
     build:
       - export PATH="$$flutter$$/bin:$PATH"
       - bash ./scripts/reproducible_build.sh x64
-    ndk: r28d
+    ndk: r28
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags

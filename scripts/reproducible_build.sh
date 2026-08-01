@@ -1,24 +1,9 @@
 #!/usr/bin/env bash
-# Canonical release-APK build procedure. Used identically by:
-#   - .github/workflows/build-release.yml
-#   - metadata/com.aeidolon.vaultexplorer.yml (F-Droid buildserver recipe)
-#   - local dev, for byte-for-byte comparison against either of the above
-#
-# Builds ONE ABI's APK per invocation via environment-driven ABI restriction:
-#   - `--target-platform` restricts Flutter's Dart AOT compiler and Flutter's auto-abiFilters
-#   - `VAULTEXPLORER_TARGET_ABI` restricts CMake's C++ compilation in build.gradle.kts
-#   - `--build-number` sets the per-ABI versionCode (matching F-Droid's VercodeOperation)
-#
-# Usage: scripts/reproducible_build.sh <target>
-#   target: one of arm64 | armeabi | x64
-#
-# Prerequisites (infra/toolchain installs):
-#   - JDK 17 on PATH or JAVA_HOME set
-#   - Flutter 3.44.0 with `flutter` on PATH
-#   - Android NDK r28d (28.2.13676358) installed
-#   - Node.js 26 on PATH (optional if assets/pdfjs is already built)
-
+# Canonical release-APK build procedure for single-ABI target builds.
 set -euo pipefail
+
+# Container Safeguard 1: Allow Git operations in Docker containers
+git config --global --add safe.directory '*' 2>/dev/null || true
 
 FLAVOR="${1:-}"
 case "$FLAVOR" in
@@ -46,9 +31,6 @@ esac
 ORIG_DIR="$(pwd)"
 CANONICAL_BUILD_DIR="/tmp/vaultexplorer_canonical_build"
 
-# Normalize working directory path so libapp.so (the compiled Dart AOT
-# snapshot) and any native code compiled from PUB_CACHE produce identical
-# bytes on GitHub Actions, the F-Droid buildserver, and local dev machines.
 if [ "$ORIG_DIR" != "$CANONICAL_BUILD_DIR" ]; then
   echo "Copying repository into canonical workspace $CANONICAL_BUILD_DIR..."
   rm -rf "$CANONICAL_BUILD_DIR"
@@ -56,7 +38,8 @@ if [ "$ORIG_DIR" != "$CANONICAL_BUILD_DIR" ]; then
   tar -cf - . | (cd "$CANONICAL_BUILD_DIR" && tar -xf -)
 
   cd "$CANONICAL_BUILD_DIR"
-  ./scripts/reproducible_build.sh "$FLAVOR"
+  # Container Safeguard 2: Explicitly invoke bash for re-execution
+  bash ./scripts/reproducible_build.sh "$FLAVOR"
 
   OUT_NAME="app-${FLAVOR}-release.apk"
   mkdir -p "$ORIG_DIR/build/app/outputs/flutter-apk"
@@ -75,6 +58,11 @@ flutter --version | head -n 2
 node --version 2>/dev/null || echo "node: not on PATH (fine if assets/pdfjs is already built)"
 echo "========================================================"
 
+# Container Safeguard 3: Point Flutter at Android SDK if defined
+if [ -n "${ANDROID_HOME:-}" ]; then
+  flutter config --android-sdk "$ANDROID_HOME" >/dev/null 2>&1 || true
+fi
+
 # Pre-check: warn if CRLF line endings exist in static assets or scripts.
 if command -v file >/dev/null 2>&1; then
   if find assets/ scripts/ -type f -exec file {} + 2>/dev/null | grep -q 'CRLF'; then
@@ -83,7 +71,7 @@ if command -v file >/dev/null 2>&1; then
   fi
 fi
 
-# Embedded timestamps: derive from commit timestamp, not wall-clock time.
+# Embedded timestamps: derive from commit timestamp
 export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}"
 echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH ($(date -u -d "@$SOURCE_DATE_EPOCH" 2>/dev/null || date -u -r "$SOURCE_DATE_EPOCH"))"
 
@@ -93,7 +81,7 @@ echo "PUB_CACHE=$PUB_CACHE"
 flutter config --no-analytics
 flutter pub get
 
-# Extract base build number from pubspec.yaml (e.g. version: 1.0.1+2 -> base 2)
+# Extract base build number from pubspec.yaml
 BASE_BUILD_NUMBER=$(grep '^version:' pubspec.yaml | sed -n 's/.*+\([0-9]*\)/\1/p')
 if [ -z "$BASE_BUILD_NUMBER" ]; then
   BASE_BUILD_NUMBER=1
@@ -106,7 +94,7 @@ echo "Calculated versionCode for $FLAVOR: $VERSION_CODE (Base $BASE_BUILD_NUMBER
 # Export target ABI for build.gradle.kts System.getenv("VAULTEXPLORER_TARGET_ABI")
 export VAULTEXPLORER_TARGET_ABI="$TARGET_ABI"
 
-# R8/D8 output can depend on CPU core count. Pin to one core if available.
+# Pin R8/D8 output to single core
 if command -v taskset >/dev/null 2>&1; then
   TASKSET="taskset -c 0"
 else
@@ -124,11 +112,7 @@ OUT_APK="build/app/outputs/flutter-apk/app-${FLAVOR}-release.apk"
 cp "$RAW_APK" "$OUT_APK"
 echo "Built: $OUT_APK"
 
-# ==============================================================================
-# VERIFICATION CHECKS
-# Fail loudly if any reproducibility patch, or the ABI restriction itself,
-# didn't apply as expected, rather than silently shipping a bad APK.
-# ==============================================================================
+# Verification Checks
 VERIFY_DIR="$(mktemp -d)"
 trap 'rm -rf "$VERIFY_DIR"' EXIT
 unzip -q "$OUT_APK" -d "$VERIFY_DIR"
@@ -152,7 +136,7 @@ for so in "$VERIFY_DIR"/lib/*/libvaultexplorer.so "$VERIFY_DIR"/lib/*/libdartjni
   fi
 done
 
-# Check 3: CMake build paths (.cxx) were stripped from native binaries.
+# Check 3: Ensure dynamic local user build paths (.cxx) were stripped.
 for so in "$VERIFY_DIR"/lib/*/libvaultexplorer.so; do
   [ -f "$so" ] || continue
   if strings "$so" 2>/dev/null | grep -q '\.cxx'; then

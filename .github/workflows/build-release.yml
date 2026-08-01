@@ -3,8 +3,8 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*'           # triggers on version tags like v1.0.0
-  workflow_dispatch:   # allows manual runs from the Actions tab
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -16,39 +16,39 @@ jobs:
       PUB_CACHE: /tmp/.pub-cache
 
     steps:
-      # ── Checkout ──────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Required to read the git commit history
+          fetch-depth: 0
 
-      # ── Set SOURCE_DATE_EPOCH to match F-Droid ────────────────────────────
       - name: Set SOURCE_DATE_EPOCH for Reproducible Builds
         run: |
           COMMIT_TIMESTAMP=$(git log -1 --format=%ct)
           echo "SOURCE_DATE_EPOCH=$COMMIT_TIMESTAMP" >> $GITHUB_ENV
 
-      # ── Java ──────────────────────────────────────────────────────────
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # ── Flutter (PINNED VERSION for Reproducible Builds -- must match
-      #    `srclibs: [flutter@X.Y.Z]` in metadata/com.aeidolon.vaultexplorer.yml) ──
+      # ── Install Android NDK r28d (28.2.13676358) ───────────────────────
+      - name: Install Android NDK r28d
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.2.13676358"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.44.0'
           cache: true
 
-      # ── Node.js (needed by scripts/build_pdfjs.sh, run automatically from
-      #    Gradle's preBuild once `flutter build` invokes Gradle) ───────────
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '26'
+          node-version: '22'
 
       - name: Install dependencies
         run: flutter pub get
@@ -61,7 +61,6 @@ jobs:
       # below. See that file for details. scripts/patch_jni_reproducibility.sh
       # is no longer invoked by this workflow.
 
-      # ── Keystore ────────────────────────────────────────────────────
       - name: Decode keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release.keystore
@@ -75,17 +74,9 @@ jobs:
           storeFile=release.keystore
           EOF
 
-
       - name: Pin to single CPU core for R8 determinism
         run: echo "TASKSET=taskset -c 0" >> $GITHUB_ENV
 
-
-      # ── Build ────────────────────────────────────────────────────────
-      # Universal APK (all ABIs in one file) -- matches the single Builds:
-      # entry in metadata/com.aeidolon.vaultexplorer.yml so the two are
-      # actually comparable for Reproducible Builds verification. Splitting
-      # per-ABI is a real feature to add later, not something to do on just
-      # one side of this pair without the other.
       - name: Build release APK
         run: ${TASKSET:-} flutter build apk --release
 
@@ -104,7 +95,6 @@ jobs:
           done
           exit $fail
 
-      # ── Rename with version ───────────────────────────────────────────
       - name: Rename build output
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr '+' '-')
@@ -113,7 +103,6 @@ jobs:
           mkdir -p release-apk
           cp build/app/outputs/flutter-apk/app-release.apk "release-apk/vaultexplorer-${VERSION}-${SHA}.apk"
 
-      # ── Upload artifact ─────────────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -121,7 +110,6 @@ jobs:
           path: release-apk/*.apk
           retention-days: 30
 
-      # ── Create GitHub Release ───────────────────────────────────────────
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -132,7 +120,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── Cleanup keystore ────────────────────────────────────────────
       - name: Remove keystore
         if: always()
         run: |

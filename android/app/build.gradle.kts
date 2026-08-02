@@ -18,7 +18,7 @@ tasks.whenTaskAdded {
     }
 }
 
-// Single source of truth for the NDK pin -- referenced below by both the
+// Single source of truth for the NDK pin
 val ndkVersionPin = "28.0.13004108" // r28
 
 // ── Reproducibility fix for pub packages' native builds ────────────────────
@@ -26,17 +26,15 @@ rootProject.subprojects {
     plugins.withId("com.android.library") {
         val subprojectName = name
 
-        afterEvaluate {
-            extensions.configure<LibraryExtension>("android") {
-                ndkVersion = ndkVersionPin
-                defaultConfig {
-                    externalNativeBuild {
-                        cmake {
-                            arguments += "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--build-id=none,--hash-style=gnu"
-                            arguments += "-DCMAKE_MODULE_LINKER_FLAGS=-Wl,--build-id=none,--hash-style=gnu"
-                            cFlags += listOf("-ffile-prefix-map=${projectDir}=/native-$subprojectName", "-fno-ident")
-                            cppFlags += listOf("-ffile-prefix-map=${projectDir}=/native-$subprojectName", "-fno-ident")
-                        }
+        extensions.configure<LibraryExtension>("android") {
+            ndkVersion = ndkVersionPin
+            defaultConfig {
+                externalNativeBuild {
+                    cmake {
+                        arguments += "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--build-id=none,--hash-style=gnu"
+                        arguments += "-DCMAKE_MODULE_LINKER_FLAGS=-Wl,--build-id=none,--hash-style=gnu"
+                        cFlags += listOf("-ffile-prefix-map=${projectDir}=/native-$subprojectName", "-fno-ident")
+                        cppFlags += listOf("-ffile-prefix-map=${projectDir}=/native-$subprojectName", "-fno-ident")
                     }
                 }
             }

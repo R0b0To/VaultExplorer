@@ -18,7 +18,7 @@ tasks.whenTaskAdded {
 }
 
 // Single source of truth for the NDK pin
-val ndkVersionPin = "28.0.13004108" // r28
+val ndkVersionPin = "28.2.13676358" // r28c -- see android/build.gradle.kts for why not plain r28
 
 // ── From-source build steps ───────────────────────────────────────────────
 val buildPdfJs = tasks.register<Exec>("buildPdfJsAssets") {

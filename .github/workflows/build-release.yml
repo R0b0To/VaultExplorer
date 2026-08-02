@@ -25,12 +25,18 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # ── Install Android NDK r28 (28.0.13004108) ────────────────────────
-      - name: Install Android NDK r28
+      # ── Install Android NDK r28c (28.2.13676358) ────────────────────────
+      # Must match ndkVersionPin in android/build.gradle.kts and
+      # android/app/build.gradle.kts, and the `ndk:` field in
+      # metadata/com.aeidolon.vaultexplorer.yml -- all four have to agree.
+      # Plain r28 (28.0.13004108) will fail with CXX1104: the `jni` pub
+      # package's own native build resolves to r28c regardless of what
+      # Gradle is told to install, so the installed NDK has to be r28c too.
+      - name: Install Android NDK r28c
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.0.13004108"
-          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.0.13004108" >> $GITHUB_ENV
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;28.2.13676358"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/28.2.13676358" >> $GITHUB_ENV
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2

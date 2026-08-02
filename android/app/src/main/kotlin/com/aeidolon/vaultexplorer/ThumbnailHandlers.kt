@@ -296,7 +296,18 @@ class ThumbnailHandlers(
 
     // ── Public handlers ─────────────────────────────────────────────────────
 
-    fun handleGetVideoThumbnail(call: MethodCall, result: MethodChannel.Result) {
+    /** Shared body for [handleGetVideoThumbnail] and
+     *  [handleGetVideoThumbnailWithSize] (TD-15) — arg parsing, volume
+     *  resolution, the OS-version gate, frame extraction, and error
+     *  dispatch were previously copy-pasted between the two handlers with
+     *  only the success payload differing. That's now the one thing left
+     *  to each of them, via [onFrame]. No behavior change versus the
+     *  previous two independent copies. */
+    private fun runVideoThumbnail(
+        call: MethodCall,
+        result: MethodChannel.Result,
+        onFrame: (VideoFrameResult) -> Any,
+    ) {
         val uriString = call.argument<String>("filePath")
         val fileName  = call.argument<String>("fileName")
         val targetSize = call.argument<Int>("targetSize") ?: 180
@@ -325,7 +336,7 @@ class ThumbnailHandlers(
                 val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality)
 
                 if (frameResult != null) {
-                    activity.runOnUiThread { result.success(frameResult.bytes) }
+                    activity.runOnUiThread { result.success(onFrame(frameResult)) }
                 } else {
                     activity.runOnUiThread { result.error("FRAME_FAILED", "Failed to extract frame", null) }
                 }
@@ -335,8 +346,12 @@ class ThumbnailHandlers(
         }
     }
 
-    /** Identical frame-extraction/scale/compress path to
-     *  [handleGetVideoThumbnail]; the only difference is the result shape:
+    fun handleGetVideoThumbnail(call: MethodCall, result: MethodChannel.Result) {
+        runVideoThumbnail(call, result) { frame -> frame.bytes }
+    }
+
+    /** Same extraction as [handleGetVideoThumbnail] (see [runVideoThumbnail]);
+     *  the only difference is the result shape:
      *  `{"bytes": ByteArray, "width": Int, "height": Int}` using the
      *  *extracted frame's* pre-scale dimensions (there's no separate
      *  bounds-only pass for video the way there is for images — the decoded
@@ -347,43 +362,109 @@ class ThumbnailHandlers(
      *  return type, for the same reason as [handleGetImageThumbnailWithSize]
      *  — existing byte-only callers stay untouched. */
     fun handleGetVideoThumbnailWithSize(call: MethodCall, result: MethodChannel.Result) {
-        val uriString = call.argument<String>("filePath")
-        val fileName  = call.argument<String>("fileName")
+        runVideoThumbnail(call, result) { frame ->
+            mapOf(
+                "bytes" to frame.bytes,
+                "width" to frame.sourceWidth,
+                "height" to frame.sourceHeight,
+            )
+        }
+    }
+
+    /** Outcome of [extractImageThumbnail] (TD-15) — a sealed result instead
+     *  of a nullable so the two specific failure reasons that existed
+     *  before this was shared (bad bounds vs. failed decode) still reach
+     *  the caller with their original code/message, not a collapsed
+     *  generic one. */
+    private sealed class ImageThumbnailOutcome {
+        data class Success(val bytes: ByteArray, val sourceWidth: Int, val sourceHeight: Int) : ImageThumbnailOutcome()
+        data class Failure(val code: String, val message: String) : ImageThumbnailOutcome()
+    }
+
+    /** Shared body for [handleGetImageThumbnail] and
+     *  [handleGetImageThumbnailWithSize] (TD-15): decode bounds, pick a
+     *  sample size, decode, scale, compress, recycle — previously
+     *  copy-pasted between the two handlers with only the success payload
+     *  differing.
+     *
+     *  One deliberate behavior change while unifying: the `width <= 0 ||
+     *  height <= 0` bounds-validity check previously only existed in
+     *  [handleGetImageThumbnailWithSize]. [handleGetImageThumbnail] didn't
+     *  have it, so a 0x0-bounds file would fall through into
+     *  `calculateInSampleSize(0, 0, targetSize)` and only fail later at the
+     *  null-bitmap check — same eventual "DECODE_FAILED" outcome, just
+     *  later and less precisely diagnosed. Both callers now get the
+     *  earlier, more precise check. */
+    private fun extractImageThumbnail(
+        uriString: String,
+        fileName: String,
+        volId: Int,
+        targetSize: Int,
+        quality: Int,
+    ): ImageThumbnailOutcome {
+        var inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
+
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeStream(inputStream, null, options)
+        inputStream.close()
+
+        val width = options.outWidth
+        val height = options.outHeight
+
+        if (width <= 0 || height <= 0) {
+            return ImageThumbnailOutcome.Failure("DECODE_FAILED", "Failed to read image bounds")
+        }
+
+        val inSampleSize = calculateInSampleSize(width, height, targetSize)
+        val decodeOptions = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
+
+        inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
+        val rawBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
+        inputStream.close()
+
+        if (rawBitmap == null) {
+            return ImageThumbnailOutcome.Failure("DECODE_FAILED", "Failed to decode image bytes")
+        }
+
+        val scaledBitmap = scaledToFit(rawBitmap, targetSize)
+        if (scaledBitmap != rawBitmap) rawBitmap.recycle()
+
+        val stream = ByteArrayOutputStream()
+        scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), stream)
+        val bytes = stream.toByteArray()
+        scaledBitmap.recycle()
+
+        return ImageThumbnailOutcome.Success(bytes, width, height)
+    }
+
+    private fun runImageThumbnail(
+        call: MethodCall,
+        result: MethodChannel.Result,
+        onSuccess: (ImageThumbnailOutcome.Success) -> Any,
+    ) {
+        val uriString  = call.argument<String>("filePath")
+        val fileName   = call.argument<String>("fileName")
         val targetSize = call.argument<Int>("targetSize") ?: 180
+        val quality = call.argument<Int>("quality") ?: 70
 
         if (uriString == null || fileName == null) {
             result.error("INVALID_ARGS", "filePath and fileName required", null)
             return
         }
 
-        videoExecutor.execute {
+        imageExecutor.execute {
             try {
                 val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
                     ?: run {
-                        activity.runOnUiThread {
-                            result.error("NOT_MOUNTED", "Container not mounted", null)
-                        }
+                        activity.runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
                         return@execute
                     }
 
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-                    activity.runOnUiThread { result.error("UNSUPPORTED_OS", "Requires Android 6.0+", null) }
-                    return@execute
-                }
-
-                val quality = call.argument<Int>("quality") ?: 60
-                val frameResult = extractVideoFrame(uriString, fileName, volId, targetSize, quality)
-
-                if (frameResult != null) {
-                    activity.runOnUiThread {
-                        result.success(mapOf(
-                            "bytes" to frameResult.bytes,
-                            "width" to frameResult.sourceWidth,
-                            "height" to frameResult.sourceHeight,
-                        ))
-                    }
-                } else {
-                    activity.runOnUiThread { result.error("FRAME_FAILED", "Failed to extract frame", null) }
+                when (val outcome = extractImageThumbnail(uriString, fileName, volId, targetSize, quality)) {
+                    is ImageThumbnailOutcome.Success ->
+                        activity.runOnUiThread { result.success(onSuccess(outcome)) }
+                    is ImageThumbnailOutcome.Failure ->
+                        activity.runOnUiThread { result.error(outcome.code, outcome.message, null) }
                 }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
@@ -392,144 +473,28 @@ class ThumbnailHandlers(
     }
 
     fun handleGetImageThumbnail(call: MethodCall, result: MethodChannel.Result) {
-        val uriString  = call.argument<String>("filePath")
-        val fileName   = call.argument<String>("fileName")
-        val targetSize = call.argument<Int>("targetSize") ?: 180
-        val quality = call.argument<Int>("quality") ?: 70
-
-        if (uriString == null || fileName == null) {
-            result.error("INVALID_ARGS", "filePath and fileName required", null)
-            return
-        }
-
-        imageExecutor.execute {
-            try {
-                val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-                    ?: run {
-                        activity.runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                        return@execute
-                    }
-
-                var inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
-
-                val options = BitmapFactory.Options().apply {
-                    inJustDecodeBounds = true
-                }
-                BitmapFactory.decodeStream(inputStream, null, options)
-                inputStream.close()
-
-                val width = options.outWidth
-                val height = options.outHeight
-
-                val inSampleSize = calculateInSampleSize(width, height, targetSize)
-
-                val decodeOptions = BitmapFactory.Options().apply {
-                    this.inSampleSize = inSampleSize
-                }
-
-                inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
-                val rawBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
-                inputStream.close()
-
-                if (rawBitmap != null) {
-                    val scaledBitmap = scaledToFit(rawBitmap, targetSize)
-                    if (scaledBitmap != rawBitmap) rawBitmap.recycle()
-
-                    val stream = ByteArrayOutputStream()
-                    val qualityVal = quality.coerceIn(1, 100)
-                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, qualityVal, stream)
-                    val bytes = stream.toByteArray()
-                    scaledBitmap.recycle()
-
-                    activity.runOnUiThread { result.success(bytes) }
-                } else {
-                    activity.runOnUiThread { result.error("DECODE_FAILED", "Failed to decode image bytes", null) }
-                }
-            } catch (e: Exception) {
-                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
-            }
-        }
+        runImageThumbnail(call, result) { outcome -> outcome.bytes }
     }
 
-    /** Identical decode/scale/compress path to [handleGetImageThumbnail], the
-     *  only difference being the result shape: `{"bytes": ByteArray, "width":
-     *  Int, "height": Int}` instead of a bare `ByteArray`. `width`/`height`
-     *  are the *source* frame's bounds (from the `inJustDecodeBounds` pass
-     *  that already runs to pick `inSampleSize`) — i.e. the true content
-     *  aspect ratio, not the downscaled thumbnail's own dimensions (though
-     *  scaledToFit preserves the ratio, so they agree up to rounding).
+    /** Same extraction as [handleGetImageThumbnail] (see
+     *  [extractImageThumbnail]/[runImageThumbnail]); the only difference is
+     *  the result shape: `{"bytes": ByteArray, "width": Int, "height": Int}`
+     *  instead of a bare `ByteArray`. `width`/`height` are the *source*
+     *  frame's bounds (from the `inJustDecodeBounds` pass that already runs
+     *  to pick `inSampleSize`) — i.e. the true content aspect ratio, not the
+     *  downscaled thumbnail's own dimensions (though scaledToFit preserves
+     *  the ratio, so they agree up to rounding).
      *
      *  A second method rather than changing [handleGetImageThumbnail]'s
      *  return type, so the four existing callers that only want bytes
      *  (file grid, media viewer, playlist carousel) are unaffected. */
     fun handleGetImageThumbnailWithSize(call: MethodCall, result: MethodChannel.Result) {
-        val uriString  = call.argument<String>("filePath")
-        val fileName   = call.argument<String>("fileName")
-        val targetSize = call.argument<Int>("targetSize") ?: 180
-        val quality = call.argument<Int>("quality") ?: 70
-
-        if (uriString == null || fileName == null) {
-            result.error("INVALID_ARGS", "filePath and fileName required", null)
-            return
-        }
-
-        imageExecutor.execute {
-            try {
-                val volId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
-                    ?: run {
-                        activity.runOnUiThread { result.error("NOT_MOUNTED", "Container not mounted", null) }
-                        return@execute
-                    }
-
-                var inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
-
-                val options = BitmapFactory.Options().apply {
-                    inJustDecodeBounds = true
-                }
-                BitmapFactory.decodeStream(inputStream, null, options)
-                inputStream.close()
-
-                val width = options.outWidth
-                val height = options.outHeight
-
-                if (width <= 0 || height <= 0) {
-                    activity.runOnUiThread { result.error("DECODE_FAILED", "Failed to read image bounds", null) }
-                    return@execute
-                }
-
-                val inSampleSize = calculateInSampleSize(width, height, targetSize)
-
-                val decodeOptions = BitmapFactory.Options().apply {
-                    this.inSampleSize = inSampleSize
-                }
-
-                inputStream = BufferedInputStream(ContainerInputStream(activity, uriString, fileName, volId), 65536)
-                val rawBitmap = BitmapFactory.decodeStream(inputStream, null, decodeOptions)
-                inputStream.close()
-
-                if (rawBitmap != null) {
-                    val scaledBitmap = scaledToFit(rawBitmap, targetSize)
-                    if (scaledBitmap != rawBitmap) rawBitmap.recycle()
-
-                    val stream = ByteArrayOutputStream()
-                    val qualityVal = quality.coerceIn(1, 100)
-                    scaledBitmap.compress(Bitmap.CompressFormat.JPEG, qualityVal, stream)
-                    val bytes = stream.toByteArray()
-                    scaledBitmap.recycle()
-
-                    activity.runOnUiThread {
-                        result.success(mapOf(
-                            "bytes" to bytes,
-                            "width" to width,
-                            "height" to height
-                        ))
-                    }
-                } else {
-                    activity.runOnUiThread { result.error("DECODE_FAILED", "Failed to decode image bytes", null) }
-                }
-            } catch (e: Exception) {
-                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
-            }
+        runImageThumbnail(call, result) { outcome ->
+            mapOf(
+                "bytes" to outcome.bytes,
+                "width" to outcome.sourceWidth,
+                "height" to outcome.sourceHeight,
+            )
         }
     }
 

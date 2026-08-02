@@ -116,6 +116,11 @@ android {
             vcsInfo.include = false
         }
     }
+
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
 }
 
 kotlin {

@@ -26,14 +26,6 @@ jobs:
           java-version: '21'
 
       # ── Install Android NDK r28 (28.0.13004108) ────────────────────────
-      # Pinned to bare r28, not a lettered point release: F-Droid's own
-      # SDK transparency log (the curated package index its buildserver
-      # uses -- separate from Google's full sdkmanager repo, which GitHub
-      # Actions can reach) only has "ndk;r28" indexed, not "ndk;r28d". All
-      # three build environments have to resolve to the exact same NDK
-      # build for native library bytes to match, so this has to track
-      # whatever the buildserver's index actually has, not the newest
-      # point release available generally.
       - name: Install Android NDK r28
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -46,13 +38,6 @@ jobs:
           flutter-version: '3.44.0'
           cache: true
 
-      # Must match metadata/com.aeidolon.vaultexplorer.yml's `sudo:` nodesource
-      # pin exactly -- npm ci fixes dependency versions via package-lock.json,
-      # but not the Node/V8 runtime itself, and pdf.js's minifier can emit
-      # different bytes from identical input under a different Node major.
-      # A drift here (this was '22' while the recipe pinned 26) is a
-      # reproducibility bug: it silently makes this workflow's APK
-      # unreproducible against the F-Droid buildserver's.
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -71,16 +56,6 @@ jobs:
           storeFile=release.keystore
           EOF
 
-      # Delegates SOURCE_DATE_EPOCH, PUB_CACHE, `flutter pub get`, the
-      # single-core taskset for R8 determinism, `flutter build apk --release
-      # --flavor <x>`, and the build-id/ABI verification checks to the same
-      # script metadata/com.aeidolon.vaultexplorer.yml calls per flavor, so
-      # CI and the F-Droid buildserver run the exact same build procedure
-      # rather than independently-maintained step lists that can drift
-      # apart (see the Node version comment above for what that drift
-      # costs). One APK per ABI, not a fat APK -- see the flavor comment in
-      # android/app/build.gradle.kts for why this can't be
-      # `--split-per-abi` instead.
       - name: Build release APKs (arm64, armeabi, x64)
         run: |
           for flavor in arm64 armeabi x64; do
@@ -89,13 +64,12 @@ jobs:
 
       - name: Rename build outputs
         run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr '+' '-')
-          SHA=$(git rev-parse --short HEAD)
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f1)
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           mkdir -p release-apk
           for flavor in arm64 armeabi x64; do
             cp "build/app/outputs/flutter-apk/app-${flavor}-release.apk" \
-               "release-apk/vaultexplorer-${VERSION}-${flavor}-${SHA}.apk"
+               "release-apk/vaultexplorer-${VERSION}-${flavor}.apk"
           done
 
       - name: Upload APK artifact

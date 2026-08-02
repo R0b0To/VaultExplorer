@@ -6,7 +6,6 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.provider.DocumentsContract
-import android.util.Base64
 import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -96,31 +95,10 @@ class UsbContainerHandlers(
     }
 
     fun handleUnlockUsbContainer(call: MethodCall, result: MethodChannel.Result) {
-        val deviceName    = call.argument<String>("deviceName")
-        val password      = call.argument<String>("password")
-        val pim           = call.argument<Number>("pim")?.toInt() ?: 0
-        val displayName   = call.argument<String>("displayName")
-        val docProvider   = call.argument<Boolean>("documentProvider") ?: false
-        val autoMountFolders = call.argument<List<String>>("autoMountFolders")
-        val cipherId      = call.argument<Number>("cipherId")?.toInt() ?: 255
-        val hashId        = call.argument<Number>("hashId")?.toInt() ?: 255
-        val preservedKeyBase64 = call.argument<String>("preservedKey")
-        val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
-        if (preservedKey != null) {
-            Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
-        }
-        val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
-        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
-        val readOnly = call.argument<Boolean>("readOnly") ?: false
+        val deviceNameOrNull = call.argument<String>("deviceName")
+        val args = parseUnlockArgs(call, result, deviceNameOrNull, "deviceName") ?: return
+        val deviceName = deviceNameOrNull!! // parseUnlockArgs already validated this is non-null
 
-        if (deviceName == null || password == null) {
-            result.error("INVALID_ARGS", "deviceName and password required", null)
-            return
-        }
-        if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
-            result.error("INVALID_ARGS", "password or keyfiles required", null)
-            return
-        }
         val device = usbManager.deviceList[deviceName]
         if (device == null) {
             result.error("USB_NOT_FOUND", "USB device not found: $deviceName", null)
@@ -135,7 +113,7 @@ class UsbContainerHandlers(
         val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(containerUri)
             ?: ContainerSessionRegistry.getFreeVolumeId()
         if (targetVolId == null) {
-            result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
+            result.error("MAX_CONTAINERS", "Maximum ${ContainerSessionRegistry.MAX_VOLUMES} containers already mounted", null)
             return
         }
         activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
@@ -149,11 +127,11 @@ class UsbContainerHandlers(
                 val sizeBytes = msd.sectorCount * msd.sectorSize
                 UsbBlockBridge.register(targetVolId, msd)
 
-                val keyfileFds = nativeOps.openKeyfileFds(keyfilePaths)
+                val keyfileFds = nativeOps.openKeyfileFds(args.keyfilePaths)
 
-                if (preservedKey != null) {
-                    Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${preservedKey.size})")
-                } else if (cacheDerivedKey) {
+                if (args.preservedKey != null) {
+                    Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${args.preservedKey.size})")
+                } else if (args.cacheDerivedKey) {
                     Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
                 }
                 if (keyfileFds != null && keyfileFds.isNotEmpty()) {
@@ -162,8 +140,8 @@ class UsbContainerHandlers(
 
                 val files = ContainerSessionRegistry.locks[targetVolId].writeLock().withLock {
                     ContainerEngine.unlockUsb(
-                        password, pim, targetVolId, sizeBytes, cipherId, hashId, preservedKey,
-                        keyfileFds = keyfileFds, readOnly = readOnly
+                        args.password, args.pim, targetVolId, sizeBytes, args.cipherId, args.hashId, args.preservedKey,
+                        keyfileFds = keyfileFds, readOnly = args.readOnly
                     )
                 }
 
@@ -173,15 +151,15 @@ class UsbContainerHandlers(
                             uri = containerUri,
                             volId = targetVolId,
                             cachedFilesList = files.toList(),
-                            displayName = displayName ?: device.productName ?: deviceName,
-                            documentProvider = docProvider,
+                            displayName = args.displayName ?: device.productName ?: deviceName,
+                            documentProvider = args.docProvider,
                             isUsbSource = true,
-                            readOnly = readOnly,
+                            readOnly = args.readOnly,
                         )
-                        ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
+                        ContainerSessionRegistry.applyAutoMountFolders(targetVolId, args.autoMountFolders)
                         val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
                             ?.subFolderMounts?.isNotEmpty() == true
-                        if (docProvider || hasFolderMounts) {
+                        if (args.docProvider || hasFolderMounts) {
                             activity.contentResolver.notifyChange(
                                 DocumentsContract.buildRootsUri(
                                     "com.aeidolon.vaultexplorer.documents"), null)
@@ -194,7 +172,7 @@ class UsbContainerHandlers(
                             "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
                             "containerFormat" to fmt
                         ))
-                        if (cacheDerivedKey && preservedKey == null) {
+                        if (args.cacheDerivedKey && args.preservedKey == null) {
                             val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
                             if (derived != null) {
                                 ioExecutor.execute { derivedKeyHandlers.storeDerivedKeyBytes(deviceName, derived) }
@@ -228,7 +206,7 @@ class UsbContainerHandlers(
         }
         val volId = ContainerSessionRegistry.getFreeVolumeId()
         if (volId == null) {
-            result.error("MAX_CONTAINERS", "Maximum containers already mounted", null)
+            result.error("MAX_CONTAINERS", "Maximum ${ContainerSessionRegistry.MAX_VOLUMES} containers already mounted", null)
             return
         }
         ioExecutor.execute {

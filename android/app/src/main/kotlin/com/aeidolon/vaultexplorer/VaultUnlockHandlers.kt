@@ -13,6 +13,91 @@ import java.util.concurrent.ExecutorService
 import kotlin.concurrent.withLock
 
 /**
+ * Parsed, validated arguments shared by [VaultUnlockHandlers.handleUnlockContainer]
+ * and [UsbContainerHandlers.handleUnlockUsbContainer] (TD-17) -- password,
+ * pim, display/mount options, cipher/hash hints, preserved-key, and keyfile
+ * data. Deliberately does NOT include how the underlying container is
+ * located or opened (a content:// [Uri] vs. a raw USB block device):
+ * that part differs enough between the two handlers -- different native
+ * engine calls, different pre-checks, different cleanup on failure -- that
+ * folding it into this same abstraction would trade real, testable
+ * behavior for a smaller diff. See TD-17 in docs/tech-debt.md for why only
+ * this slice was extracted, not the full handler bodies.
+ */
+data class UnlockArgs(
+    val password: String,
+    val pim: Int,
+    val displayName: String?,
+    val docProvider: Boolean,
+    val autoMountFolders: List<String>?,
+    val cipherId: Int,
+    val hashId: Int,
+    val preservedKey: ByteArray?,
+    val cacheDerivedKey: Boolean,
+    val keyfilePaths: List<String>?,
+    val readOnly: Boolean,
+)
+
+/**
+ * Parses and validates the [UnlockArgs] common to both password-based
+ * unlock handlers. On invalid input, calls `result.error(...)` itself
+ * (matching this codebase's existing early-return convention) and returns
+ * null -- callers should return immediately when this returns null.
+ *
+ * [sourceIdentifier] is the caller's own source-specific identifier
+ * (`filePath` for file-backed containers, `deviceName` for USB) -- it's
+ * passed in rather than parsed here because the two callers need it for
+ * more than validation (registry lookup, session URI, derived-key storage
+ * key), so parsing it twice would be worse than parsing it once at each
+ * call site the way the original code already did.
+ */
+fun parseUnlockArgs(
+    call: MethodCall,
+    result: MethodChannel.Result,
+    sourceIdentifier: String?,
+    sourceIdentifierArgName: String,
+): UnlockArgs? {
+    val password    = call.argument<String>("password")
+    val pim         = call.argument<Number>("pim")?.toInt() ?: 0
+    val displayName = call.argument<String>("displayName")
+    val docProvider = call.argument<Boolean>("documentProvider") ?: false
+    val autoMountFolders = call.argument<List<String>>("autoMountFolders")
+    val cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255
+    val hashId      = call.argument<Number>("hashId")?.toInt() ?: 255
+    val preservedKeyBase64 = call.argument<String>("preservedKey")
+    val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
+    if (preservedKey != null) {
+        Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
+    }
+    val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
+    val keyfilePaths = call.argument<List<String>>("keyfilePaths")
+    val readOnly = call.argument<Boolean>("readOnly") ?: false
+
+    if (sourceIdentifier == null || password == null) {
+        result.error("INVALID_ARGS", "$sourceIdentifierArgName and password required", null)
+        return null
+    }
+    if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
+        result.error("INVALID_ARGS", "password or keyfiles required", null)
+        return null
+    }
+
+    return UnlockArgs(
+        password = password,
+        pim = pim,
+        displayName = displayName,
+        docProvider = docProvider,
+        autoMountFolders = autoMountFolders,
+        cipherId = cipherId,
+        hashId = hashId,
+        preservedKey = preservedKey,
+        cacheDerivedKey = cacheDerivedKey,
+        keyfilePaths = keyfilePaths,
+        readOnly = readOnly,
+    )
+}
+
+/**
  * Container lifecycle for every non-USB source: unlocking VeraCrypt/LUKS
  * (via the native ProxyFileDescriptor session) and Cryptomator/gocryptfs/
  * CryFS (via their pure-Kotlin [VaultBackend] sessions), locking, password
@@ -25,36 +110,14 @@ class VaultUnlockHandlers(
     private val derivedKeyHandlers: DerivedKeyHandlers,
 ) {
     fun handleUnlockContainer(call: MethodCall, result: MethodChannel.Result) {
-        val uriString   = call.argument<String>("filePath")
-        val password    = call.argument<String>("password")
-        val pim         = call.argument<Number>("pim")?.toInt() ?: 0
-        val displayName = call.argument<String>("displayName")
-        val docProvider = call.argument<Boolean>("documentProvider") ?: false
-        val autoMountFolders = call.argument<List<String>>("autoMountFolders")
-        val cipherId    = call.argument<Number>("cipherId")?.toInt() ?: 255
-        val hashId      = call.argument<Number>("hashId")?.toInt() ?: 255
-        val preservedKeyBase64 = call.argument<String>("preservedKey")
-        val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
-        if (preservedKey != null) {
-            Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
-        }
-        val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
-        val keyfilePaths = call.argument<List<String>>("keyfilePaths")
-        val readOnly = call.argument<Boolean>("readOnly") ?: false
-
-        if (uriString == null || password == null) {
-            result.error("INVALID_ARGS", "filePath and password required", null)
-            return
-        }
-        if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
-            result.error("INVALID_ARGS", "password or keyfiles required", null)
-            return
-        }
+        val uriStringOrNull = call.argument<String>("filePath")
+        val args = parseUnlockArgs(call, result, uriStringOrNull, "filePath") ?: return
+        val uriString = uriStringOrNull!! // parseUnlockArgs already validated this is non-null
 
         val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
             ?: ContainerSessionRegistry.getFreeVolumeId()
         if (targetVolId == null) {
-            result.error("MAX_CONTAINERS", "Maximum 8 containers already mounted", null)
+            result.error("MAX_CONTAINERS", "Maximum ${ContainerSessionRegistry.MAX_VOLUMES} containers already mounted", null)
             return
         }
         activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
@@ -66,12 +129,12 @@ class VaultUnlockHandlers(
                 pfd = activity.contentResolver.openFileDescriptor(uri, "rw")
                     ?: throw Exception("Could not open file descriptor")
 
-                val keyfileFds = nativeOps.openKeyfileFds(keyfilePaths)
+                val keyfileFds = nativeOps.openKeyfileFds(args.keyfilePaths)
                 val fd = pfd.detachFd()
 
-                if (preservedKey != null) {
-                    Log.i("VaultExplorer_C++", "File unlock using preserved derived key (len=${preservedKey.size})")
-                } else if (cacheDerivedKey) {
+                if (args.preservedKey != null) {
+                    Log.i("VaultExplorer_C++", "File unlock using preserved derived key (len=${args.preservedKey.size})")
+                } else if (args.cacheDerivedKey) {
                     Log.i("VaultExplorer_C++", "File unlock will derive and cache a fresh key")
                 }
                 if (keyfileFds != null && keyfileFds.isNotEmpty()) {
@@ -79,7 +142,7 @@ class VaultUnlockHandlers(
                 }
 
                 val files = ContainerSessionRegistry.locks[targetVolId].writeLock().withLock {
-                    ContainerEngine.unlockFile(fd, password, pim, targetVolId, cipherId, hashId, preservedKey, keyfileFds, readOnly)
+                    ContainerEngine.unlockFile(fd, args.password, args.pim, targetVolId, args.cipherId, args.hashId, args.preservedKey, keyfileFds, args.readOnly)
                 }
 
                 activity.runOnUiThread {
@@ -88,14 +151,14 @@ class VaultUnlockHandlers(
                             uri = uriString,
                             volId = targetVolId,
                             cachedFilesList = files.toList(),
-                            displayName = displayName,
-                            documentProvider = docProvider,
-                            readOnly = readOnly,
+                            displayName = args.displayName,
+                            documentProvider = args.docProvider,
+                            readOnly = args.readOnly,
                         )
-                        ContainerSessionRegistry.applyAutoMountFolders(targetVolId, autoMountFolders)
+                        ContainerSessionRegistry.applyAutoMountFolders(targetVolId, args.autoMountFolders)
                         val hasFolderMounts = ContainerSessionRegistry.activeSessions[targetVolId]
                             ?.subFolderMounts?.isNotEmpty() == true
-                        if (docProvider || hasFolderMounts) {
+                        if (args.docProvider || hasFolderMounts) {
                             activity.contentResolver.notifyChange(
                                 DocumentsContract.buildRootsUri(
                                     "com.aeidolon.vaultexplorer.documents"), null)
@@ -108,7 +171,7 @@ class VaultUnlockHandlers(
                             "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
                             "containerFormat" to fmt
                         ))
-                        if (cacheDerivedKey && preservedKey == null) {
+                        if (args.cacheDerivedKey && args.preservedKey == null) {
                             val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
                             if (derived != null) {
                                 ioExecutor.execute { derivedKeyHandlers.storeDerivedKeyBytes(uriString, derived) }
@@ -140,7 +203,7 @@ class VaultUnlockHandlers(
         val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
             ?: ContainerSessionRegistry.getFreeVolumeId()
         if (targetVolId == null) {
-            result.error("MAX_CONTAINERS", "Maximum containers already mounted", null)
+            result.error("MAX_CONTAINERS", "Maximum ${ContainerSessionRegistry.MAX_VOLUMES} containers already mounted", null)
             return
         }
         activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
@@ -215,7 +278,7 @@ class VaultUnlockHandlers(
         val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
             ?: ContainerSessionRegistry.getFreeVolumeId()
         if (targetVolId == null) {
-            result.error("MAX_CONTAINERS", "Maximum containers already mounted", null)
+            result.error("MAX_CONTAINERS", "Maximum ${ContainerSessionRegistry.MAX_VOLUMES} containers already mounted", null)
             return
         }
         activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
@@ -293,7 +356,7 @@ class VaultUnlockHandlers(
         val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
             ?: ContainerSessionRegistry.getFreeVolumeId()
         if (targetVolId == null) {
-            result.error("MAX_CONTAINERS", "Maximum containers already mounted", null)
+            result.error("MAX_CONTAINERS", "Maximum ${ContainerSessionRegistry.MAX_VOLUMES} containers already mounted", null)
             return
         }
         activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))

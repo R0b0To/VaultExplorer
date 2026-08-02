@@ -75,7 +75,7 @@ jobs:
           mkdir -p release-apk
           for flavor in arm64 armeabi x64; do
             cp "build/app/outputs/flutter-apk/app-${flavor}-release.apk" \
-               "release-apk/vaultexplorer-${VERSION}-${flavor}.apk"
+               "release-apk/VaultExplorer-v${VERSION}-${flavor}.apk"
           done
 
       - name: Upload APK artifact

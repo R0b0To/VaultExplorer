@@ -26,12 +26,6 @@ jobs:
           java-version: '21'
 
       # ── Install Android NDK r28c (28.2.13676358) ────────────────────────
-      # Must match ndkVersionPin in android/build.gradle.kts and
-      # android/app/build.gradle.kts, and the `ndk:` field in
-      # metadata/com.aeidolon.vaultexplorer.yml -- all four have to agree.
-      # Plain r28 (28.0.13004108) will fail with CXX1104: the `jni` pub
-      # package's own native build resolves to r28c regardless of what
-      # Gradle is told to install, so the installed NDK has to be r28c too.
       - name: Install Android NDK r28c
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -44,10 +38,11 @@ jobs:
           flutter-version: '3.44.0'
           cache: true
 
+      # Must match Debian trixie's own packaged nodejs version exactly
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '26'
+          node-version: '20.19.2'
 
       - name: Decode keystore
         run: |

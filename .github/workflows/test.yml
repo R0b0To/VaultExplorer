@@ -86,6 +86,41 @@ jobs:
           path: android/app/build/reports/tests/testDebugUnitTest/
           retention-days: 14
 
+  # ── TD-13: the three host-side C++ unit tests (ADR-023) were being built
+  # and registered with CTest, but nothing in CI actually ran them. Doing
+  # that via the *full* android/app/src/main/cpp/CMakeLists.txt would pull
+  # in FetchContent for mbedtls/fatfs/ntfs-3g/e2fs/cjson/dislocker just to
+  # compile three self-contained test binaries that need none of it -- each
+  # test file documents its own plain `g++` build command in its header
+  # comment, so this job runs those directly instead. Verified locally
+  # before adding this job: all three compile clean and pass with this
+  # exact invocation.
+  native-unit-tests:
+    name: Native C++ host unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build & run kdf_table_test
+        working-directory: android/app/src/main/cpp/crypto/test
+        run: |
+          g++ -std=c++17 kdf_table_test.cpp ../kdf_table.cpp -o kdf_table_test
+          ./kdf_table_test
+
+      - name: Build & run sector_batching_test
+        working-directory: android/app/src/main/cpp/io/test
+        run: |
+          g++ -std=c++17 sector_batching_test.cpp -o sector_batching_test
+          ./sector_batching_test
+
+      - name: Build & run fs_scan_test
+        working-directory: android/app/src/main/cpp/test
+        run: |
+          g++ -std=c++17 fs_scan_test.cpp -o fs_scan_test
+          ./fs_scan_test
+
   # ── TD-11: catch a repeat of docs/architecture.md silently going missing ──
   # while dozens of comments still cite it by path. Not exhaustive (doesn't
   # validate individual ADR numbers resolve to real entries), just makes sure

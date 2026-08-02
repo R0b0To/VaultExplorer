@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
 /// Holds the state for browsing inside an archive file.
@@ -112,6 +113,13 @@ class ArchiveContext {
 
   /// Extract a single file entry from the archive to a temp file.
   /// Returns the path to the temp file, or null if the entry was not found.
+  ///
+  /// Safe against Zip Slip by construction: [p.basename] strips every
+  /// directory component from [entryPath] before it's joined with
+  /// [tempDir], so a single malicious entry name has nothing to escape
+  /// with. See TD-18 for why [extractAll] below needs an explicit check
+  /// instead — it has to preserve directory structure, so it can't just
+  /// discard the path the same way.
   Future<String?> extractEntry(String entryPath) async {
     for (final file in _archive.files) {
       var name = file.name;
@@ -145,6 +153,18 @@ class ArchiveContext {
       }
 
       final outPath = p.join(tempDir.path, name);
+
+      // TD-18 (Zip Slip guard): [name] comes straight from the archive's own
+      // central directory, so it's attacker-controlled. Without this check,
+      // an entry like "../../../../some/other/app/data" would resolve
+      // outside [tempDir] once joined, and the write below would happily
+      // create it there. p.isWithin normalizes both sides (so "../" segments
+      // can't sneak past a naive prefix check) before comparing.
+      if (!p.isWithin(tempDir.path, outPath)) {
+        debugPrint('Skipped archive entry escaping extraction dir: $name');
+        continue;
+      }
+
       final outFile = File(outPath);
       await outFile.parent.create(recursive: true);
       await outFile.writeAsBytes(file.content as List<int>);

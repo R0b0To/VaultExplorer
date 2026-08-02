@@ -18,11 +18,15 @@ tasks.whenTaskAdded {
     }
 }
 
+
+val ndkVersionPin = "28.0.13004108" // r28
+
 // ── Reproducibility fix for pub packages' native builds ────────────────────
 rootProject.subprojects {
     plugins.withId("com.android.library") {
         val subprojectName = name
         extensions.configure<LibraryExtension>("android") {
+            ndkVersion = ndkVersionPin
             defaultConfig {
                 externalNativeBuild {
                     cmake {
@@ -50,7 +54,7 @@ val buildPdfJs = tasks.register<Exec>("buildPdfJsAssets") {
 android {
     namespace = "com.aeidolon.vaultexplorer"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "28.0.13004108" // r28 -- see the NDK comment in .github/workflows/build-release.yml
+    ndkVersion = ndkVersionPin
     buildToolsVersion = "34.0.0"
 
     externalNativeBuild {

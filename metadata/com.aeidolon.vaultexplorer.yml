@@ -83,13 +83,8 @@ Builds:
     binary: https://github.com/R0b0To/VaultExplorer/releases/download/v%v/vaultexplorer-%v-x64.apk
     ndk: r28
 
-# TODO before merging: replace with the real SHA-256 fingerprint of the
-# certificate in the release.keystore build-release.yml signs with. Get it
-# from any of your own already-signed release APKs:
-#   apksigner verify --print-certs vaultexplorer-1.0.1-arm64.apk \
-#     | sed -n 's/^Signer #1 certificate SHA-256 digest: \(.*\)/\1/p'
-# Same keystore signs all three ABI APKs, so one value covers all of them.
-AllowedAPKSigningKeys: REPLACE_WITH_YOUR_CERT_SHA256_FINGERPRINT
+
+AllowedAPKSigningKeys: 0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -184,8 +185,26 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
       return;
     }
 
-    final attempt = hashPattern(pattern);
-    if (attempt == storedPatternHash) {
+    final lockout = await _PatternUnlockThrottle.currentLockout(source.containerUri);
+    if (lockout != null) {
+      setState(() {
+        unlockError = 'Too many failed attempts. Try again in ${lockout.inSeconds} second(s).';
+        patternError = true;
+      });
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() {
+            patternError = false;
+            patternResetKey = patternResetKey + 1;
+          });
+        }
+      });
+      return;
+    }
+
+    final matched = await verifyPattern(pattern, storedPatternHash);
+    if (matched) {
+      await _PatternUnlockThrottle.clear(source.containerUri);
       final record = await source.resolveRecord();
 
       final appSettings = await AppSettingsService.loadSettings();
@@ -225,7 +244,13 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
         });
       }
     } else {
-      setState(() => patternError = true);
+      final newLockout = await _PatternUnlockThrottle.recordFailure(source.containerUri);
+      setState(() {
+        patternError = true;
+        if (newLockout != null) {
+          unlockError = 'Too many failed attempts. Locked for ${newLockout.inSeconds}s.';
+        }
+      });
       Future.delayed(const Duration(milliseconds: 800), () {
         if (mounted) {
           setState(() {
@@ -235,5 +260,72 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
         }
       });
     }
+  }
+}
+
+/// Per-container, persisted exponential-backoff lockout for pattern-unlock
+/// attempts. Mirrors `LockGateScreen`'s master-password lockout (same
+/// thresholds/schedule) because a correct pattern here grants the same
+/// access to the vault's derived key that a correct master password does
+/// -- it deserves the same brute-force protection. Keyed by container URI
+/// so each vault's lockout state is independent of the others'.
+class _PatternUnlockThrottle {
+  static const _secure = AppSecureStorage.instance;
+
+  static String _attemptsKey(String uri) => 'pattern_unlock_failed_attempts_v1:$uri';
+  static String _lockedUntilKey(String uri) => 'pattern_unlock_locked_until_ms_v1:$uri';
+
+  /// Returns the remaining lockout duration for [uri], or null if it isn't
+  /// currently locked out.
+  static Future<Duration?> currentLockout(String uri) async {
+    try {
+      final storedUntilMs = await _secure.read(key: _lockedUntilKey(uri));
+      if (storedUntilMs == null) return null;
+      final ms = int.tryParse(storedUntilMs);
+      if (ms == null) return null;
+      final remaining = DateTime.fromMillisecondsSinceEpoch(ms).difference(DateTime.now());
+      if (remaining.isNegative) {
+        await _secure.delete(key: _lockedUntilKey(uri));
+        return null;
+      }
+      return remaining;
+    } catch (_) {
+      // If secure storage read fails, don't lock the user out of their own
+      // vault over a storage glitch -- fail open on this side only.
+      return null;
+    }
+  }
+
+  /// Records a failed attempt for [uri] and applies the same schedule as
+  /// LockGateScreen: 5 failures -> 30s, 6 -> 60s, 7 -> 120s, 8+ -> 300s.
+  /// Returns the new lockout duration once one is triggered, else null.
+  static Future<Duration?> recordFailure(String uri) async {
+    try {
+      final stored = await _secure.read(key: _attemptsKey(uri));
+      final attempts = (int.tryParse(stored ?? '') ?? 0) + 1;
+      await _secure.write(key: _attemptsKey(uri), value: attempts.toString());
+
+      if (attempts >= 5) {
+        final excess = attempts - 4;
+        final seconds = (30 * excess).clamp(30, 300);
+        final until = DateTime.now().add(Duration(seconds: seconds));
+        await _secure.write(
+          key: _lockedUntilKey(uri),
+          value: until.millisecondsSinceEpoch.toString(),
+        );
+        return Duration(seconds: seconds);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Clears persisted lockout state for [uri] after a successful unlock.
+  static Future<void> clear(String uri) async {
+    try {
+      await _secure.delete(key: _attemptsKey(uri));
+      await _secure.delete(key: _lockedUntilKey(uri));
+    } catch (_) {}
   }
 }

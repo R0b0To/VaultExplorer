@@ -994,10 +994,10 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
   bool _showError = false;
   int _resetKey = 0;
 
-  void _onPatternComplete(List<int> pattern) {
-    final hash = hashPattern(pattern);
-    if (hash == widget.storedHash) {
-      Navigator.pop(context, hash);
+  Future<void> _onPatternComplete(List<int> pattern) async {
+    final ok = await verifyPattern(pattern, widget.storedHash);
+    if (ok) {
+      if (mounted) Navigator.pop(context, widget.storedHash);
     } else {
       setState(() {
         _error = 'Incorrect pattern';

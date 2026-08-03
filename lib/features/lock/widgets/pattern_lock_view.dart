@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pointycastle/digests/sha256.dart';
+import 'package:pointycastle/export.dart' hide State;
 
 /// A beautiful 3×3 pattern lock widget drawn on a [CustomPainter].
 ///
@@ -264,13 +264,70 @@ class _PatternPainter extends CustomPainter {
 
 // ── Utility ───────────────────────────────────────────────────────────────────
 
-/// Computes a SHA-256 hash of the pattern for secure storage.
+// SECURITY NOTE: patterns are drawn from a far smaller space than
+// passwords (permutations over at most 9 dots — a few hundred thousand
+// possibilities), so a fast, unsalted, single-round hash lets a stored
+// hash be exhaustively reversed almost instantly if it's ever recovered.
+// This mirrors PasswordHasher's PBKDF2 approach (see password_hasher.dart)
+// with a random per-pattern salt and repeated key derivation, specifically
+// to make brute-forcing the *entire* pattern space computationally
+// expensive rather than free.
+//
+// Breaking change: this replaces the old single-round unsalted SHA-256
+// format 1:1 (same "pattern -> stored string" contract), but old stored
+// values won't verify against it — anyone with a pattern set up under the
+// previous scheme will need to re-create it.
+const int _patternKdfIterations = 50000;
+const int _patternSaltBytes = 16;
+const int _patternHashBytes = 32;
+
+Uint8List _derivePatternBits(List<int> pattern, Uint8List salt) {
+  final input = Uint8List.fromList(utf8.encode(pattern.join('-')));
+  final derivator = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
+    ..init(Pbkdf2Parameters(salt, _patternKdfIterations, _patternHashBytes));
+  return derivator.process(input);
+}
+
+/// Derives a salted, PBKDF2-stretched hash of [pattern] for secure storage.
 ///
-/// The pattern is serialised as a dash-separated string of dot indices
-/// (e.g. "0-1-4-7-8") and then hashed.
-String hashPattern(List<int> pattern) {
-  final input = pattern.join('-');
-  final bytes = Uint8List.fromList(utf8.encode(input));
-  final digest = SHA256Digest().process(bytes);
-  return digest.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+/// Returns `"<salt_b64>:<hash_b64>"` — a fresh random salt is generated on
+/// every call, so hashing the same pattern twice yields different strings
+/// (callers that need to confirm two entries match should compare the raw
+/// pattern lists *before* hashing, not the hashed output).
+Future<String> hashPattern(List<int> pattern) async {
+  final salt = Uint8List(_patternSaltBytes);
+  final rng = Random.secure();
+  for (int i = 0; i < _patternSaltBytes; i++) {
+    salt[i] = rng.nextInt(256);
+  }
+  final hash = _derivePatternBits(pattern, salt);
+  return '${base64Encode(salt)}:${base64Encode(hash)}';
+}
+
+/// Verifies [pattern] against a `stored` value produced by [hashPattern].
+///
+/// Uses a constant-time byte comparison so timing can't leak how many
+/// leading bytes matched. Returns `false` (rather than throwing) for a
+/// null, malformed, or pre-migration legacy stored value.
+Future<bool> verifyPattern(List<int> pattern, String? stored) async {
+  if (stored == null) return false;
+  final parts = stored.split(':');
+  if (parts.length != 2) return false;
+  try {
+    final salt = Uint8List.fromList(base64Decode(parts[0]));
+    final expected = base64Decode(parts[1]);
+    final actual = _derivePatternBits(pattern, salt);
+    return _constantTimeEquals(actual, expected);
+  } catch (_) {
+    return false;
+  }
+}
+
+bool _constantTimeEquals(List<int> a, List<int> b) {
+  if (a.length != b.length) return false;
+  var result = 0;
+  for (var i = 0; i < a.length; i++) {
+    result |= a[i] ^ b[i];
+  }
+  return result == 0;
 }

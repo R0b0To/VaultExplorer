@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 
@@ -23,7 +24,7 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
   bool _showError = false;
   int _resetKey = 0; // Force PatternLockView rebuild on reset.
 
-  void _onPatternComplete(List<int> pattern) {
+  Future<void> _onPatternComplete(List<int> pattern) async {
     if (pattern.length < 4) {
       setState(() {
         _error = 'Connect at least 4 dots';
@@ -52,10 +53,9 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
         break;
 
       case _SetupStep.confirm:
-        final firstHash = hashPattern(_firstPattern!);
-        final confirmHash = hashPattern(pattern);
-        if (firstHash == confirmHash) {
-          Navigator.pop(context, firstHash);
+        if (listEquals(_firstPattern, pattern)) {
+          final hash = await hashPattern(pattern);
+          if (mounted) Navigator.pop(context, hash);
         } else {
           setState(() {
             _error = 'Patterns don\'t match — try again';

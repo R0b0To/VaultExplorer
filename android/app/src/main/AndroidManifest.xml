@@ -14,9 +14,10 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
-        android:label="Vault Explorer"
+        android:label="@string/decoy_app_name"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/ic_launcher_pdf"
+        android:roundIcon="@mipmap/ic_launcher_pdf"
         android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
@@ -32,10 +33,6 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
 
             <!-- ADDED: USB intent filter and meta-data -->
             <intent-filter>
@@ -47,6 +44,61 @@
             <!-- END OF ADDITION -->
 
         </activity>
+        <activity-alias
+            android:name=".VaultLauncherAlias"
+            android:targetActivity=".MainActivity"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter
+                android:label="@string/app_name"
+                android:icon="@mipmap/ic_launcher"
+                android:roundIcon="@mipmap/ic_launcher">
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".PDFViewerAlias"
+            android:targetActivity=".MainActivity"
+            android:label="@string/decoy_app_name"
+            android:icon="@mipmap/ic_launcher_pdf"
+            android:roundIcon="@mipmap/ic_launcher_pdf"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter
+                android:label="@string/decoy_app_name"
+                android:icon="@mipmap/ic_launcher_pdf"
+                android:roundIcon="@mipmap/ic_launcher_pdf">
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- "Open with Doc Viewer" from a file manager or another app -->
+            <intent-filter
+                android:label="@string/decoy_app_name"
+                android:icon="@mipmap/ic_launcher_pdf"
+                android:roundIcon="@mipmap/ic_launcher_pdf">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="file"/>
+                <data android:scheme="content"/>
+                <data android:mimeType="application/pdf"/>
+            </intent-filter>
+            <!-- "Share -> Doc Viewer" for a PDF from another app -->
+            <intent-filter
+                android:label="@string/decoy_app_name"
+                android:icon="@mipmap/ic_launcher_pdf"
+                android:roundIcon="@mipmap/ic_launcher_pdf">
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/pdf"/>
+            </intent-filter>
+        </activity-alias>
+
         <activity
             android:name=".camera.CameraCaptureActivity"
             android:exported="false"

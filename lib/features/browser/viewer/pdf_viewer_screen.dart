@@ -37,6 +37,13 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   int _pageCount = 0;
   bool _isContainerLocked = false;
 
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  Timer? _searchDebounce;
+  int _searchCurrent = 0;
+  int _searchTotal = 0;
+
   String get _fileName => widget.filePath.split('/').last;
 
   void _onContainerLockedEvent(int volId) {
@@ -80,13 +87,44 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           _errorMessage =
               (raw['message'] as String?) ?? 'Failed to load PDF';
         });
+      case 'searchResult':
+        setState(() {
+          _searchCurrent = (raw['current'] as int?) ?? 0;
+          _searchTotal = (raw['total'] as int?) ?? 0;
+        });
     }
+  }
+
+  void _onSearchChanged(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      _method?.invokeMethod('search', {'query': query});
+    });
+  }
+
+  void _startSearch() {
+    setState(() => _isSearching = true);
+    _searchFocusNode.requestFocus();
+  }
+
+  void _stopSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    _method?.invokeMethod('clearSearch');
+    setState(() {
+      _isSearching = false;
+      _searchCurrent = 0;
+      _searchTotal = 0;
+    });
   }
 
   @override
   void dispose() {
     VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     _eventSub?.cancel();
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -102,21 +140,79 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_fileName),
-        actions: [
-          if (_pageCount > 0)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  '$_currentPage / $_pageCount',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                autofocus: true,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  hintText: 'Search in document',
+                  border: InputBorder.none,
                 ),
-              ),
-            ),
-        ],
+                onChanged: _onSearchChanged,
+                onSubmitted: (_) => _method?.invokeMethod('findNext'),
+              )
+            : Text(_fileName),
+        leading: _isSearching
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: _stopSearch,
+              )
+            : null,
+        actions: _isSearching
+            ? [
+                if (_searchTotal > 0)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        '$_searchCurrent / $_searchTotal',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                      ),
+                    ),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                  tooltip: 'Previous match',
+                  onPressed: _searchTotal > 0
+                      ? () => _method?.invokeMethod('findPrevious')
+                      : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                  tooltip: 'Next match',
+                  onPressed: _searchTotal > 0
+                      ? () => _method?.invokeMethod('findNext')
+                      : null,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  tooltip: 'Close search',
+                  onPressed: _stopSearch,
+                ),
+              ]
+            : [
+                IconButton(
+                  icon: const Icon(Icons.search_rounded),
+                  tooltip: 'Search',
+                  onPressed: _pageCount > 0 ? _startSearch : null,
+                ),
+                if (_pageCount > 0)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        '$_currentPage / $_pageCount',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                      ),
+                    ),
+                  ),
+              ],
       ),
       body: _buildBody(cs),
     );

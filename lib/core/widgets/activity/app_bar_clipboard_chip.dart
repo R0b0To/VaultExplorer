@@ -30,27 +30,43 @@ class AppBarClipboardButton extends StatelessWidget {
         final count = clip.items.length;
         final source = clip.sourceDisplayName ?? 'Vault';
 
-        return PopupMenuButton<void>(
-          tooltip: '$verb ($count) — Clipboard details',
-          offset: const Offset(0, 48), // Anchored directly beneath the AppBar action icon
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          color: cs.surfaceContainerHigh,
-          elevation: 6,
-          icon: Badge(
-            label: Text(
-              '$count',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+        return Tooltip(
+          message: onPaste != null
+              ? '$verb ($count) — Tap details, long press to paste'
+              : '$verb ($count) — Clipboard details',
+          triggerMode: TooltipTriggerMode.manual,
+          child: PopupMenuButton<void>(
+            offset: const Offset(0, 48), // Anchored directly beneath the AppBar action icon
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.md),
             ),
-            backgroundColor: cs.primary,
-            textColor: cs.onPrimary,
-            child: Icon(
-              clip.isCutOperation ? Icons.cut_rounded : Icons.content_paste_rounded,
-              color: cs.primary,
+            color: cs.surfaceContainerHigh,
+            elevation: 6,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onLongPress: onPaste != null
+                  ? () {
+                      Feedback.forLongPress(context);
+                      onPaste!();
+                    }
+                  : null,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Badge(
+                  label: Text(
+                    '$count',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                  ),
+                  backgroundColor: cs.primary,
+                  textColor: cs.onPrimary,
+                  child: Icon(
+                    clip.isCutOperation ? Icons.cut_rounded : Icons.content_paste_rounded,
+                    color: cs.primary,
+                  ),
+                ),
+              ),
             ),
-          ),
-          itemBuilder: (popupContext) => [
+            itemBuilder: (popupContext) => [
             PopupMenuItem<void>(
               enabled: false, // Custom interactive layout inside menu
               child: Container(
@@ -171,7 +187,8 @@ class AppBarClipboardButton extends StatelessWidget {
               ),
             ),
           ],
-        );
+        ),
+      );
       },
     );
   }

@@ -729,6 +729,7 @@ class _VaultDashboardState extends State<VaultDashboard>
           if (a.isMounted == b.isMounted) return 0;
           return a.isMounted ? -1 : 1;
         });
+        _syncRecordsOrder(sorted);
         return sorted;
       case ContainerSortMode.nameAZ:
         sorted.sort(
@@ -741,6 +742,24 @@ class _VaultDashboardState extends State<VaultDashboard>
       case ContainerSortMode.oldest:
         sorted.sort((a, b) => a.sortDate.compareTo(b.sortDate));
         return sorted;
+    }
+  }
+
+  void _syncRecordsOrder(List<VaultListItem> sorted) {
+    if (sorted.length != _recordsOrder.length) return;
+    final newOrder = sorted.map((e) => e.uri).toList();
+    bool changed = false;
+    for (int i = 0; i < newOrder.length; i++) {
+      if (_recordsOrder[i] != newOrder[i]) {
+        changed = true;
+        break;
+      }
+    }
+    if (changed) {
+      _recordsOrder
+        ..clear()
+        ..addAll(newOrder);
+      unawaited(ContainerRepository.instance.saveOrder(_recordsOrder));
     }
   }
 

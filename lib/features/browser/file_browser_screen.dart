@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
-
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
@@ -20,7 +19,6 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/services/archive_service.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
@@ -36,22 +34,16 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
-import 'package:vaultexplorer/features/browser/widgets/file_grid_view.dart';
-import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
-import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_manager_action_bar.dart';
-import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
-import 'package:vaultexplorer/features/browser/widgets/selection_app_bar_wide.dart';
 import 'package:vaultexplorer/features/browser/widgets/add_item_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/sort_menu_button.dart';
 import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.dart';
-import 'package:vaultexplorer/features/browser/widgets/settings_menu_button.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
+import 'package:vaultexplorer/features/browser/widgets/browser_body_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
-import 'package:vaultexplorer/features/browser/widgets/truncated_banner.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
-import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 
 import '../../core/widgets/thumbnail/thumbnail_concurrency.dart';
@@ -1612,6 +1604,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final fileCount = filteredItems.where((e) => !e.isDir).length;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !_searchActive;
+    final actionBuilders = _buildActionBuilders();
+    // Same computation _buildAppBar used to do internally; needed here now
+    // since it's a parameter to buildBrowserAppBar rather than something
+    // that function can read off private state itself.
+    final isFiltered = query.isNotEmpty || _currentFilter != null;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -1628,12 +1625,47 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
-        appBar: _buildAppBar(context, filteredItems, dirCount, fileCount),
+        appBar: buildBrowserAppBar(
+          context,
+          container: widget.container,
+          filteredItems: filteredItems,
+          dirCount: dirCount,
+          fileCount: fileCount,
+          isSelectionMode: isSelectionMode,
+          selectedItems: selectedItems,
+          isReadOnly: _isReadOnly,
+          searchActive: _searchActive,
+          currentDirPath: _currentDirPath,
+          toolbarConfig: _toolbarConfig,
+          currentFilter: _currentFilter,
+          freeSpace: _freeSpace,
+          selectedTotalBytes: selectedTotalBytes,
+          hasPendingFolderSizes: hasPendingFolderSizes,
+          actionBuilders: actionBuilders,
+          isFolderMounted: _isFolderMounted,
+          isPinned: _isPinned,
+          onExitSelectionMode: exitSelectionMode,
+          onSelectAll: () => setState(() => selectedItems.addAll(filteredItems)),
+          onCopy: () => _initClipboard(cut: false),
+          onCut: () => _initClipboard(cut: true),
+          onExport: _exportSelectedToStorage,
+          onDelete: _batchDelete,
+          onTogglePin: _togglePinSelected,
+          onDirectoryReload: _loadDirectoryContents,
+          onSetStatus: (msg, {required bool error}) => _setStatus(msg, error: error),
+          onShowOpenWithDialog: _showOpenWithDialog,
+          onShowFolderDocumentProviderSheet: _showFolderDocumentProviderSheet,
+          onToggleFolderDocumentProvider: _toggleFolderDocumentProvider,
+          onFilterChanged: (value) => setState(() => _currentFilter = value),
+          onSettingsClosed: _loadToolbarConfig,
+          isFiltered: isFiltered,
+          onPaste: _isReadOnly ? null : _paste,
+        ),
         bottomNavigationBar: (!isLandscape && showActionBar)
             ? FileManagerActionBar(
                 axis: Axis.horizontal,
                 actions: _toolbarConfig.visible,
-                builders: _buildActionBuilders(),
+                builders: actionBuilders,
               )
             : null,
         body: Stack(
@@ -1644,7 +1676,53 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
                   const Divider(),
                 ],
-                Expanded(child: _buildBody(filteredItems)),
+                Expanded(
+                  child: buildBrowserBody(
+                    context,
+                    filteredItems,
+                    isLoading: _isLoading,
+                    currentItems: _currentItems,
+                    atRoot: _atRoot,
+                    onNavigateUp: _atRoot ? null : _navigateUp,
+                    searchQuery: _searchQuery,
+                    layoutMode: _layoutMode,
+                    container: widget.container,
+                    currentDirPath: _currentDirPath,
+                    thumbnailCacheMode: _resolvedThumbnailCacheMode,
+                    thumbnailQuality: _resolvedThumbnailQuality,
+                    toolbarConfig: _toolbarConfig,
+                    isSelectionMode: isSelectionMode,
+                    selectedItems: selectedItems,
+                    searchActive: _searchActive,
+                    mountedDocProviderFolders: _mountedDocProviderFolders,
+                    isFolderMounted: _isFolderMounted,
+                    isPinned: _isPinned,
+                    onDirTap: _handleDirTap,
+                    onFileTap: _handleFileTap,
+                    onItemLongPress: _handleItemLongPress,
+                    // Exact original closure bodies, just relocated from
+                    // inside _buildBody to here -- see the doc comment on
+                    // buildBrowserBody for why these weren't rewritten.
+                    onGridColumnCountChanged: (count) {
+                      _toolbarConfig = isLandscape
+                          ? _toolbarConfig.copyWith(gridColumnsLandscape: count)
+                          : _toolbarConfig.copyWith(gridColumnsPortrait: count);
+                      FileManagerToolbarService.instance.save(_toolbarConfig);
+                    },
+                    onMasonryColumnCountChanged: (count) {
+                      _toolbarConfig = isLandscape
+                          ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
+                          : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
+                      FileManagerToolbarService.instance.save(_toolbarConfig);
+                    },
+                    onListZoomLevelChanged: (newZoom) {
+                      _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
+                      FileManagerToolbarService.instance.save(_toolbarConfig);
+                    },
+                    onRefresh: () => _loadDirectoryContents(_currentDirPath),
+                    isListingTruncated: _isListingTruncated,
+                  ),
+                ),
               ],
             ),
             Positioned(
@@ -1693,336 +1771,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           ],
         ),
       ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar(
-    BuildContext context,
-    List<RawEntry> filteredItems,
-    int dirCount,
-    int fileCount,
-  ) {
-    final allItems = filteredItems;
-    final cs = Theme.of(context).colorScheme;
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
-    final showActionBar = !_searchActive;
-    final actionBuilders = _buildActionBuilders();
-    if (isSelectionMode) {
-      final single = selectedItems.length == 1;
-      final singleFile = single && !selectedItems.first.isDir;
-      final singleFolder = single && selectedItems.first.isDir;
-      final folderDocProviderMounted =
-          singleFolder && _isFolderMounted(selectedItems.first);
-      final showPinOption = selectedItems.any((item) => !_isPinned(item));
-      final showUnpinOption = selectedItems.any((item) => _isPinned(item));
-      final totalBytes = selectedTotalBytes;
-      final isPending = hasPendingFolderSizes;
-      final sizeLabel = isPending
-          ? (totalBytes > 0
-                ? '${formatBytes(totalBytes)} (calculating…)'
-                : 'calculating…')
-          : formatBytes(totalBytes);
-      void doRename() {
-        final entries = selectedItems.toList();
-        for (final entry in entries) {
-          final parts = entry.name.split('.');
-          final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
-          if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-             _setStatus('Edit secure items to rename them');
-             exitSelectionMode();
-             return;
-          }
-        }
-        BrowserDialogs.showRename(
-          context,
-          container: widget.container,
-          oldEntries: entries,
-          existingEntries: allItems,
-          currentDirPath: _currentDirPath,
-          onSuccess: () => _loadDirectoryContents(_currentDirPath),
-          readOnly: _isReadOnly,
-        );
-        exitSelectionMode();
-      }
-      Future<void> doOpenWithApp() async {
-        final entry = selectedItems.first;
-        final path = _currentDirPath.isEmpty
-            ? entry.name
-            : '$_currentDirPath/${entry.name}';
-        final parts = entry.name.split('.');
-        final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
-        exitSelectionMode();
-        if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-           _setStatus('Vault items cannot be opened in external apps', error: true);
-           return;
-        }
-        final settings = await AppSettingsService.loadSettings();
-        if (mounted) {
-          await _showOpenWithDialog(entry.name, path, ext, settings);
-        }
-      }
-      Future<void> doToggleDocProvider() async {
-        final entry = selectedItems.first;
-        exitSelectionMode();
-        if (folderDocProviderMounted) {
-          await _showFolderDocumentProviderSheet(entry);
-        } else {
-          await _toggleFolderDocumentProvider(entry);
-        }
-      }
-      if (!isLandscape) {
-        return SelectionAppBar(
-          selectedCount: selectedItems.length,
-          selectionLabel: sizeLabel,
-          singleSelected: single,
-          singleFileSelected: singleFile,
-          singleFolderSelected: singleFolder,
-          folderDocumentProviderMounted: folderDocProviderMounted,
-          readOnly: _isReadOnly,
-          showPinOption: showPinOption,
-          showUnpinOption: showUnpinOption,
-          onPin: () => _togglePinSelected(pin: true),
-          onUnpin: () => _togglePinSelected(pin: false),
-          onClose: exitSelectionMode,
-          onSelectAll: () => setState(() => selectedItems.addAll(allItems)),
-          onRename: doRename,
-          onCopy: () => _initClipboard(cut: false),
-          onCut: () => _initClipboard(cut: true),
-          onExport: _exportSelectedToStorage,
-          onDelete: _batchDelete,
-          onOpenWithApp: doOpenWithApp,
-          onToggleDocumentProvider: doToggleDocProvider,
-        );
-      }
-      return SelectionAppBarWide(
-        selectedCount: selectedItems.length,
-        selectionLabel: sizeLabel,
-        singleFileSelected: singleFile,
-        singleFolderSelected: singleFolder,
-        folderDocumentProviderMounted: folderDocProviderMounted,
-        readOnly: _isReadOnly,
-        showPinOption: showPinOption,
-        showUnpinOption: showUnpinOption,
-        showActionBar: showActionBar,
-        visibleActions: _toolbarConfig.visible,
-        actionBuilders: actionBuilders,
-        onClose: exitSelectionMode,
-        onSelectAll: () => setState(() => selectedItems.addAll(allItems)),
-        onRename: doRename,
-        onCopy: () => _initClipboard(cut: false),
-        onCut: () => _initClipboard(cut: true),
-        onExport: _exportSelectedToStorage,
-        onDelete: _batchDelete,
-        onOpenWithApp: doOpenWithApp,
-        onToggleDocumentProvider: doToggleDocProvider,
-        onPin: () => _togglePinSelected(pin: true),
-        onUnpin: () => _togglePinSelected(pin: false),
-      );
-    }
-    final query = _searchQuery.trim().toLowerCase();
-    final isFiltered = query.isNotEmpty || _currentFilter != null;
-    return AppBar(
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        tooltip: 'Back to dashboard',
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-      title: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  widget.container.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (_isReadOnly) ...[
-                const SizedBox(width: 8),
-                Tooltip(
-                  message: 'Mounted read-only',
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.lock_outline_rounded, size: 11, color: cs.onSurfaceVariant),
-                        const SizedBox(width: 3),
-                        Text(
-                          'RO',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          if (_toolbarConfig.showStatsBar)
-            _buildAppBarStatsSubtitle(
-              dirCount: dirCount,
-              fileCount: fileCount,
-              isFiltered: isFiltered,
-            ),
-        ],
-      ),
-      actions: [
-        AppBarClipboardButton(onPaste: _isReadOnly ? null : _paste),
-        if (isLandscape && showActionBar) ...[
-          ..._toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
-        ],
-        SettingsMenuButton(
-          currentFilter: _currentFilter,
-          onFilterChanged: (value) => setState(() => _currentFilter = value),
-          onSettingsClosed: _loadToolbarConfig,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAppBarStatsSubtitle({
-    required int dirCount,
-    required int fileCount,
-    required bool isFiltered,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final style = textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant);
-    final parts = <String>[
-      if (_freeSpace >= 0) '${formatBytes(_freeSpace)} free',
-      if (isFiltered) 'filtered',
-    ];
-    return Text(
-      parts.join(' · '),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: style,
-    );
-  }
-
-  Widget _buildBody(List<RawEntry> items) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
-    }
-    if (_currentItems.isEmpty) {
-      return AppEmptyState(
-        icon: Icons.folder_open_rounded,
-        title: 'Empty Folder',
-        message: 'Use the Add action to create files or import from device.',
-        actionLabel: _atRoot ? null : 'Go back',
-        actionIcon: Icons.arrow_upward_rounded,
-        onAction: _atRoot ? null : _navigateUp,
-      );
-    }
-    if (_searchQuery.trim().isNotEmpty && items.isEmpty) {
-      return AppEmptyState(
-        icon: Icons.search_off_rounded,
-        title: 'No results',
-        message: 'Nothing in this folder matches "${_searchQuery.trim()}".',
-      );
-    }
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
-    final content = switch (_layoutMode) {
-      BrowserLayoutMode.grid => FileGridView(
-          container: widget.container,
-          items: items,
-          isSelectionMode: isSelectionMode,
-          selectedItems: selectedItems,
-          currentDirPath: _currentDirPath,
-          thumbnailCacheMode: _resolvedThumbnailCacheMode,
-          thumbnailQuality: _resolvedThumbnailQuality,
-          showFileNames: _toolbarConfig.showGridFileNames,
-          initialColumns: isLandscape
-              ? _toolbarConfig.gridColumnsLandscape
-              : _toolbarConfig.gridColumnsPortrait,
-          onColumnCountChanged: (count) {
-            _toolbarConfig = isLandscape
-                ? _toolbarConfig.copyWith(gridColumnsLandscape: count)
-                : _toolbarConfig.copyWith(gridColumnsPortrait: count);
-            FileManagerToolbarService.instance.save(_toolbarConfig);
-          },
-          onDirTap: _handleDirTap,
-          onFileTap: _handleFileTap,
-          onItemLongPress: _handleItemLongPress,
-          searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
-          mountedFolderPaths: _mountedDocProviderFolders,
-          isPinned: _isPinned,
-        ),
-      BrowserLayoutMode.masonry => FileMasonryView(
-          container: widget.container,
-          items: items,
-          isSelectionMode: isSelectionMode,
-          selectedItems: selectedItems,
-          currentDirPath: _currentDirPath,
-          thumbnailCacheMode: _resolvedThumbnailCacheMode,
-          thumbnailQuality: _resolvedThumbnailQuality,
-          showFileNames: _toolbarConfig.showGridFileNames,
-          initialColumns: isLandscape
-              ? _toolbarConfig.masonryColumnsLandscape
-              : _toolbarConfig.masonryColumnsPortrait,
-          onColumnCountChanged: (count) {
-            _toolbarConfig = isLandscape
-                ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
-                : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
-            FileManagerToolbarService.instance.save(_toolbarConfig);
-          },
-          onDirTap: _handleDirTap,
-          onFileTap: _handleFileTap,
-          onItemLongPress: _handleItemLongPress,
-          searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
-          mountedFolderPaths: _mountedDocProviderFolders,
-          isPinned: _isPinned,
-        ),
-      BrowserLayoutMode.list ||
-      BrowserLayoutMode.compact =>
-        FileListView(
-          container: widget.container,
-          currentDirPath: _currentDirPath,
-          thumbnailCacheMode: _resolvedThumbnailCacheMode,
-          thumbnailQuality: _resolvedThumbnailQuality,
-          showThumbnails: _toolbarConfig.showListThumbnails,
-          initialZoomLevel: _toolbarConfig.listZoomLevel,
-          onZoomLevelChanged: (newZoom) {
-            _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
-            FileManagerToolbarService.instance.save(_toolbarConfig);
-          },
-          items: items,
-          isSelectionMode: isSelectionMode,
-          isCompact: _layoutMode == BrowserLayoutMode.compact,
-          selectedItems: selectedItems,
-          detailColumns: _toolbarConfig.visibleDetailColumns,
-          onDirTap: _handleDirTap,
-          onFileTap: _handleFileTap,
-          onItemLongPress: _handleItemLongPress,
-          searchQuery: _searchActive ? _searchQuery.trim().toLowerCase() : null,
-          isFolderMounted: _isFolderMounted,
-          isPinned: _isPinned,
-        ),
-    };
-    final refreshable = RefreshIndicator(
-      onRefresh: () => _loadDirectoryContents(_currentDirPath),
-      child: content,
-    );
-    if (!_isListingTruncated) return refreshable;
-    return Column(
-      children: [
-        const TruncatedBanner(),
-        Expanded(child: refreshable),
-      ],
     );
   }
 }

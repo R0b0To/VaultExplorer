@@ -86,6 +86,7 @@ private object ChannelMethods {
 
 class MainActivity : FlutterFragmentActivity() {
     private val CHANNEL = "com.aeidolon.vaultexplorer/engine"
+    private val DISGUISE_CHANNEL = "com.aeidolon.vaultexplorer/disguise_channel"
     internal val ACTION_CHOOSER = "com.aeidolon.vaultexplorer.ACTION_CHOOSER"
     private var chooserReceiver: BroadcastReceiver? = null
     internal var methodChannel: MethodChannel? = null
@@ -114,6 +115,20 @@ class MainActivity : FlutterFragmentActivity() {
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
+    private val disguiseModeHandlers = DisguiseModeHandlers(this, pendingResult, ioExecutor)
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        disguiseModeHandlers.updateActivityIdentity()
+        disguiseModeHandlers.handleIncomingIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        disguiseModeHandlers.updateActivityIdentity()
+        disguiseModeHandlers.handleIncomingIntent(intent)
+    }
 
     override fun onDestroy() {
         chooserReceiver?.let { unregisterReceiver(it) }
@@ -182,6 +197,18 @@ class MainActivity : FlutterFragmentActivity() {
         methodChannel = channel
         UnlockProgressBridge.channel = channel
         ImportProgressBridge.channel = channel
+
+        val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
+        ExternalOpenBridge.channel = disguiseChannel
+        disguiseChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                DisguiseChannelMethods.GET_MODE -> disguiseModeHandlers.handleGetMode(call, result)
+                DisguiseChannelMethods.SET_MODE -> disguiseModeHandlers.handleSetMode(call, result)
+                DisguiseChannelMethods.PICK_LOCAL_PDF_FILE -> disguiseModeHandlers.handlePickLocalPdfFile(call, result)
+                DisguiseChannelMethods.CONSUME_PENDING_OPEN_REQUEST -> disguiseModeHandlers.handleConsumePendingOpenRequest(call, result)
+                else -> result.notImplemented()
+            }
+        }
         val filter = IntentFilter(ACTION_CHOOSER)
         chooserReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/features/settings/about_screen.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
@@ -23,6 +25,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   bool _loading = true;
   bool _saving = false;
   bool _hasAllStorageAccess = false;
+  DisguiseMode _disguiseMode = DisguiseMode.vault;
   bool _showPwFields = false;
   final _pwCtrl = TextEditingController();
   final _pwConfirmCtrl = TextEditingController();
@@ -101,13 +104,61 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     } catch (_) {}
     const api = VaultExplorerApi();
     final hasAccess = await api.hasAllFilesAccess();
+    final disguiseMode = await disguiseModeApi.getMode();
     if (mounted) {
       setState(() {
         _settings = s;
         _biometricAvailable = bioAvail;
         _hasAllStorageAccess = hasAccess;
+        _disguiseMode = disguiseMode;
         _loading = false;
       });
+    }
+  }
+
+  // ✅ FIXED CODE:
+  Future<void> _setDiscreteMode(bool enable) async {
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: enable ? 'Enable Discrete Mode?' : 'Disable Discrete Mode?',
+      message: enable
+          ? 'The app icon and name on your home screen will change to '
+                '"PDF Viewer". It will work as a normal PDF reader.\n\n'
+                'To get back into the vault, open PDF Viewer and hold your '
+                'finger on the title at the top of the screen for a few '
+                'seconds.'
+          : 'The app icon and name on your home screen will change back to '
+                '"Vault Explorer".',
+      confirmLabel: enable ? 'Enable' : 'Disable',
+    );
+    if (!confirmed || !mounted) return;
+
+    final targetMode = enable ? DisguiseMode.decoy : DisguiseMode.vault;
+    try {
+      await disguiseModeApi.setMode(targetMode);
+      if (!mounted) return;
+      setState(() => _disguiseMode = targetMode);
+      applyDisguiseModeTaskSwitcherLabel(targetMode);
+      showAppSnackBar(
+        context,
+        message: enable
+            ? 'Discrete Mode enabled. The app will close — reopen from the new launcher icon.'
+            : 'Discrete Mode disabled. The app will close — reopen from the new launcher icon.',
+      );
+      // Close the app after a brief delay so the user sees the snackbar.
+      // A cold restart ensures the Flutter engine initialises cleanly
+      // under the new launcher-alias configuration (otherwise the
+      // activity recreation caused by the component flip can leave the
+      // engine in a stale state, especially during debug hot-reload).
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      SystemNavigator.pop();
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: 'Failed to change Discrete Mode',
+        tone: AppBannerTone.error,
+      );
     }
   }
 
@@ -124,6 +175,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       }
     }
   }
+
 
   void _toggleMasterPassword(bool enabled) {
     setState(() {
@@ -469,6 +521,22 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               await SecureScreenPolicy.apply(preference: v);
                               await _persist();
                             },
+                          ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text('Discrete Mode',
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                              _disguiseMode == DisguiseMode.decoy
+                                  ? 'Active — the app currently appears as "PDF Viewer"'
+                                  : 'Disguise this app as a PDF reader on the home screen',
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: _disguiseMode == DisguiseMode.decoy,
+                            onChanged: (v) => _setDiscreteMode(v),
                           ),
                           SwitchListTile(
                             contentPadding:

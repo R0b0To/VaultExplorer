@@ -1,0 +1,52 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
+import 'package:vaultexplorer/data/models/clipboard_item.dart';
+import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
+
+void main() {
+  testWidgets('AppBarClipboardButton long press triggers onPaste directly', (tester) async {
+    bool pasteCalled = false;
+
+    // Populate clipboard
+    CrossContainerClipboard.instance.set(
+      volId: 1,
+      displayName: 'Test Vault',
+      cut: false,
+      clipItems: [
+        const ClipboardItem(
+          path: '/test/file.txt',
+          isDir: false,
+          sizeBytes: 100,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          appBar: AppBar(
+            actions: [
+              AppBarClipboardButton(
+                onPaste: () {
+                  pasteCalled = true;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(AppBarClipboardButton), findsOneWidget);
+
+    // Long press on the clipboard button
+    await tester.longPress(find.byType(AppBarClipboardButton));
+    await tester.pumpAndSettle();
+
+    expect(pasteCalled, isTrue);
+
+    // Clean up clipboard
+    CrossContainerClipboard.instance.clear();
+  });
+}

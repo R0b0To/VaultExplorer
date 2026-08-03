@@ -55,6 +55,24 @@ html, body {
 }
 .textLayer .endOfContent.active { top: 0; }
 
+/* ── Search results ─────────────────────────────────────────────────
+ * These are injected *inside* an existing .textLayer span (wrapping a
+ * substring of its text node), so they must override the
+ * `.textLayer :is(span, br)` rule's `position: absolute` — otherwise the
+ * highlight detaches from its normal in-flow position within the parent
+ * span instead of sitting under the matched glyphs. Two classes beats
+ * one class + one type selector on specificity, so this wins. */
+.textLayer .pdf-search-highlight {
+  position: static;
+  display: inline;
+  color: transparent;
+  background: rgba(255, 223, 0, .55);
+  border-radius: 1px;
+}
+.textLayer .pdf-search-highlight.current {
+  background: rgba(255, 140, 0, .85);
+}
+
 /* ── Loading overlay ──────────────────────────────────────────────── */
 #loading-overlay {
   position: fixed; inset: 0;

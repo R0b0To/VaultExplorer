@@ -26,6 +26,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
+import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.FileNotFoundException
 
@@ -248,6 +249,17 @@ class PdfViewerView(
                 ))
             }
         }
+
+        @JavascriptInterface
+        fun onSearchResult(current: Int, total: Int) {
+            mainHandler.post {
+                eventSink?.success(mapOf(
+                    "event"   to "searchResult",
+                    "current" to current,
+                    "total"   to total,
+                ))
+            }
+        }
     }
 
     // ── Dart → WebView method calls ──────────────────────────────────────────
@@ -257,6 +269,27 @@ class PdfViewerView(
             "goToPage" -> {
                 val page = call.argument<Int>("page") ?: 1
                 webView.evaluateJavascript("goToPage($page)", null)
+                result.success(null)
+            }
+            "search" -> {
+                val query = call.argument<String>("query") ?: ""
+                // JSONObject.quote produces a safely-escaped JS/JSON string
+                // literal (handles quotes, backslashes, newlines in query).
+                webView.evaluateJavascript(
+                    "window.searchText(${JSONObject.quote(query)})", null,
+                )
+                result.success(null)
+            }
+            "findNext" -> {
+                webView.evaluateJavascript("window.findNext()", null)
+                result.success(null)
+            }
+            "findPrevious" -> {
+                webView.evaluateJavascript("window.findPrevious()", null)
+                result.success(null)
+            }
+            "clearSearch" -> {
+                webView.evaluateJavascript("window.clearSearch()", null)
                 result.success(null)
             }
             else -> result.notImplemented()

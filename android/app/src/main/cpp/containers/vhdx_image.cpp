@@ -244,6 +244,21 @@ bool VhdxImage::open(int fd, bool requestReadWrite) {
     }
     const uint16_t metaEntryCount = static_cast<uint16_t>(metaBuf[10] | (metaBuf[11] << 8));
 
+    // Bound metaEntryCount against the actual size of metaBuf (which is
+    // only metadataRegion->length bytes) before the loop below indexes
+    // into it. Each entry is 32 bytes starting right after the 32-byte
+    // metadata-table header, so entryCount*32 + 32 must fit within the
+    // buffer -- otherwise a crafted file (small region length, large
+    // declared entry count) causes the loop to read past the end of the
+    // heap allocation. Same fail-closed treatment as the entryCount > 2047
+    // check already applied to the region table above.
+    if (metadataRegion->length < 32 ||
+        static_cast<uint64_t>(metaEntryCount) * 32 >
+            static_cast<uint64_t>(metadataRegion->length) - 32) {
+        lastError_ = "VHDX metadata region entry count exceeds region length";
+        return false;
+    }
+
     const unsigned char* fileParamsBytes = nullptr;
     const unsigned char* virtualDiskSizeBytes = nullptr;
     const unsigned char* logicalSectorSizeBytes = nullptr;

@@ -1,18 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Cleaned up permissions block -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
-
-    <!-- Built-in camera capture (CameraCaptureActivity) -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
@@ -21,6 +17,8 @@
         android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
@@ -28,21 +26,16 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
-
-            <!-- ADDED: USB intent filter and meta-data -->
             <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
-            <meta-data 
+            <meta-data
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/device_filter" />
-            <!-- END OF ADDITION -->
-
         </activity>
         <activity-alias
             android:name=".VaultLauncherAlias"
@@ -60,52 +53,22 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity-alias>
-
         <activity-alias
-            android:name=".PDFViewerAlias"
+            android:name=".HydroTrackerAlias"
             android:targetActivity=".MainActivity"
             android:label="@string/decoy_app_name"
-            android:icon="@mipmap/ic_launcher_pdf"
-            android:roundIcon="@mipmap/ic_launcher_pdf"
+            android:icon="@mipmap/ic_launcher_water"
+            android:roundIcon="@mipmap/ic_launcher_water"
             android:enabled="false"
             android:exported="true">
             <intent-filter
                 android:label="@string/decoy_app_name"
-                android:icon="@mipmap/ic_launcher_pdf"
-                android:roundIcon="@mipmap/ic_launcher_pdf">
+                android:icon="@mipmap/ic_launcher_water"
+                android:roundIcon="@mipmap/ic_launcher_water">
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- "Open with PDF Viewer" from a file manager or another app -->
-            <intent-filter
-                android:label="@string/decoy_app_name"
-                android:icon="@mipmap/ic_launcher_pdf"
-                android:roundIcon="@mipmap/ic_launcher_pdf">
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="file"/>
-                <data android:scheme="content"/>
-                <data android:mimeType="application/pdf"/>
-            </intent-filter>
-            <!-- "Share -> PDF Viewer" for a PDF from another app -->
-            <intent-filter
-                android:label="@string/decoy_app_name"
-                android:icon="@mipmap/ic_launcher_pdf"
-                android:roundIcon="@mipmap/ic_launcher_pdf">
-                <action android:name="android.intent.action.SEND"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <data android:mimeType="application/pdf"/>
-            </intent-filter>
         </activity-alias>
-
-        <activity
-            android:name=".camera.CameraCaptureActivity"
-            android:exported="false"
-            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
-            android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:windowSoftInputMode="stateAlwaysHidden" />
         <provider
             android:name="com.aeidolon.vaultexplorer.ContainerDocumentsProvider"
             android:authorities="com.aeidolon.vaultexplorer.documents"
@@ -116,12 +79,10 @@
                 <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
             </intent-filter>
         </provider>
-        <!-- Required by Flutter embedding -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
-
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Vault Explorer</string>
-    <string name="decoy_app_name">PDF Viewer</string>
+    <string name="decoy_app_name">Hydro Tracker</string>
 </resources>

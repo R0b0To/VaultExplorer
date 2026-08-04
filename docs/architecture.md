@@ -293,7 +293,7 @@ progressing through its own lifecycle.
         │      auth fail /│ hash — auto-detect cascade)         │
         │      invalid    │ success                             │
         │      container  ▼                                     │
-        │           ┌───────────┐        USB detach /            │
+        │               ┌───────────┐        USB detach /          │
         │  cancelUnlock  │Unlocked │───▶  screen-off auto-lock /  │
         │  (best-effort, │(rw/RO) │      lockContainer /          │
         │   next hash/   └─────┬───┘      app-lock enforcement ──┘
@@ -411,7 +411,7 @@ Via the same channel's method-call handler in reverse — see
 ## 7. Discrete Mode
 
 A presentation-layer disguise: the Android launcher shows either the real
-"Vault Explorer" identity or an innocuous "PDF Viewer" identity, determined
+"Vault Explorer" identity or an innocuous "Hydro Tracker" identity, determined
 by which of two `activity-alias` components is currently enabled (§2.9).
 Both aliases target the same `MainActivity` — this is never a second
 process, a second Activity class, or a second copy of the Flutter engine,
@@ -420,34 +420,30 @@ Mode is independent of cryptographic session state; a `volId` being
 Unlocked or Locked is unrelated to which launcher identity is active.
 
 While the decoy identity is active, the app functions as a real, usable
-offline PDF reader (`DecoyPdfHomeScreen` / `DecoyPdfViewerScreen`) —
-browsing/opening local files there never touches vault code paths, and the
-recents list (`DiscreteModeRepository`) is ordinary plaintext carrying no
-vault linkage.
+daily water intake tracker (`DecoyWaterTrackerScreen`) — logging daily
+water intake and managing streaks uses local preferences and zero external
+files.
 
 ### 7.1 State machine
 
 ```
-        ┌────────────────────┐                       ┌────────────────────┐
-        │   Vault identity   │   setMode(decoy)       │   Decoy identity   │
-        │ VaultLauncherAlias │──────────────────────▶ │   PDFViewerAlias   │
-        │      enabled       │◀──────────────────────│      enabled       │
-        └─────────┬──────────┘   setMode(vault)       └─────────┬──────────┘
-                  │           (AppSettingsScreen toggle,                  │
-                  │            both directions, explicit only)            │
-                  │                                                       │
-        boots into LockGateScreen                     boots into DecoyPdfHomeScreen
-        (→ VaultDashboard on auth)                     (real, working PDF reader)
-                                                                 │
-                                                    hold app-bar title 3s
-                                                    (HiddenVaultTrigger, ADR-028)
-                                                                 │
-                                                                 ▼
-                                                   Navigator.push(LockGateScreen)
-                                                  (pushed on top of the decoy UI —
-                                                   back-navigation after auth
-                                                   returns to the decoy, doesn't
-                                                   exit; alias state is untouched)
+    ┌────────────────────┐                        ┌────────────────────┐
+    │   Vault identity   │   setMode(decoy)       │   Decoy identity   │
+    │ VaultLauncherAlias │ ─────────────────────▶│ HydroTrackerAlias  │
+    │      enabled       │◀───────────────────── │      enabled       │
+    └─────────┬──────────┘   setMode(vault)       └─────────┬──────────┘
+              │           (AppSettingsScreen toggle,                  │
+              │            both directions, explicit only)            │
+              │                                                       │
+    boots into LockGateScreen                     boots into DecoyWaterTrackerScreen
+    (→ VaultDashboard on auth)                    (functional water tracker)
+                                                             │
+                                                hold app-bar title / goal 3s
+                                                (HiddenVaultTrigger, ADR-028)
+                                                             │
+                                                             ▼
+                                               Navigator.push(LockGateScreen)
+                                              (pushed on top of decoy UI)
 ```
 
 - **Vault identity** — `VaultLauncherAlias` enabled, `PDFViewerAlias`
@@ -536,3 +532,5 @@ the following changes:
 6. **Fixed section numbering**: Renumbered §8 (Discrete Mode) → §7 and §9
    (Cross-references) → §8 to eliminate the gap left by an earlier
    renumbering that was documented only in a now-removed status note.
+
+   

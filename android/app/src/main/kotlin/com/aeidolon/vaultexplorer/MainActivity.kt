@@ -113,19 +113,17 @@ class MainActivity : FlutterFragmentActivity() {
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
-    private val disguiseModeHandlers = DisguiseModeHandlers(this, pendingResult, ioExecutor)
+    private val disguiseModeHandlers = DisguiseModeHandlers(this)
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         disguiseModeHandlers.updateActivityIdentity()
-        disguiseModeHandlers.handleIncomingIntent(intent)
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         disguiseModeHandlers.updateActivityIdentity()
-        disguiseModeHandlers.handleIncomingIntent(intent)
     }
 
     override fun onDestroy() {
@@ -182,7 +180,6 @@ class MainActivity : FlutterFragmentActivity() {
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
-
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel
         UnlockProgressBridge.channel = channel
@@ -194,8 +191,6 @@ class MainActivity : FlutterFragmentActivity() {
             when (call.method) {
                 DisguiseChannelMethods.GET_MODE -> disguiseModeHandlers.handleGetMode(call, result)
                 DisguiseChannelMethods.SET_MODE -> disguiseModeHandlers.handleSetMode(call, result)
-                DisguiseChannelMethods.PICK_LOCAL_PDF_FILE -> disguiseModeHandlers.handlePickLocalPdfFile(call, result)
-                DisguiseChannelMethods.CONSUME_PENDING_OPEN_REQUEST -> disguiseModeHandlers.handleConsumePendingOpenRequest(call, result)
                 else -> result.notImplemented()
             }
         }

@@ -26,12 +26,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   bool _saving = false;
   bool _hasAllStorageAccess = false;
   DisguiseMode _disguiseMode = DisguiseMode.vault;
+
   bool _showPwFields = false;
   final _pwCtrl = TextEditingController();
   final _pwConfirmCtrl = TextEditingController();
   bool _obscurePw = true;
   bool _obscureConfirm = true;
   String? _pwError;
+
   bool _biometricAvailable = false;
   final _localAuth = LocalAuthentication();
 
@@ -105,6 +107,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     const api = VaultExplorerApi();
     final hasAccess = await api.hasAllFilesAccess();
     final disguiseMode = await disguiseModeApi.getMode();
+
     if (mounted) {
       setState(() {
         _settings = s;
@@ -116,17 +119,15 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     }
   }
 
-  // ✅ FIXED CODE:
   Future<void> _setDiscreteMode(bool enable) async {
     final confirmed = await showAppConfirmDialog(
       context,
       title: enable ? 'Enable Discrete Mode?' : 'Disable Discrete Mode?',
       message: enable
           ? 'The app icon and name on your home screen will change to '
-                '"PDF Viewer". It will work as a normal PDF reader.\n\n'
-                'To get back into the vault, open PDF Viewer and hold your '
-                'finger on the title at the top of the screen for a few '
-                'seconds.'
+                '"Hydro Tracker". It will function as a daily water intake tracker.\n\n'
+                'To access your vault, open Hydro Tracker and hold your '
+                'finger on the title or water gauge for 3 seconds.'
           : 'The app icon and name on your home screen will change back to '
                 '"Vault Explorer".',
       confirmLabel: enable ? 'Enable' : 'Disable',
@@ -145,11 +146,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
             ? 'Discrete Mode enabled. The app will close — reopen from the new launcher icon.'
             : 'Discrete Mode disabled. The app will close — reopen from the new launcher icon.',
       );
-      // Close the app after a brief delay so the user sees the snackbar.
-      // A cold restart ensures the Flutter engine initialises cleanly
-      // under the new launcher-alias configuration (otherwise the
-      // activity recreation caused by the component flip can leave the
-      // engine in a stale state, especially during debug hot-reload).
       await Future<void>.delayed(const Duration(milliseconds: 1500));
       SystemNavigator.pop();
     } catch (_) {
@@ -176,7 +172,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     }
   }
 
-
   void _toggleMasterPassword(bool enabled) {
     setState(() {
       _settings.useMasterPassword = enabled;
@@ -197,6 +192,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   Future<void> _confirmPassword() async {
     final pw = _pwCtrl.text;
     final confirm = _pwConfirmCtrl.text;
+
     if (pw.isEmpty) {
       setState(() => _pwError = 'Password cannot be empty');
       return;
@@ -209,20 +205,24 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       setState(() => _pwError = 'Passwords do not match');
       return;
     }
+
     setState(() {
       _saving = true;
       _pwError = null;
     });
+
     try {
       final (:hash, :salt) = await PasswordHasher.deriveHash(pw);
       if (!mounted) return;
       await AppSettingsService.saveMasterPassword(_settings, hash, salt);
+
       setState(() {
         _showPwFields = false;
         _pwCtrl.clear();
         _pwConfirmCtrl.clear();
         _saving = false;
       });
+
       if (mounted) {
         showAppSnackBar(
           context,
@@ -251,6 +251,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
@@ -530,8 +531,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
                               _disguiseMode == DisguiseMode.decoy
-                                  ? 'Active — the app currently appears as "PDF Viewer"'
-                                  : 'Disguise this app as a PDF reader on the home screen',
+                                  ? 'Active — the app currently appears as "Hydro Tracker"'
+                                  : 'Disguise this app as a daily water tracker on the home screen',
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -654,7 +655,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                           SwitchListTile(
+                          SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
                             title: Text('Enable JavaScript in HTML Viewer',
@@ -725,7 +726,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           ),
                           ThumbnailQualityTile(
                             label: 'Thumbnail Quality (default)',
-                            value: _settings.defaultThumbnailQuality,                            
+                            value: _settings.defaultThumbnailQuality,
                             onChanged: (v) {
                               setState(
                                   () => _settings.defaultThumbnailQuality = v);

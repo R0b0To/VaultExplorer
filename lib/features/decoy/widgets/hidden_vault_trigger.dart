@@ -35,7 +35,7 @@ class HiddenVaultTrigger extends StatefulWidget {
 }
 
 class _HiddenVaultTriggerState extends State<HiddenVaultTrigger> {
-  static const _holdDuration = Duration(seconds: 3);
+  static const _holdDuration = Duration(seconds: 2);
 
   late final _hold = HoldTrigger(duration: _holdDuration, onComplete: _fire);
 

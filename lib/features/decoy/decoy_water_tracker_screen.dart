@@ -17,10 +17,12 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
   static const _kWaterKey = 'decoy_water_intake_ml';
   static const _kWaterDateKey = 'decoy_water_intake_date';
   static const _kStreakKey = 'decoy_water_streak_days';
+  static const _kUnitKey = 'decoy_water_is_imperial';
   static const int _goalMl = 2000;
 
   int _currentMl = 0;
   int _streak = 1;
+  bool _isImperial = false; // false = ml, true = fl oz
   bool _loading = true;
 
   @override
@@ -46,6 +48,9 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
 
       final streakStr = await secure.read(key: _kStreakKey);
       _streak = (int.tryParse(streakStr ?? '') ?? 1).clamp(1, 999);
+
+      final unitStr = await secure.read(key: _kUnitKey);
+      _isImperial = unitStr == 'true';
     } catch (_) {}
 
     if (mounted) {
@@ -58,10 +63,29 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
     return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
+  Future<void> _setUnit(bool isImperial) async {
+    setState(() => _isImperial = isImperial);
+    try {
+      final secure = AppSecureStorage.instance;
+      await secure.write(key: _kUnitKey, value: isImperial.toString());
+    } catch (_) {}
+  }
+
+  String _formatVolume(int ml) {
+    if (_isImperial) {
+      final oz = (ml / 29.5735).round();
+      return '$oz fl oz';
+    }
+    return '$ml ml';
+  }
+
   Future<void> _addWater(int amountMl) async {
     HapticFeedback.lightImpact();
+    final previousMl = _currentMl;
+    final newMl = (_currentMl + amountMl).clamp(0, 10000);
+
     setState(() {
-      _currentMl = (_currentMl + amountMl).clamp(0, 10000);
+      _currentMl = newMl;
     });
 
     try {
@@ -69,18 +93,70 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
       await secure.write(key: _kWaterKey, value: _currentMl.toString());
       await secure.write(key: _kWaterDateKey, value: _todayString());
 
-      if (_currentMl >= _goalMl) {
+      if (previousMl < _goalMl && newMl >= _goalMl) {
         final newStreak = _streak + 1;
+        setState(() => _streak = newStreak);
         await secure.write(key: _kStreakKey, value: newStreak.toString());
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('🎉 Daily hydration goal reached! Streak increased!'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
     } catch (_) {}
+  }
+
+  Future<void> _showCustomAddDialog() async {
+    final controller = TextEditingController();
+    final unitLabel = _isImperial ? 'fl oz' : 'ml';
+
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Water'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Amount ($unitLabel)',
+            suffixText: unitLabel,
+            border: const OutlineInputBorder(),
+          ),
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final val = int.tryParse(controller.text);
+              Navigator.pop(ctx, val);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+
+    if (amount != null && amount > 0) {
+      // Convert fl oz input back to ml for storage if Imperial unit is active
+      final mlToAdd = _isImperial ? (amount * 29.5735).round() : amount;
+      _addWater(mlToAdd);
+    }
   }
 
   Future<void> _resetToday() async {
     final confirm = await showAppConfirmDialog(
       context,
       title: 'Reset Today\'s Water Log?',
-      message: 'This will reset your logged water intake for today to 0 ml.',
+      message: 'This will reset your logged water intake for today to 0.',
       confirmLabel: 'Reset',
       isDestructive: true,
     );
@@ -100,11 +176,59 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
     final progress = (_currentMl / _goalMl).clamp(0.0, 1.0);
     final percent = (progress * 100).toInt();
 
+    // Quick add button amounts based on unit system
+    final quickAdds = _isImperial
+        ? [
+            (label: 'Glass', display: '+8 oz', ml: 237),
+            (label: 'Bottle', display: '+16 oz', ml: 473),
+            (label: 'Large', display: '+24 oz', ml: 710),
+          ]
+        : [
+            (label: 'Glass', display: '+250 ml', ml: 250),
+            (label: 'Bottle', display: '+500 ml', ml: 500),
+            (label: 'Large', display: '+750 ml', ml: 750),
+          ];
+
     return Scaffold(
       appBar: AppBar(
         title: const HiddenVaultTrigger(child: Text('Hydro Tracker')),
         centerTitle: true,
         actions: [
+          PopupMenuButton<bool>(
+            icon: const Icon(Icons.tune_rounded),
+            tooltip: 'Units',
+            onSelected: _setUnit,
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: false,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_rounded,
+                      size: 18,
+                      color: !_isImperial ? cs.primary : Colors.transparent,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Metric (ml)'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: true,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_rounded,
+                      size: 18,
+                      color: _isImperial ? cs.primary : Colors.transparent,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text('Imperial (fl oz)'),
+                  ],
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Reset Today',
@@ -143,7 +267,7 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
                     ),
                     const SizedBox(height: 32),
 
-                    // Main circular progress gauge (Long press title or gauge for 3s to trigger vault login)
+                    // Main circular progress gauge (HiddenVaultTrigger wraps secret vault login)
                     HiddenVaultTrigger(
                       child: Stack(
                         alignment: Alignment.center,
@@ -169,7 +293,7 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                '$_currentMl ml',
+                                _formatVolume(_currentMl),
                                 style: textTheme.headlineMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: cs.onSurface,
@@ -177,7 +301,7 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Goal: $_goalMl ml ($percent%)',
+                                'Goal: ${_formatVolume(_goalMl)} ($percent%)',
                                 style: textTheme.bodySmall?.copyWith(
                                   color: cs.onSurfaceVariant,
                                 ),
@@ -203,28 +327,37 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
                       children: [
                         Expanded(
                           child: _QuickAddCard(
-                            amountMl: 250,
-                            label: 'Glass',
+                            amountText: quickAdds[0].display,
+                            label: quickAdds[0].label,
                             icon: Icons.local_drink_rounded,
-                            onTap: () => _addWater(250),
+                            onTap: () => _addWater(quickAdds[0].ml),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _QuickAddCard(
-                            amountMl: 500,
-                            label: 'Bottle',
+                            amountText: quickAdds[1].display,
+                            label: quickAdds[1].label,
                             icon: Icons.water_drop_outlined,
-                            onTap: () => _addWater(500),
+                            onTap: () => _addWater(quickAdds[1].ml),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _QuickAddCard(
-                            amountMl: 750,
-                            label: 'Large',
+                            amountText: quickAdds[2].display,
+                            label: quickAdds[2].label,
                             icon: Icons.local_cafe_rounded,
-                            onTap: () => _addWater(750),
+                            onTap: () => _addWater(quickAdds[2].ml),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _QuickAddCard(
+                            amountText: 'Custom',
+                            label: 'Custom',
+                            icon: Icons.add_rounded,
+                            onTap: _showCustomAddDialog,
                           ),
                         ),
                       ],
@@ -288,13 +421,13 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
 }
 
 class _QuickAddCard extends StatelessWidget {
-  final int amountMl;
+  final String amountText;
   final String label;
   final IconData icon;
   final VoidCallback onTap;
 
   const _QuickAddCard({
-    required this.amountMl,
+    required this.amountText,
     required this.label,
     required this.icon,
     required this.onTap,
@@ -315,15 +448,15 @@ class _QuickAddCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 28, color: const Color(0xFF0288D1)),
+              Icon(icon, size: 26, color: const Color(0xFF0288D1)),
               const SizedBox(height: 8),
               Text(
-                '+$amountMl ml',
-                style: textTheme.labelLarge?.copyWith(
+                amountText,
+                style: textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: cs.onSurface,
                 ),
@@ -333,6 +466,7 @@ class _QuickAddCard extends StatelessWidget {
                 label,
                 style: textTheme.labelSmall?.copyWith(
                   color: cs.onSurfaceVariant,
+                  fontSize: 10,
                 ),
               ),
             ],

@@ -38,11 +38,6 @@ jobs:
           flutter-version: '3.44.0'
           cache: true
 
-      # Must match Debian trixie's own packaged nodejs version exactly
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.19.2'
 
       - name: Decode keystore
         run: |

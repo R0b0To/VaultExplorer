@@ -123,7 +123,7 @@ new code must not violate. Each is traceable to specific enforcement code.
    second call site that toggles only one side — the app becomes unreachable
    from the launcher, or shows two icons and defeats the disguise.
 
-10. **Discrete Mode's on/off state is never separately persisted anywhere in
+10. **Mask Mode's on/off state is never separately persisted anywhere in
     Dart — it is always re-derived from live `PackageManager` component-
     enabled state (ADR-025).** There is no `bool` for it in `AppSettings`,
     `AppSecureStorage`, or any other Dart-side store. `DisguiseModeApi.getMode()`
@@ -225,7 +225,7 @@ of ad-hoc `Future`/`Timer` juggling:
   there is no cancellation once `invokeMethod` has been sent — the only
   lever Dart has is never submitting the call in the first place.
 
-### 3.5 Discrete Mode
+### 3.5 Mask Mode
 
 Introduces no new locks, executors, or registries. `getMode`/`setMode`
 (`DisguiseModeHandlers`) run directly on the calling thread —
@@ -266,8 +266,8 @@ written at the call sites.
 | **022** | Backend-specific lock-skip behavior (§3.2) is a `VaultBackend.skipsPerVolumeLock` property, not a runtime string match on a session's class name | Accepted | `VaultBackend.kt`, `CryptomatorSession.kt`, `GocryptfsSession.kt`, `ContainerFileSystem.kt` |
 | **023** | Native crypto/filesystem engine's first automated regression tests are plain host-side C++ binaries (`g++`-buildable, `assert`-based, zero Android toolchain), registered with CTest and gated behind `if(NOT ANDROID)` | Accepted | `CMakeLists.txt`, `crypto/test/kdf_table_test.cpp`, `io/test/sector_batching_test.cpp`, `test/fs_scan_test.cpp` |
 | **024** | `file_browser_screen.dart`'s selection-mode and sort-mode state live in reusable `SelectionMixin<T>`/`SortMixin<T>` mixins, not inline in the screen's `State` class | Accepted | `lib/features/browser/mixins/selection_mixin.dart`, `lib/features/browser/mixins/sort_mixin.dart`, `file_browser_screen.dart` |
-| **025** | Discrete Mode's active/inactive state is derived from live `PackageManager` component-enabled state on every query, never cached in a separately persisted Dart flag (§2.9, §2.10) | Accepted | `DisguiseModeHandlers.kt`, `disguise_mode_api.dart`, `vault_explorer_app.dart` |
-| **026** | The Discrete Mode decoy reader renders local PDFs through the same pdf.js `PlatformView`/WebView pipeline as the in-vault viewer, via a `localUri` creation param and a `_local` URL segment, rather than a second rendering pipeline | Accepted | `PdfViewerPlugin.kt`, `decoy_pdf_viewer_screen.dart` |
+| **025** | Mask Mode's active/inactive state is derived from live `PackageManager` component-enabled state on every query, never cached in a separately persisted Dart flag (§2.9, §2.10) | Accepted | `DisguiseModeHandlers.kt`, `disguise_mode_api.dart`, `vault_explorer_app.dart` |
+| **026** | The Mask Mode decoy reader renders local PDFs through the same pdf.js `PlatformView`/WebView pipeline as the in-vault viewer, via a `localUri` creation param and a `_local` URL segment, rather than a second rendering pipeline | Accepted | `PdfViewerPlugin.kt`, `decoy_pdf_viewer_screen.dart` |
 | **027** | The decoy reader's "Open PDF File" picker reuses the existing SAF `ACTION_OPEN_DOCUMENT` + `PendingActivityResult` pattern instead of adding a third-party `file_picker` dependency | Accepted | `DisguiseModeHandlers.kt`, `VaultPickerHandlers.kt`, `disguise_mode_api.dart` |
 | **028** | The hidden vault-unlock trigger (3 s hold on app-bar title) uses a raw touch-down timer (`HoldTrigger`), `Navigator.push`s (not `pushReplacement`) onto `LockGateScreen`, and never modifies OS-level alias state | Accepted | `lib/core/utils/hold_trigger.dart`, `lib/features/decoy/widgets/hidden_vault_trigger.dart` |
 
@@ -408,7 +408,7 @@ Via the same channel's method-call handler in reverse — see
 
 ---
 
-## 7. Discrete Mode
+## 7. Mask Mode
 
 A presentation-layer disguise: the Android launcher shows either the real
 "Vault Explorer" identity or an innocuous "Hydro Tracker" identity, determined
@@ -483,7 +483,7 @@ engine channel documented in §6. Method names are constants in
 | `setMode` | Dart → native | Atomically flips both aliases (§2.9); `DONT_KILL_APP` preserves running engine/session state |
 | `pickLocalPdfFile` | Dart → native | SAF `ACTION_OPEN_DOCUMENT` filtered to `application/pdf`, read-only persistable grant (ADR-027); returns `{uri, displayName}` or `null` on cancel |
 
-There are currently no native → Dart events on this channel — Discrete Mode
+There are currently no native → Dart events on this channel — Mask Mode
 has no asynchronous native-side progress to report.
 
 ---
@@ -529,7 +529,7 @@ the following changes:
    this rule exists to prevent") and tightened phrasing throughout to
    authoritative declarative statements.
 
-6. **Fixed section numbering**: Renumbered §8 (Discrete Mode) → §7 and §9
+6. **Fixed section numbering**: Renumbered §8 (Mask Mode) → §7 and §9
    (Cross-references) → §8 to eliminate the gap left by an earlier
    renumbering that was documented only in a now-removed status note.
 

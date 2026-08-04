@@ -35,38 +35,20 @@ All entries below were checked directly against upstream sources/licenses
 | VeraCrypt crypto primitives -- `Twofish.c`, `Serpent.c`, `Camellia.c`, `kuznyechik.c`, `Whirlpool.c`, `blake2s.c`, `cpu.c`, Argon2 | veracrypt/VeraCrypt | Per-file permissive: Twofish (Gladman permissive), Serpent/Whirlpool/kuznyechik/cpu.c (public domain), Camellia (BSD-2-clause/NTT), blake2/Argon2 (CC0 or Apache-2.0, at your option) | d26216c2 (1.26.29) | OK, individually |
 | `Common/Tcdefs.h` and `Common/Endian.c`/`Common/Endian.h` | project contributors (clean-room; no longer sourced from veracrypt/VeraCrypt) | GPL-3.0-or-later, matching this project's own LICENSE | n/a -- written in-repo, see `cpp/Common/AUDIT.md` | **OK -- see `cpp/Common/AUDIT.md` for two rewrite regressions found & fixed here** |
 
-See `docs/DECISIONS.md` for a note on FFmpeg, previously vendored here and
-since removed in favor of the `video_player` plugin below.
-
 ## Flutter/Dart (`pubspec.yaml`)
 
 | Package | License | Notes |
 |---|---|---|
+| `pdfrx` | BSD-3-Clause / Apache-2.0 (PDFium) | High-performance Flutter PDF rendering engine built on PDFium. Renders PDFs directly in Dart via custom stream reader callbacks without extracting unencrypted files to disk. |
 | `video_player` | BSD-3-Clause | Official Flutter plugin. On Android, backed by AndroidX Media3/ExoPlayer (Apache-2.0), which decodes via the OS's own `MediaCodec` -- no bundled codec binaries of any kind. |
 | `path_provider`, `local_auth`, `flutter_secure_storage`, `url_launcher`, `wakelock_plus`, `package_info_plus`, `sensors_plus`, `flutter_staggered_grid_view`, `archive`, `path`, `vector_math`, `flutter_launcher_icons` | BSD-3-Clause / MIT (each individually) | Standard Flutter-community/AOSP-adjacent packages. No proprietary or copyleft-incompatible terms. |
 | `pointycastle`, `encrypt` | BSD-3-Clause / MIT | Pure-Dart crypto libraries (`encrypt` wraps `pointycastle`). |
-
-See `docs/DECISIONS.md` for packages that were evaluated and rejected
-(`fvp`, `syncfusion_flutter_pdfviewer`/`syncfusion_flutter_pdf`, `pdfrx`)
-and why none of them ship in this project.
-
-## Vendored web assets (`android/app/src/main/assets/`)
-
-| Component | Upstream | License | Version | Status |
-|---|---|---|---|---|
-| pdf.js (`pdfjs/pdf.min.mjs`, `pdfjs/pdf.worker.min.mjs`) | mozilla/pdf.js | Apache-2.0 (confirmed in the `@licstart` header) | v6.2.108, pinned in `scripts/build_pdfjs.sh` | **Built from source**, not vendored -- `scripts/build_pdfjs.sh` clones the pinned tag and runs pdf.js's own `gulp minified` build, invoked automatically by `android/app/build.gradle.kts`'s `preBuild` task for every build (local, CI, and F-Droid alike). Nothing under this path is committed to the repo; see `android/app/src/main/assets/pdfjs/.gitignore`. Loaded into a sandboxed, no-network `WebView` (`PdfViewerPlugin.kt`) with vault bytes streamed in over a method channel; nothing is fetched from the internet at runtime. |
-| `pdfjs/viewer.{html,css,js}` | this project | GPL-3.0-or-later, matching this project's own LICENSE | n/a | Original code, not vendored -- the custom viewer chrome that loads pdf.js above and talks to `PdfViewerPlugin.kt`. Committed and tracked normally. |
-
-This is what actually backs the in-app PDF viewer
-(`lib/features/browser/viewer/pdf_viewer_screen.dart` + `PdfViewerPlugin.kt`).
 
 ## Distribution notes
 
 - All GPL/LGPL native components are built from their original, unmodified
   upstream source at the pinned commit via CMake `FetchContent`
   (`android/app/src/main/cpp/CMakeLists.txt`) -- nothing is shipped as a
-  prebuilt binary in the native (`cpp/`) part of this repository,
-  satisfying GPL "source availability" and F-Droid's "buildable from
-  source" requirement simultaneously.
+  prebuilt binary in the native (`cpp/`) part of this repository.
 - If you fork this project and modify any GPL-licensed component in place,
   you must publish your modified source per the GPL's terms.

@@ -20,16 +20,6 @@ tasks.whenTaskAdded {
 // Single source of truth for the NDK pin
 val ndkVersionPin = "28.2.13676358" // r28c -- see android/build.gradle.kts for why not plain r28
 
-// ── From-source build steps ───────────────────────────────────────────────
-val buildPdfJs = tasks.register<Exec>("buildPdfJsAssets") {
-    description = "Builds the pdf.js viewer bundle from source (scripts/build_pdfjs.sh)."
-    val repoRoot = rootProject.file("..")
-    workingDir = repoRoot
-    commandLine("bash", "scripts/build_pdfjs.sh")
-    inputs.file(repoRoot.resolve("scripts/build_pdfjs.sh"))
-    outputs.dir("src/main/assets/pdfjs")
-}
-
 android {
     namespace = "com.aeidolon.vaultexplorer"
     compileSdk = flutter.compileSdkVersion
@@ -137,10 +127,6 @@ flutter {
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation("junit:junit:4.13.2")
-}
-
-tasks.named("preBuild").configure {
-    dependsOn(buildPdfJs)
 }
 
 androidComponents {

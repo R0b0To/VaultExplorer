@@ -49,7 +49,6 @@ private object ChannelMethods {
     const val GET_VIDEO_THUMBNAIL_WITH_SIZE = "getVideoThumbnailWithSize"
     const val SET_PLAYBACK_ACTIVE       = "setPlaybackActive"
     const val GET_FOLDER_SIZE           = "getFolderSize"
-
     const val HASH_PASSWORD             = "hashPassword"
     const val DERIVE_DERIVED_KEY        = "deriveDerivedKey"
     const val STORE_DERIVED_KEY         = "storeDerivedKey"
@@ -95,7 +94,6 @@ class MainActivity : FlutterFragmentActivity() {
     }
     private val ACTION_USB_PERMISSION = "com.aeidolon.vaultexplorer.USB_PERMISSION"
     private var usbPermissionReceiver: BroadcastReceiver? = null
-
     private val ioExecutor = Executors.newFixedThreadPool(4) as ThreadPoolExecutor
     private val imageThumbnailExecutor = Executors.newFixedThreadPool(2) as ThreadPoolExecutor
     private val videoThumbnailExecutor = Executors.newFixedThreadPool(1) as ThreadPoolExecutor
@@ -153,7 +151,6 @@ class MainActivity : FlutterFragmentActivity() {
         if (hasFocus) systemHandlers.sanitizeClipboard()
     }
 
-
     private fun resizeExecutorPools() {
         val sizes = DeviceCapabilityProfiler.executorSizesFor(DeviceCapabilityProfiler.tierFor(this))
         resizeThreadPool(ioExecutor, sizes.io)
@@ -161,7 +158,6 @@ class MainActivity : FlutterFragmentActivity() {
         resizeThreadPool(videoThumbnailExecutor, sizes.videoThumbnail)
         resizeThreadPool(fullResExecutor, sizes.fullRes)
     }
-
 
     private fun resizeThreadPool(executor: ThreadPoolExecutor, newSize: Int) {
         if (newSize >= executor.corePoolSize) {
@@ -173,7 +169,6 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         methodChannel?.invokeMethod("onTrimMemory", mapOf("level" to level))
@@ -181,18 +176,13 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-
         resizeExecutorPools()
-
-    vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(this,flutterEngine.dartExecutor.binaryMessenger,flutterEngine.renderer,)
+        vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(this, flutterEngine.dartExecutor.binaryMessenger, flutterEngine.renderer)
         flutterEngine.platformViewsController.registry.registerViewFactory(
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
-        flutterEngine.platformViewsController.registry.registerViewFactory(
-            com.aeidolon.vaultexplorer.pdfviewer.PDF_VIEWER_VIEW_TYPE,
-            com.aeidolon.vaultexplorer.pdfviewer.PdfViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
-        )
+
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel
         UnlockProgressBridge.channel = channel
@@ -209,6 +199,7 @@ class MainActivity : FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+
         val filter = IntentFilter(ACTION_CHOOSER)
         chooserReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -229,6 +220,7 @@ class MainActivity : FlutterFragmentActivity() {
                 }
             }
         }
+
         val usbFilter = IntentFilter(ACTION_USB_PERMISSION)
         usbPermissionReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
@@ -241,6 +233,7 @@ class MainActivity : FlutterFragmentActivity() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(usbPermissionReceiver, usbFilter)
         }
+
         usbDetachReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != UsbManager.ACTION_USB_DEVICE_DETACHED) return
@@ -260,6 +253,7 @@ class MainActivity : FlutterFragmentActivity() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(usbDetachReceiver, detachFilter)
         }
+
         screenOffReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != Intent.ACTION_SCREEN_OFF) return
@@ -275,11 +269,13 @@ class MainActivity : FlutterFragmentActivity() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(screenOffReceiver, screenOffFilter)
         }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(chooserReceiver, filter, RECEIVER_EXPORTED)
         } else {
             registerReceiver(chooserReceiver, filter)
         }
+
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 ChannelMethods.SET_SECURE_SCREEN -> systemHandlers.handleSetSecureScreen(call, result)
@@ -322,7 +318,6 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_IMAGE_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetImageThumbnailWithSize(call, result)
                 ChannelMethods.GET_VIDEO_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetVideoThumbnailWithSize(call, result)
                 ChannelMethods.SET_PLAYBACK_ACTIVE -> thumbnailHandlers.handleSetPlaybackActive(call, result)
-
                 ChannelMethods.LOCK_CONTAINER -> vaultUnlockHandlers.handleLockContainer(call, result)
                 ChannelMethods.UPDATE_CONTAINER_SETTINGS -> vaultUnlockHandlers.handleUpdateContainerSettings(call, result)
                 ChannelMethods.DECRYPT_FILE -> fileOperationHandlers.handleDecryptFile(call, result)

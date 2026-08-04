@@ -1,11 +1,8 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
-
-const String _kPdfViewerViewType = 'com.aeidolon.vaultexplorer/pdf_viewer';
+import 'package:pdfrx/pdfrx.dart';
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 class PdfSearchConfig {
   final String searchMethod;
@@ -31,17 +28,23 @@ class PdfSearchConfig {
 }
 
 class PdfViewerBase extends StatefulWidget {
-  final Map<String, dynamic> creationParams;
+  final MountedContainer? container;
+  final String? pdfPath;
+  final String? localUri;
+  final Map<String, dynamic>? creationParams;
   final String title;
   final bool isLocked;
   final Widget Function(Widget child)? titleBuilder;
   final Widget Function(Widget child)? pageCounterBuilder;
-  final List<Widget> Function(MethodChannel? method)? extraActionsBuilder;
+  final List<Widget> Function(PdfViewerController? controller)? extraActionsBuilder;
   final PdfSearchConfig searchConfig;
 
   const PdfViewerBase({
     super.key,
-    required this.creationParams,
+    this.container,
+    this.pdfPath,
+    this.localUri,
+    this.creationParams,
     required this.title,
     this.isLocked = false,
     this.titleBuilder,
@@ -55,14 +58,15 @@ class PdfViewerBase extends StatefulWidget {
 }
 
 class _PdfViewerBaseState extends State<PdfViewerBase> {
-  MethodChannel? _method;
-  StreamSubscription<dynamic>? _eventSub;
+  late final PdfViewerController _controller = PdfViewerController();
+  PdfTextSearcher? _textSearcher;
 
   bool _isLoading = true;
   bool _hasError = false;
   String _errorMessage = '';
   int _currentPage = 1;
   int _pageCount = 0;
+  int? _vaultFileSize;
 
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
@@ -71,62 +75,104 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
   int _searchCurrent = 0;
   int _searchTotal = 0;
 
-  void _onPlatformViewCreated(int id) {
-    if (!mounted) return;
-    final method = MethodChannel('$_kPdfViewerViewType/$id');
-    final events = EventChannel('$_kPdfViewerViewType/events/$id');
-    _eventSub =
-        events.receiveBroadcastStream().listen(_onEvent, onError: (_) {});
-    setState(() => _method = method);
+  MountedContainer? _effectiveContainer;
+  String? _effectivePdfPath;
+  String? _effectiveLocalUri;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveSource();
   }
 
-  void _onEvent(dynamic raw) {
-    if (raw is! Map) return;
-    if (!mounted) return;
-    switch (raw['event']) {
-      case 'documentLoaded':
-        setState(() {
-          _isLoading = false;
-          _hasError = false;
-          _pageCount = (raw['pageCount'] as int?) ?? 0;
-        });
-        break;
-      case 'pageChanged':
-        setState(() {
-          _currentPage = (raw['page'] as int?) ?? 1;
-        });
-        break;
-      case 'error':
+  void _resolveSource() {
+    _effectiveContainer = widget.container;
+    _effectivePdfPath = widget.pdfPath;
+    _effectiveLocalUri = widget.localUri;
+
+    if (_effectiveContainer == null &&
+        _effectivePdfPath == null &&
+        _effectiveLocalUri == null &&
+        widget.creationParams != null) {
+      _effectiveLocalUri = widget.creationParams!['localUri'] as String?;
+      _effectivePdfPath = widget.creationParams!['pdfPath'] as String?;
+    }
+
+    if (_effectiveContainer != null && _effectivePdfPath != null) {
+      _fetchVaultFileSize();
+    } else if (_effectiveLocalUri != null && _effectiveLocalUri!.isNotEmpty) {
+      setState(() {
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _errorMessage = 'No PDF source provided.';
+      });
+    }
+  }
+
+  Future<void> _fetchVaultFileSize() async {
+    try {
+      final size = await vaultExplorerApi.getFileSize(
+        _effectiveContainer!,
+        _effectivePdfPath!,
+      );
+      if (!mounted) return;
+      if (size <= 0) {
         setState(() {
           _isLoading = false;
           _hasError = true;
-          _errorMessage =
-              (raw['message'] as String?) ?? 'Failed to load PDF';
+          _errorMessage = 'PDF file is empty or unreadable.';
         });
-        break;
-      case 'findResult':
-      case 'searchResult':
-        setState(() {
-          _searchCurrent = (raw['activeMatch'] as int?) ??
-              (raw['current'] as int?) ??
-              0;
-          _searchTotal = (raw['numberOfMatches'] as int?) ??
-              (raw['total'] as int?) ??
-              0;
-        });
-        break;
+        return;
+      }
+      setState(() {
+        _vaultFileSize = size;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _hasError = true;
+        _errorMessage = 'Failed to inspect PDF file size: $e';
+      });
     }
+  }
+
+  void _onSearchUpdated() {
+    if (!mounted) return;
+    setState(() {
+      _searchTotal = _textSearcher?.matches.length ?? 0;
+      final idx = _textSearcher?.currentIndex;
+      _searchCurrent = (idx != null && _searchTotal > 0) ? idx + 1 : 0;
+    });
   }
 
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
     final cfg = widget.searchConfig;
+    void executeSearch() {
+      final trimmed = query.trim();
+      if (trimmed.isEmpty) {
+        _textSearcher?.resetTextSearch();
+        if (mounted) {
+          setState(() {
+            _searchCurrent = 0;
+            _searchTotal = 0;
+          });
+        }
+      } else {
+        _textSearcher?.startTextSearch(trimmed, caseInsensitive: true);
+      }
+    }
+
     if (cfg.debounceDuration > Duration.zero) {
-      _searchDebounce = Timer(cfg.debounceDuration, () {
-        unawaited(_method?.invokeMethod(cfg.searchMethod, {'query': query}));
-      });
+      _searchDebounce = Timer(cfg.debounceDuration, executeSearch);
     } else {
-      unawaited(_method?.invokeMethod(cfg.searchMethod, {'query': query}));
+      executeSearch();
     }
   }
 
@@ -138,7 +184,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
   void _stopSearch() {
     _searchDebounce?.cancel();
     _searchController.clear();
-    unawaited(_method?.invokeMethod(widget.searchConfig.clearMethod));
+    _textSearcher?.resetTextSearch();
     setState(() {
       _isSearching = false;
       _searchCurrent = 0;
@@ -147,75 +193,38 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
   }
 
   void _findNext() {
-    final cfg = widget.searchConfig;
-    if (cfg.findPrevMethod == null) {
-      unawaited(_method?.invokeMethod(cfg.findNextMethod, {'forward': true}));
-    } else {
-      unawaited(_method?.invokeMethod(cfg.findNextMethod));
-    }
+    _textSearcher?.goToNextMatch();
   }
 
   void _findPrevious() {
-    final cfg = widget.searchConfig;
-    if (cfg.findPrevMethod == null) {
-      unawaited(_method?.invokeMethod(cfg.findNextMethod, {'forward': false}));
-    } else {
-      unawaited(_method?.invokeMethod(cfg.findPrevMethod!));
-    }
+    _textSearcher?.goToPrevMatch();
   }
 
   Future<void> _showGoToPageDialog() async {
     if (_pageCount <= 0) return;
-    final controller = TextEditingController(text: _currentPage.toString());
-    try {
-      final targetPageStr = await showDialog<String>(
-        context: context,
-        builder: (dialogCtx) => AlertDialog(
-          title: const Text('Go to page'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'Page number (1 - $_pageCount)',
-              labelText: 'Page',
-            ),
-            onSubmitted: (val) => Navigator.of(dialogCtx).pop(val),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(controller.text),
-              child: const Text('Go'),
-            ),
-          ],
-        ),
-      );
-      if (targetPageStr == null || targetPageStr.trim().isEmpty) return;
-      final targetPage = int.tryParse(targetPageStr.trim());
-      if (targetPage != null && targetPage >= 1 && targetPage <= _pageCount) {
-        unawaited(_method?.invokeMethod('goToPage', {'page': targetPage}));
+    final targetPageStr = await showDialog<String>(
+      context: context,
+      builder: (dialogCtx) => _GoToPageDialog(
+        currentPage: _currentPage,
+        pageCount: _pageCount,
+      ),
+    );
+    if (targetPageStr == null || targetPageStr.trim().isEmpty) return;
+    final targetPage = int.tryParse(targetPageStr.trim());
+    if (targetPage != null && targetPage >= 1 && targetPage <= _pageCount) {
+      if (_controller.isReady) {
+        await _controller.goToPage(pageNumber: targetPage);
       }
-    } finally {
-      controller.dispose();
     }
-  }
-
-  Future<void> _printDocument() async {
-    try {
-      await _method?.invokeMethod('printDocument');
-    } catch (_) {}
   }
 
   @override
   void dispose() {
-    _eventSub?.cancel();
     _searchDebounce?.cancel();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _textSearcher?.removeListener(_onSearchUpdated);
+    _textSearcher?.dispose();
     super.dispose();
   }
 
@@ -308,12 +317,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
           tooltip: 'Search',
           onPressed: _startSearch,
         ),
-        IconButton(
-          icon: const Icon(Icons.print_rounded),
-          tooltip: 'Print document',
-          onPressed: _printDocument,
-        ),
-        ...?widget.extraActionsBuilder?.call(_method),
+        ...?widget.extraActionsBuilder?.call(_controller),
       ],
     ];
   }
@@ -338,91 +342,212 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
   }
 
   Widget _buildBody(ColorScheme cs) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: PlatformViewLink(
-            viewType: _kPdfViewerViewType,
-            surfaceFactory: (context, controller) {
-              return AndroidViewSurface(
-                controller: controller as AndroidViewController,
-                gestureRecognizers:
-                    const <Factory<OneSequenceGestureRecognizer>>{},
-                hitTestBehavior: PlatformViewHitTestBehavior.opaque,
-              );
-            },
-            onCreatePlatformView: (PlatformViewCreationParams params) {
-              return PlatformViewsService.initExpensiveAndroidView(
-                id: params.id,
-                viewType: _kPdfViewerViewType,
-                layoutDirection: TextDirection.ltr,
-                creationParams: widget.creationParams,
-                creationParamsCodec: const StandardMessageCodec(),
-                onFocus: () => params.onFocusChanged(true),
-              )
-                ..addOnPlatformViewCreatedListener(
-                    params.onPlatformViewCreated)
-                ..addOnPlatformViewCreatedListener(_onPlatformViewCreated)
-                ..create();
-            },
+    if (_hasError) {
+      return Container(
+        color: cs.surface,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline_rounded,
+                    color: cs.error, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  'Cannot open PDF',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _errorMessage,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: cs.onSurfaceVariant),
+                ),
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  label: const Text('Go back'),
+                ),
+              ],
+            ),
           ),
         ),
-        if (_isLoading)
-          IgnorePointer(
-            child: AnimatedOpacity(
-              opacity: _isLoading ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 200),
-              child: Container(
-                color: cs.surface,
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(strokeWidth: 2.5),
-                      SizedBox(height: 16),
-                      Text('Loading document…'),
-                    ],
-                  ),
+      );
+    }
+
+    if (_isLoading) {
+      return Container(
+        color: cs.surface,
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(strokeWidth: 2.5),
+              SizedBox(height: 16),
+              Text('Loading document…'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final params = PdfViewerParams(
+      pagePaintCallbacks: [
+        (canvas, pageRect, page) {
+          _textSearcher?.pageTextMatchPaintCallback(canvas, pageRect, page);
+        }
+      ],
+      onViewerReady: (document, controller) {
+        if (mounted) {
+          _textSearcher ??= PdfTextSearcher(controller)..addListener(_onSearchUpdated);
+          setState(() {
+            _isLoading = false;
+            _hasError = false;
+            _pageCount = document.pages.length;
+            _currentPage = controller.pageNumber ?? 1;
+          });
+        }
+      },
+      onPageChanged: (pageNumber) {
+        if (mounted && pageNumber != null) {
+          setState(() => _currentPage = pageNumber);
+        }
+      },
+      errorBannerBuilder: (context, error, stackTrace, documentRef) {
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline_rounded,
+                    color: cs.error, size: 48),
+                const SizedBox(height: 16),
+                Text(
+                  'Error loading PDF',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  error.toString(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: cs.onSurfaceVariant),
+                ),
+              ],
             ),
           ),
-        if (_hasError)
-          Container(
-            color: cs.surface,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.error_outline_rounded,
-                        color: cs.error, size: 48),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Cannot open PDF',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _errorMessage,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: cs.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 24),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back_rounded),
-                      label: const Text('Go back'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+        );
+      },
+    );
+
+    if (_effectiveContainer != null && _effectivePdfPath != null && _vaultFileSize != null) {
+      return PdfViewer.custom(
+        fileSize: _vaultFileSize!,
+        read: (buffer, position, size) async {
+          final chunk = await vaultExplorerApi.readFileChunk(
+            _effectiveContainer!,
+            _effectivePdfPath!,
+            position,
+            size,
+          );
+          if (chunk == null || chunk.isEmpty) return 0;
+          buffer.setRange(0, chunk.length, chunk);
+          return chunk.length;
+        },
+        sourceName: _effectivePdfPath!,
+        controller: _controller,
+        params: params,
+      );
+    }
+
+    if (_effectiveLocalUri != null && _effectiveLocalUri!.isNotEmpty) {
+      final uri = Uri.parse(_effectiveLocalUri!);
+      final isSchemeFile = uri.scheme == 'file' || uri.scheme.isEmpty;
+      if (isSchemeFile) {
+        return PdfViewer.file(
+          uri.path,
+          controller: _controller,
+          params: params,
+        );
+      } else {
+        return PdfViewer.uri(
+          uri,
+          controller: _controller,
+          params: params,
+        );
+      }
+    }
+
+    return Container(
+      color: cs.surface,
+      child: const Center(child: Text('No PDF document loaded.')),
+    );
+  }
+}
+
+class _GoToPageDialog extends StatefulWidget {
+  final int currentPage;
+  final int pageCount;
+
+  const _GoToPageDialog({
+    required this.currentPage,
+    required this.pageCount,
+  });
+
+  @override
+  State<_GoToPageDialog> createState() => _GoToPageDialogState();
+}
+
+class _GoToPageDialogState extends State<_GoToPageDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.currentPage.toString());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.of(context).pop(_controller.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Go to page'),
+      content: TextField(
+        controller: _controller,
+        keyboardType: TextInputType.number,
+        autofocus: true,
+        decoration: InputDecoration(
+          hintText: 'Page number (1 - ${widget.pageCount})',
+          labelText: 'Page',
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _submit,
+          child: const Text('Go'),
+        ),
       ],
     );
   }

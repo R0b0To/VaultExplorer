@@ -6,20 +6,17 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 class PdfViewerScreen extends StatefulWidget {
   final MountedContainer container;
   final String filePath;
-
   const PdfViewerScreen({
     super.key,
     required this.container,
     required this.filePath,
   });
-
   @override
   State<PdfViewerScreen> createState() => _PdfViewerScreenState();
 }
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
   bool _isContainerLocked = false;
-
   void _onContainerLockedEvent(int volId) {
     if (volId == widget.container.volId && mounted) {
       setState(() => _isContainerLocked = true);
@@ -43,10 +40,8 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
   @override
   Widget build(BuildContext context) {
     return PdfViewerBase(
-      creationParams: {
-        'volId': widget.container.volId,
-        'pdfPath': widget.filePath,
-      },
+      container: widget.container,
+      pdfPath: widget.filePath,
       title: _fileName,
       isLocked: _isContainerLocked,
     );

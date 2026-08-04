@@ -18,7 +18,7 @@ enum DisguiseMode {
   /// / the vault dashboard.
   vault,
 
-  /// Decoy identity: "Doc Viewer" label/icon, boots into the decoy PDF
+  /// Decoy identity: "PDF Viewer" label/icon, boots into the decoy PDF
   /// reader UI.
   decoy;
 

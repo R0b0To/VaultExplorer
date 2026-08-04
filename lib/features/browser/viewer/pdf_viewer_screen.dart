@@ -3,12 +3,6 @@ import 'package:vaultexplorer/core/widgets/pdf_viewer_base.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
-/// PDF viewer used inside the vault file-browser.
-///
-/// This is a thin wrapper around [PdfViewerBase] that adds vault-specific
-/// behaviour: the native view receives `volId` + `pdfPath` as creation
-/// params, and the screen blacks out when the container is locked
-/// mid-session.
 class PdfViewerScreen extends StatefulWidget {
   final MountedContainer container;
   final String filePath;

@@ -7,33 +7,11 @@ import 'package:flutter/services.dart';
 
 const String _kPdfViewerViewType = 'com.aeidolon.vaultexplorer/pdf_viewer';
 
-// ---------------------------------------------------------------------------
-// Search configuration
-// ---------------------------------------------------------------------------
-
-/// Platform method-name mapping for in-document search.
-///
-/// The vault file-browser viewer and the Discrete Mode decoy reader talk to
-/// the same native `PdfView` but historically used different method names.
-/// This config abstracts over that difference so [PdfViewerBase] stays
-/// caller-agnostic.
 class PdfSearchConfig {
-  /// Method invoked to start or update a text search.
   final String searchMethod;
-
-  /// Method invoked to clear the current search highlights.
   final String clearMethod;
-
-  /// Method invoked to jump to the next match.
   final String findNextMethod;
-
-  /// Method invoked to jump to the previous match.
-  /// When `null`, [findNextMethod] is called with `{'forward': false}`
-  /// instead.
   final String? findPrevMethod;
-
-  /// Duration to debounce search-query changes.
-  /// Use [Duration.zero] to disable debouncing.
   final Duration debounceDuration;
 
   const PdfSearchConfig({
@@ -44,7 +22,6 @@ class PdfSearchConfig {
     this.debounceDuration = const Duration(milliseconds: 300),
   });
 
-  /// Preset matching the decoy reader's native method names.
   const PdfSearchConfig.decoy()
       : searchMethod = 'findInPage',
         clearMethod = 'clearMatches',
@@ -53,42 +30,13 @@ class PdfSearchConfig {
         debounceDuration = Duration.zero;
 }
 
-// ---------------------------------------------------------------------------
-// PdfViewerBase
-// ---------------------------------------------------------------------------
-
-/// A reusable PDF viewer screen backed by the native `PdfView`.
-///
-/// Handles platform-view creation, event handling, in-document search,
-/// go-to-page navigation, and loading / error overlays.  Both the vault
-/// file-browser viewer and the Discrete Mode decoy reader delegate to this
-/// widget, passing in their caller-specific configuration.
 class PdfViewerBase extends StatefulWidget {
-  /// Params forwarded to the native `PdfView` factory via
-  /// [StandardMessageCodec].
   final Map<String, dynamic> creationParams;
-
-  /// Text shown in the app-bar title when not searching.
   final String title;
-
-  /// If `true`, the viewer is replaced by a solid-black [Scaffold]
-  /// (used when the vault container locks mid-session).
   final bool isLocked;
-
-  /// Optional wrapper applied to the title widget
-  /// (e.g. `HiddenVaultTrigger` in the decoy reader).
   final Widget Function(Widget child)? titleBuilder;
-
-  /// Optional wrapper applied to the page-counter chip
-  /// (e.g. `HiddenVaultTrigger` in the decoy reader).
   final Widget Function(Widget child)? pageCounterBuilder;
-
-  /// Extra action buttons appended after search & page-counter in the
-  /// normal (non-search) app-bar.  Receives the current [MethodChannel]
-  /// so callers can wire up platform calls (e.g. print).
   final List<Widget> Function(MethodChannel? method)? extraActionsBuilder;
-
-  /// Platform method-name mapping for in-document search.
   final PdfSearchConfig searchConfig;
 
   const PdfViewerBase({
@@ -123,11 +71,8 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
   int _searchCurrent = 0;
   int _searchTotal = 0;
 
-  // ---------------------------------------------------------------------------
-  // Platform view
-  // ---------------------------------------------------------------------------
-
   void _onPlatformViewCreated(int id) {
+    if (!mounted) return;
     final method = MethodChannel('$_kPdfViewerViewType/$id');
     final events = EventChannel('$_kPdfViewerViewType/events/$id');
     _eventSub =
@@ -145,10 +90,12 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
           _hasError = false;
           _pageCount = (raw['pageCount'] as int?) ?? 0;
         });
+        break;
       case 'pageChanged':
         setState(() {
           _currentPage = (raw['page'] as int?) ?? 1;
         });
+        break;
       case 'error':
         setState(() {
           _isLoading = false;
@@ -156,6 +103,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
           _errorMessage =
               (raw['message'] as String?) ?? 'Failed to load PDF';
         });
+        break;
       case 'findResult':
       case 'searchResult':
         setState(() {
@@ -166,24 +114,19 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
               (raw['total'] as int?) ??
               0;
         });
+        break;
     }
   }
-
-  // ---------------------------------------------------------------------------
-  // Search
-  // ---------------------------------------------------------------------------
 
   void _onSearchChanged(String query) {
     _searchDebounce?.cancel();
     final cfg = widget.searchConfig;
     if (cfg.debounceDuration > Duration.zero) {
       _searchDebounce = Timer(cfg.debounceDuration, () {
-        unawaited(
-            _method?.invokeMethod(cfg.searchMethod, {'query': query}));
+        unawaited(_method?.invokeMethod(cfg.searchMethod, {'query': query}));
       });
     } else {
-      unawaited(
-          _method?.invokeMethod(cfg.searchMethod, {'query': query}));
+      unawaited(_method?.invokeMethod(cfg.searchMethod, {'query': query}));
     }
   }
 
@@ -206,8 +149,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
   void _findNext() {
     final cfg = widget.searchConfig;
     if (cfg.findPrevMethod == null) {
-      unawaited(
-          _method?.invokeMethod(cfg.findNextMethod, {'forward': true}));
+      unawaited(_method?.invokeMethod(cfg.findNextMethod, {'forward': true}));
     } else {
       unawaited(_method?.invokeMethod(cfg.findNextMethod));
     }
@@ -216,50 +158,49 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
   void _findPrevious() {
     final cfg = widget.searchConfig;
     if (cfg.findPrevMethod == null) {
-      unawaited(
-          _method?.invokeMethod(cfg.findNextMethod, {'forward': false}));
+      unawaited(_method?.invokeMethod(cfg.findNextMethod, {'forward': false}));
     } else {
       unawaited(_method?.invokeMethod(cfg.findPrevMethod!));
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Go-to-page
-  // ---------------------------------------------------------------------------
-
   Future<void> _showGoToPageDialog() async {
     if (_pageCount <= 0) return;
     final controller = TextEditingController(text: _currentPage.toString());
-    final targetPageStr = await showDialog<String>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Go to page'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: InputDecoration(
-            hintText: 'Page number (1 - $_pageCount)',
-            labelText: 'Page',
+    try {
+      final targetPageStr = await showDialog<String>(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          title: const Text('Go to page'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Page number (1 - $_pageCount)',
+              labelText: 'Page',
+            ),
+            onSubmitted: (val) => Navigator.of(dialogCtx).pop(val),
           ),
-          onSubmitted: (val) => Navigator.of(dialogCtx).pop(val),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(controller.text),
+              child: const Text('Go'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(controller.text),
-            child: const Text('Go'),
-          ),
-        ],
-      ),
-    );
-    if (targetPageStr == null || targetPageStr.trim().isEmpty) return;
-    final targetPage = int.tryParse(targetPageStr.trim());
-    if (targetPage != null && targetPage >= 1 && targetPage <= _pageCount) {
-      unawaited(_method?.invokeMethod('goToPage', {'page': targetPage}));
+      );
+      if (targetPageStr == null || targetPageStr.trim().isEmpty) return;
+      final targetPage = int.tryParse(targetPageStr.trim());
+      if (targetPage != null && targetPage >= 1 && targetPage <= _pageCount) {
+        unawaited(_method?.invokeMethod('goToPage', {'page': targetPage}));
+      }
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -268,10 +209,6 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
       await _method?.invokeMethod('printDocument');
     } catch (_) {}
   }
-
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
 
   @override
   void dispose() {
@@ -282,10 +219,6 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-  // Build
-  // ---------------------------------------------------------------------------
-
   @override
   Widget build(BuildContext context) {
     if (widget.isLocked) {
@@ -294,9 +227,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
         body: SizedBox.expand(),
       );
     }
-
     final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: _isSearching ? _buildSearchField(cs) : _buildTitle(),

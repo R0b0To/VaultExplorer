@@ -411,7 +411,7 @@ Via the same channel's method-call handler in reverse — see
 ## 7. Discrete Mode
 
 A presentation-layer disguise: the Android launcher shows either the real
-"Vault Explorer" identity or an innocuous "Doc Viewer" identity, determined
+"Vault Explorer" identity or an innocuous "PDF Viewer" identity, determined
 by which of two `activity-alias` components is currently enabled (§2.9).
 Both aliases target the same `MainActivity` — this is never a second
 process, a second Activity class, or a second copy of the Flutter engine,

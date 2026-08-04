@@ -63,23 +63,24 @@ class PdfViewerView(
     private var eventSink: EventChannel.EventSink? = null
     private val mainHandler   = Handler(Looper.getMainLooper())
 
-    private var pendingEvent: Map<String, Any?>? = null
+    // A single nullable slot here would silently drop any event that arrives before
+    // this one, e.g. a fast "documentLoaded" immediately followed by "pageChanged"
+    // while Dart is still attaching its listener. Queue instead, so every event that
+    // fires before onListen still reaches the Dart side once it attaches.
+    private val pendingEvents = ArrayDeque<Map<String, Any?>>()
     private var isViewerLoaded = false
 
     init {
         if (0 != (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)) {
-        WebView.setWebContentsDebuggingEnabled(true)
-    }
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
         methodChannel.setMethodCallHandler(this)
         eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
                 eventSink = sink
-                // Flush any event that fired before Flutter attached its listener
-                pendingEvent?.let { evt ->
-                    eventSink?.success(evt)
-                    pendingEvent = null
+                while (pendingEvents.isNotEmpty()) {
+                    sink.success(pendingEvents.removeFirst())
                 }
-                // Defer loadViewer until Flutter is actively listening to events
                 if (!isViewerLoaded) {
                     isViewerLoaded = true
                     loadViewer()
@@ -95,7 +96,7 @@ class PdfViewerView(
             ViewGroup.LayoutParams.MATCH_PARENT
         )
 
-       with(webView.settings) {
+        with(webView.settings) {
             javaScriptEnabled                = true
             domStorageEnabled                = true
             databaseEnabled                  = false
@@ -114,6 +115,7 @@ class PdfViewerView(
             textZoom                         = 100
             minimumFontSize                  = 1
             minimumLogicalFontSize           = 1
+            layoutAlgorithm                  = WebSettings.LayoutAlgorithm.NORMAL
             useWideViewPort                  = false
             loadWithOverviewMode             = false
         }
@@ -129,7 +131,7 @@ class PdfViewerView(
             if (sink != null) {
                 sink.success(evt)
             } else {
-                pendingEvent = evt
+                pendingEvents.addLast(evt)
             }
         }
     }
@@ -145,7 +147,10 @@ class PdfViewerView(
 
     private fun loadViewer() {
         val targetUri = when {
-            localUri.isNotEmpty() -> Uri.parse(localUri)
+            localUri.isNotEmpty() -> Uri.Builder()
+                .scheme("https").authority(VAULT_HOST)
+                .appendPath("_local")
+                .build()
             pdfPath.isNotEmpty()  -> buildVaultUri(pdfPath)
             else                  -> return
         }
@@ -178,6 +183,24 @@ class PdfViewerView(
                         it.responseHeaders = mapOf(
                             "Cache-Control"                to "no-store",
                             "Access-Control-Allow-Origin"  to "*",
+                        )
+                    }
+                } catch (_: Exception) { notFoundResponse() }
+            }
+
+            if (segments[0] == "_local") {
+                if (localUri.isEmpty()) return notFoundResponse()
+                return try {
+                    val uriToOpen = Uri.parse(localUri)
+                    val stream = if (localUri.startsWith("content://") || localUri.startsWith("file://")) {
+                        context.contentResolver.openInputStream(uriToOpen)
+                    } else {
+                        java.io.FileInputStream(java.io.File(localUri))
+                    } ?: return notFoundResponse()
+                    WebResourceResponse("application/pdf", null, stream).also {
+                        it.responseHeaders = mapOf(
+                            "Cache-Control"               to "no-store",
+                            "Access-Control-Allow-Origin" to "*",
                         )
                     }
                 } catch (_: Exception) { notFoundResponse() }
@@ -238,6 +261,7 @@ class PdfViewerView(
         path.endsWith(".html")                        -> "text/html"
         path.endsWith(".css")                         -> "text/css"
         path.endsWith(".js") || path.endsWith(".mjs") -> "text/javascript"
+        path.endsWith(".ttf") || path.endsWith(".otf")-> "font/sfnt"
         else                                          -> "application/octet-stream"
     }
 
@@ -332,6 +356,7 @@ class PdfViewerView(
     override fun dispose() {
         methodChannel.setMethodCallHandler(null)
         eventChannel.setStreamHandler(null)
+        pendingEvents.clear()
         webView.removeJavascriptInterface("VaultPdfViewer")
         webView.webViewClient = object : WebViewClient() {}
         webView.stopLoading()

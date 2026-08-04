@@ -1,36 +1,50 @@
-/* ── Reset ─────────────────────────────────────────────────────────── */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body {
-  width: 100%; height: 100%;
+  width: 100%;
+  height: 100%;
   background: #525659;
   overflow: hidden;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
+  -webkit-text-size-adjust: none !important;
+  text-size-adjust: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
-/* ── Scroll container ─────────────────────────────────────────────── */
 #viewer {
-  width: 100%; height: 100%;
-  overflow-y: auto; overflow-x: auto;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden !important; /* Prevents horizontal view shifts when dragging selection handles */
   -webkit-overflow-scrolling: touch;
-  display: flex; flex-direction: column;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px; padding: 8px 0;
+  gap: 8px;
+  padding: 8px 0;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
-/* ── Per-page wrapper ─────────────────────────────────────────────── */
 .page-container {
   position: relative;
   background: #fff;
   box-shadow: 0 2px 8px rgba(0,0,0,.3);
-  line-height: 0;
   flex-shrink: 0;
   overflow: hidden;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
-.page-container canvas { display: block; }
 
-/* ── pdf.js text-layer (transparent overlay for selection) ────────── */
+.page-container canvas {
+  display: block;
+  pointer-events: none !important;
+}
+
+:root {
+  --text-layer-foreground: transparent;
+}
+
 .textLayer, .textLayer * {
   box-sizing: content-box !important;
 }
@@ -39,49 +53,98 @@ html, body {
   position: absolute;
   text-align: initial;
   left: 0; top: 0; right: 0; bottom: 0;
-  overflow: hidden; opacity: 1;
+  overflow: hidden;
+  opacity: 1;
   line-height: 1;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  text-size-adjust: none !important;
+  -webkit-text-size-adjust: none !important;
   forced-color-adjust: none;
-  transform-origin: 0 0;
+  caret-color: CanvasText;
   z-index: 2;
   pointer-events: auto;
-  user-select: text;
-  -webkit-user-select: text;
+  user-select: none !important;
+  -webkit-user-select: none !important;
   --scale-factor: 1;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
 }
 
-/* Use direct child selectors (>) so inner highlight spans don't inherit absolute positioning */
-.textLayer > span,
-.textLayer > br {
-  color: transparent;
+.textLayer.selecting {
+  touch-action: none !important; /* Disables WebKit touch panning while dragging selection handles */
+}
+
+.textLayer :is(span, br) {
+  color: var(--text-layer-foreground);
   position: absolute;
   white-space: pre;
   cursor: text;
   transform-origin: 0% 0%;
   pointer-events: auto;
-  /* Consume PDF.js CSS custom properties for text scaling and alignment */
-  font-size: calc(var(--font-height) * var(--scale-factor, 1));
-  transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1));
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  letter-spacing: 0px !important;
+  word-spacing: 0px !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
-.textLayer span.markedContent { top: 0; height: 0; }
-.textLayer ::selection        { background: rgba(0, 100, 200, 0.35); color: transparent; }
-.textLayer ::-moz-selection   { background: rgba(0, 100, 200, 0.35); color: transparent; }
-.textLayer br::selection      { background: transparent; }
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+
+.textLayer ::selection {
+  background: rgba(0, 100, 200, 0.35) !important;
+  color: transparent !important;
+}
+
+.textLayer br::selection {
+  background: transparent !important;
+}
 
 .textLayer .endOfContent {
-  display: block; position: absolute;
-  inset: 100% 0 0; z-index: -1;
-  cursor: default; user-select: none;
-  pointer-events: none;
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  pointer-events: none !important;
 }
-.textLayer .endOfContent.active { top: 0; }
 
-/* ── Search results ─────────────────────────────────────────────────
-   Highlight spans must inherit scaleX transform from parent span 
-   so the background box matches compressed text */
+.textLayer.selecting .endOfContent {
+  top: 0 !important;
+  bottom: 0 !important;
+  z-index: 10 !important;
+}
+
+/* ── Native CSS Custom Highlights (No DOM Mutation) ───────────────── */
+::highlight(pdf-search-highlight) {
+  background-color: rgba(255, 223, 0, 0.65);
+  color: transparent;
+}
+
+::highlight(pdf-search-selected) {
+  background-color: rgba(255, 140, 0, 0.95);
+  color: transparent;
+}
+
+/* Fallback DOM Search Highlights */
 .textLayer .pdf-search-highlight {
   position: static !important;
   display: inline !important;
@@ -90,11 +153,11 @@ html, body {
   border-radius: 2px !important;
 }
 
-.textLayer .pdf-search-highlight.current {
-  background-color: rgba(255, 140, 0, 0.492) !important;
+.textLayer .pdf-search-highlight.selected {
+  background-color: rgba(255, 140, 0, 0.95) !important;
 }
 
-/* ── Loading overlay ──────────────────────────────────────────────── */
+/* ── Overlays ──────────────────────────────────────────────────────── */
 #loading-overlay {
   position: fixed; inset: 0;
   display: flex; flex-direction: column;
@@ -117,13 +180,11 @@ html, body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Error state ──────────────────────────────────────────────────── */
 #error {
   display: none; position: fixed; inset: 0;
   flex-direction: column;
   align-items: center; justify-content: center;
-  background: #525659;
-  color: rgba(255,255,255,.8);
+  background: #525659; color: #fff;
   font-family: sans-serif; z-index: 100;
 }
 #error.visible { display: flex; }

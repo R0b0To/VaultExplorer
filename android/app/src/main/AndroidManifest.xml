@@ -14,10 +14,10 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
-        android:label="@string/decoy_app_name"
+        android:label="@string/app_name"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher_pdf"
-        android:roundIcon="@mipmap/ic_launcher_pdf"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
@@ -76,7 +76,7 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- "Open with Doc Viewer" from a file manager or another app -->
+            <!-- "Open with PDF Viewer" from a file manager or another app -->
             <intent-filter
                 android:label="@string/decoy_app_name"
                 android:icon="@mipmap/ic_launcher_pdf"
@@ -88,7 +88,7 @@
                 <data android:scheme="content"/>
                 <data android:mimeType="application/pdf"/>
             </intent-filter>
-            <!-- "Share -> Doc Viewer" for a PDF from another app -->
+            <!-- "Share -> PDF Viewer" for a PDF from another app -->
             <intent-filter
                 android:label="@string/decoy_app_name"
                 android:icon="@mipmap/ic_launcher_pdf"

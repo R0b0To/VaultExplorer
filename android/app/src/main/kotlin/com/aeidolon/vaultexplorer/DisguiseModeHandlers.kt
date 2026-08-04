@@ -36,7 +36,7 @@ internal object DisguiseMode {
 
 /**
  * Discrete Mode: launcher-alias switching (real "Vault Explorer" identity
- * vs. decoy "Doc Viewer" identity) and the decoy reader's own local-file
+ * vs. decoy "PDF Viewer" identity) and the decoy reader's own local-file
  * picker.
  *
  * Ownership rule (docs/architecture.md §2.9): exactly one of
@@ -170,16 +170,17 @@ class DisguiseModeHandlers(
             // docs/architecture.md). This call only ever changes how the
             // *launcher* presents the app; the running Activity/engine
             // instance must be left alone.
+            val targetAlias = if (enableDecoy) ALIAS_DECOY else ALIAS_VAULT
+            val oldAlias    = if (enableDecoy) ALIAS_VAULT else ALIAS_DECOY
+
             pm.setComponentEnabledSetting(
-                aliasComponent(ALIAS_VAULT),
-                if (enableDecoy) PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                else PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                aliasComponent(targetAlias),
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                 PackageManager.DONT_KILL_APP,
             )
             pm.setComponentEnabledSetting(
-                aliasComponent(ALIAS_DECOY),
-                if (enableDecoy) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                aliasComponent(oldAlias),
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                 PackageManager.DONT_KILL_APP,
             )
             updateActivityIdentity()

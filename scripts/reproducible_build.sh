@@ -91,7 +91,6 @@ echo "Target             : $FLAVOR ($TARGET_PLATFORM / $TARGET_ABI)"
 echo "Working directory   : $(pwd)"
 java -version
 run_flutter flutter --version
-node --version 2>/dev/null || echo "node: not on PATH (fine if assets/pdfjs is already built)"
 echo "========================================================"
 
 # Container Safeguard 3: Point Flutter at Android SDK if defined

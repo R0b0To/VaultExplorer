@@ -1,6 +1,5 @@
 Categories:
-  - Security
-  - System
+  - File Encryption & Vault
 License: GPL-3.0-or-later
 AuthorName: R0b0To
 AuthorEmail: Aeidolon@proton.me
@@ -16,73 +15,66 @@ Repo: https://github.com/R0b0To/VaultExplorer.git
 Builds:
   - versionName: 1.0.1
     versionCode: 201
-    commit: 1b31f083b5c7c16bcd7aad36c4b457f014034584
+    commit: 5824e4561991549c41a2b602b1c795e3a9431c7c
     subdir: android
-    sudo:
-      - apt-get update
-      - apt-get install -y ca-certificates curl gnupg
-      - mkdir -p /etc/apt/keyrings
-      - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg
-        --dearmor -o /etc/apt/keyrings/nodesource.gpg
-      - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x
-        nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
-      - apt-get update
-      - apt-get install -y nodejs
     output: build/app/outputs/flutter-apk/app-arm64-release.apk
+    binary: 
+      https://github.com/R0b0To/VaultExplorer/releases/download/v%v/VaultExplorer-v%v-arm64.apk
     srclibs:
-      - flutter@3.44.0
+      - flutter@stable
+    prebuild:
+      - flutterVersion=$(sed -n -E "s/.*flutter-version:\ '(.*)'/\1/p" ../.github/workflows/build-release.yml)
+      - '[[ $flutterVersion ]]'
+      - git -C $$flutter$$ checkout -f $flutterVersion
     build:
       - export PATH="$$flutter$$/bin:$PATH"
-      - cd .. && bash ./scripts/reproducible_build.sh arm64
-    binary: https://github.com/R0b0To/VaultExplorer/releases/download/v%v/vaultexplorer-%v-arm64.apk
-    ndk: r28
+      - cd ..
+      - bash ./scripts/reproducible_build.sh arm64
+      - mkdir -p android/build/app/outputs/flutter-apk
+      - cp build/app/outputs/flutter-apk/app-arm64-release.apk android/build/app/outputs/flutter-apk/app-arm64-release.apk
+    ndk: r28c
 
   - versionName: 1.0.1
     versionCode: 202
-    commit: 1b31f083b5c7c16bcd7aad36c4b457f014034584
+    commit: 5824e4561991549c41a2b602b1c795e3a9431c7c
     subdir: android
-    sudo:
-      - apt-get update
-      - apt-get install -y ca-certificates curl gnupg
-      - mkdir -p /etc/apt/keyrings
-      - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg
-        --dearmor -o /etc/apt/keyrings/nodesource.gpg
-      - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x
-        nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
-      - apt-get update
-      - apt-get install -y nodejs
     output: build/app/outputs/flutter-apk/app-armeabi-release.apk
+    binary: 
+      https://github.com/R0b0To/VaultExplorer/releases/download/v%v/VaultExplorer-v%v-armeabi.apk
     srclibs:
-      - flutter@3.44.0
+      - flutter@stable
+    prebuild:
+      - flutterVersion=$(sed -n -E "s/.*flutter-version:\ '(.*)'/\1/p" ../.github/workflows/build-release.yml)
+      - '[[ $flutterVersion ]]'
+      - git -C $$flutter$$ checkout -f $flutterVersion
     build:
       - export PATH="$$flutter$$/bin:$PATH"
-      - cd .. && bash ./scripts/reproducible_build.sh armeabi
-    binary: https://github.com/R0b0To/VaultExplorer/releases/download/v%v/vaultexplorer-%v-armeabi.apk
-    ndk: r28
+      - cd ..
+      - bash ./scripts/reproducible_build.sh armeabi
+      - mkdir -p android/build/app/outputs/flutter-apk
+      - cp build/app/outputs/flutter-apk/app-armeabi-release.apk android/build/app/outputs/flutter-apk/app-armeabi-release.apk
+    ndk: r28c
 
   - versionName: 1.0.1
     versionCode: 203
-    commit: 1b31f083b5c7c16bcd7aad36c4b457f014034584
+    commit: 5824e4561991549c41a2b602b1c795e3a9431c7c
     subdir: android
-    sudo:
-      - apt-get update
-      - apt-get install -y ca-certificates curl gnupg
-      - mkdir -p /etc/apt/keyrings
-      - curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg
-        --dearmor -o /etc/apt/keyrings/nodesource.gpg
-      - echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x
-        nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
-      - apt-get update
-      - apt-get install -y nodejs
     output: build/app/outputs/flutter-apk/app-x64-release.apk
+    binary: 
+      https://github.com/R0b0To/VaultExplorer/releases/download/v%v/VaultExplorer-v%v-x64.apk
     srclibs:
-      - flutter@3.44.0
+      - flutter@stable
+    prebuild:
+      - flutterVersion=$(sed -n -E "s/.*flutter-version:\ '(.*)'/\1/p" ../.github/workflows/build-release.yml)
+      - '[[ $flutterVersion ]]'
+      - git -C $$flutter$$ checkout -f $flutterVersion
     build:
       - export PATH="$$flutter$$/bin:$PATH"
-      - cd .. && bash ./scripts/reproducible_build.sh x64
-    binary: https://github.com/R0b0To/VaultExplorer/releases/download/v%v/vaultexplorer-%v-x64.apk
-    ndk: r28
-
+      - cd ..
+      - bash ./scripts/reproducible_build.sh x64
+      - mkdir -p android/build/app/outputs/flutter-apk
+      - cp build/app/outputs/flutter-apk/app-x64-release.apk android/build/app/outputs/flutter-apk/app-x64-release.apk
+    ndk: r28c
 
 AllowedAPKSigningKeys: 0bde9d3b0ee3f56617d02632c843b1629bf0b2faa4560dff5d26f651dc325f19
 

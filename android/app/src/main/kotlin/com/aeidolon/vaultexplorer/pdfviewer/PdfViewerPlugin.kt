@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -30,15 +31,8 @@ import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.FileNotFoundException
 
-/** viewType used to register this platform view with Flutter. */
 const val PDF_VIEWER_VIEW_TYPE = "com.aeidolon.vaultexplorer/pdf_viewer"
-
-/** First path segment that signals "serve from Android assets/pdfjs/". */
 private const val PDFJS_ASSET_PREFIX = "_pdfjs"
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Factory
-// ─────────────────────────────────────────────────────────────────────────────
 
 class PdfViewerViewFactory(
     private val messenger: BinaryMessenger,
@@ -48,13 +42,10 @@ class PdfViewerViewFactory(
         val params = args as? Map<String, Any?> ?: emptyMap<String, Any?>()
         val volId   = (params["volId"]   as? Number)?.toInt() ?: -1
         val pdfPath = params["pdfPath"]  as? String ?: ""
-        return PdfViewerView(context, messenger, viewId, volId, pdfPath)
+        val localUri = params["localUri"] as? String ?: ""
+        return PdfViewerView(context, messenger, viewId, volId, pdfPath, localUri)
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Platform view
-// ─────────────────────────────────────────────────────────────────────────────
 
 @SuppressLint("SetJavaScriptEnabled")
 class PdfViewerView(
@@ -63,6 +54,7 @@ class PdfViewerView(
     viewId: Int,
     private val volId: Int,
     private val pdfPath: String,
+    private val localUri: String = "",
 ) : PlatformView, MethodChannel.MethodCallHandler {
 
     private val webView       = WebView(context)
@@ -71,22 +63,47 @@ class PdfViewerView(
     private var eventSink: EventChannel.EventSink? = null
     private val mainHandler   = Handler(Looper.getMainLooper())
 
+    private var pendingEvent: Map<String, Any?>? = null
+    private var isViewerLoaded = false
+
     init {
+        if (0 != (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)) {
+        WebView.setWebContentsDebuggingEnabled(true)
+    }
         methodChannel.setMethodCallHandler(this)
         eventChannel.setStreamHandler(object : EventChannel.StreamHandler {
-            override fun onListen(arguments: Any?, sink: EventChannel.EventSink) { eventSink = sink }
-            override fun onCancel(arguments: Any?) { eventSink = null }
+            override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
+                eventSink = sink
+                // Flush any event that fired before Flutter attached its listener
+                pendingEvent?.let { evt ->
+                    eventSink?.success(evt)
+                    pendingEvent = null
+                }
+                // Defer loadViewer until Flutter is actively listening to events
+                if (!isViewerLoaded) {
+                    isViewerLoaded = true
+                    loadViewer()
+                }
+            }
+            override fun onCancel(arguments: Any?) {
+                eventSink = null
+            }
         })
 
-        with(webView.settings) {
-            javaScriptEnabled                = true   // required by pdf.js
+        webView.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
+
+       with(webView.settings) {
+            javaScriptEnabled                = true
             domStorageEnabled                = true
             databaseEnabled                  = false
             allowFileAccess                  = false
             allowContentAccess               = false
             allowFileAccessFromFileURLs      = false
             allowUniversalAccessFromFileURLs = false
-            blockNetworkLoads                = true   // hard OS backstop
+            blockNetworkLoads                = true
             cacheMode                        = WebSettings.LOAD_NO_CACHE
             setGeolocationEnabled(false)
             setSupportZoom(true)
@@ -94,16 +111,28 @@ class PdfViewerView(
             displayZoomControls              = false
             mixedContentMode                 = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             mediaPlaybackRequiresUserGesture = true
+            textZoom                         = 100
+            minimumFontSize                  = 1
+            minimumLogicalFontSize           = 1
+            useWideViewPort                  = false
+            loadWithOverviewMode             = false
         }
 
         webView.addJavascriptInterface(JsBridge(), "VaultPdfViewer")
-        webView.webViewClient  = PdfWebViewClient()
+        webView.webViewClient   = PdfWebViewClient()
         webView.webChromeClient = WebChromeClient()
-
-        loadViewer()
     }
 
-    // ── URL helpers ──────────────────────────────────────────────────────────
+    private fun sendEvent(evt: Map<String, Any?>) {
+        mainHandler.post {
+            val sink = eventSink
+            if (sink != null) {
+                sink.success(evt)
+            } else {
+                pendingEvent = evt
+            }
+        }
+    }
 
     private fun buildVaultUri(fatPath: String): Uri {
         val builder = Uri.Builder().scheme("https").authority(VAULT_HOST)
@@ -115,21 +144,21 @@ class PdfViewerView(
     }
 
     private fun loadViewer() {
-        if (pdfPath.isEmpty()) return
-        val pdfUri    = buildVaultUri(pdfPath)
+        val targetUri = when {
+            localUri.isNotEmpty() -> Uri.parse(localUri)
+            pdfPath.isNotEmpty()  -> buildVaultUri(pdfPath)
+            else                  -> return
+        }
         val viewerUri = Uri.Builder()
             .scheme("https").authority(VAULT_HOST)
             .appendPath(PDFJS_ASSET_PREFIX)
             .appendPath("viewer.html")
-            .appendQueryParameter("url", pdfUri.toString())
+            .appendQueryParameter("url", targetUri.toString())
             .build()
         webView.loadUrl(viewerUri.toString())
     }
 
-    // ── WebViewClient ────────────────────────────────────────────────────────
-
     private inner class PdfWebViewClient : WebViewClient() {
-
         override fun shouldInterceptRequest(
             view: WebView,
             request: WebResourceRequest,
@@ -140,7 +169,6 @@ class PdfViewerView(
             val segments = uri.pathSegments
             if (segments.isEmpty()) return blockedResponse()
 
-            // ── pdf.js assets (served from android assets/pdfjs/) ────────
             if (segments[0] == PDFJS_ASSET_PREFIX) {
                 val assetPath = "pdfjs/" + segments.drop(1).joinToString("/")
                 return try {
@@ -155,7 +183,6 @@ class PdfViewerView(
                 } catch (_: Exception) { notFoundResponse() }
             }
 
-            // ── vault file ───────────────────────────────────────────────
             val requestVolId = segments[0].toIntOrNull()
             if (requestVolId != volId || !ContainerSessionRegistry.isUnlocked(volId)) {
                 return blockedResponse()
@@ -189,13 +216,11 @@ class PdfViewerView(
             error: WebResourceError,
         ) {
             if (request.isForMainFrame) {
-                mainHandler.post {
-                    eventSink?.success(mapOf(
-                        "event"   to "error",
-                        "message" to (error.description?.toString()
-                            ?: "Failed to load PDF viewer"),
-                    ))
-                }
+                sendEvent(mapOf(
+                    "event"   to "error",
+                    "message" to (error.description?.toString()
+                        ?: "Failed to load PDF viewer"),
+                ))
             }
         }
 
@@ -210,59 +235,49 @@ class PdfViewerView(
     }
 
     private fun mimeForAsset(path: String): String = when {
-        path.endsWith(".html")                       -> "text/html"
-        path.endsWith(".css")                        -> "text/css"
+        path.endsWith(".html")                        -> "text/html"
+        path.endsWith(".css")                         -> "text/css"
         path.endsWith(".js") || path.endsWith(".mjs") -> "text/javascript"
-        else                                         -> "application/octet-stream"
+        else                                          -> "application/octet-stream"
     }
-
-    // ── JavaScript → Native bridge ───────────────────────────────────────────
 
     @Suppress("unused")
     inner class JsBridge {
         @JavascriptInterface
         fun onDocumentLoaded(pageCount: Int) {
-            mainHandler.post {
-                eventSink?.success(mapOf(
-                    "event"     to "documentLoaded",
-                    "pageCount" to pageCount,
-                ))
-            }
+            sendEvent(mapOf(
+                "event"     to "documentLoaded",
+                "pageCount" to pageCount,
+            ))
         }
 
         @JavascriptInterface
         fun onPageChanged(page: Int) {
-            mainHandler.post {
-                eventSink?.success(mapOf(
-                    "event" to "pageChanged",
-                    "page"  to page,
-                ))
-            }
+            sendEvent(mapOf(
+                "event" to "pageChanged",
+                "page"  to page,
+            ))
         }
 
         @JavascriptInterface
         fun onError(message: String) {
-            mainHandler.post {
-                eventSink?.success(mapOf(
-                    "event"   to "error",
-                    "message" to message,
-                ))
-            }
+            sendEvent(mapOf(
+                "event"   to "error",
+                "message" to message,
+            ))
         }
 
         @JavascriptInterface
         fun onSearchResult(current: Int, total: Int) {
-            mainHandler.post {
-                eventSink?.success(mapOf(
-                    "event"   to "searchResult",
-                    "current" to current,
-                    "total"   to total,
-                ))
-            }
+            sendEvent(mapOf(
+                "event"           to "findResult",
+                "activeMatch"     to current,
+                "numberOfMatches" to total,
+                "current"         to current,
+                "total"           to total,
+            ))
         }
     }
-
-    // ── Dart → WebView method calls ──────────────────────────────────────────
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -271,32 +286,46 @@ class PdfViewerView(
                 webView.evaluateJavascript("goToPage($page)", null)
                 result.success(null)
             }
-            "search" -> {
+            "search", "findInPage" -> {
                 val query = call.argument<String>("query") ?: ""
-                // JSONObject.quote produces a safely-escaped JS/JSON string
-                // literal (handles quotes, backslashes, newlines in query).
                 webView.evaluateJavascript(
                     "window.searchText(${JSONObject.quote(query)})", null,
                 )
                 result.success(null)
             }
             "findNext" -> {
-                webView.evaluateJavascript("window.findNext()", null)
+                val forward = call.argument<Boolean>("forward") ?: true
+                if (forward) {
+                    webView.evaluateJavascript("window.findNext()", null)
+                } else {
+                    webView.evaluateJavascript("window.findPrevious()", null)
+                }
                 result.success(null)
             }
             "findPrevious" -> {
                 webView.evaluateJavascript("window.findPrevious()", null)
                 result.success(null)
             }
-            "clearSearch" -> {
+            "clearSearch", "clearMatches" -> {
                 webView.evaluateJavascript("window.clearSearch()", null)
                 result.success(null)
+            }
+            "printDocument" -> {
+                try {
+                    val printManager = context.getSystemService(Context.PRINT_SERVICE) as? android.print.PrintManager
+                    if (printManager != null) {
+                        val jobName = "PDF_Document_${System.currentTimeMillis()}"
+                        val printAdapter = webView.createPrintDocumentAdapter(jobName)
+                        printManager.print(jobName, printAdapter, null)
+                    }
+                    result.success(null)
+                } catch (e: Exception) {
+                    result.error("PRINT_ERROR", e.message, null)
+                }
             }
             else -> result.notImplemented()
         }
     }
-
-    // ── Lifecycle ────────────────────────────────────────────────────────────
 
     override fun getView(): View = webView
 

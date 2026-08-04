@@ -8,8 +8,11 @@ on:
 
 jobs:
   build:
-    name: Build Signed APK
+    name: Build Signed APK (${{ matrix.flavor }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        flavor: [arm64, armeabi, x64]
     permissions:
       contents: write
 
@@ -25,7 +28,6 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # ── Install Android NDK r28c (28.2.13676358) ────────────────────────
       - name: Install Android NDK r28c
         run: |
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -37,7 +39,6 @@ jobs:
         with:
           flutter-version: '3.44.0'
           cache: true
-
 
       - name: Decode keystore
         run: |
@@ -52,31 +53,40 @@ jobs:
           storeFile=release.keystore
           EOF
 
-      - name: Build release APKs (arm64, armeabi, x64)
-        run: |
-          for flavor in arm64 armeabi x64; do
-            bash ./scripts/reproducible_build.sh "$flavor"
-          done
+      - name: Build release APK (${{ matrix.flavor }})
+        run: bash ./scripts/reproducible_build.sh "${{ matrix.flavor }}"
 
-      - name: Rename build outputs
+      - name: Rename build output
         run: |
           VERSION=$(grep '^version:' pubspec.yaml | sed 's/^version: //' | cut -d'+' -f1)
           echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
           mkdir -p release-apk
-          for flavor in arm64 armeabi x64; do
-            cp "build/app/outputs/flutter-apk/app-${flavor}-release.apk" \
-               "release-apk/VaultExplorer-v${VERSION}-${flavor}.apk"
-          done
+          cp "build/app/outputs/flutter-apk/app-${{ matrix.flavor }}-release.apk" \
+             "release-apk/VaultExplorer-v${VERSION}-${{ matrix.flavor }}.apk"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VaultExplorer-${{ env.APP_VERSION }}-APK
+          name: VaultExplorer-${{ matrix.flavor }}-APK
           path: release-apk/*.apk
           retention-days: 30
 
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-apk
+          pattern: VaultExplorer-*-APK
+          merge-multiple: true
+
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: VaultExplorer ${{ github.ref_name }}

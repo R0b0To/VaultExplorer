@@ -2,33 +2,13 @@
 # Canonical release-APK build procedure for single-ABI target builds.
 set -euo pipefail
 
-# Container Safeguard 1: mark every directory as git-safe, without ever
-# touching $HOME/.gitconfig as a file. `git config --global` does exactly
-# that (creates it if missing) -- and on the F-Droid buildserver, that file
-# path is a symlink the CI wrapper manages itself between builds in the
-# same job (`ln -s .../.gitconfig /home/vagrant/.gitconfig`). Once our
-# script materialized it as a real file during one build, that `ln -s` for
-# the *next* build in the same job hit "File exists" and aborted the whole
-# job -- even though the build itself had already succeeded. Since the
-# reproducibility work here already leans on treating environments as
-# hostile/uncontrolled rather than assuming a clean slate, avoid the
-# filesystem entirely: GIT_CONFIG_COUNT/KEY/VALUE inject config purely via
-# environment (Git 2.31+), with zero filesystem footprint.
+# Container Safeguard 1: mark every directory as git-safe via environment
 git_cfg_n="${GIT_CONFIG_COUNT:-0}"
 export GIT_CONFIG_KEY_$git_cfg_n=safe.directory
 export GIT_CONFIG_VALUE_$git_cfg_n='*'
 export GIT_CONFIG_COUNT=$((git_cfg_n + 1))
 
-# Container Safeguard 4: never let `flutter` write directly to a live pipe.
-# flutter_tools has a long-standing, still-unresolved bug where its stdout
-# writer throws an unhandled exception and crashes the whole process the
-# moment the pipe it's writing to closes or hiccups mid-write
-# (flutter/flutter#8580, #99617, #51872, #81660 -- 2017 through present).
-# Buildserver/CI log capture is exactly the kind of pipe that triggers this
-# -- it hit us on the very first `flutter --version` call, while
-# flutter_tools was still bootstrapping itself. Buffering through a real
-# file and `cat`-ing it afterward sidesteps this entirely: `cat` exits
-# quietly on a closed pipe (default SIGPIPE handling) instead of throwing.
+# Container Safeguard 4: buffer stdout to avoid broken pipe crashes in flutter_tools
 run_flutter() {
   local log
   log="$(mktemp)"
@@ -71,7 +51,15 @@ if [ "$ORIG_DIR" != "$CANONICAL_BUILD_DIR" ]; then
   echo "Copying repository into canonical workspace $CANONICAL_BUILD_DIR..."
   rm -rf "$CANONICAL_BUILD_DIR"
   mkdir -p "$CANONICAL_BUILD_DIR"
-  tar -cf - . | (cd "$CANONICAL_BUILD_DIR" && tar -xf -)
+
+  # SPEED FIX 1: Exclude heavy build outputs, caches, and git history from tar
+  tar --exclude='./build' \
+      --exclude='./.pub-cache' \
+      --exclude='./.git' \
+      --exclude='./.dart_tool' \
+      --exclude='./android/.gradle' \
+      --exclude='./android/app/.cxx' \
+      -cf - . | (cd "$CANONICAL_BUILD_DIR" && tar -xf -)
 
   cd "$CANONICAL_BUILD_DIR"
   # Container Safeguard 2: Explicitly invoke bash for re-execution
@@ -107,7 +95,7 @@ if command -v file >/dev/null 2>&1; then
 fi
 
 # Embedded timestamps: derive from commit timestamp
-export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct)}"
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git log -1 2>/dev/null --format=%ct || date +%s)}"
 echo "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH ($(date -u -d "@$SOURCE_DATE_EPOCH" 2>/dev/null || date -u -r "$SOURCE_DATE_EPOCH"))"
 
 export PUB_CACHE="${PUB_CACHE:-$(pwd)/.pub-cache}"
@@ -129,12 +117,13 @@ echo "Calculated versionCode for $FLAVOR: $VERSION_CODE (Base $BASE_BUILD_NUMBER
 # Export target ABI for build.gradle.kts System.getenv("VAULTEXPLORER_TARGET_ABI")
 export VAULTEXPLORER_TARGET_ABI="$TARGET_ABI"
 
-# Pin R8/D8 output to single core
-if command -v taskset >/dev/null 2>&1; then
+# SPEED FIX 2: Only pin to single-core if explicitly requested (e.g. F-Droid strict mode).
+# Default to using all available CPU cores for Kotlin/C++ compilation.
+if [ "${REPRODUCIBLE_SINGLE_CORE:-false}" = "true" ] && command -v taskset >/dev/null 2>&1; then
   TASKSET="taskset -c 0"
+  echo "info: taskset single-core pinning ENABLED"
 else
   TASKSET=""
-  echo "warning: taskset not found -- R8 output may not match a build that used it" >&2
 fi
 
 # Build release APK

@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 /// Viewer" looks and behaves like a real, previously-used PDF reader. It
 /// carries no vault linkage of any kind (just a SAF `content://` Uri and a
 /// display name), which is exactly why it's fine for it to live in a plain
-/// JSON file rather than secure storage: unlike Discrete Mode's on/off
+/// JSON file rather than secure storage: unlike Mask Mode's on/off
 /// state (deliberately *not* persisted anywhere, see
 /// `DisguiseModeApi.getMode`), a list of "PDFs this reader app opened"
 /// reveals nothing about the vault and is the kind of thing a real PDF

@@ -122,7 +122,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   Future<void> _setDiscreteMode(bool enable) async {
     final confirmed = await showAppConfirmDialog(
       context,
-      title: enable ? 'Enable Discrete Mode?' : 'Disable Discrete Mode?',
+      title: enable ? 'Enable Mask Mode?' : 'Disable Mask Mode?',
       message: enable
           ? 'The app icon and name on your home screen will change to '
                 '"Hydro Tracker". It will function as a daily water intake tracker.\n\n'
@@ -143,8 +143,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       showAppSnackBar(
         context,
         message: enable
-            ? 'Discrete Mode enabled. The app will close — reopen from the new launcher icon.'
-            : 'Discrete Mode disabled. The app will close — reopen from the new launcher icon.',
+            ? 'Mask Mode enabled. The app will close — reopen from the new launcher icon.'
+            : 'Mask Mode disabled. The app will close — reopen from the new launcher icon.',
       );
       await Future<void>.delayed(const Duration(milliseconds: 1500));
       SystemNavigator.pop();
@@ -152,7 +152,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       if (!mounted) return;
       showAppSnackBar(
         context,
-        message: 'Failed to change Discrete Mode',
+        message: 'Failed to change Mask Mode',
         tone: AppBannerTone.error,
       );
     }
@@ -526,7 +526,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Discrete Mode',
+                            title: Text('Mask Mode',
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(

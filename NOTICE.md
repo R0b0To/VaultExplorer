@@ -39,7 +39,7 @@ All entries below were checked directly against upstream sources/licenses
 
 | Package | License | Notes |
 |---|---|---|
-| `pdfrx` | BSD-3-Clause / Apache-2.0 (PDFium) | High-performance Flutter PDF rendering engine built on PDFium. Renders PDFs directly in Dart via custom stream reader callbacks without extracting unencrypted files to disk. |
+| `pdfrx` | MIT (pdfrx itself) / BSD-3-Clause (PDFium core, per its own upstream `LICENSE` file) | High-performance Flutter PDF rendering engine built on PDFium. Renders PDFs directly in Dart via custom stream reader callbacks without extracting unencrypted files to disk. PDFium itself further bundles third-party components (FreeType, libopenjpeg, libpng, zlib, etc.), each under its own separate permissive license — none GPL-incompatible. |
 | `video_player` | BSD-3-Clause | Official Flutter plugin. On Android, backed by AndroidX Media3/ExoPlayer (Apache-2.0), which decodes via the OS's own `MediaCodec` -- no bundled codec binaries of any kind. |
 | `path_provider`, `local_auth`, `flutter_secure_storage`, `url_launcher`, `wakelock_plus`, `package_info_plus`, `sensors_plus`, `flutter_staggered_grid_view`, `archive`, `path`, `vector_math`, `flutter_launcher_icons` | BSD-3-Clause / MIT (each individually) | Standard Flutter-community/AOSP-adjacent packages. No proprietary or copyleft-incompatible terms. |
 | `pointycastle`, `encrypt` | BSD-3-Clause / MIT | Pure-Dart crypto libraries (`encrypt` wraps `pointycastle`). |

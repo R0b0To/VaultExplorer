@@ -74,7 +74,7 @@
 
 *   **Multi-Layout File Explorer**: Detailed List, Grid, and Masonry view modes with gesture-based pinch-to-zoom column adjustments, breadcrumbs, search term highlighting, and instant folder size calculations.
 *   **Direct Vault Camera**: Capture photos and record video (H.264 / HEVC) directly into encrypted containers without writing unencrypted temporary files to host storage.
-*   **PDF Annotator & Editor**: View PDF documents, draw markup annotations (highlights, underlines, sticky notes), rotate pages, delete pages, undo/redo edits, and commit changes back to the vault.
+*   **PDF Viewer**: Native rendering via `pdfrx` (PDFium/FFI) with in-document text search and match navigation, streamed directly from the encrypted volume through a custom byte-range reader — no plaintext PDF is ever written to host storage.
 *   **Web & HTML Viewer**: Isolated `WebView` platform view rendering HTML, CSS, JavaScript, and linked web assets directly out of the vault via a local secure origin (`https://vault-local.internal`).
 *   **Built-In Text Editor**: Create, edit, and save plain text, code, or markdown files directly inside encrypted volumes.
 *   **In-Vault ZIP Archive Browser**: Inspect and extract `.zip` archive contents directly inside an encrypted volume without unencrypting archives to the host filesystem.

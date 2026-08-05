@@ -116,7 +116,7 @@ new code must not violate. Each is traceable to specific enforcement code.
    thread-safety by pointing at `locks[volId]`; they are unrelated.
 
 9. **Exactly one of the two launcher `activity-alias` components
-   (`VaultLauncherAlias` / `PDFViewerAlias`) is enabled at any time, never
+   (`VaultLauncherAlias` / `HydroTrackerAlias`) is enabled at any time, never
    zero or both (ADR-025).** `DisguiseModeHandlers.handleSetMode` is the only
    place allowed to call `PackageManager.setComponentEnabledSetting` for
    either of them, and it always flips both in the same call. Do not add a
@@ -267,8 +267,8 @@ written at the call sites.
 | **023** | Native crypto/filesystem engine's first automated regression tests are plain host-side C++ binaries (`g++`-buildable, `assert`-based, zero Android toolchain), registered with CTest and gated behind `if(NOT ANDROID)` | Accepted | `CMakeLists.txt`, `crypto/test/kdf_table_test.cpp`, `io/test/sector_batching_test.cpp`, `test/fs_scan_test.cpp` |
 | **024** | `file_browser_screen.dart`'s selection-mode and sort-mode state live in reusable `SelectionMixin<T>`/`SortMixin<T>` mixins, not inline in the screen's `State` class | Accepted | `lib/features/browser/mixins/selection_mixin.dart`, `lib/features/browser/mixins/sort_mixin.dart`, `file_browser_screen.dart` |
 | **025** | Mask Mode's active/inactive state is derived from live `PackageManager` component-enabled state on every query, never cached in a separately persisted Dart flag (§2.9, §2.10) | Accepted | `DisguiseModeHandlers.kt`, `disguise_mode_api.dart`, `vault_explorer_app.dart` |
-| **026** | The Mask Mode decoy reader renders local PDFs through the same pdf.js `PlatformView`/WebView pipeline as the in-vault viewer, via a `localUri` creation param and a `_local` URL segment, rather than a second rendering pipeline | Accepted | `PdfViewerPlugin.kt`, `decoy_pdf_viewer_screen.dart` |
-| **027** | The decoy reader's "Open PDF File" picker reuses the existing SAF `ACTION_OPEN_DOCUMENT` + `PendingActivityResult` pattern instead of adding a third-party `file_picker` dependency | Accepted | `DisguiseModeHandlers.kt`, `VaultPickerHandlers.kt`, `disguise_mode_api.dart` |
+| **026** | The in-vault PDF viewer renders through `pdfrx` (native PDFium via FFI: `PdfViewer.custom` streams decrypted bytes straight from `vaultExplorerApi.readFileChunk`, no plaintext temp file, no WebView/JS bridge), superseding the original pdf.js `PlatformView`/WebView pipeline this ADR originally described. That original pipeline's other half — the Mask Mode decoy reader sharing it via a `localUri` param — no longer applies at all: the decoy identity is now `DecoyWaterTrackerScreen` only, with no PDF entry point; `pickLocalPdfFile()` (`disguise_mode_api.dart`) and `PdfViewerBase`'s `localUri`/`PdfSearchConfig.decoy` parameters are unreferenced leftovers from it | Superseded | `pdf_viewer_base.dart`, `pdf_viewer_screen.dart`, `disguise_mode_api.dart` |
+| **027** | The decoy reader's "Open PDF File" picker reuses the existing SAF `ACTION_OPEN_DOCUMENT` + `PendingActivityResult` pattern instead of adding a third-party `file_picker` dependency — **superseded** along with ADR-026: nothing in the current UI calls `pickLocalPdfFile()` anymore | Superseded | `DisguiseModeHandlers.kt`, `VaultPickerHandlers.kt`, `disguise_mode_api.dart` |
 | **028** | The hidden vault-unlock trigger (3 s hold on app-bar title) uses a raw touch-down timer (`HoldTrigger`), `Navigator.push`s (not `pushReplacement`) onto `LockGateScreen`, and never modifies OS-level alias state | Accepted | `lib/core/utils/hold_trigger.dart`, `lib/features/decoy/widgets/hidden_vault_trigger.dart` |
 
 ---
@@ -446,11 +446,11 @@ files.
                                               (pushed on top of decoy UI)
 ```
 
-- **Vault identity** — `VaultLauncherAlias` enabled, `PDFViewerAlias`
+- **Vault identity** — `VaultLauncherAlias` enabled, `HydroTrackerAlias`
   disabled. Manifest default on a fresh install. `_DisguiseModeGate` boots
   straight into `LockGateScreen`.
-- **Decoy identity** — `PDFViewerAlias` enabled, `VaultLauncherAlias`
-  disabled. `_DisguiseModeGate` boots into `DecoyPdfHomeScreen` instead.
+- **Decoy identity** — `HydroTrackerAlias` enabled, `VaultLauncherAlias`
+  disabled. `_DisguiseModeGate` boots into `DecoyWaterTrackerScreen` instead.
 - The only transition between the two is `DisguiseModeApi.setMode`, called
   from exactly one place (`AppSettingsScreen._setDiscreteMode`), always with
   a confirmation dialog. Nothing else in the app may call `setMode` — in
@@ -481,7 +481,7 @@ engine channel documented in §6. Method names are constants in
 |---|---|---|
 | `getMode` | Dart → native | Reads live `PackageManager` component-enabled state; returns `"vault"`/`"decoy"` (§2.10 — never cached) |
 | `setMode` | Dart → native | Atomically flips both aliases (§2.9); `DONT_KILL_APP` preserves running engine/session state |
-| `pickLocalPdfFile` | Dart → native | SAF `ACTION_OPEN_DOCUMENT` filtered to `application/pdf`, read-only persistable grant (ADR-027); returns `{uri, displayName}` or `null` on cancel |
+| `pickLocalPdfFile` | Dart → native | SAF `ACTION_OPEN_DOCUMENT` filtered to `application/pdf`, read-only persistable grant (ADR-027, now superseded); returns `{uri, displayName}` or `null` on cancel. Currently unreferenced — no UI calls this |
 
 There are currently no native → Dart events on this channel — Mask Mode
 has no asynchronous native-side progress to report.
@@ -532,5 +532,3 @@ the following changes:
 6. **Fixed section numbering**: Renumbered §8 (Mask Mode) → §7 and §9
    (Cross-references) → §8 to eliminate the gap left by an earlier
    renumbering that was documented only in a now-removed status note.
-
-   

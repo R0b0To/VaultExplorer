@@ -4,6 +4,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/features/settings/about_screen.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
+import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
@@ -730,6 +731,21 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             onChanged: (v) {
                               setState(
                                   () => _settings.defaultThumbnailQuality = v);
+                              _persist();
+                            },
+                          ),
+                          OptionPickerTile<PlaylistTransitionEffect>(
+                            label: 'Playlist Transition Animation',
+                            value: _settings.playlistTransitionEffect,
+                            options: PlaylistTransitionEffect.values.map((effect) {
+                              return SelectOption(
+                                value: effect,
+                                label: effect.label,
+                              );
+                            }).toList(),
+                            onChanged: (v) {
+                              setState(() =>
+                                  _settings.playlistTransitionEffect = v);
                               _persist();
                             },
                           ),

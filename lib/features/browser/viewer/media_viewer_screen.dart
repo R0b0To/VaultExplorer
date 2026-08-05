@@ -5,8 +5,10 @@ import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -22,6 +24,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_botto
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
+import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_transition_transformer.dart';
 
 import 'native_video_controller.dart';
 
@@ -74,6 +77,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _subtitlesEnabled = true;
   final int _doubleTapSkipSeconds = 5;
   BoxFit _imageFit = BoxFit.contain;
+  PlaylistTransitionEffect _transitionEffect = PlaylistTransitionEffect.slide;
   bool _isMuted = false;
   bool _isSwiping = false;
   final Set<String> _prefetchingFullRes = {};
@@ -158,12 +162,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
   Future<void> _loadConfig() async {
     final config = await FileManagerToolbarService.instance.load();
+    final appSettings = await AppSettingsService.loadSettings();
     if (mounted) {
       setState(() {
         _enableCarousel = config.showMediaCarousel;
         if (!_enableCarousel) {
           _isCarouselVisible = false;
         }
+        _transitionEffect = appSettings.playlistTransitionEffect;
       });
     }
   }
@@ -832,7 +838,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     final prefetchedBytes = _prefetchedBytesFor(fileName);
                     final isImg = MediaViewerConstants.isImage(fileName);
                     final isAudio = MediaViewerConstants.isAudio(fileName);
-                    return Container(
+                    final itemWidget = Container(
                         color: Colors.black,
                         child: isImg
                             ? ImagePageItem(
@@ -880,6 +886,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                               onError: () => _handleMediaError(fileName),
                             ),
                     );
+
+                    return PlaylistTransitionTransformer(
+                      pageController: _pageController,
+                      index: index,
+                      effect: _transitionEffect,
+                      child: itemWidget,
+                    );
                   },
                 ),
               );
@@ -898,6 +911,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 playlistController: _playlistController,
                 currentFileName: _playlistController.currentFile,
                 totalCount: _playlistController.playlist.length,
+                currentTransitionEffect: _transitionEffect,
+                onTransitionEffectChanged: (newEffect) async {
+                  setState(() {
+                    _transitionEffect = newEffect;
+                  });
+                  final appSettings = await AppSettingsService.loadSettings();
+                  await AppSettingsService.saveSettings(
+                    appSettings.copyWith(playlistTransitionEffect: newEffect),
+                  );
+                },
                 onBackPressed: () {
                   HapticFeedback.lightImpact();
                   Navigator.pop(context);

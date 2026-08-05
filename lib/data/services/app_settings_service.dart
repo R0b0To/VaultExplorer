@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -36,6 +37,7 @@ class AppSettings {
   SortBy defaultFileSortBy;
   bool defaultFileSortAscending;
   bool htmlEnableJavaScript;
+  PlaylistTransitionEffect playlistTransitionEffect;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
   AppSettings({
@@ -58,6 +60,7 @@ class AppSettings {
     this.defaultFileSortBy = SortBy.name,
     this.defaultFileSortAscending = true,
     this.htmlEnableJavaScript = false,
+    this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
     Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
     String? masterPasswordSalt,
@@ -106,6 +109,7 @@ class AppSettings {
     SortBy? defaultFileSortBy,
     bool? defaultFileSortAscending,
     bool? htmlEnableJavaScript,
+    PlaylistTransitionEffect? playlistTransitionEffect,
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
@@ -130,6 +134,7 @@ class AppSettings {
       defaultFileSortBy: defaultFileSortBy ?? this.defaultFileSortBy,
       defaultFileSortAscending: defaultFileSortAscending ?? this.defaultFileSortAscending,
       htmlEnableJavaScript: htmlEnableJavaScript ?? this.htmlEnableJavaScript,
+      playlistTransitionEffect: playlistTransitionEffect ?? this.playlistTransitionEffect,
     );
   }
 
@@ -154,6 +159,7 @@ class AppSettings {
     'defaultFileSortBy': defaultFileSortBy.toJson(),
     'defaultFileSortAscending': defaultFileSortAscending,
     'htmlEnableJavaScript': htmlEnableJavaScript,
+    'playlistTransitionEffect': playlistTransitionEffect.toJson(),
   };
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
     useMasterPassword: j['useMasterPassword'] as bool? ?? false,
@@ -189,6 +195,7 @@ class AppSettings {
    defaultFileSortBy: SortBy.fromJson(j['defaultFileSortBy'] as String?),
     defaultFileSortAscending: j['defaultFileSortAscending'] as bool? ?? true,
     htmlEnableJavaScript: j['htmlEnableJavaScript'] as bool? ?? false,
+    playlistTransitionEffect: PlaylistTransitionEffect.fromJson(j['playlistTransitionEffect'] as String?),
   );
 }
 

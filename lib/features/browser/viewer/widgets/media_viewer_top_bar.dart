@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 
@@ -9,6 +10,8 @@ class MediaViewerTopBar extends StatelessWidget {
   final PlaylistController playlistController;
   final String currentFileName;
   final int totalCount;
+  final PlaylistTransitionEffect currentTransitionEffect;
+  final ValueChanged<PlaylistTransitionEffect> onTransitionEffectChanged;
   final VoidCallback onBackPressed;
   final VoidCallback onDeletePressed;
   final VoidCallback onPlaylistChanged;
@@ -19,6 +22,8 @@ class MediaViewerTopBar extends StatelessWidget {
     required this.playlistController,
     required this.currentFileName,
     required this.totalCount,
+    required this.currentTransitionEffect,
+    required this.onTransitionEffectChanged,
     required this.onBackPressed,
     required this.onDeletePressed,
     required this.onPlaylistChanged,
@@ -292,6 +297,34 @@ class MediaViewerTopBar extends StatelessWidget {
             ),
           ],
           child: const Text('Screen Orientation'),
+        ),
+        SubmenuButton(
+          leadingIcon: Icon(
+            currentTransitionEffect.icon,
+            size: 18,
+            color: cs.onSurfaceVariant,
+          ),
+          menuChildren: PlaylistTransitionEffect.values.map((effect) {
+            final isSelected = effect == currentTransitionEffect;
+            return MenuItemButton(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onTransitionEffectChanged(effect);
+              },
+              leadingIcon: isSelected
+                  ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+                  : SizedBox(
+                      width: 18,
+                      child: Icon(
+                        effect.icon,
+                        size: 16,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                      ),
+                    ),
+              child: Text(effect.label),
+            );
+          }).toList(),
+          child: const Text('Playlist Transition'),
         ),
         const PopupMenuDivider(),
         MenuItemButton(

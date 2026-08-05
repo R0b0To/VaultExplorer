@@ -29,6 +29,7 @@ class PlaylistTransitionTransformer extends StatelessWidget {
       builder: (context, child) {
         double position = 0.0;
         if (pageController.hasClients &&
+            pageController.positions.length == 1 &&
             pageController.position.haveDimensions) {
           position = (pageController.page ?? pageController.initialPage.toDouble()) - index;
         }

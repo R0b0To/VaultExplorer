@@ -437,7 +437,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _playbackManager.pauseActive();
     _playlistController.updateIndex(index);
 
-    if (_pageController.hasClients) {
+    if (_pageController.hasClients && _pageController.positions.length == 1) {
       if (animate) {
         await _pageController.animateToPage(
           index,

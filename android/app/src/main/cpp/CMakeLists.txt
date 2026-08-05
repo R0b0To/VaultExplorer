@@ -17,6 +17,40 @@ set(ENABLE_TESTING OFF CACHE BOOL "Disable mbedtls tests")
 set(ENABLE_PROGRAMS OFF CACHE BOOL "Disable mbedtls programs")
 FetchContent_MakeAvailable(mbedtls)
 
+
+# ── AVIF Decoder (libgav1 + libavif) ──
+FetchContent_Declare(
+    libgav1
+    GIT_REPOSITORY https://chromium.googlesource.com/codecs/libgav1
+    GIT_TAG        c05bf9be660cf170d7c26bd06bb42b3322180e58
+)
+set(LIBGAV1_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+set(LIBGAV1_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(libgav1)
+
+# FIX: Export alias & include path so libavif detects libgav1
+if(TARGET libgav1)
+    target_include_directories(libgav1 PUBLIC ${libgav1_SOURCE_DIR}/src)
+    if(NOT TARGET libgav1::libgav1)
+        add_library(libgav1::libgav1 ALIAS libgav1)
+    endif()
+    set(libgav1_FOUND TRUE CACHE BOOL "" FORCE)
+endif()
+
+FetchContent_Declare(
+    libavif
+    GIT_REPOSITORY https://github.com/AOMediaCodec/libavif.git
+    GIT_TAG        c5240fc79fe5c2407e10afd35f5505ef6333ea49
+)
+set(AVIF_CODEC_LIBGAV1 ON CACHE BOOL "" FORCE)
+set(AVIF_CODEC_LIBGAV1_ENCODE OFF CACHE BOOL "" FORCE)
+set(AVIF_CODEC_LIBGAV1_DECODE ON CACHE BOOL "" FORCE)
+set(AVIF_LIBYUV OFF CACHE BOOL "" FORCE)
+set(AVIF_BUILD_APPS OFF CACHE BOOL "" FORCE)
+set(AVIF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(libavif)
+
+
 # Enable ARMv8 Cryptography Extensions (hardware AES/SHA1/SHA2 instructions)
 # for mbedTLS's runtime-dispatched aesce.c backend. Without this, mbedTLS
 # falls back to scalar C for AES and SHA-256 on every device -- these are
@@ -356,6 +390,7 @@ add_library(
         containers/vhd_image.cpp       # legacy VHD BAT-indexed read/write for dynamic (expandable) disks
         jni/jni_runtime.cpp
         jni/jni_callbacks.cpp
+        jni/avif_bridge.cpp
         io/block_io.cpp
         io/partition_writer.cpp
         containers/container_create_usb.cpp
@@ -473,7 +508,8 @@ target_link_libraries(
         e2fs_com_err
         e2fs_uuid
         cjson
-        dislocker_lib)
+        dislocker_lib
+        avif)
 
 
 if(NOT ANDROID)

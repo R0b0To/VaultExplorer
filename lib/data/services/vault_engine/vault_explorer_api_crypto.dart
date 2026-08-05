@@ -70,6 +70,35 @@ mixin _CryptoOps {
     return result;
   }
 
+ Future<({int width, int height, int frameCount, int totalDurationMs})?> getAvifInfo(Uint8List avifBytes) async {
+  final result = await _channel.invokeMethod<List<Object?>>(
+    ChannelMethods.getAvifInfo,
+    {'avifBytes': avifBytes},
+  );
+  if (result == null || result.length < 4) return null;
+  return (
+    width: (result[0] as num).toInt(),
+    height: (result[1] as num).toInt(),
+    frameCount: (result[2] as num).toInt(),
+    totalDurationMs: (result[3] as num).toInt(),
+  );
+}
+
+Future<({Uint8List rgbaBytes, int durationMs})?> decodeAvifFrame(Uint8List avifBytes, int frameIndex) async {
+  final result = await _channel.invokeMapMethod<String, dynamic>(
+    ChannelMethods.decodeAvifFrame,
+    {
+      'avifBytes': avifBytes,
+      'frameIndex': frameIndex,
+    },
+  );
+  if (result == null) return null;
+  return (
+    rgbaBytes: result['rgbaBytes'] as Uint8List,
+    durationMs: (result['durationMs'] as num?)?.toInt() ?? 100,
+  );
+}
+
   Future<Uint8List?> deriveDerivedKey({
     required String filePath,
     required String password,

@@ -34,6 +34,8 @@ class MediaViewerConstants {
     'png',
     'gif',
     'webp',
+    'avif',
+    'heic',
   ];
 static const List<String> videoExtensions = [
   'mp4', 'm4v', 'webm', 'mov', 'avi', 'mkv', 'mpeg', 'mpg',

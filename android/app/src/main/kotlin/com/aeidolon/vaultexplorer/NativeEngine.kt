@@ -59,6 +59,12 @@ internal object NativeEngine {
         keyfileFds: IntArray? = null, readOnly: Boolean = false
     ): Array<String>?
 
+
+
+    @JvmStatic external fun getAvifInfoNative(avifBytes: ByteArray): IntArray?
+    @JvmStatic external fun decodeAvifFrameNative(avifBytes: ByteArray, frameIndex: Int): Map<String, Any>?
+
+
     /** Writes a new container to fd and formats it.
      *
      *  containerFormat: 0 = VeraCrypt, 1 = LUKS1, 2 = LUKS2 (matches

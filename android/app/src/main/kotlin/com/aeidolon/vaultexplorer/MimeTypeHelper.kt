@@ -6,6 +6,8 @@ object MimeTypeHelper {
         fileName.endsWith(".jpg",  ignoreCase = true) || fileName.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
         fileName.endsWith(".webp", ignoreCase = true)                                         -> "image/webp"
         fileName.endsWith(".gif",  ignoreCase = true)                                         -> "image/gif"
+        fileName.endsWith(".heic", ignoreCase = true)                                         -> "image/heic"
+        fileName.endsWith(".avif", ignoreCase = true)                                         -> "image/avif" 
         fileName.endsWith(".mp4",  ignoreCase = true) || fileName.endsWith(".m4v",  ignoreCase = true) -> "video/mp4"
         fileName.endsWith(".webm", ignoreCase = true)                                         -> "video/webm"
         fileName.endsWith(".mkv",  ignoreCase = true)                                         -> "video/x-matroska"

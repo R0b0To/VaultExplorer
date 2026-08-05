@@ -81,6 +81,8 @@ private object ChannelMethods {
     const val UNMOUNT_CONTAINER_FOLDER  = "unmountContainerFolder"
     const val GET_MOUNTED_CONTAINER_FOLDERS = "getMountedContainerFolders"
     const val GET_DEVICE_CAPABILITY_PROFILE = "getDeviceCapabilityProfile"
+    const val GET_AVIF_INFO = "getAvifInfo"
+    const val DECODE_AVIF_FRAME = "decodeAvifFrame"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -149,6 +151,7 @@ class MainActivity : FlutterFragmentActivity() {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) systemHandlers.sanitizeClipboard()
     }
+    
 
     private fun resizeExecutorPools() {
         val sizes = DeviceCapabilityProfiler.executorSizesFor(DeviceCapabilityProfiler.tierFor(this))
@@ -348,6 +351,8 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.UNMOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleUnmountContainerFolder(call, result)
                 ChannelMethods.GET_MOUNTED_CONTAINER_FOLDERS -> folderDocumentProviderHandlers.handleGetMountedContainerFolders(call, result)
                 ChannelMethods.GET_DEVICE_CAPABILITY_PROFILE -> DeviceCapabilityProfiler.handleGetDeviceCapabilityProfile(this, call, result)
+                ChannelMethods.GET_AVIF_INFO -> derivedKeyHandlers.handleGetAvifInfo(call, result)
+                ChannelMethods.DECODE_AVIF_FRAME -> derivedKeyHandlers.handleDecodeAvifFrame(call, result)
                 else -> result.notImplemented()
             }
         }

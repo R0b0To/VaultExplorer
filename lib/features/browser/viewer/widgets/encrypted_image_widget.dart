@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'native_avif_widget.dart';
 
 class EncryptedImageWidget extends StatefulWidget {
   final MountedContainer container;
@@ -201,18 +202,20 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       );
     }
 
+    // ── Check if the file is AVIF ──
+    final isAvif = widget.fileName.toLowerCase().endsWith('.avif');
+    if (isAvif) {
+      return NativeAvifWidget(
+        avifBytes: _bytes!,
+        fit: widget.fit,
+      );
+    }
+
+    // ── Standard Image rendering for JPG, PNG, WEBP, GIF ──
     final mq = MediaQuery.of(context);
     final dpr = mq.devicePixelRatio;
     final headroom = MediaViewerConstants.fullResDecodeZoomHeadroom;
-    // Physical-pixel viewport size x zoom headroom, recomputed on every
-    // build — so a device rotation (which changes MediaQuery.size) picks up
-    // a new cap automatically without any extra plumbing. ResizeImagePolicy
-    // .fit (rather than Image.memory's cacheWidth/cacheHeight, which is
-    // always "exact" and would stretch a mismatched aspect ratio) scales
-    // the *longer* source edge down to fit within this box and preserves
-    // aspect ratio on the other edge — correct for both a wide landscape
-    // photo and a tall portrait one without knowing the source's native
-    // dimensions ahead of the decode.
+
     final capWidth = (mq.size.width * dpr * headroom).round().clamp(1, 1 << 20);
     final capHeight = (mq.size.height * dpr * headroom).round().clamp(1, 1 << 20);
 
@@ -226,7 +229,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       fit: widget.fit,
       width: double.infinity,
       height: double.infinity,
-      gaplessPlayback: true, // <--- KEEPS THE THUMBNAIL VISIBLE WHILE DECODING HIGH-RES
+      gaplessPlayback: true,
       errorBuilder: (context, error, stackTrace) => Center(
         child: Text(
           'Invalid or corrupted image format.',

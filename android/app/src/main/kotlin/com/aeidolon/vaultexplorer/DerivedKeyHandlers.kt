@@ -179,6 +179,45 @@ class DerivedKeyHandlers(
         }
     }
 
+    fun handleGetAvifInfo(call: MethodCall, result: MethodChannel.Result) {
+    val avifBytes = call.argument<ByteArray>("avifBytes")
+    if (avifBytes == null || avifBytes.isEmpty()) {
+        result.error("INVALID_ARGS", "avifBytes required", null)
+        return
+    }
+    ioExecutor.execute {
+        try {
+            val info = NativeEngine.getAvifInfoNative(avifBytes)
+            activity.runOnUiThread {
+                if (info != null) result.success(info)
+                else result.error("AVIF_ERROR", "Failed to parse AVIF info", null)
+            }
+        } catch (e: Exception) {
+            activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+        }
+    }
+}
+
+fun handleDecodeAvifFrame(call: MethodCall, result: MethodChannel.Result) {
+    val avifBytes = call.argument<ByteArray>("avifBytes")
+    val frameIndex = call.argument<Int>("frameIndex") ?: 0
+    if (avifBytes == null || avifBytes.isEmpty()) {
+        result.error("INVALID_ARGS", "avifBytes required", null)
+        return
+    }
+    ioExecutor.execute {
+        try {
+            val frameMap = NativeEngine.decodeAvifFrameNative(avifBytes, frameIndex)
+            activity.runOnUiThread {
+                if (frameMap != null) result.success(frameMap)
+                else result.error("AVIF_ERROR", "Failed to decode AVIF frame $frameIndex", null)
+            }
+        } catch (e: Exception) {
+            activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+        }
+    }
+}
+
     /** Called cross-domain by [VaultUnlockHandlers] and [UsbContainerHandlers]
      *  right after a successful unlock when the caller asked to cache the
      *  freshly-derived key, in addition to being exposed as its own

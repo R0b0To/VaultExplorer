@@ -1,5 +1,5 @@
 {
-  "image":    ["jpg","jpeg","png","gif","webp"],
+  "image":    ["jpg","jpeg","png","gif","webp","avif","heic"],
   "video":    ["mp4","m4v","webm","mov","avi","mkv"],
   "audio":    ["mp3","m4a","wav","flac","ogg","aac"],
   "document": ["pdf","doc","docx","xls","xlsx","txt","rtf","csv","zip","tar","gz","json","xml"],

@@ -10,6 +10,8 @@ IconData iconForFile(String name) {
     case 'jpeg':
     case 'png':
     case 'gif':
+    case 'avif':
+    case 'heic':
     case 'webp':
       return Icons.image_outlined;
     case 'mp4':
@@ -54,6 +56,7 @@ Color colorForFile(String name) {
     case 'jpeg':
     case 'png':
     case 'gif':
+    case 'avif':
     case 'webp':
       return const Color(0xFF26C6DA);
     case 'mp4':

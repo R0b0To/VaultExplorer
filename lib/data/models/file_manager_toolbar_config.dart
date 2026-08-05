@@ -34,6 +34,7 @@ class FileManagerToolbarConfig {
   final bool showBreadcrumbBar;
   final bool showStatsBar;
   final bool showMediaCarousel;
+  final bool autoStartPlaylistMode;
   final List<FileDetailColumn> detailColumnsOrder;
   final Set<FileDetailColumn> hiddenDetailColumns;
   final bool showGridFileNames;
@@ -50,6 +51,7 @@ class FileManagerToolbarConfig {
     this.showBreadcrumbBar = true,
     this.showStatsBar = true,
     this.showMediaCarousel = true,
+    this.autoStartPlaylistMode = false,
     this.detailColumnsOrder = const [
       FileDetailColumn.date,
       FileDetailColumn.size,
@@ -77,6 +79,7 @@ class FileManagerToolbarConfig {
         showBreadcrumbBar: true,
         showStatsBar: true,
         showMediaCarousel: true,
+        autoStartPlaylistMode: false,
         detailColumnsOrder: [
           FileDetailColumn.date,
           FileDetailColumn.size,
@@ -105,6 +108,7 @@ class FileManagerToolbarConfig {
     bool? showBreadcrumbBar,
     bool? showStatsBar,
     bool? showMediaCarousel,
+    bool? autoStartPlaylistMode,
     List<FileDetailColumn>? detailColumnsOrder,
     Set<FileDetailColumn>? hiddenDetailColumns,
     bool? showGridFileNames,
@@ -121,6 +125,8 @@ class FileManagerToolbarConfig {
         showBreadcrumbBar: showBreadcrumbBar ?? this.showBreadcrumbBar,
         showStatsBar: showStatsBar ?? this.showStatsBar,
         showMediaCarousel: showMediaCarousel ?? this.showMediaCarousel,
+        autoStartPlaylistMode:
+            autoStartPlaylistMode ?? this.autoStartPlaylistMode,
         detailColumnsOrder: detailColumnsOrder ?? this.detailColumnsOrder,
         hiddenDetailColumns: hiddenDetailColumns ?? this.hiddenDetailColumns,
         showGridFileNames: showGridFileNames ?? this.showGridFileNames,
@@ -141,6 +147,7 @@ class FileManagerToolbarConfig {
         'showBreadcrumbBar': showBreadcrumbBar,
         'showStatsBar': showStatsBar,
         'showMediaCarousel': showMediaCarousel,
+        'autoStartPlaylistMode': autoStartPlaylistMode,
         'detailColumnsOrder':
             detailColumnsOrder.map((c) => c.toJson()).toList(),
         'hiddenDetailColumns':
@@ -186,6 +193,7 @@ class FileManagerToolbarConfig {
       showBreadcrumbBar: j['showBreadcrumbBar'] as bool? ?? true,
       showStatsBar: j['showStatsBar'] as bool? ?? true,
       showMediaCarousel: j['showMediaCarousel'] as bool? ?? true,
+      autoStartPlaylistMode: j['autoStartPlaylistMode'] as bool? ?? false,
       detailColumnsOrder: rawDetailColumns.isEmpty
           ? const [
               FileDetailColumn.date,

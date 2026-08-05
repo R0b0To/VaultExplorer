@@ -592,13 +592,47 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   void _openMediaViewer(String fileName, String fullPath) {
+    List<String> mediaFiles = [fullPath];
+    int initialIndex = 0;
+
+    if (_toolbarConfig.autoStartPlaylistMode) {
+      int compareOverall(RawEntry ea, RawEntry eb) {
+        final aPinned = _isPinned(ea);
+        final bPinned = _isPinned(eb);
+        if (aPinned != bPinned) {
+          return aPinned ? -1 : 1;
+        }
+        if (ea.isDir != eb.isDir) {
+          return ea.isDir ? -1 : 1;
+        }
+        return compareItems(ea, eb);
+      }
+
+      final sortedItems = _currentItems.where((e) => !e.isDir).toList()
+        ..sort(compareOverall);
+      final localMedia = sortedItems
+          .map((e) => e.name)
+          .where(_isSupportedMedia)
+          .toList();
+      if (localMedia.isNotEmpty) {
+        final resolvedPaths = localMedia
+            .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
+            .toList();
+        final idx = resolvedPaths.indexOf(fullPath);
+        if (idx != -1) {
+          mediaFiles = resolvedPaths;
+          initialIndex = idx;
+        }
+      }
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => MediaViewerScreen(
           container: widget.container,
-          mediaFiles: [fullPath],
-          initialIndex: 0,
+          mediaFiles: mediaFiles,
+          initialIndex: initialIndex,
           startingFolder: _currentDirPath,
           thumbnailQuality: _resolvedThumbnailQuality,
           thumbnailCacheMode: _resolvedThumbnailCacheMode,

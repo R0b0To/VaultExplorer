@@ -4,18 +4,18 @@ class MediaViewerConstants {
   static const Duration pageTransitionDuration = Duration(milliseconds: 300);
   static const Duration doubleTapIndicatorDelay = Duration(milliseconds: 550);
 
-  static const double maxImageZoom = 4.0;
+  static const double maxImageZoom = 12.0;
 
   /// Full-resolution decode headroom used by [EncryptedImageWidget] to
   /// bound `Image.memory`'s decode target (Finding F-10). Deliberately
   /// smaller than [maxImageZoom]: this caps how many *pixels* Skia decodes
   /// relative to the viewport, not the interactive zoom ceiling itself — a
   /// 48MP source at 4x the viewport's physical size would still be tens of
-  /// MB of raw bitmap. 3x gives comfortable pinch-zoom headroom before the
+  /// MB of raw bitmap. 5x gives comfortable pinch-zoom headroom before the
   /// image visibly softens, without decoding at "whatever the source file
   /// happens to be."
-  static const double fullResDecodeZoomHeadroom = 3.0;
-  static const double maxVideoZoom = 6.0;
+  static const double fullResDecodeZoomHeadroom = 5.0;
+  static const double maxVideoZoom = 12.0;
 
   static const int maxPrefetchCacheSize = 5;
   static const int maxDirectorySearchDepth = 20;

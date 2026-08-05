@@ -171,6 +171,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         }
         _transitionEffect = appSettings.playlistTransitionEffect;
       });
+      if (config.autoStartPlaylistMode && !_playlistController.isPlaylistMode) {
+        await _playlistController.enablePlaylist('Current Folder Only');
+      }
     }
   }
 

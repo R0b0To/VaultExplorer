@@ -104,7 +104,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   final TransformationController _videoTransformationController =
       TransformationController();
   static const double _minZoomScale = 1.0;
-  static const double _maxZoomScale = 2.2;
+  static const double _maxZoomScale = 4.0;
   double _videoScale = _minZoomScale;
   TapDownDetails? _videoDoubleTapDetails;
   Size _lastKnownVideoSize = Size.zero;

@@ -132,7 +132,7 @@ class _ImagePageItemState extends State<ImagePageItem> {
       onDoubleTap: () {
         final position = _doubleTapDetails?.localPosition;
         if (_scale == 1.0) {
-          _scale = 2.5;
+          _scale = 3.5;
           if (position != null) {
             final x = -position.dx * (_scale - 1);
             final y = -position.dy * (_scale - 1);

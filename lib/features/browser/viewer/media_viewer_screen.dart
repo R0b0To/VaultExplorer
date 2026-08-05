@@ -22,7 +22,7 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/media_viewer_botto
 import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
+
 import 'native_video_controller.dart';
 
 enum VideoPlaybackMode { playOnce, loop, playAndAdvance }
@@ -721,7 +721,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   void _updateWakelock(bool enable) {
     if (_wakelockEnabled != enable) {
       _wakelockEnabled = enable;
-      WakelockPlus.toggle(enable: enable);
+      vaultExplorerApi.setKeepScreenOn(enable);
     }
   }
 

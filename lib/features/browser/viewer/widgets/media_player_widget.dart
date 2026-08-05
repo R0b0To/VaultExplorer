@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:vector_math/vector_math_64.dart' show Vector3;
+
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
@@ -321,8 +321,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     final x = -localPosition.dx * (scale - 1.0);
     final y = -localPosition.dy * (scale - 1.0);
     return Matrix4.identity()
-      ..translateByVector3(Vector3(x, y, 0.0))
-      ..scaleByVector3(Vector3(scale, scale, 1.0));
+      ..translate(x, y, 0.0)
+      ..scale(scale, scale, 1.0);
   }
 
   void _handleVideoDoubleTap() {
@@ -346,10 +346,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             scale: targetScale,
           );
         } else {
-          targetMatrix = Matrix4.identity()..scaleByVector3(Vector3(targetScale, targetScale, 1.0));
+          targetMatrix = Matrix4.identity()..scale(targetScale, targetScale, 1.0);
         }
       } else {
-        targetMatrix = Matrix4.identity()..scaleByVector3(Vector3(targetScale, targetScale, 1.0));
+        targetMatrix = Matrix4.identity()..scale(targetScale, targetScale, 1.0);
       }
     } else {
       targetScale = _minZoomScale;

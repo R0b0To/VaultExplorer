@@ -84,6 +84,9 @@ private object ChannelMethods {
     const val GET_AVIF_INFO = "getAvifInfo"
     const val DECODE_AVIF_FRAME = "decodeAvifFrame"
     const val DECODE_AVIF = "decodeAvif"
+    const val SET_KEEP_SCREEN_ON = "setKeepScreenOn"
+    const val LAUNCH_URL = "launchUrl"
+    const val GET_APP_VERSION = "getAppVersion"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -343,6 +346,9 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_SPACE_INFO -> fileOperationHandlers.handleGetSpaceInfo(call, result)
                 ChannelMethods.DELETE_FILE -> fileOperationHandlers.handleDeleteFile(call, result)
                 ChannelMethods.OPEN_WITH_APP -> systemHandlers.handleOpenWithApp(call, result)
+                ChannelMethods.SET_KEEP_SCREEN_ON -> systemHandlers.handleSetKeepScreenOn(call, result)
+                ChannelMethods.LAUNCH_URL -> systemHandlers.handleLaunchUrl(call, result)
+                ChannelMethods.GET_APP_VERSION -> systemHandlers.handleGetAppVersion(call, result)
                 ChannelMethods.IMPORT_FILE -> importExportHandlers.handleImportFile(call, result)
                 ChannelMethods.EXPORT_FILES_FOLDER -> importExportHandlers.handleExportFilesFolder(call, result)
                 ChannelMethods.IMPORT_FOLDER -> importExportHandlers.handleImportFolder(call, result)

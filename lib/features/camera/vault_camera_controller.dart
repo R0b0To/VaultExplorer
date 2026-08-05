@@ -87,6 +87,18 @@ class VaultCameraSessionInfo {
 
 class VaultCameraController {
   static const MethodChannel _channel = MethodChannel('com.aeidolon.vaultexplorer/camera');
+  static const EventChannel _accelChannel = EventChannel('com.aeidolon.vaultexplorer/camera/accelerometer');
+
+  static Stream<({double x, double y, double z})> accelerometerEventStream() {
+    return _accelChannel.receiveBroadcastStream().map((dynamic event) {
+      final map = Map<String, dynamic>.from(event as Map);
+      return (
+        x: (map['x'] as num).toDouble(),
+        y: (map['y'] as num).toDouble(),
+        z: (map['z'] as num).toDouble(),
+      );
+    });
+  }
 
   int? _sessionId;
   int? _textureId;

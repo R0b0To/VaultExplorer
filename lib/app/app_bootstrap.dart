@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/app/vault_explorer_app.dart';
 import 'package:vaultexplorer/core/services/device_capability_service.dart';
@@ -42,8 +42,7 @@ Future<void> runDeferredStartupWork() async {
     }
   } catch (_) {}
   try {
-    final packageInfo = await PackageInfo.fromPlatform();
-    appVersion = packageInfo.version;
+    appVersion = await vaultExplorerApi.getAppVersion();
   } catch (e) {
     appVersion = 'unknown';
   }

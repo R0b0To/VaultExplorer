@@ -90,6 +90,36 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
         } catch (_: Exception) {}
     }
 
+    fun handleSetKeepScreenOn(call: MethodCall, result: MethodChannel.Result) {
+        val enabled = call.argument<Boolean>("enabled") ?: false
+        if (enabled) {
+            activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        result.success(true)
+    }
+
+    fun handleLaunchUrl(call: MethodCall, result: MethodChannel.Result) {
+        val url = call.argument<String>("url") ?: return result.error("INVALID_ARGS", "url required", null)
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            activity.startActivity(intent)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("LAUNCH_FAILED", e.message, null)
+        }
+    }
+
+    fun handleGetAppVersion(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            val pInfo = activity.packageManager.getPackageInfo(activity.packageName, 0)
+            result.success(pInfo.versionName ?: "1.0.0")
+        } catch (e: Exception) {
+            result.success("1.0.0")
+        }
+    }
+
     fun handleOpenWithApp(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val fileName  = call.argument<String>("fileName")

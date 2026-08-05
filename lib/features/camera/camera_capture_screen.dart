@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:sensors_plus/sensors_plus.dart';
+
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import '../../data/services/vault_engine/vault_explorer_api.dart';
 import 'camera_vault_service.dart';
@@ -65,7 +65,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   String? _currentRecordingName;
   String? _currentRecordingPath;
 
-  StreamSubscription<AccelerometerEvent>? _sensorSubscription;
+  StreamSubscription<({double x, double y, double z})>? _sensorSubscription;
   StreamSubscription<Map<String, dynamic>>? _cameraEventSubscription;
   double _iconTurns = 0.0;
 
@@ -105,7 +105,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   }
 
   void _startSensorListener() {
-    _sensorSubscription = accelerometerEventStream().listen((event) {
+    _sensorSubscription = VaultCameraController.accelerometerEventStream().listen((event) {
       double magnitude = math.sqrt(event.x * event.x + event.y * event.y);
       if (magnitude < 2.0) return;
 

@@ -9,6 +9,10 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
@@ -18,6 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 private const val METHOD_CHANNEL = "com.aeidolon.vaultexplorer/camera"
 private const val EVENT_CHANNEL_PREFIX = "com.aeidolon.vaultexplorer/camera/events/"
+private const val ACCEL_EVENT_CHANNEL = "com.aeidolon.vaultexplorer/camera/accelerometer"
 private const val TAG = "VaultCameraPlugin"
 const val CAMERA_PERMISSION_REQUEST_CODE = 9821
 
@@ -33,11 +38,42 @@ class VaultCameraPlugin(
     private val eventChannels = LinkedHashMap<Long, EventChannel>()
     private val eventSinks = LinkedHashMap<Long, EventChannel.EventSink?>()
     private val methodChannel = MethodChannel(messenger, METHOD_CHANNEL)
+    private val accelEventChannel = EventChannel(messenger, ACCEL_EVENT_CHANNEL)
     private val messenger = messenger
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private var accelSensorEventListener: SensorEventListener? = null
 
     init {
         methodChannel.setMethodCallHandler(this)
+        accelEventChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
+                val sensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
+                val listener = object : SensorEventListener {
+                    override fun onSensorChanged(event: SensorEvent) {
+                        mainHandler.post {
+                            sink.success(
+                                mapOf(
+                                    "x" to event.values[0].toDouble(),
+                                    "y" to event.values[1].toDouble(),
+                                    "z" to event.values[2].toDouble()
+                                )
+                            )
+                        }
+                    }
+                    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+                }
+                accelSensorEventListener = listener
+                sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+            }
+
+            override fun onCancel(arguments: Any?) {
+                accelSensorEventListener?.let {
+                    sensorManager.unregisterListener(it)
+                    accelSensorEventListener = null
+                }
+            }
+        })
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -232,6 +268,11 @@ class VaultCameraPlugin(
     }
 
     fun disposeAll() {
+        accelSensorEventListener?.let {
+            sensorManager.unregisterListener(it)
+            accelSensorEventListener = null
+        }
+        accelEventChannel.setStreamHandler(null)
         sessions.keys.toList().forEach { disposeSession(it) }
         methodChannel.setMethodCallHandler(null)
     }

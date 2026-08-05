@@ -450,6 +450,44 @@ Future<bool> openWithApp(
     }
   }
 
+  Future<bool> setKeepScreenOn(bool enabled) async {
+    try {
+      final bool? success = await _channel.invokeMethod<bool>(
+        ChannelMethods.setKeepScreenOn,
+        {'enabled': enabled},
+      );
+      return success ?? false;
+    } catch (e) {
+      _logSwallowed('setKeepScreenOn', e);
+      return false;
+    }
+  }
+
+  Future<bool> launchUrl(String url) async {
+    try {
+      final bool? success = await _channel.invokeMethod<bool>(
+        ChannelMethods.launchUrl,
+        {'url': url},
+      );
+      return success ?? false;
+    } catch (e) {
+      _logSwallowed('launchUrl', e);
+      return false;
+    }
+  }
+
+  Future<String> getAppVersion() async {
+    try {
+      final String? version = await _channel.invokeMethod<String>(
+        ChannelMethods.getAppVersion,
+      );
+      return version ?? '1.0.0';
+    } catch (e) {
+      _logSwallowed('getAppVersion', e);
+      return '1.0.0';
+    }
+  }
+
 
 
   /// Checks if the folder at [uri] contains a "cryfs.config" file.

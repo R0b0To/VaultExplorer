@@ -105,6 +105,9 @@ abstract final class ChannelMethods {
 
   // ── Security & Privacy ───────────────────────────────────────────────────
   static const setSecureScreen = 'setSecureScreen';
+  static const setKeepScreenOn = 'setKeepScreenOn';
+  static const launchUrl = 'launchUrl';
+  static const getAppVersion = 'getAppVersion';
 
   // ── USB Drive Support ────────────────────────────────────────────────────
   static const listUsbDevices = 'listUsbDevices';

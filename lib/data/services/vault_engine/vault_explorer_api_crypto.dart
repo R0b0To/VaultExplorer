@@ -84,6 +84,37 @@ mixin _CryptoOps {
   );
 }
 
+Future<({
+  int width,
+  int height,
+  int totalDurationMs,
+  List<({Uint8List rgbaBytes, int durationMs})> frames,
+})?> decodeAvif(Uint8List avifBytes) async {
+  final result = await _channel.invokeMapMethod<String, dynamic>(
+    ChannelMethods.decodeAvif,
+    {'avifBytes': avifBytes},
+  );
+  if (result == null) return null;
+
+  final rawFrames = result['frames'] as List<dynamic>? ?? [];
+  final frames = <({Uint8List rgbaBytes, int durationMs})>[];
+  for (final f in rawFrames) {
+    if (f is Map) {
+      frames.add((
+        rgbaBytes: f['rgbaBytes'] as Uint8List,
+        durationMs: (f['durationMs'] as num?)?.toInt() ?? 100,
+      ));
+    }
+  }
+
+  return (
+    width: (result['width'] as num).toInt(),
+    height: (result['height'] as num).toInt(),
+    totalDurationMs: (result['totalDurationMs'] as num).toInt(),
+    frames: frames,
+  );
+}
+
 Future<({Uint8List rgbaBytes, int durationMs})?> decodeAvifFrame(Uint8List avifBytes, int frameIndex) async {
   final result = await _channel.invokeMapMethod<String, dynamic>(
     ChannelMethods.decodeAvifFrame,

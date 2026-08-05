@@ -218,6 +218,25 @@ fun handleDecodeAvifFrame(call: MethodCall, result: MethodChannel.Result) {
     }
 }
 
+fun handleDecodeAvif(call: MethodCall, result: MethodChannel.Result) {
+    val avifBytes = call.argument<ByteArray>("avifBytes")
+    if (avifBytes == null || avifBytes.isEmpty()) {
+        result.error("INVALID_ARGS", "avifBytes required", null)
+        return
+    }
+    ioExecutor.execute {
+        try {
+            val decoded = NativeEngine.decodeAvifNative(avifBytes)
+            activity.runOnUiThread {
+                if (decoded != null) result.success(decoded)
+                else result.error("AVIF_ERROR", "Failed to decode AVIF", null)
+            }
+        } catch (e: Exception) {
+            activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+        }
+    }
+}
+
     /** Called cross-domain by [VaultUnlockHandlers] and [UsbContainerHandlers]
      *  right after a successful unlock when the caller asked to cache the
      *  freshly-derived key, in addition to being exposed as its own

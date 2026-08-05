@@ -63,6 +63,7 @@ internal object NativeEngine {
 
     @JvmStatic external fun getAvifInfoNative(avifBytes: ByteArray): IntArray?
     @JvmStatic external fun decodeAvifFrameNative(avifBytes: ByteArray, frameIndex: Int): Map<String, Any>?
+    @JvmStatic external fun decodeAvifNative(avifBytes: ByteArray): Map<String, Any>?
 
 
     /** Writes a new container to fd and formats it.

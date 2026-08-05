@@ -83,6 +83,7 @@ private object ChannelMethods {
     const val GET_DEVICE_CAPABILITY_PROFILE = "getDeviceCapabilityProfile"
     const val GET_AVIF_INFO = "getAvifInfo"
     const val DECODE_AVIF_FRAME = "decodeAvifFrame"
+    const val DECODE_AVIF = "decodeAvif"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -353,6 +354,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_DEVICE_CAPABILITY_PROFILE -> DeviceCapabilityProfiler.handleGetDeviceCapabilityProfile(this, call, result)
                 ChannelMethods.GET_AVIF_INFO -> derivedKeyHandlers.handleGetAvifInfo(call, result)
                 ChannelMethods.DECODE_AVIF_FRAME -> derivedKeyHandlers.handleDecodeAvifFrame(call, result)
+                ChannelMethods.DECODE_AVIF -> derivedKeyHandlers.handleDecodeAvif(call, result)
                 else -> result.notImplemented()
             }
         }

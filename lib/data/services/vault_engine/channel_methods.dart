@@ -16,6 +16,7 @@ abstract final class ChannelMethods {
 
   static const getAvifInfo = 'getAvifInfo';
   static const decodeAvifFrame = 'decodeAvifFrame';
+  static const decodeAvif = 'decodeAvif';
 
   // Exposes/unmounts a single folder inside an unlocked container as its
   // own SAF root, independent of the container-wide documentProvider flag.

@@ -35,44 +35,41 @@ class _NativeAvifWidgetState extends State<NativeAvifWidget> {
 
   Future<void> _loadAndAnimate() async {
     try {
-      final info = await vaultExplorerApi.getAvifInfo(widget.avifBytes);
-      if (info == null || info.frameCount == 0) {
+      final decoded = await vaultExplorerApi.decodeAvif(widget.avifBytes);
+      if (decoded == null || decoded.frames.isEmpty) {
         if (mounted) setState(() { _error = 'Invalid AVIF image'; _isLoading = false; });
         return;
       }
 
-      final width = info.width;
-      final height = info.height;
-      final count = info.frameCount;
+      final width = decoded.width;
+      final height = decoded.height;
+      final rawFrames = decoded.frames;
 
-      final frames = <ui.Image>[];
-      final durations = <int>[];
-
-      for (int i = 0; i < count; i++) {
-        final frameData = await vaultExplorerApi.decodeAvifFrame(widget.avifBytes, i);
-        if (frameData == null) break;
-
-        final uiImg = await _rgbaToUiImage(frameData.rgbaBytes, width, height);
-        frames.add(uiImg);
-        durations.add(frameData.durationMs > 0 ? frameData.durationMs : 100);
-      }
-
-      if (frames.isEmpty) {
-        if (mounted) setState(() { _error = 'Failed to decode AVIF'; _isLoading = false; });
-        return;
-      }
+      // 1. Convert frame 0 immediately so it paints right away
+      final frame0Img = await _rgbaToUiImage(rawFrames[0].rgbaBytes, width, height);
 
       if (!mounted) return;
 
+      // Paint frame 0 and hide spinner immediately
       setState(() {
-        _decodedFrames = frames;
-        _durationsMs = durations;
-        _currentFrame = frames[0];
+        _currentFrame = frame0Img;
+        _decodedFrames = [frame0Img];
+        _durationsMs = [rawFrames[0].durationMs];
         _isLoading = false;
       });
 
-      if (frames.length > 1) {
-        _scheduleNextFrame();
+      // 2. Convert remaining animation frames in background if multi-frame
+      if (rawFrames.length > 1) {
+        for (int i = 1; i < rawFrames.length; i++) {
+          if (!mounted) break;
+          final img = await _rgbaToUiImage(rawFrames[i].rgbaBytes, width, height);
+          _decodedFrames!.add(img);
+          _durationsMs!.add(rawFrames[i].durationMs);
+        }
+
+        if (mounted && _decodedFrames!.length > 1) {
+          _scheduleNextFrame();
+        }
       }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _isLoading = false; });
@@ -122,7 +119,10 @@ class _NativeAvifWidgetState extends State<NativeAvifWidget> {
     }
     if (_error != null || _currentFrame == null) {
       return Center(
-        child: Text(_error ?? 'Failed to render AVIF', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        child: Text(
+          _error ?? 'Failed to render AVIF',
+          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
       );
     }
     return RawImage(

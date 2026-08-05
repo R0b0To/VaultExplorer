@@ -31,9 +31,8 @@ bool createContainer(int fd, const char* password, int pim, int64_t sizeBytes,
 // master key, writes a fresh header + single occupied keyslot (see
 // luksCreateHeader() in crypto/luks_header.h for the on-disk format
 // details and the LUKS1-is-AES-only restriction), zero-fills the data
-// area, then formats an ext2/ext3/ext4 filesystem on top — LUKS containers
-// are restricted to the ext family since that's the realistic pairing for
-// a container the user intends to also mount on Linux.
+// area, then formats the requested filesystem (fat/exfat/ntfs/ext2/ext3/ext4)
+// on top of it.
 //
 // [luksVersion]: 1 or 2.
 //

@@ -120,6 +120,24 @@ internal object NativeEngine {
         password: String, salt: ByteArray, iterations: Int
     ): ByteArray?
 
+    /** PBKDF2-SHA256 via mbedTLS; no volId, no session required. */
+    @JvmStatic
+    external fun hashPasswordSha256Native(
+        password: String, salt: ByteArray, iterations: Int, outputLen: Int
+    ): ByteArray?
+
+    /** AES-GCM encryption via mbedTLS. */
+    @JvmStatic
+    external fun aesGcmEncryptNative(
+        key: ByteArray, iv: ByteArray, plaintext: ByteArray
+    ): ByteArray?
+
+    /** AES-GCM decryption via mbedTLS. */
+    @JvmStatic
+    external fun aesGcmDecryptNative(
+        key: ByteArray, iv: ByteArray, ciphertextAndTag: ByteArray
+    ): ByteArray?
+
     // ── Session teardown ───────────────────────────────────────────────────
 
     @JvmStatic

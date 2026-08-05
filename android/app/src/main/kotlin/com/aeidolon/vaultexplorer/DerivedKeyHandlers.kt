@@ -296,4 +296,74 @@ class DerivedKeyHandlers(
             }
         }
     }
+
+    fun handleHashPasswordSha256(call: MethodCall, result: MethodChannel.Result) {
+        val password   = call.argument<String>("password")
+        val saltBytes  = call.argument<ByteArray>("salt")
+        val iterations = call.argument<Int>("iterations") ?: 50_000
+        val outputLen  = call.argument<Int>("outputLen") ?: 32
+
+        if (password == null || saltBytes == null || saltBytes.isEmpty()) {
+            result.error("INVALID_ARGS", "password and non-empty salt required", null)
+            return
+        }
+
+        ioExecutor.execute {
+            try {
+                val hash = NativeEngine.hashPasswordSha256Native(password, saltBytes, iterations, outputLen)
+                activity.runOnUiThread {
+                    if (hash != null) result.success(hash)
+                    else result.error("KDF_FAILED", "PBKDF2 SHA-256 derivation failed", null)
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
+    }
+
+    fun handleAesGcmEncrypt(call: MethodCall, result: MethodChannel.Result) {
+        val key = call.argument<ByteArray>("key")
+        val iv = call.argument<ByteArray>("iv")
+        val plaintext = call.argument<ByteArray>("plaintext")
+
+        if (key == null || iv == null || plaintext == null) {
+            result.error("INVALID_ARGS", "key, iv, and plaintext required", null)
+            return
+        }
+
+        ioExecutor.execute {
+            try {
+                val encrypted = NativeEngine.aesGcmEncryptNative(key, iv, plaintext)
+                activity.runOnUiThread {
+                    if (encrypted != null) result.success(encrypted)
+                    else result.error("CRYPTO_FAILED", "AES-GCM encryption failed", null)
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
+    }
+
+    fun handleAesGcmDecrypt(call: MethodCall, result: MethodChannel.Result) {
+        val key = call.argument<ByteArray>("key")
+        val iv = call.argument<ByteArray>("iv")
+        val ciphertextAndTag = call.argument<ByteArray>("ciphertextAndTag")
+
+        if (key == null || iv == null || ciphertextAndTag == null) {
+            result.error("INVALID_ARGS", "key, iv, and ciphertextAndTag required", null)
+            return
+        }
+
+        ioExecutor.execute {
+            try {
+                val decrypted = NativeEngine.aesGcmDecryptNative(key, iv, ciphertextAndTag)
+                activity.runOnUiThread {
+                    if (decrypted != null) result.success(decrypted)
+                    else result.error("CRYPTO_FAILED", "AES-GCM decryption failed", null)
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
+    }
 }

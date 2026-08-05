@@ -83,10 +83,21 @@ abstract final class ChannelMethods {
 
   // ── Crypto ───────────────────────────────────────────────────────────────
   static const hashPassword = 'hashPassword';
+  static const hashPasswordSha256 = 'hashPasswordSha256';
   static const deriveDerivedKey = 'deriveDerivedKey';
   static const storeDerivedKey = 'storeDerivedKey';
   static const loadDerivedKey = 'loadDerivedKey';
   static const clearDerivedKey = 'clearDerivedKey';
+  static const aesGcmEncrypt = 'aesGcmEncrypt';
+  static const aesGcmDecrypt = 'aesGcmDecrypt';
+
+  // ── Secure Storage ───────────────────────────────────────────────────────
+  static const readSecure = 'readSecure';
+  static const writeSecure = 'writeSecure';
+  static const deleteSecure = 'deleteSecure';
+  static const deleteAllSecure = 'deleteAllSecure';
+  static const readAllSecure = 'readAllSecure';
+  static const containsKeySecure = 'containsKeySecure';
 
   // ── Security & Privacy ───────────────────────────────────────────────────
   static const setSecureScreen = 'setSecureScreen';

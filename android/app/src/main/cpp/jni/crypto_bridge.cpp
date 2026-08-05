@@ -16,12 +16,14 @@
 
 #include "mbedtls/md.h"
 #include "mbedtls/pkcs5.h"
+#include "mbedtls/gcm.h"
 #include "mbedtls/platform_util.h"
 
 #include "crypto/cascade.h"
 #include "crypto/vc_header_layout.h"
 #include "crypto/keyfile_mixing.h"
 #include "crypto/luks_header.h"
+#include "crypto/cipher_shim.h"
 #include "session_prepare.h"
 #include "session_guard.h"
 #include "volume_state.h"
@@ -499,6 +501,156 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_cryfsDecryptBlockNative(
     jbyteArray result = env->NewByteArray(out.size());
     if (!out.empty()) {
         env->SetByteArrayRegion(result, 0, out.size(), reinterpret_cast<const jbyte*>(out.data()));
+    }
+    mbedtls_platform_zeroize(out.data(), out.size());
+    return result;
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_hashPasswordSha256Native(
+        JNIEnv* env, jobject,
+        jstring password, jbyteArray salt, jint iterations, jint outputLen) {
+    JNI_TRY
+
+    if (password == nullptr || salt == nullptr || outputLen <= 0) return nullptr;
+
+    const jsize saltLen = env->GetArrayLength(salt);
+    if (saltLen == 0) return nullptr;
+
+    const char* nativePass = env->GetStringUTFChars(password, nullptr);
+    jbyte* saltData        = env->GetByteArrayElements(salt, nullptr);
+
+    const unsigned int safeIter =
+        (iterations > 0) ? static_cast<unsigned int>(iterations) : 50000u;
+
+    std::vector<unsigned char> out(static_cast<size_t>(outputLen), 0);
+
+    bool ok = pbkdf2Hmac(
+        HashId::kSha256,
+        reinterpret_cast<const unsigned char*>(nativePass), strlen(nativePass),
+        reinterpret_cast<const unsigned char*>(saltData), static_cast<size_t>(saltLen),
+        safeIter, out.data(), out.size());
+
+    env->ReleaseStringUTFChars(password, nativePass);
+    env->ReleaseByteArrayElements(salt, saltData, JNI_ABORT);
+
+    if (!ok) return nullptr;
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(out.size()));
+    env->SetByteArrayRegion(result, 0, static_cast<jsize>(out.size()), reinterpret_cast<jbyte*>(out.data()));
+    mbedtls_platform_zeroize(out.data(), out.size());
+
+    return result;
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmEncryptNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jbyteArray iv, jbyteArray plaintext) {
+    JNI_TRY
+
+    if (!key || !iv || !plaintext) return nullptr;
+
+    jsize keyLen = env->GetArrayLength(key);
+    jsize ivLen = env->GetArrayLength(iv);
+    jsize ptLen = env->GetArrayLength(plaintext);
+
+    if (keyLen != 16 && keyLen != 24 && keyLen != 32) return nullptr;
+    if (ivLen == 0) return nullptr;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* ivData = env->GetByteArrayElements(iv, nullptr);
+    jbyte* ptData = ptLen > 0 ? env->GetByteArrayElements(plaintext, nullptr) : nullptr;
+
+    constexpr size_t tagLen = 16;
+    std::vector<uint8_t> out(static_cast<size_t>(ptLen) + tagLen);
+
+    mbedtls_gcm_context ctx;
+    mbedtls_gcm_init(&ctx);
+    bool ok = mbedtls_gcm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES,
+                                 reinterpret_cast<const unsigned char*>(keyData),
+                                 static_cast<unsigned int>(keyLen * 8)) == 0;
+    if (ok) {
+        ok = mbedtls_gcm_crypt_and_tag(
+            &ctx, MBEDTLS_GCM_ENCRYPT, static_cast<size_t>(ptLen),
+            reinterpret_cast<const unsigned char*>(ivData), static_cast<size_t>(ivLen),
+            nullptr, 0,
+            reinterpret_cast<const unsigned char*>(ptData), out.data(),
+            tagLen, out.data() + ptLen) == 0;
+    }
+    mbedtls_gcm_free(&ctx);
+
+    env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+    env->ReleaseByteArrayElements(iv, ivData, JNI_ABORT);
+    if (ptData) env->ReleaseByteArrayElements(plaintext, ptData, JNI_ABORT);
+
+    if (!ok) return nullptr;
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(out.size()));
+    env->SetByteArrayRegion(result, 0, static_cast<jsize>(out.size()), reinterpret_cast<const jbyte*>(out.data()));
+    mbedtls_platform_zeroize(out.data(), out.size());
+    return result;
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmDecryptNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jbyteArray iv, jbyteArray ciphertextAndTag) {
+    JNI_TRY
+
+    if (!key || !iv || !ciphertextAndTag) return nullptr;
+
+    jsize keyLen = env->GetArrayLength(key);
+    jsize ivLen = env->GetArrayLength(iv);
+    jsize ctLen = env->GetArrayLength(ciphertextAndTag);
+
+    constexpr size_t tagLen = 16;
+    if (ctLen < static_cast<jsize>(tagLen)) return nullptr;
+    if (keyLen != 16 && keyLen != 24 && keyLen != 32) return nullptr;
+    if (ivLen == 0) return nullptr;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* ivData = env->GetByteArrayElements(iv, nullptr);
+    jbyte* ctData = env->GetByteArrayElements(ciphertextAndTag, nullptr);
+
+    const size_t ptLen = static_cast<size_t>(ctLen) - tagLen;
+    std::vector<uint8_t> out(ptLen);
+
+    const unsigned char* tagPtr = reinterpret_cast<const unsigned char*>(ctData) + ptLen;
+
+    mbedtls_gcm_context ctx;
+    mbedtls_gcm_init(&ctx);
+    bool ok = mbedtls_gcm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES,
+                                 reinterpret_cast<const unsigned char*>(keyData),
+                                 static_cast<unsigned int>(keyLen * 8)) == 0;
+    if (ok) {
+        ok = mbedtls_gcm_auth_decrypt(
+            &ctx, ptLen,
+            reinterpret_cast<const unsigned char*>(ivData), static_cast<size_t>(ivLen),
+            nullptr, 0,
+            tagPtr, tagLen,
+            reinterpret_cast<const unsigned char*>(ctData), out.data()) == 0;
+    }
+    mbedtls_gcm_free(&ctx);
+
+    env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+    env->ReleaseByteArrayElements(iv, ivData, JNI_ABORT);
+    env->ReleaseByteArrayElements(ciphertextAndTag, ctData, JNI_ABORT);
+
+    if (!ok) {
+        mbedtls_platform_zeroize(out.data(), out.size());
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(out.size()));
+    if (ptLen > 0) {
+        env->SetByteArrayRegion(result, 0, static_cast<jsize>(out.size()), reinterpret_cast<const jbyte*>(out.data()));
     }
     mbedtls_platform_zeroize(out.data(), out.size());
     return result;

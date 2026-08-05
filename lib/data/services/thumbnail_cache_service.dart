@@ -2,9 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:encrypt/encrypt.dart' as enc;
 import 'package:flutter/services.dart';
 
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -57,8 +58,8 @@ class ThumbnailCacheService {
       _memoryCache.trimToFraction(fraction);
 
   // ── AES key ────────────────────────────────────────────────────────────────
-  static Future<enc.Key>? _keyFuture;
-  static Future<enc.Key> getOrFetchKey() =>
+  static Future<Uint8List>? _keyFuture;
+  static Future<Uint8List> getOrFetchKey() =>
       _keyFuture ??= AppCacheEncryption.getEncryptionKey();
 
   // ── App-cache directory — resolved once ───────────────────────────────────
@@ -174,82 +175,39 @@ class ThumbnailCacheService {
 
   // ── AES-GCM helpers ────────────────────────────────────────────────────────
 
-  static Uint8List? _decryptInline(Uint8List raw, enc.Key key) {
+  static Future<Uint8List?> _decrypt(Uint8List raw, Uint8List key) async {
     if (raw.length <= _gcmNonceSize + _gcmTagSize) return null;
     try {
-      final iv = enc.IV(raw.sublist(0, _gcmNonceSize));
-      final ciphertext = enc.Encrypted(raw.sublist(_gcmNonceSize));
-      return Uint8List.fromList(
-        enc.Encrypter(
-          enc.AES(key, mode: enc.AESMode.gcm),
-        ).decryptBytes(ciphertext, iv: iv),
+      final iv = raw.sublist(0, _gcmNonceSize);
+      final ciphertextAndTag = raw.sublist(_gcmNonceSize);
+      return await vaultExplorerApi.aesGcmDecrypt(
+        key: key,
+        iv: iv,
+        ciphertextAndTag: ciphertextAndTag,
       );
     } catch (_) {
       return null;
     }
   }
 
-  static Uint8List _encryptInline(Uint8List data, enc.Key key) {
-    final iv = enc.IV.fromSecureRandom(_gcmNonceSize);
-    final encrypted = enc.Encrypter(
-      enc.AES(key, mode: enc.AESMode.gcm),
-    ).encryptBytes(data, iv: iv);
-    final out = Uint8List(_gcmNonceSize + encrypted.bytes.length);
-    out.setRange(0, _gcmNonceSize, iv.bytes);
-    out.setRange(_gcmNonceSize, out.length, encrypted.bytes);
-    return out;
-  }
-
-  // ── Top-level functions for compute() ─────────────────────────────────────
-
-  static Uint8List? _decryptIsolate(_DecryptArgs args) {
-    if (args.raw.length <= _gcmNonceSize + _gcmTagSize) return null;
-    try {
-      final key = enc.Key(args.keyBytes);
-      final iv = enc.IV(args.raw.sublist(0, _gcmNonceSize));
-      final ciphertext = enc.Encrypted(args.raw.sublist(_gcmNonceSize));
-      return Uint8List.fromList(
-        enc.Encrypter(
-          enc.AES(key, mode: enc.AESMode.gcm),
-        ).decryptBytes(ciphertext, iv: iv),
-      );
-    } catch (_) {
-      return null;
+  static Future<Uint8List> _encrypt(Uint8List data, Uint8List key) async {
+    final rng = Random.secure();
+    final iv = Uint8List(_gcmNonceSize);
+    for (int i = 0; i < _gcmNonceSize; i++) {
+      iv[i] = rng.nextInt(256);
     }
-  }
-
-  static Uint8List _encryptIsolate(_EncryptArgs args) {
-    final key = enc.Key(args.keyBytes);
-    final iv = enc.IV.fromSecureRandom(_gcmNonceSize);
-    final encrypted = enc.Encrypter(
-      enc.AES(key, mode: enc.AESMode.gcm),
-    ).encryptBytes(args.data, iv: iv);
-    final out = Uint8List(_gcmNonceSize + encrypted.bytes.length);
-    out.setRange(0, _gcmNonceSize, iv.bytes);
-    out.setRange(_gcmNonceSize, out.length, encrypted.bytes);
-    return out;
-  }
-
-  // ── Dispatch helpers ───────────────────────────────────────────────────────
-
-  static Future<Uint8List?> _decrypt(Uint8List raw, enc.Key key) async {
-    if (raw.length < _computeThresholdBytes) {
-      return _decryptInline(raw, key);
-    }
-    return compute(
-      _decryptIsolate,
-      _DecryptArgs(raw: raw, keyBytes: key.bytes),
+    final encryptedAndTag = await vaultExplorerApi.aesGcmEncrypt(
+      key: key,
+      iv: iv,
+      plaintext: data,
     );
-  }
-
-  static Future<Uint8List> _encrypt(Uint8List data, enc.Key key) async {
-    if (data.length < _computeThresholdBytes) {
-      return _encryptInline(data, key);
+    if (encryptedAndTag == null) {
+      throw Exception('AES-GCM encryption failed');
     }
-    return compute(
-      _encryptIsolate,
-      _EncryptArgs(data: data, keyBytes: key.bytes),
-    );
+    final out = Uint8List(_gcmNonceSize + encryptedAndTag.length);
+    out.setRange(0, _gcmNonceSize, iv);
+    out.setRange(_gcmNonceSize, out.length, encryptedAndTag);
+    return out;
   }
 
   // ── Memory-tier public helpers ─────────────────────────────────────────────
@@ -682,18 +640,4 @@ static Future<void> put({
       }
     } catch (_) {}
   }
-}
-
-// ── compute() argument records ─────────────────────────────────────────────
-
-class _DecryptArgs {
-  final Uint8List raw;
-  final Uint8List keyBytes;
-  const _DecryptArgs({required this.raw, required this.keyBytes});
-}
-
-class _EncryptArgs {
-  final Uint8List data;
-  final Uint8List keyBytes;
-  const _EncryptArgs({required this.data, required this.keyBytes});
 }

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pointycastle/export.dart' hide State;
+import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 /// A beautiful 3×3 pattern lock widget drawn on a [CustomPainter].
 ///
@@ -281,11 +281,18 @@ const int _patternKdfIterations = 50000;
 const int _patternSaltBytes = 16;
 const int _patternHashBytes = 32;
 
-Uint8List _derivePatternBits(List<int> pattern, Uint8List salt) {
-  final input = Uint8List.fromList(utf8.encode(pattern.join('-')));
-  final derivator = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64))
-    ..init(Pbkdf2Parameters(salt, _patternKdfIterations, _patternHashBytes));
-  return derivator.process(input);
+Future<Uint8List> _derivePatternBits(List<int> pattern, Uint8List salt) async {
+  final input = pattern.join('-');
+  final hash = await vaultExplorerApi.hashPasswordSha256(
+    password: input,
+    salt: salt,
+    iterations: _patternKdfIterations,
+    outputLen: _patternHashBytes,
+  );
+  if (hash == null) {
+    throw Exception('Pattern bit derivation failed');
+  }
+  return hash;
 }
 
 /// Derives a salted, PBKDF2-stretched hash of [pattern] for secure storage.
@@ -300,7 +307,7 @@ Future<String> hashPattern(List<int> pattern) async {
   for (int i = 0; i < _patternSaltBytes; i++) {
     salt[i] = rng.nextInt(256);
   }
-  final hash = _derivePatternBits(pattern, salt);
+  final hash = await _derivePatternBits(pattern, salt);
   return '${base64Encode(salt)}:${base64Encode(hash)}';
 }
 
@@ -316,7 +323,7 @@ Future<bool> verifyPattern(List<int> pattern, String? stored) async {
   try {
     final salt = Uint8List.fromList(base64Decode(parts[0]));
     final expected = base64Decode(parts[1]);
-    final actual = _derivePatternBits(pattern, salt);
+    final actual = await _derivePatternBits(pattern, salt);
     return _constantTimeEquals(actual, expected);
   } catch (_) {
     return false;

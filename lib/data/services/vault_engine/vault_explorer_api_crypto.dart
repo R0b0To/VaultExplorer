@@ -24,6 +24,52 @@ mixin _CryptoOps {
     return result;
   }
 
+  /// PBKDF2-SHA256 via the C++ mbedTLS layer.
+  Future<Uint8List?> hashPasswordSha256({
+    required String password,
+    required Uint8List salt,
+    int iterations = 50000,
+    int outputLen = 32,
+  }) async {
+    assert(salt.isNotEmpty, 'salt must not be empty');
+    final result = await _channel.invokeMethod<Uint8List>(
+      ChannelMethods.hashPasswordSha256,
+      {
+        'password': password,
+        'salt': salt,
+        'iterations': iterations,
+        'outputLen': outputLen,
+      },
+    );
+    return result;
+  }
+
+  /// AES-GCM encryption via the C++ mbedTLS layer.
+  Future<Uint8List?> aesGcmEncrypt({
+    required Uint8List key,
+    required Uint8List iv,
+    required Uint8List plaintext,
+  }) async {
+    final result = await _channel.invokeMethod<Uint8List>(
+      ChannelMethods.aesGcmEncrypt,
+      {'key': key, 'iv': iv, 'plaintext': plaintext},
+    );
+    return result;
+  }
+
+  /// AES-GCM decryption via the C++ mbedTLS layer.
+  Future<Uint8List?> aesGcmDecrypt({
+    required Uint8List key,
+    required Uint8List iv,
+    required Uint8List ciphertextAndTag,
+  }) async {
+    final result = await _channel.invokeMethod<Uint8List>(
+      ChannelMethods.aesGcmDecrypt,
+      {'key': key, 'iv': iv, 'ciphertextAndTag': ciphertextAndTag},
+    );
+    return result;
+  }
+
   Future<Uint8List?> deriveDerivedKey({
     required String filePath,
     required String password,

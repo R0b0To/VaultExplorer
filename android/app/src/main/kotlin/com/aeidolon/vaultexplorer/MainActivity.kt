@@ -114,6 +114,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val systemHandlers = SystemPermissionHandlers(this)
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
     private val disguiseModeHandlers = DisguiseModeHandlers(this)
+    private val secureStorageHandlers = SecureStorageHandlers(this)
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -308,6 +309,15 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.LOAD_DERIVED_KEY -> derivedKeyHandlers.handleLoadDerivedKey(call, result)
                 ChannelMethods.CLEAR_DERIVED_KEY -> derivedKeyHandlers.handleClearDerivedKey(call, result)
                 ChannelMethods.HASH_PASSWORD -> derivedKeyHandlers.handleHashPassword(call, result)
+                "hashPasswordSha256" -> derivedKeyHandlers.handleHashPasswordSha256(call, result)
+                "aesGcmEncrypt" -> derivedKeyHandlers.handleAesGcmEncrypt(call, result)
+                "aesGcmDecrypt" -> derivedKeyHandlers.handleAesGcmDecrypt(call, result)
+                "readSecure" -> secureStorageHandlers.handleRead(call, result)
+                "writeSecure" -> secureStorageHandlers.handleWrite(call, result)
+                "deleteSecure" -> secureStorageHandlers.handleDelete(call, result)
+                "deleteAllSecure" -> secureStorageHandlers.handleDeleteAll(call, result)
+                "readAllSecure" -> secureStorageHandlers.handleReadAll(call, result)
+                "containsKeySecure" -> secureStorageHandlers.handleContainsKey(call, result)
                 ChannelMethods.GET_VIDEO_THUMBNAIL -> thumbnailHandlers.handleGetVideoThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL -> thumbnailHandlers.handleGetImageThumbnail(call, result)
                 ChannelMethods.GET_IMAGE_THUMBNAIL_WITH_SIZE -> thumbnailHandlers.handleGetImageThumbnailWithSize(call, result)

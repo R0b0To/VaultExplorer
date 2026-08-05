@@ -21,6 +21,9 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getAvifInfoNative(
         return nullptr;
     }
 
+    // Force GAV1 decoder if needed, or leave AUTO
+    decoder->codecChoice = AVIF_CODEC_CHOICE_AUTO;
+
     avifResult res = avifDecoderSetIOMemory(decoder, reinterpret_cast<const uint8_t*>(data), len);
     if (res != AVIF_RESULT_OK) {
         LOGE("avifDecoderSetIOMemory failed: %s (%d)", avifResultToString(res), res);

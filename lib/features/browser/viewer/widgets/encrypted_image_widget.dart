@@ -156,7 +156,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     super.dispose();
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
@@ -205,6 +205,24 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     // ── Check if the file is AVIF ──
     final isAvif = widget.fileName.toLowerCase().endsWith('.avif');
     if (isAvif) {
+      // If full-res AVIF has not finished loading, display the JPEG thumbnail
+      // preview using Image.memory until the raw .avif file bytes arrive.
+      if (!_isFullResLoaded) {
+        return Image.memory(
+          _bytes!,
+          fit: widget.fit,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, __, ___) => Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+            ),
+          ),
+        );
+      }
+
+      // Once full-res is loaded, pass the raw .avif file bytes to NativeAvifWidget
       return NativeAvifWidget(
         avifBytes: _bytes!,
         fit: widget.fit,

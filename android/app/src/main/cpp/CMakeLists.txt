@@ -28,11 +28,10 @@ set(LIBGAV1_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
 set(LIBGAV1_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(libgav1)
 
-# FIX: Export alias & include path so libavif detects libgav1
-if(TARGET libgav1)
-    target_include_directories(libgav1 PUBLIC ${libgav1_SOURCE_DIR}/src)
+if(TARGET libgav1_static)
+    target_include_directories(libgav1_static PUBLIC ${libgav1_SOURCE_DIR}/src)
     if(NOT TARGET libgav1::libgav1)
-        add_library(libgav1::libgav1 ALIAS libgav1)
+        add_library(libgav1::libgav1 ALIAS libgav1_static)
     endif()
     set(libgav1_FOUND TRUE CACHE BOOL "" FORCE)
 endif()
@@ -42,14 +41,11 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/AOMediaCodec/libavif.git
     GIT_TAG        c5240fc79fe5c2407e10afd35f5505ef6333ea49
 )
-set(AVIF_CODEC_LIBGAV1 ON CACHE BOOL "" FORCE)
-set(AVIF_CODEC_LIBGAV1_ENCODE OFF CACHE BOOL "" FORCE)
-set(AVIF_CODEC_LIBGAV1_DECODE ON CACHE BOOL "" FORCE)
+set(AVIF_CODEC_LIBGAV1 SYSTEM CACHE STRING "" FORCE)
 set(AVIF_LIBYUV OFF CACHE BOOL "" FORCE)
 set(AVIF_BUILD_APPS OFF CACHE BOOL "" FORCE)
 set(AVIF_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(libavif)
-
 
 # Enable ARMv8 Cryptography Extensions (hardware AES/SHA1/SHA2 instructions)
 # for mbedTLS's runtime-dispatched aesce.c backend. Without this, mbedTLS
@@ -509,7 +505,8 @@ target_link_libraries(
         e2fs_uuid
         cjson
         dislocker_lib
-        avif)
+        avif
+        libgav1_static)
 
 
 if(NOT ANDROID)

@@ -2336,6 +2336,10 @@
       }
     }
   },
+    "addAVaultTitle": "Add a vault",
+  "@addAVaultTitle": {
+    "description": "Bottom sheet title for the add-vault options"
+  },
   "selectEmptyDestinationFolderFirst": "Select an empty destination folder first",
   "@selectEmptyDestinationFolderFirst": {
     "description": "Validation error when creating a folder vault without picking a destination"
@@ -2854,6 +2858,687 @@
   "thumbnailCacheDisabledDesc": "No disk cache. Thumbnails are re-generated on every load.",
   "@thumbnailCacheDisabledDesc": {
     "description": "Description for disabled thumbnail mode"
+  },
+  "unlockContainerTitle": "Unlock Container",
+  "@unlockContainerTitle": {
+    "description": "AppBar title when unlocking a known container"
+  },
+  "containerFileSegment": "Container File",
+  "@containerFileSegment": {
+    "description": "Segmented button label for container-file unlock mode"
+  },
+  "folderVaultSegment": "Folder Vault",
+  "@folderVaultSegment": {
+    "description": "Segmented button label for folder-vault unlock mode"
+  },
+  "enableButtonLabel": "Enable",
+  "@enableButtonLabel": {
+    "description": "Button label to enable a feature (e.g. storage access)"
+  },
+  "retryButtonLabelShort": "Retry",
+  "@retryButtonLabelShort": {
+    "description": "Short retry button label"
+  },
+  "locateFileButton": "Locate File",
+  "@locateFileButton": {
+    "description": "Button to relocate a missing container file"
+  },
+  "authenticateButton": "Authenticate",
+  "@authenticateButton": {
+    "description": "Button label to trigger biometric authentication"
+  },
+  "cancelUnlockButton": "Cancel Unlock",
+  "@cancelUnlockButton": {
+    "description": "Button to cancel an in-progress unlock operation"
+  },
+  "incorrectPasswordOrInvalidVault": "Incorrect password or invalid vault",
+  "@incorrectPasswordOrInvalidVault": {
+    "description": "Error message when folder-vault unlock fails"
+  },
+  "incorrectPasswordOrInvalidContainer": "Incorrect password or invalid container",
+  "@incorrectPasswordOrInvalidContainer": {
+    "description": "Error message when container unlock fails"
+  },
+  "decryptingLabel": "Decrypting…",
+  "@decryptingLabel": {
+    "description": "Generic progress label while decrypting"
+  },
+  "tryingKeyslotProgress": "Trying keyslot {attempted} of {total}…",
+  "@tryingKeyslotProgress": {
+    "description": "LUKS unlock progress with multiple keyslots",
+    "placeholders": {
+      "attempted": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "tryingKeyslotSingle": "Trying keyslot…",
+  "@tryingKeyslotSingle": {
+    "description": "LUKS unlock progress with a single keyslot"
+  },
+  "verifyingCredentialProgress": "Verifying credential {attempted} of {total}…",
+  "@verifyingCredentialProgress": {
+    "description": "BitLocker unlock progress with multiple credentials",
+    "placeholders": {
+      "attempted": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "verifyingCredentialSingle": "Verifying credential…",
+  "@verifyingCredentialSingle": {
+    "description": "BitLocker unlock progress with a single credential"
+  },
+  "tryingAlgoSlot": "Trying {algo} ({slotName})…",
+  "@tryingAlgoSlot": {
+    "description": "VeraCrypt unlock progress showing algorithm and slot",
+    "placeholders": {
+      "algo": { "type": "String" },
+      "slotName": { "type": "String" }
+    }
+  },
+  "hiddenVolumeSlotName": "Hidden Volume",
+  "@hiddenVolumeSlotName": {
+    "description": "Slot name for VeraCrypt hidden volume during unlock"
+  },
+  "standardVolumeSlotName": "Standard Volume",
+  "@standardVolumeSlotName": {
+    "description": "Slot name for VeraCrypt standard volume during unlock"
+  },
+  "encryptedContainerLabel": "Encrypted Container",
+  "@encryptedContainerLabel": {
+    "description": "Generic label for an unidentified encrypted container"
+  },
+  "containerMissingTitle": "Container Missing",
+  "@containerMissingTitle": {
+    "description": "Error card title when the container file cannot be found"
+  },
+  "containerMissingSubtitle": "File path could not be resolved",
+  "@containerMissingSubtitle": {
+    "description": "Error card subtitle when the container file cannot be found"
+  },
+  "containerMissingBody": "The container file may have been moved, deleted, or its host storage is currently disconnected.",
+  "@containerMissingBody": {
+    "description": "Explanation text when a container is missing"
+  },
+  "biometricUnlockTitle": "Biometric Unlock",
+  "@biometricUnlockTitle": {
+    "description": "Title of the biometric unlock card"
+  },
+  "biometricUnlockSubtitle": "Authenticate to securely mount the container",
+  "@biometricUnlockSubtitle": {
+    "description": "Subtitle of the biometric unlock card"
+  },
+  "drawUnlockPatternTitle": "Draw Unlock Pattern",
+  "@drawUnlockPatternTitle": {
+    "description": "Title of the pattern unlock card"
+  },
+  "connectPatternSequence": "Connect your pattern sequence",
+  "@connectPatternSequence": {
+    "description": "Subtitle prompting the user to draw their pattern"
+  },
+  "passwordLabel": "Password",
+  "@passwordLabel": {
+    "description": "Label for password text field"
+  },
+  "enterVaultPasswordHint": "Enter vault password",
+  "@enterVaultPasswordHint": {
+    "description": "Hint text for folder-vault password field"
+  },
+  "enterBitlockerPasswordHint": "Enter password or recovery key",
+  "@enterBitlockerPasswordHint": {
+    "description": "Hint text for BitLocker password field"
+  },
+  "enterContainerPasswordHint": "Enter container password",
+  "@enterContainerPasswordHint": {
+    "description": "Hint text for container password field"
+  },
+  "readOnlyModeUsbSubtitleDrive": "Mount without allowing changes to this drive",
+  "@readOnlyModeUsbSubtitleDrive": {
+    "description": "Read-only toggle subtitle specific to USB drives"
+  },
+  "rememberDriveLabel": "Remember drive",
+  "@rememberDriveLabel": {
+    "description": "Toggle label to pin a USB drive on the dashboard"
+  },
+  "rememberDriveSubtitle": "Pin drive on dashboard for quick access",
+  "@rememberDriveSubtitle": {
+    "description": "Subtitle for remember-drive toggle"
+  },
+  "unlockVaultButtonLabel": "Unlock Vault",
+  "@unlockVaultButtonLabel": {
+    "description": "Button label to unlock a folder vault"
+  },
+  "cryfsStorageAccessWarning": "CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.",
+  "@cryfsStorageAccessWarning": {
+    "description": "Warning message about CryFS performance without direct storage access"
+  },
+  "folderVaultStorageAccessWarning": "Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.",
+  "@folderVaultStorageAccessWarning": {
+    "description": "Warning message about folder vault performance without direct storage access"
+  },
+  "requestingPermission": "Requesting permission…",
+  "@requestingPermission": {
+    "description": "Progress label while requesting USB permission"
+  },
+  "unlockAndMountButton": "Unlock & Mount",
+  "@unlockAndMountButton": {
+    "description": "Button label for USB reconnect unlock"
+  },
+  "unlockDriveButton": "Unlock Drive",
+  "@unlockDriveButton": {
+    "description": "Button label to unlock a USB drive"
+  },
+  "couldntFindDevice": "Couldn't find \"{deviceName}\"",
+  "@couldntFindDevice": {
+    "description": "Error title when a saved USB device is not found",
+    "placeholders": {
+      "deviceName": { "type": "String" }
+    }
+  },
+  "plugDriveBackInRetry": "Plug the drive back in and tap Retry, or select it below if it shows up under a different name.",
+  "@plugDriveBackInRetry": {
+    "description": "Instruction when a saved USB device is not found"
+  },
+  "retryConnectionButton": "Retry Connection",
+  "@retryConnectionButton": {
+    "description": "Button to retry USB device connection"
+  },
+  "refreshDevicesButton": "Refresh Devices",
+  "@refreshDevicesButton": {
+    "description": "Button to refresh USB device list"
+  },
+  "connectOtgDriveToMount": "Connect an OTG flash drive to mount",
+  "@connectOtgDriveToMount": {
+    "description": "Empty state subtitle when no USB devices are detected"
+  },
+  "alreadyActive": "Already active",
+  "@alreadyActive": {
+    "description": "Status label for an already-mounted USB device"
+  },
+  "active": "Active",
+  "@active": {
+    "description": "Short badge label for an already-active USB device"
+  },
+  "readyToUnlock": "Ready to unlock",
+  "@readyToUnlock": {
+    "description": "Status label for a USB device with permission granted"
+  },
+  "enterUsbPartitionPassword": "Enter USB partition password",
+  "@enterUsbPartitionPassword": {
+    "description": "Hint text for USB partition password field"
+  },
+  "biometricAuthenticationTitle": "Biometric Authentication",
+  "@biometricAuthenticationTitle": {
+    "description": "Title of the biometric auth card on USB unlock"
+  },
+  "biometricAuthUsbSubtitle": "Authenticate to unlock and mount this USB device",
+  "@biometricAuthUsbSubtitle": {
+    "description": "Subtitle of the biometric auth card on USB unlock"
+  },
+  "connectPatternSequenceToMount": "Connect your pattern sequence to mount",
+  "@connectPatternSequenceToMount": {
+    "description": "Subtitle prompting the user to draw their pattern to mount USB"
+  },
+  "selectAllAction": "Select All",
+  "@selectAllAction": {
+    "description": "Menu item to select all items"
+  },
+  "clearSelectionAction": "Clear Selection",
+  "@clearSelectionAction": {
+    "description": "Menu item to clear the selection"
+  },
+  "clearSelectionTooltip": "Clear selection",
+  "@clearSelectionTooltip": {
+    "description": "Tooltip for close/clear selection button"
+  },
+  "selectionOptionsTooltip": "Selection options",
+  "@selectionOptionsTooltip": {
+    "description": "Tooltip for the selection dropdown menu"
+  },
+  "readOnlyContainerTooltip": "Read-only container",
+  "@readOnlyContainerTooltip": {
+    "description": "Tooltip shown when an action is disabled due to read-only"
+  },
+  "copyAction": "Copy",
+  "@copyAction": {
+    "description": "Action label to copy items"
+  },
+  "moveAction": "Move",
+  "@moveAction": {
+    "description": "Action label to move/cut items"
+  },
+  "renameAction": "Rename",
+  "@renameAction": {
+    "description": "Action label to rename items"
+  },
+  "exportToDeviceAction": "Export to device",
+  "@exportToDeviceAction": {
+    "description": "Menu item to export items to the device"
+  },
+  "openWithAppAction": "Open with App",
+  "@openWithAppAction": {
+    "description": "Menu item to open a file with an external app"
+  },
+  "pinAction": "Pin",
+  "@pinAction": {
+    "description": "Menu item to pin item"
+  },
+  "pinSelectedAction": "Pin selected",
+  "@pinSelectedAction": {
+    "description": "Menu item to pin multiple items"
+  },
+  "unpinAction": "Unpin",
+  "@unpinAction": {
+    "description": "Menu item to unpin item"
+  },
+  "unpinSelectedAction": "Unpin selected",
+  "@unpinSelectedAction": {
+    "description": "Menu item to unpin multiple items"
+  },
+  "documentProviderSettingsMenu": "Document Provider Settings",
+  "@documentProviderSettingsMenu": {
+    "description": "Menu item for document provider settings on a folder"
+  },
+  "exposeAsDocumentProviderMenu": "Expose as Document Provider",
+  "@exposeAsDocumentProviderMenu": {
+    "description": "Menu item to expose a folder as a document provider"
+  },
+  "moreOptionsTooltipShort": "More options",
+  "@moreOptionsTooltipShort": {
+    "description": "Tooltip for the more-options overflow menu"
+  },
+  "copyTooltip": "Copy",
+  "@copyTooltip": {
+    "description": "Tooltip for copy icon button"
+  },
+  "searchInThisFolderHint": "Search in this folder…",
+  "@searchInThisFolderHint": {
+    "description": "Hint text for the bottom search bar"
+  },
+  "closeSearchTooltip": "Close search",
+  "@closeSearchTooltip": {
+    "description": "Tooltip for close search button"
+  },
+  "clearTooltip": "Clear",
+  "@clearTooltip": {
+    "description": "Tooltip for clear text button"
+  },
+  "backToDashboardTooltip": "Back to dashboard",
+  "@backToDashboardTooltip": {
+    "description": "Tooltip for the back button in browser app bar"
+  },
+  "cancelPasteButton": "Cancel paste",
+  "@cancelPasteButton": {
+    "description": "Button to cancel a paste operation"
+  },
+  "continueButton": "Continue",
+  "@continueButton": {
+    "description": "Button to continue a conflict resolution"
+  },
+  "skipButton": "Skip",
+  "@skipButton": {
+    "description": "Button to skip a conflicting file"
+  },
+  "keepBothButton": "Keep both",
+  "@keepBothButton": {
+    "description": "Button to keep both files in conflict resolution"
+  },
+  "clearAllButton": "Clear all",
+  "@clearAllButton": {
+    "description": "Button to clear all file operations"
+  },
+  "autoMountWhenUnlocksTitle": "Auto-mount when container unlocks",
+  "@autoMountWhenUnlocksTitle": {
+    "description": "Toggle title for auto-mounting a document provider folder"
+  },
+  "autoMountWhenUnlocksSubtitle": "Expose this folder again automatically next time",
+  "@autoMountWhenUnlocksSubtitle": {
+    "description": "Toggle subtitle for auto-mounting a document provider folder"
+  },
+  "unmountButton": "Unmount",
+  "@unmountButton": {
+    "description": "Button to unmount a document provider folder"
+  },
+  "filtersMenuItem": "Filters",
+  "@filtersMenuItem": {
+    "description": "Menu item for filters"
+  },
+  "settingsMenuItem": "Settings",
+  "@settingsMenuItem": {
+    "description": "Menu item for settings"
+  },
+  "sortOptionsTooltip": "Sort options",
+  "@sortOptionsTooltip": {
+    "description": "Tooltip for sort options menu button"
+  },
+  "layoutOptionsTooltip": "Layout options",
+  "@layoutOptionsTooltip": {
+    "description": "Tooltip for layout mode menu button"
+  },
+  "lockContainerTooltip": "Lock container",
+  "@lockContainerTooltip": {
+    "description": "Tooltip for the lock container action button"
+  },
+  "renameTooltip": "Rename",
+  "@renameTooltip": {
+    "description": "Tooltip for the rename action button"
+  },
+  "cancelUpdatingPasswordTooltip": "Cancel updating password",
+  "@cancelUpdatingPasswordTooltip": {
+    "description": "Tooltip for cancelling password update"
+  },
+  "unlockSettingsButton": "Unlock Settings",
+  "@unlockSettingsButton": {
+    "description": "Button to open unlock method settings"
+  },
+  "updateSavedCredentialsButton": "Update Saved Credentials",
+  "@updateSavedCredentialsButton": {
+    "description": "Button to update saved credentials for a container"
+  },
+  "verifyCredentialsTitle": "Verify Credentials",
+  "@verifyCredentialsTitle": {
+    "description": "Dialog title for verifying credentials before update"
+  },
+  "verifyButton": "Verify",
+  "@verifyButton": {
+    "description": "Button label to verify credentials"
+  },
+  "displayNameTitle": "Display Name",
+  "@displayNameTitle": {
+    "description": "Dialog title for editing a container display name"
+  },
+  "containerNameHint": "Container name",
+  "@containerNameHint": {
+    "description": "Hint text for the container name input field"
+  },
+  "deleteFileDialogTitle": "Delete file?",
+  "@deleteFileDialogTitle": {
+    "description": "Confirmation dialog title for deleting a single file"
+  },
+  "deleteFilePermanentWarning": "This action is permanent and cannot be undone.",
+  "@deleteFilePermanentWarning": {
+    "description": "Warning text in the delete file confirmation dialog"
+  },
+  "unsavedChangesTitle": "Unsaved Changes",
+  "@unsavedChangesTitle": {
+    "description": "Dialog title when closing text editor with unsaved changes"
+  },
+  "unsavedChangesMessage": "You have unsaved changes. Would you like to save before closing?",
+  "@unsavedChangesMessage": {
+    "description": "Dialog message when closing text editor with unsaved changes"
+  },
+  "discardButton": "Discard",
+  "@discardButton": {
+    "description": "Button label to discard changes"
+  },
+  "decryptingFileContent": "Decrypting file content...",
+  "@decryptingFileContent": {
+    "description": "Loading message while decrypting a file for the text editor"
+  },
+  "cannotOpenFile": "Cannot open file",
+  "@cannotOpenFile": {
+    "description": "Error title when a file cannot be opened in the text editor"
+  },
+  "changesSavedSuccessfully": "Changes saved successfully",
+  "@changesSavedSuccessfully": {
+    "description": "Snackbar message after successfully saving a text file"
+  },
+  "saveFailedWithError": "Save failed: {error}",
+  "@saveFailedWithError": {
+    "description": "Snackbar message when saving a text file fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "linesCount": "Lines: {count}",
+  "@linesCount": {
+    "description": "Bottom bar line count in text editor",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "charsCount": "Chars: {count}",
+  "@charsCount": {
+    "description": "Bottom bar character count in text editor",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "unsavedChangesLabel": "Unsaved Changes",
+  "@unsavedChangesLabel": {
+    "description": "Bottom bar status when text editor has unsaved changes"
+  },
+  "savedToVault": "Saved to vault",
+  "@savedToVault": {
+    "description": "Bottom bar status when text file is saved"
+  },
+  "saveChangesTooltip": "Save changes",
+  "@saveChangesTooltip": {
+    "description": "Tooltip for save icon button in text editor"
+  },
+  "backTooltip": "Back",
+  "@backTooltip": {
+    "description": "Generic back navigation tooltip"
+  },
+  "forwardTooltip": "Forward",
+  "@forwardTooltip": {
+    "description": "Forward navigation tooltip for HTML viewer"
+  },
+  "reloadTooltip": "Reload",
+  "@reloadTooltip": {
+    "description": "Reload tooltip for HTML viewer"
+  },
+  "optionsTooltip": "Options",
+  "@optionsTooltip": {
+    "description": "Options menu tooltip"
+  },
+  "disableJavaScriptMenu": "Disable JavaScript",
+  "@disableJavaScriptMenu": {
+    "description": "Menu item to disable JavaScript in HTML viewer"
+  },
+  "enableJavaScriptMenu": "Enable JavaScript",
+  "@enableJavaScriptMenu": {
+    "description": "Menu item to enable JavaScript in HTML viewer"
+  },
+  "enterFullscreenMenu": "Enter Fullscreen",
+  "@enterFullscreenMenu": {
+    "description": "Menu item to enter fullscreen mode"
+  },
+  "failedToOpenExternalApp": "Failed to open in external app: {error}",
+  "@failedToOpenExternalApp": {
+    "description": "Snackbar error when opening a file in external app fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "thisFolderMenu": "This Folder",
+  "@thisFolderMenu": {
+    "description": "Menu item for current-folder-only playlist scope"
+  },
+  "allInclSubfoldersMenu": "All (Incl. Subfolders)",
+  "@allInclSubfoldersMenu": {
+    "description": "Menu item for all-including-subfolders playlist scope"
+  },
+  "disableShuffleMenu": "Disable Shuffle",
+  "@disableShuffleMenu": {
+    "description": "Menu item to disable playlist shuffle"
+  },
+  "shufflePlaylistMenu": "Shuffle Playlist",
+  "@shufflePlaylistMenu": {
+    "description": "Menu item to enable playlist shuffle"
+  },
+  "playlistOptionsTooltip": "Playlist Options",
+  "@playlistOptionsTooltip": {
+    "description": "Tooltip when playlist is active"
+  },
+  "enablePlaylistTooltip": "Enable Playlist",
+  "@enablePlaylistTooltip": {
+    "description": "Tooltip when playlist is not active"
+  },
+  "moreActionsTooltip": "More Actions",
+  "@moreActionsTooltip": {
+    "description": "Tooltip for the more-actions menu"
+  },
+  "forcePortraitMenu": "Force Portrait",
+  "@forcePortraitMenu": {
+    "description": "Menu item to force portrait orientation"
+  },
+  "forceLandscapeMenu": "Force Landscape",
+  "@forceLandscapeMenu": {
+    "description": "Menu item to force landscape orientation"
+  },
+  "autoRotateSensorMenu": "Auto-Rotate (Sensor)",
+  "@autoRotateSensorMenu": {
+    "description": "Menu item to follow sensor orientation"
+  },
+  "screenOrientationMenu": "Screen Orientation",
+  "@screenOrientationMenu": {
+    "description": "Submenu title for screen orientation options"
+  },
+  "playlistTransitionMenu": "Playlist Transition",
+  "@playlistTransitionMenu": {
+    "description": "Submenu title for playlist transition effect options"
+  },
+  "deleteFileMenu": "Delete File",
+  "@deleteFileMenu": {
+    "description": "Menu item to delete the current file"
+  },
+  "thumbnailCarouselTooltip": "Thumbnail Carousel",
+  "@thumbnailCarouselTooltip": {
+    "description": "Tooltip for toggle thumbnail carousel button"
+  },
+  "advancedSettingsTooltip": "Advanced Settings",
+  "@advancedSettingsTooltip": {
+    "description": "Tooltip for advanced settings button"
+  },
+  "previousTooltip": "Previous",
+  "@previousTooltip": {
+    "description": "Tooltip for previous media button"
+  },
+  "nextTooltip": "Next",
+  "@nextTooltip": {
+    "description": "Tooltip for next media button"
+  },
+  "diagnosticsCopiedToClipboard": "Diagnostics copied to clipboard",
+  "@diagnosticsCopiedToClipboard": {
+    "description": "Snackbar message when diagnostics are copied"
+  },
+  "diagnosticsTitle": "Diagnostics",
+  "@diagnosticsTitle": {
+    "description": "Title of the diagnostics sheet"
+  },
+  "copyDiagnosticsTooltip": "Copy diagnostics",
+  "@copyDiagnosticsTooltip": {
+    "description": "Tooltip for copy diagnostics button"
+  },
+  "closeTooltip": "Close",
+  "@closeTooltip": {
+    "description": "Tooltip for close button"
+  },
+  "rotate90Label": "Rotate 90°",
+  "@rotate90Label": {
+    "description": "Label for rotate 90 degrees action"
+  },
+  "imageFitModeLabel": "Image Fit Mode",
+  "@imageFitModeLabel": {
+    "description": "Label for image fit mode option"
+  },
+  "slideshowDelayLabel": "Slideshow Delay",
+  "@slideshowDelayLabel": {
+    "description": "Label for slideshow delay option"
+  },
+  "playbackSpeedLabel": "Playback Speed",
+  "@playbackSpeedLabel": {
+    "description": "Label for playback speed option"
+  },
+  "subtitlesLabel": "Subtitles",
+  "@subtitlesLabel": {
+    "description": "Label for subtitles toggle"
+  },
+  "imageSettingsTitle": "Image Settings",
+  "@imageSettingsTitle": {
+    "description": "Sheet title for image settings"
+  },
+  "playbackSettingsTitle": "Playback Settings",
+  "@playbackSettingsTitle": {
+    "description": "Sheet title for playback/video settings"
+  },
+  "imageFitContain": "Contain",
+  "@imageFitContain": {
+    "description": "Image fit mode: contain"
+  },
+  "imageFitWidth": "Fit Width",
+  "@imageFitWidth": {
+    "description": "Image fit mode: fit width"
+  },
+  "imageFitHeight": "Fit Height",
+  "@imageFitHeight": {
+    "description": "Image fit mode: fit height"
+  },
+  "nSecondsDelay": "{n} seconds",
+  "@nSecondsDelay": {
+    "description": "Slideshow delay option label",
+    "placeholders": {
+      "n": { "type": "int" }
+    }
+  },
+  "playbackSpeedNormal": "{speed}x (Normal)",
+  "@playbackSpeedNormal": {
+    "description": "Playback speed label with Normal tag",
+    "placeholders": {
+      "speed": { "type": "String" }
+    }
+  },
+  "settingsTooltipShort": "Settings",
+  "@settingsTooltipShort": {
+    "description": "Tooltip for settings menu button"
+  },
+  "sourceCodeTooltip": "Source Code",
+  "@sourceCodeTooltip": {
+    "description": "Tooltip for source code link on about screen"
+  },
+  "donateTooltip": "Donate",
+  "@donateTooltip": {
+    "description": "Tooltip for donate link on about screen"
+  },
+  "shareAppTooltip": "Share App",
+  "@shareAppTooltip": {
+    "description": "Tooltip for share app button on about screen"
+  },
+  "resetToDefaultsTooltip": "Reset to defaults",
+  "@resetToDefaultsTooltip": {
+    "description": "Tooltip for reset to defaults button on toolbar settings"
+  },
+  "usbUnlockContainerTitle": "Unlock USB Container",
+  "@usbUnlockContainerTitle": {
+    "description": "AppBar title when unlocking a USB container"
+  },
+  "usbMountContainerTitle": "Mount USB Drive",
+  "@usbMountContainerTitle": {
+    "description": "AppBar title when mounting a new USB drive"
+  },
+  "staticLabel": "Static",
+  "@staticLabel": {
+    "description": "Label when slideshow auto-advance is off"
+  },
+  "unmuteTooltip": "Unmute",
+  "@unmuteTooltip": {
+    "description": "Tooltip for unmute button"
+  },
+  "muteTooltip": "Mute",
+  "@muteTooltip": {
+    "description": "Tooltip for mute button"
+  },
+  "playOnceDisabledTooltip": "Play Once (Auto-Advance Disabled)",
+  "@playOnceDisabledTooltip": {
+    "description": "Tooltip for play once mode"
+  },
+  "playAndAdvanceTooltip": "Play & Advance to Next",
+  "@playAndAdvanceTooltip": {
+    "description": "Tooltip for play and advance mode"
+  },
+  "loopCurrentVideoTooltip": "Loop Current Video",
+  "@loopCurrentVideoTooltip": {
+    "description": "Tooltip for loop video mode"
   }
 }
 

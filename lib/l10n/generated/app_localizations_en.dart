@@ -719,7 +719,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get biometricUnlockTitle => 'Biometric Unlock';
 
   @override
-  String get biometricUnlockSubtitle => 'Use fingerprint or face recognition';
+  String get biometricUnlockSubtitle =>
+      'Authenticate to securely mount the container';
 
   @override
   String get changeMasterPasswordTitle => 'Change Master Password';
@@ -1011,7 +1012,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get patternsDontMatch => 'Patterns don\'t match — try again';
 
   @override
-  String get drawUnlockPatternTitle => 'Draw your unlock pattern';
+  String get drawUnlockPatternTitle => 'Draw Unlock Pattern';
 
   @override
   String get confirmPatternTitle => 'Confirm your pattern';
@@ -1133,7 +1134,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get genericUnknownError => 'Unknown error';
 
   @override
-  String get decryptingLabel => 'Decrypting...';
+  String get decryptingLabel => 'Decrypting…';
 
   @override
   String luksKeyslotProgress(int attempted, int total) {
@@ -1718,6 +1719,9 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get addAVaultTitle => 'Add a vault';
+
+  @override
   String get selectEmptyDestinationFolderFirst =>
       'Select an empty destination folder first';
 
@@ -2126,4 +2130,493 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get thumbnailCacheDisabledDesc =>
       'No disk cache. Thumbnails are re-generated on every load.';
+
+  @override
+  String get unlockContainerTitle => 'Unlock Container';
+
+  @override
+  String get containerFileSegment => 'Container File';
+
+  @override
+  String get folderVaultSegment => 'Folder Vault';
+
+  @override
+  String get enableButtonLabel => 'Enable';
+
+  @override
+  String get retryButtonLabelShort => 'Retry';
+
+  @override
+  String get locateFileButton => 'Locate File';
+
+  @override
+  String get authenticateButton => 'Authenticate';
+
+  @override
+  String get cancelUnlockButton => 'Cancel Unlock';
+
+  @override
+  String tryingKeyslotProgress(int attempted, int total) {
+    return 'Trying keyslot $attempted of $total…';
+  }
+
+  @override
+  String get tryingKeyslotSingle => 'Trying keyslot…';
+
+  @override
+  String verifyingCredentialProgress(int attempted, int total) {
+    return 'Verifying credential $attempted of $total…';
+  }
+
+  @override
+  String get verifyingCredentialSingle => 'Verifying credential…';
+
+  @override
+  String tryingAlgoSlot(String algo, String slotName) {
+    return 'Trying $algo ($slotName)…';
+  }
+
+  @override
+  String get hiddenVolumeSlotName => 'Hidden Volume';
+
+  @override
+  String get standardVolumeSlotName => 'Standard Volume';
+
+  @override
+  String get containerMissingSubtitle => 'File path could not be resolved';
+
+  @override
+  String get containerMissingBody =>
+      'The container file may have been moved, deleted, or its host storage is currently disconnected.';
+
+  @override
+  String get connectPatternSequence => 'Connect your pattern sequence';
+
+  @override
+  String get passwordLabel => 'Password';
+
+  @override
+  String get enterVaultPasswordHint => 'Enter vault password';
+
+  @override
+  String get enterBitlockerPasswordHint => 'Enter password or recovery key';
+
+  @override
+  String get enterContainerPasswordHint => 'Enter container password';
+
+  @override
+  String get readOnlyModeUsbSubtitleDrive =>
+      'Mount without allowing changes to this drive';
+
+  @override
+  String get rememberDriveLabel => 'Remember drive';
+
+  @override
+  String get rememberDriveSubtitle => 'Pin drive on dashboard for quick access';
+
+  @override
+  String get unlockVaultButtonLabel => 'Unlock Vault';
+
+  @override
+  String get cryfsStorageAccessWarning =>
+      'CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.';
+
+  @override
+  String get folderVaultStorageAccessWarning =>
+      'Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.';
+
+  @override
+  String get requestingPermission => 'Requesting permission…';
+
+  @override
+  String get unlockAndMountButton => 'Unlock & Mount';
+
+  @override
+  String get unlockDriveButton => 'Unlock Drive';
+
+  @override
+  String couldntFindDevice(String deviceName) {
+    return 'Couldn\'t find \"$deviceName\"';
+  }
+
+  @override
+  String get plugDriveBackInRetry =>
+      'Plug the drive back in and tap Retry, or select it below if it shows up under a different name.';
+
+  @override
+  String get retryConnectionButton => 'Retry Connection';
+
+  @override
+  String get refreshDevicesButton => 'Refresh Devices';
+
+  @override
+  String get connectOtgDriveToMount => 'Connect an OTG flash drive to mount';
+
+  @override
+  String get alreadyActive => 'Already active';
+
+  @override
+  String get active => 'Active';
+
+  @override
+  String get readyToUnlock => 'Ready to unlock';
+
+  @override
+  String get enterUsbPartitionPassword => 'Enter USB partition password';
+
+  @override
+  String get biometricAuthenticationTitle => 'Biometric Authentication';
+
+  @override
+  String get biometricAuthUsbSubtitle =>
+      'Authenticate to unlock and mount this USB device';
+
+  @override
+  String get connectPatternSequenceToMount =>
+      'Connect your pattern sequence to mount';
+
+  @override
+  String get selectAllAction => 'Select All';
+
+  @override
+  String get clearSelectionAction => 'Clear Selection';
+
+  @override
+  String get clearSelectionTooltip => 'Clear selection';
+
+  @override
+  String get selectionOptionsTooltip => 'Selection options';
+
+  @override
+  String get readOnlyContainerTooltip => 'Read-only container';
+
+  @override
+  String get copyAction => 'Copy';
+
+  @override
+  String get moveAction => 'Move';
+
+  @override
+  String get renameAction => 'Rename';
+
+  @override
+  String get exportToDeviceAction => 'Export to device';
+
+  @override
+  String get openWithAppAction => 'Open with App';
+
+  @override
+  String get pinAction => 'Pin';
+
+  @override
+  String get pinSelectedAction => 'Pin selected';
+
+  @override
+  String get unpinAction => 'Unpin';
+
+  @override
+  String get unpinSelectedAction => 'Unpin selected';
+
+  @override
+  String get documentProviderSettingsMenu => 'Document Provider Settings';
+
+  @override
+  String get exposeAsDocumentProviderMenu => 'Expose as Document Provider';
+
+  @override
+  String get moreOptionsTooltipShort => 'More options';
+
+  @override
+  String get copyTooltip => 'Copy';
+
+  @override
+  String get searchInThisFolderHint => 'Search in this folder…';
+
+  @override
+  String get clearTooltip => 'Clear';
+
+  @override
+  String get backToDashboardTooltip => 'Back to dashboard';
+
+  @override
+  String get cancelPasteButton => 'Cancel paste';
+
+  @override
+  String get continueButton => 'Continue';
+
+  @override
+  String get skipButton => 'Skip';
+
+  @override
+  String get keepBothButton => 'Keep both';
+
+  @override
+  String get clearAllButton => 'Clear all';
+
+  @override
+  String get autoMountWhenUnlocksTitle => 'Auto-mount when container unlocks';
+
+  @override
+  String get autoMountWhenUnlocksSubtitle =>
+      'Expose this folder again automatically next time';
+
+  @override
+  String get unmountButton => 'Unmount';
+
+  @override
+  String get filtersMenuItem => 'Filters';
+
+  @override
+  String get settingsMenuItem => 'Settings';
+
+  @override
+  String get sortOptionsTooltip => 'Sort options';
+
+  @override
+  String get layoutOptionsTooltip => 'Layout options';
+
+  @override
+  String get lockContainerTooltip => 'Lock container';
+
+  @override
+  String get renameTooltip => 'Rename';
+
+  @override
+  String get cancelUpdatingPasswordTooltip => 'Cancel updating password';
+
+  @override
+  String get unlockSettingsButton => 'Unlock Settings';
+
+  @override
+  String get updateSavedCredentialsButton => 'Update Saved Credentials';
+
+  @override
+  String get verifyCredentialsTitle => 'Verify Credentials';
+
+  @override
+  String get verifyButton => 'Verify';
+
+  @override
+  String get displayNameTitle => 'Display Name';
+
+  @override
+  String get containerNameHint => 'Container name';
+
+  @override
+  String get deleteFileDialogTitle => 'Delete file?';
+
+  @override
+  String get deleteFilePermanentWarning =>
+      'This action is permanent and cannot be undone.';
+
+  @override
+  String get unsavedChangesTitle => 'Unsaved Changes';
+
+  @override
+  String get unsavedChangesMessage =>
+      'You have unsaved changes. Would you like to save before closing?';
+
+  @override
+  String get discardButton => 'Discard';
+
+  @override
+  String get decryptingFileContent => 'Decrypting file content...';
+
+  @override
+  String get cannotOpenFile => 'Cannot open file';
+
+  @override
+  String get changesSavedSuccessfully => 'Changes saved successfully';
+
+  @override
+  String saveFailedWithError(String error) {
+    return 'Save failed: $error';
+  }
+
+  @override
+  String linesCount(int count) {
+    return 'Lines: $count';
+  }
+
+  @override
+  String charsCount(int count) {
+    return 'Chars: $count';
+  }
+
+  @override
+  String get unsavedChangesLabel => 'Unsaved Changes';
+
+  @override
+  String get savedToVault => 'Saved to vault';
+
+  @override
+  String get saveChangesTooltip => 'Save changes';
+
+  @override
+  String get backTooltip => 'Back';
+
+  @override
+  String get forwardTooltip => 'Forward';
+
+  @override
+  String get reloadTooltip => 'Reload';
+
+  @override
+  String get optionsTooltip => 'Options';
+
+  @override
+  String get disableJavaScriptMenu => 'Disable JavaScript';
+
+  @override
+  String get enableJavaScriptMenu => 'Enable JavaScript';
+
+  @override
+  String get enterFullscreenMenu => 'Enter Fullscreen';
+
+  @override
+  String failedToOpenExternalApp(String error) {
+    return 'Failed to open in external app: $error';
+  }
+
+  @override
+  String get thisFolderMenu => 'This Folder';
+
+  @override
+  String get allInclSubfoldersMenu => 'All (Incl. Subfolders)';
+
+  @override
+  String get disableShuffleMenu => 'Disable Shuffle';
+
+  @override
+  String get shufflePlaylistMenu => 'Shuffle Playlist';
+
+  @override
+  String get playlistOptionsTooltip => 'Playlist Options';
+
+  @override
+  String get enablePlaylistTooltip => 'Enable Playlist';
+
+  @override
+  String get moreActionsTooltip => 'More Actions';
+
+  @override
+  String get forcePortraitMenu => 'Force Portrait';
+
+  @override
+  String get forceLandscapeMenu => 'Force Landscape';
+
+  @override
+  String get autoRotateSensorMenu => 'Auto-Rotate (Sensor)';
+
+  @override
+  String get screenOrientationMenu => 'Screen Orientation';
+
+  @override
+  String get playlistTransitionMenu => 'Playlist Transition';
+
+  @override
+  String get deleteFileMenu => 'Delete File';
+
+  @override
+  String get thumbnailCarouselTooltip => 'Thumbnail Carousel';
+
+  @override
+  String get advancedSettingsTooltip => 'Advanced Settings';
+
+  @override
+  String get previousTooltip => 'Previous';
+
+  @override
+  String get nextTooltip => 'Next';
+
+  @override
+  String get diagnosticsCopiedToClipboard => 'Diagnostics copied to clipboard';
+
+  @override
+  String get diagnosticsTitle => 'Diagnostics';
+
+  @override
+  String get copyDiagnosticsTooltip => 'Copy diagnostics';
+
+  @override
+  String get closeTooltip => 'Close';
+
+  @override
+  String get rotate90Label => 'Rotate 90°';
+
+  @override
+  String get imageFitModeLabel => 'Image Fit Mode';
+
+  @override
+  String get slideshowDelayLabel => 'Slideshow Delay';
+
+  @override
+  String get playbackSpeedLabel => 'Playback Speed';
+
+  @override
+  String get subtitlesLabel => 'Subtitles';
+
+  @override
+  String get imageSettingsTitle => 'Image Settings';
+
+  @override
+  String get playbackSettingsTitle => 'Playback Settings';
+
+  @override
+  String get imageFitContain => 'Contain';
+
+  @override
+  String get imageFitWidth => 'Fit Width';
+
+  @override
+  String get imageFitHeight => 'Fit Height';
+
+  @override
+  String nSecondsDelay(int n) {
+    return '$n seconds';
+  }
+
+  @override
+  String playbackSpeedNormal(String speed) {
+    return '${speed}x (Normal)';
+  }
+
+  @override
+  String get settingsTooltipShort => 'Settings';
+
+  @override
+  String get sourceCodeTooltip => 'Source Code';
+
+  @override
+  String get donateTooltip => 'Donate';
+
+  @override
+  String get shareAppTooltip => 'Share App';
+
+  @override
+  String get resetToDefaultsTooltip => 'Reset to defaults';
+
+  @override
+  String get usbUnlockContainerTitle => 'Unlock USB Container';
+
+  @override
+  String get usbMountContainerTitle => 'Mount USB Drive';
+
+  @override
+  String get staticLabel => 'Static';
+
+  @override
+  String get unmuteTooltip => 'Unmute';
+
+  @override
+  String get muteTooltip => 'Mute';
+
+  @override
+  String get playOnceDisabledTooltip => 'Play Once (Auto-Advance Disabled)';
+
+  @override
+  String get playAndAdvanceTooltip => 'Play & Advance to Next';
+
+  @override
+  String get loopCurrentVideoTooltip => 'Loop Current Video';
 }

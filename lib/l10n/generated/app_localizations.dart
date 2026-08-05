@@ -1232,16 +1232,16 @@ abstract class AppLocalizations {
   /// **'Set Password'**
   String get setPassword;
 
-  /// Title of the biometric-unlock prompt card
+  /// Title of the biometric unlock card
   ///
   /// In en, this message translates to:
   /// **'Biometric Unlock'**
   String get biometricUnlockTitle;
 
-  /// Settings toggle subtitle
+  /// Subtitle of the biometric unlock card
   ///
   /// In en, this message translates to:
-  /// **'Use fingerprint or face recognition'**
+  /// **'Authenticate to securely mount the container'**
   String get biometricUnlockSubtitle;
 
   /// Settings row title to open the change-password form
@@ -1706,10 +1706,10 @@ abstract class AppLocalizations {
   /// **'Patterns don\'t match — try again'**
   String get patternsDontMatch;
 
-  /// Title shown during the first step of pattern lock setup
+  /// Title of the pattern unlock card
   ///
   /// In en, this message translates to:
-  /// **'Draw your unlock pattern'**
+  /// **'Draw Unlock Pattern'**
   String get drawUnlockPatternTitle;
 
   /// Title shown during the confirmation step of pattern lock setup
@@ -1892,13 +1892,13 @@ abstract class AppLocalizations {
   /// **'Container'**
   String get defaultContainerName;
 
-  /// Error shown when unlocking a folder vault fails
+  /// Error message when folder-vault unlock fails
   ///
   /// In en, this message translates to:
   /// **'Incorrect password or invalid vault'**
   String get incorrectPasswordOrInvalidVault;
 
-  /// Error shown when unlocking a container fails
+  /// Error message when container unlock fails
   ///
   /// In en, this message translates to:
   /// **'Incorrect password or invalid container'**
@@ -1910,10 +1910,10 @@ abstract class AppLocalizations {
   /// **'Unknown error'**
   String get genericUnknownError;
 
-  /// Progress label while a container is being decrypted, before any per-attempt detail is known
+  /// Generic progress label while decrypting
   ///
   /// In en, this message translates to:
-  /// **'Decrypting...'**
+  /// **'Decrypting…'**
   String get decryptingLabel;
 
   /// Progress label while trying successive LUKS keyslots
@@ -1988,7 +1988,7 @@ abstract class AppLocalizations {
   /// **'{format} Drive'**
   String formatDriveLabel(String format);
 
-  /// Generic fallback label for a container of unrecognized/unknown format
+  /// Generic label for an unidentified encrypted container
   ///
   /// In en, this message translates to:
   /// **'Encrypted Container'**
@@ -2018,7 +2018,7 @@ abstract class AppLocalizations {
   /// **'Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.'**
   String get folderVaultPerformanceWarning;
 
-  /// Title shown when a saved container's underlying file/folder can no longer be found
+  /// Error card title when the container file cannot be found
   ///
   /// In en, this message translates to:
   /// **'Container Missing'**
@@ -2774,7 +2774,7 @@ abstract class AppLocalizations {
   /// **'Failed to extract: {type}'**
   String failedToExtractGeneric(String type);
 
-  /// Tooltip for closing the in-folder search bar
+  /// Tooltip for close search button
   ///
   /// In en, this message translates to:
   /// **'Close search'**
@@ -2803,6 +2803,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Folder picker failed: {error}'**
   String folderPickerFailed(String error);
+
+  /// Bottom sheet title for the add-vault options
+  ///
+  /// In en, this message translates to:
+  /// **'Add a vault'**
+  String get addAVaultTitle;
 
   /// Validation error when creating a folder vault without picking a destination
   ///
@@ -3541,6 +3547,924 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No disk cache. Thumbnails are re-generated on every load.'**
   String get thumbnailCacheDisabledDesc;
+
+  /// AppBar title when unlocking a known container
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Container'**
+  String get unlockContainerTitle;
+
+  /// Segmented button label for container-file unlock mode
+  ///
+  /// In en, this message translates to:
+  /// **'Container File'**
+  String get containerFileSegment;
+
+  /// Segmented button label for folder-vault unlock mode
+  ///
+  /// In en, this message translates to:
+  /// **'Folder Vault'**
+  String get folderVaultSegment;
+
+  /// Button label to enable a feature (e.g. storage access)
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get enableButtonLabel;
+
+  /// Short retry button label
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retryButtonLabelShort;
+
+  /// Button to relocate a missing container file
+  ///
+  /// In en, this message translates to:
+  /// **'Locate File'**
+  String get locateFileButton;
+
+  /// Button label to trigger biometric authentication
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate'**
+  String get authenticateButton;
+
+  /// Button to cancel an in-progress unlock operation
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Unlock'**
+  String get cancelUnlockButton;
+
+  /// LUKS unlock progress with multiple keyslots
+  ///
+  /// In en, this message translates to:
+  /// **'Trying keyslot {attempted} of {total}…'**
+  String tryingKeyslotProgress(int attempted, int total);
+
+  /// LUKS unlock progress with a single keyslot
+  ///
+  /// In en, this message translates to:
+  /// **'Trying keyslot…'**
+  String get tryingKeyslotSingle;
+
+  /// BitLocker unlock progress with multiple credentials
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying credential {attempted} of {total}…'**
+  String verifyingCredentialProgress(int attempted, int total);
+
+  /// BitLocker unlock progress with a single credential
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying credential…'**
+  String get verifyingCredentialSingle;
+
+  /// VeraCrypt unlock progress showing algorithm and slot
+  ///
+  /// In en, this message translates to:
+  /// **'Trying {algo} ({slotName})…'**
+  String tryingAlgoSlot(String algo, String slotName);
+
+  /// Slot name for VeraCrypt hidden volume during unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden Volume'**
+  String get hiddenVolumeSlotName;
+
+  /// Slot name for VeraCrypt standard volume during unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Standard Volume'**
+  String get standardVolumeSlotName;
+
+  /// Error card subtitle when the container file cannot be found
+  ///
+  /// In en, this message translates to:
+  /// **'File path could not be resolved'**
+  String get containerMissingSubtitle;
+
+  /// Explanation text when a container is missing
+  ///
+  /// In en, this message translates to:
+  /// **'The container file may have been moved, deleted, or its host storage is currently disconnected.'**
+  String get containerMissingBody;
+
+  /// Subtitle prompting the user to draw their pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your pattern sequence'**
+  String get connectPatternSequence;
+
+  /// Label for password text field
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get passwordLabel;
+
+  /// Hint text for folder-vault password field
+  ///
+  /// In en, this message translates to:
+  /// **'Enter vault password'**
+  String get enterVaultPasswordHint;
+
+  /// Hint text for BitLocker password field
+  ///
+  /// In en, this message translates to:
+  /// **'Enter password or recovery key'**
+  String get enterBitlockerPasswordHint;
+
+  /// Hint text for container password field
+  ///
+  /// In en, this message translates to:
+  /// **'Enter container password'**
+  String get enterContainerPasswordHint;
+
+  /// Read-only toggle subtitle specific to USB drives
+  ///
+  /// In en, this message translates to:
+  /// **'Mount without allowing changes to this drive'**
+  String get readOnlyModeUsbSubtitleDrive;
+
+  /// Toggle label to pin a USB drive on the dashboard
+  ///
+  /// In en, this message translates to:
+  /// **'Remember drive'**
+  String get rememberDriveLabel;
+
+  /// Subtitle for remember-drive toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Pin drive on dashboard for quick access'**
+  String get rememberDriveSubtitle;
+
+  /// Button label to unlock a folder vault
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Vault'**
+  String get unlockVaultButtonLabel;
+
+  /// Warning message about CryFS performance without direct storage access
+  ///
+  /// In en, this message translates to:
+  /// **'CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.'**
+  String get cryfsStorageAccessWarning;
+
+  /// Warning message about folder vault performance without direct storage access
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.'**
+  String get folderVaultStorageAccessWarning;
+
+  /// Progress label while requesting USB permission
+  ///
+  /// In en, this message translates to:
+  /// **'Requesting permission…'**
+  String get requestingPermission;
+
+  /// Button label for USB reconnect unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock & Mount'**
+  String get unlockAndMountButton;
+
+  /// Button label to unlock a USB drive
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Drive'**
+  String get unlockDriveButton;
+
+  /// Error title when a saved USB device is not found
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t find \"{deviceName}\"'**
+  String couldntFindDevice(String deviceName);
+
+  /// Instruction when a saved USB device is not found
+  ///
+  /// In en, this message translates to:
+  /// **'Plug the drive back in and tap Retry, or select it below if it shows up under a different name.'**
+  String get plugDriveBackInRetry;
+
+  /// Button to retry USB device connection
+  ///
+  /// In en, this message translates to:
+  /// **'Retry Connection'**
+  String get retryConnectionButton;
+
+  /// Button to refresh USB device list
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh Devices'**
+  String get refreshDevicesButton;
+
+  /// Empty state subtitle when no USB devices are detected
+  ///
+  /// In en, this message translates to:
+  /// **'Connect an OTG flash drive to mount'**
+  String get connectOtgDriveToMount;
+
+  /// Status label for an already-mounted USB device
+  ///
+  /// In en, this message translates to:
+  /// **'Already active'**
+  String get alreadyActive;
+
+  /// Short badge label for an already-active USB device
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get active;
+
+  /// Status label for a USB device with permission granted
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to unlock'**
+  String get readyToUnlock;
+
+  /// Hint text for USB partition password field
+  ///
+  /// In en, this message translates to:
+  /// **'Enter USB partition password'**
+  String get enterUsbPartitionPassword;
+
+  /// Title of the biometric auth card on USB unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric Authentication'**
+  String get biometricAuthenticationTitle;
+
+  /// Subtitle of the biometric auth card on USB unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate to unlock and mount this USB device'**
+  String get biometricAuthUsbSubtitle;
+
+  /// Subtitle prompting the user to draw their pattern to mount USB
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your pattern sequence to mount'**
+  String get connectPatternSequenceToMount;
+
+  /// Menu item to select all items
+  ///
+  /// In en, this message translates to:
+  /// **'Select All'**
+  String get selectAllAction;
+
+  /// Menu item to clear the selection
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Selection'**
+  String get clearSelectionAction;
+
+  /// Tooltip for close/clear selection button
+  ///
+  /// In en, this message translates to:
+  /// **'Clear selection'**
+  String get clearSelectionTooltip;
+
+  /// Tooltip for the selection dropdown menu
+  ///
+  /// In en, this message translates to:
+  /// **'Selection options'**
+  String get selectionOptionsTooltip;
+
+  /// Tooltip shown when an action is disabled due to read-only
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only container'**
+  String get readOnlyContainerTooltip;
+
+  /// Action label to copy items
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copyAction;
+
+  /// Action label to move/cut items
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get moveAction;
+
+  /// Action label to rename items
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get renameAction;
+
+  /// Menu item to export items to the device
+  ///
+  /// In en, this message translates to:
+  /// **'Export to device'**
+  String get exportToDeviceAction;
+
+  /// Menu item to open a file with an external app
+  ///
+  /// In en, this message translates to:
+  /// **'Open with App'**
+  String get openWithAppAction;
+
+  /// Menu item to pin item
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get pinAction;
+
+  /// Menu item to pin multiple items
+  ///
+  /// In en, this message translates to:
+  /// **'Pin selected'**
+  String get pinSelectedAction;
+
+  /// Menu item to unpin item
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get unpinAction;
+
+  /// Menu item to unpin multiple items
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin selected'**
+  String get unpinSelectedAction;
+
+  /// Menu item for document provider settings on a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Document Provider Settings'**
+  String get documentProviderSettingsMenu;
+
+  /// Menu item to expose a folder as a document provider
+  ///
+  /// In en, this message translates to:
+  /// **'Expose as Document Provider'**
+  String get exposeAsDocumentProviderMenu;
+
+  /// Tooltip for the more-options overflow menu
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get moreOptionsTooltipShort;
+
+  /// Tooltip for copy icon button
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get copyTooltip;
+
+  /// Hint text for the bottom search bar
+  ///
+  /// In en, this message translates to:
+  /// **'Search in this folder…'**
+  String get searchInThisFolderHint;
+
+  /// Tooltip for clear text button
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearTooltip;
+
+  /// Tooltip for the back button in browser app bar
+  ///
+  /// In en, this message translates to:
+  /// **'Back to dashboard'**
+  String get backToDashboardTooltip;
+
+  /// Button to cancel a paste operation
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel paste'**
+  String get cancelPasteButton;
+
+  /// Button to continue a conflict resolution
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get continueButton;
+
+  /// Button to skip a conflicting file
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get skipButton;
+
+  /// Button to keep both files in conflict resolution
+  ///
+  /// In en, this message translates to:
+  /// **'Keep both'**
+  String get keepBothButton;
+
+  /// Button to clear all file operations
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all'**
+  String get clearAllButton;
+
+  /// Toggle title for auto-mounting a document provider folder
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-mount when container unlocks'**
+  String get autoMountWhenUnlocksTitle;
+
+  /// Toggle subtitle for auto-mounting a document provider folder
+  ///
+  /// In en, this message translates to:
+  /// **'Expose this folder again automatically next time'**
+  String get autoMountWhenUnlocksSubtitle;
+
+  /// Button to unmount a document provider folder
+  ///
+  /// In en, this message translates to:
+  /// **'Unmount'**
+  String get unmountButton;
+
+  /// Menu item for filters
+  ///
+  /// In en, this message translates to:
+  /// **'Filters'**
+  String get filtersMenuItem;
+
+  /// Menu item for settings
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsMenuItem;
+
+  /// Tooltip for sort options menu button
+  ///
+  /// In en, this message translates to:
+  /// **'Sort options'**
+  String get sortOptionsTooltip;
+
+  /// Tooltip for layout mode menu button
+  ///
+  /// In en, this message translates to:
+  /// **'Layout options'**
+  String get layoutOptionsTooltip;
+
+  /// Tooltip for the lock container action button
+  ///
+  /// In en, this message translates to:
+  /// **'Lock container'**
+  String get lockContainerTooltip;
+
+  /// Tooltip for the rename action button
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get renameTooltip;
+
+  /// Tooltip for cancelling password update
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel updating password'**
+  String get cancelUpdatingPasswordTooltip;
+
+  /// Button to open unlock method settings
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Settings'**
+  String get unlockSettingsButton;
+
+  /// Button to update saved credentials for a container
+  ///
+  /// In en, this message translates to:
+  /// **'Update Saved Credentials'**
+  String get updateSavedCredentialsButton;
+
+  /// Dialog title for verifying credentials before update
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Credentials'**
+  String get verifyCredentialsTitle;
+
+  /// Button label to verify credentials
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get verifyButton;
+
+  /// Dialog title for editing a container display name
+  ///
+  /// In en, this message translates to:
+  /// **'Display Name'**
+  String get displayNameTitle;
+
+  /// Hint text for the container name input field
+  ///
+  /// In en, this message translates to:
+  /// **'Container name'**
+  String get containerNameHint;
+
+  /// Confirmation dialog title for deleting a single file
+  ///
+  /// In en, this message translates to:
+  /// **'Delete file?'**
+  String get deleteFileDialogTitle;
+
+  /// Warning text in the delete file confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'This action is permanent and cannot be undone.'**
+  String get deleteFilePermanentWarning;
+
+  /// Dialog title when closing text editor with unsaved changes
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved Changes'**
+  String get unsavedChangesTitle;
+
+  /// Dialog message when closing text editor with unsaved changes
+  ///
+  /// In en, this message translates to:
+  /// **'You have unsaved changes. Would you like to save before closing?'**
+  String get unsavedChangesMessage;
+
+  /// Button label to discard changes
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get discardButton;
+
+  /// Loading message while decrypting a file for the text editor
+  ///
+  /// In en, this message translates to:
+  /// **'Decrypting file content...'**
+  String get decryptingFileContent;
+
+  /// Error title when a file cannot be opened in the text editor
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot open file'**
+  String get cannotOpenFile;
+
+  /// Snackbar message after successfully saving a text file
+  ///
+  /// In en, this message translates to:
+  /// **'Changes saved successfully'**
+  String get changesSavedSuccessfully;
+
+  /// Snackbar message when saving a text file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed: {error}'**
+  String saveFailedWithError(String error);
+
+  /// Bottom bar line count in text editor
+  ///
+  /// In en, this message translates to:
+  /// **'Lines: {count}'**
+  String linesCount(int count);
+
+  /// Bottom bar character count in text editor
+  ///
+  /// In en, this message translates to:
+  /// **'Chars: {count}'**
+  String charsCount(int count);
+
+  /// Bottom bar status when text editor has unsaved changes
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved Changes'**
+  String get unsavedChangesLabel;
+
+  /// Bottom bar status when text file is saved
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to vault'**
+  String get savedToVault;
+
+  /// Tooltip for save icon button in text editor
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get saveChangesTooltip;
+
+  /// Generic back navigation tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get backTooltip;
+
+  /// Forward navigation tooltip for HTML viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Forward'**
+  String get forwardTooltip;
+
+  /// Reload tooltip for HTML viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get reloadTooltip;
+
+  /// Options menu tooltip
+  ///
+  /// In en, this message translates to:
+  /// **'Options'**
+  String get optionsTooltip;
+
+  /// Menu item to disable JavaScript in HTML viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Disable JavaScript'**
+  String get disableJavaScriptMenu;
+
+  /// Menu item to enable JavaScript in HTML viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Enable JavaScript'**
+  String get enableJavaScriptMenu;
+
+  /// Menu item to enter fullscreen mode
+  ///
+  /// In en, this message translates to:
+  /// **'Enter Fullscreen'**
+  String get enterFullscreenMenu;
+
+  /// Snackbar error when opening a file in external app fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to open in external app: {error}'**
+  String failedToOpenExternalApp(String error);
+
+  /// Menu item for current-folder-only playlist scope
+  ///
+  /// In en, this message translates to:
+  /// **'This Folder'**
+  String get thisFolderMenu;
+
+  /// Menu item for all-including-subfolders playlist scope
+  ///
+  /// In en, this message translates to:
+  /// **'All (Incl. Subfolders)'**
+  String get allInclSubfoldersMenu;
+
+  /// Menu item to disable playlist shuffle
+  ///
+  /// In en, this message translates to:
+  /// **'Disable Shuffle'**
+  String get disableShuffleMenu;
+
+  /// Menu item to enable playlist shuffle
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle Playlist'**
+  String get shufflePlaylistMenu;
+
+  /// Tooltip when playlist is active
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist Options'**
+  String get playlistOptionsTooltip;
+
+  /// Tooltip when playlist is not active
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Playlist'**
+  String get enablePlaylistTooltip;
+
+  /// Tooltip for the more-actions menu
+  ///
+  /// In en, this message translates to:
+  /// **'More Actions'**
+  String get moreActionsTooltip;
+
+  /// Menu item to force portrait orientation
+  ///
+  /// In en, this message translates to:
+  /// **'Force Portrait'**
+  String get forcePortraitMenu;
+
+  /// Menu item to force landscape orientation
+  ///
+  /// In en, this message translates to:
+  /// **'Force Landscape'**
+  String get forceLandscapeMenu;
+
+  /// Menu item to follow sensor orientation
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-Rotate (Sensor)'**
+  String get autoRotateSensorMenu;
+
+  /// Submenu title for screen orientation options
+  ///
+  /// In en, this message translates to:
+  /// **'Screen Orientation'**
+  String get screenOrientationMenu;
+
+  /// Submenu title for playlist transition effect options
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist Transition'**
+  String get playlistTransitionMenu;
+
+  /// Menu item to delete the current file
+  ///
+  /// In en, this message translates to:
+  /// **'Delete File'**
+  String get deleteFileMenu;
+
+  /// Tooltip for toggle thumbnail carousel button
+  ///
+  /// In en, this message translates to:
+  /// **'Thumbnail Carousel'**
+  String get thumbnailCarouselTooltip;
+
+  /// Tooltip for advanced settings button
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced Settings'**
+  String get advancedSettingsTooltip;
+
+  /// Tooltip for previous media button
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get previousTooltip;
+
+  /// Tooltip for next media button
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get nextTooltip;
+
+  /// Snackbar message when diagnostics are copied
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics copied to clipboard'**
+  String get diagnosticsCopiedToClipboard;
+
+  /// Title of the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get diagnosticsTitle;
+
+  /// Tooltip for copy diagnostics button
+  ///
+  /// In en, this message translates to:
+  /// **'Copy diagnostics'**
+  String get copyDiagnosticsTooltip;
+
+  /// Tooltip for close button
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeTooltip;
+
+  /// Label for rotate 90 degrees action
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate 90°'**
+  String get rotate90Label;
+
+  /// Label for image fit mode option
+  ///
+  /// In en, this message translates to:
+  /// **'Image Fit Mode'**
+  String get imageFitModeLabel;
+
+  /// Label for slideshow delay option
+  ///
+  /// In en, this message translates to:
+  /// **'Slideshow Delay'**
+  String get slideshowDelayLabel;
+
+  /// Label for playback speed option
+  ///
+  /// In en, this message translates to:
+  /// **'Playback Speed'**
+  String get playbackSpeedLabel;
+
+  /// Label for subtitles toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Subtitles'**
+  String get subtitlesLabel;
+
+  /// Sheet title for image settings
+  ///
+  /// In en, this message translates to:
+  /// **'Image Settings'**
+  String get imageSettingsTitle;
+
+  /// Sheet title for playback/video settings
+  ///
+  /// In en, this message translates to:
+  /// **'Playback Settings'**
+  String get playbackSettingsTitle;
+
+  /// Image fit mode: contain
+  ///
+  /// In en, this message translates to:
+  /// **'Contain'**
+  String get imageFitContain;
+
+  /// Image fit mode: fit width
+  ///
+  /// In en, this message translates to:
+  /// **'Fit Width'**
+  String get imageFitWidth;
+
+  /// Image fit mode: fit height
+  ///
+  /// In en, this message translates to:
+  /// **'Fit Height'**
+  String get imageFitHeight;
+
+  /// Slideshow delay option label
+  ///
+  /// In en, this message translates to:
+  /// **'{n} seconds'**
+  String nSecondsDelay(int n);
+
+  /// Playback speed label with Normal tag
+  ///
+  /// In en, this message translates to:
+  /// **'{speed}x (Normal)'**
+  String playbackSpeedNormal(String speed);
+
+  /// Tooltip for settings menu button
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTooltipShort;
+
+  /// Tooltip for source code link on about screen
+  ///
+  /// In en, this message translates to:
+  /// **'Source Code'**
+  String get sourceCodeTooltip;
+
+  /// Tooltip for donate link on about screen
+  ///
+  /// In en, this message translates to:
+  /// **'Donate'**
+  String get donateTooltip;
+
+  /// Tooltip for share app button on about screen
+  ///
+  /// In en, this message translates to:
+  /// **'Share App'**
+  String get shareAppTooltip;
+
+  /// Tooltip for reset to defaults button on toolbar settings
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to defaults'**
+  String get resetToDefaultsTooltip;
+
+  /// AppBar title when unlocking a USB container
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock USB Container'**
+  String get usbUnlockContainerTitle;
+
+  /// AppBar title when mounting a new USB drive
+  ///
+  /// In en, this message translates to:
+  /// **'Mount USB Drive'**
+  String get usbMountContainerTitle;
+
+  /// Label when slideshow auto-advance is off
+  ///
+  /// In en, this message translates to:
+  /// **'Static'**
+  String get staticLabel;
+
+  /// Tooltip for unmute button
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute'**
+  String get unmuteTooltip;
+
+  /// Tooltip for mute button
+  ///
+  /// In en, this message translates to:
+  /// **'Mute'**
+  String get muteTooltip;
+
+  /// Tooltip for play once mode
+  ///
+  /// In en, this message translates to:
+  /// **'Play Once (Auto-Advance Disabled)'**
+  String get playOnceDisabledTooltip;
+
+  /// Tooltip for play and advance mode
+  ///
+  /// In en, this message translates to:
+  /// **'Play & Advance to Next'**
+  String get playAndAdvanceTooltip;
+
+  /// Tooltip for loop video mode
+  ///
+  /// In en, this message translates to:
+  /// **'Loop Current Video'**
+  String get loopCurrentVideoTooltip;
 }
 
 class _AppLocalizationsDelegate

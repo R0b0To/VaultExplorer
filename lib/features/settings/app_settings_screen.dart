@@ -745,7 +745,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             options: PlaylistTransitionEffect.values.map((effect) {
                               return SelectOption(
                                 value: effect,
-                                label: effect.label,
+                                label: effect.getLocalizedLabel(context.l10n),
                               );
                             }).toList(),
                             onChanged: (v) {

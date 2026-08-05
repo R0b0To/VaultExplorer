@@ -1467,9 +1467,304 @@
   "@containerAlreadyMounted": {
     "description": "Snackbar shown when trying to unlock a container that's already open"
   },
-  "addAVaultTitle": "Add a vault",
-  "@addAVaultTitle": {
-    "description": "Bottom sheet title for the add-vault options"
+  "noVaultFolderFormatDetected": "No masterkey.cryptomator, gocryptfs.conf, or cryfs.config found in that folder.",
+  "@noVaultFolderFormatDetected": {
+    "description": "Error when a picked folder doesn't match any supported folder-vault format"
+  },
+  "savedContainerSettingsNotFound": "Saved settings for this container could not be found.",
+  "@savedContainerSettingsNotFound": {
+    "description": "Error when relocating a container whose saved record has gone missing"
+  },
+  "couldNotUpdateContainerLocation": "Could not update the container location: {error}",
+  "@couldNotUpdateContainerLocation": {
+    "description": "Error when relocating a container to a new file/folder fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "filePickerFailed": "File picker failed: {error}",
+  "@filePickerFailed": {
+    "description": "Error when the system file/folder picker fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "selectContainerFirst": "Select a container first",
+  "@selectContainerFirst": {
+    "description": "Error when trying to unlock without having picked a container"
+  },
+  "passwordOrKeyfilesRequired": "Password or keyfiles required",
+  "@passwordOrKeyfilesRequired": {
+    "description": "Error when neither a password nor keyfiles were provided to unlock"
+  },
+  "slowPerformanceWarningTitle": "Slow Performance Warning",
+  "@slowPerformanceWarningTitle": {
+    "description": "Title of the dialog warning about slow CryFS performance without Direct Storage Access"
+  },
+  "slowPerformanceWarningMessage": "Direct Storage Access is currently disabled.\n\nCryFS stores files across thousands of small blocks. Opening non-empty CryFS vaults via Android SAF will be very slow.\n\nWould you like to open Settings to grant \"All Files Access\" for fast speed?",
+  "@slowPerformanceWarningMessage": {
+    "description": "Message explaining the slow-performance tradeoff for CryFS without Direct Storage Access"
+  },
+  "unlockAnyway": "Unlock Anyway",
+  "@unlockAnyway": {
+    "description": "Button to dismiss the slow-performance warning and proceed with unlocking regardless"
+  },
+  "defaultVaultName": "Vault",
+  "@defaultVaultName": {
+    "description": "Fallback display name for a folder vault when none was resolved"
+  },
+  "defaultContainerName": "Container",
+  "@defaultContainerName": {
+    "description": "Fallback display name for a container when none was resolved"
+  },
+  "incorrectPasswordOrInvalidVault": "Incorrect password or invalid vault",
+  "@incorrectPasswordOrInvalidVault": {
+    "description": "Error shown when unlocking a folder vault fails"
+  },
+  "incorrectPasswordOrInvalidContainer": "Incorrect password or invalid container",
+  "@incorrectPasswordOrInvalidContainer": {
+    "description": "Error shown when unlocking a container fails"
+  },
+  "genericUnknownError": "Unknown error",
+  "@genericUnknownError": {
+    "description": "Fallback error text when no specific error message is available"
+  },
+  "decryptingLabel": "Decrypting...",
+  "@decryptingLabel": {
+    "description": "Progress label while a container is being decrypted, before any per-attempt detail is known"
+  },
+  "luksKeyslotProgress": "Trying keyslot {attempted} of {total}…",
+  "@luksKeyslotProgress": {
+    "description": "Progress label while trying successive LUKS keyslots",
+    "placeholders": {
+      "attempted": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "luksKeyslotProgressUnknown": "Trying keyslot…",
+  "@luksKeyslotProgressUnknown": {
+    "description": "Progress label while trying a LUKS keyslot when the total count isn't known yet"
+  },
+  "bitlockerCredentialProgress": "Verifying credential {attempted} of {total}…",
+  "@bitlockerCredentialProgress": {
+    "description": "Progress label while trying successive BitLocker credentials",
+    "placeholders": {
+      "attempted": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "bitlockerCredentialProgressUnknown": "Verifying credential…",
+  "@bitlockerCredentialProgressUnknown": {
+    "description": "Progress label while verifying a BitLocker credential when the total count isn't known yet"
+  },
+  "veracryptAlgoProgress": "Trying {algo} ({slotName})…",
+  "@veracryptAlgoProgress": {
+    "description": "Progress label showing the hash/cipher algorithm combination currently being tried for a VeraCrypt volume",
+    "placeholders": {
+      "algo": {
+        "type": "String"
+      },
+      "slotName": {
+        "type": "String"
+      }
+    }
+  },
+  "unlockContainerLabel": "Unlock Container",
+  "@unlockContainerLabel": {
+    "description": "Title/button label for unlocking an existing (non-folder-vault) container"
+  },
+  "mountContainerTitle": "Mount Container",
+  "@mountContainerTitle": {
+    "description": "Title of the sheet when mounting a brand-new container (none picked yet)"
+  },
+  "containerFileSegmentLabel": "Container File",
+  "@containerFileSegmentLabel": {
+    "description": "Segmented control option for choosing a single-file container"
+  },
+  "folderVaultSegmentLabel": "Folder Vault",
+  "@folderVaultSegmentLabel": {
+    "description": "Segmented control option for choosing a folder-based vault"
+  },
+  "formatContainerLabel": "{format} Container",
+  "@formatContainerLabel": {
+    "description": "Detected container-type label combining an untranslated format/brand name with 'Container', e.g. 'LUKS Container'",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
+  "formatVaultLabel": "{format} Vault",
+  "@formatVaultLabel": {
+    "description": "Detected container-type label combining an untranslated format/brand name with 'Vault', e.g. 'Cryptomator Vault'",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
+  "formatDriveLabel": "{format} Drive",
+  "@formatDriveLabel": {
+    "description": "Detected container-type label combining an untranslated format/brand name with 'Drive', e.g. 'BitLocker Drive'",
+    "placeholders": {
+      "format": {
+        "type": "String"
+      }
+    }
+  },
+  "encryptedContainerLabel": "Encrypted Container",
+  "@encryptedContainerLabel": {
+    "description": "Generic fallback label for a container of unrecognized/unknown format"
+  },
+  "tapToSelectVaultFolder": "Tap to select vault folder…",
+  "@tapToSelectVaultFolder": {
+    "description": "Placeholder hint prompting the user to pick a folder vault"
+  },
+  "tapToSelectContainerFile": "Tap to select container file…",
+  "@tapToSelectContainerFile": {
+    "description": "Placeholder hint prompting the user to pick a container file"
+  },
+  "cryfsPerformanceWarning": "CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.",
+  "@cryfsPerformanceWarning": {
+    "description": "Banner warning about CryFS performance without Direct Storage Access"
+  },
+  "folderVaultPerformanceWarning": "Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.",
+  "@folderVaultPerformanceWarning": {
+    "description": "Banner warning about folder vault performance without Direct Storage Access"
+  },
+  "containerMissingTitle": "Container Missing",
+  "@containerMissingTitle": {
+    "description": "Title shown when a saved container's underlying file/folder can no longer be found"
+  },
+  "filePathCouldNotBeResolved": "File path could not be resolved",
+  "@filePathCouldNotBeResolved": {
+    "description": "Subtitle shown alongside the container-missing title"
+  },
+  "containerMissingExplanation": "The container file may have been moved, deleted, or its host storage is currently disconnected.",
+  "@containerMissingExplanation": {
+    "description": "Longer explanation shown when a saved container's file can't be found"
+  },
+  "retryButtonLabel": "Retry",
+  "@retryButtonLabel": {
+    "description": "Generic retry button label"
+  },
+  "locateFileButtonLabel": "Locate File",
+  "@locateFileButtonLabel": {
+    "description": "Button to re-pick the location of a missing container's file"
+  },
+  "biometricUnlockTitle": "Biometric Unlock",
+  "@biometricUnlockTitle": {
+    "description": "Title of the biometric-unlock prompt card"
+  },
+  "authenticateToMountSubtitle": "Authenticate to securely mount the container",
+  "@authenticateToMountSubtitle": {
+    "description": "Subtitle under the biometric-unlock title, explaining what authenticating will do"
+  },
+  "usePasswordButtonLabel": "Use Password",
+  "@usePasswordButtonLabel": {
+    "description": "Button to switch from biometric prompt to manual password entry"
+  },
+  "authenticateButtonLabel": "Authenticate",
+  "@authenticateButtonLabel": {
+    "description": "Button to trigger the biometric authentication prompt"
+  },
+  "drawUnlockPatternCardTitle": "Draw Unlock Pattern",
+  "@drawUnlockPatternCardTitle": {
+    "description": "Title of the pattern-unlock card shown on the unlock sheet"
+  },
+  "wrongPatternTryAgain": "Wrong pattern — try again",
+  "@wrongPatternTryAgain": {
+    "description": "Message shown under the pattern title after an incorrect pattern attempt"
+  },
+  "connectYourPatternSequence": "Connect your pattern sequence",
+  "@connectYourPatternSequence": {
+    "description": "Message shown under the pattern title prompting the user to draw their pattern"
+  },
+  "usePasswordInsteadButtonLabel": "Use Password instead",
+  "@usePasswordInsteadButtonLabel": {
+    "description": "Button to switch from pattern entry to manual password entry"
+  },
+  "passwordHintFolderVault": "Enter vault password",
+  "@passwordHintFolderVault": {
+    "description": "Password field hint text when unlocking a folder vault"
+  },
+  "passwordHintBitlocker": "Enter password or recovery key",
+  "@passwordHintBitlocker": {
+    "description": "Password field hint text when unlocking a BitLocker drive"
+  },
+  "passwordHintContainer": "Enter container password",
+  "@passwordHintContainer": {
+    "description": "Password field hint text when unlocking a regular container"
+  },
+  "usingSavedPasswordTooltip": "Using saved password",
+  "@usingSavedPasswordTooltip": {
+    "description": "Tooltip on the bookmark icon shown when the password field was prefilled from a saved credential"
+  },
+  "luksKeyfileReplacesPasswordNote": "For LUKS containers the keyfile replaces the password.",
+  "@luksKeyfileReplacesPasswordNote": {
+    "description": "Helper note shown under the keyfile picker for LUKS containers"
+  },
+  "readOnlyModeUsbSubtitle": "Mount without allowing changes to this drive",
+  "@readOnlyModeUsbSubtitle": {
+    "description": "Subtitle explaining read-only mode for a USB drive"
+  },
+  "rememberContainerLabel": "Remember container",
+  "@rememberContainerLabel": {
+    "description": "Toggle label to remember/pin a newly mounted container"
+  },
+  "rememberContainerSubtitle": "Pin container on dashboard for quick access",
+  "@rememberContainerSubtitle": {
+    "description": "Subtitle explaining the remember-container toggle"
+  },
+  "cancelUnlockButtonLabel": "Cancel Unlock",
+  "@cancelUnlockButtonLabel": {
+    "description": "Button to cancel an in-progress unlock operation"
+  },
+  "biometricSubjectContainer": "container",
+  "@biometricSubjectContainer": {
+    "description": "Noun substituted into the biometric prompt reason when unlocking a local container, e.g. 'Authenticate to unlock container'"
+  },
+  "authenticateToUnlockPrompt": "Authenticate to unlock {subject}",
+  "@authenticateToUnlockPrompt": {
+    "description": "Reason shown by the OS biometric prompt, combined with a source-specific subject noun",
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "noPatternConfiguredMessage": "No pattern configured. Please enter password manually.",
+  "@noPatternConfiguredMessage": {
+    "description": "Error shown when a pattern is submitted but none is on record"
+  },
+  "patternLockedForSeconds": "Too many failed attempts. Locked for {seconds}s.",
+  "@patternLockedForSeconds": {
+    "description": "Error shown when a new pattern-unlock lockout is triggered",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "initSecureCredsBiometricMessage": "Initializing secure credentials. Please unlock manually once to authorize biometric access.",
+  "@initSecureCredsBiometricMessage": {
+    "description": "Message shown when biometric unlock has no saved credentials to use yet, for a local container"
+  },
+  "initSecureCredsPatternMessage": "Initializing secure credentials. Please unlock manually once to authorize pattern access.",
+  "@initSecureCredsPatternMessage": {
+    "description": "Message shown when pattern unlock has no saved credentials to use yet, for a local container"
   },
   "mountExistingContainerTitle": "Mount existing container",
   "@mountExistingContainerTitle": {
@@ -2334,6 +2629,30 @@
   "playlistTransitionAnimationLabel": "Playlist Transition Animation",
   "@playlistTransitionAnimationLabel": {
     "description": "Label for the playlist transition effect settings option"
+  },
+  "playlistTransitionSlideLabel": "Slide (Default)",
+  "@playlistTransitionSlideLabel": {
+    "description": "Playlist transition effect: default horizontal slide"
+  },
+  "playlistTransitionFadeLabel": "Fade",
+  "@playlistTransitionFadeLabel": {
+    "description": "Playlist transition effect: cross-fade"
+  },
+  "playlistTransitionZoomLabel": "Zoom & Scale",
+  "@playlistTransitionZoomLabel": {
+    "description": "Playlist transition effect: zoom and scale"
+  },
+  "playlistTransitionDepthLabel": "Depth Stack",
+  "@playlistTransitionDepthLabel": {
+    "description": "Playlist transition effect: 3D depth stack"
+  },
+  "playlistTransitionCubeLabel": "3D Cube",
+  "@playlistTransitionCubeLabel": {
+    "description": "Playlist transition effect: 3D cube rotation"
+  },
+  "playlistTransitionFlipLabel": "3D Flip",
+  "@playlistTransitionFlipLabel": {
+    "description": "Playlist transition effect: 3D card flip"
   },
   "unlockVaultTitle": "Unlock Vault",
   "@unlockVaultTitle": {

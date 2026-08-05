@@ -1232,7 +1232,7 @@ abstract class AppLocalizations {
   /// **'Set Password'**
   String get setPassword;
 
-  /// Settings toggle title
+  /// Title of the biometric-unlock prompt card
   ///
   /// In en, this message translates to:
   /// **'Biometric Unlock'**
@@ -1826,11 +1826,359 @@ abstract class AppLocalizations {
   /// **'This container is already mounted.'**
   String get containerAlreadyMounted;
 
-  /// Bottom sheet title for the add-vault options
+  /// Error when a picked folder doesn't match any supported folder-vault format
   ///
   /// In en, this message translates to:
-  /// **'Add a vault'**
-  String get addAVaultTitle;
+  /// **'No masterkey.cryptomator, gocryptfs.conf, or cryfs.config found in that folder.'**
+  String get noVaultFolderFormatDetected;
+
+  /// Error when relocating a container whose saved record has gone missing
+  ///
+  /// In en, this message translates to:
+  /// **'Saved settings for this container could not be found.'**
+  String get savedContainerSettingsNotFound;
+
+  /// Error when relocating a container to a new file/folder fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not update the container location: {error}'**
+  String couldNotUpdateContainerLocation(String error);
+
+  /// Error when the system file/folder picker fails
+  ///
+  /// In en, this message translates to:
+  /// **'File picker failed: {error}'**
+  String filePickerFailed(String error);
+
+  /// Error when trying to unlock without having picked a container
+  ///
+  /// In en, this message translates to:
+  /// **'Select a container first'**
+  String get selectContainerFirst;
+
+  /// Error when neither a password nor keyfiles were provided to unlock
+  ///
+  /// In en, this message translates to:
+  /// **'Password or keyfiles required'**
+  String get passwordOrKeyfilesRequired;
+
+  /// Title of the dialog warning about slow CryFS performance without Direct Storage Access
+  ///
+  /// In en, this message translates to:
+  /// **'Slow Performance Warning'**
+  String get slowPerformanceWarningTitle;
+
+  /// Message explaining the slow-performance tradeoff for CryFS without Direct Storage Access
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Storage Access is currently disabled.\n\nCryFS stores files across thousands of small blocks. Opening non-empty CryFS vaults via Android SAF will be very slow.\n\nWould you like to open Settings to grant \"All Files Access\" for fast speed?'**
+  String get slowPerformanceWarningMessage;
+
+  /// Button to dismiss the slow-performance warning and proceed with unlocking regardless
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Anyway'**
+  String get unlockAnyway;
+
+  /// Fallback display name for a folder vault when none was resolved
+  ///
+  /// In en, this message translates to:
+  /// **'Vault'**
+  String get defaultVaultName;
+
+  /// Fallback display name for a container when none was resolved
+  ///
+  /// In en, this message translates to:
+  /// **'Container'**
+  String get defaultContainerName;
+
+  /// Error shown when unlocking a folder vault fails
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect password or invalid vault'**
+  String get incorrectPasswordOrInvalidVault;
+
+  /// Error shown when unlocking a container fails
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect password or invalid container'**
+  String get incorrectPasswordOrInvalidContainer;
+
+  /// Fallback error text when no specific error message is available
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get genericUnknownError;
+
+  /// Progress label while a container is being decrypted, before any per-attempt detail is known
+  ///
+  /// In en, this message translates to:
+  /// **'Decrypting...'**
+  String get decryptingLabel;
+
+  /// Progress label while trying successive LUKS keyslots
+  ///
+  /// In en, this message translates to:
+  /// **'Trying keyslot {attempted} of {total}…'**
+  String luksKeyslotProgress(int attempted, int total);
+
+  /// Progress label while trying a LUKS keyslot when the total count isn't known yet
+  ///
+  /// In en, this message translates to:
+  /// **'Trying keyslot…'**
+  String get luksKeyslotProgressUnknown;
+
+  /// Progress label while trying successive BitLocker credentials
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying credential {attempted} of {total}…'**
+  String bitlockerCredentialProgress(int attempted, int total);
+
+  /// Progress label while verifying a BitLocker credential when the total count isn't known yet
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying credential…'**
+  String get bitlockerCredentialProgressUnknown;
+
+  /// Progress label showing the hash/cipher algorithm combination currently being tried for a VeraCrypt volume
+  ///
+  /// In en, this message translates to:
+  /// **'Trying {algo} ({slotName})…'**
+  String veracryptAlgoProgress(String algo, String slotName);
+
+  /// Title/button label for unlocking an existing (non-folder-vault) container
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Container'**
+  String get unlockContainerLabel;
+
+  /// Title of the sheet when mounting a brand-new container (none picked yet)
+  ///
+  /// In en, this message translates to:
+  /// **'Mount Container'**
+  String get mountContainerTitle;
+
+  /// Segmented control option for choosing a single-file container
+  ///
+  /// In en, this message translates to:
+  /// **'Container File'**
+  String get containerFileSegmentLabel;
+
+  /// Segmented control option for choosing a folder-based vault
+  ///
+  /// In en, this message translates to:
+  /// **'Folder Vault'**
+  String get folderVaultSegmentLabel;
+
+  /// Detected container-type label combining an untranslated format/brand name with 'Container', e.g. 'LUKS Container'
+  ///
+  /// In en, this message translates to:
+  /// **'{format} Container'**
+  String formatContainerLabel(String format);
+
+  /// Detected container-type label combining an untranslated format/brand name with 'Vault', e.g. 'Cryptomator Vault'
+  ///
+  /// In en, this message translates to:
+  /// **'{format} Vault'**
+  String formatVaultLabel(String format);
+
+  /// Detected container-type label combining an untranslated format/brand name with 'Drive', e.g. 'BitLocker Drive'
+  ///
+  /// In en, this message translates to:
+  /// **'{format} Drive'**
+  String formatDriveLabel(String format);
+
+  /// Generic fallback label for a container of unrecognized/unknown format
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted Container'**
+  String get encryptedContainerLabel;
+
+  /// Placeholder hint prompting the user to pick a folder vault
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to select vault folder…'**
+  String get tapToSelectVaultFolder;
+
+  /// Placeholder hint prompting the user to pick a container file
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to select container file…'**
+  String get tapToSelectContainerFile;
+
+  /// Banner warning about CryFS performance without Direct Storage Access
+  ///
+  /// In en, this message translates to:
+  /// **'CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.'**
+  String get cryfsPerformanceWarning;
+
+  /// Banner warning about folder vault performance without Direct Storage Access
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.'**
+  String get folderVaultPerformanceWarning;
+
+  /// Title shown when a saved container's underlying file/folder can no longer be found
+  ///
+  /// In en, this message translates to:
+  /// **'Container Missing'**
+  String get containerMissingTitle;
+
+  /// Subtitle shown alongside the container-missing title
+  ///
+  /// In en, this message translates to:
+  /// **'File path could not be resolved'**
+  String get filePathCouldNotBeResolved;
+
+  /// Longer explanation shown when a saved container's file can't be found
+  ///
+  /// In en, this message translates to:
+  /// **'The container file may have been moved, deleted, or its host storage is currently disconnected.'**
+  String get containerMissingExplanation;
+
+  /// Generic retry button label
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retryButtonLabel;
+
+  /// Button to re-pick the location of a missing container's file
+  ///
+  /// In en, this message translates to:
+  /// **'Locate File'**
+  String get locateFileButtonLabel;
+
+  /// Subtitle under the biometric-unlock title, explaining what authenticating will do
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate to securely mount the container'**
+  String get authenticateToMountSubtitle;
+
+  /// Button to switch from biometric prompt to manual password entry
+  ///
+  /// In en, this message translates to:
+  /// **'Use Password'**
+  String get usePasswordButtonLabel;
+
+  /// Button to trigger the biometric authentication prompt
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate'**
+  String get authenticateButtonLabel;
+
+  /// Title of the pattern-unlock card shown on the unlock sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Draw Unlock Pattern'**
+  String get drawUnlockPatternCardTitle;
+
+  /// Message shown under the pattern title after an incorrect pattern attempt
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong pattern — try again'**
+  String get wrongPatternTryAgain;
+
+  /// Message shown under the pattern title prompting the user to draw their pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your pattern sequence'**
+  String get connectYourPatternSequence;
+
+  /// Button to switch from pattern entry to manual password entry
+  ///
+  /// In en, this message translates to:
+  /// **'Use Password instead'**
+  String get usePasswordInsteadButtonLabel;
+
+  /// Password field hint text when unlocking a folder vault
+  ///
+  /// In en, this message translates to:
+  /// **'Enter vault password'**
+  String get passwordHintFolderVault;
+
+  /// Password field hint text when unlocking a BitLocker drive
+  ///
+  /// In en, this message translates to:
+  /// **'Enter password or recovery key'**
+  String get passwordHintBitlocker;
+
+  /// Password field hint text when unlocking a regular container
+  ///
+  /// In en, this message translates to:
+  /// **'Enter container password'**
+  String get passwordHintContainer;
+
+  /// Tooltip on the bookmark icon shown when the password field was prefilled from a saved credential
+  ///
+  /// In en, this message translates to:
+  /// **'Using saved password'**
+  String get usingSavedPasswordTooltip;
+
+  /// Helper note shown under the keyfile picker for LUKS containers
+  ///
+  /// In en, this message translates to:
+  /// **'For LUKS containers the keyfile replaces the password.'**
+  String get luksKeyfileReplacesPasswordNote;
+
+  /// Subtitle explaining read-only mode for a USB drive
+  ///
+  /// In en, this message translates to:
+  /// **'Mount without allowing changes to this drive'**
+  String get readOnlyModeUsbSubtitle;
+
+  /// Toggle label to remember/pin a newly mounted container
+  ///
+  /// In en, this message translates to:
+  /// **'Remember container'**
+  String get rememberContainerLabel;
+
+  /// Subtitle explaining the remember-container toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Pin container on dashboard for quick access'**
+  String get rememberContainerSubtitle;
+
+  /// Button to cancel an in-progress unlock operation
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Unlock'**
+  String get cancelUnlockButtonLabel;
+
+  /// Noun substituted into the biometric prompt reason when unlocking a local container, e.g. 'Authenticate to unlock container'
+  ///
+  /// In en, this message translates to:
+  /// **'container'**
+  String get biometricSubjectContainer;
+
+  /// Reason shown by the OS biometric prompt, combined with a source-specific subject noun
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate to unlock {subject}'**
+  String authenticateToUnlockPrompt(String subject);
+
+  /// Error shown when a pattern is submitted but none is on record
+  ///
+  /// In en, this message translates to:
+  /// **'No pattern configured. Please enter password manually.'**
+  String get noPatternConfiguredMessage;
+
+  /// Error shown when a new pattern-unlock lockout is triggered
+  ///
+  /// In en, this message translates to:
+  /// **'Too many failed attempts. Locked for {seconds}s.'**
+  String patternLockedForSeconds(int seconds);
+
+  /// Message shown when biometric unlock has no saved credentials to use yet, for a local container
+  ///
+  /// In en, this message translates to:
+  /// **'Initializing secure credentials. Please unlock manually once to authorize biometric access.'**
+  String get initSecureCredsBiometricMessage;
+
+  /// Message shown when pattern unlock has no saved credentials to use yet, for a local container
+  ///
+  /// In en, this message translates to:
+  /// **'Initializing secure credentials. Please unlock manually once to authorize pattern access.'**
+  String get initSecureCredsPatternMessage;
 
   /// Add-vault option title
   ///
@@ -2881,6 +3229,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Playlist Transition Animation'**
   String get playlistTransitionAnimationLabel;
+
+  /// Playlist transition effect: default horizontal slide
+  ///
+  /// In en, this message translates to:
+  /// **'Slide (Default)'**
+  String get playlistTransitionSlideLabel;
+
+  /// Playlist transition effect: cross-fade
+  ///
+  /// In en, this message translates to:
+  /// **'Fade'**
+  String get playlistTransitionFadeLabel;
+
+  /// Playlist transition effect: zoom and scale
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom & Scale'**
+  String get playlistTransitionZoomLabel;
+
+  /// Playlist transition effect: 3D depth stack
+  ///
+  /// In en, this message translates to:
+  /// **'Depth Stack'**
+  String get playlistTransitionDepthLabel;
+
+  /// Playlist transition effect: 3D cube rotation
+  ///
+  /// In en, this message translates to:
+  /// **'3D Cube'**
+  String get playlistTransitionCubeLabel;
+
+  /// Playlist transition effect: 3D card flip
+  ///
+  /// In en, this message translates to:
+  /// **'3D Flip'**
+  String get playlistTransitionFlipLabel;
 
   /// Title for the vault unlock bottom sheet
   ///

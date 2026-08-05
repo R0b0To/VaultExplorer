@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
@@ -157,15 +158,15 @@ class _UnlockSheetState extends State<UnlockSheet>
   String get containerUri => widget.initialUri!;
 
   @override
-  String get biometricPromptSubject => 'container';
+  String get biometricPromptSubject => context.l10n.biometricSubjectContainer;
 
   @override
   String get noSavedCredentialsForBiometricMessage =>
-      'Initializing secure credentials. Please unlock manually once to authorize biometric access.';
+      context.l10n.initSecureCredsBiometricMessage;
 
   @override
   String get noSavedCredentialsForPatternMessage =>
-      'Initializing secure credentials. Please unlock manually once to authorize pattern access.';
+      context.l10n.initSecureCredsPatternMessage;
 
   @override
   String get debugLogTag => 'unlock';
@@ -313,7 +314,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         if (picked == null || !mounted) return;
         final format = picked.format;
         if (format == null) {
-          setState(() => _error = 'No masterkey.cryptomator, gocryptfs.conf, or cryfs.config found in that folder.');
+          setState(() => _error = context.l10n.noVaultFolderFormatDetected);
           return;
         }
         detectedFormat = format;
@@ -334,7 +335,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         if (mounted) {
           setState(() {
             _loadingAuth = false;
-            _error = 'Saved settings for this container could not be found.';
+            _error = context.l10n.savedContainerSettingsNotFound;
           });
         }
         return;
@@ -387,7 +388,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       if (mounted) {
         setState(() {
           _loadingAuth = false;
-          _error = 'Could not update the container location: $e';
+          _error = context.l10n.couldNotUpdateContainerLocation(e.toString());
         });
       }
     }
@@ -402,7 +403,7 @@ class _UnlockSheetState extends State<UnlockSheet>
 
         if (widget.mountedUris.contains(result.uri)) {
           setState(() {
-            _error = 'This container is already mounted.';
+            _error = context.l10n.containerAlreadyMounted;
             _selectedUri = null;
             _selectedName = null;
           });
@@ -412,7 +413,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         final detectedFormat = result.format;
         if (detectedFormat == null) {
           setState(() {
-            _error = 'No masterkey.cryptomator, gocryptfs.conf, or cryfs.config found in that folder.';
+            _error = context.l10n.noVaultFolderFormatDetected;
             _selectedUri = null;
             _selectedName = null;
           });
@@ -432,7 +433,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       if (result != null) {
         if (widget.mountedUris.contains(result.uri)) {
           setState(() {
-            _error = 'This container is already mounted.';
+            _error = context.l10n.containerAlreadyMounted;
             _selectedUri = null;
             _selectedName = null;
           });
@@ -447,7 +448,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         vaultExplorerApi.warmContainer(result.uri);
       }
     } catch (e) {
-      setState(() => _error = 'File picker failed: $e');
+      setState(() => _error = context.l10n.filePickerFailed(e.toString()));
     }
   }
 
@@ -467,28 +468,28 @@ class _UnlockSheetState extends State<UnlockSheet>
     List<String>? keyfilePathsOverride,
   }) async {
     if (_selectedUri == null) {
-      setState(() => _error = 'Select a container first');
+      setState(() => _error = context.l10n.selectContainerFirst);
       return;
     }
     if (widget.mountedUris.contains(_selectedUri)) {
-      setState(() => _error = 'This container is already mounted.');
+      setState(() => _error = context.l10n.containerAlreadyMounted);
       return;
     }
     var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
     final effectiveKeyfilePaths =
         keyfilePathsOverride ?? keyfiles.map((k) => k.uri).toList();
     if (effectivePassword.isEmpty && preservedKey == null && effectiveKeyfilePaths.isEmpty) {
-      setState(() => _error = 'Password or keyfiles required');
+      setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
       return;
     }
 
     if (_isCryfs && !_hasAllStorageAccess) {
       final grant = await showAppConfirmDialog(
         context,
-        title: 'Slow Performance Warning',
-        message: 'Direct Storage Access is currently disabled.\n\nCryFS stores files across thousands of small blocks. Opening non-empty CryFS vaults via Android SAF will be very slow.\n\nWould you like to open Settings to grant "All Files Access" for fast speed?',
-        confirmLabel: 'Open Settings',
-        cancelLabel: 'Unlock Anyway',
+        title: context.l10n.slowPerformanceWarningTitle,
+        message: context.l10n.slowPerformanceWarningMessage,
+        confirmLabel: context.l10n.openSettings,
+        cancelLabel: context.l10n.unlockAnyway,
       );
       if (grant) {
         await _requestStoragePermission();

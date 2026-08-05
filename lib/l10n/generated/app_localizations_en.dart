@@ -1082,7 +1082,216 @@ class AppLocalizationsEn extends AppLocalizations {
   String get containerAlreadyMounted => 'This container is already mounted.';
 
   @override
-  String get addAVaultTitle => 'Add a vault';
+  String get noVaultFolderFormatDetected =>
+      'No masterkey.cryptomator, gocryptfs.conf, or cryfs.config found in that folder.';
+
+  @override
+  String get savedContainerSettingsNotFound =>
+      'Saved settings for this container could not be found.';
+
+  @override
+  String couldNotUpdateContainerLocation(String error) {
+    return 'Could not update the container location: $error';
+  }
+
+  @override
+  String filePickerFailed(String error) {
+    return 'File picker failed: $error';
+  }
+
+  @override
+  String get selectContainerFirst => 'Select a container first';
+
+  @override
+  String get passwordOrKeyfilesRequired => 'Password or keyfiles required';
+
+  @override
+  String get slowPerformanceWarningTitle => 'Slow Performance Warning';
+
+  @override
+  String get slowPerformanceWarningMessage =>
+      'Direct Storage Access is currently disabled.\n\nCryFS stores files across thousands of small blocks. Opening non-empty CryFS vaults via Android SAF will be very slow.\n\nWould you like to open Settings to grant \"All Files Access\" for fast speed?';
+
+  @override
+  String get unlockAnyway => 'Unlock Anyway';
+
+  @override
+  String get defaultVaultName => 'Vault';
+
+  @override
+  String get defaultContainerName => 'Container';
+
+  @override
+  String get incorrectPasswordOrInvalidVault =>
+      'Incorrect password or invalid vault';
+
+  @override
+  String get incorrectPasswordOrInvalidContainer =>
+      'Incorrect password or invalid container';
+
+  @override
+  String get genericUnknownError => 'Unknown error';
+
+  @override
+  String get decryptingLabel => 'Decrypting...';
+
+  @override
+  String luksKeyslotProgress(int attempted, int total) {
+    return 'Trying keyslot $attempted of $total…';
+  }
+
+  @override
+  String get luksKeyslotProgressUnknown => 'Trying keyslot…';
+
+  @override
+  String bitlockerCredentialProgress(int attempted, int total) {
+    return 'Verifying credential $attempted of $total…';
+  }
+
+  @override
+  String get bitlockerCredentialProgressUnknown => 'Verifying credential…';
+
+  @override
+  String veracryptAlgoProgress(String algo, String slotName) {
+    return 'Trying $algo ($slotName)…';
+  }
+
+  @override
+  String get unlockContainerLabel => 'Unlock Container';
+
+  @override
+  String get mountContainerTitle => 'Mount Container';
+
+  @override
+  String get containerFileSegmentLabel => 'Container File';
+
+  @override
+  String get folderVaultSegmentLabel => 'Folder Vault';
+
+  @override
+  String formatContainerLabel(String format) {
+    return '$format Container';
+  }
+
+  @override
+  String formatVaultLabel(String format) {
+    return '$format Vault';
+  }
+
+  @override
+  String formatDriveLabel(String format) {
+    return '$format Drive';
+  }
+
+  @override
+  String get encryptedContainerLabel => 'Encrypted Container';
+
+  @override
+  String get tapToSelectVaultFolder => 'Tap to select vault folder…';
+
+  @override
+  String get tapToSelectContainerFile => 'Tap to select container file…';
+
+  @override
+  String get cryfsPerformanceWarning =>
+      'CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.';
+
+  @override
+  String get folderVaultPerformanceWarning =>
+      'Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.';
+
+  @override
+  String get containerMissingTitle => 'Container Missing';
+
+  @override
+  String get filePathCouldNotBeResolved => 'File path could not be resolved';
+
+  @override
+  String get containerMissingExplanation =>
+      'The container file may have been moved, deleted, or its host storage is currently disconnected.';
+
+  @override
+  String get retryButtonLabel => 'Retry';
+
+  @override
+  String get locateFileButtonLabel => 'Locate File';
+
+  @override
+  String get authenticateToMountSubtitle =>
+      'Authenticate to securely mount the container';
+
+  @override
+  String get usePasswordButtonLabel => 'Use Password';
+
+  @override
+  String get authenticateButtonLabel => 'Authenticate';
+
+  @override
+  String get drawUnlockPatternCardTitle => 'Draw Unlock Pattern';
+
+  @override
+  String get wrongPatternTryAgain => 'Wrong pattern — try again';
+
+  @override
+  String get connectYourPatternSequence => 'Connect your pattern sequence';
+
+  @override
+  String get usePasswordInsteadButtonLabel => 'Use Password instead';
+
+  @override
+  String get passwordHintFolderVault => 'Enter vault password';
+
+  @override
+  String get passwordHintBitlocker => 'Enter password or recovery key';
+
+  @override
+  String get passwordHintContainer => 'Enter container password';
+
+  @override
+  String get usingSavedPasswordTooltip => 'Using saved password';
+
+  @override
+  String get luksKeyfileReplacesPasswordNote =>
+      'For LUKS containers the keyfile replaces the password.';
+
+  @override
+  String get readOnlyModeUsbSubtitle =>
+      'Mount without allowing changes to this drive';
+
+  @override
+  String get rememberContainerLabel => 'Remember container';
+
+  @override
+  String get rememberContainerSubtitle =>
+      'Pin container on dashboard for quick access';
+
+  @override
+  String get cancelUnlockButtonLabel => 'Cancel Unlock';
+
+  @override
+  String get biometricSubjectContainer => 'container';
+
+  @override
+  String authenticateToUnlockPrompt(String subject) {
+    return 'Authenticate to unlock $subject';
+  }
+
+  @override
+  String get noPatternConfiguredMessage =>
+      'No pattern configured. Please enter password manually.';
+
+  @override
+  String patternLockedForSeconds(int seconds) {
+    return 'Too many failed attempts. Locked for ${seconds}s.';
+  }
+
+  @override
+  String get initSecureCredsBiometricMessage =>
+      'Initializing secure credentials. Please unlock manually once to authorize biometric access.';
+
+  @override
+  String get initSecureCredsPatternMessage =>
+      'Initializing secure credentials. Please unlock manually once to authorize pattern access.';
 
   @override
   String get mountExistingContainerTitle => 'Mount existing container';
@@ -1747,6 +1956,24 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get playlistTransitionAnimationLabel =>
       'Playlist Transition Animation';
+
+  @override
+  String get playlistTransitionSlideLabel => 'Slide (Default)';
+
+  @override
+  String get playlistTransitionFadeLabel => 'Fade';
+
+  @override
+  String get playlistTransitionZoomLabel => 'Zoom & Scale';
+
+  @override
+  String get playlistTransitionDepthLabel => 'Depth Stack';
+
+  @override
+  String get playlistTransitionCubeLabel => '3D Cube';
+
+  @override
+  String get playlistTransitionFlipLabel => '3D Flip';
 
   @override
   String get unlockVaultTitle => 'Unlock Vault';

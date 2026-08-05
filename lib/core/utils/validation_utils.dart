@@ -1,3 +1,5 @@
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
 /// Clamps a user-supplied PIM value to a safe range.
 ///
 /// The native PBKDF2 iteration formula is:
@@ -52,31 +54,24 @@ HiddenVolumeValidation validateHiddenVolume({
   required bool hasHiddenKeyfiles,
   required Set<String> outerKeyfileUris,
   required Set<String> hiddenKeyfileUris,
+  required AppLocalizations l10n,
 }) {
   final hiddenSizeVal = double.tryParse(hiddenSizeText);
   if (hiddenSizeVal == null || hiddenSizeVal <= 0) {
-    return const HiddenVolumeValidation.error(
-      'Enter a valid hidden size greater than 0',
-    );
+    return HiddenVolumeValidation.error(l10n.hiddenVolumeErrorInvalidSize);
   }
   final hiddenMultiplier =
       hiddenSizeUnit == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024;
   final hiddenSizeBytes = (hiddenSizeVal * hiddenMultiplier).round();
 
   if (hiddenSizeBytes >= outerSizeBytes) {
-    return const HiddenVolumeValidation.error(
-      'Hidden volume size must be less than the outer volume size',
-    );
+    return HiddenVolumeValidation.error(l10n.hiddenVolumeErrorTooLargeVsOuter);
   }
   if (outerSizeBytes <= vcDataAreaOffset + hiddenSizeBytes) {
-    return const HiddenVolumeValidation.error(
-      'Hidden volume size is too large for this container size',
-    );
+    return HiddenVolumeValidation.error(l10n.hiddenVolumeErrorTooLargeForContainer);
   }
   if (hiddenPassword.isEmpty && !hasHiddenKeyfiles) {
-    return const HiddenVolumeValidation.error(
-      'A hidden password or keyfile is required when creating a hidden volume',
-    );
+    return HiddenVolumeValidation.error(l10n.hiddenVolumeErrorCredentialsRequired);
   }
 
   final samePassword = outerPassword == hiddenPassword;
@@ -85,10 +80,7 @@ HiddenVolumeValidation validateHiddenVolume({
       outerKeyfileUris.difference(hiddenKeyfileUris).isEmpty;
 
   if (samePassword && samePim && sameKeyfiles) {
-    return const HiddenVolumeValidation.error(
-      'Hidden volume credentials (password, PIM, and keyfiles) cannot be '
-      'identical to the outer volume credentials.',
-    );
+    return HiddenVolumeValidation.error(l10n.hiddenVolumeErrorCredentialsMustDiffer);
   }
 
   return HiddenVolumeValidation.ok(hiddenSizeBytes);

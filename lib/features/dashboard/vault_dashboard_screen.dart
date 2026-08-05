@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -266,7 +267,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     _onContainerLocked(volId);
     showAppSnackBar(
       context,
-      message: 'USB drive disconnected — container locked',
+      message: context.l10n.usbDriveDisconnectedLocked,
       tone: AppBannerTone.warning,
     );
   }
@@ -337,7 +338,7 @@ class _VaultDashboardState extends State<VaultDashboard>
 
   Future<void> _showUnlockSheet({String? uri, String? name}) async {
     if (uri != null && _mounted.any((c) => c.uri == uri)) {
-      showAppSnackBar(context, message: 'This container is already mounted.');
+      showAppSnackBar(context, message: context.l10n.containerAlreadyMounted);
       return;
     }
     if (_actionInFlight) return;
@@ -480,7 +481,7 @@ class _VaultDashboardState extends State<VaultDashboard>
             Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 4),
               child: Text(
-                'Add a vault',
+                context.l10n.addAVaultTitle,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
@@ -488,8 +489,8 @@ class _VaultDashboardState extends State<VaultDashboard>
             SheetOptionTile(
               icon: Icons.lock_open_rounded,
               iconColor: cs.primary,
-              title: 'Mount existing container',
-              subtitle: 'Unlock a file container you already have',
+              title: context.l10n.mountExistingContainerTitle,
+              subtitle: context.l10n.mountExistingContainerSubtitle,
               onTap: () {
                 Navigator.pop(sheetContext);
                 _showUnlockSheet();
@@ -499,8 +500,8 @@ class _VaultDashboardState extends State<VaultDashboard>
               SheetOptionTile(
                 icon: Icons.usb_rounded,
                 iconColor: cs.tertiary,
-                title: 'Mount USB drive',
-                subtitle: 'Unlock a container on an OTG flash drive',
+                title: context.l10n.mountUsbDriveTitle,
+                subtitle: context.l10n.mountUsbDriveSubtitle,
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _showUsbUnlockSheet();
@@ -509,8 +510,8 @@ class _VaultDashboardState extends State<VaultDashboard>
               SheetOptionTile(
                 icon: Icons.usb_off_rounded,
                 iconColor: cs.error,
-                title: 'Format USB drive',
-                subtitle: 'Erase a drive and create a new encrypted container on it',
+                title: context.l10n.formatUsbDriveTitle,
+                subtitle: context.l10n.formatUsbDriveSubtitle,
                 onTap: () {
                   Navigator.pop(sheetContext);
                   _showUsbCreateSheet();
@@ -520,8 +521,8 @@ class _VaultDashboardState extends State<VaultDashboard>
             SheetOptionTile(
               icon: Icons.add_box_rounded,
               iconColor: cs.secondary,
-              title: 'Create new container',
-              subtitle: 'Format a brand-new encrypted vault',
+              title: context.l10n.createNewContainerTitle,
+              subtitle: context.l10n.createNewContainerSubtitle,
               onTap: () {
                 Navigator.pop(sheetContext);
                 _showCreateSheet();
@@ -688,7 +689,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     if (item.isMounted) {
       showAppSnackBar(
         context,
-        message: 'Lock the container before removing it.',
+        message: context.l10n.lockBeforeRemovingWarning,
         tone: AppBannerTone.warning,
       );
       return;
@@ -850,15 +851,15 @@ class _VaultDashboardState extends State<VaultDashboard>
       child: Scaffold(
         appBar: AppBar(
           backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
-          title: const Text(
-            'Vault Explorer',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          title: Text(
+            context.l10n.appNameVaultExplorer,
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           actions: [
             const AppBarClipboardButton(),
             IconButton(
               icon: const Icon(Icons.settings_rounded),
-              tooltip: 'Settings',
+              tooltip: context.l10n.settingsTooltip,
               onPressed: () async {
                 await Navigator.push(
                   context,
@@ -873,7 +874,7 @@ class _VaultDashboardState extends State<VaultDashboard>
         floatingActionButton: FloatingActionButton.extended(
           onPressed: _actionInFlight ? null : _showAddOptionsSheet,
           icon: const Icon(Icons.add_rounded),
-          label: const Text('Add vault'),
+          label: Text(context.l10n.addVaultFabLabel),
         ),
         body: Stack(
           children: [
@@ -945,7 +946,7 @@ class _FloatingUndoBar extends StatelessWidget {
             child: AnimatedSwitcher(
               duration: AppMotion.short2,
               child: Text(
-                'Removed "$label"',
+                context.l10n.removedLabelUndo(label),
                 key: ValueKey(label),
                 style: textTheme.labelLarge?.copyWith(
                   color: cs.onInverseSurface,
@@ -965,9 +966,9 @@ class _FloatingUndoBar extends StatelessWidget {
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: const Text(
-              'Undo',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            child: Text(
+              context.l10n.undo,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],

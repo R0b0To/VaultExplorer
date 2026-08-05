@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
@@ -74,9 +75,9 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
           Icons.lock_outline_rounded,
           color: cs.onSurfaceVariant.withValues(alpha: 0.5),
         ),
-        tooltip: 'Read-only — can\'t add items',
+        tooltip: context.l10n.readOnlyCantAddItemsTooltip,
         onPressed: () => widget.onSetStatus(
-          'This container is mounted read-only.',
+          context.l10n.readOnlyContainerWarning,
           error: true,
         ),
       );
@@ -84,14 +85,14 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
     if (widget.hasArchiveContext) {
       return IconButton(
         icon: const Icon(Icons.unarchive_rounded, size: 28),
-        tooltip: 'Extract Archive',
+        tooltip: context.l10n.extractArchive,
         onPressed: widget.onExtractArchive,
       );
     }
     return MenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: const Icon(Icons.add_rounded, size: 28),
-        tooltip: 'New item',
+        tooltip: context.l10n.newItemTooltip,
         onPressed: () {
           widget.onSignalActivity();
           if (controller.isOpen) {
@@ -106,7 +107,7 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
       menuChildren: [
         MenuItemButton(
           leadingIcon: Icon(Icons.create_new_folder_outlined, color: cs.primary),
-          child: const Text('New Folder'),
+          child: Text(context.l10n.newFolderTitle),
           onPressed: () {
             BrowserDialogs.showCreateFolder(
               context,
@@ -120,7 +121,7 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.insert_drive_file_outlined, color: cs.primary),
-          child: const Text('New Text File'),
+          child: Text(context.l10n.newTextFileTitle),
           onPressed: () {
             BrowserDialogs.showCreateFile(
               context,
@@ -134,17 +135,17 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.photo_camera_outlined, color: cs.primary),
-          child: const Text('Camera'),
+          child: Text(context.l10n.camera),
           onPressed: widget.onCaptureFromCamera,
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
-          child: const Text('Import Files'),
+          child: Text(context.l10n.importFiles),
           onPressed: widget.onImportFilesFromDevice,
         ),
         MenuItemButton(
           leadingIcon: Icon(Icons.drive_folder_upload_outlined, color: cs.secondary),
-          child: const Text('Import Folder'),
+          child: Text(context.l10n.importFolder),
           onPressed: widget.onImportFolderFromDevice,
         ),
         const PopupMenuDivider(),
@@ -157,12 +158,12 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
                   vaultIconForExt(type.name) ?? Icons.lock_rounded,
                   color: vaultColorForExt(type.name) ?? cs.primary,
                 ),
-                child: Text(type.label),
+                child: Text(type.label(context.l10n)),
                 onPressed: () => widget.onAddVaultItem(type),
               ),
             ),
           ],
-          child: const Text('Secure Item'),
+          child: Text(context.l10n.secureItem),
         ),
       ],
     );

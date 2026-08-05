@@ -1,3 +1,5 @@
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
 /// How container cards are ordered on the dashboard.
 ///
 /// [manual] preserves the user's own drag-and-drop ordering
@@ -18,6 +20,14 @@ enum ContainerSortMode {
         ContainerSortMode.nameAZ => 'Name (A–Z)',
         ContainerSortMode.newest => 'Newest first',
         ContainerSortMode.oldest => 'Oldest first',
+      };
+
+  String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
+        ContainerSortMode.manual => l10n.sortContainersModeManual,
+        ContainerSortMode.unlockStatus => l10n.sortContainersModeUnlockStatus,
+        ContainerSortMode.nameAZ => l10n.sortContainersModeNameAZ,
+        ContainerSortMode.newest => l10n.sortContainersModeNewest,
+        ContainerSortMode.oldest => l10n.sortContainersModeOldest,
       };
 
   String toJson() => name;

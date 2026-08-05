@@ -38,6 +38,9 @@ class AppSettings {
   bool defaultFileSortAscending;
   bool htmlEnableJavaScript;
   PlaylistTransitionEffect playlistTransitionEffect;
+  /// `null` = follow system locale; otherwise an explicit BCP-47 language
+  /// code matching one of `AppLocalizations.supportedLocales` (e.g. `'en'`).
+  String? languageCode;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
   AppSettings({
@@ -61,6 +64,7 @@ class AppSettings {
     this.defaultFileSortAscending = true,
     this.htmlEnableJavaScript = false,
     this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
+    this.languageCode,
     Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
     String? masterPasswordSalt,
@@ -110,6 +114,7 @@ class AppSettings {
     bool? defaultFileSortAscending,
     bool? htmlEnableJavaScript,
     PlaylistTransitionEffect? playlistTransitionEffect,
+    String? languageCode,
   }) {
     return AppSettings(
       useMasterPassword: useMasterPassword ?? this.useMasterPassword,
@@ -135,6 +140,7 @@ class AppSettings {
       defaultFileSortAscending: defaultFileSortAscending ?? this.defaultFileSortAscending,
       htmlEnableJavaScript: htmlEnableJavaScript ?? this.htmlEnableJavaScript,
       playlistTransitionEffect: playlistTransitionEffect ?? this.playlistTransitionEffect,
+      languageCode: languageCode ?? this.languageCode,
     );
   }
 
@@ -160,6 +166,7 @@ class AppSettings {
     'defaultFileSortAscending': defaultFileSortAscending,
     'htmlEnableJavaScript': htmlEnableJavaScript,
     'playlistTransitionEffect': playlistTransitionEffect.toJson(),
+    'languageCode': languageCode,
   };
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
     useMasterPassword: j['useMasterPassword'] as bool? ?? false,
@@ -196,6 +203,7 @@ class AppSettings {
     defaultFileSortAscending: j['defaultFileSortAscending'] as bool? ?? true,
     htmlEnableJavaScript: j['htmlEnableJavaScript'] as bool? ?? false,
     playlistTransitionEffect: PlaylistTransitionEffect.fromJson(j['playlistTransitionEffect'] as String?),
+    languageCode: j['languageCode'] as String?,
   );
 }
 

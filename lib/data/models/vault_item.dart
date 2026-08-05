@@ -1,3 +1,5 @@
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
 // ── Item type enum ─────────────────────────────────────────────────────────────
 
 enum VaultItemType {
@@ -8,13 +10,13 @@ enum VaultItemType {
   bankAccount,
   softwareLicense;
 
-  String get label => switch (this) {
-        VaultItemType.password => 'Password',
-        VaultItemType.paymentCard => 'Payment Card',
-        VaultItemType.identity => 'Identity',
-        VaultItemType.secureNote => 'Secure Note',
-        VaultItemType.bankAccount => 'Bank Account',
-        VaultItemType.softwareLicense => 'Software License',
+  String label(AppLocalizations l10n) => switch (this) {
+        VaultItemType.password => l10n.vaultItemTypePassword,
+        VaultItemType.paymentCard => l10n.vaultItemTypePaymentCard,
+        VaultItemType.identity => l10n.vaultItemTypeIdentity,
+        VaultItemType.secureNote => l10n.vaultItemTypeSecureNote,
+        VaultItemType.bankAccount => l10n.vaultItemTypeBankAccount,
+        VaultItemType.softwareLicense => l10n.vaultItemTypeSoftwareLicense,
       };
 
   String get icon => switch (this) {
@@ -88,60 +90,60 @@ class VaultField {
 // ── Item templates ─────────────────────────────────────────────────────────────
 
 class VaultItemTemplate {
-  static List<Map<String, dynamic>> fieldsFor(VaultItemType type) =>
+  static List<Map<String, dynamic>> fieldsFor(VaultItemType type, AppLocalizations l10n) =>
       switch (type) {
         VaultItemType.password => [
-            {'key': 'username', 'label': 'Username / Email', 'type': 'text', 'required': true},
-            {'key': 'password', 'label': 'Password', 'type': 'secret', 'required': true},
-            {'key': 'url', 'label': 'Website URL', 'type': 'url'},
-            {'key': 'totp_secret', 'label': 'TOTP Secret (2FA)', 'type': 'secret'},
-            {'key': 'notes', 'label': 'Notes', 'type': 'multiline'},
+            {'key': 'username', 'label': l10n.fieldUsernameEmail, 'type': 'text', 'required': true},
+            {'key': 'password', 'label': l10n.fieldPassword, 'type': 'secret', 'required': true},
+            {'key': 'url', 'label': l10n.fieldWebsiteUrl, 'type': 'url'},
+            {'key': 'totp_secret', 'label': l10n.fieldTotpSecret, 'type': 'secret'},
+            {'key': 'notes', 'label': l10n.fieldNotes, 'type': 'multiline'},
           ],
         VaultItemType.paymentCard => [
-            {'key': 'cardholder', 'label': 'Cardholder Name', 'type': 'text', 'required': true},
-            {'key': 'number', 'label': 'Card Number', 'type': 'secret', 'required': true},
-            {'key': 'expiry', 'label': 'Expiry (MM/YY)', 'type': 'text', 'required': true},
-            {'key': 'cvv', 'label': 'CVV / CVC', 'type': 'secret', 'required': true},
-            {'key': 'pin', 'label': 'PIN', 'type': 'secret'},
-            {'key': 'bank', 'label': 'Issuing Bank', 'type': 'text'},
-            {'key': 'notes', 'label': 'Notes', 'type': 'multiline'},
+            {'key': 'cardholder', 'label': l10n.fieldCardholderName, 'type': 'text', 'required': true},
+            {'key': 'number', 'label': l10n.fieldCardNumber, 'type': 'secret', 'required': true},
+            {'key': 'expiry', 'label': l10n.fieldExpiryMMYY, 'type': 'text', 'required': true},
+            {'key': 'cvv', 'label': l10n.fieldCvvCvc, 'type': 'secret', 'required': true},
+            {'key': 'pin', 'label': l10n.fieldPin, 'type': 'secret'},
+            {'key': 'bank', 'label': l10n.fieldIssuingBank, 'type': 'text'},
+            {'key': 'notes', 'label': l10n.fieldNotes, 'type': 'multiline'},
           ],
         VaultItemType.identity => [
-            {'key': 'full_name', 'label': 'Full Name', 'type': 'text', 'required': true},
-            {'key': 'dob', 'label': 'Date of Birth', 'type': 'date'},
-            {'key': 'nationality', 'label': 'Nationality', 'type': 'text'},
-            {'key': 'passport_no', 'label': 'Passport Number', 'type': 'secret'},
-            {'key': 'passport_expiry', 'label': 'Passport Expiry', 'type': 'date'},
-            {'key': 'national_id', 'label': 'National ID / SSN', 'type': 'secret'},
-            {'key': 'drivers_license', 'label': "Driver's License", 'type': 'text'},
-            {'key': 'address', 'label': 'Address', 'type': 'multiline'},
-            {'key': 'phone', 'label': 'Phone', 'type': 'phone'},
-            {'key': 'email', 'label': 'Email', 'type': 'email'},
-            {'key': 'notes', 'label': 'Notes', 'type': 'multiline'},
+            {'key': 'full_name', 'label': l10n.fieldFullName, 'type': 'text', 'required': true},
+            {'key': 'dob', 'label': l10n.fieldDateOfBirth, 'type': 'date'},
+            {'key': 'nationality', 'label': l10n.fieldNationality, 'type': 'text'},
+            {'key': 'passport_no', 'label': l10n.fieldPassportNumber, 'type': 'secret'},
+            {'key': 'passport_expiry', 'label': l10n.fieldPassportExpiry, 'type': 'date'},
+            {'key': 'national_id', 'label': l10n.fieldNationalIdSsn, 'type': 'secret'},
+            {'key': 'drivers_license', 'label': l10n.fieldDriversLicense, 'type': 'text'},
+            {'key': 'address', 'label': l10n.fieldAddress, 'type': 'multiline'},
+            {'key': 'phone', 'label': l10n.fieldPhone, 'type': 'phone'},
+            {'key': 'email', 'label': l10n.fieldEmail, 'type': 'email'},
+            {'key': 'notes', 'label': l10n.fieldNotes, 'type': 'multiline'},
           ],
         VaultItemType.secureNote => [
-            {'key': 'content', 'label': 'Note', 'type': 'multiline', 'required': true},
+            {'key': 'content', 'label': l10n.fieldNote, 'type': 'multiline', 'required': true},
           ],
         VaultItemType.bankAccount => [
-            {'key': 'bank_name', 'label': 'Bank Name', 'type': 'text', 'required': true},
-            {'key': 'account_holder', 'label': 'Account Holder', 'type': 'text', 'required': true},
-            {'key': 'account_number', 'label': 'Account Number', 'type': 'secret', 'required': true},
-            {'key': 'routing_number', 'label': 'Routing / Sort Code', 'type': 'secret'},
-            {'key': 'iban', 'label': 'IBAN', 'type': 'secret'},
-            {'key': 'swift', 'label': 'SWIFT / BIC', 'type': 'text'},
-            {'key': 'account_type', 'label': 'Account Type', 'type': 'text'},
-            {'key': 'pin', 'label': 'PIN', 'type': 'secret'},
-            {'key': 'notes', 'label': 'Notes', 'type': 'multiline'},
+            {'key': 'bank_name', 'label': l10n.fieldBankName, 'type': 'text', 'required': true},
+            {'key': 'account_holder', 'label': l10n.fieldAccountHolder, 'type': 'text', 'required': true},
+            {'key': 'account_number', 'label': l10n.fieldAccountNumber, 'type': 'secret', 'required': true},
+            {'key': 'routing_number', 'label': l10n.fieldRoutingSortCode, 'type': 'secret'},
+            {'key': 'iban', 'label': l10n.fieldIban, 'type': 'secret'},
+            {'key': 'swift', 'label': l10n.fieldSwiftBic, 'type': 'text'},
+            {'key': 'account_type', 'label': l10n.fieldAccountType, 'type': 'text'},
+            {'key': 'pin', 'label': l10n.fieldPin, 'type': 'secret'},
+            {'key': 'notes', 'label': l10n.fieldNotes, 'type': 'multiline'},
           ],
         VaultItemType.softwareLicense => [
-            {'key': 'product', 'label': 'Product Name', 'type': 'text', 'required': true},
-            {'key': 'license_key', 'label': 'License Key', 'type': 'secret', 'required': true},
-            {'key': 'registered_to', 'label': 'Registered To', 'type': 'text'},
-            {'key': 'email', 'label': 'Registration Email', 'type': 'email'},
-            {'key': 'purchase_date', 'label': 'Purchase Date', 'type': 'date'},
-            {'key': 'expiry_date', 'label': 'Expiry / Renewal Date', 'type': 'date'},
-            {'key': 'download_url', 'label': 'Download URL', 'type': 'url'},
-            {'key': 'notes', 'label': 'Notes', 'type': 'multiline'},
+            {'key': 'product', 'label': l10n.fieldProductName, 'type': 'text', 'required': true},
+            {'key': 'license_key', 'label': l10n.fieldLicenseKey, 'type': 'secret', 'required': true},
+            {'key': 'registered_to', 'label': l10n.fieldRegisteredTo, 'type': 'text'},
+            {'key': 'email', 'label': l10n.fieldRegistrationEmail, 'type': 'email'},
+            {'key': 'purchase_date', 'label': l10n.fieldPurchaseDate, 'type': 'date'},
+            {'key': 'expiry_date', 'label': l10n.fieldExpiryRenewalDate, 'type': 'date'},
+            {'key': 'download_url', 'label': l10n.fieldDownloadUrl, 'type': 'url'},
+            {'key': 'notes', 'label': l10n.fieldNotes, 'type': 'multiline'},
           ],
       };
 }
@@ -168,8 +170,8 @@ class VaultItem {
   });
 
   /// Returns the primary display subtitle (first non-empty non-secret field).
-  String get subtitle {
-    final template = VaultItemTemplate.fieldsFor(type);
+  String subtitle(AppLocalizations l10n) {
+    final template = VaultItemTemplate.fieldsFor(type, l10n);
     for (final t in template) {
       final fieldType = FieldType.values.firstWhere(
         (ft) => ft.name == (t['type'] as String? ?? 'text'),
@@ -183,8 +185,8 @@ class VaultItem {
     return '';
   }
 
-  List<VaultField> get vaultFields {
-    final template = VaultItemTemplate.fieldsFor(type);
+  List<VaultField> vaultFields(AppLocalizations l10n) {
+    final template = VaultItemTemplate.fieldsFor(type, l10n);
     return template
         .map((t) => VaultField.fromTemplate(t, fields))
         .toList();

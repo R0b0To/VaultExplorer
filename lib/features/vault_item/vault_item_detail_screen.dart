@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
@@ -52,9 +54,9 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
   Future<void> _delete() async {
     final confirm = await showAppConfirmDialog(
       context,
-      title: 'Delete item?',
-      message: '"${_item.title}" will be permanently deleted from the vault.',
-      confirmLabel: 'Delete',
+      title: context.l10n.deleteItemTitle,
+      message: context.l10n.deleteItemMessage(_item.title),
+      confirmLabel: context.l10n.delete,
       isDestructive: true,
     );
     if (!confirm || !mounted) return;
@@ -96,7 +98,7 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
     Clipboard.setData(ClipboardData(text: value));
     showAppSnackBar(
       context,
-      message: '$label copied to clipboard',
+      message: context.l10n.labelCopiedToClipboard(label),
       tone: AppBannerTone.success,
     );
   }
@@ -111,7 +113,7 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
     }
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final fields = _item.vaultFields.where((f) => f.value.isNotEmpty).toList();
+    final fields = _item.vaultFields(context.l10n).where((f) => f.value.isNotEmpty).toList();
     return PopScope(
       canPop: true,
       child: Scaffold(
@@ -124,12 +126,12 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
                 color: _item.favourite ? context.semanticColors.favourite : null,
               ),
               onPressed: _toggleFavourite,
-              tooltip: _item.favourite ? 'Remove from favourites' : 'Add to favourites',
+              tooltip: _item.favourite ? context.l10n.removeFromFavourites : context.l10n.addToFavourites,
             ),
             IconButton(
               icon: const Icon(Icons.edit_rounded),
               onPressed: _edit,
-              tooltip: 'Edit',
+              tooltip: context.l10n.edit,
             ),
             PopupMenuButton<String>(
               onSelected: (v) { if (v == 'delete') _delete(); },
@@ -139,7 +141,7 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
                   child: Row(children: [
                     Icon(Icons.delete_outline_rounded, color: cs.error, size: AppIconSize.standard),
                     const SizedBox(width: 12),
-                    Text('Delete', style: TextStyle(color: cs.error)),
+                    Text(context.l10n.delete, style: TextStyle(color: cs.error)),
                   ]),
                 ),
               ],
@@ -156,14 +158,14 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Text(
-                    'No fields filled in.\nTap Edit to add details.',
+                    context.l10n.noFieldsFilledIn,
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     textAlign: TextAlign.center,
                   ),
                 ),
               )
             else ...[
-              const SectionLabel('Details'),
+              SectionLabel(context.l10n.sectionLabelDetails),
               AppCard.rows(
                 dividerIndent: 16,
                 children: fields
@@ -180,13 +182,13 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
               ),
             ],
             const SizedBox(height: 20),
-            const SectionLabel('Info'),
+            SectionLabel(context.l10n.sectionLabelInfo),
             AppCard.rows(
               dividerIndent: 16,
               children: [
-                _MetaRow(label: 'Type', value: _item.type.label),
-                _MetaRow(label: 'Created', value: _formatDate(_item.createdAt)),
-                _MetaRow(label: 'Modified', value: _formatDate(_item.updatedAt)),
+                _MetaRow(label: context.l10n.metaLabelType, value: _item.type.label(context.l10n)),
+                _MetaRow(label: context.l10n.metaLabelCreated, value: _formatDate(_item.createdAt)),
+                _MetaRow(label: context.l10n.metaLabelModified, value: _formatDate(_item.updatedAt)),
               ],
             ),
           ],
@@ -196,9 +198,7 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
   }
 
   String _formatDate(DateTime dt) {
-    final months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return '${months[dt.month - 1]} ${dt.day}, ${dt.year}  '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return DateFormat('MMM d, y  HH:mm', context.l10n.localeName).format(dt);
   }
 }
 
@@ -244,7 +244,7 @@ class _HeaderCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(100),
                       ),
                       child: Text(
-                        item.type.label,
+                        item.type.label(context.l10n),
                         style: textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w600),
                       ),
                     ),
@@ -324,7 +324,7 @@ class _FieldRow extends StatelessWidget {
                   icon: Icon(Icons.copy_rounded, size: AppIconSize.small, color: cs.onSurfaceVariant),
                   onPressed: onCopy,
                   visualDensity: VisualDensity.compact,
-                  tooltip: 'Copy ${field.label}',
+                  tooltip: context.l10n.copyFieldTooltip(field.label),
                 ),
               ],
             ),

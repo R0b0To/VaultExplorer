@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
@@ -103,12 +104,12 @@ class _LockGateScreenState extends State<LockGateScreen> {
       final isSupported = await _localAuth.isDeviceSupported();
       if (!canCheck || !isSupported) {
         if (mounted) {
-          setState(() => _error = 'Biometric not available on this device');
+          setState(() => _error = context.l10n.biometricNotAvailable);
         }
         return;
       }
       final ok = await _localAuth.authenticate(
-        localizedReason: 'Unlock VaultExplorer',
+        localizedReason: context.l10n.unlockVaultExplorerReason,
         biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
@@ -119,7 +120,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
         // Silently ignore race condition errors on startup/transitions
         return;
       }
-      if (mounted) setState(() => _error = 'Biometric error: ${e.code.name}');
+      if (mounted) setState(() => _error = context.l10n.biometricErrorWithCode(e.code.name));
     } on PlatformException catch (e) {
       if (e.code == 'auth_in_progress' ||
           e.code == 'AuthenticationInProgress' ||
@@ -127,7 +128,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
         // Silently ignore race condition errors on startup/transitions
         return;
       }
-      if (mounted) setState(() => _error = 'Biometric error: ${e.message}');
+      if (mounted) setState(() => _error = context.l10n.biometricErrorWithCode(e.message ?? ''));
     } finally {
       _isAuthenticating = false;
     }
@@ -198,16 +199,14 @@ class _LockGateScreenState extends State<LockGateScreen> {
     final lockout = _currentLockout();
     if (lockout != null) {
       setState(() {
-        _error =
-            'Too many failed attempts. '
-            'Try again in ${lockout.inSeconds} second(s).';
+        _error = context.l10n.tooManyFailedAttempts(lockout.inSeconds);
       });
       return;
     }
 
     final pw = _pwCtrl.text;
     if (pw.isEmpty) {
-      setState(() => _error = 'Enter your master password');
+      setState(() => _error = context.l10n.enterMasterPasswordPrompt);
       return;
     }
     setState(() {
@@ -244,10 +243,8 @@ class _LockGateScreenState extends State<LockGateScreen> {
       setState(() {
         _checking = false;
         _error = newLockout != null
-            ? 'Incorrect password. Locked for ${newLockout.inSeconds}s '
-                  'due to $_failedAttempts failed attempts.'
-            : 'Incorrect password ($_failedAttempts failed attempt'
-                  '${_failedAttempts == 1 ? '' : 's'}).';
+            ? context.l10n.incorrectPasswordLockedFor(newLockout.inSeconds, _failedAttempts)
+            : context.l10n.incorrectPasswordAttempts(_failedAttempts);
       });
       _pwCtrl.clear();
     }
@@ -311,7 +308,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
                   ),
                   const SizedBox(height: 28),
                   Text(
-                    'VaultExplorer',
+                    context.l10n.brandNameNoSpace,
                     style: textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       letterSpacing: -0.2,
@@ -319,7 +316,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Enter your master password to continue',
+                    context.l10n.enterPasswordSubtitle,
                     style: textTheme.bodyMedium?.copyWith(
                       color: cs.onSurfaceVariant,
                     ),
@@ -334,7 +331,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
                     autofillHints: const [AutofillHints.password],
                     onSubmitted: (_) => _checkPassword(),
                     decoration: InputDecoration(
-                      labelText: 'Master Password',
+                      labelText: context.l10n.masterPasswordFieldLabelTitleCase,
                       prefixIcon: const Icon(Icons.key_rounded, size: 18),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -372,14 +369,14 @@ class _LockGateScreenState extends State<LockGateScreen> {
                               valueColor: AlwaysStoppedAnimation(cs.onPrimary),
                             ),
                           )
-                        : const Text('Unlock'),
+                        : Text(context.l10n.unlock),
                   ),
                   if (s.masterPasswordIsFingerprint) ...[
                     const SizedBox(height: 16),
                     OutlinedButton.icon(
                       onPressed: isLockedOut ? null : _tryBiometric,
                       icon: const Icon(Icons.fingerprint_rounded, size: 20),
-                      label: const Text('Use Biometric'),
+                      label: Text(context.l10n.useBiometric),
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 48),
                       ),

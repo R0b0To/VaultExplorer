@@ -37,6 +37,9 @@ Future<void> runDeferredStartupWork() async {
   try {
     final settings = await AppSettingsService.loadSettings();
     appThemeModeNotifier.value = settings.themeMode;
+    if (settings.languageCode != null) {
+      appLocaleNotifier.value = Locale(settings.languageCode!);
+    }
     if (settings.blockScreenshots) {
       await vaultExplorerApi.setSecureScreen(true);
     }

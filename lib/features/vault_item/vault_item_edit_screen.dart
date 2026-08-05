@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
@@ -67,7 +68,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
     _titleCtrl = TextEditingController(text: _initialTitle);
     _titleCtrl.addListener(_onTextChanged);
 
-    _fields = VaultItemTemplate.fieldsFor(widget.type)
+    _fields = VaultItemTemplate.fieldsFor(widget.type, context.l10n)
         .map((t) => VaultField.fromTemplate(t, existing?.fields ?? {}))
         .toList();
 
@@ -128,11 +129,11 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
   /// instead.
   bool _validate() {
     if (_titleCtrl.text.isEmpty) {
-      _showSnack('Title is required');
+      _showSnack(context.l10n.titleRequired);
       return false;
     }
     final desiredName = '${_titleCtrl.text}.${widget.type.name}';
-    final result = validateEntryName(desiredName, _fsType, entryType: EntryType.file);
+    final result = validateEntryName(desiredName, _fsType, entryType: EntryType.file, l10n: context.l10n);
     if (result.issues.isNotEmpty) {
       _showSnack(result.issues.first.message);
       return false;
@@ -197,7 +198,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
     if (ok) {
       Navigator.pop(context, finalPath);
     } else {
-      _showSnack('Failed to save — check container is still mounted');
+      _showSnack(context.l10n.failedToSaveCheckMounted);
     }
   }
 
@@ -206,10 +207,10 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
 
     return showAppConfirmDialog(
       context,
-      title: 'Discard changes?',
-      message: 'Your unsaved changes will be lost.',
-      confirmLabel: 'Discard',
-      cancelLabel: 'Keep editing',
+      title: context.l10n.discardChangesTitle,
+      message: context.l10n.discardChangesMessage,
+      confirmLabel: context.l10n.discard,
+      cancelLabel: context.l10n.keepEditing,
       isDestructive: true,
     );
   }
@@ -240,7 +241,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(_isNew ? 'New ${widget.type.label}' : 'Edit ${widget.existing!.title}'),
+          title: Text(_isNew ? context.l10n.newTypeTitle(widget.type.label(context.l10n)) : context.l10n.editItemTitle(widget.existing!.title)),
           actions: [
             if (_saving)
               const Padding(
@@ -250,7 +251,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
             else
               TextButton(
                 onPressed: _save,
-                child: Text('Save', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
+                child: Text(context.l10n.save, style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold)),
               ),
             const SizedBox(width: 8),
           ],
@@ -259,20 +260,20 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
           padding: AppSpacing.pagePadding,
           children: [
             // ── Title ───────────────────────────────────────────────────────
-            const SectionLabel('Title'),
+            SectionLabel(context.l10n.titleSectionLabel),
             TextField(
               controller: _titleCtrl,
               autofocus: _isNew,
               textCapitalization: TextCapitalization.words,
               inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
               decoration: InputDecoration(
-                hintText: '${widget.type.label} name',
+                hintText: context.l10n.typeNameHint(widget.type.label(context.l10n)),
                 prefixIcon: Icon(Icons.label_outline_rounded, size: AppIconSize.small, color: cs.onSurfaceVariant),
               ),
             ),
 
             const SizedBox(height: 24),
-            const SectionLabel('Fields'),
+            SectionLabel(context.l10n.fieldsSectionLabel),
 
             // ── Fields ──────────────────────────────────────────────────────
             ...(_fields.map((f) => Padding(
@@ -289,7 +290,7 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
             const SizedBox(height: 8),
             Center(
               child: Text(
-                'All fields are stored encrypted inside the container.',
+                context.l10n.encryptedStorageHint,
                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
@@ -349,11 +350,11 @@ class _FieldInput extends StatelessWidget {
 
                       showAppSnackBar(
                         context,
-                        message: '${field.label} copied',
+                        message: context.l10n.copiedSuffix(field.label),
                         tone: AppBannerTone.success,
                       );
                     },
-                    tooltip: 'Copy',
+                    tooltip: context.l10n.copy,
                   ),
                 ],
               )

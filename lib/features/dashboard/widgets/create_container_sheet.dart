@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -43,7 +44,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   final _hiddenSizeCtrl = TextEditingController(text: '10');
   late final _hiddenKeyfilesController = KeyfilePickerController(
     notify: () { if (mounted) setState(() {}); },
-    onError: (msg) { if (mounted) setState(() => _error = msg); },
+    onError: (msg) { if (mounted) setState(() => _error = msg ?? context.l10n.couldNotPickKeyfiles); },
   );
   String _hiddenFileSystem = 'FAT';
   int _hiddenCipherId = 0; // AES
@@ -153,7 +154,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Folder picker failed: $e');
+      if (mounted) setState(() => _error = context.l10n.folderPickerFailed('$e'));
     } finally {
       if (mounted) setState(() => _pickingFolderVault = false);
     }
@@ -168,16 +169,16 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
 
   Future<void> _createFolderVault() async {
     if (_folderVaultUri == null) {
-      setState(() => _error = 'Select an empty destination folder first');
+      setState(() => _error = context.l10n.selectEmptyDestinationFolderFirst);
       return;
     }
     final password = _folderVaultPasswordCtrl.text;
     if (password.isEmpty) {
-      setState(() => _error = 'A password is required');
+      setState(() => _error = context.l10n.passwordRequired);
       return;
     }
     if (password != _folderVaultConfirmCtrl.text) {
-      setState(() => _error = 'Passwords do not match');
+      setState(() => _error = context.l10n.passwordsDoNotMatch);
       return;
     }
 
@@ -198,16 +199,15 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
           Navigator.pop(context);
           showAppSnackBar(
             context,
-            message: 'Vault created successfully.',
+            message: context.l10n.vaultCreatedSuccessfully,
             tone: AppBannerTone.success,
           );
         }
       } else {
-        setState(() => _error =
-            'Vault creation failed — make sure the selected folder is empty.');
+        setState(() => _error = context.l10n.vaultCreationFailedEmptyFolder);
       }
     } on PlatformException catch (e) {
-      setState(() => _error = e.message ?? 'Unknown error occurred');
+      setState(() => _error = e.message ?? context.l10n.unknownErrorOccurred);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -215,28 +215,28 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
 
   Future<void> _createContainerFile() async {
     if (_nameCtrl.text.isEmpty) {
-      setState(() => _error = 'Container name is required');
+      setState(() => _error = context.l10n.containerNameRequired);
       return;
     }
     final sizeVal = double.tryParse(_sizeCtrl.text);
     if (sizeVal == null || sizeVal <= 0) {
-      setState(() => _error = 'Enter a valid size greater than 0');
+      setState(() => _error = context.l10n.enterValidSizeGreaterThanZero);
       return;
     }
     if (_passwordCtrl.text.isEmpty && keyfiles.isEmpty) {
-      setState(() => _error = 'A password or at least one keyfile is required');
+      setState(() => _error = context.l10n.passwordOrKeyfileRequired);
       return;
     }
     if (_passwordCtrl.text.isNotEmpty &&
         _passwordCtrl.text != _confirmPasswordCtrl.text) {
-      setState(() => _error = 'Standard volume passwords do not match');
+      setState(() => _error = context.l10n.standardVolumePasswordsDoNotMatch);
       return;
     }
 
     if (_enableHiddenVolume && _format == CreateFormat.veracrypt) {
       if (_hiddenPasswordCtrl.text.isNotEmpty &&
           _hiddenPasswordCtrl.text != _hiddenConfirmPasswordCtrl.text) {
-        setState(() => _error = 'Hidden volume passwords do not match');
+        setState(() => _error = context.l10n.hiddenVolumePasswordsDoNotMatch);
         return;
       }
     }
@@ -270,6 +270,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
           hasHiddenKeyfiles: _hiddenKeyfilesController.keyfiles.isNotEmpty,
           outerKeyfileUris: keyfiles.map((k) => k.uri).toSet(),
           hiddenKeyfileUris: _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toSet(),
+          l10n: context.l10n,
         );
         if (!validation.isValid) {
           setState(() => _error = validation.error);
@@ -307,15 +308,15 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
           Navigator.pop(context);
           showAppSnackBar(
             context,
-            message: 'Container file created successfully.',
+            message: context.l10n.containerFileCreatedSuccessfully,
             tone: AppBannerTone.success,
           );
         }
       } else {
-        setState(() => _error = 'Container creation cancelled or failed.');
+        setState(() => _error = context.l10n.containerCreationCancelledOrFailed);
       }
     } on PlatformException catch (e) {
-      setState(() => _error = e.message ?? 'Unknown error occurred');
+      setState(() => _error = e.message ?? context.l10n.unknownErrorOccurred);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -325,16 +326,16 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
 
   Widget _buildVaultKindSelector() {
     return SegmentedButton<bool>(
-      segments: const [
+      segments: [
         ButtonSegment(
           value: false,
-          label: Text('Container File'),
-          icon: Icon(Icons.folder_zip_rounded),
+          label: Text(context.l10n.vaultKindContainerFile),
+          icon: const Icon(Icons.folder_zip_rounded),
         ),
         ButtonSegment(
           value: true,
-          label: Text('Folder Vault'),
-          icon: Icon(Icons.folder_shared_rounded),
+          label: Text(context.l10n.vaultKindFolderVault),
+          icon: const Icon(Icons.folder_shared_rounded),
         ),
       ],
       selected: {_isFolderVault},
@@ -392,7 +393,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
       onHashChanged: (val) => setState(() => _hashId = val),
       extraFields: [
         OptionPickerTile<String>(
-          label: 'Format File System',
+          label: context.l10n.formatFileSystemLabel,
           value: _fileSystem,
           prefixIcon: Icons.dns_rounded,
           options: _availableFileSystems
@@ -408,7 +409,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader('Standard Volume'),
+        SectionHeader(context.l10n.standardVolumeHeader),
         SectionCard(
           children: [
             // Format Selector
@@ -418,7 +419,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Container Format',
+                    context.l10n.containerFormatLabel,
                     style: textTheme.bodyMedium
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
@@ -433,9 +434,9 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
               padding: const EdgeInsets.all(16),
               child: TextField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'File Name',
-                  prefixIcon: Icon(Icons.drive_file_rename_outline_rounded,
+                decoration: InputDecoration(
+                  labelText: context.l10n.fileNameLabel,
+                  prefixIcon: const Icon(Icons.drive_file_rename_outline_rounded,
                       size: 20),
                 ),
               ),
@@ -452,20 +453,20 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                       controller: _sizeCtrl,
                       keyboardType: const TextInputType.numberWithOptions(
                           decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Container Size',
-                        prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
+                      decoration: InputDecoration(
+                        labelText: context.l10n.containerSizeLabel,
+                        prefixIcon: const Icon(Icons.sd_card_outlined, size: 20),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: OptionPickerTile<String>(
-                      label: 'Unit',
+                      label: context.l10n.unitLabel,
                       value: _sizeUnit,
-                      options: const [
-                        SelectOption(value: 'MB', label: 'MB'),
-                        SelectOption(value: 'GB', label: 'GB'),
+                      options: [
+                        SelectOption(value: 'MB', label: context.l10n.unitMbShort),
+                        SelectOption(value: 'GB', label: context.l10n.unitGbShort),
                       ],
                       onChanged: (val) => setState(() => _sizeUnit = val),
                     ),
@@ -483,7 +484,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 onChanged: (_) => setState(() {}),
                 autofillHints: const [AutofillHints.newPassword],
                 decoration: InputDecoration(
-                  labelText: 'Password',
+                  labelText: context.l10n.passwordFieldLabel,
                   prefixIcon:
                       Icon(Icons.key_rounded, size: 20, color: cs.primary),
                   suffixIcon: PasswordVisibilityToggle(
@@ -503,7 +504,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 onChanged: (_) => setState(() {}),
                 autofillHints: const [AutofillHints.newPassword],
                 decoration: InputDecoration(
-                  labelText: 'Confirm Password',
+                  labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
                   prefixIcon: Icon(Icons.check_circle_outline_rounded,
                       size: 20, color: cs.primary),
                   suffixIcon: PasswordVisibilityToggle(
@@ -533,7 +534,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader('Hidden Volume'),
+        SectionHeader(context.l10n.hiddenVolumeHeader),
         SectionCard(
           children: [
             SwitchListTile(
@@ -542,13 +543,13 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
               onChanged: isEnabled
                   ? (val) => setState(() => _enableHiddenVolume = val)
                   : null,
-              title: Text('Create Hidden Volume',
+              title: Text(context.l10n.createHiddenVolumeToggleTitle,
                   style: textTheme.bodyMedium
                       ?.copyWith(fontWeight: FontWeight.w600)),
               subtitle: Text(
                 isEnabled
-                    ? 'Create an invisible secondary volume'
-                    : 'Set outer password or keyfiles first to enable',
+                    ? context.l10n.createInvisibleSecondaryVolume
+                    : context.l10n.setOuterPasswordFirstToEnable,
                 style: textTheme.bodySmall
                     ?.copyWith(color: cs.onSurfaceVariant),
               ),
@@ -568,7 +569,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   onChanged: (_) => setState(() {}),
                   autofillHints: const [AutofillHints.newPassword],
                   decoration: InputDecoration(
-                    labelText: 'Hidden Password',
+                    labelText: context.l10n.hiddenPasswordLabel,
                     prefixIcon:
                         Icon(Icons.key_rounded, size: 20, color: cs.primary),
                     suffixIcon: PasswordVisibilityToggle(
@@ -587,7 +588,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   onChanged: (_) => setState(() {}),
                   autofillHints: const [AutofillHints.newPassword],
                   decoration: InputDecoration(
-                    labelText: 'Confirm Hidden Password',
+                    labelText: context.l10n.confirmHiddenPasswordLabel,
                     prefixIcon: Icon(Icons.check_circle_outline_rounded,
                         size: 20, color: cs.primary),
                     suffixIcon: PasswordVisibilityToggle(
@@ -608,20 +609,20 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                         controller: _hiddenSizeCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Hidden Size',
-                          prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
+                        decoration: InputDecoration(
+                          labelText: context.l10n.hiddenSizeLabel,
+                          prefixIcon: const Icon(Icons.sd_card_outlined, size: 20),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: OptionPickerTile<String>(
-                        label: 'Unit',
+                        label: context.l10n.unitLabel,
                         value: _hiddenSizeUnit,
-                        options: const [
-                          SelectOption(value: 'MB', label: 'MB (Megabytes)'),
-                          SelectOption(value: 'GB', label: 'GB (Gigabytes)'),
+                        options: [
+                          SelectOption(value: 'MB', label: context.l10n.unitMbMegabytes),
+                          SelectOption(value: 'GB', label: context.l10n.unitGbGigabytes),
                         ],
                         onChanged: (val) =>
                             setState(() => _hiddenSizeUnit = val),
@@ -648,7 +649,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 onHashChanged: (val) => setState(() => _hiddenHashId = val),
                 extraFields: [
                   OptionPickerTile<String>(
-                    label: 'Hidden File System',
+                    label: context.l10n.hiddenFileSystemLabel,
                     value: _hiddenFileSystem,
                     prefixIcon: Icons.dns_rounded,
                     options: _availableFileSystems
@@ -742,7 +743,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      hasSelection ? 'Destination Folder' : 'Select an empty folder',
+                      hasSelection ? context.l10n.destinationFolderLabel : context.l10n.selectEmptyFolderLabel,
                       style: textTheme.labelMedium?.copyWith(
                         color: hasSelection ? cs.primary : cs.onSurfaceVariant,
                         fontWeight: FontWeight.bold,
@@ -808,7 +809,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader('Folder Vault'),
+        SectionHeader(context.l10n.vaultKindFolderVault),
         SectionCard(
           children: [
             Padding(
@@ -817,7 +818,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Vault Format',
+                    context.l10n.vaultFormatLabel,
                     style: textTheme.bodyMedium
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
@@ -838,7 +839,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 onChanged: (_) => setState(() {}),
                 autofillHints: const [AutofillHints.newPassword],
                 decoration: InputDecoration(
-                  labelText: 'Password',
+                  labelText: context.l10n.passwordFieldLabel,
                   prefixIcon:
                       Icon(Icons.key_rounded, size: 20, color: cs.primary),
                   suffixIcon: PasswordVisibilityToggle(
@@ -857,7 +858,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 onChanged: (_) => setState(() {}),
                 autofillHints: const [AutofillHints.newPassword],
                 decoration: InputDecoration(
-                  labelText: 'Confirm Password',
+                  labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
                   prefixIcon: Icon(Icons.check_circle_outline_rounded,
                       size: 20, color: cs.primary),
                   suffixIcon: PasswordVisibilityToggle(
@@ -940,7 +941,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   ),
                 )
               : Text(
-                  _isFolderVault ? 'Create Vault' : 'Create Container',
+                  _isFolderVault ? context.l10n.createVaultButton : context.l10n.createContainerButton,
                   style:
                       const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
@@ -960,8 +961,9 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         if (!didPop && _loading) {
           showAppSnackBar(
             context,
-            message:
-                '${_isFolderVault ? 'Vault' : 'Container'} creation in progress. Please wait.',
+            message: _isFolderVault
+                ? context.l10n.vaultCreationInProgressWait
+                : context.l10n.containerCreationInProgressWait,
             tone: AppBannerTone.warning,
           );
         }
@@ -975,8 +977,8 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
           ),
           title: Text(
             _isFolderVault
-                ? 'Create Encrypted Vault'
-                : 'Create Encrypted Container',
+                ? context.l10n.createEncryptedVaultTitle
+                : context.l10n.createEncryptedContainerTitle,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           bottom: _loading

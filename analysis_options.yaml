@@ -1,5 +1,10 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    - vaultexplorer-i18n-wip/**
+    - lib/l10n/generated/**
+
 # Incremental additions on top of the flutter_lints defaults -- added a few
 # rules at a time rather than all at once, per docs/tech-debt.md TD-10, so
 # each addition can be triaged on its own rather than landing as one large,

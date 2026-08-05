@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import '../../app/vault_explorer_app.dart';
@@ -16,7 +16,10 @@ class AboutScreen extends StatelessWidget {
 
   Future<void> _openUrl(BuildContext context, String url) async {
     try {
-      final ok = await vaultExplorerApi.launchUrl(url);
+      final ok = await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
       if (!ok && context.mounted) {
         _showSnack(context, 'Could not open link', tone: AppBannerTone.error);
       }

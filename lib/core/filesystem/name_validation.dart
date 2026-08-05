@@ -1,3 +1,5 @@
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
 import 'filesystem_type.dart';
 
 /// Whether the entry being named is a file or a folder. Validation rules
@@ -74,17 +76,20 @@ NameValidationResult validateEntryName(
   String name,
   FilesystemType fsType, {
   required EntryType entryType,
+  required AppLocalizations l10n,
 }) {
   final issues = <NameValidationIssue>[];
   final rules = FilesystemRules.of(fsType);
-  final noun = entryType == EntryType.file ? 'file' : 'folder';
+  final noun = entryType == EntryType.file ? l10n.nounFile : l10n.nounFolder;
+  final nounCapitalized =
+      entryType == EntryType.file ? l10n.nounFileCapitalized : l10n.nounFolderCapitalized;
 
   // Empty / "." / ".." are path-navigation tokens on every filesystem this
   // app deals with, not fs-specific rules, so they're checked unconditionally.
   if (name.isEmpty) {
-    issues.add(const NameValidationIssue(
+    issues.add(NameValidationIssue(
       reason: NameValidationReason.empty,
-      message: 'The name cannot be empty.',
+      message: l10n.validationEmptyName,
     ));
     // Nothing else to check on an empty string.
     return NameValidationResult(name: name, issues: issues);
@@ -93,8 +98,7 @@ NameValidationResult validateEntryName(
   if (name == '.' || name == '..') {
     issues.add(NameValidationIssue(
       reason: NameValidationReason.isDotOrDotDot,
-      message: '"$name" is a reserved navigation name and can\'t be used '
-          'as a $noun name.',
+      message: l10n.validationReservedNavName(name, noun),
     ));
   }
 
@@ -106,8 +110,11 @@ NameValidationResult validateEntryName(
     if (rules.illegalCharCodes.contains(code)) {
       issues.add(NameValidationIssue(
         reason: NameValidationReason.illegalCharacter,
-        message: '"${String.fromCharCode(code)}" at position ${i + 1} is '
-            'not allowed in a name on ${fsType.label}.',
+        message: l10n.validationIllegalChar(
+          String.fromCharCode(code),
+          i + 1,
+          fsType.label(l10n),
+        ),
         charIndex: i,
       ));
       continue;
@@ -117,9 +124,11 @@ NameValidationResult validateEntryName(
     if (isControl && rules.disallowControlChars) {
       issues.add(NameValidationIssue(
         reason: NameValidationReason.controlCharacter,
-        message: 'Position ${i + 1} contains a non-printable control '
-            'character (code 0x${code.toRadixString(16).padLeft(2, '0')}), '
-            'which is not allowed on ${fsType.label}.',
+        message: l10n.validationControlChar(
+          i + 1,
+          '0x${code.toRadixString(16).padLeft(2, '0')}',
+          fsType.label(l10n),
+        ),
         charIndex: i,
       ));
     }
@@ -128,9 +137,7 @@ NameValidationResult validateEntryName(
   if (rules.disallowReservedDeviceNames && isReservedDeviceName(name)) {
     issues.add(NameValidationIssue(
       reason: NameValidationReason.reservedDeviceName,
-      message: '"$name" is a reserved device name on ${fsType.label} '
-          '(matches CON, PRN, AUX, NUL, COM0–9, or LPT0–9) and can\'t be '
-          'used, with or without a file extension.',
+      message: l10n.validationReservedDeviceName(name, fsType.label(l10n)),
     ));
   }
 
@@ -138,16 +145,14 @@ NameValidationResult validateEntryName(
     if (name.endsWith(' ')) {
       issues.add(NameValidationIssue(
         reason: NameValidationReason.trailingSpace,
-        message: '${entryType == EntryType.file ? 'File' : 'Folder'} names '
-            'can\'t end with a space on ${fsType.label}',
+        message: l10n.validationTrailingSpace(nounCapitalized, fsType.label(l10n)),
         charIndex: name.length - 1,
       ));
     }
     if (name.endsWith('.')) {
       issues.add(NameValidationIssue(
         reason: NameValidationReason.trailingDot,
-        message: '${entryType == EntryType.file ? 'File' : 'Folder'} names '
-            'can\'t end with a "." on ${fsType.label}',
+        message: l10n.validationTrailingDot(nounCapitalized, fsType.label(l10n)),
         charIndex: name.length - 1,
       ));
     }
@@ -157,12 +162,16 @@ NameValidationResult validateEntryName(
       ? _utf8Length(name)
       : name.length;
   if (measuredLength > rules.maxComponentLength) {
-    final unit = rules.maxComponentLengthIsUtf8Bytes ? 'bytes' : 'characters';
+    final unit = rules.maxComponentLengthIsUtf8Bytes ? l10n.unitBytes : l10n.unitCharacters;
     issues.add(NameValidationIssue(
       reason: NameValidationReason.componentTooLong,
-      message: 'This name is $measuredLength $unit long; ${fsType.label} '
-          'allows at most ${rules.maxComponentLength} $unit per '
-          '${entryType == EntryType.file ? 'file' : 'folder'} name.',
+      message: l10n.validationNameTooLong(
+        measuredLength,
+        unit,
+        fsType.label(l10n),
+        rules.maxComponentLength,
+        noun,
+      ),
     ));
   }
 

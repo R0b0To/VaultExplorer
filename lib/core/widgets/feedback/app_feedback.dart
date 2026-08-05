@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart' show AppBannerTone;
 
@@ -45,11 +46,13 @@ Future<bool> showAppConfirmDialog(
   BuildContext context, {
   required String title,
   required String message,
-  String confirmLabel = 'Confirm',
-  String cancelLabel = 'Cancel',
+  String? confirmLabel,
+  String? cancelLabel,
   bool isDestructive = false,
 }) async {
   final cs = context.colors;
+  final resolvedConfirmLabel = confirmLabel ?? context.l10n.confirm;
+  final resolvedCancelLabel = cancelLabel ?? context.l10n.cancel;
   final result = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -58,12 +61,12 @@ Future<bool> showAppConfirmDialog(
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, false),
-          child: Text(cancelLabel),
+          child: Text(resolvedCancelLabel),
         ),
         TextButton(
           onPressed: () => Navigator.pop(dialogContext, true),
           child: Text(
-            confirmLabel,
+            resolvedConfirmLabel,
             style: isDestructive ? TextStyle(color: cs.error) : null,
           ),
         ),

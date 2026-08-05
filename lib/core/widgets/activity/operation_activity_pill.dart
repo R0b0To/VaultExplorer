@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_operations_sheet.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_pill.dart';
 
@@ -100,16 +101,20 @@ class _OperationPillContent extends StatelessWidget {
     required this.hasActive,
   });
 
-  String _progressText(FileOperation op) {
+  String _progressText(BuildContext context, FileOperation op) {
     if (op.totalBytes > 0) {
       final pct = ((op.transferredBytes / op.totalBytes) * 100).clamp(0, 100).round();
-      return '${formatBytes(op.transferredBytes)} / ${formatBytes(op.totalBytes)}  ($pct%)';
+      return context.l10n.byteProgressText(
+        formatBytes(op.transferredBytes),
+        formatBytes(op.totalBytes),
+        pct,
+      );
     }
     final done = op.doneCount + op.skipCount + op.failCount;
     final total = op.totalCount;
     if (total == 0) return '';
     final pct = ((done / total) * 100).round();
-    return '$done / $total  ($pct%)';
+    return context.l10n.countProgressText(done, total, pct);
   }
 
   @override
@@ -127,13 +132,13 @@ class _OperationPillContent extends StatelessWidget {
 
     final multiOp = totalOps > 1;
     final label = multiOp
-        ? '$totalOps transfers'
+        ? context.l10n.multiOpLabel(totalOps)
         : (hasActive
               ? (primary.currentActivity.isNotEmpty ? primary.currentActivity : primary.shortSummary)
               : primary.completionSummary);
     final sublabel = multiOp
-        ? '${hasActive ? primary.shortSummary : 'Completed'} · tap to view all'
-        : (hasActive ? _progressText(primary) : '');
+        ? context.l10n.multiOpSublabel(hasActive ? primary.shortSummary : context.l10n.completed)
+        : (hasActive ? _progressText(context, primary) : '');
 
     return FloatingPill(
       color: color,
@@ -196,7 +201,7 @@ class _OperationPillContent extends StatelessWidget {
             else
               IconButton(
                 icon: Icon(Icons.close_rounded, size: AppIconSize.standard, color: onColor),
-                tooltip: 'Dismiss',
+                tooltip: context.l10n.dismiss,
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 padding: EdgeInsets.zero,

@@ -20,7 +20,7 @@ class _FakeVaultExplorerApi extends VaultExplorerApi {
 void main() {
   late _FakeVaultExplorerApi fake;
   late int notifyCount;
-  late List<String> errors;
+  late List<String?> errors;
   late KeyfilePickerController controller;
 
   setUp(() {

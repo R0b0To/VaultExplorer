@@ -392,25 +392,6 @@ class _FileManagerToolbarSettingsScreenState
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            value: _config.autoStartPlaylistMode,
-                            onChanged: (v) {
-                              setState(() => _config =
-                                  _config.copyWith(autoStartPlaylistMode: v));
-                              _persist();
-                            },
-                            title: Text('Auto-start Playlist Mode',
-                                style: textTheme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                                'Automatically start in playlist mode when opening a media item',
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant)),
-                            secondary: Icon(Icons.playlist_play_rounded,
-                                color: cs.primary),
-                          ),
-                          SwitchListTile(
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 16),
                             value: _config.showMediaCarousel,
                             onChanged: (v) {
                               setState(() => _config =

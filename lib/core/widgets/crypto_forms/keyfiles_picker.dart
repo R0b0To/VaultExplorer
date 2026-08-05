@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart' show KeyfileRef;
 
@@ -41,7 +42,7 @@ class KeyfilesPicker extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'Keyfiles (optional)',
+                    context.l10n.keyfilesOptionalLabel,
                     style: textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       color: cs.onSurface,
@@ -68,7 +69,7 @@ class KeyfilesPicker extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.add_rounded, size: AppIconSize.small),
-                label: const Text('Add File'),
+                label: Text(context.l10n.addFile),
               ),
             ],
           ),
@@ -105,7 +106,7 @@ class KeyfilesPicker extends StatelessWidget {
             ),
           ] else ...[
             Text(
-              'No keyfiles attached',
+              context.l10n.noKeyfilesAttached,
               style: textTheme.bodySmall?.copyWith(
                 color: cs.onSurfaceVariant,
               ),

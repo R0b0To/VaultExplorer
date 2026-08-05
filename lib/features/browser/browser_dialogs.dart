@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -15,7 +16,7 @@ abstract class BrowserDialogs {
   static void _blockedReadOnly(BuildContext context) {
     showAppSnackBar(
       context,
-      message: 'This container is mounted read-only.',
+      message: context.l10n.readOnlyContainerWarning,
       tone: AppBannerTone.warning,
     );
   }
@@ -104,11 +105,11 @@ abstract class BrowserDialogs {
     final hasDir = toDelete.any((item) => item.isDir);
     final confirmed = await showAppConfirmDialog(
       context,
-      title: 'Delete ${toDelete.length} item(s)?',
+      title: context.l10n.deleteItemsTitle(toDelete.length),
       message: hasDir
-          ? 'These items will be permanently deleted, including all contents of any selected folders.'
-          : 'These items will be permanently erased from your encrypted volume.',
-      confirmLabel: 'Delete',
+          ? context.l10n.deleteFoldersWarning
+          : context.l10n.deleteFilesWarning,
+      confirmLabel: context.l10n.delete,
       isDestructive: true,
     );
     if (confirmed) onConfirmed(toDelete);
@@ -139,7 +140,7 @@ mixin _LiveNameValidation<T extends StatefulWidget> on State<T> {
     required List<RawEntry> existingEntries,
     RawEntry? excluding,
   }) {
-    final nameResult = validateEntryName(text, fsType, entryType: entryType);
+    final nameResult = validateEntryName(text, fsType, entryType: entryType, l10n: context.l10n);
     final conflictResult = text.isEmpty
         ? const EntryConflictResult(EntryConflictKind.none, null)
         : checkEntryConflict(
@@ -187,14 +188,14 @@ mixin _LiveNameValidation<T extends StatefulWidget> on State<T> {
   /// every one of them, not just the first, per ADR-002.
   List<String> get allMessages => [
         ...issues.map((i) => i.message),
-        if (conflict.isConflict) conflict.message('')!,
+        if (conflict.isConflict) conflict.message(context.l10n, '')!,
       ];
 
   Widget buildIssuesList(String candidateName) {
     if (issues.isEmpty && !conflict.isConflict) return const SizedBox.shrink();
     final messages = [
       ...issues.map((i) => i.message),
-      if (conflict.isConflict) conflict.message(candidateName)!,
+      if (conflict.isConflict) conflict.message(context.l10n, candidateName)!,
     ];
     return Padding(
       padding: const EdgeInsets.only(top: 8),
@@ -259,6 +260,7 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveName
   Future<void> _onCreate() async {
     final name = _ctrl.text;
     if (name.isEmpty || !isValid) return;
+    final l10n = context.l10n;
 
     final parentSegments = widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
     final built = PathComponents(
@@ -266,7 +268,7 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveName
       name: name,
       type: EntryType.folder,
       fsType: _fsType,
-    ).validateAndBuild();
+    ).validateAndBuild(l10n);
     if (built is! PathBuildSuccess) return;
 
     final parentContext = context;
@@ -278,7 +280,7 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveName
     } else if (parentContext.mounted) {
       showAppSnackBar(
         parentContext,
-        message: 'Couldn\'t create "$name" — check the container is still mounted',
+        message: l10n.couldntCreateItem(name),
         tone: AppBannerTone.error,
       );
     }
@@ -288,14 +290,14 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveName
   Widget build(BuildContext context) {
     final name = _ctrl.text;
     return AlertDialog(
-      title: const Text('New Folder'),
+      title: Text(context.l10n.newFolderTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
             controller: _ctrl,
-            decoration: const InputDecoration(hintText: 'Folder name'),
+            decoration: InputDecoration(hintText: context.l10n.folderNameHint),
             autofocus: true,
             inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
             onChanged: _onChanged,
@@ -307,11 +309,11 @@ class _CreateFolderDialogState extends State<_CreateFolderDialog> with _LiveName
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.cancel),
         ),
         TextButton(
           onPressed: name.isNotEmpty && isValid ? _onCreate : null,
-          child: const Text('Create'),
+          child: Text(context.l10n.create),
         ),
       ],
     );
@@ -362,6 +364,7 @@ class _CreateFileDialogState extends State<_CreateFileDialog> with _LiveNameVali
   Future<void> _onCreate() async {
     final name = _ctrl.text;
     if (name.isEmpty || !isValid) return;
+    final l10n = context.l10n;
 
     final parentSegments = widget.currentDirPath.isEmpty ? <String>[] : widget.currentDirPath.split('/');
     final built = PathComponents(
@@ -369,7 +372,7 @@ class _CreateFileDialogState extends State<_CreateFileDialog> with _LiveNameVali
       name: name,
       type: EntryType.file,
       fsType: _fsType,
-    ).validateAndBuild();
+    ).validateAndBuild(l10n);
     if (built is! PathBuildSuccess) return;
 
     final parentContext = context;
@@ -381,7 +384,7 @@ class _CreateFileDialogState extends State<_CreateFileDialog> with _LiveNameVali
     } else if (parentContext.mounted) {
       showAppSnackBar(
         parentContext,
-        message: 'Couldn\'t create "$name" — check the container is still mounted',
+        message: l10n.couldntCreateItem(name),
         tone: AppBannerTone.error,
       );
     }
@@ -391,14 +394,14 @@ class _CreateFileDialogState extends State<_CreateFileDialog> with _LiveNameVali
   Widget build(BuildContext context) {
     final name = _ctrl.text;
     return AlertDialog(
-      title: const Text('New Text File'),
+      title: Text(context.l10n.newTextFileTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(
             controller: _ctrl,
-            decoration: const InputDecoration(hintText: 'filename.txt'),
+            decoration: InputDecoration(hintText: context.l10n.filenameHint),
             autofocus: true,
             inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
             onChanged: _onChanged,
@@ -410,11 +413,11 @@ class _CreateFileDialogState extends State<_CreateFileDialog> with _LiveNameVali
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.cancel),
         ),
         TextButton(
           onPressed: name.isNotEmpty && isValid ? _onCreate : null,
-          child: const Text('Create'),
+          child: Text(context.l10n.create),
         ),
       ],
     );
@@ -485,7 +488,7 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
       // conflict-check live here — only the base-name character legality
       // is checked as the user types. Each computed final name is
       // validated for real, individually, at submit time.
-      final result = validateEntryName(text, _fsType, entryType: EntryType.file);
+      final result = validateEntryName(text, _fsType, entryType: EntryType.file, l10n: context.l10n);
       setState(() => issues = result.issues);
     }
   }
@@ -493,6 +496,7 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
   Future<void> _onRename() async {
     final newNameBase = _ctrl.text;
     if (newNameBase.isEmpty) return;
+    final l10n = context.l10n;
 
     if (_isSingle) {
       if (!isValid) return;
@@ -508,7 +512,7 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
         name: newNameBase,
         type: oldEntry.isDir ? EntryType.folder : EntryType.file,
         fsType: _fsType,
-      ).validateAndBuild();
+      ).validateAndBuild(l10n);
       if (built is! PathBuildSuccess) return;
 
       final parentContext = context;
@@ -521,7 +525,7 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
       } else if (parentContext.mounted) {
         showAppSnackBar(
           parentContext,
-          message: 'Couldn\'t rename "$oldName" — an item with that name may already exist',
+          message: l10n.couldntRenameSingle(oldName),
           tone: AppBannerTone.error,
         );
       }
@@ -555,7 +559,7 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
       }
       final uniqueName = FileOperationService.makeUniqueName(desiredName, existingLower);
 
-      final nameCheck = validateEntryName(uniqueName, _fsType, entryType: oldEntry.isDir ? EntryType.folder : EntryType.file);
+      final nameCheck = validateEntryName(uniqueName, _fsType, entryType: oldEntry.isDir ? EntryType.folder : EntryType.file, l10n: l10n);
       if (nameCheck.issues.isNotEmpty) {
         failCount++;
         firstFailureReason ??= nameCheck.issues.first.message;
@@ -570,7 +574,7 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
       );
       if (conflictCheck.kind == EntryConflictKind.crossType) {
         failCount++;
-        firstFailureReason ??= conflictCheck.message(uniqueName);
+        firstFailureReason ??= conflictCheck.message(l10n, uniqueName);
         continue;
       }
 
@@ -589,8 +593,8 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
       showAppSnackBar(
         parentContext,
         message: firstFailureReason != null
-            ? 'Couldn\'t rename $failCount item(s): $firstFailureReason'
-            : 'Couldn\'t rename $failCount item(s)',
+            ? l10n.couldntRenameMultiWithReason(failCount, firstFailureReason)
+            : l10n.couldntRenameMultiNoReason(failCount),
         tone: AppBannerTone.error,
       );
     }
@@ -598,7 +602,7 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
 
   @override
   Widget build(BuildContext context) {
-    final title = _isSingle ? 'Rename' : 'Rename ${widget.oldEntries.length} items';
+    final title = _isSingle ? context.l10n.rename : context.l10n.renameMultipleTitle(widget.oldEntries.length);
     final name = _ctrl.text;
     return AlertDialog(
       title: Text(title),
@@ -610,7 +614,7 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
             controller: _ctrl,
             autofocus: true,
             decoration: InputDecoration(
-              hintText: _isSingle ? 'New name' : 'Base name',
+              hintText: _isSingle ? context.l10n.newNameHint : context.l10n.baseNameHint,
             ),
             inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
             onChanged: _onChanged,
@@ -622,11 +626,11 @@ class _RenameDialogState extends State<_RenameDialog> with _LiveNameValidation<_
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.cancel),
         ),
         TextButton(
           onPressed: name.isNotEmpty && (_isSingle ? isValid : issues.isEmpty) ? _onRename : null,
-          child: const Text('Rename'),
+          child: Text(context.l10n.rename),
         ),
       ],
     );

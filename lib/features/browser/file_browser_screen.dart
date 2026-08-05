@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
@@ -152,7 +153,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
     if (!mounted) return;
     if (!ok) {
-      showAppSnackBar(context, message: 'Could not expose "${entry.name}".');
+      showAppSnackBar(context, message: context.l10n.couldNotExpose(entry.name));
       return;
     }
     setState(() => _mountedDocProviderFolders = {..._mountedDocProviderFolders, path});
@@ -161,7 +162,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (!mounted) return;
     showAppSnackBar(
       context,
-      message: '"${entry.name}" is now available to other apps.',
+      message: context.l10n.nowAvailableToOtherApps(entry.name),
     );
   }
 
@@ -170,7 +171,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final ok = await vaultExplorerApi.unmountContainerFolder(widget.container.uri, path);
     if (!mounted) return;
     if (!ok) {
-      showAppSnackBar(context, message: 'Could not unmount "${entry.name}".');
+      showAppSnackBar(context, message: context.l10n.couldNotUnmount(entry.name));
       return;
     }
     setState(() {
@@ -226,8 +227,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final count = pathsToToggle.length;
     _setStatus(
       pin
-          ? 'Pinned $count item${count == 1 ? '' : 's'}'
-          : 'Unpinned $count item${count == 1 ? '' : 's'}',
+          ? context.l10n.pinnedCount(count)
+          : context.l10n.unpinnedCount(count),
     );
     exitSelectionMode();
   }
@@ -270,9 +271,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           _resolvedThumbnailCacheMode == ThumbnailCacheMode.inContainer) {
         showAppSnackBar(
           context,
-          message:
-              'Read-only mount — thumbnails will show but won\'t be saved '
-              'inside the container this session.',
+          message: context.l10n.readOnlyThumbnailWarning,
           tone: AppBannerTone.warning,
         );
       }
@@ -339,7 +338,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        _setStatus('Failed loading folder: ${e.runtimeType}', error: true);
+        _setStatus(context.l10n.failedLoadingFolder('${e.runtimeType}'), error: true);
       }
     }
   }
@@ -381,7 +380,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        _setStatus('Failed to read archive: ${e.runtimeType}', error: true);
+        _setStatus(context.l10n.failedToReadArchive('${e.runtimeType}'), error: true);
       }
     }
   }
@@ -472,7 +471,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       if (ArchiveService.isSupported(ext)) {
         await _openArchive(fullPath, entry.name);
       } else {
-        _setStatus('Archive format .$ext is not yet supported', error: true);
+        _setStatus(context.l10n.archiveFormatNotSupported(ext), error: true);
       }
       return;
     }
@@ -500,13 +499,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               ),
             );
           } else {
-            _setStatus('Failed to read file from archive', error: true);
+            _setStatus(context.l10n.failedToReadFileFromArchive, error: true);
           }
         }
       } catch (e) {
         if (mounted) {
           setState(() => _isLoading = false);
-          _setStatus('Failed to extract file: ${e.runtimeType}', error: true);
+          _setStatus(context.l10n.failedToExtractFile('${e.runtimeType}'), error: true);
         }
       }
       return;
@@ -530,7 +529,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           _loadDirectoryContents(_currentDirPath);
         }
       } else {
-        _setStatus('Failed to read secure item', error: true);
+        _setStatus(context.l10n.failedToReadSecureItem, error: true);
       }
       return;
     }
@@ -592,47 +591,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   void _openMediaViewer(String fileName, String fullPath) {
-    List<String> mediaFiles = [fullPath];
-    int initialIndex = 0;
-
-    if (_toolbarConfig.autoStartPlaylistMode) {
-      int compareOverall(RawEntry ea, RawEntry eb) {
-        final aPinned = _isPinned(ea);
-        final bPinned = _isPinned(eb);
-        if (aPinned != bPinned) {
-          return aPinned ? -1 : 1;
-        }
-        if (ea.isDir != eb.isDir) {
-          return ea.isDir ? -1 : 1;
-        }
-        return compareItems(ea, eb);
-      }
-
-      final sortedItems = _currentItems.where((e) => !e.isDir).toList()
-        ..sort(compareOverall);
-      final localMedia = sortedItems
-          .map((e) => e.name)
-          .where(_isSupportedMedia)
-          .toList();
-      if (localMedia.isNotEmpty) {
-        final resolvedPaths = localMedia
-            .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
-            .toList();
-        final idx = resolvedPaths.indexOf(fullPath);
-        if (idx != -1) {
-          mediaFiles = resolvedPaths;
-          initialIndex = idx;
-        }
-      }
-    }
-
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => MediaViewerScreen(
           container: widget.container,
-          mediaFiles: mediaFiles,
-          initialIndex: initialIndex,
+          mediaFiles: [fullPath],
+          initialIndex: 0,
           startingFolder: _currentDirPath,
           thumbnailQuality: _resolvedThumbnailQuality,
           thumbnailCacheMode: _resolvedThumbnailCacheMode,
@@ -657,13 +622,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Open File'),
+              title: Text(context.l10n.openFileDialogTitle),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Choose how to open "$fileName":',
+                    context.l10n.chooseHowToOpen(fileName),
                     style: textTheme.bodyMedium?.copyWith(
                       color: cs.onSurfaceVariant,
                     ),
@@ -696,16 +661,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                               children: [
                                 Text(
                                   isMedia
-                                      ? 'In-app Media Viewer'
-                                      : 'In-app Text Editor',
+                                      ? context.l10n.fileAssocInAppMediaViewer
+                                      : context.l10n.fileAssocInAppTextEditor,
                                   style: textTheme.bodyLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 Text(
                                   isMedia
-                                      ? 'Play video/audio or view image in-app'
-                                      : 'View/edit text, markdown, code',
+                                      ? context.l10n.playVideoAudioViewImageInApp
+                                      : context.l10n.viewEditTextMarkdownCode,
                                   style: textTheme.bodySmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                   ),
@@ -745,13 +710,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'External App',
+                                  context.l10n.fileAssocExternalApp,
                                   style: textTheme.bodyLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 Text(
-                                  'Send file to third-party app',
+                                  context.l10n.sendFileToThirdPartyApp,
                                   style: textTheme.bodySmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                   ),
@@ -791,13 +756,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Open As...',
+                                  context.l10n.openAsEllipsis,
                                   style: textTheme.bodyLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 Text(
-                                  'Choose file type to open as',
+                                  context.l10n.chooseFileTypeToOpenAs,
                                   style: textTheme.bodySmall?.copyWith(
                                     color: cs.onSurfaceVariant,
                                   ),
@@ -827,8 +792,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                       Expanded(
                         child: Text(
                           ext.isNotEmpty
-                              ? 'Always remember choice for .$ext files'
-                              : 'Always remember choice for files without extension',
+                              ? context.l10n.alwaysRememberChoiceExt(ext)
+                              : context.l10n.alwaysRememberChoiceNoExt,
                           style: textTheme.bodyMedium,
                         ),
                       ),
@@ -839,7 +804,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
+                  child: Text(context.l10n.cancel),
                 ),
               ],
             );
@@ -884,38 +849,38 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text('Open As'),
+            title: Text(context.l10n.openAsDialogTitle),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
                   leading: const Icon(Icons.text_fields_rounded),
-                  title: const Text('Text'),
+                  title: Text(context.l10n.mimeTypeText),
                   onTap: () => Navigator.of(context).pop('text/plain'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.image_outlined),
-                  title: const Text('Image'),
+                  title: Text(context.l10n.mimeTypeImage),
                   onTap: () => Navigator.of(context).pop('image/*'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.ondemand_video_outlined),
-                  title: const Text('Video'),
+                  title: Text(context.l10n.mimeTypeVideo),
                   onTap: () => Navigator.of(context).pop('video/*'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.audio_file_outlined),
-                  title: const Text('Audio'),
+                  title: Text(context.l10n.mimeTypeAudio),
                   onTap: () => Navigator.of(context).pop('audio/*'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.archive_outlined),
-                  title: const Text('Archive'),
+                  title: Text(context.l10n.mimeTypeArchive),
                   onTap: () => Navigator.of(context).pop('application/zip'),
                 ),
                 ListTile(
                   leading: const Icon(Icons.insert_drive_file_outlined),
-                  title: const Text('Other'),
+                  title: Text(context.l10n.mimeTypeOther),
                   onTap: () => Navigator.of(context).pop('*/*'),
                 ),
               ],
@@ -973,7 +938,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
     setState(() => _isLoading = true);
     _setStatus(
-      'Scanning subfolders for media…',
+      context.l10n.scanningSubfoldersForMedia,
       autoClear: const Duration(seconds: 15),
     );
     try {
@@ -996,12 +961,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         );
       } else {
         _setStatus(
-          'No media files found in this folder or its subfolders',
+          context.l10n.noMediaFilesFoundRecursive,
           error: true,
         );
       }
     } catch (e) {
-      _setStatus('Failed to scan subfolders: $e', error: true);
+      _setStatus(context.l10n.failedToScanSubfolders('$e'), error: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1081,16 +1046,16 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         mimeType: mimeType,
       );
       if (!ok && mounted) {
-        _setStatus('No app found for this file type', error: true);
+        _setStatus(context.l10n.noAppFoundForFileType, error: true);
       }
     } catch (_) {
-      if (mounted) _setStatus('Could not open "$cleanName"', error: true);
+      if (mounted) _setStatus(context.l10n.couldNotOpenFile(cleanName), error: true);
     }
   }
 
   Future<void> _addVaultItem(VaultItemType type) async {
     if (_isReadOnly) {
-      _setStatus('This container is mounted read-only.', error: true);
+      _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
     _signalActivity();
@@ -1110,7 +1075,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   void _initClipboard({required bool cut}) {
     if (cut && _isReadOnly) {
       _setStatus(
-        'This container is mounted read-only — items can\'t be moved from here.',
+        context.l10n.readOnlyCantMove,
         error: true,
       );
       return;
@@ -1140,7 +1105,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (!_clip.hasItems) return;
     if (_isReadOnly) {
       _setStatus(
-        'This container is mounted read-only — items can\'t be pasted here.',
+        context.l10n.readOnlyCantPaste,
         error: true,
       );
       return;
@@ -1148,7 +1113,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _signalActivity();
     final srcVolId = _clip.sourceVolId;
     if (srcVolId == null) {
-      _setStatus('Clipboard source is invalid', error: true);
+      _setStatus(context.l10n.clipboardSourceInvalid, error: true);
       _clip.clear();
       return;
     }
@@ -1156,13 +1121,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     MountedContainer? srcContainer;
     if (isCrossContainer) {
       if (widget.resolveContainer == null) {
-        _setStatus('Cross-container paste is not configured.', error: true);
+        _setStatus(context.l10n.crossContainerPasteNotConfigured, error: true);
         return;
       }
       srcContainer = widget.resolveContainer!(srcVolId);
       if (srcContainer == null) {
         _setStatus(
-          'Cross-container paste requires both containers to remain mounted.',
+          context.l10n.crossContainerPasteRequiresBothMounted,
           error: true,
           autoClear: const Duration(seconds: 6),
         );
@@ -1248,7 +1213,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   void _batchDelete() {
     if (_isReadOnly) {
       _setStatus(
-        'This container is mounted read-only — items can\'t be deleted.',
+        context.l10n.readOnlyCantDelete,
         error: true,
       );
       return;
@@ -1288,8 +1253,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         await _loadDirectoryContents(_currentDirPath);
         _setStatus(
           failCount == 0
-              ? 'Deleted $deleted item(s)'
-              : '$deleted deleted · $failCount failed',
+              ? context.l10n.deletedCount(deleted)
+              : context.l10n.deletedWithFailures(deleted, failCount),
           error: failCount > 0,
         );
       },
@@ -1312,11 +1277,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         items,
       );
       _setStatus(
-        count > 0 ? 'Exported $count file(s)' : 'Export cancelled or failed',
+        count > 0 ? context.l10n.exportedCount(count) : context.l10n.exportCancelledOrFailed,
         error: count == 0,
       );
     } catch (e) {
-      _setStatus('Export error: ${e.runtimeType}', error: true);
+      _setStatus(context.l10n.exportError('${e.runtimeType}'), error: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1325,7 +1290,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _importFilesFromDevice() async {
     if (_isReadOnly) {
-      _setStatus('This container is mounted read-only.', error: true);
+      _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
     _signalActivity();
@@ -1370,20 +1335,20 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete original?'),
+        title: Text(context.l10n.deleteOriginalTitle),
         content: Text(
           isFolder
-              ? 'Delete the original folder from your device now that it has been imported?'
-              : 'Delete the original file(s) from your device now that they have been imported?',
+              ? context.l10n.deleteOriginalFolderMessage
+              : context.l10n.deleteOriginalFilesMessage,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep original'),
+            child: Text(context.l10n.keepOriginal),
           ),
           FilledButton.tonal(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete original'),
+            child: Text(context.l10n.deleteOriginalButton),
           ),
         ],
       ),
@@ -1393,8 +1358,8 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     if (!mounted) return;
     _setStatus(
       deleted > 0
-          ? 'Deleted $deleted original item(s)'
-          : 'Could not delete original(s)',
+          ? context.l10n.deletedOriginalCount(deleted)
+          : context.l10n.couldNotDeleteOriginals,
       error: deleted == 0,
       autoClear: const Duration(seconds: 3),
     );
@@ -1402,7 +1367,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _importFolderFromDevice() async {
     if (_isReadOnly) {
-      _setStatus('This container is mounted read-only.', error: true);
+      _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
     _signalActivity();
@@ -1441,7 +1406,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _captureFromCamera() async {
     if (_isReadOnly) {
-      _setStatus('This container is mounted read-only.', error: true);
+      _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
     _signalActivity();
@@ -1459,13 +1424,13 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       await _loadDirectoryContents(_currentDirPath);
       _setStatus(
         captured.isVideo
-            ? 'Video captured and encrypted'
-            : 'Photo captured and encrypted',
+            ? context.l10n.videoCapturedEncrypted
+            : context.l10n.photoCapturedEncrypted,
         autoClear: const Duration(seconds: 3),
       );
     } catch (e) {
       if (mounted) {
-        _setStatus('Camera capture failed: ${e.runtimeType}', error: true);
+        _setStatus(context.l10n.cameraCaptureFailed('${e.runtimeType}'), error: true);
       }
     }
   }
@@ -1490,7 +1455,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Future<void> _extractArchive() async {
     if (_archiveContext == null) return;
     if (_isReadOnly) {
-      _setStatus('This container is mounted read-only.', error: true);
+      _setStatus(context.l10n.readOnlyContainerWarning, error: true);
       return;
     }
     final archivePath = _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
@@ -1500,11 +1465,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Extract Archive'),
-        content: Text('Extract all files to the folder "${parentDir.isEmpty ? 'Root' : parentDir}"?'),
+        title: Text(context.l10n.extractArchive),
+        content: Text(context.l10n.extractAllFilesToFolder(parentDir.isEmpty ? context.l10n.rootFolderLabel : parentDir)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Extract')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(context.l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(context.l10n.extract)),
         ],
       ),
     );
@@ -1517,11 +1482,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         targetDirInContainer: parentDir,
       );
       if (mounted) {
-        _setStatus('Extracted $count files', autoClear: const Duration(seconds: 3));
+        _setStatus(context.l10n.extractedCount(count), autoClear: const Duration(seconds: 3));
       }
     } catch (e) {
       if (mounted) {
-        _setStatus('Failed to extract: ${e.runtimeType}', error: true);
+        _setStatus(context.l10n.failedToExtractGeneric('${e.runtimeType}'), error: true);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -1563,7 +1528,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     return {
       FileManagerAction.search: (context) => IconButton(
             icon: Icon(_searchActive ? Icons.search_off_rounded : Icons.search_rounded),
-            tooltip: _searchActive ? 'Close search' : 'Search in this folder',
+            tooltip: _searchActive ? context.l10n.closeSearchTooltip : context.l10n.searchInThisFolderTooltip,
             onPressed: () => setState(() {
               _searchActive = !_searchActive;
               if (!_searchActive) _searchQuery = '';
@@ -1595,7 +1560,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           ),
       FileManagerAction.playMedia: (context) => IconButton(
             icon: const Icon(Icons.play_circle_outline_rounded),
-            tooltip: 'Play media here',
+            tooltip: context.l10n.playMediaHereTooltip,
             onPressed: canPlayMedia ? _startMediaViewerFromCurrentLocation : null,
           ),
     };

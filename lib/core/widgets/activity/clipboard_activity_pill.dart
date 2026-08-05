@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_pill.dart';
 
@@ -61,9 +62,13 @@ class _ClipboardActivityPillState extends State<ClipboardActivityPill> {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final verb = widget.isCutOperation ? 'Moving' : 'Copying';
-    final fromSuffix = widget.sourceLabel != null ? ' from "${widget.sourceLabel}"' : '';
-    final title = '$verb ${widget.itemCount} item${widget.itemCount == 1 ? '' : 's'}$fromSuffix';
+    final verb = widget.isCutOperation
+        ? context.l10n.clipboardVerbMoving
+        : context.l10n.clipboardVerbCopying;
+    final fromSuffix = widget.sourceLabel != null
+        ? context.l10n.clipboardFromSourceSuffix(widget.sourceLabel!)
+        : '';
+    final title = '${context.l10n.clipboardPillTitle(verb, widget.itemCount)}$fromSuffix';
 
     return FloatingPill(
       color: cs.secondaryContainer,
@@ -107,7 +112,7 @@ class _ClipboardActivityPillState extends State<ClipboardActivityPill> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            'Open a container to paste',
+                            context.l10n.clipboardOpenContainerToPaste,
                             style: textTheme.labelSmall?.copyWith(
                               color: cs.onSecondaryContainer.withValues(alpha: 0.8),
                             ),
@@ -129,7 +134,7 @@ class _ClipboardActivityPillState extends State<ClipboardActivityPill> {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
-                child: const Text('Paste'),
+                child: Text(context.l10n.paste),
               ),
             Container(
               width: 1,
@@ -139,7 +144,7 @@ class _ClipboardActivityPillState extends State<ClipboardActivityPill> {
             ),
             IconButton(
               icon: Icon(Icons.close_rounded, size: AppIconSize.standard, color: cs.onSecondaryContainer),
-              tooltip: 'Cancel',
+              tooltip: context.l10n.cancel,
               onPressed: widget.onCancel,
               visualDensity: VisualDensity.compact,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),

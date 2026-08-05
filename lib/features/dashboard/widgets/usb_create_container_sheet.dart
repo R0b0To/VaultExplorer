@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
@@ -63,7 +64,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
   final _hiddenSizeCtrl = TextEditingController(text: '10');
   late final _hiddenKeyfilesController = KeyfilePickerController(
     notify: () { if (mounted) setState(() {}); },
-    onError: (msg) { if (mounted) setState(() => _error = msg); },
+    onError: (msg) { if (mounted) setState(() => _error = msg ?? context.l10n.couldNotPickKeyfiles); },
   );
   String _hiddenFileSystem = 'FAT';
   int _hiddenCipherId = 0; // AES
@@ -149,7 +150,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
       if (mounted) {
         setState(() {
           _loadingDevices = false;
-          _error = 'Failed to list USB devices: $e';
+          _error = context.l10n.failedToListUsbDevices('$e');
         });
       }
     }
@@ -163,7 +164,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     if (mounted) {
       setState(() {
         _requestingPermission = false;
-        if (!granted) _error = 'USB permission denied';
+        if (!granted) _error = context.l10n.usbPermissionDenied;
       });
     }
     if (granted) await _loadDevices();
@@ -196,7 +197,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
           _sizeCtrl.text = (usable / (1024 * 1024)).floor().toString();
         }
       } else {
-        _error = 'Could not read drive capacity — enter size manually.';
+        _error = context.l10n.couldNotReadDriveCapacity;
       }
     });
   }
@@ -229,40 +230,38 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
   Future<void> _create() async {
     final device = _selected;
     if (device == null) {
-      setState(() => _error = 'Select a USB drive first');
+      setState(() => _error = context.l10n.selectUsbDriveFirst);
       return;
     }
     final sizeVal = double.tryParse(_sizeCtrl.text);
     if (sizeVal == null || sizeVal <= 0) {
-      setState(() => _error = 'Enter a valid size greater than 0');
+      setState(() => _error = context.l10n.enterValidSizeGreaterThanZero);
       return;
     }
     if (_passwordCtrl.text.isEmpty && keyfiles.isEmpty) {
       setState(
-          () => _error = 'A password or at least one keyfile is required');
+          () => _error = context.l10n.passwordOrKeyfileRequired);
       return;
     }
     if (_passwordCtrl.text.isNotEmpty &&
         _passwordCtrl.text != _confirmPasswordCtrl.text) {
-      setState(() => _error = 'Standard volume passwords do not match');
+      setState(() => _error = context.l10n.standardVolumePasswordsDoNotMatch);
       return;
     }
 
     if (_enableHiddenVolume && _format == CreateFormat.veracrypt) {
       if (_hiddenPasswordCtrl.text.isNotEmpty &&
           _hiddenPasswordCtrl.text != _hiddenConfirmPasswordCtrl.text) {
-        setState(() => _error = 'Hidden volume passwords do not match');
+        setState(() => _error = context.l10n.hiddenVolumePasswordsDoNotMatch);
         return;
       }
     }
 
     final confirmed = await showAppConfirmDialog(
       context,
-      title: 'Erase "${device.productName}"?',
-      message: 'This will permanently erase everything currently on this '
-          'USB drive and replace it with a new encrypted container. This '
-          'cannot be undone.',
-      confirmLabel: 'Erase & Create',
+      title: context.l10n.eraseDeviceTitle(device.productName),
+      message: context.l10n.eraseDeviceMessage,
+      confirmLabel: context.l10n.eraseAndCreateButton,
       isDestructive: true,
     );
     if (!confirmed || !mounted) return;
@@ -280,7 +279,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
           orElse: () => device,
         );
         if (!refreshed.hasPermission) {
-          setState(() => _error = 'USB permission is required to continue');
+          setState(() => _error = context.l10n.usbPermissionRequiredToContinue);
           return;
         }
       }
@@ -311,6 +310,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
           outerKeyfileUris: keyfiles.map((k) => k.uri).toSet(),
           hiddenKeyfileUris:
               _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toSet(),
+          l10n: context.l10n,
         );
         if (!validation.isValid) {
           setState(() => _error = validation.error);
@@ -358,14 +358,14 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
         Navigator.pop(context);
         showAppSnackBar(
           context,
-          message: 'USB container created. Use "Mount USB drive" to unlock it.',
+          message: context.l10n.usbContainerCreatedSnack,
           tone: AppBannerTone.success,
         );
       } else {
-        setState(() => _error = 'USB container creation failed.');
+        setState(() => _error = context.l10n.usbContainerCreationFailed);
       }
     } on PlatformException catch (e) {
-      setState(() => _error = e.message ?? 'Unknown error occurred');
+      setState(() => _error = e.message ?? context.l10n.unknownErrorOccurred);
     } finally {
       if (mounted) setState(() => _creating = false);
     }
@@ -377,14 +377,14 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader('USB Drive & Standard Volume'),
+        SectionHeader(context.l10n.usbStandardVolumeSectionHeader),
         SectionCard(
           children: [
             // Warning Banner
             Padding(
               padding: const EdgeInsets.all(16),
               child: InlineBanner(
-                'Formatting erases everything currently on the selected drive.',
+                context.l10n.formattingErasesEverythingWarning,
                 tone: AppBannerTone.warning,
               ),
             ),
@@ -396,7 +396,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Container Format',
+                    context.l10n.containerFormatLabel,
                     style: textTheme.bodyMedium
                         ?.copyWith(fontWeight: FontWeight.w600),
                   ),
@@ -413,7 +413,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Select USB Drive',
+                    context.l10n.selectUsbDriveLabel,
                     style: textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: cs.primary,
@@ -452,13 +452,13 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'No USB storage detected',
+                              context.l10n.noUsbStorageDetected,
                               style: textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Connect an OTG drive to format',
+                              context.l10n.connectOtgDriveToFormat,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -466,7 +466,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                             FilledButton.icon(
                               onPressed: busy ? null : _loadDevices,
                               icon: const Icon(Icons.refresh_rounded, size: 18),
-                              label: const Text('Refresh list'),
+                              label: Text(context.l10n.refreshListButton),
                               style: FilledButton.styleFrom(
                                 minimumSize: const Size(0, 44),
                                 shape: const StadiumBorder(),
@@ -543,8 +543,8 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                                             const SizedBox(height: 2),
                                             Text(
                                               d.hasPermission
-                                                  ? 'Ready to format'
-                                                  : 'Permission required',
+                                                  ? context.l10n.readyToFormat
+                                                  : context.l10n.permissionRequired,
                                               style: textTheme.bodySmall
                                                   ?.copyWith(
                                                 color: d.hasPermission
@@ -592,22 +592,22 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                           enabled: !busy,
                           keyboardType: const TextInputType.numberWithOptions(
                               decimal: true),
-                          decoration: const InputDecoration(
-                            labelText: 'Container Size',
-                            prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
+                          decoration: InputDecoration(
+                            labelText: context.l10n.containerSizeLabel,
+                            prefixIcon: const Icon(Icons.sd_card_outlined, size: 20),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: OptionPickerTile<String>(
-                          label: 'Unit',
+                          label: context.l10n.unitLabel,
                           value: _sizeUnit,
-                          options: const [
+                          options: [
                             SelectOption(
-                                value: 'MB', label: 'MB (Megabytes)'),
+                                value: 'MB', label: context.l10n.unitMbMegabytes),
                             SelectOption(
-                                value: 'GB', label: 'GB (Gigabytes)'),
+                                value: 'GB', label: context.l10n.unitGbGigabytes),
                           ],
                           onChanged: busy
                               ? (v) {}
@@ -643,7 +643,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 onChanged: (_) => setState(() {}),
                 autofillHints: const [AutofillHints.newPassword],
                 decoration: InputDecoration(
-                  labelText: 'Password',
+                  labelText: context.l10n.passwordFieldLabel,
                   prefixIcon:
                       Icon(Icons.key_rounded, size: 20, color: cs.primary),
                   suffixIcon: PasswordVisibilityToggle(
@@ -664,7 +664,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 onChanged: (_) => setState(() {}),
                 autofillHints: const [AutofillHints.newPassword],
                 decoration: InputDecoration(
-                  labelText: 'Confirm Password',
+                  labelText: context.l10n.confirmPasswordFieldLabelTitleCase,
                   prefixIcon: Icon(Icons.check_circle_outline_rounded,
                       size: 20, color: cs.primary),
                   suffixIcon: PasswordVisibilityToggle(
@@ -698,7 +698,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
               onHashChanged: (val) => setState(() => _hashId = val),
               extraFields: [
                 OptionPickerTile<String>(
-                  label: 'Format File System',
+                  label: context.l10n.formatFileSystemLabel,
                   value: _fileSystem,
                   prefixIcon: Icons.dns_rounded,
                   options: _availableFileSystems
@@ -714,11 +714,11 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
             // Quick Format Switch Tile
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              title: Text('Quick Format',
+              title: Text(context.l10n.quickFormatTitle,
                   style: textTheme.bodyMedium
                       ?.copyWith(fontWeight: FontWeight.w600)),
               subtitle: Text(
-                'Skips zero-filling the drive. Faster, but does not securely erase old data.',
+                context.l10n.quickFormatDescription,
                 style: textTheme.bodySmall
                     ?.copyWith(color: cs.onSurfaceVariant),
               ),
@@ -739,7 +739,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader('Hidden Volume'),
+        SectionHeader(context.l10n.hiddenVolumeHeader),
         SectionCard(
           children: [
             SwitchListTile(
@@ -748,13 +748,13 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
               onChanged: (isEnabled && !busy)
                   ? (val) => setState(() => _enableHiddenVolume = val)
                   : null,
-              title: Text('Create Hidden Volume',
+              title: Text(context.l10n.createHiddenVolumeToggleTitle,
                   style: textTheme.bodyMedium
                       ?.copyWith(fontWeight: FontWeight.w600)),
               subtitle: Text(
                 isEnabled
-                    ? 'Create an invisible secondary volume'
-                    : 'Set outer password or keyfiles first to enable',
+                    ? context.l10n.createInvisibleSecondaryVolume
+                    : context.l10n.setOuterPasswordFirstToEnable,
                 style: textTheme.bodySmall
                     ?.copyWith(color: cs.onSurfaceVariant),
               ),
@@ -775,7 +775,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                   onChanged: (_) => setState(() {}),
                   autofillHints: const [AutofillHints.newPassword],
                   decoration: InputDecoration(
-                    labelText: 'Hidden Password',
+                    labelText: context.l10n.hiddenPasswordLabel,
                     prefixIcon:
                         Icon(Icons.key_rounded, size: 20, color: cs.primary),
                     suffixIcon: PasswordVisibilityToggle(
@@ -795,7 +795,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                   onChanged: (_) => setState(() {}),
                   autofillHints: const [AutofillHints.newPassword],
                   decoration: InputDecoration(
-                    labelText: 'Confirm Hidden Password',
+                    labelText: context.l10n.confirmHiddenPasswordLabel,
                     prefixIcon: Icon(Icons.check_circle_outline_rounded,
                         size: 20, color: cs.primary),
                     suffixIcon: PasswordVisibilityToggle(
@@ -817,8 +817,8 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                         enabled: !busy,
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
-                        decoration: const InputDecoration(
-                          labelText: 'Hidden Size',
+                        decoration: InputDecoration(
+                          labelText: context.l10n.hiddenSizeLabel,
                           prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
                         ),
                       ),
@@ -826,11 +826,11 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                     const SizedBox(width: 12),
                     Expanded(
                       child: OptionPickerTile<String>(
-                        label: 'Unit',
+                        label: context.l10n.unitLabel,
                         value: _hiddenSizeUnit,
-                        options: const [
-                          SelectOption(value: 'MB', label: 'MB (Megabytes)'),
-                          SelectOption(value: 'GB', label: 'GB (Gigabytes)'),
+                        options: [
+                          SelectOption(value: 'MB', label: context.l10n.unitMbMegabytes),
+                          SelectOption(value: 'GB', label: context.l10n.unitGbGigabytes),
                         ],
                         onChanged: busy
                             ? (val) {}
@@ -859,7 +859,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 onHashChanged: (val) => setState(() => _hiddenHashId = val),
                 extraFields: [
                   OptionPickerTile<String>(
-                    label: 'Hidden File System',
+                    label: context.l10n.hiddenFileSystemLabel,
                     value: _hiddenFileSystem,
                     prefixIcon: Icons.dns_rounded,
                     options: _veraCryptFileSystems
@@ -926,9 +926,9 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                     valueColor: AlwaysStoppedAnimation(cs.onPrimary),
                   ),
                 )
-              : const Text(
-                  'Erase & Create Container',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              : Text(
+                  context.l10n.eraseAndCreateContainerButton,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
         ),
       ],
@@ -942,7 +942,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
         if (!didPop && busy) {
           showAppSnackBar(
             context,
-            message: 'Container creation in progress. Please wait.',
+            message: context.l10n.usbContainerCreationInProgressWait,
             tone: AppBannerTone.warning,
           );
         }
@@ -954,9 +954,9 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
             icon: const Icon(Icons.arrow_back_rounded),
             onPressed: () => Navigator.pop(context),
           ),
-          title: const Text(
-            'Format USB Drive',
-            style: TextStyle(fontWeight: FontWeight.bold),
+          title: Text(
+            context.l10n.formatUsbDriveScreenTitle,
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           bottom: _creating
               ? PreferredSize(

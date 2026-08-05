@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
 
@@ -25,7 +26,7 @@ mixin KeyfilePickerMixin<T extends StatefulWidget> on State<T> {
         }
       });
     } on PlatformException catch (e) {
-      if (mounted) onKeyfilePickError(e.message ?? 'Could not pick keyfiles');
+      if (mounted) onKeyfilePickError(e.message ?? context.l10n.couldNotPickKeyfiles);
     } finally {
       if (mounted) setState(() => pickingKeyfiles = false);
     }
@@ -47,9 +48,12 @@ class KeyfilePickerController {
   /// after the owning widget is disposed can't throw.
   final VoidCallback notify;
 
-  /// Called with a user-facing message when picking keyfiles fails. Same
-  /// mounted-guard responsibility as [notify].
-  final void Function(String message) onError;
+  /// Called with a user-facing message when picking keyfiles fails, or
+  /// `null` if the platform didn't provide one — callers should fall back
+  /// to a localized message (e.g. `context.l10n.couldNotPickKeyfiles`) since
+  /// this controller has no [BuildContext] of its own. Same mounted-guard
+  /// responsibility as [notify].
+  final void Function(String? message) onError;
 
   final List<KeyfileRef> keyfiles = [];
   bool picking = false;
@@ -65,7 +69,7 @@ class KeyfilePickerController {
         }
       }
     } on PlatformException catch (e) {
-      onError(e.message ?? 'Could not pick keyfiles');
+      onError(e.message);
     } finally {
       picking = false;
       notify();

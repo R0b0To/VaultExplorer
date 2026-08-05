@@ -1,3 +1,5 @@
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
 /// Where thumbnail data (decrypted image/video previews) is stored on disk.
 ///
 /// The in-memory LRU cache in [FileGridView] is independent of this; it sits
@@ -39,6 +41,17 @@ enum ThumbnailCacheMode {
     }
   }
 
+  String getLocalizedLabel(AppLocalizations l10n) {
+    switch (this) {
+      case ThumbnailCacheMode.appCache:
+        return l10n.thumbnailCacheAppCacheLabel;
+      case ThumbnailCacheMode.inContainer:
+        return l10n.thumbnailCacheInContainerLabel;
+      case ThumbnailCacheMode.disabled:
+        return l10n.thumbnailCacheDisabledLabel;
+    }
+  }
+
   String get description {
     switch (this) {
       case ThumbnailCacheMode.appCache:
@@ -49,6 +62,17 @@ enum ThumbnailCacheMode {
             'Protected by the container itself, but writes are slower.';
       case ThumbnailCacheMode.disabled:
         return 'No disk cache. Thumbnails are re-generated on every load.';
+    }
+  }
+
+  String getLocalizedDescription(AppLocalizations l10n) {
+    switch (this) {
+      case ThumbnailCacheMode.appCache:
+        return l10n.thumbnailCacheAppCacheDesc;
+      case ThumbnailCacheMode.inContainer:
+        return l10n.thumbnailCacheInContainerDesc;
+      case ThumbnailCacheMode.disabled:
+        return l10n.thumbnailCacheDisabledDesc;
     }
   }
 

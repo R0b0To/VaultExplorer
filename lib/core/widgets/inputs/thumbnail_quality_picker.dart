@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 
@@ -120,7 +121,7 @@ class _ThumbnailQualityDialogState extends State<_ThumbnailQualityDialog> {
 
               // ── Thumbnail Size (Resolution) ──
               Text(
-                'Thumbnail Size (Resolution)',
+                context.l10n.thumbnailSizeResolutionLabel,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -188,7 +189,7 @@ class _ThumbnailQualityDialogState extends State<_ThumbnailQualityDialog> {
 
               // ── Compression Quality ──
               Text(
-                'JPEG Compression Quality',
+                context.l10n.jpegCompressionQualityLabel,
                 style: textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -257,7 +258,7 @@ class _ThumbnailQualityDialogState extends State<_ThumbnailQualityDialog> {
                 alignment: Alignment.centerRight,
                 child: FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Done'),
+                  child: Text(context.l10n.done),
                 ),
               ),
             ],

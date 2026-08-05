@@ -1,0 +1,2540 @@
+{
+  "@@locale": "en",
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Generic Cancel button label"
+  },
+  "close": "Close",
+  "@close": {
+    "description": "Generic Close action label"
+  },
+  "search": "Search",
+  "@search": {
+    "description": "Generic Search action/tooltip label"
+  },
+  "goBack": "Go back",
+  "@goBack": {
+    "description": "Generic back navigation button label"
+  },
+  "xOfYCounter": "{current} / {total}",
+  "@xOfYCounter": {
+    "description": "Generic X of Y counter, e.g. page 2 of 10 or search match 1 of 3",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "pdfViewerGoToPageTitle": "Go to page",
+  "@pdfViewerGoToPageTitle": {
+    "description": "Dialog title for jumping to a specific PDF page"
+  },
+  "pdfViewerPageNumberHint": "Page number (1 - {pageCount})",
+  "@pdfViewerPageNumberHint": {
+    "description": "Hint text showing the valid page range",
+    "placeholders": {
+      "pageCount": {
+        "type": "int"
+      }
+    }
+  },
+  "pdfViewerPageLabel": "Page",
+  "@pdfViewerPageLabel": {
+    "description": "Text field label for page number input"
+  },
+  "pdfViewerGoButton": "Go",
+  "@pdfViewerGoButton": {
+    "description": "Confirm button label for the go-to-page dialog"
+  },
+  "pdfViewerSearchHint": "Search in document",
+  "@pdfViewerSearchHint": {
+    "description": "Hint text for the PDF in-document search field"
+  },
+  "pdfViewerNoMatches": "No matches",
+  "@pdfViewerNoMatches": {
+    "description": "Shown when a PDF text search finds no results"
+  },
+  "pdfViewerPreviousMatch": "Previous match",
+  "@pdfViewerPreviousMatch": {
+    "description": "Tooltip for the previous search match button"
+  },
+  "pdfViewerNextMatch": "Next match",
+  "@pdfViewerNextMatch": {
+    "description": "Tooltip for the next search match button"
+  },
+  "pdfViewerCloseSearch": "Close search",
+  "@pdfViewerCloseSearch": {
+    "description": "Tooltip for closing the PDF search bar"
+  },
+  "pdfViewerPrintTooltip": "Print document",
+  "@pdfViewerPrintTooltip": {
+    "description": "Tooltip for the print action"
+  },
+  "pdfViewerLoadingDocument": "Loading document…",
+  "@pdfViewerLoadingDocument": {
+    "description": "Loading state message while a PDF loads"
+  },
+  "pdfViewerCannotOpenTitle": "Cannot open PDF",
+  "@pdfViewerCannotOpenTitle": {
+    "description": "Error title shown when a PDF fails to load"
+  },
+  "pdfViewerFailedToLoad": "Failed to load PDF",
+  "@pdfViewerFailedToLoad": {
+    "description": "Fallback error message when the platform view reports an error without a message"
+  },
+  "paste": "Paste",
+  "@paste": {
+    "description": "Generic Paste action label"
+  },
+  "clear": "Clear",
+  "@clear": {
+    "description": "Generic Clear action label"
+  },
+  "clipboardVerbMove": "Move",
+  "@clipboardVerbMove": {
+    "description": "Verb shown when the clipboard holds a cut (move) operation"
+  },
+  "clipboardVerbCopy": "Copy",
+  "@clipboardVerbCopy": {
+    "description": "Verb shown when the clipboard holds a copy operation"
+  },
+  "clipboardTooltipInteractive": "{verb} ({count}) — Tap details, long press to paste",
+  "@clipboardTooltipInteractive": {
+    "description": "Tooltip for the AppBar clipboard chip when a paste target is available",
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "clipboardTooltipViewOnly": "{verb} ({count}) — Clipboard details",
+  "@clipboardTooltipViewOnly": {
+    "description": "Tooltip for the AppBar clipboard chip when no paste target is available",
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "clipboardSourceLabel": "Source: {source}",
+  "@clipboardSourceLabel": {
+    "description": "Shows which vault/container the clipboard contents came from",
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "clipboardDefaultSourceName": "Vault",
+  "@clipboardDefaultSourceName": {
+    "description": "Fallback source name shown when the clipboard source container has no display name"
+  },
+  "clipboardHeaderCount": "{verb} {count, plural, =1{1 item} other{# items}}",
+  "@clipboardHeaderCount": {
+    "description": "Header showing the clipboard verb and item count",
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "clipboardMoreItems": "{count, plural, =1{+1 more item} other{+# more items}}",
+  "@clipboardMoreItems": {
+    "description": "Overflow indicator when more clipboard items exist than shown in the preview",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "advancedParametersTitle": "Advanced Parameters",
+  "@advancedParametersTitle": {
+    "description": "Expansion tile title for PIM/cipher/hash advanced options"
+  },
+  "pimFieldLabel": "PIM  (leave blank for default)",
+  "@pimFieldLabel": {
+    "description": "Label for the optional PIM (Personal Iterations Multiplier) field"
+  },
+  "encryptionAlgorithmLabel": "Encryption Algorithm",
+  "@encryptionAlgorithmLabel": {
+    "description": "Label for the cipher/encryption algorithm picker"
+  },
+  "hashAlgorithmLabel": "Hash Algorithm",
+  "@hashAlgorithmLabel": {
+    "description": "Label for the hash algorithm picker"
+  },
+  "clipboardVerbMoving": "Moving",
+  "@clipboardVerbMoving": {
+    "description": "Progress verb shown while a cut/move clipboard operation is pending"
+  },
+  "clipboardVerbCopying": "Copying",
+  "@clipboardVerbCopying": {
+    "description": "Progress verb shown while a copy clipboard operation is pending"
+  },
+  "clipboardPillTitle": "{verb} {count, plural, =1{1 item} other{# items}}",
+  "@clipboardPillTitle": {
+    "description": "Title of the floating clipboard activity pill",
+    "placeholders": {
+      "verb": {
+        "type": "String"
+      },
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "clipboardFromSourceSuffix": " from \"{source}\"",
+  "@clipboardFromSourceSuffix": {
+    "description": "Appended to the clipboard pill title to show the source container",
+    "placeholders": {
+      "source": {
+        "type": "String"
+      }
+    }
+  },
+  "clipboardOpenContainerToPaste": "Open a container to paste",
+  "@clipboardOpenContainerToPaste": {
+    "description": "Hint shown on the clipboard pill when no paste target is currently open"
+  },
+  "keyfilesOptionalLabel": "Keyfiles (optional)",
+  "@keyfilesOptionalLabel": {
+    "description": "Header for the optional keyfiles section on unlock/creation forms"
+  },
+  "addFile": "Add File",
+  "@addFile": {
+    "description": "Button label to add a keyfile"
+  },
+  "noKeyfilesAttached": "No keyfiles attached",
+  "@noKeyfilesAttached": {
+    "description": "Empty state text when no keyfiles have been selected"
+  },
+  "completed": "Completed",
+  "@completed": {
+    "description": "Generic completed status label"
+  },
+  "dismiss": "Dismiss",
+  "@dismiss": {
+    "description": "Generic dismiss action tooltip"
+  },
+  "byteProgressText": "{transferred} / {total}  ({pct}%)",
+  "@byteProgressText": {
+    "description": "Byte transfer progress, e.g. '1.2 MB / 4.0 MB (30%)'",
+    "placeholders": {
+      "transferred": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "int"
+      }
+    }
+  },
+  "countProgressText": "{done} / {total}  ({pct}%)",
+  "@countProgressText": {
+    "description": "Item count transfer progress, e.g. '3 / 10 (30%)'",
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "pct": {
+        "type": "int"
+      }
+    }
+  },
+  "multiOpLabel": "{count, plural, =1{1 transfer} other{# transfers}}",
+  "@multiOpLabel": {
+    "description": "Label shown when multiple file operations are running at once",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "multiOpSublabel": "{summary} · tap to view all",
+  "@multiOpSublabel": {
+    "description": "Sublabel under the multi-operation activity pill",
+    "placeholders": {
+      "summary": {
+        "type": "String"
+      }
+    }
+  },
+  "thumbnailSizeResolutionLabel": "Thumbnail Size (Resolution)",
+  "@thumbnailSizeResolutionLabel": {
+    "description": "Section header for the thumbnail resolution slider"
+  },
+  "jpegCompressionQualityLabel": "JPEG Compression Quality",
+  "@jpegCompressionQualityLabel": {
+    "description": "Section header for the JPEG compression quality slider"
+  },
+  "done": "Done",
+  "@done": {
+    "description": "Generic Done button label"
+  },
+  "confirm": "Confirm",
+  "@confirm": {
+    "description": "Generic Confirm button label"
+  },
+  "couldNotPickKeyfiles": "Could not pick keyfiles",
+  "@couldNotPickKeyfiles": {
+    "description": "Fallback error message when picking keyfiles fails without a platform-provided message"
+  },
+  "filesystemLabelEncryptedVault": "this encrypted vault",
+  "@filesystemLabelEncryptedVault": {
+    "description": "Generic filesystem label used in validation messages for encrypted-vault formats (Cryptomator/gocryptfs/CryFS)"
+  },
+  "filesystemLabelThisContainer": "this container",
+  "@filesystemLabelThisContainer": {
+    "description": "Generic filesystem label used in validation messages when the concrete filesystem type is unknown"
+  },
+  "nounFile": "file",
+  "@nounFile": {
+    "description": "Lowercase noun for a file, used inside validation sentences"
+  },
+  "nounFolder": "folder",
+  "@nounFolder": {
+    "description": "Lowercase noun for a folder, used inside validation sentences"
+  },
+  "nounFileCapitalized": "File",
+  "@nounFileCapitalized": {
+    "description": "Capitalized noun for a file, used at the start of a validation sentence"
+  },
+  "nounFolderCapitalized": "Folder",
+  "@nounFolderCapitalized": {
+    "description": "Capitalized noun for a folder, used at the start of a validation sentence"
+  },
+  "unitBytes": "bytes",
+  "@unitBytes": {
+    "description": "Unit label for byte-based length limits"
+  },
+  "unitCharacters": "characters",
+  "@unitCharacters": {
+    "description": "Unit label for character-based length limits"
+  },
+  "validationEmptyName": "The name cannot be empty.",
+  "@validationEmptyName": {
+    "description": "Validation error when a file/folder name field is empty"
+  },
+  "validationReservedNavName": "\"{name}\" is a reserved navigation name and can't be used as a {noun} name.",
+  "@validationReservedNavName": {
+    "description": "Validation error for names that are exactly \".\" or \"..\"",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "noun": {
+        "type": "String"
+      }
+    }
+  },
+  "validationIllegalChar": "\"{char}\" at position {position} is not allowed in a name on {fsLabel}.",
+  "@validationIllegalChar": {
+    "description": "Validation error for a specific illegal character in a name",
+    "placeholders": {
+      "char": {
+        "type": "String"
+      },
+      "position": {
+        "type": "int"
+      },
+      "fsLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "validationControlChar": "Position {position} contains a non-printable control character (code {code}), which is not allowed on {fsLabel}.",
+  "@validationControlChar": {
+    "description": "Validation error for a non-printable control character in a name",
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "code": {
+        "type": "String"
+      },
+      "fsLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "validationReservedDeviceName": "\"{name}\" is a reserved device name on {fsLabel} (matches CON, PRN, AUX, NUL, COM0–9, or LPT0–9) and can't be used, with or without a file extension.",
+  "@validationReservedDeviceName": {
+    "description": "Validation error for Windows-family reserved device names",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "fsLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "validationTrailingSpace": "{noun} names can't end with a space on {fsLabel}",
+  "@validationTrailingSpace": {
+    "description": "Validation error for a trailing space in a name",
+    "placeholders": {
+      "noun": {
+        "type": "String"
+      },
+      "fsLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "validationTrailingDot": "{noun} names can't end with a \".\" on {fsLabel}",
+  "@validationTrailingDot": {
+    "description": "Validation error for a trailing dot in a name",
+    "placeholders": {
+      "noun": {
+        "type": "String"
+      },
+      "fsLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "validationNameTooLong": "This name is {length} {unit} long; {fsLabel} allows at most {maxLength} {unit} per {noun} name.",
+  "@validationNameTooLong": {
+    "description": "Validation error when a name exceeds the filesystem's length limit",
+    "placeholders": {
+      "length": {
+        "type": "int"
+      },
+      "unit": {
+        "type": "String"
+      },
+      "fsLabel": {
+        "type": "String"
+      },
+      "maxLength": {
+        "type": "int"
+      },
+      "noun": {
+        "type": "String"
+      }
+    }
+  },
+  "validationPathTooLong": "The full path is {length} characters long; {fsLabel} allows at most {maxLength}.",
+  "@validationPathTooLong": {
+    "description": "Validation error when the full joined path exceeds the filesystem's path length limit",
+    "placeholders": {
+      "length": {
+        "type": "int"
+      },
+      "fsLabel": {
+        "type": "String"
+      },
+      "maxLength": {
+        "type": "int"
+      }
+    }
+  },
+  "conflictSameType": "A {noun} named \"{name}\" already exists here.",
+  "@conflictSameType": {
+    "description": "Error shown when creating/renaming to a name that collides with an existing entry of the same type",
+    "placeholders": {
+      "noun": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "conflictCrossType": "A {existingNoun} named \"{name}\" already exists here — it can't share a name with a {candidateNoun}.",
+  "@conflictCrossType": {
+    "description": "Error shown when creating/renaming to a name that collides with an existing entry of the opposite type",
+    "placeholders": {
+      "existingNoun": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      },
+      "candidateNoun": {
+        "type": "String"
+      }
+    }
+  },
+  "readOnlyContainerWarning": "This container is mounted read-only.",
+  "@readOnlyContainerWarning": {
+    "description": "Snackbar shown when trying to modify a read-only mounted container"
+  },
+  "deleteItemsTitle": "{count, plural, =1{Delete 1 item?} other{Delete # items?}}",
+  "@deleteItemsTitle": {
+    "description": "Confirmation dialog title for deleting one or more items",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "deleteFoldersWarning": "These items will be permanently deleted, including all contents of any selected folders.",
+  "@deleteFoldersWarning": {
+    "description": "Delete confirmation body when the selection includes at least one folder"
+  },
+  "deleteFilesWarning": "These items will be permanently erased from your encrypted volume.",
+  "@deleteFilesWarning": {
+    "description": "Delete confirmation body when the selection is files only"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Generic Delete action label"
+  },
+  "create": "Create",
+  "@create": {
+    "description": "Generic Create action label"
+  },
+  "rename": "Rename",
+  "@rename": {
+    "description": "Generic Rename action label / single-item rename dialog title"
+  },
+  "renameMultipleTitle": "{count, plural, =1{Rename 1 item} other{Rename # items}}",
+  "@renameMultipleTitle": {
+    "description": "Dialog title when renaming multiple items at once",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "newFolderTitle": "New Folder",
+  "@newFolderTitle": {
+    "description": "Create-folder dialog title"
+  },
+  "newTextFileTitle": "New Text File",
+  "@newTextFileTitle": {
+    "description": "Create-file dialog title"
+  },
+  "folderNameHint": "Folder name",
+  "@folderNameHint": {
+    "description": "Hint text for the new folder name field"
+  },
+  "filenameHint": "filename.txt",
+  "@filenameHint": {
+    "description": "Example hint text for the new file name field"
+  },
+  "newNameHint": "New name",
+  "@newNameHint": {
+    "description": "Hint text for a single-item rename field"
+  },
+  "baseNameHint": "Base name",
+  "@baseNameHint": {
+    "description": "Hint text for a multi-item rename base name field"
+  },
+  "couldntCreateItem": "Couldn't create \"{name}\" — check the container is still mounted",
+  "@couldntCreateItem": {
+    "description": "Error shown when creating a folder or file fails",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "couldntRenameSingle": "Couldn't rename \"{name}\" — an item with that name may already exist",
+  "@couldntRenameSingle": {
+    "description": "Error shown when a single-item rename fails",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "couldntRenameMultiWithReason": "{count, plural, =1{Couldn't rename 1 item: {reason}} other{Couldn't rename # items: {reason}}}",
+  "@couldntRenameMultiWithReason": {
+    "description": "Error shown when one or more items fail to rename in a batch, with a specific reason",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      },
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "couldntRenameMultiNoReason": "{count, plural, =1{Couldn't rename 1 item} other{Couldn't rename # items}}",
+  "@couldntRenameMultiNoReason": {
+    "description": "Error shown when one or more items fail to rename in a batch, without a specific reason",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "hiddenVolumeErrorInvalidSize": "Enter a valid hidden size greater than 0",
+  "@hiddenVolumeErrorInvalidSize": {
+    "description": "Validation error when the hidden volume size field is empty or non-positive"
+  },
+  "hiddenVolumeErrorTooLargeVsOuter": "Hidden volume size must be less than the outer volume size",
+  "@hiddenVolumeErrorTooLargeVsOuter": {
+    "description": "Validation error when the hidden volume size is not smaller than the outer volume"
+  },
+  "hiddenVolumeErrorTooLargeForContainer": "Hidden volume size is too large for this container size",
+  "@hiddenVolumeErrorTooLargeForContainer": {
+    "description": "Validation error when the hidden volume plus header reservation exceeds the outer container size"
+  },
+  "hiddenVolumeErrorCredentialsRequired": "A hidden password or keyfile is required when creating a hidden volume",
+  "@hiddenVolumeErrorCredentialsRequired": {
+    "description": "Validation error when neither a hidden password nor keyfiles were supplied"
+  },
+  "hiddenVolumeErrorCredentialsMustDiffer": "Hidden volume credentials (password, PIM, and keyfiles) cannot be identical to the outer volume credentials.",
+  "@hiddenVolumeErrorCredentialsMustDiffer": {
+    "description": "Validation error when the hidden volume credentials exactly match the outer volume credentials"
+  },
+  "vaultItemTypePassword": "Password",
+  "@vaultItemTypePassword": {
+    "description": "Vault item type name: a saved password/login"
+  },
+  "vaultItemTypePaymentCard": "Payment Card",
+  "@vaultItemTypePaymentCard": {
+    "description": "Vault item type name: a saved payment card"
+  },
+  "vaultItemTypeIdentity": "Identity",
+  "@vaultItemTypeIdentity": {
+    "description": "Vault item type name: a saved identity document"
+  },
+  "vaultItemTypeSecureNote": "Secure Note",
+  "@vaultItemTypeSecureNote": {
+    "description": "Vault item type name: a free-text secure note"
+  },
+  "vaultItemTypeBankAccount": "Bank Account",
+  "@vaultItemTypeBankAccount": {
+    "description": "Vault item type name: a saved bank account"
+  },
+  "vaultItemTypeSoftwareLicense": "Software License",
+  "@vaultItemTypeSoftwareLicense": {
+    "description": "Vault item type name: a saved software license"
+  },
+  "fieldUsernameEmail": "Username / Email",
+  "@fieldUsernameEmail": {
+    "description": "Form field label"
+  },
+  "fieldPassword": "Password",
+  "@fieldPassword": {
+    "description": "Form field label"
+  },
+  "fieldWebsiteUrl": "Website URL",
+  "@fieldWebsiteUrl": {
+    "description": "Form field label"
+  },
+  "fieldTotpSecret": "TOTP Secret (2FA)",
+  "@fieldTotpSecret": {
+    "description": "Form field label"
+  },
+  "fieldNotes": "Notes",
+  "@fieldNotes": {
+    "description": "Form field label, shared across several vault item templates"
+  },
+  "fieldCardholderName": "Cardholder Name",
+  "@fieldCardholderName": {
+    "description": "Form field label"
+  },
+  "fieldCardNumber": "Card Number",
+  "@fieldCardNumber": {
+    "description": "Form field label"
+  },
+  "fieldExpiryMMYY": "Expiry (MM/YY)",
+  "@fieldExpiryMMYY": {
+    "description": "Form field label"
+  },
+  "fieldCvvCvc": "CVV / CVC",
+  "@fieldCvvCvc": {
+    "description": "Form field label"
+  },
+  "fieldPin": "PIN",
+  "@fieldPin": {
+    "description": "Form field label, shared across several vault item templates"
+  },
+  "fieldIssuingBank": "Issuing Bank",
+  "@fieldIssuingBank": {
+    "description": "Form field label"
+  },
+  "fieldFullName": "Full Name",
+  "@fieldFullName": {
+    "description": "Form field label"
+  },
+  "fieldDateOfBirth": "Date of Birth",
+  "@fieldDateOfBirth": {
+    "description": "Form field label"
+  },
+  "fieldNationality": "Nationality",
+  "@fieldNationality": {
+    "description": "Form field label"
+  },
+  "fieldPassportNumber": "Passport Number",
+  "@fieldPassportNumber": {
+    "description": "Form field label"
+  },
+  "fieldPassportExpiry": "Passport Expiry",
+  "@fieldPassportExpiry": {
+    "description": "Form field label"
+  },
+  "fieldNationalIdSsn": "National ID / SSN",
+  "@fieldNationalIdSsn": {
+    "description": "Form field label"
+  },
+  "fieldDriversLicense": "Driver's License",
+  "@fieldDriversLicense": {
+    "description": "Form field label"
+  },
+  "fieldAddress": "Address",
+  "@fieldAddress": {
+    "description": "Form field label"
+  },
+  "fieldPhone": "Phone",
+  "@fieldPhone": {
+    "description": "Form field label"
+  },
+  "fieldEmail": "Email",
+  "@fieldEmail": {
+    "description": "Form field label, shared across several vault item templates"
+  },
+  "fieldNote": "Note",
+  "@fieldNote": {
+    "description": "Form field label for a secure note's free-text content"
+  },
+  "fieldBankName": "Bank Name",
+  "@fieldBankName": {
+    "description": "Form field label"
+  },
+  "fieldAccountHolder": "Account Holder",
+  "@fieldAccountHolder": {
+    "description": "Form field label"
+  },
+  "fieldAccountNumber": "Account Number",
+  "@fieldAccountNumber": {
+    "description": "Form field label"
+  },
+  "fieldRoutingSortCode": "Routing / Sort Code",
+  "@fieldRoutingSortCode": {
+    "description": "Form field label"
+  },
+  "fieldIban": "IBAN",
+  "@fieldIban": {
+    "description": "Form field label"
+  },
+  "fieldSwiftBic": "SWIFT / BIC",
+  "@fieldSwiftBic": {
+    "description": "Form field label"
+  },
+  "fieldAccountType": "Account Type",
+  "@fieldAccountType": {
+    "description": "Form field label"
+  },
+  "fieldProductName": "Product Name",
+  "@fieldProductName": {
+    "description": "Form field label"
+  },
+  "fieldLicenseKey": "License Key",
+  "@fieldLicenseKey": {
+    "description": "Form field label"
+  },
+  "fieldRegisteredTo": "Registered To",
+  "@fieldRegisteredTo": {
+    "description": "Form field label"
+  },
+  "fieldPurchaseDate": "Purchase Date",
+  "@fieldPurchaseDate": {
+    "description": "Form field label"
+  },
+  "fieldExpiryRenewalDate": "Expiry / Renewal Date",
+  "@fieldExpiryRenewalDate": {
+    "description": "Form field label"
+  },
+  "fieldDownloadUrl": "Download URL",
+  "@fieldDownloadUrl": {
+    "description": "Form field label"
+  },
+  "fieldRegistrationEmail": "Registration Email",
+  "@fieldRegistrationEmail": {
+    "description": "Form field label for the email associated with a software license registration"
+  },
+  "titleRequired": "Title is required",
+  "@titleRequired": {
+    "description": "Validation error when saving a vault item without a title"
+  },
+  "newTypeTitle": "New {typeLabel}",
+  "@newTypeTitle": {
+    "description": "AppBar title when creating a new vault item",
+    "placeholders": {
+      "typeLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "editItemTitle": "Edit {title}",
+  "@editItemTitle": {
+    "description": "AppBar title when editing an existing vault item",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Generic Save action label"
+  },
+  "typeNameHint": "{typeLabel} name",
+  "@typeNameHint": {
+    "description": "Hint text for the vault item title field, e.g. 'Password name'",
+    "placeholders": {
+      "typeLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "titleSectionLabel": "Title",
+  "@titleSectionLabel": {
+    "description": "Section header above the vault item title field"
+  },
+  "fieldsSectionLabel": "Fields",
+  "@fieldsSectionLabel": {
+    "description": "Section header above the vault item's dynamic fields"
+  },
+  "encryptedStorageHint": "All fields are stored encrypted inside the container.",
+  "@encryptedStorageHint": {
+    "description": "Reassurance footer text on the vault item edit screen"
+  },
+  "copiedSuffix": "{fieldLabel} copied",
+  "@copiedSuffix": {
+    "description": "Snackbar confirming a field's value was copied to the clipboard",
+    "placeholders": {
+      "fieldLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "copy": "Copy",
+  "@copy": {
+    "description": "Generic Copy action tooltip/label"
+  },
+  "failedToSaveCheckMounted": "Failed to save — check container is still mounted",
+  "@failedToSaveCheckMounted": {
+    "description": "Error shown when saving a vault item fails"
+  },
+  "discardChangesTitle": "Discard changes?",
+  "@discardChangesTitle": {
+    "description": "Confirmation dialog title when leaving a screen with unsaved edits"
+  },
+  "discardChangesMessage": "Your unsaved changes will be lost.",
+  "@discardChangesMessage": {
+    "description": "Confirmation dialog body when leaving a screen with unsaved edits"
+  },
+  "discard": "Discard",
+  "@discard": {
+    "description": "Button label to confirm discarding unsaved changes"
+  },
+  "keepEditing": "Keep editing",
+  "@keepEditing": {
+    "description": "Button label to cancel discarding unsaved changes and continue editing"
+  },
+  "deleteItemTitle": "Delete item?",
+  "@deleteItemTitle": {
+    "description": "Confirmation dialog title when deleting a single vault item"
+  },
+  "deleteItemMessage": "\"{title}\" will be permanently deleted from the vault.",
+  "@deleteItemMessage": {
+    "description": "Confirmation dialog body when deleting a single vault item",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "removeFromFavourites": "Remove from favourites",
+  "@removeFromFavourites": {
+    "description": "Tooltip for the star/favourite toggle when the item is currently a favourite"
+  },
+  "addToFavourites": "Add to favourites",
+  "@addToFavourites": {
+    "description": "Tooltip for the star/favourite toggle when the item is not currently a favourite"
+  },
+  "edit": "Edit",
+  "@edit": {
+    "description": "Generic Edit action label"
+  },
+  "labelCopiedToClipboard": "{label} copied to clipboard",
+  "@labelCopiedToClipboard": {
+    "description": "Snackbar confirming a value was copied to the clipboard",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "noFieldsFilledIn": "No fields filled in.\nTap Edit to add details.",
+  "@noFieldsFilledIn": {
+    "description": "Empty state shown on the vault item detail screen when no fields have values"
+  },
+  "sectionLabelDetails": "Details",
+  "@sectionLabelDetails": {
+    "description": "Section header above a vault item's field details"
+  },
+  "sectionLabelInfo": "Info",
+  "@sectionLabelInfo": {
+    "description": "Section header above a vault item's metadata (type, created, modified)"
+  },
+  "metaLabelType": "Type",
+  "@metaLabelType": {
+    "description": "Metadata row label for the vault item's type"
+  },
+  "metaLabelCreated": "Created",
+  "@metaLabelCreated": {
+    "description": "Metadata row label for the vault item's creation date"
+  },
+  "metaLabelModified": "Modified",
+  "@metaLabelModified": {
+    "description": "Metadata row label for the vault item's last-modified date"
+  },
+  "copyFieldTooltip": "Copy {fieldLabel}",
+  "@copyFieldTooltip": {
+    "description": "Tooltip for the per-field copy button",
+    "placeholders": {
+      "fieldLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "readOnlyCantAddItemsTooltip": "Read-only — can't add items",
+  "@readOnlyCantAddItemsTooltip": {
+    "description": "Tooltip on the add-item button when the container is mounted read-only"
+  },
+  "extractArchive": "Extract Archive",
+  "@extractArchive": {
+    "description": "Tooltip/menu label to extract the currently open archive"
+  },
+  "newItemTooltip": "New item",
+  "@newItemTooltip": {
+    "description": "Tooltip for the add-item button in the file browser app bar"
+  },
+  "camera": "Camera",
+  "@camera": {
+    "description": "Menu item label to capture a photo with the camera"
+  },
+  "importFiles": "Import Files",
+  "@importFiles": {
+    "description": "Menu item label to import files from outside the vault"
+  },
+  "importFolder": "Import Folder",
+  "@importFolder": {
+    "description": "Menu item label to import a whole folder from outside the vault"
+  },
+  "secureItem": "Secure Item",
+  "@secureItem": {
+    "description": "Submenu label listing the vault item types (password, note, card, etc.) that can be created"
+  },
+  "appNameVaultExplorer": "Vault Explorer",
+  "@appNameVaultExplorer": {
+    "description": "The app's real (non-disguised) name, shown as the app title and Android task-switcher label"
+  },
+  "appNameHydroTracker": "Hydro Tracker",
+  "@appNameHydroTracker": {
+    "description": "The decoy/disguise app name shown as the app title and Android task-switcher label when Mask Mode is active"
+  },
+  "fileAssocInAppTextEditor": "In-app Text Editor",
+  "@fileAssocInAppTextEditor": {
+    "description": "File association label: files open in the built-in text editor"
+  },
+  "fileAssocInAppMediaViewer": "In-app Media Viewer",
+  "@fileAssocInAppMediaViewer": {
+    "description": "File association label: files open in the built-in media viewer"
+  },
+  "fileAssocAppPrefix": "App: {name}",
+  "@fileAssocAppPrefix": {
+    "description": "File association label naming a specific external app",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "fileAssocExternalApp": "External App",
+  "@fileAssocExternalApp": {
+    "description": "File association label for an unspecified external app"
+  },
+  "appSettingsTitle": "App Settings",
+  "@appSettingsTitle": {
+    "description": "App Settings screen AppBar title"
+  },
+  "sectionSecurityPrivacy": "Security & Privacy",
+  "@sectionSecurityPrivacy": {
+    "description": "Settings section header"
+  },
+  "sectionAppearanceInterface": "Appearance & Interface",
+  "@sectionAppearanceInterface": {
+    "description": "Settings section header"
+  },
+  "sectionVaultFileHandling": "Vault & File Handling",
+  "@sectionVaultFileHandling": {
+    "description": "Settings section header"
+  },
+  "masterPasswordTitle": "Master Password",
+  "@masterPasswordTitle": {
+    "description": "Settings toggle title"
+  },
+  "masterPasswordActiveSubtitle": "Active — tap toggle to remove",
+  "@masterPasswordActiveSubtitle": {
+    "description": "Settings toggle subtitle when a master password is set"
+  },
+  "masterPasswordInactiveSubtitle": "Require a password to open the app",
+  "@masterPasswordInactiveSubtitle": {
+    "description": "Settings toggle subtitle when no master password is set"
+  },
+  "newPasswordLabel": "New password",
+  "@newPasswordLabel": {
+    "description": "Text field label when changing an existing master password"
+  },
+  "masterPasswordFieldLabel": "Master password",
+  "@masterPasswordFieldLabel": {
+    "description": "Text field label when setting a master password for the first time"
+  },
+  "confirmPasswordLabel": "Confirm password",
+  "@confirmPasswordLabel": {
+    "description": "Text field label for the password confirmation field"
+  },
+  "update": "Update",
+  "@update": {
+    "description": "Generic Update button label"
+  },
+  "setPassword": "Set Password",
+  "@setPassword": {
+    "description": "Button label to confirm setting a new master password"
+  },
+  "biometricUnlockTitle": "Biometric Unlock",
+  "@biometricUnlockTitle": {
+    "description": "Settings toggle title"
+  },
+  "biometricUnlockSubtitle": "Use fingerprint or face recognition",
+  "@biometricUnlockSubtitle": {
+    "description": "Settings toggle subtitle"
+  },
+  "changeMasterPasswordTitle": "Change Master Password",
+  "@changeMasterPasswordTitle": {
+    "description": "Settings row title to open the change-password form"
+  },
+  "changeMasterPasswordSubtitle": "Update master password credentials",
+  "@changeMasterPasswordSubtitle": {
+    "description": "Settings row subtitle"
+  },
+  "autoLockContainersTitle": "Auto-Lock Containers",
+  "@autoLockContainersTitle": {
+    "description": "Settings toggle title"
+  },
+  "autoLockContainersSubtitle": "Automatically lock open vaults after inactivity",
+  "@autoLockContainersSubtitle": {
+    "description": "Settings toggle subtitle"
+  },
+  "autoLockTimeoutLabel": "Auto-Lock Timeout",
+  "@autoLockTimeoutLabel": {
+    "description": "Settings picker label"
+  },
+  "immediately": "Immediately",
+  "@immediately": {
+    "description": "Auto-lock timeout option meaning zero delay"
+  },
+  "nMinutes": "{count, plural, =1{1 minute} other{# minutes}}",
+  "@nMinutes": {
+    "description": "Duration in minutes, used for auto-lock timeout options",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "blockScreenshotsTitle": "Block Screenshots",
+  "@blockScreenshotsTitle": {
+    "description": "Settings toggle title"
+  },
+  "blockScreenshotsSubtitle": "Prevent screenshots and hide recent apps preview",
+  "@blockScreenshotsSubtitle": {
+    "description": "Settings toggle subtitle"
+  },
+  "discreteModeTitle": "Mask Mode",
+  "@discreteModeTitle": {
+    "description": "Settings toggle title"
+  },
+  "discreteModeActiveSubtitle": "Active — the app currently appears as \"Hydro Tracker\"",
+  "@discreteModeActiveSubtitle": {
+    "description": "Settings toggle subtitle when Discrete Mode is on"
+  },
+  "discreteModeInactiveSubtitle": "Disguise this app as a daily water tracker on the home screen",
+  "@discreteModeInactiveSubtitle": {
+    "description": "Settings toggle subtitle when Discrete Mode is off"
+  },
+  "enableDiscreteModeTitle": "Enable Mask Mode?",
+  "@enableDiscreteModeTitle": {
+    "description": "Confirmation dialog title when turning Discrete Mode on"
+  },
+  "disableDiscreteModeTitle": "Disable Mask Mode?",
+  "@disableDiscreteModeTitle": {
+    "description": "Confirmation dialog title when turning Discrete Mode off"
+  },
+  "enableDiscreteModeMessage": "The app icon and name on your home screen will change to \"Hydro Tracker\". It will function as a daily water intake tracker.\n\nTo access your vault, open Hydro Tracker and hold your finger on the title or water gauge for 3 seconds.",
+  "@enableDiscreteModeMessage": {
+    "description": "Confirmation dialog body when turning Discrete Mode on"
+  },
+  "disableDiscreteModeMessage": "The app icon and name on your home screen will change back to \"Vault Explorer\".",
+  "@disableDiscreteModeMessage": {
+    "description": "Confirmation dialog body when turning Discrete Mode off"
+  },
+  "enable": "Enable",
+  "@enable": {
+    "description": "Generic Enable action label"
+  },
+  "disable": "Disable",
+  "@disable": {
+    "description": "Generic Disable action label"
+  },
+  "discreteModeEnabledSnack": "Mask Mode enabled. The app will close — reopen from the new launcher icon.",
+  "@discreteModeEnabledSnack": {
+    "description": "Snackbar shown after turning Discrete Mode on"
+  },
+  "discreteModeDisabledSnack": "Mask Mode disabled. The app will close — reopen from the new launcher icon.",
+  "@discreteModeDisabledSnack": {
+    "description": "Snackbar shown after turning Discrete Mode off"
+  },
+  "failedToChangeDiscreteMode": "Failed to change Mask Mode",
+  "@failedToChangeDiscreteMode": {
+    "description": "Error snackbar when toggling Discrete Mode fails"
+  },
+  "cacheDerivedKeysTitle": "Cache Derived Keys by Default",
+  "@cacheDerivedKeysTitle": {
+    "description": "Settings toggle title"
+  },
+  "cacheDerivedKeysSubtitle": "Store derived key material in Keystore for faster unlocks",
+  "@cacheDerivedKeysSubtitle": {
+    "description": "Settings toggle subtitle"
+  },
+  "appThemeLabel": "App Theme",
+  "@appThemeLabel": {
+    "description": "Settings picker label"
+  },
+  "systemDefault": "System Default",
+  "@systemDefault": {
+    "description": "Option meaning: follow the OS-level setting rather than an explicit override"
+  },
+  "lightTheme": "Light Theme",
+  "@lightTheme": {
+    "description": "Theme option"
+  },
+  "darkTheme": "Dark Theme",
+  "@darkTheme": {
+    "description": "Theme option"
+  },
+  "sortContainersByLabel": "Sort Containers By",
+  "@sortContainersByLabel": {
+    "description": "Settings picker label"
+  },
+  "swapCardSwipeActionsTitle": "Swap Card Swipe Actions",
+  "@swapCardSwipeActionsTitle": {
+    "description": "Settings toggle title"
+  },
+  "swapCardSwipeActionsSubtitle": "Reveal Edit on left and Delete on right when swiping cards",
+  "@swapCardSwipeActionsSubtitle": {
+    "description": "Settings toggle subtitle"
+  },
+  "swipeGestureHintTitle": "Swipe Gesture Hint",
+  "@swipeGestureHintTitle": {
+    "description": "Settings toggle title"
+  },
+  "swipeGestureHintSubtitle": "Show card peek animation on first container",
+  "@swipeGestureHintSubtitle": {
+    "description": "Settings toggle subtitle"
+  },
+  "autoOpenOnUnlockTitle": "Auto-Open on Unlock",
+  "@autoOpenOnUnlockTitle": {
+    "description": "Settings toggle title"
+  },
+  "autoOpenOnUnlockActiveSubtitle": "Automatically open after unlocking a vault",
+  "@autoOpenOnUnlockActiveSubtitle": {
+    "description": "Settings toggle subtitle when enabled"
+  },
+  "autoOpenOnUnlockInactiveSubtitle": "Only unlock vault and stay on dashboard",
+  "@autoOpenOnUnlockInactiveSubtitle": {
+    "description": "Settings toggle subtitle when disabled"
+  },
+  "enableJsHtmlTitle": "Enable JavaScript in HTML Viewer",
+  "@enableJsHtmlTitle": {
+    "description": "Settings toggle title"
+  },
+  "jsEnabledSubtitle": "JavaScript enabled for local HTML files",
+  "@jsEnabledSubtitle": {
+    "description": "Settings toggle subtitle when enabled"
+  },
+  "jsDisabledSubtitle": "JavaScript disabled for local HTML files",
+  "@jsDisabledSubtitle": {
+    "description": "Settings toggle subtitle when disabled"
+  },
+  "fastStorageAccessTitle": "Fast Storage Access",
+  "@fastStorageAccessTitle": {
+    "description": "Settings toggle title"
+  },
+  "fastStorageAccessGrantedSubtitle": "All Files Access granted (maximum speed)",
+  "@fastStorageAccessGrantedSubtitle": {
+    "description": "Settings toggle subtitle when permission is granted"
+  },
+  "fastStorageAccessNotGrantedSubtitle": "Grant All Files Access in System Settings for optimal speed",
+  "@fastStorageAccessNotGrantedSubtitle": {
+    "description": "Settings toggle subtitle when permission is not granted"
+  },
+  "enableFastStorageAccessTitle": "Enable Fast Storage Access",
+  "@enableFastStorageAccessTitle": {
+    "description": "Confirmation dialog title when granting All Files Access"
+  },
+  "enableFastStorageAccessMessage": "Granting \"All Files Access\" allows Vault Explorer to perform direct POSIX file operations, speeding up folder vault performance by up to 1000x.",
+  "@enableFastStorageAccessMessage": {
+    "description": "Confirmation dialog body when granting All Files Access"
+  },
+  "disableStorageAccessTitle": "Disable Storage Access",
+  "@disableStorageAccessTitle": {
+    "description": "Confirmation dialog title when revoking All Files Access"
+  },
+  "disableStorageAccessMessage": "Android requires \"All Files Access\" to be turned off inside System Settings. Would you like to open Settings to turn it off?",
+  "@disableStorageAccessMessage": {
+    "description": "Confirmation dialog body when revoking All Files Access"
+  },
+  "openSettings": "Open Settings",
+  "@openSettings": {
+    "description": "Button label to open the system settings app"
+  },
+  "androidFileProviderTitle": "Android File Provider (default)",
+  "@androidFileProviderTitle": {
+    "description": "Settings toggle title"
+  },
+  "androidFileProviderSubtitle": "Expose new containers to Android File Picker by default",
+  "@androidFileProviderSubtitle": {
+    "description": "Settings toggle subtitle"
+  },
+  "thumbnailCachingDefaultLabel": "Thumbnail Caching (default)",
+  "@thumbnailCachingDefaultLabel": {
+    "description": "Settings picker label"
+  },
+  "thumbnailQualityDefaultLabel": "Thumbnail Quality (default)",
+  "@thumbnailQualityDefaultLabel": {
+    "description": "Settings picker label"
+  },
+  "fileAssociationsHeader": "File Associations",
+  "@fileAssociationsHeader": {
+    "description": "Settings subsection header"
+  },
+  "noFileAssociationsYet": "No remembered file associations yet. You will be prompted when opening files.",
+  "@noFileAssociationsYet": {
+    "description": "Empty state text for the file associations list"
+  },
+  "defaultActionsHeader": "Default actions when opening non-standard files:",
+  "@defaultActionsHeader": {
+    "description": "Header above the list of remembered file associations"
+  },
+  "removeAssociationTooltip": "Remove association",
+  "@removeAssociationTooltip": {
+    "description": "Tooltip for the button that deletes a remembered file association"
+  },
+  "aboutAppTitle": "About VaultExplorer",
+  "@aboutAppTitle": {
+    "description": "Settings row title linking to the About screen"
+  },
+  "versionInfoSubtitle": "Version {version} · Open source licenses & details",
+  "@versionInfoSubtitle": {
+    "description": "Settings row subtitle showing the app version",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToSaveSettings": "Failed to save settings",
+  "@failedToSaveSettings": {
+    "description": "Error snackbar when persisting settings fails"
+  },
+  "masterPasswordSetSnack": "Master password set",
+  "@masterPasswordSetSnack": {
+    "description": "Success snackbar after setting the master password"
+  },
+  "passwordCannotBeEmpty": "Password cannot be empty",
+  "@passwordCannotBeEmpty": {
+    "description": "Validation error for an empty password field"
+  },
+  "atLeast4CharsRequired": "At least 4 characters required",
+  "@atLeast4CharsRequired": {
+    "description": "Validation error for a too-short password"
+  },
+  "passwordsDoNotMatch": "Passwords do not match",
+  "@passwordsDoNotMatch": {
+    "description": "Validation error when password and confirmation don't match"
+  },
+  "failedToHashPassword": "Failed to hash password — please try again",
+  "@failedToHashPassword": {
+    "description": "Error shown when password hashing fails"
+  },
+  "languageLabel": "Language",
+  "@languageLabel": {
+    "description": "Settings picker label for the app display language"
+  },
+  "biometricNotAvailable": "Biometric not available on this device",
+  "@biometricNotAvailable": {
+    "description": "Error shown when biometric auth is requested but unsupported"
+  },
+  "unlockVaultExplorerReason": "Unlock VaultExplorer",
+  "@unlockVaultExplorerReason": {
+    "description": "Reason string shown by the OS biometric prompt"
+  },
+  "biometricErrorWithCode": "Biometric error: {code}",
+  "@biometricErrorWithCode": {
+    "description": "Error message including the platform's biometric error code",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "tooManyFailedAttempts": "Too many failed attempts. Try again in {seconds, plural, =1{1 second} other{# seconds}}.",
+  "@tooManyFailedAttempts": {
+    "description": "Error shown when the lock screen is in a lockout cooldown",
+    "placeholders": {
+      "seconds": {
+        "type": "num"
+      }
+    }
+  },
+  "enterMasterPasswordPrompt": "Enter your master password",
+  "@enterMasterPasswordPrompt": {
+    "description": "Validation error when submitting the lock screen with an empty password field"
+  },
+  "incorrectPasswordLockedFor": "Incorrect password. Locked for {seconds}s due to {attempts, plural, =1{1 failed attempt} other{# failed attempts}}.",
+  "@incorrectPasswordLockedFor": {
+    "description": "Error shown when a failed attempt triggers a new lockout",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      },
+      "attempts": {
+        "type": "num"
+      }
+    }
+  },
+  "incorrectPasswordAttempts": "Incorrect password ({attempts, plural, =1{1 failed attempt} other{# failed attempts}}).",
+  "@incorrectPasswordAttempts": {
+    "description": "Error shown after a failed attempt that doesn't (yet) trigger a lockout",
+    "placeholders": {
+      "attempts": {
+        "type": "num"
+      }
+    }
+  },
+  "brandNameNoSpace": "VaultExplorer",
+  "@brandNameNoSpace": {
+    "description": "The app's wordmark as displayed on the lock screen (intentionally spaceless stylization, distinct from the 'Vault Explorer' task-switcher/about-screen name)"
+  },
+  "enterPasswordSubtitle": "Enter your master password to continue",
+  "@enterPasswordSubtitle": {
+    "description": "Subtitle shown under the app logo on the lock screen"
+  },
+  "masterPasswordFieldLabelTitleCase": "Master Password",
+  "@masterPasswordFieldLabelTitleCase": {
+    "description": "Title-case text field label on the lock screen (distinct from the settings screen's sentence-case 'Master password')"
+  },
+  "unlock": "Unlock",
+  "@unlock": {
+    "description": "Button label to submit the master password and unlock the app"
+  },
+  "useBiometric": "Use Biometric",
+  "@useBiometric": {
+    "description": "Button label to trigger biometric authentication"
+  },
+  "connectAtLeast4Dots": "Connect at least 4 dots",
+  "@connectAtLeast4Dots": {
+    "description": "Instruction/error for the pattern lock setup, shown as both a hint and a validation error"
+  },
+  "patternsDontMatch": "Patterns don't match — try again",
+  "@patternsDontMatch": {
+    "description": "Error shown when the confirmation pattern doesn't match the first one drawn"
+  },
+  "drawUnlockPatternTitle": "Draw your unlock pattern",
+  "@drawUnlockPatternTitle": {
+    "description": "Title shown during the first step of pattern lock setup"
+  },
+  "confirmPatternTitle": "Confirm your pattern",
+  "@confirmPatternTitle": {
+    "description": "Title shown during the confirmation step of pattern lock setup"
+  },
+  "drawSamePatternAgain": "Draw the same pattern again",
+  "@drawSamePatternAgain": {
+    "description": "Subtitle instructing the user to redraw their pattern to confirm it"
+  },
+  "removedFromListSnack": "Removed \"{name}\" from list",
+  "@removedFromListSnack": {
+    "description": "Snackbar confirming a recent document was removed from the decoy reader's history",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "clearRecentHistoryTitle": "Clear Recent History?",
+  "@clearRecentHistoryTitle": {
+    "description": "Confirmation dialog title for clearing the decoy reader's recent documents list"
+  },
+  "clearRecentHistoryMessage": "This will remove all recent documents from your list. The actual files on your device will not be affected.",
+  "@clearRecentHistoryMessage": {
+    "description": "Confirmation dialog body for clearing the decoy reader's recent documents list"
+  },
+  "clearAll": "Clear All",
+  "@clearAll": {
+    "description": "Button label to confirm clearing the entire recent documents list"
+  },
+  "recentHistoryClearedSnack": "Recent history cleared",
+  "@recentHistoryClearedSnack": {
+    "description": "Snackbar confirming the recent documents list was cleared"
+  },
+  "moreOptionsTooltip": "More options",
+  "@moreOptionsTooltip": {
+    "description": "Tooltip for an overflow/more-options menu button"
+  },
+  "clearHistoryMenuItem": "Clear history",
+  "@clearHistoryMenuItem": {
+    "description": "Menu item label to clear the recent documents list"
+  },
+  "openPdfFile": "Open PDF File",
+  "@openPdfFile": {
+    "description": "Button label to open a PDF file from local storage"
+  },
+  "noDocumentsYetTitle": "No documents yet",
+  "@noDocumentsYetTitle": {
+    "description": "Empty state title on the decoy PDF reader home screen"
+  },
+  "openPdfToStartMessage": "Open a PDF from your device to start reading.",
+  "@openPdfToStartMessage": {
+    "description": "Empty state message on the decoy PDF reader home screen"
+  },
+  "removeFromListMenuItem": "Remove from list",
+  "@removeFromListMenuItem": {
+    "description": "Menu item label to remove a single document from the recent list"
+  },
+  "justNow": "Just now",
+  "@justNow": {
+    "description": "Relative time label for an event that happened less than a minute ago"
+  },
+  "minutesAgo": "{count}m ago",
+  "@minutesAgo": {
+    "description": "Abbreviated relative time label, e.g. '5m ago'",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursAgo": "{count}h ago",
+  "@hoursAgo": {
+    "description": "Abbreviated relative time label, e.g. '3h ago'",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "daysAgo": "{count}d ago",
+  "@daysAgo": {
+    "description": "Abbreviated relative time label, e.g. '2d ago'",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "usbDriveDisconnectedLocked": "USB drive disconnected — container locked",
+  "@usbDriveDisconnectedLocked": {
+    "description": "Warning snackbar when a USB container auto-locks because the drive was unplugged"
+  },
+  "containerAlreadyMounted": "This container is already mounted.",
+  "@containerAlreadyMounted": {
+    "description": "Snackbar shown when trying to unlock a container that's already open"
+  },
+  "addAVaultTitle": "Add a vault",
+  "@addAVaultTitle": {
+    "description": "Bottom sheet title for the add-vault options"
+  },
+  "mountExistingContainerTitle": "Mount existing container",
+  "@mountExistingContainerTitle": {
+    "description": "Add-vault option title"
+  },
+  "mountExistingContainerSubtitle": "Unlock a file container you already have",
+  "@mountExistingContainerSubtitle": {
+    "description": "Add-vault option subtitle"
+  },
+  "mountUsbDriveTitle": "Mount USB drive",
+  "@mountUsbDriveTitle": {
+    "description": "Add-vault option title"
+  },
+  "mountUsbDriveSubtitle": "Unlock a container on an OTG flash drive",
+  "@mountUsbDriveSubtitle": {
+    "description": "Add-vault option subtitle"
+  },
+  "formatUsbDriveTitle": "Format USB drive",
+  "@formatUsbDriveTitle": {
+    "description": "Add-vault option title"
+  },
+  "formatUsbDriveSubtitle": "Erase a drive and create a new encrypted container on it",
+  "@formatUsbDriveSubtitle": {
+    "description": "Add-vault option subtitle"
+  },
+  "createNewContainerTitle": "Create new container",
+  "@createNewContainerTitle": {
+    "description": "Add-vault option title"
+  },
+  "createNewContainerSubtitle": "Format a brand-new encrypted vault",
+  "@createNewContainerSubtitle": {
+    "description": "Add-vault option subtitle"
+  },
+  "lockBeforeRemovingWarning": "Lock the container before removing it.",
+  "@lockBeforeRemovingWarning": {
+    "description": "Warning snackbar when trying to remove a currently mounted container"
+  },
+  "settingsTooltip": "Settings",
+  "@settingsTooltip": {
+    "description": "Tooltip for the settings icon button"
+  },
+  "addVaultFabLabel": "Add vault",
+  "@addVaultFabLabel": {
+    "description": "Floating action button label to add a new vault"
+  },
+  "removedLabelUndo": "Removed \"{label}\"",
+  "@removedLabelUndo": {
+    "description": "Undo bar text after removing a container from the dashboard list",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "undo": "Undo",
+  "@undo": {
+    "description": "Button label to undo the last removal"
+  },
+  "pdfViewerNoSourceProvided": "No PDF source provided.",
+  "@pdfViewerNoSourceProvided": {
+    "description": "Error shown when the PDF viewer is opened without a file, container path, or local URI"
+  },
+  "pdfViewerFileEmpty": "PDF file is empty or unreadable.",
+  "@pdfViewerFileEmpty": {
+    "description": "Error shown when a PDF file inside a vault container has zero or unreadable size"
+  },
+  "pdfViewerFailedToInspectSize": "Failed to inspect PDF file size: {error}",
+  "@pdfViewerFailedToInspectSize": {
+    "description": "Error shown when reading a PDF file's size from the vault container fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "pdfViewerErrorLoadingTitle": "Error loading PDF",
+  "@pdfViewerErrorLoadingTitle": {
+    "description": "Error banner title shown by the PDF rendering engine when a document fails to parse"
+  },
+  "pdfViewerNoDocumentLoaded": "No PDF document loaded.",
+  "@pdfViewerNoDocumentLoaded": {
+    "description": "Fallback text shown when the PDF viewer has no error, isn't loading, but has no document to display"
+  },
+  "goalReachedSnack": "🎉 Daily hydration goal reached! Streak increased!",
+  "@goalReachedSnack": {
+    "description": "Snackbar shown when the user's water intake crosses the daily goal"
+  },
+  "addWaterDialogTitle": "Add Water",
+  "@addWaterDialogTitle": {
+    "description": "Dialog title for manually logging a custom water amount"
+  },
+  "amountWithUnitLabel": "Amount ({unit})",
+  "@amountWithUnitLabel": {
+    "description": "Text field label showing the active unit, e.g. 'Amount (ml)'",
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "add": "Add",
+  "@add": {
+    "description": "Generic Add action button label"
+  },
+  "resetTodayTitle": "Reset Today's Water Log?",
+  "@resetTodayTitle": {
+    "description": "Confirmation dialog title for resetting today's logged water intake"
+  },
+  "resetTodayMessage": "This will reset your logged water intake for today to 0.",
+  "@resetTodayMessage": {
+    "description": "Confirmation dialog body for resetting today's logged water intake"
+  },
+  "reset": "Reset",
+  "@reset": {
+    "description": "Generic Reset action button label"
+  },
+  "resetTodayTooltip": "Reset Today",
+  "@resetTodayTooltip": {
+    "description": "AppBar icon button tooltip to reset today's water log"
+  },
+  "unitsTooltip": "Units",
+  "@unitsTooltip": {
+    "description": "AppBar icon button tooltip to switch between metric and imperial units"
+  },
+  "metricUnitLabel": "Metric (ml)",
+  "@metricUnitLabel": {
+    "description": "Menu item label for the metric unit option"
+  },
+  "imperialUnitLabel": "Imperial (fl oz)",
+  "@imperialUnitLabel": {
+    "description": "Menu item label for the imperial unit option"
+  },
+  "streakBadge": "{count} Day Streak",
+  "@streakBadge": {
+    "description": "Compact badge label showing the current daily-goal streak, e.g. '5 Day Streak'",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "goalProgressLabel": "Goal: {goal} ({percent}%)",
+  "@goalProgressLabel": {
+    "description": "Label showing the daily goal amount and current progress percentage",
+    "placeholders": {
+      "goal": {
+        "type": "String"
+      },
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "quickLogHeader": "QUICK LOG",
+  "@quickLogHeader": {
+    "description": "Small all-caps section header above the quick-add water buttons"
+  },
+  "quickAddGlass": "Glass",
+  "@quickAddGlass": {
+    "description": "Quick-add button label for a small glass of water"
+  },
+  "quickAddBottle": "Bottle",
+  "@quickAddBottle": {
+    "description": "Quick-add button label for a bottle of water"
+  },
+  "quickAddLarge": "Large",
+  "@quickAddLarge": {
+    "description": "Quick-add button label for a large water serving"
+  },
+  "quickAddCustom": "Custom",
+  "@quickAddCustom": {
+    "description": "Quick-add button label to open the custom-amount dialog"
+  },
+  "quickAddDisplay": "+{amount} {unit}",
+  "@quickAddDisplay": {
+    "description": "Quick-add button amount text, e.g. '+250 ml'",
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      },
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "unitMl": "ml",
+  "@unitMl": {
+    "description": "Abbreviation for millilitres (metric volume unit)"
+  },
+  "unitFlOz": "fl oz",
+  "@unitFlOz": {
+    "description": "Abbreviation for fluid ounces (imperial volume unit)"
+  },
+  "dailyHydrationTipTitle": "Daily Hydration Tip",
+  "@dailyHydrationTipTitle": {
+    "description": "Title of the hydration tip info card"
+  },
+  "hydrationTipBody": "Drink a glass of water right after waking up to kickstart your metabolism.",
+  "@hydrationTipBody": {
+    "description": "Body text of the hydration tip info card"
+  },
+  "couldNotExpose": "Could not expose \"{name}\".",
+  "@couldNotExpose": {
+    "description": "Error when exposing a folder to the Android Document Provider fails",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "nowAvailableToOtherApps": "\"{name}\" is now available to other apps.",
+  "@nowAvailableToOtherApps": {
+    "description": "Confirmation after exposing a folder to the Android Document Provider",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "couldNotUnmount": "Could not unmount \"{name}\".",
+  "@couldNotUnmount": {
+    "description": "Error when unmounting a folder from the Android Document Provider fails",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pinnedCount": "{count, plural, =1{Pinned 1 item} other{Pinned # items}}",
+  "@pinnedCount": {
+    "description": "Status message after pinning items",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "unpinnedCount": "{count, plural, =1{Unpinned 1 item} other{Unpinned # items}}",
+  "@unpinnedCount": {
+    "description": "Status message after unpinning items",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "readOnlyThumbnailWarning": "Read-only mount — thumbnails will show but won't be saved inside the container this session.",
+  "@readOnlyThumbnailWarning": {
+    "description": "Warning shown when browsing a read-only container with in-container thumbnail caching selected"
+  },
+  "failedLoadingFolder": "Failed loading folder: {type}",
+  "@failedLoadingFolder": {
+    "description": "Error status when listing a directory fails",
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToReadArchive": "Failed to read archive: {type}",
+  "@failedToReadArchive": {
+    "description": "Error status when opening an archive fails",
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveFormatNotSupported": "Archive format .{ext} is not yet supported",
+  "@archiveFormatNotSupported": {
+    "description": "Error status when tapping an archive file whose format isn't supported",
+    "placeholders": {
+      "ext": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToReadFileFromArchive": "Failed to read file from archive",
+  "@failedToReadFileFromArchive": {
+    "description": "Error status when extracting a single file from an open archive fails"
+  },
+  "failedToExtractFile": "Failed to extract file: {type}",
+  "@failedToExtractFile": {
+    "description": "Error status when extracting a single file from an open archive throws",
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "failedToReadSecureItem": "Failed to read secure item",
+  "@failedToReadSecureItem": {
+    "description": "Error status when opening a vault item (password, note, etc.) fails"
+  },
+  "openFileDialogTitle": "Open File",
+  "@openFileDialogTitle": {
+    "description": "Dialog title for choosing how to open a file with no remembered association"
+  },
+  "chooseHowToOpen": "Choose how to open \"{name}\":",
+  "@chooseHowToOpen": {
+    "description": "Dialog subtitle asking how to open a specific file",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "playVideoAudioViewImageInApp": "Play video/audio or view image in-app",
+  "@playVideoAudioViewImageInApp": {
+    "description": "Description of the in-app media viewer option"
+  },
+  "viewEditTextMarkdownCode": "View/edit text, markdown, code",
+  "@viewEditTextMarkdownCode": {
+    "description": "Description of the in-app text editor option"
+  },
+  "sendFileToThirdPartyApp": "Send file to third-party app",
+  "@sendFileToThirdPartyApp": {
+    "description": "Description of the external-app open option"
+  },
+  "openAsEllipsis": "Open As…",
+  "@openAsEllipsis": {
+    "description": "Option label to choose a specific MIME type to open the file as"
+  },
+  "chooseFileTypeToOpenAs": "Choose file type to open as",
+  "@chooseFileTypeToOpenAs": {
+    "description": "Description of the open-as option"
+  },
+  "alwaysRememberChoiceExt": "Always remember choice for .{ext} files",
+  "@alwaysRememberChoiceExt": {
+    "description": "Checkbox label to remember the open-with choice for a given extension",
+    "placeholders": {
+      "ext": {
+        "type": "String"
+      }
+    }
+  },
+  "alwaysRememberChoiceNoExt": "Always remember choice for files without extension",
+  "@alwaysRememberChoiceNoExt": {
+    "description": "Checkbox label to remember the open-with choice for extensionless files"
+  },
+  "openAsDialogTitle": "Open As",
+  "@openAsDialogTitle": {
+    "description": "Dialog title for picking a MIME type to force-open a file as"
+  },
+  "mimeTypeText": "Text",
+  "@mimeTypeText": {
+    "description": "MIME type option: plain text"
+  },
+  "mimeTypeImage": "Image",
+  "@mimeTypeImage": {
+    "description": "MIME type option: image"
+  },
+  "mimeTypeVideo": "Video",
+  "@mimeTypeVideo": {
+    "description": "MIME type option: video"
+  },
+  "mimeTypeAudio": "Audio",
+  "@mimeTypeAudio": {
+    "description": "MIME type option: audio"
+  },
+  "mimeTypeArchive": "Archive",
+  "@mimeTypeArchive": {
+    "description": "MIME type option: archive/zip"
+  },
+  "mimeTypeOther": "Other",
+  "@mimeTypeOther": {
+    "description": "MIME type option: any other/unknown type"
+  },
+  "scanningSubfoldersForMedia": "Scanning subfolders for media…",
+  "@scanningSubfoldersForMedia": {
+    "description": "Status message while recursively scanning for playable media"
+  },
+  "noMediaFilesFoundRecursive": "No media files found in this folder or its subfolders",
+  "@noMediaFilesFoundRecursive": {
+    "description": "Error status when a recursive media scan finds nothing"
+  },
+  "failedToScanSubfolders": "Failed to scan subfolders: {error}",
+  "@failedToScanSubfolders": {
+    "description": "Error status when a recursive media scan throws",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "noAppFoundForFileType": "No app found for this file type",
+  "@noAppFoundForFileType": {
+    "description": "Error status when no external app can handle a file"
+  },
+  "couldNotOpenFile": "Could not open \"{name}\"",
+  "@couldNotOpenFile": {
+    "description": "Error status when opening a file with an external app fails",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "readOnlyCantMove": "This container is mounted read-only — items can't be moved from here.",
+  "@readOnlyCantMove": {
+    "description": "Error when starting a cut operation on a read-only container"
+  },
+  "readOnlyCantPaste": "This container is mounted read-only — items can't be pasted here.",
+  "@readOnlyCantPaste": {
+    "description": "Error when pasting into a read-only container"
+  },
+  "clipboardSourceInvalid": "Clipboard source is invalid",
+  "@clipboardSourceInvalid": {
+    "description": "Error when the clipboard's source container can't be identified"
+  },
+  "crossContainerPasteNotConfigured": "Cross-container paste is not configured.",
+  "@crossContainerPasteNotConfigured": {
+    "description": "Error when a cross-container paste is attempted but not supported by the current screen"
+  },
+  "crossContainerPasteRequiresBothMounted": "Cross-container paste requires both containers to remain mounted.",
+  "@crossContainerPasteRequiresBothMounted": {
+    "description": "Error when the clipboard's source container is no longer mounted"
+  },
+  "readOnlyCantDelete": "This container is mounted read-only — items can't be deleted.",
+  "@readOnlyCantDelete": {
+    "description": "Error when attempting to delete items from a read-only container"
+  },
+  "deletedCount": "{count, plural, =1{Deleted 1 item} other{Deleted # items}}",
+  "@deletedCount": {
+    "description": "Status message after a successful batch delete",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "deletedWithFailures": "{deleted} deleted · {failed} failed",
+  "@deletedWithFailures": {
+    "description": "Status message after a batch delete with some failures",
+    "placeholders": {
+      "deleted": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "exportedCount": "{count, plural, =1{Exported 1 file} other{Exported # files}}",
+  "@exportedCount": {
+    "description": "Status message after exporting files to device storage",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "exportCancelledOrFailed": "Export cancelled or failed",
+  "@exportCancelledOrFailed": {
+    "description": "Status message when an export operation returns zero files"
+  },
+  "exportError": "Export error: {type}",
+  "@exportError": {
+    "description": "Error status when exporting files throws",
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "deleteOriginalTitle": "Delete original?",
+  "@deleteOriginalTitle": {
+    "description": "Confirmation dialog title after an import, asking whether to delete the source"
+  },
+  "deleteOriginalFolderMessage": "Delete the original folder from your device now that it has been imported?",
+  "@deleteOriginalFolderMessage": {
+    "description": "Confirmation dialog body for deleting the original imported folder"
+  },
+  "deleteOriginalFilesMessage": "Delete the original file(s) from your device now that they have been imported?",
+  "@deleteOriginalFilesMessage": {
+    "description": "Confirmation dialog body for deleting the original imported files"
+  },
+  "keepOriginal": "Keep original",
+  "@keepOriginal": {
+    "description": "Button label to keep the original imported files/folder on-device"
+  },
+  "deleteOriginalButton": "Delete original",
+  "@deleteOriginalButton": {
+    "description": "Button label to delete the original imported files/folder from-device"
+  },
+  "deletedOriginalCount": "{count, plural, =1{Deleted 1 original item} other{Deleted # original items}}",
+  "@deletedOriginalCount": {
+    "description": "Status message after deleting import source files",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "couldNotDeleteOriginals": "Could not delete original(s)",
+  "@couldNotDeleteOriginals": {
+    "description": "Error status when deleting import source files fails"
+  },
+  "videoCapturedEncrypted": "Video captured and encrypted",
+  "@videoCapturedEncrypted": {
+    "description": "Status message after successfully capturing a video with the in-app camera"
+  },
+  "photoCapturedEncrypted": "Photo captured and encrypted",
+  "@photoCapturedEncrypted": {
+    "description": "Status message after successfully capturing a photo with the in-app camera"
+  },
+  "cameraCaptureFailed": "Camera capture failed: {type}",
+  "@cameraCaptureFailed": {
+    "description": "Error status when in-app camera capture throws",
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "extractAllFilesToFolder": "Extract all files to the folder \"{folder}\"?",
+  "@extractAllFilesToFolder": {
+    "description": "Confirmation dialog body before extracting an archive",
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "extract": "Extract",
+  "@extract": {
+    "description": "Button label to confirm extracting an archive"
+  },
+  "extractedCount": "{count, plural, =1{Extracted 1 file} other{Extracted # files}}",
+  "@extractedCount": {
+    "description": "Status message after successfully extracting an archive",
+    "placeholders": {
+      "count": {
+        "type": "num"
+      }
+    }
+  },
+  "failedToExtractGeneric": "Failed to extract: {type}",
+  "@failedToExtractGeneric": {
+    "description": "Error status when extracting an archive throws",
+    "placeholders": {
+      "type": {
+        "type": "String"
+      }
+    }
+  },
+  "closeSearchTooltip": "Close search",
+  "@closeSearchTooltip": {
+    "description": "Tooltip for closing the in-folder search bar"
+  },
+  "searchInThisFolderTooltip": "Search in this folder",
+  "@searchInThisFolderTooltip": {
+    "description": "Tooltip for opening the in-folder search bar"
+  },
+  "playMediaHereTooltip": "Play media here",
+  "@playMediaHereTooltip": {
+    "description": "Tooltip for the action bar button that plays all media in the current folder"
+  },
+  "rootFolderLabel": "Root",
+  "@rootFolderLabel": {
+    "description": "Display label for a container's top-level root folder"
+  },
+  "folderPickerFailed": "Folder picker failed: {error}",
+  "@folderPickerFailed": {
+    "description": "Error when the folder-vault destination picker throws",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "selectEmptyDestinationFolderFirst": "Select an empty destination folder first",
+  "@selectEmptyDestinationFolderFirst": {
+    "description": "Validation error when creating a folder vault without picking a destination"
+  },
+  "passwordRequired": "A password is required",
+  "@passwordRequired": {
+    "description": "Validation error when a required password field is empty"
+  },
+  "vaultCreatedSuccessfully": "Vault created successfully.",
+  "@vaultCreatedSuccessfully": {
+    "description": "Success snackbar after creating a folder vault"
+  },
+  "vaultCreationFailedEmptyFolder": "Vault creation failed — make sure the selected folder is empty.",
+  "@vaultCreationFailedEmptyFolder": {
+    "description": "Error shown when folder vault creation returns failure"
+  },
+  "unknownErrorOccurred": "Unknown error occurred",
+  "@unknownErrorOccurred": {
+    "description": "Fallback error message when a platform exception has no message"
+  },
+  "containerNameRequired": "Container name is required",
+  "@containerNameRequired": {
+    "description": "Validation error when the container file name field is empty"
+  },
+  "enterValidSizeGreaterThanZero": "Enter a valid size greater than 0",
+  "@enterValidSizeGreaterThanZero": {
+    "description": "Validation error for the container size field"
+  },
+  "passwordOrKeyfileRequired": "A password or at least one keyfile is required",
+  "@passwordOrKeyfileRequired": {
+    "description": "Validation error when creating a container with neither a password nor keyfiles"
+  },
+  "standardVolumePasswordsDoNotMatch": "Standard volume passwords do not match",
+  "@standardVolumePasswordsDoNotMatch": {
+    "description": "Validation error when the outer volume password confirmation doesn't match"
+  },
+  "hiddenVolumePasswordsDoNotMatch": "Hidden volume passwords do not match",
+  "@hiddenVolumePasswordsDoNotMatch": {
+    "description": "Validation error when the hidden volume password confirmation doesn't match"
+  },
+  "containerFileCreatedSuccessfully": "Container file created successfully.",
+  "@containerFileCreatedSuccessfully": {
+    "description": "Success snackbar after creating a container file"
+  },
+  "containerCreationCancelledOrFailed": "Container creation cancelled or failed.",
+  "@containerCreationCancelledOrFailed": {
+    "description": "Error shown when container creation returns failure"
+  },
+  "vaultKindContainerFile": "Container File",
+  "@vaultKindContainerFile": {
+    "description": "Segmented button option: create a single encrypted container file"
+  },
+  "vaultKindFolderVault": "Folder Vault",
+  "@vaultKindFolderVault": {
+    "description": "Segmented button option / section header: create a folder-based encrypted vault (Cryptomator/Gocryptfs/CryFS)"
+  },
+  "formatFileSystemLabel": "Format File System",
+  "@formatFileSystemLabel": {
+    "description": "Label for the inner filesystem picker when creating a container"
+  },
+  "standardVolumeHeader": "Standard Volume",
+  "@standardVolumeHeader": {
+    "description": "Section header for the main/outer volume creation form"
+  },
+  "containerFormatLabel": "Container Format",
+  "@containerFormatLabel": {
+    "description": "Label above the VeraCrypt/LUKS1/LUKS2 format selector"
+  },
+  "fileNameLabel": "File Name",
+  "@fileNameLabel": {
+    "description": "Text field label for the new container's file name"
+  },
+  "containerSizeLabel": "Container Size",
+  "@containerSizeLabel": {
+    "description": "Text field label for the new container's size"
+  },
+  "unitLabel": "Unit",
+  "@unitLabel": {
+    "description": "Label for the MB/GB size unit picker"
+  },
+  "passwordFieldLabel": "Password",
+  "@passwordFieldLabel": {
+    "description": "Generic title-case Password text field label"
+  },
+  "confirmPasswordFieldLabelTitleCase": "Confirm Password",
+  "@confirmPasswordFieldLabelTitleCase": {
+    "description": "Title-case Confirm Password text field label"
+  },
+  "hiddenVolumeHeader": "Hidden Volume",
+  "@hiddenVolumeHeader": {
+    "description": "Section header for the hidden volume creation form"
+  },
+  "createHiddenVolumeToggleTitle": "Create Hidden Volume",
+  "@createHiddenVolumeToggleTitle": {
+    "description": "Switch title to enable creating a hidden volume"
+  },
+  "createInvisibleSecondaryVolume": "Create an invisible secondary volume",
+  "@createInvisibleSecondaryVolume": {
+    "description": "Switch subtitle explaining the hidden volume feature when enabled"
+  },
+  "setOuterPasswordFirstToEnable": "Set outer password or keyfiles first to enable",
+  "@setOuterPasswordFirstToEnable": {
+    "description": "Switch subtitle explaining why the hidden volume toggle is disabled"
+  },
+  "hiddenPasswordLabel": "Hidden Password",
+  "@hiddenPasswordLabel": {
+    "description": "Text field label for the hidden volume's password"
+  },
+  "confirmHiddenPasswordLabel": "Confirm Hidden Password",
+  "@confirmHiddenPasswordLabel": {
+    "description": "Text field label for confirming the hidden volume's password"
+  },
+  "hiddenSizeLabel": "Hidden Size",
+  "@hiddenSizeLabel": {
+    "description": "Text field label for the hidden volume's size"
+  },
+  "unitMbMegabytes": "MB (Megabytes)",
+  "@unitMbMegabytes": {
+    "description": "Size unit option with expanded unit name"
+  },
+  "unitGbGigabytes": "GB (Gigabytes)",
+  "@unitGbGigabytes": {
+    "description": "Size unit option with expanded unit name"
+  },
+  "hiddenFileSystemLabel": "Hidden File System",
+  "@hiddenFileSystemLabel": {
+    "description": "Label for the hidden volume's inner filesystem picker"
+  },
+  "vaultFormatLabel": "Vault Format",
+  "@vaultFormatLabel": {
+    "description": "Label above the Cryptomator/Gocryptfs/CryFS format selector"
+  },
+  "destinationFolderLabel": "Destination Folder",
+  "@destinationFolderLabel": {
+    "description": "Label shown once a folder vault destination has been picked"
+  },
+  "selectEmptyFolderLabel": "Select an empty folder",
+  "@selectEmptyFolderLabel": {
+    "description": "Label shown before a folder vault destination has been picked"
+  },
+  "tapToChooseVaultLocation": "Tap to choose where vault will be created…",
+  "@tapToChooseVaultLocation": {
+    "description": "Placeholder hint for the folder vault destination picker card"
+  },
+  "folderVaultLimitationsNote": "Folder vaults don't support keyfiles, PIM, hidden volumes, or VeraCrypt/LUKS cipher choices.",
+  "@folderVaultLimitationsNote": {
+    "description": "Informational note below the folder vault creation form"
+  },
+  "createVaultButton": "Create Vault",
+  "@createVaultButton": {
+    "description": "Submit button label when creating a folder vault"
+  },
+  "createContainerButton": "Create Container",
+  "@createContainerButton": {
+    "description": "Submit button label when creating a container file"
+  },
+  "vaultCreationInProgressWait": "Vault creation in progress. Please wait.",
+  "@vaultCreationInProgressWait": {
+    "description": "Warning shown when trying to leave the screen while a folder vault is being created"
+  },
+  "containerCreationInProgressWait": "Container creation in progress. Please wait.",
+  "@containerCreationInProgressWait": {
+    "description": "Warning shown when trying to leave the screen while a container file is being created"
+  },
+  "createEncryptedVaultTitle": "Create Encrypted Vault",
+  "@createEncryptedVaultTitle": {
+    "description": "AppBar title when creating a folder vault"
+  },
+  "createEncryptedContainerTitle": "Create Encrypted Container",
+  "@createEncryptedContainerTitle": {
+    "description": "AppBar title when creating a container file"
+  },
+  "unitMbShort": "MB",
+  "@unitMbShort": {
+    "description": "Short abbreviation for megabytes"
+  },
+  "unitGbShort": "GB",
+  "@unitGbShort": {
+    "description": "Short abbreviation for gigabytes"
+  },
+  "failedToListUsbDevices": "Failed to list USB devices: {error}",
+  "@failedToListUsbDevices": {
+    "description": "Error when enumerating connected USB storage devices fails",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "usbPermissionDenied": "USB permission denied",
+  "@usbPermissionDenied": {
+    "description": "Error when the user denies the USB device access permission prompt"
+  },
+  "couldNotReadDriveCapacity": "Could not read drive capacity — enter size manually.",
+  "@couldNotReadDriveCapacity": {
+    "description": "Error when the USB drive's capacity can't be auto-detected"
+  },
+  "selectUsbDriveFirst": "Select a USB drive first",
+  "@selectUsbDriveFirst": {
+    "description": "Validation error when creating a USB container without selecting a device"
+  },
+  "eraseDeviceTitle": "Erase \"{name}\"?",
+  "@eraseDeviceTitle": {
+    "description": "Confirmation dialog title before formatting a USB drive",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "eraseDeviceMessage": "This will permanently erase everything currently on this USB drive and replace it with a new encrypted container. This cannot be undone.",
+  "@eraseDeviceMessage": {
+    "description": "Confirmation dialog body before formatting a USB drive"
+  },
+  "eraseAndCreateButton": "Erase & Create",
+  "@eraseAndCreateButton": {
+    "description": "Confirmation dialog button to proceed with erasing and formatting a USB drive"
+  },
+  "usbPermissionRequiredToContinue": "USB permission is required to continue",
+  "@usbPermissionRequiredToContinue": {
+    "description": "Error shown when USB device access permission is missing at creation time"
+  },
+  "usbContainerCreatedSnack": "USB container created. Use \"Mount USB drive\" to unlock it.",
+  "@usbContainerCreatedSnack": {
+    "description": "Success snackbar after formatting a USB drive with a new encrypted container"
+  },
+  "usbContainerCreationFailed": "USB container creation failed.",
+  "@usbContainerCreationFailed": {
+    "description": "Error shown when USB container creation returns failure"
+  },
+  "usbStandardVolumeSectionHeader": "USB Drive & Standard Volume",
+  "@usbStandardVolumeSectionHeader": {
+    "description": "Section header for the USB drive selection and outer volume form"
+  },
+  "formattingErasesEverythingWarning": "Formatting erases everything currently on the selected drive.",
+  "@formattingErasesEverythingWarning": {
+    "description": "Warning banner shown on the USB container creation screen"
+  },
+  "selectUsbDriveLabel": "Select USB Drive",
+  "@selectUsbDriveLabel": {
+    "description": "Label above the USB device picker list"
+  },
+  "noUsbStorageDetected": "No USB storage detected",
+  "@noUsbStorageDetected": {
+    "description": "Empty state title when no USB devices are connected"
+  },
+  "connectOtgDriveToFormat": "Connect an OTG drive to format",
+  "@connectOtgDriveToFormat": {
+    "description": "Empty state message when no USB devices are connected"
+  },
+  "refreshListButton": "Refresh list",
+  "@refreshListButton": {
+    "description": "Button label to re-scan for connected USB devices"
+  },
+  "readyToFormat": "Ready to format",
+  "@readyToFormat": {
+    "description": "Status label for a USB device with permission already granted"
+  },
+  "permissionRequired": "Permission required",
+  "@permissionRequired": {
+    "description": "Status label for a USB device that needs an access permission grant"
+  },
+  "readingDriveCapacity": "Reading drive capacity…",
+  "@readingDriveCapacity": {
+    "description": "Status message while auto-detecting a USB drive's capacity"
+  },
+  "mustNotExceedDriveCapacity": "Must not exceed the drive's actual capacity.",
+  "@mustNotExceedDriveCapacity": {
+    "description": "Helper text under the USB container size field"
+  },
+  "quickFormatTitle": "Quick Format",
+  "@quickFormatTitle": {
+    "description": "Switch title for skipping a full zero-fill when formatting a USB drive"
+  },
+  "quickFormatDescription": "Skips zero-filling the drive. Faster, but does not securely erase old data.",
+  "@quickFormatDescription": {
+    "description": "Switch subtitle explaining Quick Format's tradeoff"
+  },
+  "eraseAndCreateContainerButton": "Erase & Create Container",
+  "@eraseAndCreateContainerButton": {
+    "description": "Submit button label to format the USB drive and create the container"
+  },
+  "usbContainerCreationInProgressWait": "Container creation in progress. Please wait.",
+  "@usbContainerCreationInProgressWait": {
+    "description": "Warning shown when trying to leave the screen while a USB container is being created"
+  },
+  "formatUsbDriveScreenTitle": "Format USB Drive",
+  "@formatUsbDriveScreenTitle": {
+    "description": "AppBar title for the USB drive formatting screen"
+  },
+  "playlistTransitionAnimationLabel": "Playlist Transition Animation",
+  "@playlistTransitionAnimationLabel": {
+    "description": "Label for the playlist transition effect settings option"
+  },
+  "unlockVaultTitle": "Unlock Vault",
+  "@unlockVaultTitle": {
+    "description": "Title for the vault unlock bottom sheet"
+  },
+  "openContainerTitle": "Open Container",
+  "@openContainerTitle": {
+    "description": "Title when opening an unmounted container"
+  },
+  "selectContainerFileOrFolder": "Select File or Folder",
+  "@selectContainerFileOrFolder": {
+    "description": "Label for picking a container file or folder"
+  },
+  "readOnlyModeLabel": "Read-only mode",
+  "@readOnlyModeLabel": {
+    "description": "Checkbox label for mounting in read-only mode"
+  },
+  "readOnlyModeSubtitle": "Prevents any write or modify operations on the vault",
+  "@readOnlyModeSubtitle": {
+    "description": "Subtitle explaining read-only mode"
+  },
+  "mountUsbDriveTitle": "Mount USB Drive",
+  "@mountUsbDriveTitle": {
+    "description": "Title for the USB drive mount sheet"
+  },
+  "selectUsbDeviceLabel": "Select USB Device",
+  "@selectUsbDeviceLabel": {
+    "description": "Label for USB device selector"
+  },
+  "noUsbDevicesFound": "No compatible USB storage devices found",
+  "@noUsbDevicesFound": {
+    "description": "Message when no USB devices are detected"
+  },
+  "containerConfigTitle": "Vault Configuration",
+  "@containerConfigTitle": {
+    "description": "Title for container configuration sheet"
+  },
+  "changePasswordTitle": "Change Vault Password",
+  "@changePasswordTitle": {
+    "description": "Title for change vault password screen"
+  },
+  "newPasswordLabel": "New Password",
+  "@newPasswordLabel": {
+    "description": "Label for new password input field"
+  },
+  "confirmNewPasswordLabel": "Confirm New Password",
+  "@confirmNewPasswordLabel": {
+    "description": "Label for confirm new password input field"
+  },
+  "cameraCaptureTitle": "Vault Camera",
+  "@cameraCaptureTitle": {
+    "description": "Title for in-app secure camera screen"
+  },
+  "takingPhoto": "Capturing photo…",
+  "@takingPhoto": {
+    "description": "Status text while taking a photo"
+  },
+  "savingToVault": "Saving to vault…",
+  "@savingToVault": {
+    "description": "Status text while saving captured media directly to vault"
+  },
+  "noVaultSelected": "No vault selected",
+  "@noVaultSelected": {
+    "description": "Message when camera is launched without a target vault"
+  },
+  "mediaDiagnosticsTitle": "Media Diagnostics",
+  "@mediaDiagnosticsTitle": {
+    "description": "Title for media viewer diagnostics sheet"
+  },
+  "advancedViewerSettingsTitle": "Viewer Settings",
+  "@advancedViewerSettingsTitle": {
+    "description": "Title for advanced media viewer settings sheet"
+  },
+  "textEditorSaveConfirmTitle": "Unsaved Changes",
+  "@textEditorSaveConfirmTitle": {
+    "description": "Title for unsaved changes confirm dialog in text editor"
+  },
+  "textEditorSaveConfirmMessage": "Do you want to save your changes before closing?",
+  "@textEditorSaveConfirmMessage": {
+    "description": "Message for unsaved changes confirm dialog in text editor"
+  },
+  "saveAndClose": "Save & Close",
+  "@saveAndClose": {
+    "description": "Button label to save changes and close editor"
+  },
+  "discardChanges": "Discard Changes",
+  "@discardChanges": {
+    "description": "Button label to discard changes and close editor"
+  },
+  "selectionBarSelectedCount": "{count, plural, =1{1 item selected} other{{count} items selected}}",
+  "@selectionBarSelectedCount": {
+    "description": "Plural label for selection app bar",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectAll": "Select All",
+  "@selectAll": {
+    "description": "Action label to select all items in file browser"
+  },
+  "deselectAll": "Deselect All",
+  "@deselectAll": {
+    "description": "Action label to clear item selection"
+  },
+  "sortOptionsTitle": "Sort Files",
+  "@sortOptionsTitle": {
+    "description": "Title for file browser sort options sheet"
+  },
+  "layoutModeList": "List View",
+  "@layoutModeList": {
+    "description": "Menu option for list layout mode"
+  },
+  "layoutModeGrid": "Grid View",
+  "@layoutModeGrid": {
+    "description": "Menu option for grid layout mode"
+  },
+  "layoutModeMasonry": "Masonry View",
+  "@layoutModeMasonry": {
+    "description": "Menu option for masonry layout mode"
+  },
+  "fileOperationsTitle": "File Operations",
+  "@fileOperationsTitle": {
+    "description": "Title for file operations action sheet"
+  },
+  "conflictResolutionTitle": "File Conflict",
+  "@conflictResolutionTitle": {
+    "description": "Title for conflict resolution sheet when copying/moving files"
+  },
+  "replaceExistingFile": "Replace existing file",
+  "@replaceExistingFile": {
+    "description": "Option to overwrite existing file in conflict resolution"
+  },
+  "keepBothFiles": "Keep both (rename new file)",
+  "@keepBothFiles": {
+    "description": "Option to keep both files in conflict resolution"
+  },
+  "skipFile": "Skip this file",
+  "@skipFile": {
+    "description": "Option to skip file in conflict resolution"
+  },
+  "noVaultsFoundTitle": "No Vaults Found",
+  "@noVaultsFoundTitle": {
+    "description": "Title for dashboard empty state"
+  },
+  "noVaultsFoundSubtitle": "Create a new encrypted container or add an existing vault to get started.",
+  "@noVaultsFoundSubtitle": {
+    "description": "Subtitle for dashboard empty state"
+  },
+  "createVaultButton": "Create Vault",
+  "@createVaultButton": {
+    "description": "Button label to create a new vault"
+  },
+  "addExistingVaultButton": "Add Existing Vault",
+  "@addExistingVaultButton": {
+    "description": "Button label to add an existing vault"
+  },
+  "sortContainersModeManual": "Manual (drag to reorder)",
+  "@sortContainersModeManual": {
+    "description": "Sort option for manual ordering"
+  },
+  "sortContainersModeUnlockStatus": "Unlock status (unlocked first)",
+  "@sortContainersModeUnlockStatus": {
+    "description": "Sort option by unlock status"
+  },
+  "sortContainersModeNameAZ": "Name (A–Z)",
+  "@sortContainersModeNameAZ": {
+    "description": "Sort option A to Z"
+  },
+  "sortContainersModeNewest": "Newest first",
+  "@sortContainersModeNewest": {
+    "description": "Sort option newest first"
+  },
+  "sortContainersModeOldest": "Oldest first",
+  "@sortContainersModeOldest": {
+    "description": "Sort option oldest first"
+  },
+  "thumbnailCacheAppCacheLabel": "App cache",
+  "@thumbnailCacheAppCacheLabel": {
+    "description": "Label for app cache thumbnail mode"
+  },
+  "thumbnailCacheAppCacheDesc": "Stored encrypted in the App cache. Fast; cleared automatically under storage pressure.",
+  "@thumbnailCacheAppCacheDesc": {
+    "description": "Description for app cache thumbnail mode"
+  },
+  "thumbnailCacheInContainerLabel": "Inside container",
+  "@thumbnailCacheInContainerLabel": {
+    "description": "Label for in-container thumbnail mode"
+  },
+  "thumbnailCacheInContainerDesc": "Stored inside the encrypted container. Protected by the container itself, but writes are slower.",
+  "@thumbnailCacheInContainerDesc": {
+    "description": "Description for in-container thumbnail mode"
+  },
+  "thumbnailCacheDisabledLabel": "Disabled",
+  "@thumbnailCacheDisabledLabel": {
+    "description": "Label for disabled thumbnail mode"
+  },
+  "thumbnailCacheDisabledDesc": "No disk cache. Thumbnails are re-generated on every load.",
+  "@thumbnailCacheDisabledDesc": {
+    "description": "Description for disabled thumbnail mode"
+  }
+}
+

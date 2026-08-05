@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/services/cross_container_clipboard.dart';
 
@@ -26,14 +27,16 @@ class AppBarClipboardButton extends StatelessWidget {
         final clip = CrossContainerClipboard.instance;
         if (!clip.hasItems) return const SizedBox.shrink();
 
-        final verb = clip.isCutOperation ? 'Move' : 'Copy';
+        final verb = clip.isCutOperation
+            ? context.l10n.clipboardVerbMove
+            : context.l10n.clipboardVerbCopy;
         final count = clip.items.length;
-        final source = clip.sourceDisplayName ?? 'Vault';
+        final source = clip.sourceDisplayName ?? context.l10n.clipboardDefaultSourceName;
 
         return Tooltip(
           message: onPaste != null
-              ? '$verb ($count) — Tap details, long press to paste'
-              : '$verb ($count) — Clipboard details',
+              ? context.l10n.clipboardTooltipInteractive(verb, count)
+              : context.l10n.clipboardTooltipViewOnly(verb, count),
           triggerMode: TooltipTriggerMode.manual,
           child: PopupMenuButton<void>(
             offset: const Offset(0, 48), // Anchored directly beneath the AppBar action icon
@@ -87,7 +90,7 @@ class AppBarClipboardButton extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '$verb $count item${count == 1 ? '' : 's'}',
+                            context.l10n.clipboardHeaderCount(verb, count),
                             style: textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: cs.onSurface,
@@ -98,7 +101,7 @@ class AppBarClipboardButton extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Source: $source',
+                      context.l10n.clipboardSourceLabel(source),
                       style: textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
@@ -143,7 +146,7 @@ class AppBarClipboardButton extends StatelessWidget {
                     if (clip.items.length > 4) ...[
                       const SizedBox(height: 4),
                       Text(
-                        '+ ${clip.items.length - 4} more item(s)',
+                        context.l10n.clipboardMoreItems(clip.items.length - 4),
                         style: textTheme.labelSmall?.copyWith(color: cs.outline),
                       ),
                     ],
@@ -163,7 +166,7 @@ class AppBarClipboardButton extends StatelessWidget {
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          child: const Text('Clear'),
+                          child: Text(context.l10n.clear),
                         ),
                         if (onPaste != null) ...[
                           const SizedBox(width: 8),
@@ -177,7 +180,7 @@ class AppBarClipboardButton extends StatelessWidget {
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            child: const Text('Paste'),
+                            child: Text(context.l10n.paste),
                           ),
                         ],
                       ],

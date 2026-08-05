@@ -1,3 +1,5 @@
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
 import 'filesystem_type.dart';
 import 'name_validation.dart';
 
@@ -64,8 +66,8 @@ class PathComponents {
   /// operation on a folder whose own name is fine on the real volume but
   /// happens not to fit this conservative approximation of it. Only [name]
   /// — the one thing actually being typed right now — is validated.
-  PathBuildResult validateAndBuild() {
-    final nameResult = validateEntryName(name, fsType, entryType: type);
+  PathBuildResult validateAndBuild(AppLocalizations l10n) {
+    final nameResult = validateEntryName(name, fsType, entryType: type, l10n: l10n);
     if (nameResult.issues.isNotEmpty) return PathBuildFailure(nameResult.issues);
 
     final allSegments = [...parentSegments, name];
@@ -76,8 +78,7 @@ class PathComponents {
       return PathBuildFailure([
         NameValidationIssue(
           reason: NameValidationReason.componentTooLong,
-          message: 'The full path is ${path.length} characters long; '
-              '${fsType.label} allows at most ${rules.maxPathLength}.',
+          message: l10n.validationPathTooLong(path.length, fsType.label(l10n), rules.maxPathLength),
         ),
       ]);
     }

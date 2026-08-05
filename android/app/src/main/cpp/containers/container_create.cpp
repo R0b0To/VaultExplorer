@@ -410,8 +410,12 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
         const bool useExt = strncasecmp(fileSystem, "ext2", 4) == 0 ||
                             strncasecmp(fileSystem, "ext3", 4) == 0 ||
                             strncasecmp(fileSystem, "ext4", 4) == 0;
-        if (!useExt) {
-            LOGI("createLuksContainer: unsupported filesystem '%s' (LUKS supports ext2/ext3/ext4 only)", fileSystem);
+        const bool useExFat = (strncasecmp(fileSystem, "exfat", 5) == 0);
+        const bool useNtfs  = (strncasecmp(fileSystem, "ntfs", 4) == 0);
+        const bool useFat   = !useExt && !useExFat && !useNtfs &&
+                              (strncasecmp(fileSystem, "fat", 3) == 0);
+        if (!useExt && !useExFat && !useNtfs && !useFat) {
+            LOGI("createLuksContainer: unsupported filesystem '%s'", fileSystem);
             break;
         }
         if (luksVersion != 1 && luksVersion != 2) {
@@ -558,7 +562,28 @@ bool createLuksContainer(int fd, const char* password, int pim, int64_t sizeByte
             break;
         }
 
-        const bool formatted = formatExtVolume(volId, fileSystem);
+        bool formatted = false;
+        if (useExt) {
+            formatted = formatExtVolume(volId, fileSystem);
+        } else if (useNtfs) {
+            char deviceName[16];
+            std::snprintf(deviceName, sizeof(deviceName), "ve%d", volId);
+            char* args[] = {
+                const_cast<char*>("mkntfs"), const_cast<char*>("-F"),
+                const_cast<char*>("-Q"), const_cast<char*>("-s"),
+                const_cast<char*>("512"), const_cast<char*>("-p"),
+                const_cast<char*>("0"), deviceName, nullptr
+            };
+            formatted = (vaultexplorer_mkntfs_main(8, args) == 0);
+        } else {
+            MKFS_PARM mp;
+            memset(&mp, 0, sizeof(mp));
+            mp.fmt = (useExFat ? FM_EXFAT : (FM_FAT | FM_FAT32)) | FM_SFD;
+            mp.n_fat = 1; mp.n_root = 512; mp.au_size = 0; mp.align = 0;
+            alignas(16) unsigned char mkfsBuf[MKFS_WORK_BUF_SIZE];
+            formatted = (f_mkfs(drivePaths[volId], &mp, mkfsBuf, sizeof(mkfsBuf)) == FR_OK);
+            f_mount(nullptr, drivePaths[volId], 0);
+        }
 
         {
             std::lock_guard<std::mutex> vlock(v.mutex);

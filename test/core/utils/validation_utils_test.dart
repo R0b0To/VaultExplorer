@@ -1,7 +1,10 @@
 import 'package:test/test.dart';
 import 'package:vaultexplorer/core/utils/validation_utils.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations_en.dart';
 
 void main() {
+  final l10n = AppLocalizationsEn();
+
   group('clampPim', () {
     test('passes through in-range values unchanged', () {
       expect(clampPim(0), 0);
@@ -50,6 +53,7 @@ void main() {
           hasHiddenKeyfiles: hasHiddenKeyfiles,
           outerKeyfileUris: outerKeyfileUris,
           hiddenKeyfileUris: hiddenKeyfileUris,
+          l10n: l10n,
         );
 
     test('accepts a well-formed request and returns the byte size', () {

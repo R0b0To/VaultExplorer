@@ -1,3 +1,5 @@
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
 import '../utils/raw_entry.dart';
 
 /// Result of checking a candidate name against a directory's existing
@@ -28,18 +30,17 @@ class EntryConflictResult {
 
   bool get isConflict => kind != EntryConflictKind.none;
 
-  String? message(String candidateName) {
+  String? message(AppLocalizations l10n, String candidateName) {
     switch (kind) {
       case EntryConflictKind.none:
         return null;
       case EntryConflictKind.sameType:
-        final noun = existing!.isDir ? 'folder' : 'file';
-        return 'A $noun named "$candidateName" already exists here.';
+        final noun = existing!.isDir ? l10n.nounFolder : l10n.nounFile;
+        return l10n.conflictSameType(noun, candidateName);
       case EntryConflictKind.crossType:
-        final existingNoun = existing!.isDir ? 'folder' : 'file';
-        final candidateNoun = existing!.isDir ? 'file' : 'folder';
-        return 'A $existingNoun named "$candidateName" already exists here '
-            '— it can\'t share a name with a $candidateNoun.';
+        final existingNoun = existing!.isDir ? l10n.nounFolder : l10n.nounFile;
+        final candidateNoun = existing!.isDir ? l10n.nounFile : l10n.nounFolder;
+        return l10n.conflictCrossType(existingNoun, candidateName, candidateNoun);
     }
   }
 }

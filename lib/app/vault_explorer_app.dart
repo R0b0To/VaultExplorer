@@ -1,13 +1,21 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/decoy/decoy_water_tracker_screen.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 String appVersion = '0.0.0';
 final ValueNotifier<ThemeMode> appThemeModeNotifier = ValueNotifier(ThemeMode.system);
+
+/// `null` = follow the system locale. Otherwise one of
+/// [AppLocalizations.supportedLocales], set from `AppSettings.languageCode`
+/// at startup (`runDeferredStartupWork`) and live-updated from the language
+/// picker in [AppSettingsScreen] the same way [appThemeModeNotifier] is.
+final ValueNotifier<Locale?> appLocaleNotifier = ValueNotifier(null);
 
 class VaultExplorerApp extends StatelessWidget {
   const VaultExplorerApp({super.key});
@@ -17,12 +25,20 @@ class VaultExplorerApp extends StatelessWidget {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: appThemeModeNotifier,
       builder: (context, themeMode, child) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          theme: buildLightTheme(),
-          darkTheme: buildDarkTheme(),
-          themeMode: themeMode,
-          home: const _DisguiseModeGate(),
+        return ValueListenableBuilder<Locale?>(
+          valueListenable: appLocaleNotifier,
+          builder: (context, locale, child) {
+            return MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: buildLightTheme(),
+              darkTheme: buildDarkTheme(),
+              themeMode: themeMode,
+              locale: locale,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const _DisguiseModeGate(),
+            );
+          },
         );
       },
     );
@@ -47,7 +63,7 @@ class _DisguiseModeGateState extends State<_DisguiseModeGate> {
 
   Future<void> _resolveMode() async {
     final mode = await disguiseModeApi.getMode();
-    applyDisguiseModeTaskSwitcherLabel(mode);
+    if (mounted) applyDisguiseModeTaskSwitcherLabel(mode, context.l10n);
     if (mounted) setState(() => _mode = mode);
   }
 
@@ -63,11 +79,11 @@ class _DisguiseModeGateState extends State<_DisguiseModeGate> {
   }
 }
 
-void applyDisguiseModeTaskSwitcherLabel(DisguiseMode mode) {
+void applyDisguiseModeTaskSwitcherLabel(DisguiseMode mode, AppLocalizations l10n) {
   unawaited(
     SystemChrome.setApplicationSwitcherDescription(
       ApplicationSwitcherDescription(
-        label: mode == DisguiseMode.decoy ? 'Hydro Tracker' : 'Vault Explorer',
+        label: mode == DisguiseMode.decoy ? l10n.appNameHydroTracker : l10n.appNameVaultExplorer,
       ),
     ),
   );

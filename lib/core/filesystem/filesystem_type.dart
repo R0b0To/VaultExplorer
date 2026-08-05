@@ -1,3 +1,5 @@
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
+
 /// The concrete filesystem (or vault-format equivalent) that a name is
 /// being validated against. See docs/architecture.md, ADR-002 and §5.4/§1.
 ///
@@ -40,14 +42,18 @@ enum FilesystemType {
   /// under-restrict just because the concrete type is unknown.
   unknownConservative;
 
-  /// Short label for error messages, e.g. "NTFS", "ext2/3/4".
-  String get label => switch (this) {
+  /// Short label for error messages, e.g. "NTFS", "ext2/3/4". Filesystem
+  /// format names are technical terms and are intentionally left
+  /// untranslated across every locale (see implementation_plan.md's open
+  /// question on VeraCrypt/LUKS-style jargon) — only the two generic,
+  /// natural-language fallbacks are localized.
+  String label(AppLocalizations l10n) => switch (this) {
         FilesystemType.fat32 => 'FAT32',
         FilesystemType.exfat => 'exFAT',
         FilesystemType.ntfs => 'NTFS',
         FilesystemType.ext => 'ext2/3/4',
-        FilesystemType.encryptedVault => 'this encrypted vault',
-        FilesystemType.unknownConservative => 'this container',
+        FilesystemType.encryptedVault => l10n.filesystemLabelEncryptedVault,
+        FilesystemType.unknownConservative => l10n.filesystemLabelThisContainer,
       };
 }
 

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 
@@ -108,7 +109,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
       setState(() {
         _isLoading = false;
         _hasError = true;
-        _errorMessage = 'No PDF source provided.';
+        _errorMessage = context.l10n.pdfViewerNoSourceProvided;
       });
     }
   }
@@ -124,7 +125,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
         setState(() {
           _isLoading = false;
           _hasError = true;
-          _errorMessage = 'PDF file is empty or unreadable.';
+          _errorMessage = context.l10n.pdfViewerFileEmpty;
         });
         return;
       }
@@ -137,7 +138,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
       setState(() {
         _isLoading = false;
         _hasError = true;
-        _errorMessage = 'Failed to inspect PDF file size: $e';
+        _errorMessage = context.l10n.pdfViewerFailedToInspectSize('$e');
       });
     }
   }
@@ -265,8 +266,8 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
       autofocus: true,
       textInputAction: TextInputAction.search,
       style: TextStyle(color: cs.onSurface),
-      decoration: const InputDecoration(
-        hintText: 'Search in document',
+      decoration: InputDecoration(
+        hintText: context.l10n.pdfViewerSearchHint,
         border: InputBorder.none,
       ),
       onChanged: _onSearchChanged,
@@ -282,8 +283,8 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
               _searchTotal > 0
-                  ? '$_searchCurrent / $_searchTotal'
-                  : 'No matches',
+                  ? context.l10n.xOfYCounter(_searchCurrent, _searchTotal)
+                  : context.l10n.pdfViewerNoMatches,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
@@ -292,17 +293,17 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
         ),
       IconButton(
         icon: const Icon(Icons.keyboard_arrow_up_rounded),
-        tooltip: 'Previous match',
+        tooltip: context.l10n.pdfViewerPreviousMatch,
         onPressed: _searchTotal > 0 ? _findPrevious : null,
       ),
       IconButton(
         icon: const Icon(Icons.keyboard_arrow_down_rounded),
-        tooltip: 'Next match',
+        tooltip: context.l10n.pdfViewerNextMatch,
         onPressed: _searchTotal > 0 ? _findNext : null,
       ),
       IconButton(
         icon: const Icon(Icons.close_rounded),
-        tooltip: 'Close search',
+        tooltip: context.l10n.pdfViewerCloseSearch,
         onPressed: _stopSearch,
       ),
     ];
@@ -314,7 +315,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
         _buildPageCounter(cs),
         IconButton(
           icon: const Icon(Icons.search_rounded),
-          tooltip: 'Search',
+          tooltip: context.l10n.search,
           onPressed: _startSearch,
         ),
         ...?widget.extraActionsBuilder?.call(_controller),
@@ -330,7 +331,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: Text(
-            '$_currentPage / $_pageCount',
+            context.l10n.xOfYCounter(_currentPage, _pageCount),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: cs.onSurfaceVariant,
                 ),
@@ -355,7 +356,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
                     color: cs.error, size: 48),
                 const SizedBox(height: 16),
                 Text(
-                  'Cannot open PDF',
+                  context.l10n.pdfViewerCannotOpenTitle,
                   style: Theme.of(context)
                       .textTheme
                       .titleMedium
@@ -371,7 +372,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
                 OutlinedButton.icon(
                   onPressed: () => Navigator.of(context).pop(),
                   icon: const Icon(Icons.arrow_back_rounded),
-                  label: const Text('Go back'),
+                  label: Text(context.l10n.goBack),
                 ),
               ],
             ),
@@ -383,13 +384,13 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
     if (_isLoading) {
       return Container(
         color: cs.surface,
-        child: const Center(
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(strokeWidth: 2.5),
-              SizedBox(height: 16),
-              Text('Loading document…'),
+              const CircularProgressIndicator(strokeWidth: 2.5),
+              const SizedBox(height: 16),
+              Text(context.l10n.pdfViewerLoadingDocument),
             ],
           ),
         ),
@@ -429,7 +430,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
                     color: cs.error, size: 48),
                 const SizedBox(height: 16),
                 Text(
-                  'Error loading PDF',
+                  context.l10n.pdfViewerErrorLoadingTitle,
                   style: Theme.of(context)
                       .textTheme
                       .titleMedium
@@ -488,7 +489,7 @@ class _PdfViewerBaseState extends State<PdfViewerBase> {
 
     return Container(
       color: cs.surface,
-      child: const Center(child: Text('No PDF document loaded.')),
+      child: Center(child: Text(context.l10n.pdfViewerNoDocumentLoaded)),
     );
   }
 }
@@ -528,25 +529,25 @@ class _GoToPageDialogState extends State<_GoToPageDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Go to page'),
+      title: Text(context.l10n.pdfViewerGoToPageTitle),
       content: TextField(
         controller: _controller,
         keyboardType: TextInputType.number,
         autofocus: true,
         decoration: InputDecoration(
-          hintText: 'Page number (1 - ${widget.pageCount})',
-          labelText: 'Page',
+          hintText: context.l10n.pdfViewerPageNumberHint(widget.pageCount),
+          labelText: context.l10n.pdfViewerPageLabel,
         ),
         onSubmitted: (_) => _submit(),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.cancel),
         ),
         TextButton(
           onPressed: _submit,
-          child: const Text('Go'),
+          child: Text(context.l10n.pdfViewerGoButton),
         ),
       ],
     );

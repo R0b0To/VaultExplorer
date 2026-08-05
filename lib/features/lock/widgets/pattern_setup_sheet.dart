@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
 
 /// Bottom sheet that guides the user through setting up a pattern lock.
@@ -27,7 +28,7 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
   Future<void> _onPatternComplete(List<int> pattern) async {
     if (pattern.length < 4) {
       setState(() {
-        _error = 'Connect at least 4 dots';
+        _error = context.l10n.connectAtLeast4Dots;
         _showError = true;
       });
       Future.delayed(const Duration(milliseconds: 800), () {
@@ -58,7 +59,7 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
           if (mounted) Navigator.pop(context, hash);
         } else {
           setState(() {
-            _error = 'Patterns don\'t match — try again';
+            _error = context.l10n.patternsDontMatch;
             _showError = true;
           });
           Future.delayed(const Duration(milliseconds: 800), () {
@@ -84,13 +85,13 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
     final mq = MediaQuery.of(context);
 
     final title = _step == _SetupStep.draw
-        ? 'Draw your unlock pattern'
-        : 'Confirm your pattern';
+        ? context.l10n.drawUnlockPatternTitle
+        : context.l10n.confirmPatternTitle;
     final subtitle = _showError
         ? (_error ?? '')
         : (_step == _SetupStep.draw
-              ? 'Connect at least 4 dots'
-              : 'Draw the same pattern again');
+              ? context.l10n.connectAtLeast4Dots
+              : context.l10n.drawSamePatternAgain);
 
     return Padding(
       padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
@@ -147,7 +148,7 @@ class _PatternSetupSheetState extends State<PatternSetupSheet> {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(
-                  'Cancel',
+                  context.l10n.cancel,
                   style: textTheme.labelLarge?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),

@@ -1,0 +1,1902 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for English (`en`).
+class AppLocalizationsEn extends AppLocalizations {
+  AppLocalizationsEn([String locale = 'en']) : super(locale);
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get search => 'Search';
+
+  @override
+  String get goBack => 'Go back';
+
+  @override
+  String xOfYCounter(int current, int total) {
+    return '$current / $total';
+  }
+
+  @override
+  String get pdfViewerGoToPageTitle => 'Go to page';
+
+  @override
+  String pdfViewerPageNumberHint(int pageCount) {
+    return 'Page number (1 - $pageCount)';
+  }
+
+  @override
+  String get pdfViewerPageLabel => 'Page';
+
+  @override
+  String get pdfViewerGoButton => 'Go';
+
+  @override
+  String get pdfViewerSearchHint => 'Search in document';
+
+  @override
+  String get pdfViewerNoMatches => 'No matches';
+
+  @override
+  String get pdfViewerPreviousMatch => 'Previous match';
+
+  @override
+  String get pdfViewerNextMatch => 'Next match';
+
+  @override
+  String get pdfViewerCloseSearch => 'Close search';
+
+  @override
+  String get pdfViewerPrintTooltip => 'Print document';
+
+  @override
+  String get pdfViewerLoadingDocument => 'Loading document…';
+
+  @override
+  String get pdfViewerCannotOpenTitle => 'Cannot open PDF';
+
+  @override
+  String get pdfViewerFailedToLoad => 'Failed to load PDF';
+
+  @override
+  String get paste => 'Paste';
+
+  @override
+  String get clear => 'Clear';
+
+  @override
+  String get clipboardVerbMove => 'Move';
+
+  @override
+  String get clipboardVerbCopy => 'Copy';
+
+  @override
+  String clipboardTooltipInteractive(String verb, int count) {
+    return '$verb ($count) — Tap details, long press to paste';
+  }
+
+  @override
+  String clipboardTooltipViewOnly(String verb, int count) {
+    return '$verb ($count) — Clipboard details';
+  }
+
+  @override
+  String clipboardSourceLabel(String source) {
+    return 'Source: $source';
+  }
+
+  @override
+  String get clipboardDefaultSourceName => 'Vault';
+
+  @override
+  String clipboardHeaderCount(String verb, num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# items',
+      one: '1 item',
+    );
+    return '$verb $_temp0';
+  }
+
+  @override
+  String clipboardMoreItems(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '+# more items',
+      one: '+1 more item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get advancedParametersTitle => 'Advanced Parameters';
+
+  @override
+  String get pimFieldLabel => 'PIM  (leave blank for default)';
+
+  @override
+  String get encryptionAlgorithmLabel => 'Encryption Algorithm';
+
+  @override
+  String get hashAlgorithmLabel => 'Hash Algorithm';
+
+  @override
+  String get clipboardVerbMoving => 'Moving';
+
+  @override
+  String get clipboardVerbCopying => 'Copying';
+
+  @override
+  String clipboardPillTitle(String verb, num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# items',
+      one: '1 item',
+    );
+    return '$verb $_temp0';
+  }
+
+  @override
+  String clipboardFromSourceSuffix(String source) {
+    return ' from \"$source\"';
+  }
+
+  @override
+  String get clipboardOpenContainerToPaste => 'Open a container to paste';
+
+  @override
+  String get keyfilesOptionalLabel => 'Keyfiles (optional)';
+
+  @override
+  String get addFile => 'Add File';
+
+  @override
+  String get noKeyfilesAttached => 'No keyfiles attached';
+
+  @override
+  String get completed => 'Completed';
+
+  @override
+  String get dismiss => 'Dismiss';
+
+  @override
+  String byteProgressText(String transferred, String total, int pct) {
+    return '$transferred / $total  ($pct%)';
+  }
+
+  @override
+  String countProgressText(int done, int total, int pct) {
+    return '$done / $total  ($pct%)';
+  }
+
+  @override
+  String multiOpLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# transfers',
+      one: '1 transfer',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String multiOpSublabel(String summary) {
+    return '$summary · tap to view all';
+  }
+
+  @override
+  String get thumbnailSizeResolutionLabel => 'Thumbnail Size (Resolution)';
+
+  @override
+  String get jpegCompressionQualityLabel => 'JPEG Compression Quality';
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get confirm => 'Confirm';
+
+  @override
+  String get couldNotPickKeyfiles => 'Could not pick keyfiles';
+
+  @override
+  String get filesystemLabelEncryptedVault => 'this encrypted vault';
+
+  @override
+  String get filesystemLabelThisContainer => 'this container';
+
+  @override
+  String get nounFile => 'file';
+
+  @override
+  String get nounFolder => 'folder';
+
+  @override
+  String get nounFileCapitalized => 'File';
+
+  @override
+  String get nounFolderCapitalized => 'Folder';
+
+  @override
+  String get unitBytes => 'bytes';
+
+  @override
+  String get unitCharacters => 'characters';
+
+  @override
+  String get validationEmptyName => 'The name cannot be empty.';
+
+  @override
+  String validationReservedNavName(String name, String noun) {
+    return '\"$name\" is a reserved navigation name and can\'t be used as a $noun name.';
+  }
+
+  @override
+  String validationIllegalChar(String char, int position, String fsLabel) {
+    return '\"$char\" at position $position is not allowed in a name on $fsLabel.';
+  }
+
+  @override
+  String validationControlChar(int position, String code, String fsLabel) {
+    return 'Position $position contains a non-printable control character (code $code), which is not allowed on $fsLabel.';
+  }
+
+  @override
+  String validationReservedDeviceName(String name, String fsLabel) {
+    return '\"$name\" is a reserved device name on $fsLabel (matches CON, PRN, AUX, NUL, COM0–9, or LPT0–9) and can\'t be used, with or without a file extension.';
+  }
+
+  @override
+  String validationTrailingSpace(String noun, String fsLabel) {
+    return '$noun names can\'t end with a space on $fsLabel';
+  }
+
+  @override
+  String validationTrailingDot(String noun, String fsLabel) {
+    return '$noun names can\'t end with a \".\" on $fsLabel';
+  }
+
+  @override
+  String validationNameTooLong(
+    int length,
+    String unit,
+    String fsLabel,
+    int maxLength,
+    String noun,
+  ) {
+    return 'This name is $length $unit long; $fsLabel allows at most $maxLength $unit per $noun name.';
+  }
+
+  @override
+  String validationPathTooLong(int length, String fsLabel, int maxLength) {
+    return 'The full path is $length characters long; $fsLabel allows at most $maxLength.';
+  }
+
+  @override
+  String conflictSameType(String noun, String name) {
+    return 'A $noun named \"$name\" already exists here.';
+  }
+
+  @override
+  String conflictCrossType(
+    String existingNoun,
+    String name,
+    String candidateNoun,
+  ) {
+    return 'A $existingNoun named \"$name\" already exists here — it can\'t share a name with a $candidateNoun.';
+  }
+
+  @override
+  String get readOnlyContainerWarning => 'This container is mounted read-only.';
+
+  @override
+  String deleteItemsTitle(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Delete # items?',
+      one: 'Delete 1 item?',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get deleteFoldersWarning =>
+      'These items will be permanently deleted, including all contents of any selected folders.';
+
+  @override
+  String get deleteFilesWarning =>
+      'These items will be permanently erased from your encrypted volume.';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get create => 'Create';
+
+  @override
+  String get rename => 'Rename';
+
+  @override
+  String renameMultipleTitle(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Rename # items',
+      one: 'Rename 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get newFolderTitle => 'New Folder';
+
+  @override
+  String get newTextFileTitle => 'New Text File';
+
+  @override
+  String get folderNameHint => 'Folder name';
+
+  @override
+  String get filenameHint => 'filename.txt';
+
+  @override
+  String get newNameHint => 'New name';
+
+  @override
+  String get baseNameHint => 'Base name';
+
+  @override
+  String couldntCreateItem(String name) {
+    return 'Couldn\'t create \"$name\" — check the container is still mounted';
+  }
+
+  @override
+  String couldntRenameSingle(String name) {
+    return 'Couldn\'t rename \"$name\" — an item with that name may already exist';
+  }
+
+  @override
+  String couldntRenameMultiWithReason(num count, String reason) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Couldn\'t rename # items: $reason',
+      one: 'Couldn\'t rename 1 item: $reason',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String couldntRenameMultiNoReason(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Couldn\'t rename # items',
+      one: 'Couldn\'t rename 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get hiddenVolumeErrorInvalidSize =>
+      'Enter a valid hidden size greater than 0';
+
+  @override
+  String get hiddenVolumeErrorTooLargeVsOuter =>
+      'Hidden volume size must be less than the outer volume size';
+
+  @override
+  String get hiddenVolumeErrorTooLargeForContainer =>
+      'Hidden volume size is too large for this container size';
+
+  @override
+  String get hiddenVolumeErrorCredentialsRequired =>
+      'A hidden password or keyfile is required when creating a hidden volume';
+
+  @override
+  String get hiddenVolumeErrorCredentialsMustDiffer =>
+      'Hidden volume credentials (password, PIM, and keyfiles) cannot be identical to the outer volume credentials.';
+
+  @override
+  String get vaultItemTypePassword => 'Password';
+
+  @override
+  String get vaultItemTypePaymentCard => 'Payment Card';
+
+  @override
+  String get vaultItemTypeIdentity => 'Identity';
+
+  @override
+  String get vaultItemTypeSecureNote => 'Secure Note';
+
+  @override
+  String get vaultItemTypeBankAccount => 'Bank Account';
+
+  @override
+  String get vaultItemTypeSoftwareLicense => 'Software License';
+
+  @override
+  String get fieldUsernameEmail => 'Username / Email';
+
+  @override
+  String get fieldPassword => 'Password';
+
+  @override
+  String get fieldWebsiteUrl => 'Website URL';
+
+  @override
+  String get fieldTotpSecret => 'TOTP Secret (2FA)';
+
+  @override
+  String get fieldNotes => 'Notes';
+
+  @override
+  String get fieldCardholderName => 'Cardholder Name';
+
+  @override
+  String get fieldCardNumber => 'Card Number';
+
+  @override
+  String get fieldExpiryMMYY => 'Expiry (MM/YY)';
+
+  @override
+  String get fieldCvvCvc => 'CVV / CVC';
+
+  @override
+  String get fieldPin => 'PIN';
+
+  @override
+  String get fieldIssuingBank => 'Issuing Bank';
+
+  @override
+  String get fieldFullName => 'Full Name';
+
+  @override
+  String get fieldDateOfBirth => 'Date of Birth';
+
+  @override
+  String get fieldNationality => 'Nationality';
+
+  @override
+  String get fieldPassportNumber => 'Passport Number';
+
+  @override
+  String get fieldPassportExpiry => 'Passport Expiry';
+
+  @override
+  String get fieldNationalIdSsn => 'National ID / SSN';
+
+  @override
+  String get fieldDriversLicense => 'Driver\'s License';
+
+  @override
+  String get fieldAddress => 'Address';
+
+  @override
+  String get fieldPhone => 'Phone';
+
+  @override
+  String get fieldEmail => 'Email';
+
+  @override
+  String get fieldNote => 'Note';
+
+  @override
+  String get fieldBankName => 'Bank Name';
+
+  @override
+  String get fieldAccountHolder => 'Account Holder';
+
+  @override
+  String get fieldAccountNumber => 'Account Number';
+
+  @override
+  String get fieldRoutingSortCode => 'Routing / Sort Code';
+
+  @override
+  String get fieldIban => 'IBAN';
+
+  @override
+  String get fieldSwiftBic => 'SWIFT / BIC';
+
+  @override
+  String get fieldAccountType => 'Account Type';
+
+  @override
+  String get fieldProductName => 'Product Name';
+
+  @override
+  String get fieldLicenseKey => 'License Key';
+
+  @override
+  String get fieldRegisteredTo => 'Registered To';
+
+  @override
+  String get fieldPurchaseDate => 'Purchase Date';
+
+  @override
+  String get fieldExpiryRenewalDate => 'Expiry / Renewal Date';
+
+  @override
+  String get fieldDownloadUrl => 'Download URL';
+
+  @override
+  String get fieldRegistrationEmail => 'Registration Email';
+
+  @override
+  String get titleRequired => 'Title is required';
+
+  @override
+  String newTypeTitle(String typeLabel) {
+    return 'New $typeLabel';
+  }
+
+  @override
+  String editItemTitle(String title) {
+    return 'Edit $title';
+  }
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String typeNameHint(String typeLabel) {
+    return '$typeLabel name';
+  }
+
+  @override
+  String get titleSectionLabel => 'Title';
+
+  @override
+  String get fieldsSectionLabel => 'Fields';
+
+  @override
+  String get encryptedStorageHint =>
+      'All fields are stored encrypted inside the container.';
+
+  @override
+  String copiedSuffix(String fieldLabel) {
+    return '$fieldLabel copied';
+  }
+
+  @override
+  String get copy => 'Copy';
+
+  @override
+  String get failedToSaveCheckMounted =>
+      'Failed to save — check container is still mounted';
+
+  @override
+  String get discardChangesTitle => 'Discard changes?';
+
+  @override
+  String get discardChangesMessage => 'Your unsaved changes will be lost.';
+
+  @override
+  String get discard => 'Discard';
+
+  @override
+  String get keepEditing => 'Keep editing';
+
+  @override
+  String get deleteItemTitle => 'Delete item?';
+
+  @override
+  String deleteItemMessage(String title) {
+    return '\"$title\" will be permanently deleted from the vault.';
+  }
+
+  @override
+  String get removeFromFavourites => 'Remove from favourites';
+
+  @override
+  String get addToFavourites => 'Add to favourites';
+
+  @override
+  String get edit => 'Edit';
+
+  @override
+  String labelCopiedToClipboard(String label) {
+    return '$label copied to clipboard';
+  }
+
+  @override
+  String get noFieldsFilledIn =>
+      'No fields filled in.\nTap Edit to add details.';
+
+  @override
+  String get sectionLabelDetails => 'Details';
+
+  @override
+  String get sectionLabelInfo => 'Info';
+
+  @override
+  String get metaLabelType => 'Type';
+
+  @override
+  String get metaLabelCreated => 'Created';
+
+  @override
+  String get metaLabelModified => 'Modified';
+
+  @override
+  String copyFieldTooltip(String fieldLabel) {
+    return 'Copy $fieldLabel';
+  }
+
+  @override
+  String get readOnlyCantAddItemsTooltip => 'Read-only — can\'t add items';
+
+  @override
+  String get extractArchive => 'Extract Archive';
+
+  @override
+  String get newItemTooltip => 'New item';
+
+  @override
+  String get camera => 'Camera';
+
+  @override
+  String get importFiles => 'Import Files';
+
+  @override
+  String get importFolder => 'Import Folder';
+
+  @override
+  String get secureItem => 'Secure Item';
+
+  @override
+  String get appNameVaultExplorer => 'Vault Explorer';
+
+  @override
+  String get appNameHydroTracker => 'Hydro Tracker';
+
+  @override
+  String get fileAssocInAppTextEditor => 'In-app Text Editor';
+
+  @override
+  String get fileAssocInAppMediaViewer => 'In-app Media Viewer';
+
+  @override
+  String fileAssocAppPrefix(String name) {
+    return 'App: $name';
+  }
+
+  @override
+  String get fileAssocExternalApp => 'External App';
+
+  @override
+  String get appSettingsTitle => 'App Settings';
+
+  @override
+  String get sectionSecurityPrivacy => 'Security & Privacy';
+
+  @override
+  String get sectionAppearanceInterface => 'Appearance & Interface';
+
+  @override
+  String get sectionVaultFileHandling => 'Vault & File Handling';
+
+  @override
+  String get masterPasswordTitle => 'Master Password';
+
+  @override
+  String get masterPasswordActiveSubtitle => 'Active — tap toggle to remove';
+
+  @override
+  String get masterPasswordInactiveSubtitle =>
+      'Require a password to open the app';
+
+  @override
+  String get newPasswordLabel => 'New Password';
+
+  @override
+  String get masterPasswordFieldLabel => 'Master password';
+
+  @override
+  String get confirmPasswordLabel => 'Confirm password';
+
+  @override
+  String get update => 'Update';
+
+  @override
+  String get setPassword => 'Set Password';
+
+  @override
+  String get biometricUnlockTitle => 'Biometric Unlock';
+
+  @override
+  String get biometricUnlockSubtitle => 'Use fingerprint or face recognition';
+
+  @override
+  String get changeMasterPasswordTitle => 'Change Master Password';
+
+  @override
+  String get changeMasterPasswordSubtitle =>
+      'Update master password credentials';
+
+  @override
+  String get autoLockContainersTitle => 'Auto-Lock Containers';
+
+  @override
+  String get autoLockContainersSubtitle =>
+      'Automatically lock open vaults after inactivity';
+
+  @override
+  String get autoLockTimeoutLabel => 'Auto-Lock Timeout';
+
+  @override
+  String get immediately => 'Immediately';
+
+  @override
+  String nMinutes(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# minutes',
+      one: '1 minute',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get blockScreenshotsTitle => 'Block Screenshots';
+
+  @override
+  String get blockScreenshotsSubtitle =>
+      'Prevent screenshots and hide recent apps preview';
+
+  @override
+  String get discreteModeTitle => 'Mask Mode';
+
+  @override
+  String get discreteModeActiveSubtitle =>
+      'Active — the app currently appears as \"Hydro Tracker\"';
+
+  @override
+  String get discreteModeInactiveSubtitle =>
+      'Disguise this app as a daily water tracker on the home screen';
+
+  @override
+  String get enableDiscreteModeTitle => 'Enable Mask Mode?';
+
+  @override
+  String get disableDiscreteModeTitle => 'Disable Mask Mode?';
+
+  @override
+  String get enableDiscreteModeMessage =>
+      'The app icon and name on your home screen will change to \"Hydro Tracker\". It will function as a daily water intake tracker.\n\nTo access your vault, open Hydro Tracker and hold your finger on the title or water gauge for 3 seconds.';
+
+  @override
+  String get disableDiscreteModeMessage =>
+      'The app icon and name on your home screen will change back to \"Vault Explorer\".';
+
+  @override
+  String get enable => 'Enable';
+
+  @override
+  String get disable => 'Disable';
+
+  @override
+  String get discreteModeEnabledSnack =>
+      'Mask Mode enabled. The app will close — reopen from the new launcher icon.';
+
+  @override
+  String get discreteModeDisabledSnack =>
+      'Mask Mode disabled. The app will close — reopen from the new launcher icon.';
+
+  @override
+  String get failedToChangeDiscreteMode => 'Failed to change Mask Mode';
+
+  @override
+  String get cacheDerivedKeysTitle => 'Cache Derived Keys by Default';
+
+  @override
+  String get cacheDerivedKeysSubtitle =>
+      'Store derived key material in Keystore for faster unlocks';
+
+  @override
+  String get appThemeLabel => 'App Theme';
+
+  @override
+  String get systemDefault => 'System Default';
+
+  @override
+  String get lightTheme => 'Light Theme';
+
+  @override
+  String get darkTheme => 'Dark Theme';
+
+  @override
+  String get sortContainersByLabel => 'Sort Containers By';
+
+  @override
+  String get swapCardSwipeActionsTitle => 'Swap Card Swipe Actions';
+
+  @override
+  String get swapCardSwipeActionsSubtitle =>
+      'Reveal Edit on left and Delete on right when swiping cards';
+
+  @override
+  String get swipeGestureHintTitle => 'Swipe Gesture Hint';
+
+  @override
+  String get swipeGestureHintSubtitle =>
+      'Show card peek animation on first container';
+
+  @override
+  String get autoOpenOnUnlockTitle => 'Auto-Open on Unlock';
+
+  @override
+  String get autoOpenOnUnlockActiveSubtitle =>
+      'Automatically open after unlocking a vault';
+
+  @override
+  String get autoOpenOnUnlockInactiveSubtitle =>
+      'Only unlock vault and stay on dashboard';
+
+  @override
+  String get enableJsHtmlTitle => 'Enable JavaScript in HTML Viewer';
+
+  @override
+  String get jsEnabledSubtitle => 'JavaScript enabled for local HTML files';
+
+  @override
+  String get jsDisabledSubtitle => 'JavaScript disabled for local HTML files';
+
+  @override
+  String get fastStorageAccessTitle => 'Fast Storage Access';
+
+  @override
+  String get fastStorageAccessGrantedSubtitle =>
+      'All Files Access granted (maximum speed)';
+
+  @override
+  String get fastStorageAccessNotGrantedSubtitle =>
+      'Grant All Files Access in System Settings for optimal speed';
+
+  @override
+  String get enableFastStorageAccessTitle => 'Enable Fast Storage Access';
+
+  @override
+  String get enableFastStorageAccessMessage =>
+      'Granting \"All Files Access\" allows Vault Explorer to perform direct POSIX file operations, speeding up folder vault performance by up to 1000x.';
+
+  @override
+  String get disableStorageAccessTitle => 'Disable Storage Access';
+
+  @override
+  String get disableStorageAccessMessage =>
+      'Android requires \"All Files Access\" to be turned off inside System Settings. Would you like to open Settings to turn it off?';
+
+  @override
+  String get openSettings => 'Open Settings';
+
+  @override
+  String get androidFileProviderTitle => 'Android File Provider (default)';
+
+  @override
+  String get androidFileProviderSubtitle =>
+      'Expose new containers to Android File Picker by default';
+
+  @override
+  String get thumbnailCachingDefaultLabel => 'Thumbnail Caching (default)';
+
+  @override
+  String get thumbnailQualityDefaultLabel => 'Thumbnail Quality (default)';
+
+  @override
+  String get fileAssociationsHeader => 'File Associations';
+
+  @override
+  String get noFileAssociationsYet =>
+      'No remembered file associations yet. You will be prompted when opening files.';
+
+  @override
+  String get defaultActionsHeader =>
+      'Default actions when opening non-standard files:';
+
+  @override
+  String get removeAssociationTooltip => 'Remove association';
+
+  @override
+  String get aboutAppTitle => 'About VaultExplorer';
+
+  @override
+  String versionInfoSubtitle(String version) {
+    return 'Version $version · Open source licenses & details';
+  }
+
+  @override
+  String get failedToSaveSettings => 'Failed to save settings';
+
+  @override
+  String get masterPasswordSetSnack => 'Master password set';
+
+  @override
+  String get passwordCannotBeEmpty => 'Password cannot be empty';
+
+  @override
+  String get atLeast4CharsRequired => 'At least 4 characters required';
+
+  @override
+  String get passwordsDoNotMatch => 'Passwords do not match';
+
+  @override
+  String get failedToHashPassword =>
+      'Failed to hash password — please try again';
+
+  @override
+  String get languageLabel => 'Language';
+
+  @override
+  String get biometricNotAvailable => 'Biometric not available on this device';
+
+  @override
+  String get unlockVaultExplorerReason => 'Unlock VaultExplorer';
+
+  @override
+  String biometricErrorWithCode(String code) {
+    return 'Biometric error: $code';
+  }
+
+  @override
+  String tooManyFailedAttempts(num seconds) {
+    String _temp0 = intl.Intl.pluralLogic(
+      seconds,
+      locale: localeName,
+      other: '# seconds',
+      one: '1 second',
+    );
+    return 'Too many failed attempts. Try again in $_temp0.';
+  }
+
+  @override
+  String get enterMasterPasswordPrompt => 'Enter your master password';
+
+  @override
+  String incorrectPasswordLockedFor(int seconds, num attempts) {
+    String _temp0 = intl.Intl.pluralLogic(
+      attempts,
+      locale: localeName,
+      other: '# failed attempts',
+      one: '1 failed attempt',
+    );
+    return 'Incorrect password. Locked for ${seconds}s due to $_temp0.';
+  }
+
+  @override
+  String incorrectPasswordAttempts(num attempts) {
+    String _temp0 = intl.Intl.pluralLogic(
+      attempts,
+      locale: localeName,
+      other: '# failed attempts',
+      one: '1 failed attempt',
+    );
+    return 'Incorrect password ($_temp0).';
+  }
+
+  @override
+  String get brandNameNoSpace => 'VaultExplorer';
+
+  @override
+  String get enterPasswordSubtitle => 'Enter your master password to continue';
+
+  @override
+  String get masterPasswordFieldLabelTitleCase => 'Master Password';
+
+  @override
+  String get unlock => 'Unlock';
+
+  @override
+  String get useBiometric => 'Use Biometric';
+
+  @override
+  String get connectAtLeast4Dots => 'Connect at least 4 dots';
+
+  @override
+  String get patternsDontMatch => 'Patterns don\'t match — try again';
+
+  @override
+  String get drawUnlockPatternTitle => 'Draw your unlock pattern';
+
+  @override
+  String get confirmPatternTitle => 'Confirm your pattern';
+
+  @override
+  String get drawSamePatternAgain => 'Draw the same pattern again';
+
+  @override
+  String removedFromListSnack(String name) {
+    return 'Removed \"$name\" from list';
+  }
+
+  @override
+  String get clearRecentHistoryTitle => 'Clear Recent History?';
+
+  @override
+  String get clearRecentHistoryMessage =>
+      'This will remove all recent documents from your list. The actual files on your device will not be affected.';
+
+  @override
+  String get clearAll => 'Clear All';
+
+  @override
+  String get recentHistoryClearedSnack => 'Recent history cleared';
+
+  @override
+  String get moreOptionsTooltip => 'More options';
+
+  @override
+  String get clearHistoryMenuItem => 'Clear history';
+
+  @override
+  String get openPdfFile => 'Open PDF File';
+
+  @override
+  String get noDocumentsYetTitle => 'No documents yet';
+
+  @override
+  String get openPdfToStartMessage =>
+      'Open a PDF from your device to start reading.';
+
+  @override
+  String get removeFromListMenuItem => 'Remove from list';
+
+  @override
+  String get justNow => 'Just now';
+
+  @override
+  String minutesAgo(int count) {
+    return '${count}m ago';
+  }
+
+  @override
+  String hoursAgo(int count) {
+    return '${count}h ago';
+  }
+
+  @override
+  String daysAgo(int count) {
+    return '${count}d ago';
+  }
+
+  @override
+  String get usbDriveDisconnectedLocked =>
+      'USB drive disconnected — container locked';
+
+  @override
+  String get containerAlreadyMounted => 'This container is already mounted.';
+
+  @override
+  String get addAVaultTitle => 'Add a vault';
+
+  @override
+  String get mountExistingContainerTitle => 'Mount existing container';
+
+  @override
+  String get mountExistingContainerSubtitle =>
+      'Unlock a file container you already have';
+
+  @override
+  String get mountUsbDriveTitle => 'Mount USB Drive';
+
+  @override
+  String get mountUsbDriveSubtitle =>
+      'Unlock a container on an OTG flash drive';
+
+  @override
+  String get formatUsbDriveTitle => 'Format USB drive';
+
+  @override
+  String get formatUsbDriveSubtitle =>
+      'Erase a drive and create a new encrypted container on it';
+
+  @override
+  String get createNewContainerTitle => 'Create new container';
+
+  @override
+  String get createNewContainerSubtitle => 'Format a brand-new encrypted vault';
+
+  @override
+  String get lockBeforeRemovingWarning =>
+      'Lock the container before removing it.';
+
+  @override
+  String get settingsTooltip => 'Settings';
+
+  @override
+  String get addVaultFabLabel => 'Add vault';
+
+  @override
+  String removedLabelUndo(String label) {
+    return 'Removed \"$label\"';
+  }
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String get pdfViewerNoSourceProvided => 'No PDF source provided.';
+
+  @override
+  String get pdfViewerFileEmpty => 'PDF file is empty or unreadable.';
+
+  @override
+  String pdfViewerFailedToInspectSize(String error) {
+    return 'Failed to inspect PDF file size: $error';
+  }
+
+  @override
+  String get pdfViewerErrorLoadingTitle => 'Error loading PDF';
+
+  @override
+  String get pdfViewerNoDocumentLoaded => 'No PDF document loaded.';
+
+  @override
+  String get goalReachedSnack =>
+      '🎉 Daily hydration goal reached! Streak increased!';
+
+  @override
+  String get addWaterDialogTitle => 'Add Water';
+
+  @override
+  String amountWithUnitLabel(String unit) {
+    return 'Amount ($unit)';
+  }
+
+  @override
+  String get add => 'Add';
+
+  @override
+  String get resetTodayTitle => 'Reset Today\'s Water Log?';
+
+  @override
+  String get resetTodayMessage =>
+      'This will reset your logged water intake for today to 0.';
+
+  @override
+  String get reset => 'Reset';
+
+  @override
+  String get resetTodayTooltip => 'Reset Today';
+
+  @override
+  String get unitsTooltip => 'Units';
+
+  @override
+  String get metricUnitLabel => 'Metric (ml)';
+
+  @override
+  String get imperialUnitLabel => 'Imperial (fl oz)';
+
+  @override
+  String streakBadge(int count) {
+    return '$count Day Streak';
+  }
+
+  @override
+  String goalProgressLabel(String goal, int percent) {
+    return 'Goal: $goal ($percent%)';
+  }
+
+  @override
+  String get quickLogHeader => 'QUICK LOG';
+
+  @override
+  String get quickAddGlass => 'Glass';
+
+  @override
+  String get quickAddBottle => 'Bottle';
+
+  @override
+  String get quickAddLarge => 'Large';
+
+  @override
+  String get quickAddCustom => 'Custom';
+
+  @override
+  String quickAddDisplay(int amount, String unit) {
+    return '+$amount $unit';
+  }
+
+  @override
+  String get unitMl => 'ml';
+
+  @override
+  String get unitFlOz => 'fl oz';
+
+  @override
+  String get dailyHydrationTipTitle => 'Daily Hydration Tip';
+
+  @override
+  String get hydrationTipBody =>
+      'Drink a glass of water right after waking up to kickstart your metabolism.';
+
+  @override
+  String couldNotExpose(String name) {
+    return 'Could not expose \"$name\".';
+  }
+
+  @override
+  String nowAvailableToOtherApps(String name) {
+    return '\"$name\" is now available to other apps.';
+  }
+
+  @override
+  String couldNotUnmount(String name) {
+    return 'Could not unmount \"$name\".';
+  }
+
+  @override
+  String pinnedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Pinned # items',
+      one: 'Pinned 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String unpinnedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Unpinned # items',
+      one: 'Unpinned 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get readOnlyThumbnailWarning =>
+      'Read-only mount — thumbnails will show but won\'t be saved inside the container this session.';
+
+  @override
+  String failedLoadingFolder(String type) {
+    return 'Failed loading folder: $type';
+  }
+
+  @override
+  String failedToReadArchive(String type) {
+    return 'Failed to read archive: $type';
+  }
+
+  @override
+  String archiveFormatNotSupported(String ext) {
+    return 'Archive format .$ext is not yet supported';
+  }
+
+  @override
+  String get failedToReadFileFromArchive => 'Failed to read file from archive';
+
+  @override
+  String failedToExtractFile(String type) {
+    return 'Failed to extract file: $type';
+  }
+
+  @override
+  String get failedToReadSecureItem => 'Failed to read secure item';
+
+  @override
+  String get openFileDialogTitle => 'Open File';
+
+  @override
+  String chooseHowToOpen(String name) {
+    return 'Choose how to open \"$name\":';
+  }
+
+  @override
+  String get playVideoAudioViewImageInApp =>
+      'Play video/audio or view image in-app';
+
+  @override
+  String get viewEditTextMarkdownCode => 'View/edit text, markdown, code';
+
+  @override
+  String get sendFileToThirdPartyApp => 'Send file to third-party app';
+
+  @override
+  String get openAsEllipsis => 'Open As…';
+
+  @override
+  String get chooseFileTypeToOpenAs => 'Choose file type to open as';
+
+  @override
+  String alwaysRememberChoiceExt(String ext) {
+    return 'Always remember choice for .$ext files';
+  }
+
+  @override
+  String get alwaysRememberChoiceNoExt =>
+      'Always remember choice for files without extension';
+
+  @override
+  String get openAsDialogTitle => 'Open As';
+
+  @override
+  String get mimeTypeText => 'Text';
+
+  @override
+  String get mimeTypeImage => 'Image';
+
+  @override
+  String get mimeTypeVideo => 'Video';
+
+  @override
+  String get mimeTypeAudio => 'Audio';
+
+  @override
+  String get mimeTypeArchive => 'Archive';
+
+  @override
+  String get mimeTypeOther => 'Other';
+
+  @override
+  String get scanningSubfoldersForMedia => 'Scanning subfolders for media…';
+
+  @override
+  String get noMediaFilesFoundRecursive =>
+      'No media files found in this folder or its subfolders';
+
+  @override
+  String failedToScanSubfolders(String error) {
+    return 'Failed to scan subfolders: $error';
+  }
+
+  @override
+  String get noAppFoundForFileType => 'No app found for this file type';
+
+  @override
+  String couldNotOpenFile(String name) {
+    return 'Could not open \"$name\"';
+  }
+
+  @override
+  String get readOnlyCantMove =>
+      'This container is mounted read-only — items can\'t be moved from here.';
+
+  @override
+  String get readOnlyCantPaste =>
+      'This container is mounted read-only — items can\'t be pasted here.';
+
+  @override
+  String get clipboardSourceInvalid => 'Clipboard source is invalid';
+
+  @override
+  String get crossContainerPasteNotConfigured =>
+      'Cross-container paste is not configured.';
+
+  @override
+  String get crossContainerPasteRequiresBothMounted =>
+      'Cross-container paste requires both containers to remain mounted.';
+
+  @override
+  String get readOnlyCantDelete =>
+      'This container is mounted read-only — items can\'t be deleted.';
+
+  @override
+  String deletedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Deleted # items',
+      one: 'Deleted 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String deletedWithFailures(int deleted, int failed) {
+    return '$deleted deleted · $failed failed';
+  }
+
+  @override
+  String exportedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Exported # files',
+      one: 'Exported 1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get exportCancelledOrFailed => 'Export cancelled or failed';
+
+  @override
+  String exportError(String type) {
+    return 'Export error: $type';
+  }
+
+  @override
+  String get deleteOriginalTitle => 'Delete original?';
+
+  @override
+  String get deleteOriginalFolderMessage =>
+      'Delete the original folder from your device now that it has been imported?';
+
+  @override
+  String get deleteOriginalFilesMessage =>
+      'Delete the original file(s) from your device now that they have been imported?';
+
+  @override
+  String get keepOriginal => 'Keep original';
+
+  @override
+  String get deleteOriginalButton => 'Delete original';
+
+  @override
+  String deletedOriginalCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Deleted # original items',
+      one: 'Deleted 1 original item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get couldNotDeleteOriginals => 'Could not delete original(s)';
+
+  @override
+  String get videoCapturedEncrypted => 'Video captured and encrypted';
+
+  @override
+  String get photoCapturedEncrypted => 'Photo captured and encrypted';
+
+  @override
+  String cameraCaptureFailed(String type) {
+    return 'Camera capture failed: $type';
+  }
+
+  @override
+  String extractAllFilesToFolder(String folder) {
+    return 'Extract all files to the folder \"$folder\"?';
+  }
+
+  @override
+  String get extract => 'Extract';
+
+  @override
+  String extractedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Extracted # files',
+      one: 'Extracted 1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String failedToExtractGeneric(String type) {
+    return 'Failed to extract: $type';
+  }
+
+  @override
+  String get closeSearchTooltip => 'Close search';
+
+  @override
+  String get searchInThisFolderTooltip => 'Search in this folder';
+
+  @override
+  String get playMediaHereTooltip => 'Play media here';
+
+  @override
+  String get rootFolderLabel => 'Root';
+
+  @override
+  String folderPickerFailed(String error) {
+    return 'Folder picker failed: $error';
+  }
+
+  @override
+  String get selectEmptyDestinationFolderFirst =>
+      'Select an empty destination folder first';
+
+  @override
+  String get passwordRequired => 'A password is required';
+
+  @override
+  String get vaultCreatedSuccessfully => 'Vault created successfully.';
+
+  @override
+  String get vaultCreationFailedEmptyFolder =>
+      'Vault creation failed — make sure the selected folder is empty.';
+
+  @override
+  String get unknownErrorOccurred => 'Unknown error occurred';
+
+  @override
+  String get containerNameRequired => 'Container name is required';
+
+  @override
+  String get enterValidSizeGreaterThanZero =>
+      'Enter a valid size greater than 0';
+
+  @override
+  String get passwordOrKeyfileRequired =>
+      'A password or at least one keyfile is required';
+
+  @override
+  String get standardVolumePasswordsDoNotMatch =>
+      'Standard volume passwords do not match';
+
+  @override
+  String get hiddenVolumePasswordsDoNotMatch =>
+      'Hidden volume passwords do not match';
+
+  @override
+  String get containerFileCreatedSuccessfully =>
+      'Container file created successfully.';
+
+  @override
+  String get containerCreationCancelledOrFailed =>
+      'Container creation cancelled or failed.';
+
+  @override
+  String get vaultKindContainerFile => 'Container File';
+
+  @override
+  String get vaultKindFolderVault => 'Folder Vault';
+
+  @override
+  String get formatFileSystemLabel => 'Format File System';
+
+  @override
+  String get standardVolumeHeader => 'Standard Volume';
+
+  @override
+  String get containerFormatLabel => 'Container Format';
+
+  @override
+  String get fileNameLabel => 'File Name';
+
+  @override
+  String get containerSizeLabel => 'Container Size';
+
+  @override
+  String get unitLabel => 'Unit';
+
+  @override
+  String get passwordFieldLabel => 'Password';
+
+  @override
+  String get confirmPasswordFieldLabelTitleCase => 'Confirm Password';
+
+  @override
+  String get hiddenVolumeHeader => 'Hidden Volume';
+
+  @override
+  String get createHiddenVolumeToggleTitle => 'Create Hidden Volume';
+
+  @override
+  String get createInvisibleSecondaryVolume =>
+      'Create an invisible secondary volume';
+
+  @override
+  String get setOuterPasswordFirstToEnable =>
+      'Set outer password or keyfiles first to enable';
+
+  @override
+  String get hiddenPasswordLabel => 'Hidden Password';
+
+  @override
+  String get confirmHiddenPasswordLabel => 'Confirm Hidden Password';
+
+  @override
+  String get hiddenSizeLabel => 'Hidden Size';
+
+  @override
+  String get unitMbMegabytes => 'MB (Megabytes)';
+
+  @override
+  String get unitGbGigabytes => 'GB (Gigabytes)';
+
+  @override
+  String get hiddenFileSystemLabel => 'Hidden File System';
+
+  @override
+  String get vaultFormatLabel => 'Vault Format';
+
+  @override
+  String get destinationFolderLabel => 'Destination Folder';
+
+  @override
+  String get selectEmptyFolderLabel => 'Select an empty folder';
+
+  @override
+  String get tapToChooseVaultLocation =>
+      'Tap to choose where vault will be created…';
+
+  @override
+  String get folderVaultLimitationsNote =>
+      'Folder vaults don\'t support keyfiles, PIM, hidden volumes, or VeraCrypt/LUKS cipher choices.';
+
+  @override
+  String get createVaultButton => 'Create Vault';
+
+  @override
+  String get createContainerButton => 'Create Container';
+
+  @override
+  String get vaultCreationInProgressWait =>
+      'Vault creation in progress. Please wait.';
+
+  @override
+  String get containerCreationInProgressWait =>
+      'Container creation in progress. Please wait.';
+
+  @override
+  String get createEncryptedVaultTitle => 'Create Encrypted Vault';
+
+  @override
+  String get createEncryptedContainerTitle => 'Create Encrypted Container';
+
+  @override
+  String get unitMbShort => 'MB';
+
+  @override
+  String get unitGbShort => 'GB';
+
+  @override
+  String failedToListUsbDevices(String error) {
+    return 'Failed to list USB devices: $error';
+  }
+
+  @override
+  String get usbPermissionDenied => 'USB permission denied';
+
+  @override
+  String get couldNotReadDriveCapacity =>
+      'Could not read drive capacity — enter size manually.';
+
+  @override
+  String get selectUsbDriveFirst => 'Select a USB drive first';
+
+  @override
+  String eraseDeviceTitle(String name) {
+    return 'Erase \"$name\"?';
+  }
+
+  @override
+  String get eraseDeviceMessage =>
+      'This will permanently erase everything currently on this USB drive and replace it with a new encrypted container. This cannot be undone.';
+
+  @override
+  String get eraseAndCreateButton => 'Erase & Create';
+
+  @override
+  String get usbPermissionRequiredToContinue =>
+      'USB permission is required to continue';
+
+  @override
+  String get usbContainerCreatedSnack =>
+      'USB container created. Use \"Mount USB drive\" to unlock it.';
+
+  @override
+  String get usbContainerCreationFailed => 'USB container creation failed.';
+
+  @override
+  String get usbStandardVolumeSectionHeader => 'USB Drive & Standard Volume';
+
+  @override
+  String get formattingErasesEverythingWarning =>
+      'Formatting erases everything currently on the selected drive.';
+
+  @override
+  String get selectUsbDriveLabel => 'Select USB Drive';
+
+  @override
+  String get noUsbStorageDetected => 'No USB storage detected';
+
+  @override
+  String get connectOtgDriveToFormat => 'Connect an OTG drive to format';
+
+  @override
+  String get refreshListButton => 'Refresh list';
+
+  @override
+  String get readyToFormat => 'Ready to format';
+
+  @override
+  String get permissionRequired => 'Permission required';
+
+  @override
+  String get readingDriveCapacity => 'Reading drive capacity…';
+
+  @override
+  String get mustNotExceedDriveCapacity =>
+      'Must not exceed the drive\'s actual capacity.';
+
+  @override
+  String get quickFormatTitle => 'Quick Format';
+
+  @override
+  String get quickFormatDescription =>
+      'Skips zero-filling the drive. Faster, but does not securely erase old data.';
+
+  @override
+  String get eraseAndCreateContainerButton => 'Erase & Create Container';
+
+  @override
+  String get usbContainerCreationInProgressWait =>
+      'Container creation in progress. Please wait.';
+
+  @override
+  String get formatUsbDriveScreenTitle => 'Format USB Drive';
+
+  @override
+  String get playlistTransitionAnimationLabel =>
+      'Playlist Transition Animation';
+
+  @override
+  String get unlockVaultTitle => 'Unlock Vault';
+
+  @override
+  String get openContainerTitle => 'Open Container';
+
+  @override
+  String get selectContainerFileOrFolder => 'Select File or Folder';
+
+  @override
+  String get readOnlyModeLabel => 'Read-only mode';
+
+  @override
+  String get readOnlyModeSubtitle =>
+      'Prevents any write or modify operations on the vault';
+
+  @override
+  String get selectUsbDeviceLabel => 'Select USB Device';
+
+  @override
+  String get noUsbDevicesFound => 'No compatible USB storage devices found';
+
+  @override
+  String get containerConfigTitle => 'Vault Configuration';
+
+  @override
+  String get changePasswordTitle => 'Change Vault Password';
+
+  @override
+  String get confirmNewPasswordLabel => 'Confirm New Password';
+
+  @override
+  String get cameraCaptureTitle => 'Vault Camera';
+
+  @override
+  String get takingPhoto => 'Capturing photo…';
+
+  @override
+  String get savingToVault => 'Saving to vault…';
+
+  @override
+  String get noVaultSelected => 'No vault selected';
+
+  @override
+  String get mediaDiagnosticsTitle => 'Media Diagnostics';
+
+  @override
+  String get advancedViewerSettingsTitle => 'Viewer Settings';
+
+  @override
+  String get textEditorSaveConfirmTitle => 'Unsaved Changes';
+
+  @override
+  String get textEditorSaveConfirmMessage =>
+      'Do you want to save your changes before closing?';
+
+  @override
+  String get saveAndClose => 'Save & Close';
+
+  @override
+  String get discardChanges => 'Discard Changes';
+
+  @override
+  String selectionBarSelectedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items selected',
+      one: '1 item selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get selectAll => 'Select All';
+
+  @override
+  String get deselectAll => 'Deselect All';
+
+  @override
+  String get sortOptionsTitle => 'Sort Files';
+
+  @override
+  String get layoutModeList => 'List View';
+
+  @override
+  String get layoutModeGrid => 'Grid View';
+
+  @override
+  String get layoutModeMasonry => 'Masonry View';
+
+  @override
+  String get fileOperationsTitle => 'File Operations';
+
+  @override
+  String get conflictResolutionTitle => 'File Conflict';
+
+  @override
+  String get replaceExistingFile => 'Replace existing file';
+
+  @override
+  String get keepBothFiles => 'Keep both (rename new file)';
+
+  @override
+  String get skipFile => 'Skip this file';
+
+  @override
+  String get noVaultsFoundTitle => 'No Vaults Found';
+
+  @override
+  String get noVaultsFoundSubtitle =>
+      'Create a new encrypted container or add an existing vault to get started.';
+
+  @override
+  String get addExistingVaultButton => 'Add Existing Vault';
+
+  @override
+  String get sortContainersModeManual => 'Manual (drag to reorder)';
+
+  @override
+  String get sortContainersModeUnlockStatus => 'Unlock status (unlocked first)';
+
+  @override
+  String get sortContainersModeNameAZ => 'Name (A–Z)';
+
+  @override
+  String get sortContainersModeNewest => 'Newest first';
+
+  @override
+  String get sortContainersModeOldest => 'Oldest first';
+
+  @override
+  String get thumbnailCacheAppCacheLabel => 'App cache';
+
+  @override
+  String get thumbnailCacheAppCacheDesc =>
+      'Stored encrypted in the App cache. Fast; cleared automatically under storage pressure.';
+
+  @override
+  String get thumbnailCacheInContainerLabel => 'Inside container';
+
+  @override
+  String get thumbnailCacheInContainerDesc =>
+      'Stored inside the encrypted container. Protected by the container itself, but writes are slower.';
+
+  @override
+  String get thumbnailCacheDisabledLabel => 'Disabled';
+
+  @override
+  String get thumbnailCacheDisabledDesc =>
+      'No disk cache. Thumbnails are re-generated on every load.';
+}

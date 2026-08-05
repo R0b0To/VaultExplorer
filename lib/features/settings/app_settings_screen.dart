@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/features/settings/about_screen.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -27,14 +28,12 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   bool _saving = false;
   bool _hasAllStorageAccess = false;
   DisguiseMode _disguiseMode = DisguiseMode.vault;
-
   bool _showPwFields = false;
   final _pwCtrl = TextEditingController();
   final _pwConfirmCtrl = TextEditingController();
   bool _obscurePw = true;
   bool _obscureConfirm = true;
   String? _pwError;
-
   bool _biometricAvailable = false;
   final _localAuth = LocalAuthentication();
 
@@ -75,10 +74,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     if (enable) {
       final grant = await showAppConfirmDialog(
         context,
-        title: 'Enable Fast Storage Access',
-        message:
-            'Granting "All Files Access" allows Vault Explorer to perform direct POSIX file operations, speeding up folder vault performance by up to 1000x.',
-        confirmLabel: 'Open Settings',
+        title: context.l10n.enableFastStorageAccessTitle,
+        message: context.l10n.enableFastStorageAccessMessage,
+        confirmLabel: context.l10n.openSettings,
       );
       if (grant) {
         await api.requestAllFilesAccess();
@@ -86,10 +84,9 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     } else {
       final revoke = await showAppConfirmDialog(
         context,
-        title: 'Disable Storage Access',
-        message:
-            'Android requires "All Files Access" to be turned off inside System Settings. Would you like to open Settings to turn it off?',
-        confirmLabel: 'Open Settings',
+        title: context.l10n.disableStorageAccessTitle,
+        message: context.l10n.disableStorageAccessMessage,
+        confirmLabel: context.l10n.openSettings,
       );
       if (revoke) {
         await api.requestAllFilesAccess();
@@ -108,7 +105,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     const api = VaultExplorerApi();
     final hasAccess = await api.hasAllFilesAccess();
     final disguiseMode = await disguiseModeApi.getMode();
-
     if (mounted) {
       setState(() {
         _settings = s;
@@ -120,18 +116,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     }
   }
 
+  // ✅ FIXED CODE:
   Future<void> _setDiscreteMode(bool enable) async {
     final confirmed = await showAppConfirmDialog(
       context,
-      title: enable ? 'Enable Mask Mode?' : 'Disable Mask Mode?',
-      message: enable
-          ? 'The app icon and name on your home screen will change to '
-                '"Hydro Tracker". It will function as a daily water intake tracker.\n\n'
-                'To access your vault, open Hydro Tracker and hold your '
-                'finger on the title or water gauge for 3 seconds.'
-          : 'The app icon and name on your home screen will change back to '
-                '"Vault Explorer".',
-      confirmLabel: enable ? 'Enable' : 'Disable',
+      title: enable ? context.l10n.enableDiscreteModeTitle : context.l10n.disableDiscreteModeTitle,
+      message: enable ? context.l10n.enableDiscreteModeMessage : context.l10n.disableDiscreteModeMessage,
+      confirmLabel: enable ? context.l10n.enable : context.l10n.disable,
     );
     if (!confirmed || !mounted) return;
 
@@ -140,20 +131,25 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       await disguiseModeApi.setMode(targetMode);
       if (!mounted) return;
       setState(() => _disguiseMode = targetMode);
-      applyDisguiseModeTaskSwitcherLabel(targetMode);
+      applyDisguiseModeTaskSwitcherLabel(targetMode, context.l10n);
       showAppSnackBar(
         context,
         message: enable
-            ? 'Mask Mode enabled. The app will close — reopen from the new launcher icon.'
-            : 'Mask Mode disabled. The app will close — reopen from the new launcher icon.',
+            ? context.l10n.discreteModeEnabledSnack
+            : context.l10n.discreteModeDisabledSnack,
       );
+      // Close the app after a brief delay so the user sees the snackbar.
+      // A cold restart ensures the Flutter engine initialises cleanly
+      // under the new launcher-alias configuration (otherwise the
+      // activity recreation caused by the component flip can leave the
+      // engine in a stale state, especially during debug hot-reload).
       await Future<void>.delayed(const Duration(milliseconds: 1500));
       SystemNavigator.pop();
     } catch (_) {
       if (!mounted) return;
       showAppSnackBar(
         context,
-        message: 'Failed to change Mask Mode',
+        message: context.l10n.failedToChangeDiscreteMode,
         tone: AppBannerTone.error,
       );
     }
@@ -166,12 +162,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       if (mounted) {
         showAppSnackBar(
           context,
-          message: 'Failed to save settings',
+          message: context.l10n.failedToSaveSettings,
           tone: AppBannerTone.error,
         );
       }
     }
   }
+
 
   void _toggleMasterPassword(bool enabled) {
     setState(() {
@@ -193,48 +190,43 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   Future<void> _confirmPassword() async {
     final pw = _pwCtrl.text;
     final confirm = _pwConfirmCtrl.text;
-
     if (pw.isEmpty) {
-      setState(() => _pwError = 'Password cannot be empty');
+      setState(() => _pwError = context.l10n.passwordCannotBeEmpty);
       return;
     }
     if (pw.length < 4) {
-      setState(() => _pwError = 'At least 4 characters required');
+      setState(() => _pwError = context.l10n.atLeast4CharsRequired);
       return;
     }
     if (pw != confirm) {
-      setState(() => _pwError = 'Passwords do not match');
+      setState(() => _pwError = context.l10n.passwordsDoNotMatch);
       return;
     }
-
     setState(() {
       _saving = true;
       _pwError = null;
     });
-
     try {
       final (:hash, :salt) = await PasswordHasher.deriveHash(pw);
       if (!mounted) return;
       await AppSettingsService.saveMasterPassword(_settings, hash, salt);
-
       setState(() {
         _showPwFields = false;
         _pwCtrl.clear();
         _pwConfirmCtrl.clear();
         _saving = false;
       });
-
       if (mounted) {
         showAppSnackBar(
           context,
-          message: 'Master password set',
+          message: context.l10n.masterPasswordSetSnack,
           tone: AppBannerTone.success,
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _pwError = 'Failed to hash password — please try again';
+          _pwError = context.l10n.failedToHashPassword;
           _saving = false;
         });
       }
@@ -242,22 +234,21 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   }
 
   String _labelForAssociation(String value) {
-    if (value == 'editor') return 'In-app Text Editor';
-    if (value == 'media') return 'In-app Media Viewer';
-    if (value.startsWith('package:')) return 'App: ${value.substring(8)}';
-    return 'External App';
+    if (value == 'editor') return context.l10n.fileAssocInAppTextEditor;
+    if (value == 'media') return context.l10n.fileAssocInAppMediaViewer;
+    if (value.startsWith('package:')) return context.l10n.fileAssocAppPrefix(value.substring(8));
+    return context.l10n.fileAssocExternalApp;
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
-        title: const Text('App Settings',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(context.l10n.appSettingsTitle,
+            style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(strokeWidth: 2.5))
@@ -270,7 +261,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     children: [
-                      SectionHeader('Security & Privacy'),
+                      SectionHeader(context.l10n.sectionSecurityPrivacy),
                       SectionCard(
                         children: [
                           Column(
@@ -279,14 +270,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               SwitchListTile(
                                 contentPadding:
                                     const EdgeInsets.symmetric(horizontal: 16),
-                                title: Text('Master Password',
+                                title: Text(context.l10n.masterPasswordTitle,
                                     style: textTheme.bodyMedium
                                         ?.copyWith(fontWeight: FontWeight.w600)),
                                 subtitle: Text(
                                   _settings.useMasterPassword &&
                                           _settings.masterPasswordHash != null
-                                      ? 'Active — tap toggle to remove'
-                                      : 'Require a password to open the app',
+                                      ? context.l10n.masterPasswordActiveSubtitle
+                                      : context.l10n.masterPasswordInactiveSubtitle,
                                   style: textTheme.bodySmall
                                       ?.copyWith(color: cs.onSurfaceVariant),
                                 ),
@@ -310,8 +301,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                             fillColor: cs.surfaceContainerHighest,
                                             labelText:
                                                 _settings.masterPasswordHash != null
-                                                    ? 'New password'
-                                                    : 'Master password',
+                                                    ? context.l10n.newPasswordLabel
+                                                    : context.l10n.masterPasswordFieldLabel,
                                             suffixIcon: PasswordVisibilityToggle(
                                               obscured: _obscurePw,
                                               onToggle: () => setState(
@@ -329,7 +320,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                           decoration: InputDecoration(
                                             filled: true,
                                             fillColor: cs.surfaceContainerHighest,
-                                            labelText: 'Confirm password',
+                                            labelText: context.l10n.confirmPasswordLabel,
                                             suffixIcon: PasswordVisibilityToggle(
                                               obscured: _obscureConfirm,
                                               onToggle: () => setState(() =>
@@ -374,7 +365,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                                         BorderRadius.circular(12),
                                                   ),
                                                 ),
-                                                child: const Text('Cancel'),
+                                                child: Text(context.l10n.cancel),
                                               ),
                                             ),
                                             const SizedBox(width: 12),
@@ -402,8 +393,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                                     : Text(
                                                         _settings.masterPasswordHash !=
                                                                 null
-                                                            ? 'Update'
-                                                            : 'Set Password',
+                                                            ? context.l10n.update
+                                                            : context.l10n.setPassword,
                                                       ),
                                               ),
                                             ),
@@ -423,11 +414,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             SwitchListTile(
                               contentPadding:
                                   const EdgeInsets.symmetric(horizontal: 16),
-                              title: Text('Biometric Unlock',
+                              title: Text(context.l10n.biometricUnlockTitle,
                                   style: textTheme.bodyMedium
                                       ?.copyWith(fontWeight: FontWeight.w600)),
                               subtitle: Text(
-                                'Use fingerprint or face recognition',
+                                context.l10n.biometricUnlockSubtitle,
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant),
                               ),
@@ -445,14 +436,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               contentPadding:
                                   const EdgeInsets.symmetric(horizontal: 16),
                               title: Text(
-                                'Change Master Password',
+                                context.l10n.changeMasterPasswordTitle,
                                 style: textTheme.bodyMedium?.copyWith(
                                   fontWeight: FontWeight.w600,
                                   color: cs.primary,
                                 ),
                               ),
                               subtitle: Text(
-                                'Update master password credentials',
+                                context.l10n.changeMasterPasswordSubtitle,
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant),
                               ),
@@ -466,11 +457,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Auto-Lock Containers',
+                            title: Text(context.l10n.autoLockContainersTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                              'Automatically lock open vaults after inactivity',
+                              context.l10n.autoLockContainersSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -489,17 +480,17 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           ),
                           if (_settings.lockContainersOnScreenLock)
                             OptionPickerTile<int>(
-                              label: 'Auto-Lock Timeout',
+                              label: context.l10n.autoLockTimeoutLabel,
                               value: _settings.autoLockMins,
-                              options: const [
-                                SelectOption(value: 0, label: 'Immediately'),
-                                SelectOption(value: 1, label: '1 minute'),
-                                SelectOption(value: 2, label: '2 minutes'),
-                                SelectOption(value: 5, label: '5 minutes'),
-                                SelectOption(value: 10, label: '10 minutes'),
-                                SelectOption(value: 15, label: '15 minutes'),
-                                SelectOption(value: 30, label: '30 minutes'),
-                                SelectOption(value: 60, label: '60 minutes'),
+                              options: [
+                                SelectOption(value: 0, label: context.l10n.immediately),
+                                SelectOption(value: 1, label: context.l10n.nMinutes(1)),
+                                SelectOption(value: 2, label: context.l10n.nMinutes(2)),
+                                SelectOption(value: 5, label: context.l10n.nMinutes(5)),
+                                SelectOption(value: 10, label: context.l10n.nMinutes(10)),
+                                SelectOption(value: 15, label: context.l10n.nMinutes(15)),
+                                SelectOption(value: 30, label: context.l10n.nMinutes(30)),
+                                SelectOption(value: 60, label: context.l10n.nMinutes(60)),
                               ],
                               onChanged: (v) {
                                 setState(() => _settings.autoLockMins = v);
@@ -509,11 +500,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Block Screenshots',
+                            title: Text(context.l10n.blockScreenshotsTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                              'Prevent screenshots and hide recent apps preview',
+                              context.l10n.blockScreenshotsSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -527,13 +518,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Mask Mode',
+                            title: Text(context.l10n.discreteModeTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
                               _disguiseMode == DisguiseMode.decoy
-                                  ? 'Active — the app currently appears as "Hydro Tracker"'
-                                  : 'Disguise this app as a daily water tracker on the home screen',
+                                  ? context.l10n.discreteModeActiveSubtitle
+                                  : context.l10n.discreteModeInactiveSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -543,11 +534,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Cache Derived Keys by Default',
+                            title: Text(context.l10n.cacheDerivedKeysTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                              'Store derived key material in Keystore for faster unlocks',
+                              context.l10n.cacheDerivedKeysSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -561,21 +552,21 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                         ],
                       ),
                       const SizedBox(height: 16),
-                      SectionHeader('Appearance & Interface'),
+                      SectionHeader(context.l10n.sectionAppearanceInterface),
                       SectionCard(
                         children: [
                           OptionPickerTile<ThemeMode>(
-                            label: 'App Theme',
+                            label: context.l10n.appThemeLabel,
                             value: _settings.themeMode,
-                            options: const [
+                            options: [
                               SelectOption(
                                   value: ThemeMode.system,
-                                  label: 'System Default'),
+                                  label: context.l10n.systemDefault),
                               SelectOption(
                                   value: ThemeMode.light,
-                                  label: 'Light Theme'),
+                                  label: context.l10n.lightTheme),
                               SelectOption(
-                                  value: ThemeMode.dark, label: 'Dark Theme'),
+                                  value: ThemeMode.dark, label: context.l10n.darkTheme),
                             ],
                             onChanged: (v) {
                               setState(() => _settings.themeMode = v);
@@ -583,8 +574,22 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
+                          OptionPickerTile<String>(
+                            label: context.l10n.languageLabel,
+                            value: _settings.languageCode ?? 'system',
+                            options: [
+                              SelectOption(value: 'system', label: context.l10n.systemDefault),
+                              const SelectOption(value: 'en', label: 'English'),
+                            ],
+                            onChanged: (v) {
+                              final code = v == 'system' ? null : v;
+                              setState(() => _settings.languageCode = code);
+                              appLocaleNotifier.value = code != null ? Locale(code) : null;
+                              _persist();
+                            },
+                          ),
                           OptionPickerTile<ContainerSortMode>(
-                            label: 'Sort Containers By',
+                            label: context.l10n.sortContainersByLabel,
                             value: _settings.containerSortMode,
                             options: ContainerSortMode.values.map((mode) {
                               return SelectOption(
@@ -600,11 +605,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Swap Card Swipe Actions',
+                            title: Text(context.l10n.swapCardSwipeActionsTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                              'Reveal Edit on left and Delete on right when swiping cards',
+                              context.l10n.swapCardSwipeActionsSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -617,11 +622,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Swipe Gesture Hint',
+                            title: Text(context.l10n.swipeGestureHintTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                              'Show card peek animation on first container',
+                              context.l10n.swipeGestureHintSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -634,19 +639,19 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                         ],
                       ),
                       const SizedBox(height: 16),
-                      SectionHeader('Vault & File Handling'),
+                      SectionHeader(context.l10n.sectionVaultFileHandling),
                       SectionCard(
                         children: [
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Auto-Open on Unlock',
+                            title: Text(context.l10n.autoOpenOnUnlockTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
                               _settings.autoOpenOnUnlock
-                                  ? 'Automatically open after unlocking a vault'
-                                  : 'Only unlock vault and stay on dashboard',
+                                  ? context.l10n.autoOpenOnUnlockActiveSubtitle
+                                  : context.l10n.autoOpenOnUnlockInactiveSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -656,16 +661,16 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                          SwitchListTile(
+                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Enable JavaScript in HTML Viewer',
+                            title: Text(context.l10n.enableJsHtmlTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
                               _settings.htmlEnableJavaScript
-                                  ? 'JavaScript enabled for local HTML files'
-                                  : 'JavaScript disabled for local HTML files',
+                                  ? context.l10n.jsEnabledSubtitle
+                                  : context.l10n.jsDisabledSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -678,13 +683,13 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Fast Storage Access',
+                            title: Text(context.l10n.fastStorageAccessTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
                               _hasAllStorageAccess
-                                  ? 'All Files Access granted (maximum speed)'
-                                  : 'Grant All Files Access in System Settings for optimal speed',
+                                  ? context.l10n.fastStorageAccessGrantedSubtitle
+                                  : context.l10n.fastStorageAccessNotGrantedSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -694,11 +699,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Android File Provider (default)',
+                            title: Text(context.l10n.androidFileProviderTitle,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                              'Expose new containers to Android File Picker by default',
+                              context.l10n.androidFileProviderSubtitle,
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),
@@ -710,7 +715,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             },
                           ),
                           OptionPickerTile<ThumbnailCacheMode>(
-                            label: 'Thumbnail Caching (default)',
+                            label: context.l10n.thumbnailCachingDefaultLabel,
                             value: _settings.defaultThumbnailCacheMode,
                             options: ThumbnailCacheMode.values.map((mode) {
                               return SelectOption(
@@ -726,8 +731,8 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             },
                           ),
                           ThumbnailQualityTile(
-                            label: 'Thumbnail Quality (default)',
-                            value: _settings.defaultThumbnailQuality,
+                            label: context.l10n.thumbnailQualityDefaultLabel,
+                            value: _settings.defaultThumbnailQuality,                            
                             onChanged: (v) {
                               setState(
                                   () => _settings.defaultThumbnailQuality = v);
@@ -735,7 +740,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             },
                           ),
                           OptionPickerTile<PlaylistTransitionEffect>(
-                            label: 'Playlist Transition Animation',
+                            label: context.l10n.playlistTransitionAnimationLabel,
                             value: _settings.playlistTransitionEffect,
                             options: PlaylistTransitionEffect.values.map((effect) {
                               return SelectOption(
@@ -755,7 +760,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                                 child: Text(
-                                  'File Associations',
+                                  context.l10n.fileAssociationsHeader,
                                   style: textTheme.titleSmall
                                       ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
@@ -764,7 +769,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
                                   child: Text(
-                                    'No remembered file associations yet. You will be prompted when opening files.',
+                                    context.l10n.noFileAssociationsYet,
                                     style: textTheme.bodySmall?.copyWith(
                                       color: cs.onSurfaceVariant,
                                       height: 1.3,
@@ -775,7 +780,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
                                   child: Text(
-                                    'Default actions when opening non-standard files:',
+                                    context.l10n.defaultActionsHeader,
                                     style: textTheme.bodySmall?.copyWith(
                                       color: cs.onSurfaceVariant,
                                     ),
@@ -817,7 +822,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                     trailing: IconButton(
                                       icon: Icon(Icons.delete_outline_rounded,
                                           color: cs.error, size: 20),
-                                      tooltip: 'Remove association',
+                                      tooltip: context.l10n.removeAssociationTooltip,
                                       onPressed: () {
                                         setState(() => _settings.extensionPreferences
                                             .remove(entry.key));
@@ -838,12 +843,12 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
                             title: Text(
-                              'About VaultExplorer',
+                              context.l10n.aboutAppTitle,
                               style: textTheme.bodyLarge
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Text(
-                              'Version $appVersion · Open source licenses & details',
+                              context.l10n.versionInfoSubtitle(appVersion),
                               style: textTheme.bodySmall
                                   ?.copyWith(color: cs.onSurfaceVariant),
                             ),

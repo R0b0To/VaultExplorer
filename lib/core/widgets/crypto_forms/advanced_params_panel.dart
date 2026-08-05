@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
@@ -100,7 +101,7 @@ class AdvancedParamsPanel extends StatelessWidget {
         collapsedBackgroundColor: Colors.transparent,
         leading: Icon(Icons.tune_rounded, color: cs.primary),
         title: Text(
-          'Advanced Parameters',
+          context.l10n.advancedParametersTitle,
           style: textTheme.bodyMedium
               ?.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface),
         ),
@@ -123,7 +124,7 @@ class AdvancedParamsPanel extends StatelessWidget {
               decoration: InputDecoration(
                 filled: true,
                 fillColor: cs.surfaceContainerHighest,
-                labelText: 'PIM  (leave blank for default)',
+                labelText: context.l10n.pimFieldLabel,
                 prefixIcon: const Icon(Icons.password_outlined,
                     size: AppIconSize.small),
               ),
@@ -135,7 +136,7 @@ class AdvancedParamsPanel extends StatelessWidget {
             const SizedBox(height: 8),
           ],
           OptionPickerTile<int>(
-            label: 'Encryption Algorithm',
+            label: context.l10n.encryptionAlgorithmLabel,
             value: cipherId,
             prefixIcon: Icons.security_rounded,
             options: cipherOptions,
@@ -143,7 +144,7 @@ class AdvancedParamsPanel extends StatelessWidget {
             enabled: enabled,
           ),
           OptionPickerTile<int>(
-            label: 'Hash Algorithm',
+            label: context.l10n.hashAlgorithmLabel,
             value: hashId,
             prefixIcon: Icons.tag_rounded,
             options: hashOptions,

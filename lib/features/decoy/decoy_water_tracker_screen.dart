@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
@@ -74,9 +75,9 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
   String _formatVolume(int ml) {
     if (_isImperial) {
       final oz = (ml / 29.5735).round();
-      return '$oz fl oz';
+      return '$oz ${context.l10n.unitFlOz}';
     }
-    return '$ml ml';
+    return '$ml ${context.l10n.unitMl}';
   }
 
   Future<void> _addWater(int amountMl) async {
@@ -100,9 +101,9 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('🎉 Daily hydration goal reached! Streak increased!'),
-              duration: Duration(seconds: 2),
+            SnackBar(
+              content: Text(context.l10n.goalReachedSnack),
+              duration: const Duration(seconds: 2),
             ),
           );
         }
@@ -112,18 +113,18 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
 
   Future<void> _showCustomAddDialog() async {
     final controller = TextEditingController();
-    final unitLabel = _isImperial ? 'fl oz' : 'ml';
+    final unitLabel = _isImperial ? context.l10n.unitFlOz : context.l10n.unitMl;
 
     final amount = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add Water'),
+        title: Text(context.l10n.addWaterDialogTitle),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
           autofocus: true,
           decoration: InputDecoration(
-            labelText: 'Amount ($unitLabel)',
+            labelText: context.l10n.amountWithUnitLabel(unitLabel),
             suffixText: unitLabel,
             border: const OutlineInputBorder(),
           ),
@@ -132,14 +133,14 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
               final val = int.tryParse(controller.text);
               Navigator.pop(ctx, val);
             },
-            child: const Text('Add'),
+            child: Text(context.l10n.add),
           ),
         ],
       ),
@@ -155,9 +156,9 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
   Future<void> _resetToday() async {
     final confirm = await showAppConfirmDialog(
       context,
-      title: 'Reset Today\'s Water Log?',
-      message: 'This will reset your logged water intake for today to 0.',
-      confirmLabel: 'Reset',
+      title: context.l10n.resetTodayTitle,
+      message: context.l10n.resetTodayMessage,
+      confirmLabel: context.l10n.reset,
       isDestructive: true,
     );
     if (!confirm || !mounted) return;
@@ -179,24 +180,24 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
     // Quick add button amounts based on unit system
     final quickAdds = _isImperial
         ? [
-            (label: 'Glass', display: '+8 oz', ml: 237),
-            (label: 'Bottle', display: '+16 oz', ml: 473),
-            (label: 'Large', display: '+24 oz', ml: 710),
+            (label: context.l10n.quickAddGlass, display: context.l10n.quickAddDisplay(8, context.l10n.unitFlOz), ml: 237),
+            (label: context.l10n.quickAddBottle, display: context.l10n.quickAddDisplay(16, context.l10n.unitFlOz), ml: 473),
+            (label: context.l10n.quickAddLarge, display: context.l10n.quickAddDisplay(24, context.l10n.unitFlOz), ml: 710),
           ]
         : [
-            (label: 'Glass', display: '+250 ml', ml: 250),
-            (label: 'Bottle', display: '+500 ml', ml: 500),
-            (label: 'Large', display: '+750 ml', ml: 750),
+            (label: context.l10n.quickAddGlass, display: context.l10n.quickAddDisplay(250, context.l10n.unitMl), ml: 250),
+            (label: context.l10n.quickAddBottle, display: context.l10n.quickAddDisplay(500, context.l10n.unitMl), ml: 500),
+            (label: context.l10n.quickAddLarge, display: context.l10n.quickAddDisplay(750, context.l10n.unitMl), ml: 750),
           ];
 
     return Scaffold(
       appBar: AppBar(
-        title: const HiddenVaultTrigger(child: Text('Hydro Tracker')),
+        title: HiddenVaultTrigger(child: Text(context.l10n.appNameHydroTracker)),
         centerTitle: true,
         actions: [
           PopupMenuButton<bool>(
             icon: const Icon(Icons.tune_rounded),
-            tooltip: 'Units',
+            tooltip: context.l10n.unitsTooltip,
             onSelected: _setUnit,
             itemBuilder: (context) => [
               PopupMenuItem(
@@ -209,7 +210,7 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
                       color: !_isImperial ? cs.primary : Colors.transparent,
                     ),
                     const SizedBox(width: 8),
-                    const Text('Metric (ml)'),
+                    Text(context.l10n.metricUnitLabel),
                   ],
                 ),
               ),
@@ -223,7 +224,7 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
                       color: _isImperial ? cs.primary : Colors.transparent,
                     ),
                     const SizedBox(width: 8),
-                    const Text('Imperial (fl oz)'),
+                    Text(context.l10n.imperialUnitLabel),
                   ],
                 ),
               ),
@@ -231,7 +232,7 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Reset Today',
+            tooltip: context.l10n.resetTodayTooltip,
             onPressed: _resetToday,
           ),
         ],
@@ -256,7 +257,7 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
                         children: [
                           const Text('🔥 ', style: TextStyle(fontSize: 16)),
                           Text(
-                            '$_streak Day Streak',
+                            context.l10n.streakBadge(_streak),
                             style: textTheme.labelLarge?.copyWith(
                               color: const Color(0xFF0288D1),
                               fontWeight: FontWeight.bold,
@@ -301,7 +302,7 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Goal: ${_formatVolume(_goalMl)} ($percent%)',
+                                context.l10n.goalProgressLabel(_formatVolume(_goalMl), percent),
                                 style: textTheme.bodySmall?.copyWith(
                                   color: cs.onSurfaceVariant,
                                 ),
@@ -315,7 +316,7 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
 
                     // Quick Add Buttons
                     Text(
-                      'QUICK LOG',
+                      context.l10n.quickLogHeader,
                       style: textTheme.labelSmall?.copyWith(
                         color: cs.primary,
                         fontWeight: FontWeight.bold,
@@ -354,8 +355,8 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _QuickAddCard(
-                            amountText: 'Custom',
-                            label: 'Custom',
+                            amountText: context.l10n.quickAddCustom,
+                            label: context.l10n.quickAddCustom,
                             icon: Icons.add_rounded,
                             onTap: _showCustomAddDialog,
                           ),
@@ -393,14 +394,14 @@ class _DecoyWaterTrackerScreenState extends State<DecoyWaterTrackerScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Daily Hydration Tip',
+                                    context.l10n.dailyHydrationTipTitle,
                                     style: textTheme.labelMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Drink a glass of water right after waking up to kickstart your metabolism.',
+                                    context.l10n.hydrationTipBody,
                                     style: textTheme.bodySmall?.copyWith(
                                       color: cs.onSurfaceVariant,
                                     ),

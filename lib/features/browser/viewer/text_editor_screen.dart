@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -24,29 +25,36 @@ class TextEditorScreen extends StatefulWidget {
 
 class _TextEditorScreenState extends State<TextEditorScreen> {
   final TextEditingController _textController = TextEditingController();
+  late final UndoHistoryController _undoController;
+
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isAutosaving = false;
   bool _isDirty = false;
   bool _hasError = false;
   String _errorMessage = '';
   File? _tempFile;
-
   int _lineCount = 0;
   int _charCount = 0;
+  DateTime? _lastSavedAt;
 
+  Timer? _autosaveTimer;
   final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
+    _undoController = UndoHistoryController();
     _textController.addListener(_onTextChanged);
     _loadFile();
   }
 
   @override
   void dispose() {
+    _autosaveTimer?.cancel();
     _textController.removeListener(_onTextChanged);
     _textController.dispose();
+    _undoController.dispose();
     _focusNode.dispose();
     _cleanTempFile();
     super.dispose();
@@ -55,11 +63,22 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   void _onTextChanged() {
     final text = _textController.text;
     final lines = text.isEmpty ? 0 : text.split('\n').length;
+
     setState(() {
       _isDirty = true;
       _lineCount = lines;
       _charCount = text.length;
     });
+
+    // Debounced autosave: triggers 2.5s after user stops typing
+    _autosaveTimer?.cancel();
+    if (!_isLoading && !_hasError) {
+      _autosaveTimer = Timer(const Duration(milliseconds: 2500), () {
+        if (mounted && _isDirty && !_isSaving && !_isAutosaving) {
+          _saveFile(isAutosave: true);
+        }
+      });
+    }
   }
 
   Future<void> _cleanTempFile() async {
@@ -78,24 +97,20 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       _hasError = false;
       _errorMessage = '';
     });
-
     try {
       final tempDir = await getTemporaryDirectory();
       final extension = widget.filePath.split('.').last;
       _tempFile = File(
         '${tempDir.path}/cb_edit_${DateTime.now().microsecondsSinceEpoch}.$extension',
       );
-
       final ok = await vaultExplorerApi.decryptFile(
         widget.container,
         widget.filePath,
         _tempFile!.path,
       );
-
       if (!ok) {
         throw Exception(context.l10n.textEditorDecryptFailedMessage);
       }
-
       final bytes = await _tempFile!.readAsBytes();
       String text;
       try {
@@ -105,10 +120,9 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
           context.l10n.textEditorInvalidTextFileMessage,
         );
       }
-
       _textController.text = text;
+      _autosaveTimer?.cancel();
       final lines = text.isEmpty ? 0 : text.split('\n').length;
-
       setState(() {
         _isLoading = false;
         _isDirty = false;
@@ -124,16 +138,22 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     }
   }
 
-  Future<bool> _saveFile() async {
+  Future<bool> _saveFile({bool isAutosave = false}) async {
     if (_tempFile == null) return false;
+
+    _autosaveTimer?.cancel();
+
     setState(() {
-      _isSaving = true;
+      if (isAutosave) {
+        _isAutosaving = true;
+      } else {
+        _isSaving = true;
+      }
     });
 
     try {
       final content = _textController.text;
       await _tempFile!.writeAsString(content, encoding: utf8);
-
       final ok = await vaultExplorerApi.writeBackFile(
         widget.container,
         widget.filePath,
@@ -144,29 +164,37 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         throw Exception(context.l10n.textEditorWriteBackFailedMessage);
       }
 
-      setState(() {
-        _isSaving = false;
-        _isDirty = false;
-      });
-
       if (mounted) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.changesSavedSuccessfully,
-          tone: AppBannerTone.success,
-        );
+        setState(() {
+          _isSaving = false;
+          _isAutosaving = false;
+          _isDirty = false;
+          _lastSavedAt = DateTime.now();
+        });
+
+        if (!isAutosave) {
+          showAppSnackBar(
+            context,
+            message: context.l10n.changesSavedSuccessfully,
+            tone: AppBannerTone.success,
+          );
+        }
       }
       return true;
     } catch (e) {
-      setState(() {
-        _isSaving = false;
-      });
       if (mounted) {
-        showAppSnackBar(
-          context,
-          message: context.l10n.saveFailedWithError('$e'),
-          tone: AppBannerTone.error,
-        );
+        setState(() {
+          _isSaving = false;
+          _isAutosaving = false;
+        });
+
+        if (!isAutosave) {
+          showAppSnackBar(
+            context,
+            message: context.l10n.saveFailedWithError('$e'),
+            tone: AppBannerTone.error,
+          );
+        }
       }
       return false;
     }
@@ -175,6 +203,11 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   Future<bool> _onWillPop() async {
     if (!_isDirty) return true;
 
+    // Flush any pending changes automatically on exit
+    final saved = await _saveFile(isAutosave: true);
+    if (saved) return true;
+
+    if (!mounted) return true;
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -203,12 +236,10 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     );
 
     if (result == 'save') {
-      final saved = await _saveFile();
-      return saved;
+      return await _saveFile();
     } else if (result == 'discard') {
       return true;
     }
-
     return false;
   }
 
@@ -217,7 +248,6 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     return PopScope(
       canPop: !_isDirty,
       onPopInvokedWithResult: (didPop, result) async {
@@ -231,9 +261,29 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         appBar: AppBar(
           title: Text(_fileName),
           actions: [
-            if (!_isLoading && !_hasError)
+            if (!_isLoading && !_hasError) ...[
+              ValueListenableBuilder<UndoHistoryValue>(
+                valueListenable: _undoController,
+                builder: (context, value, _) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.undo_rounded),
+                        tooltip: 'Undo',
+                        onPressed: value.canUndo ? () => _undoController.undo() : null,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.redo_rounded),
+                        tooltip: 'Redo',
+                        onPressed: value.canRedo ? () => _undoController.redo() : null,
+                      ),
+                    ],
+                  );
+                },
+              ),
               IconButton(
-                icon: _isSaving
+                icon: (_isSaving || _isAutosaving)
                     ? const SizedBox(
                         width: 18,
                         height: 18,
@@ -244,14 +294,16 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                         color: _isDirty ? cs.primary : cs.outline,
                       ),
                 tooltip: context.l10n.saveChangesTooltip,
-                onPressed: (_isDirty && !_isSaving) ? _saveFile : null,
+                onPressed: (_isDirty && !_isSaving && !_isAutosaving)
+                    ? () => _saveFile()
+                    : null,
               ),
+            ],
           ],
         ),
         body: _buildBody(cs, Theme.of(context).textTheme),
-        bottomNavigationBar: _isLoading || _hasError
-            ? null
-            : _buildBottomBar(cs),
+        bottomNavigationBar:
+            _isLoading || _hasError ? null : _buildBottomBar(cs),
       ),
     );
   }
@@ -262,14 +314,13 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(strokeWidth: 2.5),
-            SizedBox(height: 16),
+            const CircularProgressIndicator(strokeWidth: 2.5),
+            const SizedBox(height: 16),
             Text(context.l10n.decryptingFileContent),
           ],
         ),
       );
     }
-
     if (_hasError) {
       return Center(
         child: Padding(
@@ -304,7 +355,6 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         ),
       );
     }
-
     return GestureDetector(
       onTap: () {
         if (!_focusNode.hasFocus) {
@@ -319,6 +369,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
         child: SingleChildScrollView(
           child: TextField(
             controller: _textController,
+            undoController: _undoController,
             focusNode: _focusNode,
             maxLines: null,
             keyboardType: TextInputType.multiline,
@@ -340,6 +391,10 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
   }
 
   Widget _buildBottomBar(ColorScheme cs) {
+    final timeStr = _lastSavedAt != null
+        ? '${_lastSavedAt!.hour.toString().padLeft(2, '0')}:${_lastSavedAt!.minute.toString().padLeft(2, '0')}'
+        : null;
+
     return Container(
       decoration: BoxDecoration(
         color: cs.surfaceContainerLow,
@@ -353,7 +408,34 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
           ),
           const Spacer(),
-          if (_isDirty)
+          if (_isAutosaving) ...[
+            SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.8,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Autosaving…',
+              style: TextStyle(
+                color: cs.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ] else if (_isSaving) ...[
+            Text(
+              'Saving…',
+              style: TextStyle(
+                color: cs.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ] else if (_isDirty) ...[
             Text(
               context.l10n.unsavedChangesLabel,
               style: TextStyle(
@@ -361,16 +443,23 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
-            )
-          else
+            ),
+          ] else ...[
+            Icon(
+              Icons.check_circle_outline_rounded,
+              size: 14,
+              color: context.semanticColors.success,
+            ),
+            const SizedBox(width: 4),
             Text(
-              context.l10n.savedToVault,
+              timeStr != null ? 'Autosaved at $timeStr' : context.l10n.savedToVault,
               style: TextStyle(
                 color: context.semanticColors.success,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
             ),
+          ],
         ],
       ),
     );

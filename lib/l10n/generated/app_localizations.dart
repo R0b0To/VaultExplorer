@@ -5983,6 +5983,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{speed}× Speed'**
   String holdToSpeedIndicatorLabel(String speed);
+
+  /// Section header on toolbar settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'Toolbar Layout'**
+  String get toolbarLayoutSectionHeader;
+
+  /// Section header on toolbar settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'List View Options'**
+  String get listViewOptionsSectionHeader;
+
+  /// Section header on toolbar settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed List View Columns'**
+  String get detailedListViewColumnsSectionHeader;
+
+  /// Section header on toolbar settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery Grid View'**
+  String get galleryGridViewSectionHeader;
+
+  /// Section header on toolbar settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'Browser Layout'**
+  String get browserLayoutSectionHeader;
+
+  /// Section header on toolbar settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'Media Viewer'**
+  String get mediaViewerSectionHeader;
+
+  /// Label for view mode toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'View mode'**
+  String get viewModeAction;
+
+  /// Label for sort toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get sortAction;
+
+  /// Label for play media toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Play media'**
+  String get playMediaAction;
+
+  /// Storage space summary shown on mounted container card
+  ///
+  /// In en, this message translates to:
+  /// **'{free} free · {total} total'**
+  String containerSpaceSummary(String free, String total);
+
+  /// Fallback summary shown on mounted container card when total space is unknown
+  ///
+  /// In en, this message translates to:
+  /// **'Vol {volId} · Mounted'**
+  String volMountedSummary(int volId);
+
+  /// Error message when unlocking/verifying container fails due to wrong password or keyfiles
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect password/keyfiles or unsupported drive'**
+  String get incorrectPasswordOrKeyfilesDriveError;
+
+  /// Helper text showing detected USB drive usable capacity
+  ///
+  /// In en, this message translates to:
+  /// **'Drive usable capacity: {mb} MB. Must not exceed this.'**
+  String driveUsableCapacity(int mb);
 }
 
 class _AppLocalizationsDelegate

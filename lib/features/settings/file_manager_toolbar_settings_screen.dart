@@ -95,7 +95,6 @@ class _FileManagerToolbarSettingsScreenState
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
@@ -123,7 +122,7 @@ class _FileManagerToolbarSettingsScreenState
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 12),
                     children: [
-                      SectionHeader('Toolbar Layout'),
+                      SectionHeader(context.l10n.toolbarLayoutSectionHeader),
                       ReorderableListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -165,7 +164,7 @@ class _FileManagerToolbarSettingsScreenState
                                   ),
                                 ),
                                 title: Text(
-                                  action.label,
+                                  action.getLocalizedLabel(context.l10n),
                                   style: textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: visible
@@ -208,7 +207,7 @@ class _FileManagerToolbarSettingsScreenState
                         },
                       ),
                       const SizedBox(height: 16),
-                      SectionHeader('List View Options'),
+                      SectionHeader(context.l10n.listViewOptionsSectionHeader),
                       SectionCard(
                         children: [
                           SwitchListTile(
@@ -233,7 +232,7 @@ class _FileManagerToolbarSettingsScreenState
                         ],
                       ),
                       const SizedBox(height: 16),
-                      SectionHeader('Detailed List View Columns'),
+                      SectionHeader(context.l10n.detailedListViewColumnsSectionHeader),
                       ReorderableListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -278,7 +277,7 @@ class _FileManagerToolbarSettingsScreenState
                                   ),
                                 ),
                                 title: Text(
-                                  col.label,
+                                  col.getLocalizedLabel(context.l10n),
                                   style: textTheme.bodyMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     color: visible
@@ -321,7 +320,7 @@ class _FileManagerToolbarSettingsScreenState
                         },
                       ),
                       const SizedBox(height: 16),
-                      SectionHeader('Gallery Grid View'),
+                      SectionHeader(context.l10n.galleryGridViewSectionHeader),
                       SectionCard(
                         children: [
                           SwitchListTile(
@@ -346,7 +345,7 @@ class _FileManagerToolbarSettingsScreenState
                         ],
                       ),
                       const SizedBox(height: 16),
-                      SectionHeader('Browser Layout'),
+                      SectionHeader(context.l10n.browserLayoutSectionHeader),
                       SectionCard(
                         children: [
                           SwitchListTile(
@@ -389,7 +388,7 @@ class _FileManagerToolbarSettingsScreenState
                         ],
                       ),
                       const SizedBox(height: 16),
-                      SectionHeader('Media Viewer'),
+                      SectionHeader(context.l10n.mediaViewerSectionHeader),
                       SectionCard(
                         children: [
                           SwitchListTile(

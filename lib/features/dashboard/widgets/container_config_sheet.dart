@@ -24,7 +24,6 @@ class ContainerConfigScreen extends StatefulWidget {
   final void Function(ContainerRecord record) onSaved;
   final AppSettings? appSettings;
   final MountedContainer? mountedContainer;
-
   const ContainerConfigScreen({
     super.key,
     required this.uri,
@@ -34,7 +33,6 @@ class ContainerConfigScreen extends StatefulWidget {
     this.appSettings,
     this.mountedContainer,
   });
-
   @override
   State<ContainerConfigScreen> createState() => _ContainerConfigScreenState();
 }
@@ -55,20 +53,16 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
   bool _biometricAvailable = false;
   late bool _settingsLocked;
   bool _changePassword = false;
-
   String get _containerFormat =>
       widget.existingRecord?.containerFormat ??
       widget.mountedContainer?.containerFormat ??
       'veracrypt';
-
   bool get _isCryptomator => ContainerFormat.isCryptomatorWire(_containerFormat);
   bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(_containerFormat);
   bool get _isCryfs => ContainerFormat.isCryfsWire(_containerFormat);
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(_containerFormat);
-
   bool _saving = false;
   bool _loadingPassword = true;
-
   late String _initialLabel;
   late ContainerUnlockMethod _initialUnlockMethod;
   late int _initialAutoCloseMins;
@@ -79,7 +73,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
   ThumbnailQuality? _initialThumbnailQuality;
   bool? _initialCacheDerivedKey;
   String? _initialPatternHash;
-
   static const _autoCloseOptions = [0, 1, 2, 5, 10, 15, 30, 60];
 
   @override
@@ -106,11 +99,9 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     _initialCipherId = rec?.cipherId ?? 255;
     _initialHashId = rec?.hashId ?? 255;
     _initialCacheDerivedKey = rec?.cacheDerivedKey;
-
     _labelCtrl = TextEditingController(text: _initialLabel);
     _passwordCtrl = TextEditingController();
     _labelCtrl.addListener(() => setState(() {}));
-
     _unlockMethod = _initialUnlockMethod;
     _showPassword = false;
     _autoCloseMins = _initialAutoCloseMins;
@@ -121,7 +112,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
         rec?.cacheDerivedKey ?? widget.appSettings?.defaultDerivedKeyCacheEnabled ?? false;
     _cipherId = _initialCipherId;
     _hashId = _initialHashId;
-
     final recentlyUnlocked = widget.mountedContainer != null &&
         DateTime.now().difference(widget.mountedContainer!.mountedAt) <
             const Duration(seconds: 30);
@@ -129,10 +119,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     _initAsync();
   }
 
-  
-
   bool _clearingCache = false;
-
   Future<void> _clearThumbnailCache() async {
     final confirm = await showAppConfirmDialog(
       context,
@@ -142,16 +129,13 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
       isDestructive: true,
     );
     if (!confirm || !mounted) return;
-
     setState(() => _clearingCache = true);
     bool appCacheCleared = false;
     bool containerCacheCleared = false;
     bool isLocked = false;
-
     try {
       await ThumbnailCacheService.clearAppCacheByUri(widget.uri);
       appCacheCleared = true;
-
       await ThumbnailCacheService.clearInContainerCacheByUri(widget.uri);
       containerCacheCleared = true;
     } on PlatformException catch (e) {
@@ -191,20 +175,18 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     }
   }
 
- Future<void> _initAsync() async {
+  Future<void> _initAsync() async {
     try {
       final tempPw = await AppSecureStorage.instance.read(key: 'temp_pw_${widget.uri}');
       if (tempPw != null && tempPw.isNotEmpty && mounted) {
         setState(() => _passwordCtrl.text = tempPw);
       }
     } catch (_) {}
-
     try {
       final localAuth = LocalAuthentication();
       _biometricAvailable = await localAuth.canCheckBiometrics &&
           await localAuth.isDeviceSupported();
     } catch (_) {}
-
     try {
       final settings = widget.appSettings ?? await AppSettingsService.loadSettings();
       if (mounted) {
@@ -213,7 +195,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
           _initialThumbnailCacheMode = _thumbnailCacheMode;
           _thumbnailQuality ??= settings.defaultThumbnailQuality;
           _initialThumbnailQuality = _thumbnailQuality;
-
           if (widget.appSettings == null && widget.existingRecord == null) {
             _cacheDerivedKey = settings.defaultDerivedKeyCacheEnabled;
           }
@@ -228,7 +209,6 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
         });
       }
     }
-
     if (_unlockMethod == ContainerUnlockMethod.pattern) {
       _patternHash = await ContainerRepository.instance.getPatternHash(widget.uri);
       _initialPatternHash = _patternHash;
@@ -279,7 +259,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
       widget.existingRecord == null ||
       widget.existingRecord!.unlockMethod == ContainerUnlockMethod.password;
 
- bool get _unlockMethodNeedsPassword =>
+  bool get _unlockMethodNeedsPassword =>
       _unlockMethod != ContainerUnlockMethod.password;
 
   bool get _needsPasswordSetup {
@@ -306,18 +286,15 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
       );
       return;
     }
-
     setState(() => _saving = true);
-
     final label = _labelCtrl.text.trim().isEmpty
         ? widget.currentLabel
         : _labelCtrl.text.trim();
-
     final needsPassword = _unlockMethodNeedsPassword;
     final shouldSavePassword =
         needsPassword && (_wasPasswordless || _changePassword);
 
- final record = ContainerRecord(
+    final record = ContainerRecord(
       uri: widget.uri,
       label: label,
       rememberPassword: needsPassword,
@@ -341,11 +318,9 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     );
 
     await ContainerRepository.instance.save(record);
-
     if (!_cacheDerivedKey) {
       await vaultExplorerApi.clearDerivedKey(widget.uri);
     }
-
     widget.onSaved(record);
     if (mounted) Navigator.pop(context);
   }
@@ -361,7 +336,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     }
   }
 
-Future<void> _authenticateSettings() async {
+  Future<void> _authenticateSettings() async {
     final record = widget.existingRecord;
     if (record == null) return;
     if (record.unlockMethod == ContainerUnlockMethod.biometrics) {
@@ -444,7 +419,6 @@ Future<void> _authenticateSettings() async {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -496,7 +470,6 @@ Future<void> _authenticateSettings() async {
                     ],
                   ),
                   const SizedBox(height: 16),
-
                   SectionHeader(context.l10n.securityCredentialsSectionHeader),
                   SectionCard(
                     children: [
@@ -564,7 +537,7 @@ Future<void> _authenticateSettings() async {
                                 );
                               })
                               .toList(),
-                            onChanged: (v) {
+                          onChanged: (v) {
                             setState(() {
                               _unlockMethod = v;
                               if (v == ContainerUnlockMethod.password) {
@@ -574,7 +547,6 @@ Future<void> _authenticateSettings() async {
                             });
                           },
                         ),
-
                         if (widget.existingRecord != null &&
                             widget.existingRecord!.unlockMethod !=
                                 ContainerUnlockMethod.password &&
@@ -598,7 +570,6 @@ Future<void> _authenticateSettings() async {
                             ),
                           ),
                         ],
-
                         if (_unlockMethod != ContainerUnlockMethod.password &&
                             (widget.existingRecord == null ||
                                 widget.existingRecord!.unlockMethod ==
@@ -659,7 +630,6 @@ Future<void> _authenticateSettings() async {
                               ],
                             ),
                           ),
-
                           if (!_isCryptomator && !_isGocryptfs && !_isCryfs && !_isBitlocker) ...[
                             KeyfilesPicker(
                               keyfiles: keyfiles,
@@ -669,7 +639,6 @@ Future<void> _authenticateSettings() async {
                             ),
                           ],
                         ],
-
                         if (_unlockMethod == ContainerUnlockMethod.pattern) ...[
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -687,7 +656,6 @@ Future<void> _authenticateSettings() async {
                             ),
                           ),
                         ],
-
                         if (!_isCryptomator &&
                             !_isGocryptfs &&
                             !_isBitlocker) ...[
@@ -719,7 +687,6 @@ Future<void> _authenticateSettings() async {
                             ),
                         ],
                       ],
-
                       if (widget.existingRecord != null) ...[
                         ListTile(
                           contentPadding: const EdgeInsets.symmetric(
@@ -795,7 +762,6 @@ Future<void> _authenticateSettings() async {
                     ],
                   ),
                   const SizedBox(height: 16),
-
                   SectionHeader(context.l10n.systemIntegrationSectionHeader),
                   SectionCard(
                     children: [
@@ -826,7 +792,6 @@ Future<void> _authenticateSettings() async {
                     ],
                   ),
                   const SizedBox(height: 16),
-
                   SectionHeader(context.l10n.thumbnailStorageSectionHeader),
                   SectionCard(
                     children: [
@@ -909,7 +874,6 @@ Future<void> _authenticateSettings() async {
     final isModified = _isModified;
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
@@ -938,10 +902,10 @@ Future<void> _authenticateSettings() async {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                      _needsPatternSetup
-                          ? context.l10n.patternSetupRequiredAboveBeforeSaving
-                          : context.l10n.passwordOrCacheDerivedKeyRequiredMessage,
-                      style: textTheme.bodySmall?.copyWith(
+                              _needsPatternSetup
+                                  ? context.l10n.patternSetupRequiredAboveBeforeSaving
+                                  : context.l10n.passwordOrCacheDerivedKeyRequiredMessage,
+                              style: textTheme.bodySmall?.copyWith(
                                 color: cs.error,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -981,7 +945,6 @@ Future<void> _authenticateSettings() async {
 class _PatternVerifySheet extends StatefulWidget {
   final String storedHash;
   const _PatternVerifySheet({required this.storedHash});
-
   @override
   State<_PatternVerifySheet> createState() => _PatternVerifySheetState();
 }
@@ -1016,7 +979,6 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return AppBottomSheet(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1066,6 +1028,7 @@ class _RealPasswordGateDialog extends StatefulWidget {
   @override
   State<_RealPasswordGateDialog> createState() => _RealPasswordGateDialogState();
 }
+
 class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
     with KeyfilePickerMixin {
   final _pwCtrl = TextEditingController();
@@ -1083,6 +1046,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(widget.containerFormat);
   int? _activeVolId;
   late final void Function(int) _onUnlockStarted;
+
   @override
   void initState() {
     super.initState();
@@ -1114,9 +1078,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
       setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
       return;
     }
-
     setState(() { _loading = true; _error = null; });
-
     if (_isCryptomator || _isGocryptfs || _isCryfs) {
       try {
         final result = _isCryptomator
@@ -1139,14 +1101,12 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
                     displayName: '',
                     documentProvider: widget.documentProvider,
                   );
-                  
         if (result == null) {
           if (mounted) setState(() { _loading = false; _error = context.l10n.incorrectPasswordError; });
           return;
         }
-
         await vaultExplorerApi.lockContainer(widget.uri);
-       if (mounted) {
+        if (mounted) {
           Navigator.pop(context, (
             password: _pwCtrl.text,
             keyfiles: List<KeyfileRef>.from(keyfiles),
@@ -1162,11 +1122,9 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
       }
       return;
     }
-
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final keyfilePaths = keyfiles.map((k) => k.uri).toList();
-
       final result = _isUsb
           ? await vaultExplorerApi.unlockUsbContainer(
               _usbDeviceName,
@@ -1192,12 +1150,10 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
               cacheDerivedKey: widget.cacheDerivedKey,
               keyfilePaths: keyfilePaths,
             );
-
       if (result == null) {
         if (mounted) setState(() { _loading = false; _error = context.l10n.incorrectCredentialsError; });
         return;
       }
-
       await vaultExplorerApi.lockContainer(_isUsb ? _usbDeviceName : widget.uri);
       if (mounted) {
         Navigator.pop(context, (
@@ -1219,7 +1175,6 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return AlertDialog(
       title: Text(context.l10n.verifyCredentialsTitle),
       content: SingleChildScrollView(
@@ -1308,28 +1263,23 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
 
 class _DisplayNameDialog extends StatefulWidget {
   final String initialText;
-
   const _DisplayNameDialog({required this.initialText});
-
   @override
   State<_DisplayNameDialog> createState() => _DisplayNameDialogState();
 }
 
 class _DisplayNameDialogState extends State<_DisplayNameDialog> {
   late final TextEditingController _controller;
-
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialText);
   }
-
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return AlertDialog(

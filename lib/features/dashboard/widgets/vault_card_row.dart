@@ -30,7 +30,6 @@ class SwipeRowGroupController extends ChangeNotifier {
 
 class StrictHorizontalDragGestureRecognizer extends HorizontalDragGestureRecognizer {
   StrictHorizontalDragGestureRecognizer({super.debugOwner});
-
   final Map<int, Offset> _startPositions = {};
 
   @override
@@ -329,13 +328,13 @@ class _VaultCardRowState extends State<VaultCardRow>
     final rightSlotProgress = (-_dx / _revealExtent).clamp(0.0, 1.0);
     final leftIsDelete = !widget.swapActions;
     final leftIcon = leftIsDelete ? Icons.delete_outline_rounded : Icons.edit_outlined;
-    final leftLabel = leftIsDelete ? 'Delete' : 'Edit';
+    final leftLabel = leftIsDelete ? context.l10n.delete : context.l10n.edit;
     final leftBackground = leftIsDelete ? cs.errorContainer : cs.secondaryContainer;
     final leftForeground = leftIsDelete ? cs.onErrorContainer : cs.onSecondaryContainer;
     final leftOnTap = leftIsDelete ? _fireDelete : _fireEdit;
     final rightIsDelete = widget.swapActions;
     final rightIcon = rightIsDelete ? Icons.delete_outline_rounded : Icons.edit_outlined;
-    final rightLabel = rightIsDelete ? 'Delete' : 'Edit';
+    final rightLabel = rightIsDelete ? context.l10n.delete : context.l10n.edit;
     final rightBackground = rightIsDelete ? cs.errorContainer : cs.secondaryContainer;
     final rightForeground = rightIsDelete ? cs.onErrorContainer : cs.onSecondaryContainer;
     final rightOnTap = rightIsDelete ? _fireDelete : _fireEdit;
@@ -435,7 +434,6 @@ class _SwipeActionButton extends StatelessWidget {
   final Color foreground;
   final double progress;
   final VoidCallback onTap;
-
   const _SwipeActionButton({
     required this.icon,
     required this.label,
@@ -444,7 +442,6 @@ class _SwipeActionButton extends StatelessWidget {
     required this.progress,
     required this.onTap,
   });
-
   @override
   Widget build(BuildContext context) {
     return Opacity(

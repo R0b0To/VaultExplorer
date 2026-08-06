@@ -4649,6 +4649,68 @@
     "placeholders": {
       "speed": { "type": "String" }
     }
+  },
+  "toolbarLayoutSectionHeader": "Toolbar Layout",
+  "@toolbarLayoutSectionHeader": {
+    "description": "Section header on toolbar settings screen"
+  },
+  "listViewOptionsSectionHeader": "List View Options",
+  "@listViewOptionsSectionHeader": {
+    "description": "Section header on toolbar settings screen"
+  },
+  "detailedListViewColumnsSectionHeader": "Detailed List View Columns",
+  "@detailedListViewColumnsSectionHeader": {
+    "description": "Section header on toolbar settings screen"
+  },
+  "galleryGridViewSectionHeader": "Gallery Grid View",
+  "@galleryGridViewSectionHeader": {
+    "description": "Section header on toolbar settings screen"
+  },
+  "browserLayoutSectionHeader": "Browser Layout",
+  "@browserLayoutSectionHeader": {
+    "description": "Section header on toolbar settings screen"
+  },
+  "mediaViewerSectionHeader": "Media Viewer",
+  "@mediaViewerSectionHeader": {
+    "description": "Section header on toolbar settings screen"
+  },
+  "viewModeAction": "View mode",
+  "@viewModeAction": {
+    "description": "Label for view mode toolbar action"
+  },
+  "sortAction": "Sort",
+  "@sortAction": {
+    "description": "Label for sort toolbar action"
+  },
+  "playMediaAction": "Play media",
+  "@playMediaAction": {
+    "description": "Label for play media toolbar action"
+  },
+  "containerSpaceSummary": "{free} free · {total} total",
+  "@containerSpaceSummary": {
+    "description": "Storage space summary shown on mounted container card",
+    "placeholders": {
+      "free": { "type": "String" },
+      "total": { "type": "String" }
+    }
+  },
+  "volMountedSummary": "Vol {volId} · Mounted",
+  "@volMountedSummary": {
+    "description": "Fallback summary shown on mounted container card when total space is unknown",
+    "placeholders": {
+      "volId": { "type": "int" }
+    }
+  },
+  "incorrectPasswordOrKeyfilesDriveError": "Incorrect password/keyfiles or unsupported drive",
+  "@incorrectPasswordOrKeyfilesDriveError": {
+    "description": "Error message when unlocking/verifying container fails due to wrong password or keyfiles"
+  },
+  "driveUsableCapacity": "Drive usable capacity: {mb} MB. Must not exceed this.",
+  "@driveUsableCapacity": {
+    "description": "Helper text showing detected USB drive usable capacity",
+    "placeholders": {
+      "mb": { "type": "int" }
+    }
   }
 }
 

@@ -3527,4 +3527,51 @@ class AppLocalizationsEn extends AppLocalizations {
   String holdToSpeedIndicatorLabel(String speed) {
     return '$speed× Speed';
   }
+
+  @override
+  String get toolbarLayoutSectionHeader => 'Toolbar Layout';
+
+  @override
+  String get listViewOptionsSectionHeader => 'List View Options';
+
+  @override
+  String get detailedListViewColumnsSectionHeader =>
+      'Detailed List View Columns';
+
+  @override
+  String get galleryGridViewSectionHeader => 'Gallery Grid View';
+
+  @override
+  String get browserLayoutSectionHeader => 'Browser Layout';
+
+  @override
+  String get mediaViewerSectionHeader => 'Media Viewer';
+
+  @override
+  String get viewModeAction => 'View mode';
+
+  @override
+  String get sortAction => 'Sort';
+
+  @override
+  String get playMediaAction => 'Play media';
+
+  @override
+  String containerSpaceSummary(String free, String total) {
+    return '$free free · $total total';
+  }
+
+  @override
+  String volMountedSummary(int volId) {
+    return 'Vol $volId · Mounted';
+  }
+
+  @override
+  String get incorrectPasswordOrKeyfilesDriveError =>
+      'Incorrect password/keyfiles or unsupported drive';
+
+  @override
+  String driveUsableCapacity(int mb) {
+    return 'Drive usable capacity: $mb MB. Must not exceed this.';
+  }
 }

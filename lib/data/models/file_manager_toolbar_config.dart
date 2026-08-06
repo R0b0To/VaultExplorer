@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 enum FileDetailColumn {
   date,
@@ -11,6 +12,12 @@ enum FileDetailColumn {
         FileDetailColumn.date => 'Date',
         FileDetailColumn.size => 'Size',
         FileDetailColumn.type => 'Type',
+      };
+
+  String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
+        FileDetailColumn.date => l10n.sortFieldDate,
+        FileDetailColumn.size => l10n.sortFieldSize,
+        FileDetailColumn.type => l10n.sortFieldType,
       };
 
   IconData get icon => switch (this) {

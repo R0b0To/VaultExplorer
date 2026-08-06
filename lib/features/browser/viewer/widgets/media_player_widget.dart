@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
@@ -66,7 +67,6 @@ class MediaPlayerWidget extends StatefulWidget {
   final VideoPlaybackManager playbackManager;
   final Uint8List? posterBytes;
   final bool enableZoom;
-
   const MediaPlayerWidget({
     super.key,
     required this.container,
@@ -88,7 +88,6 @@ class MediaPlayerWidget extends StatefulWidget {
     this.onError,
     this.enableZoom = true,
   });
-
   @override
   State<MediaPlayerWidget> createState() => _MediaPlayerWidgetState();
 }
@@ -646,7 +645,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '2× Speed',
+                        context.l10n.holdToSpeedIndicatorLabel('2'),
                         style: TextStyle(
                           color: cs.primary,
                           fontSize: 13,
@@ -749,6 +748,7 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   final List<double> _heights = [0.2, 0.5, 0.8, 0.4, 0.9, 0.3, 0.7, 0.5, 0.2];
+
   @override
   void initState() {
     super.initState();
@@ -758,6 +758,7 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
     );
     if (widget.isPlaying) _controller.repeat(reverse: true);
   }
+
   @override
   void didUpdateWidget(covariant _AudioVisualizer oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -767,11 +768,13 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
       _controller.stop();
     }
   }
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

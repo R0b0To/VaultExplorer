@@ -8,11 +8,8 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
-/// Formats a brand-new encrypted container directly onto a raw USB drive,
-/// erasing everything currently on it.
 class UsbCreateContainerSheet extends StatefulWidget {
   const UsbCreateContainerSheet({super.key});
-
   @override
   State<UsbCreateContainerSheet> createState() =>
       _UsbCreateContainerSheetState();
@@ -29,12 +26,10 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     'ext4'
   ];
   static const _luksFileSystems = ['ext2', 'ext3', 'ext4'];
-
   final _sizeCtrl = TextEditingController(text: '1024');
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
-
   List<UsbDeviceInfo> _devices = [];
   UsbDeviceInfo? _selected;
   bool _loadingDevices = true;
@@ -43,17 +38,13 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
   bool _confirmObscure = true;
   bool _creating = false;
   String? _error;
-
   @override
   void onKeyfilePickError(String message) => setState(() => _error = message);
-
   String _sizeUnit = 'MB';
   String _fileSystem = 'exFAT';
-  int _cipherId = 0; // AES
-  int _hashId = 0; // SHA-512
+  int _cipherId = 0;
+  int _hashId = 0;
   bool _quickFormat = true;
-
-  // ── Hidden Volume State ──
   bool _enableHiddenVolume = false;
   final _hiddenPasswordCtrl = TextEditingController();
   final _hiddenConfirmPasswordCtrl = TextEditingController();
@@ -67,12 +58,10 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     onError: (msg) { if (mounted) setState(() => _error = msg ?? context.l10n.couldNotPickKeyfiles); },
   );
   String _hiddenFileSystem = 'FAT';
-  int _hiddenCipherId = 0; // AES
-  int _hiddenHashId = 0; // SHA-512
-
+  int _hiddenCipherId = 0;
+  int _hiddenHashId = 0;
   int? _usableCapacityBytes;
   bool _fetchingCapacity = false;
-
   CreateFormat _format = CreateFormat.veracrypt;
 
   List<String> get _availableFileSystems => _format == CreateFormat.veracrypt
@@ -180,7 +169,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
       orElse: () => device,
     );
     if (!refreshed.hasPermission || !mounted) return;
-
     setState(() => _fetchingCapacity = true);
     final usable =
         await vaultExplorerApi.getUsbDeviceCapacity(device.deviceName);
@@ -248,7 +236,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
       setState(() => _error = context.l10n.standardVolumePasswordsDoNotMatch);
       return;
     }
-
     if (_enableHiddenVolume && _format == CreateFormat.veracrypt) {
       if (_hiddenPasswordCtrl.text.isNotEmpty &&
           _hiddenPasswordCtrl.text != _hiddenConfirmPasswordCtrl.text) {
@@ -256,7 +243,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
         return;
       }
     }
-
     final confirmed = await showAppConfirmDialog(
       context,
       title: context.l10n.eraseDeviceTitle(device.productName),
@@ -265,12 +251,10 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
       isDestructive: true,
     );
     if (!confirmed || !mounted) return;
-
     setState(() {
       _creating = true;
       _error = null;
     });
-
     try {
       if (!device.hasPermission) {
         await _ensurePermission(device);
@@ -283,13 +267,11 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
           return;
         }
       }
-
       final multiplier = _sizeUnit == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024;
       final sizeBytes = (sizeVal * multiplier).round();
       final pim = clampPim(
         _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0,
       );
-
       int hiddenSizeBytes = 0;
       if (_enableHiddenVolume && _format == CreateFormat.veracrypt) {
         final hiddenPimClamped = clampPim(
@@ -297,7 +279,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
               ? 0
               : int.tryParse(_hiddenPimCtrl.text) ?? 0,
         );
-
         final validation = validateHiddenVolume(
           hiddenSizeText: _hiddenSizeCtrl.text,
           hiddenSizeUnit: _hiddenSizeUnit,
@@ -318,7 +299,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
         }
         hiddenSizeBytes = validation.hiddenSizeBytes!;
       }
-
       final success = await vaultExplorerApi.createUsbContainer(
         deviceName: device.deviceName,
         sizeBytes: sizeBytes,
@@ -352,7 +332,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
             ? _hiddenHashId
             : 255,
       );
-
       if (!mounted) return;
       if (success) {
         Navigator.pop(context);
@@ -373,14 +352,12 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
 
   Widget _buildMainVolumeSection(ColorScheme cs, TextTheme textTheme) {
     final busy = _creating || _requestingPermission;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SectionHeader(context.l10n.usbStandardVolumeSectionHeader),
         SectionCard(
           children: [
-            // Warning Banner
             Padding(
               padding: const EdgeInsets.all(16),
               child: InlineBanner(
@@ -388,8 +365,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 tone: AppBannerTone.warning,
               ),
             ),
-
-            // Format Selector
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -405,8 +380,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 ],
               ),
             ),
-
-            // USB Drive Selection List
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -576,8 +549,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 ],
               ),
             ),
-
-            // Container Size & Unit Row
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -621,10 +592,10 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Text(
                       _fetchingCapacity
-                          ? 'Reading drive capacity…'
+                          ? context.l10n.readingDriveCapacity
                           : _usableCapacityBytes != null
-                              ? 'Drive usable capacity: ${(_usableCapacityBytes! / (1024 * 1024)).floor()} MB. Must not exceed this.'
-                              : 'Must not exceed the drive\'s actual capacity.',
+                              ? context.l10n.driveUsableCapacity((_usableCapacityBytes! / (1024 * 1024)).floor())
+                              : context.l10n.mustNotExceedDriveCapacity,
                       style: textTheme.bodySmall
                           ?.copyWith(color: cs.onSurfaceVariant),
                     ),
@@ -632,8 +603,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 ],
               ),
             ),
-
-            // Password Field
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
@@ -653,8 +622,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 ),
               ),
             ),
-
-            // Confirm Password Field
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
@@ -675,8 +642,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 ),
               ),
             ),
-
-            // Keyfiles Picker
             KeyfilesPicker(
               keyfiles: keyfiles,
               picking: pickingKeyfiles,
@@ -684,8 +649,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
               onRemove: removeKeyfile,
               enabled: !busy,
             ),
-
-            // Advanced Parameters Panel
             AdvancedParamsPanel(
               pimController: _pimCtrl,
               cipherId: _cipherId,
@@ -710,8 +673,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 ),
               ],
             ),
-
-            // Quick Format Switch Tile
             SwitchListTile(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               title: Text(context.l10n.quickFormatTitle,
@@ -735,7 +696,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     final busy = _creating || _requestingPermission;
     final bool isEnabled =
         _passwordCtrl.text.isNotEmpty || keyfiles.isNotEmpty;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -758,7 +718,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                 style: textTheme.bodySmall
                     ?.copyWith(color: cs.onSurfaceVariant),
               ),
-              secondary: Icon(
+secondary: Icon(
                 Icons.visibility_off_outlined,
                 color: isEnabled
                     ? cs.primary
@@ -819,7 +779,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
                             decimal: true),
                         decoration: InputDecoration(
                           labelText: context.l10n.hiddenSizeLabel,
-                          prefixIcon: Icon(Icons.sd_card_outlined, size: 20),
+                          prefixIcon: const Icon(Icons.sd_card_outlined, size: 20),
                         ),
                       ),
                     ),
@@ -885,7 +845,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
     final busy = _creating || _requestingPermission;
-
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
@@ -903,7 +862,6 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
         borderSide: BorderSide(color: cs.primary, width: 2),
       ),
     );
-
     final errorAndSubmit = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -933,9 +891,7 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
         ),
       ],
     );
-
     final showHiddenSection = _format == CreateFormat.veracrypt;
-
     return PopScope(
       canPop: !busy,
       onPopInvokedWithResult: (didPop, result) {
@@ -1020,4 +976,3 @@ class _UsbCreateContainerSheetState extends State<UsbCreateContainerSheet>
     );
   }
 }
-

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
@@ -53,7 +54,6 @@ class FileRowShell extends StatelessWidget {
   final VoidCallback onLongPress;
   final Widget? iconBadge;
   final Widget? customLeading;
-
   const FileRowShell({
     super.key,
     required this.icon,
@@ -79,7 +79,7 @@ class FileRowShell extends StatelessWidget {
     final String text = switch (col) {
       FileDetailColumn.date => formatEntryDate(entry.modifiedSecs),
       FileDetailColumn.size => entry.isDir ? '' : formatBytes(entry.sizeBytes),
-      FileDetailColumn.type => _getTypeLabel(entry),
+      FileDetailColumn.type => _getTypeLabel(entry, context),
     };
     final double width = switch (col) {
       FileDetailColumn.date => 70,
@@ -98,12 +98,12 @@ class FileRowShell extends StatelessWidget {
     );
   }
 
-  static String _getTypeLabel(RawEntry entry) {
-    if (entry.isDir) return 'Folder';
+  static String _getTypeLabel(RawEntry entry, BuildContext context) {
+    if (entry.isDir) return context.l10n.nounFolderCapitalized;
     final name = entry.name;
-    if (!name.contains('.')) return 'File';
+    if (!name.contains('.')) return context.l10n.nounFileCapitalized;
     final ext = name.split('.').last.trim();
-    if (ext.isEmpty) return 'File';
+    if (ext.isEmpty) return context.l10n.nounFileCapitalized;
     return ext.toUpperCase();
   }
 
@@ -163,17 +163,17 @@ class FileRowShell extends StatelessWidget {
                 ],
               ),
               const SizedBox(width: 10),
-                Expanded(
-                    child: HighlightedText(
-                      text: displayName.characters.join('\u200B'), 
-                      query: searchQuery,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: TileSelectionStyle.titleWeight(isSelected),
-                        letterSpacing: 0,
-                      ),
-                    ),
+              Expanded(
+                child: HighlightedText(
+                  text: displayName.characters.join('\u200B'),
+                  query: searchQuery,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: TileSelectionStyle.titleWeight(isSelected),
+                    letterSpacing: 0,
+                  ),
+                ),
               ),
               if (!isCompact) ...[
                 for (final col in detailColumns) ...[

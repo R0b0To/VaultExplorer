@@ -9,8 +9,6 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/container_format_icon.dart';
 
-// ── Base Container Card (Internal Expressive Layout) ───────────────────────
-
 class _BaseContainerCard extends StatelessWidget {
   final VoidCallback onTap;
   final Widget icon;
@@ -20,7 +18,6 @@ class _BaseContainerCard extends StatelessWidget {
   final Widget? trailingAction;
   final Color? backgroundColor;
   final BorderRadiusGeometry? borderRadius;
-
   const _BaseContainerCard({
     required this.onTap,
     required this.icon,
@@ -31,14 +28,11 @@ class _BaseContainerCard extends StatelessWidget {
     this.backgroundColor,
     this.borderRadius,
   });
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-
     final effectiveRadius = borderRadius ?? BorderRadius.circular(24);
-
     return Card(
       elevation: 0,
       color: backgroundColor ?? cs.surfaceContainer,
@@ -93,13 +87,11 @@ class _BaseContainerCard extends StatelessWidget {
   }
 }
 
-// ── Mounted (unlocked) container card ──────────────────────────────────────
 class ContainerCard extends StatelessWidget {
   final MountedContainer container;
   final ValueChanged<int> onLocked;
   final VoidCallback onBrowse;
   final BorderRadiusGeometry? borderRadius;
-
   const ContainerCard({
     super.key,
     required this.container,
@@ -124,15 +116,12 @@ class ContainerCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isLight = cs.brightness == Brightness.light;
-
     final usedBytes = container.totalSpace - container.freeSpace;
     final usedFraction = container.totalSpace > 0
         ? (usedBytes / container.totalSpace).clamp(0.0, 1.0)
         : 0.0;
     final hasSpace = container.totalSpace > 0;
     final isUsb = container.uri.startsWith('usb:');
-
-    // Mini progress bar embedded in subtitle area below free space text
     final Widget progressBar;
     if (hasSpace) {
       progressBar = ClipRRect(
@@ -164,15 +153,17 @@ class ContainerCard extends StatelessWidget {
         ),
       );
     }
-
     final subtitleWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           hasSpace
-              ? '${formatBytes(container.freeSpace)} free · ${formatBytes(container.totalSpace)} total'
-              : 'Vol ${container.volId} · Mounted',
+              ? context.l10n.containerSpaceSummary(
+                  formatBytes(container.freeSpace),
+                  formatBytes(container.totalSpace),
+                )
+              : context.l10n.volMountedSummary(container.volId),
           style: textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
           ),
@@ -183,7 +174,6 @@ class ContainerCard extends StatelessWidget {
         progressBar,
       ],
     );
-
     final iconWidget = isUsb
         ? Icon(Icons.usb_rounded, size: 26, color: cs.onPrimaryContainer)
         : ContainerFormatIcon(
@@ -191,15 +181,12 @@ class ContainerCard extends StatelessWidget {
             size: 26,
             color: cs.onPrimaryContainer,
           );
-
-    // Compute a 100% solid, opaque card background using alpha blend so dragging remains solid
     final cardBg = Color.alphaBlend(
       isLight
           ? cs.primaryContainer.withValues(alpha: 0.55)
           : cs.primaryContainer.withValues(alpha: 0.35),
       cs.surfaceContainerHigh,
     );
-
     return _BaseContainerCard(
       onTap: onBrowse,
       icon: iconWidget,
@@ -213,14 +200,12 @@ class ContainerCard extends StatelessWidget {
   }
 }
 
-// ── Saved (locked) container card ───────────────────────────────────────────
 class SavedContainerCard extends StatelessWidget {
   final String name;
   final String uri;
   final String containerFormat;
   final VoidCallback onUnlock;
   final BorderRadiusGeometry? borderRadius;
-
   const SavedContainerCard({
     super.key,
     required this.name,
@@ -229,13 +214,11 @@ class SavedContainerCard extends StatelessWidget {
     required this.onUnlock,
     this.borderRadius,
   });
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final isUsb = uri.startsWith('usb:');
-
     final iconWidget = isUsb
         ? Icon(Icons.usb_rounded, size: 26, color: cs.onSurfaceVariant)
         : ContainerFormatIcon(
@@ -243,9 +226,6 @@ class SavedContainerCard extends StatelessWidget {
             size: 26,
             color: cs.onSurfaceVariant,
           );
-
-    // Removed the dummy progressBar line here
-
     final subtitleWidget = Text(
       isUsb ? context.l10n.usbDriveLockedLabel : context.l10n.lockedContainerLabel,
       style: textTheme.bodySmall?.copyWith(
@@ -254,7 +234,6 @@ class SavedContainerCard extends StatelessWidget {
       overflow: TextOverflow.ellipsis,
       maxLines: 1,
     );
-
     return _BaseContainerCard(
       onTap: onUnlock,
       icon: iconWidget,
@@ -269,10 +248,8 @@ class SavedContainerCard extends StatelessWidget {
       borderRadius: borderRadius,
     );
   }
-
 }
 
-// ── Compact Icon-Only Action Button (Android 16+ M3 Pill Shape) ──────────────
 class _CompactIconButton extends StatelessWidget {
   final IconData icon;
   final bool isLoading;
@@ -280,7 +257,6 @@ class _CompactIconButton extends StatelessWidget {
   final Color backgroundColor;
   final Color foregroundColor;
   final String? tooltip;
-
   const _CompactIconButton({
     required this.icon,
     this.isLoading = false,
@@ -289,7 +265,6 @@ class _CompactIconButton extends StatelessWidget {
     required this.foregroundColor,
     this.tooltip,
   });
-
   @override
   Widget build(BuildContext context) {
     final message = isLoading && tooltip != null ? '$tooltip, in progress' : (tooltip ?? '');
@@ -327,19 +302,16 @@ class _CompactIconButton extends StatelessWidget {
   }
 }
 
-// ── Lock button ───────────────────────────────────────────────────────────────
 class _LockButton extends StatefulWidget {
   final MountedContainer container;
   final ValueChanged<int> onLocked;
   const _LockButton({required this.container, required this.onLocked});
-
   @override
   State<_LockButton> createState() => _LockButtonState();
 }
 
 class _LockButtonState extends State<_LockButton> {
   bool _loading = false;
-
   Future<void> _lock() async {
     HapticFeedback.mediumImpact();
     if (!vaultExplorerApi.acquireLockGuard(widget.container.volId)) {
@@ -352,7 +324,6 @@ class _LockButtonState extends State<_LockButton> {
       }
       return;
     }
-
     setState(() => _loading = true);
     try {
       await vaultExplorerApi.lockContainer(widget.container.uri);
@@ -385,16 +356,13 @@ class _LockButtonState extends State<_LockButton> {
   }
 }
 
-// ── Unlock button ────────────────────────────────────────────────────────────
 class _UnlockButton extends StatelessWidget {
   final VoidCallback onUnlock;
   final bool isUsb;
-
   const _UnlockButton({
     required this.onUnlock,
     required this.isUsb,
   });
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

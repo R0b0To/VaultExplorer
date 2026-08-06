@@ -44,10 +44,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
     implements UnlockBiometricSource {
   final _passwordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
-
   List<UsbDeviceInfo> _devices = [];
   UsbDeviceInfo? _selected;
-
   bool _obscure = true;
   bool _loadingDevices = true;
   bool _requestingPermission = false;
@@ -64,7 +62,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   String _containerFormat = 'veracrypt';
   bool get _isLuks => ContainerFormat.isLuksWire(_containerFormat);
   bool get _isBitlocker => ContainerFormat.isBitlockerWire(_containerFormat);
-
   int? _activeVolId;
   UnlockProgress? _progress;
   late final void Function(int) _onUnlockStarted;
@@ -78,42 +75,32 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   String? _storedPatternHash;
   bool _loadingAuth = true;
   bool _reconnectTargetMissing = false;
-
   bool _isAuthenticating = false;
 
-  // --- UnlockBiometricMixin wiring: plain forwards, never wrapped in
-  // setState here -- see the matching comment in unlock_sheet.dart.
   @override
   UnlockBiometricSource get unlockSource => this;
-
   @override
   bool get isAuthenticating => _isAuthenticating;
   @override
   set isAuthenticating(bool value) => _isAuthenticating = value;
-
   @override
   String? get unlockError => _error;
   @override
   set unlockError(String? value) => _error = value;
-
   @override
   bool get showPasswordFallback => _showPasswordFallback;
   @override
   set showPasswordFallback(bool value) => _showPasswordFallback = value;
-
   @override
   bool get patternError => _patternError;
   @override
   set patternError(bool value) => _patternError = value;
-
   @override
   int get patternResetKey => _patternResetKey;
   @override
   set patternResetKey(int value) => _patternResetKey = value;
-
   @override
   String? get storedPatternHash => _storedPatternHash;
-
   @override
   TextEditingController get passwordCtrl => _passwordCtrl;
 
@@ -131,10 +118,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         keyfilePathsOverride: keyfilePathsOverride,
       );
 
-  // --- UnlockBiometricSource wiring: USB-specific answers. preAuthReadiness
-  // reproduces the original's two genuinely different guards exactly --
-  // no known record bails silently; a record but no selected device bails
-  // with 'Select a USB drive first'.
   @override
   ({bool ready, String? blockMessage}) get preAuthReadiness {
     if (widget.existingRecord == null) return (ready: false, blockMessage: null);
@@ -144,29 +127,18 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
 
   @override
   bool get isReadyForPattern => widget.existingRecord != null;
-
   @override
   Future<ContainerRecord?> resolveRecord() async => widget.existingRecord;
-
   @override
   String? get derivedKeyIdentifier => _expectedDeviceName;
-
-  // Only ever read after preAuthReadiness/isReadyForPattern has already
-  // confirmed widget.existingRecord != null, matching the original code's
-  // own control flow -- safe to force-unwrap here for the same reason it
-  // was safe there.
   @override
   String get containerUri => widget.existingRecord!.uri;
-
   @override
   String get biometricPromptSubject => context.l10n.biometricSubjectUsbDrive;
-
   @override
   String get noSavedCredentialsForBiometricMessage => context.l10n.usbNoSavedCredentialsMessage;
-
   @override
   String get noSavedCredentialsForPatternMessage => context.l10n.usbNoSavedCredentialsMessage;
-
   @override
   String get debugLogTag => 'usb unlock';
 
@@ -183,7 +155,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   String get _unlockProgressLabel {
     final p = _progress;
     if (p == null || p.total <= 0) return context.l10n.decryptingDriveLabel;
-
     if (_isLuks) {
       return p.total > 1
           ? context.l10n.luksKeyslotProgress(p.attempted, p.total)
@@ -194,11 +165,9 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           ? context.l10n.bitlockerCredentialProgress(p.attempted, p.total)
           : context.l10n.bitlockerCredentialProgressUnknown;
     }
-
     final hashName = hashAlgorithmName(p.hashId);
     final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
     final slotName = p.slot == 1 ? context.l10n.hiddenVolumeSlotName : context.l10n.standardVolumeSlotName;
-
     final algo = cipherName.isNotEmpty ? '$hashName + $cipherName' : hashName;
     return p.total > 1
         ? context.l10n.veracryptAlgoProgress(algo, slotName)
@@ -218,7 +187,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
     }
     _loadDevicesFuture = _loadDevices();
     _initUnlockMethod();
-
     _onUnlockStarted = (volId) {
       if (mounted) setState(() => _activeVolId = volId);
     };
@@ -249,12 +217,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           record.keyfiles.isNotEmpty) {
         keyfiles.addAll(record.keyfiles.map((k) => (uri: k['uri']!, displayName: k['name']!)));
       }
-
       if (_unlockMethod == ContainerUnlockMethod.pattern) {
         _storedPatternHash = await ContainerRepository.instance.getPatternHash(record.uri);
       }
       if (mounted) setState(() => _loadingAuth = false);
-
       if (_unlockMethod == ContainerUnlockMethod.biometrics) {
         if (_loadDevicesFuture != null) {
           await _loadDevicesFuture;
@@ -289,7 +255,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         setState(() {
           _devices = devices;
           _loadingDevices = false;
-          
           final expected = _expectedDeviceName;
           if (expected != null) {
             final matches = devices.where((d) => d.deviceName == expected);
@@ -306,7 +271,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       if (mounted) {
         setState(() {
           _loadingDevices = false;
-          _error = 'Failed to list USB devices: $e';
+          _error = context.l10n.failedToListUsbDevices('$e');
         });
       }
     }
@@ -334,7 +299,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
     }
   }
 
- Future<void> _unlock({
+  Future<void> _unlock({
     Uint8List? preservedKey,
     bool? shouldCacheDerivedKeyOverride,
     String? passwordOverride,
@@ -345,23 +310,19 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       setState(() => _error = context.l10n.selectUsbDriveFirst);
       return;
     }
-
     final newUri = 'usb:${device.deviceName}';
     if (widget.mountedUris.contains(newUri)) {
       setState(() => _error = context.l10n.usbDeviceAlreadyActiveMounted);
       return;
     }
-
-   var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
+    var effectivePassword = (passwordOverride ?? _passwordCtrl.text).trim();
     final effectiveKeyfilePaths =
         keyfilePathsOverride ?? keyfiles.map((k) => k.uri).toList();
     if (effectivePassword.isEmpty && preservedKey == null && effectiveKeyfilePaths.isEmpty) {
       setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
       return;
     }
-
     setState(() { _unlocking = true; _error = null; _activeVolId = null; _progress = null; });
-
     try {
       if (!device.hasPermission) {
         await _ensurePermission(device);
@@ -371,7 +332,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           return;
         }
       }
-
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
       final displayName = widget.existingRecord?.label ?? device.productName;
       final appSettings = await AppSettingsService.loadSettings();
@@ -440,14 +400,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           );
         }
       }
-
       if (result == null) {
-        setState(() => _error = 'Incorrect password/keyfiles or unsupported drive');
+        setState(() => _error = context.l10n.incorrectPasswordOrKeyfilesDriveError);
         return;
       }
-
       await AppSecureStorage.instance.write(key: 'temp_pw_$newUri', value: effectivePassword);
-
       final tempContainer = MountedContainer(
         uri: newUri,
         displayName: displayName,
@@ -459,17 +416,14 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         readOnly: _readOnly,
         containerFormat: result.containerFormat,
       );
-
       final space = await vaultExplorerApi.getSpaceInfo(tempContainer);
       final total = (space != null && space.isNotEmpty) ? space[0] : 0;
       final free = (space != null && space.length > 1) ? space[1] : 0;
-      
       final finalContainer = tempContainer.copyWith(
         totalSpace: total,
         freeSpace: free,
       );
-
-     final existing = widget.existingRecord;
+      final existing = widget.existingRecord;
       final newKeyfiles = keyfiles.map((k) => {'uri': k.uri, 'name': k.displayName}).toList();
       if (existing != null && existing.uri != newUri) {
         final savedPassword = await ContainerRepository.instance.getPassword(existing.uri);
@@ -535,7 +489,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         }
         widget.onMounted(finalContainer, record: savedRecord);
       }
-
       HapticFeedback.lightImpact();
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -554,10 +507,8 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    
     final busy = _unlocking || _requestingPermission;
     final isReconnect = widget.existingRecord != null;
-
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
@@ -575,7 +526,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         borderSide: BorderSide(color: cs.primary, width: 2),
       ),
     );
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
@@ -599,8 +549,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         data: Theme.of(context).copyWith(
           inputDecorationTheme: inputDecorationTheme,
         ),
-        // Tap-anywhere-else-to-dismiss (ADR-020) — see unlock_sheet.dart
-        // for why this is safe alongside the password/PIM text fields.
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: dismissKeyboard,
@@ -675,7 +623,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                       ),
                       const SizedBox(height: 16),
                     ],
-
                     if (_devices.isEmpty) ...[
                       Card(
                         elevation: 0,
@@ -747,7 +694,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                 final deviceUri = 'usb:${d.deviceName}';
                                 final isAlreadyMounted = widget.mountedUris.contains(deviceUri);
                                 final isSelected = _selected?.deviceName == d.deviceName;
-                              
                                 return GestureDetector(
                                   onTap: (busy || isAlreadyMounted) ? null : () => setState(() => _selected = d),
                                   child: Card(
@@ -864,7 +810,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                         ],
                       ),
                       const SizedBox(height: 16),
-
                       if (_loadingAuth)
                         const Center(
                           child: Padding(
@@ -1106,7 +1051,6 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                               ),
                           ],
                         ),
-
                         if (_error != null) ...[
                           const SizedBox(height: 16),
                           InlineErrorBanner(_error!),

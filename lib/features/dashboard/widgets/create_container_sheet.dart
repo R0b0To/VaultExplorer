@@ -9,7 +9,6 @@ import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 
 class CreateContainerSheet extends StatefulWidget {
   const CreateContainerSheet({super.key});
-
   @override
   State<CreateContainerSheet> createState() => _CreateContainerSheetState();
 }
@@ -20,20 +19,17 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   final _passwordCtrl = TextEditingController();
   final _confirmPasswordCtrl = TextEditingController();
   final _pimCtrl = TextEditingController();
-
   static const _veraCryptFileSystems = ['FAT', 'exFAT', 'NTFS', 'ext2', 'ext3', 'ext4'];
   static const _luksFileSystems = ['ext2', 'ext3', 'ext4'];
-
   String _sizeUnit = 'MB';
   CreateFormat _format = CreateFormat.veracrypt;
   String _fileSystem = 'FAT';
-  int _cipherId = 0; // AES
-  int _hashId = 0; // SHA-512
+  int _cipherId = 0;
+  int _hashId = 0;
   bool _obscure = true;
   bool _confirmObscure = true;
   bool _loading = false;
   String? _error;
-
   bool _enableHiddenVolume = false;
   final _hiddenPasswordCtrl = TextEditingController();
   final _hiddenConfirmPasswordCtrl = TextEditingController();
@@ -47,15 +43,13 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     onError: (msg) { if (mounted) setState(() => _error = msg ?? context.l10n.couldNotPickKeyfiles); },
   );
   String _hiddenFileSystem = 'FAT';
-  int _hiddenCipherId = 0; // AES
-  int _hiddenHashId = 0; // SHA-512
+  int _hiddenCipherId = 0;
+  int _hiddenHashId = 0;
 
   @override
   void onKeyfilePickError(String message) => setState(() => _error = message);
 
-  // ── Folder vault (Cryptomator / Gocryptfs) state ──────────────────────────
   bool _isFolderVault = false;
-
   String _folderVaultFormat = 'cryptomator';
   String? _folderVaultUri;
   String? _folderVaultDisplayName;
@@ -108,14 +102,12 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     setState(() {
       _format = format;
       _fileSystem = _format == CreateFormat.veracrypt ? 'FAT' : 'ext4';
-      
       if (!_cipherChoices.any((c) => c.id == _cipherId)) {
         _cipherId = _cipherChoices.first.id;
       }
       if (!_hashChoices.any((h) => h.id == _hashId)) {
         _hashId = _hashChoices.first.id;
       }
-      
       _hiddenFileSystem = 'FAT';
     });
   }
@@ -160,9 +152,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     }
   }
 
-
-  // ── Top-level dispatch ─────────────────────────────────────────────────────
-
   Future<void> _create() {
     return _isFolderVault ? _createFolderVault() : _createContainerFile();
   }
@@ -181,19 +170,16 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
       setState(() => _error = context.l10n.passwordsDoNotMatch);
       return;
     }
-
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
       final success = _folderVaultFormat == 'cryptomator'
           ? await vaultExplorerApi.createCryptomatorVault(_folderVaultUri!, password)
           : _folderVaultFormat == 'gocryptfs'
               ? await vaultExplorerApi.createGocryptfsVault(_folderVaultUri!, password)
               : await vaultExplorerApi.createCryfsVault(_folderVaultUri!, password);
-
       if (success) {
         if (mounted) {
           Navigator.pop(context);
@@ -232,7 +218,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
       setState(() => _error = context.l10n.standardVolumePasswordsDoNotMatch);
       return;
     }
-
     if (_enableHiddenVolume && _format == CreateFormat.veracrypt) {
       if (_hiddenPasswordCtrl.text.isNotEmpty &&
           _hiddenPasswordCtrl.text != _hiddenConfirmPasswordCtrl.text) {
@@ -240,16 +225,13 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         return;
       }
     }
-
     setState(() {
       _loading = true;
       _error = null;
     });
-
     try {
       final multiplier = _sizeUnit == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024;
       final sizeBytes = (sizeVal * multiplier).round();
-
       int hiddenSizeBytes = 0;
       if (_enableHiddenVolume && _format == CreateFormat.veracrypt) {
         final outerPimClamped = clampPim(
@@ -258,7 +240,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         final hiddenPimClamped = clampPim(
           _hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0,
         );
-
         final validation = validateHiddenVolume(
           hiddenSizeText: _hiddenSizeCtrl.text,
           hiddenSizeUnit: _hiddenSizeUnit,
@@ -278,11 +259,9 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         }
         hiddenSizeBytes = validation.hiddenSizeBytes!;
       }
-
       final pim = clampPim(
         _pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0,
       );
-
       final success = await vaultExplorerApi.createContainer(
         displayName: _nameCtrl.text,
         sizeBytes: sizeBytes,
@@ -302,7 +281,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         hiddenCipherId: _enableHiddenVolume ? _hiddenCipherId : 255,
         hiddenHashId: _enableHiddenVolume ? _hiddenHashId : 255,
       );
-
       if (success) {
         if (mounted) {
           Navigator.pop(context);
@@ -321,8 +299,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
       if (mounted) setState(() => _loading = false);
     }
   }
-
-  // ── Vault-kind selector (Container File vs Folder Vault) ──────────────────
 
   Widget _buildVaultKindSelector() {
     return SegmentedButton<bool>(
@@ -412,7 +388,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         SectionHeader(context.l10n.standardVolumeHeader),
         SectionCard(
           children: [
-            // Format Selector
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -428,8 +403,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 ],
               ),
             ),
-
-            // File Name Field
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
@@ -441,8 +414,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 ),
               ),
             ),
-
-            // Container Size & Unit Row
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -474,8 +445,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 ],
               ),
             ),
-
-            // Password Field
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
@@ -494,8 +463,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 ),
               ),
             ),
-
-            // Confirm Password Field
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
@@ -515,11 +482,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                 ),
               ),
             ),
-
-            // Keyfiles Picker
             _buildKeyfilesPicker(),
-
-            // Advanced Parameters Panel
             _buildAdvancedTile(context),
           ],
         ),
@@ -530,7 +493,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   Widget _buildHiddenVolumeSection(ColorScheme cs, TextTheme textTheme) {
     final bool isEnabled =
         _passwordCtrl.text.isNotEmpty || keyfiles.isNotEmpty;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -667,8 +629,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     );
   }
 
-  // ── Folder vault (Cryptomator / Gocryptfs) section ─────────────────────────
-
   Widget _buildFolderVaultFormatSelector() {
     return SegmentedButton<String>(
       segments: const [
@@ -698,7 +658,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   Widget _buildFolderVaultPickerCard(ColorScheme cs, TextTheme textTheme) {
     final hasSelection = _folderVaultUri != null;
     final busy = _loading || _pickingFolderVault;
-
     return GestureDetector(
       onTap: busy ? null : _pickFolderVaultLocation,
       child: Card(
@@ -753,7 +712,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                     const SizedBox(height: 2),
                     Text(
                       _folderVaultDisplayName ??
-                          'Tap to choose where vault will be created…',
+                          context.l10n.tapToChooseVaultLocation,
                       style: textTheme.bodyLarge?.copyWith(
                         color:
                             hasSelection ? cs.onSurface : cs.onSurfaceVariant,
@@ -898,7 +857,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
     final textTheme = Theme.of(context).textTheme;
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
-
     final inputDecorationTheme = InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHighest,
@@ -916,7 +874,6 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         borderSide: BorderSide(color: cs.primary, width: 2),
       ),
     );
-
     final errorAndSubmit = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -947,13 +904,11 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
         ),
       ],
     );
-
     final primarySection = _isFolderVault
         ? _buildFolderVaultSection(cs, textTheme)
         : _buildMainVolumeSection(cs, textTheme);
     final showHiddenVolumeSection =
         !_isFolderVault && _format == CreateFormat.veracrypt;
-
     return PopScope(
       canPop: !_loading,
       onPopInvokedWithResult: (didPop, result) {

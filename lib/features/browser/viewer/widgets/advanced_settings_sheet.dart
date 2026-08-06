@@ -13,7 +13,6 @@ class AdvancedSettingsSheet extends StatefulWidget {
   final double initialPlaybackSpeed;
   final bool hasSubtitles;
   final bool initialSubtitlesEnabled;
-
   final ValueChanged<int> onRotationChanged;
   final ValueChanged<BoxFit> onImageFitChanged;
   final ValueChanged<int> onSlideshowDelayChanged;
@@ -78,7 +77,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
           color: cs.primary,
           fontWeight: FontWeight.bold,
           fontSize: 13,
-         ),
+        ),
       ),
       onTap: () {
         HapticFeedback.mediumImpact();
@@ -128,7 +127,6 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
     final double maxSheetHeight = isLandscapeLayout
         ? MediaQuery.of(context).size.height * 0.72
         : MediaQuery.of(context).size.height * 0.9;
-
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: maxSheetHeight),
       child: SafeArea(
@@ -194,7 +192,6 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
               setState(() => _sheetPage = 'imageFit');
             },
           ),
-          // Only show Slideshow Delay if we are in Playlist Mode
           if (widget.isPlaylistMode) ...[
             const Divider(),
             ListTile(

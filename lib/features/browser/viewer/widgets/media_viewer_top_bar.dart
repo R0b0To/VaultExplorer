@@ -13,6 +13,8 @@ class MediaViewerTopBar extends StatelessWidget {
   final int totalCount;
   final PlaylistTransitionEffect currentTransitionEffect;
   final ValueChanged<PlaylistTransitionEffect> onTransitionEffectChanged;
+  final Axis currentScrollDirection;
+  final ValueChanged<Axis> onScrollDirectionChanged;
   final VoidCallback onBackPressed;
   final VoidCallback onDeletePressed;
   final VoidCallback onPlaylistChanged;
@@ -25,6 +27,8 @@ class MediaViewerTopBar extends StatelessWidget {
     required this.totalCount,
     required this.currentTransitionEffect,
     required this.onTransitionEffectChanged,
+    this.currentScrollDirection = Axis.horizontal,
+    required this.onScrollDirectionChanged,
     required this.onBackPressed,
     required this.onDeletePressed,
     required this.onPlaylistChanged,
@@ -34,7 +38,6 @@ class MediaViewerTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.paddingOf(context).top + 8,
@@ -54,14 +57,12 @@ class MediaViewerTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // M3 Tactile Back Button
           _TopBarCircleButton(
             icon: Icons.arrow_back_rounded,
             tooltip: context.l10n.backTooltip,
             onPressed: onBackPressed,
           ),
           const SizedBox(width: 12),
-          // Title & Subtitle Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,10 +107,8 @@ class MediaViewerTopBar extends StatelessWidget {
   Widget _buildPlaylistMenu(BuildContext context, ColorScheme cs) {
     final isPlaylist = playlistController.isPlaylistMode;
     final folderScope = playlistController.selectedFolder;
-
     final isThisFolderSelected = isPlaylist && folderScope == 'Current Folder Only';
     final isAllSelected = isPlaylist && folderScope == 'All';
-
     final menuStyle = MenuStyle(
       elevation: const WidgetStatePropertyAll(4),
       shape: WidgetStatePropertyAll(
@@ -121,7 +120,6 @@ class MediaViewerTopBar extends StatelessWidget {
         EdgeInsets.symmetric(vertical: 8),
       ),
     );
-
     return MenuAnchor(
       style: menuStyle,
       builder: (ctx, controller, child) => _TopBarCircleButton(
@@ -140,18 +138,15 @@ class MediaViewerTopBar extends StatelessWidget {
           ),
           onPressed: () async {
             final targetFile = playlistController.currentFile;
-
             if (isThisFolderSelected) {
               playlistController.disablePlaylist();
             } else {
               await playlistController.enablePlaylist('Current Folder Only');
             }
-
             final newIndex = playlistController.playlist.indexOf(targetFile);
             if (newIndex != -1) {
               playlistController.updateIndex(newIndex);
             }
-
             onPlaylistChanged();
           },
           leadingIcon: isThisFolderSelected
@@ -165,18 +160,15 @@ class MediaViewerTopBar extends StatelessWidget {
           ),
           onPressed: () async {
             final targetFile = playlistController.currentFile;
-
             if (isAllSelected) {
               playlistController.disablePlaylist();
             } else {
               await playlistController.enablePlaylist('All');
             }
-
             final newIndex = playlistController.playlist.indexOf(targetFile);
             if (newIndex != -1) {
               playlistController.updateIndex(newIndex);
             }
-
             onPlaylistChanged();
           },
           leadingIcon: isAllSelected
@@ -192,14 +184,11 @@ class MediaViewerTopBar extends StatelessWidget {
             ),
             onPressed: () {
               final targetFile = playlistController.currentFile;
-              
               playlistController.toggleShuffle();
-
               final newIndex = playlistController.playlist.indexOf(targetFile);
               if (newIndex != -1) {
                 playlistController.updateIndex(newIndex);
               }
-
               onPlaylistChanged();
             },
             leadingIcon: Icon(
@@ -230,7 +219,6 @@ class MediaViewerTopBar extends StatelessWidget {
         EdgeInsets.symmetric(vertical: 8),
       ),
     );
-
     return MenuAnchor(
       style: menuStyle,
       builder: (ctx, controller, child) => _TopBarCircleButton(
@@ -266,6 +254,38 @@ class MediaViewerTopBar extends StatelessWidget {
             color: cs.onSurfaceVariant,
           ),
           child: Text(context.l10n.openWithAppAction),
+        ),
+        SubmenuButton(
+          leadingIcon: Icon(
+            currentScrollDirection == Axis.vertical
+                ? Icons.swap_vert_rounded
+                : Icons.swap_horiz_rounded,
+            size: 18,
+            color: cs.onSurfaceVariant,
+          ),
+          menuChildren: [
+            MenuItemButton(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onScrollDirectionChanged(Axis.horizontal);
+              },
+              leadingIcon: currentScrollDirection == Axis.horizontal
+                  ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+                  : const SizedBox(width: 18),
+              child: const Text('Horizontal (Left / Right)'),
+            ),
+            MenuItemButton(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onScrollDirectionChanged(Axis.vertical);
+              },
+              leadingIcon: currentScrollDirection == Axis.vertical
+                  ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+                  : const SizedBox(width: 18),
+              child: const Text('Vertical (Up / Down)'),
+            ),
+          ],
+          child: const Text('Playlist Direction'),
         ),
         SubmenuButton(
           leadingIcon: Icon(
@@ -348,8 +368,6 @@ class MediaViewerTopBar extends StatelessWidget {
     );
   }
 }
-
-// ── Translucent M3 Top-Bar Action Button ─────────────────────────────────────
 
 class _TopBarCircleButton extends StatelessWidget {
   final IconData icon;

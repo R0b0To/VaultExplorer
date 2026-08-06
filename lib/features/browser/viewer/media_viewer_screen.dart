@@ -26,7 +26,6 @@ import 'package:vaultexplorer/features/browser/viewer/widgets/advanced_settings_
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_diagnostics_sheet.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_carousel_overlay.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/playlist_transition_transformer.dart';
-
 import 'native_video_controller.dart';
 
 enum VideoPlaybackMode { playOnce, loop, playAndAdvance }
@@ -80,6 +79,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   final int _doubleTapSkipSeconds = 5;
   BoxFit _imageFit = BoxFit.contain;
   PlaylistTransitionEffect _transitionEffect = PlaylistTransitionEffect.slide;
+  Axis _scrollDirection = Axis.horizontal;
   bool _isMuted = false;
   bool _isSwiping = false;
   final Set<String> _prefetchingFullRes = {};
@@ -89,12 +89,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _wakelockEnabled = false;
   int _transitionToken = 0;
 
-    void _onContainerLockedEvent(int volId) {
+  void _onContainerLockedEvent(int volId) {
     if (volId == widget.container.volId && mounted) {
       setState(() => _isContainerLocked = true);
     }
   }
-
 
   @override
   void initState() {
@@ -121,38 +120,24 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     );
     _loadConfig();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-       _activateCurrentMedia();
+      _activateCurrentMedia();
       _startSlideshowTimerIfNeeded();
-
-      // 2. Wait for ExoPlayer initialization to complete before background prefetching starts
       await PlaybackThrottleController.initGate;
       if (mounted) _prefetchSurroundingItems();
     });
   }
 
-  // Monotonically-increasing token guarding against overlapping
-  // _activateCurrentMedia() calls (e.g. if some future caller fires it
-  // twice in quick succession before the first call's awaits resolve).
-  // Without this, two concurrent calls could both pass VideoPlaybackManager
-  // .activate()'s "already active" check on stale state and each spin up
-  // their own hardware decoder for the same or different files at once --
-  // exactly the kind of overlap this whole fix is meant to prevent.
   int _activateToken = 0;
-
   void _activateCurrentMedia() {
     if (_playlistController.isEmpty) return;
     final file = _playlistController.currentFile;
     final token = ++_activateToken;
-
     final isVid = MediaViewerConstants.isVideo(file);
     final isAud = MediaViewerConstants.isAudio(file);
-
     unawaited(PlaybackThrottleController.setActive(isVid));
     if (!mounted || token != _activateToken) return;
-
     if (isVid || isAud) {
       PlaybackThrottleController.setInitializing();
-      // Call activate asynchronously - Manager internal queue handles safety
       unawaited(_playbackManager.activate(
         fileName: file,
         contentUriString: _contentUriFor(file),
@@ -164,8 +149,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
-
-Future<void> _loadConfig() async {
+  Future<void> _loadConfig() async {
     final config = await FileManagerToolbarService.instance.load();
     final appSettings = await AppSettingsService.loadSettings();
     if (mounted) {
@@ -175,6 +159,7 @@ Future<void> _loadConfig() async {
           _isCarouselVisible = false;
         }
         _transitionEffect = appSettings.playlistTransitionEffect;
+        _scrollDirection = appSettings.playlistScrollDirection;
       });
       if (config.autoStartPlaylistMode && !_playlistController.isPlaylistMode) {
         final targetFile = _playlistController.currentFile;
@@ -188,30 +173,6 @@ Future<void> _loadConfig() async {
         }
       }
     }
-  }
-
-    void _onPlaylistChanged() {
-    _startHideTimer();
-    if (!_playlistController.isPlaylistMode) {
-      if (_isCarouselVisible) _toggleCarousel();
-      if (_autoAdvance) {
-        _updatePlaybackMode(VideoPlaybackMode.playOnce);
-      }
-    }
-    final oldController = _pageController;
-    _pageController =
-        PageController(initialPage: _playlistController.currentIndex);
-    if (oldController.hasClients) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        oldController.dispose();
-      });
-    } else {
-      oldController.dispose();
-    }
-    setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _onScrollEnd();
-    });
   }
 
   GlobalKey _getMediaKey(String fileName) {
@@ -248,6 +209,30 @@ Future<void> _loadConfig() async {
     }
   }
 
+  void _onPlaylistChanged() {
+    _startHideTimer();
+    if (!_playlistController.isPlaylistMode) {
+      if (_isCarouselVisible) _toggleCarousel();
+      if (_autoAdvance) {
+        _updatePlaybackMode(VideoPlaybackMode.playOnce);
+      }
+    }
+    final oldController = _pageController;
+    _pageController =
+        PageController(initialPage: _playlistController.currentIndex);
+    if (oldController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        oldController.dispose();
+      });
+    } else {
+      oldController.dispose();
+    }
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onScrollEnd();
+    });
+  }
+
   void _onActiveVideoControllerChanged() {
     if (_lastListenedController != null) {
       try {
@@ -268,33 +253,23 @@ Future<void> _loadConfig() async {
     _videoProgressNotifier.value = const VideoPlaybackProgress();
   }
 
-void _onControllerTickUpdate() {
+  void _onControllerTickUpdate() {
     final controller = _playbackManager.activeController;
     if (controller == null || controller.value.hasError) return;
     _updateWakelock(controller.value.isPlaying);
-
     if (_isAutoAdvancing) return;
-
     final isInitialized = controller.value.isInitialized;
     final position = controller.value.position;
     final duration = controller.value.duration;
-
     if (isInitialized &&
         _videoPlaybackMode == VideoPlaybackMode.playAndAdvance &&
         duration > Duration.zero &&
         position >= duration) {
-      // 1. Immediately set flag to block subsequent ticks
       _isAutoAdvancing = true;
-
-      // 2. Remove listener from this controller so it stops notifying
       try {
         controller.removeListener(_onControllerTickUpdate);
       } catch (_) {}
-
-      // 3. Pause playback
       _playbackManager.pauseActive();
-
-      // 4. Schedule a SINGLE auto-advance timer
       _cancelSlideshowTimer();
       _slideshowTimer = Timer(const Duration(milliseconds: 300), () {
         if (mounted && _videoPlaybackMode == VideoPlaybackMode.playAndAdvance) {
@@ -313,33 +288,27 @@ void _onControllerTickUpdate() {
         '$volId%3Afile%3A$escapedPath';
   }
 
-void _prefetchSurroundingItems() {
+  void _prefetchSurroundingItems() {
     final index = _playlistController.currentIndex;
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty) return;
 
-    final next = index + 1;
-    final prev = index - 1;
-    final nextFile = next < playlist.length ? playlist[next] : null;
-    final prevFile = prev >= 0 ? playlist[prev] : null;
-
-    // Prefetch Thumbnails
-    if (nextFile != null) _prefetchThumbnail(nextFile);
-    if (prevFile != null) _prefetchThumbnail(prevFile);
-
-    // Prefetch Full-Res Image if next is an image
-    final currentFile = _playlistController.currentFile;
-    if (MediaViewerConstants.isImage(currentFile) && nextFile != null) {
-      _prefetchFullRes(nextFile);
+    for (final delta in [1, -1, 2, -2]) {
+      final i = index + delta;
+      if (i >= 0 && i < playlist.length) {
+        final file = playlist[i];
+        _prefetchThumbnail(file);
+        if (MediaViewerConstants.isImage(file)) {
+          _prefetchFullRes(file);
+        }
+      }
     }
   }
 
-Future<void> _prefetchThumbnail(String fileName) async {
+  Future<void> _prefetchThumbnail(String fileName) async {
     final isImg = MediaViewerConstants.isImage(fileName);
     final isVid = MediaViewerConstants.isVideo(fileName);
     if (!isImg && !isVid) return;
-
-    // 1. Check memory cache first
     if (ThumbnailCacheService.getFromMemory(
           widget.container,
           fileName,
@@ -348,8 +317,6 @@ Future<void> _prefetchThumbnail(String fileName) async {
         null) {
       return;
     }
-
-    // 2. ALWAYS CHECK DISK CACHE (Fast file I/O, uses 0 hardware video decoders!)
     final mode = widget.thumbnailCacheMode;
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await ThumbnailCacheService.get(
@@ -369,13 +336,9 @@ Future<void> _prefetchThumbnail(String fileName) async {
         return;
       }
     }
-
-    // 3. ONLY block heavy native hardware extraction if playback is actively playing
     if (isVid && PlaybackThrottleController.isPlaybackActive.value) {
       return;
     }
-
-    // 4. Proceed with native extraction queue
     final key = '${widget.container.volId}:'
         '${widget.container.mountedAt.millisecondsSinceEpoch}:$fileName';
     final existing = ThumbnailConcurrency.inFlightThumbnails[key];
@@ -386,7 +349,6 @@ Future<void> _prefetchThumbnail(String fileName) async {
       if (mounted) setState(() {});
       return;
     }
-
     final limiter = isVid
         ? ThumbnailConcurrency.videoLimiter
         : ThumbnailConcurrency.imageLimiter;
@@ -507,7 +469,7 @@ Future<void> _prefetchThumbnail(String fileName) async {
         isStillWanted: () {
           if (!mounted) return false;
           final idx = _playlistController.playlist.indexOf(fileName);
-          return idx != -1 && (idx - _playlistController.currentIndex).abs() <= 1;
+          return idx != -1 && (idx - _playlistController.currentIndex).abs() <= 2;
         },
         priority: TaskPriority.adjacent,
       );
@@ -518,7 +480,7 @@ Future<void> _prefetchThumbnail(String fileName) async {
     }
   }
 
-Future<void> _transitionTo(
+  Future<void> _transitionTo(
     int index, {
     bool animate = true,
     Duration duration = const Duration(milliseconds: 250),
@@ -528,15 +490,12 @@ Future<void> _transitionTo(
     final token = ++_transitionToken;
     _cancelSlideshowTimer();
     _startHideTimer();
-
     _playlistController.updateIndex(index);
     _activateCurrentMedia();
-
     _prefetchDebounceTimer?.cancel();
     _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
       if (mounted) _prefetchSurroundingItems();
     });
-
     if (_pageController.hasClients && _pageController.positions.length == 1) {
       if (animate) {
         await _pageController.animateToPage(
@@ -548,10 +507,9 @@ Future<void> _transitionTo(
         _pageController.jumpToPage(index);
       }
     }
-
     if (mounted && _transitionToken == token) {
       _isSwiping = false;
-      _isAutoAdvancing = false; // Reset guard flag when page arrives
+      _isAutoAdvancing = false;
       final currentFile = _playlistController.currentFile;
       if (MediaViewerConstants.isImage(currentFile)) {
         _startSlideshowTimerIfNeeded();
@@ -563,7 +521,7 @@ Future<void> _transitionTo(
     }
   }
 
-void _autoAdvanceToNext() {
+  void _autoAdvanceToNext() {
     final index = _playlistController.currentIndex;
     if (index < _playlistController.playlist.length - 1) {
       _transitionTo(
@@ -607,20 +565,17 @@ void _autoAdvanceToNext() {
   void _onScrollStart() {
     if (!_isSwiping) {
       _isSwiping = true;
-      _isAutoAdvancing = false; // Cancel auto-advance if user manually swipes
+      _isAutoAdvancing = false;
       _playbackManager.activeController?.pause();
       _cancelSlideshowTimer();
     }
   }
 
-void _onScrollEnd() {
+  void _onScrollEnd() {
     _isSwiping = false;
-    
-    // Fallback check in case page scroll completed without index change
     if (_playbackManager.currentFileNotifier.value != _playlistController.currentFile) {
       _activateCurrentMedia();
     }
-
     final currentFile = _playlistController.currentFile;
     if (MediaViewerConstants.isImage(currentFile)) {
       _startSlideshowTimerIfNeeded();
@@ -702,13 +657,6 @@ void _onScrollEnd() {
 
   void _handleMediaError(String fileName) {
     if (fileName != _playlistController.currentFile) return;
-    // Leave the current item in place and let its error overlay stay on
-    // screen so the user can see what failed, rather than automatically
-    // skipping to the next file. Auto-skipping here previously triggered
-    // a cascading loop: it advanced (and began initializing the next
-    // file's decoder) while the failed video's hardware decoder was still
-    // being torn down, which on single-decoder-pipeline devices produced
-    // another NO_MEMORY failure, which skipped again, and so on.
     _cancelSlideshowTimer();
     _playbackManager.pauseActive();
   }
@@ -895,7 +843,7 @@ void _onScrollEnd() {
 
   @override
   Widget build(BuildContext context) {
-        if (_isContainerLocked) {
+    if (_isContainerLocked) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: SizedBox.expand(),
@@ -946,56 +894,52 @@ void _onScrollEnd() {
                   key: ValueKey(
                     '${_playlistController.isPlaylistMode}_'
                     '${_playlistController.selectedFolder}_'
-                    '${_playlistController.isShuffled}',
+                    '${_playlistController.isShuffled}_'
+                    '$_scrollDirection',
                   ),
                   controller: _pageController,
+                  scrollDirection: _scrollDirection,
                   physics: physics,
                   itemCount: _playlistController.playlist.length,
                   onPageChanged: (index) {
-                  if (_playlistController.currentIndex != index) {
-                    _playlistController.updateIndex(index);
-                    // Immediately start hardware decoder switch when swipe crosses midpoint
-                    _activateCurrentMedia();
-                  }
-
-                  _prefetchDebounceTimer?.cancel();
-                  _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
-                    if (mounted) _prefetchSurroundingItems();
-                  });
-                },
-
-                itemBuilder: (context, index) {
+                    if (_playlistController.currentIndex != index) {
+                      _playlistController.updateIndex(index);
+                      _activateCurrentMedia();
+                    }
+                    _prefetchDebounceTimer?.cancel();
+                    _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+                      if (mounted) _prefetchSurroundingItems();
+                    });
+                  },
+                  itemBuilder: (context, index) {
                     final fileName = _playlistController.playlist[index];
                     final contentUriString = _contentUriFor(fileName);
                     final prefetchedBytes = _prefetchedBytesFor(fileName);
-
-                    // IF THUMBNAIL IS MISSING FROM MEMORY, TRIGGER DISK CACHE LOAD IMMEDIATELY
                     if (prefetchedBytes == null) {
                       unawaited(_prefetchThumbnail(fileName));
                     }
-
                     final isImg = MediaViewerConstants.isImage(fileName);
                     final isAudio = MediaViewerConstants.isAudio(fileName);
                     final itemWidget = Container(
-                        color: Colors.black,
-                        child: isImg
-                            ? ImagePageItem(
-                                key: _getMediaKey(fileName),
-                                fileName: fileName,
-                                prefetchedBytes: prefetchedBytes,
-                                container: widget.container,
-                                imageFit: _imageFit,
-                                rotationQuarterTurns: _rotations[fileName] ?? 0,
-                                showUI: _showUI,
-                                onToggleUI: _setUIVisibility,
-                                onZoomChanged: (allowSwipe) {
+                      color: Colors.black,
+                      child: isImg
+                          ? ImagePageItem(
+                              key: _getMediaKey(fileName),
+                              fileName: fileName,
+                              prefetchedBytes: prefetchedBytes,
+                              container: widget.container,
+                              imageFit: _imageFit,
+                              rotationQuarterTurns: _rotations[fileName] ?? 0,
+                              showUI: _showUI,
+                              onToggleUI: _setUIVisibility,
+                              onZoomChanged: (allowSwipe) {
                                 _swipePhysicsNotifier.value = allowSwipe
                                     ? const BouncingScrollPhysics()
                                     : const NeverScrollableScrollPhysics();
                               },
                               onError: () => _handleMediaError(fileName),
                             )
-                          :MediaPlayerWidget(
+                          : MediaPlayerWidget(
                               key: _getMediaKey(fileName),
                               container: widget.container,
                               fileName: fileName,
@@ -1024,11 +968,11 @@ void _onScrollEnd() {
                               onError: () => _handleMediaError(fileName),
                             ),
                     );
-
                     return PlaylistTransitionTransformer(
                       pageController: _pageController,
                       index: index,
                       effect: _transitionEffect,
+                      scrollDirection: _scrollDirection,
                       child: itemWidget,
                     );
                   },
@@ -1059,12 +1003,22 @@ void _onScrollEnd() {
                     appSettings.copyWith(playlistTransitionEffect: newEffect),
                   );
                 },
+                currentScrollDirection: _scrollDirection,
+                onScrollDirectionChanged: (newDirection) async {
+                  setState(() {
+                    _scrollDirection = newDirection;
+                  });
+                  final appSettings = await AppSettingsService.loadSettings();
+                  await AppSettingsService.saveSettings(
+                    appSettings.copyWith(playlistScrollDirection: newDirection),
+                  );
+                },
                 onBackPressed: () {
                   HapticFeedback.lightImpact();
                   Navigator.pop(context);
                 },
                 onDeletePressed: _deleteCurrentFile,
-                onPlaylistChanged:_onPlaylistChanged,
+                onPlaylistChanged: _onPlaylistChanged,
               ),
             ),
           ),
@@ -1092,7 +1046,7 @@ void _onScrollEnd() {
                   videoPlaybackMode: _videoPlaybackMode,
                   onNavigateToPrev: _navigateToPrev,
                   onNavigateToNext: _navigateToNext,
-                   onTogglePlayPause: (wasPlaying) {
+                  onTogglePlayPause: (wasPlaying) {
                     _startHideTimer();
                     if (isImg) {
                       _updatePlaybackMode(
@@ -1145,7 +1099,6 @@ void _onScrollEnd() {
                 onClose: _toggleCarousel,
               ),
             ),
-
         ],
       ),
     );

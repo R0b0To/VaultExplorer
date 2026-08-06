@@ -38,11 +38,11 @@ class AppSettings {
   bool defaultFileSortAscending;
   bool htmlEnableJavaScript;
   PlaylistTransitionEffect playlistTransitionEffect;
-  /// `null` = follow system locale; otherwise an explicit BCP-47 language
-  /// code matching one of `AppLocalizations.supportedLocales` (e.g. `'en'`).
+  Axis playlistScrollDirection;
   String? languageCode;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
+
   AppSettings({
     this.useMasterPassword = false,
     this.masterPasswordIsFingerprint = false,
@@ -64,6 +64,7 @@ class AppSettings {
     this.defaultFileSortAscending = true,
     this.htmlEnableJavaScript = false,
     this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
+    this.playlistScrollDirection = Axis.horizontal,
     this.languageCode,
     Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
@@ -114,6 +115,7 @@ class AppSettings {
     bool? defaultFileSortAscending,
     bool? htmlEnableJavaScript,
     PlaylistTransitionEffect? playlistTransitionEffect,
+    Axis? playlistScrollDirection,
     String? languageCode,
   }) {
     return AppSettings(
@@ -140,6 +142,7 @@ class AppSettings {
       defaultFileSortAscending: defaultFileSortAscending ?? this.defaultFileSortAscending,
       htmlEnableJavaScript: htmlEnableJavaScript ?? this.htmlEnableJavaScript,
       playlistTransitionEffect: playlistTransitionEffect ?? this.playlistTransitionEffect,
+      playlistScrollDirection: playlistScrollDirection ?? this.playlistScrollDirection,
       languageCode: languageCode ?? this.languageCode,
     );
   }
@@ -166,8 +169,10 @@ class AppSettings {
     'defaultFileSortAscending': defaultFileSortAscending,
     'htmlEnableJavaScript': htmlEnableJavaScript,
     'playlistTransitionEffect': playlistTransitionEffect.toJson(),
+    'playlistScrollDirection': playlistScrollDirection == Axis.vertical ? 'vertical' : 'horizontal',
     'languageCode': languageCode,
   };
+
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
     useMasterPassword: j['useMasterPassword'] as bool? ?? false,
     masterPasswordIsFingerprint: j['masterPasswordIsFingerprint'] as bool? ?? false,
@@ -199,10 +204,11 @@ class AppSettings {
         ) ??
         {},
     autoOpenOnUnlock: j['autoOpenOnUnlock'] as bool? ?? false,
-   defaultFileSortBy: SortBy.fromJson(j['defaultFileSortBy'] as String?),
+    defaultFileSortBy: SortBy.fromJson(j['defaultFileSortBy'] as String?),
     defaultFileSortAscending: j['defaultFileSortAscending'] as bool? ?? true,
     htmlEnableJavaScript: j['htmlEnableJavaScript'] as bool? ?? false,
     playlistTransitionEffect: PlaylistTransitionEffect.fromJson(j['playlistTransitionEffect'] as String?),
+    playlistScrollDirection: j['playlistScrollDirection'] == 'vertical' ? Axis.vertical : Axis.horizontal,
     languageCode: j['languageCode'] as String?,
   );
 }

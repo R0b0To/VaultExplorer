@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class AdvancedSettingsSheet extends StatefulWidget {
   final bool isPlaylistMode;
@@ -60,19 +61,19 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
   }
 
   String _getImageFitLabel(BoxFit fit) {
-    if (fit == BoxFit.contain) return 'Contain';
-    if (fit == BoxFit.fitWidth) return 'Fit Width';
-    if (fit == BoxFit.fitHeight) return 'Fit Height';
-    return 'Contain';
+    if (fit == BoxFit.contain) return context.l10n.imageFitContain;
+    if (fit == BoxFit.fitWidth) return context.l10n.imageFitWidth;
+    if (fit == BoxFit.fitHeight) return context.l10n.imageFitHeight;
+    return context.l10n.imageFitContain;
   }
 
   Widget _buildRotationTile(ColorScheme cs) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: const Icon(Icons.rotate_right_rounded),
-      title: const Text('Rotate 90°'),
+      title: Text(context.l10n.rotate90Label),
       trailing: Text(
-        '${_currentRotation * 90}°',
+        context.l10n.rotationDegreesValue(_currentRotation * 90),
         style: TextStyle(
           color: cs.primary,
           fontWeight: FontWeight.bold,
@@ -143,19 +144,19 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_sheetPage == 'main') ...[
-                _buildHeader(cs, widget.isImage ? 'Image Settings' : 'Playback Settings', null),
+                _buildHeader(cs, widget.isImage ? context.l10n.imageSettingsTitle : context.l10n.playbackSettingsTitle, null),
                 const SizedBox(height: 8),
                 _buildMainPage(cs),
               ] else if (_sheetPage == 'imageFit') ...[
-                _buildHeader(cs, 'Image Fit Mode', () => setState(() => _sheetPage = 'main')),
+                _buildHeader(cs, context.l10n.imageFitModeLabel, () => setState(() => _sheetPage = 'main')),
                 const SizedBox(height: 8),
                 _buildImageFitSubmenu(cs),
               ] else if (_sheetPage == 'slideshowDelay') ...[
-                _buildHeader(cs, 'Slideshow Delay', () => setState(() => _sheetPage = 'main')),
+                _buildHeader(cs, context.l10n.slideshowDelayLabel, () => setState(() => _sheetPage = 'main')),
                 const SizedBox(height: 8),
                 _buildSlideshowDelaySubmenu(cs),
               ] else if (_sheetPage == 'playbackSpeed') ...[
-                _buildHeader(cs, 'Playback Speed', () => setState(() => _sheetPage = 'main')),
+                _buildHeader(cs, context.l10n.playbackSpeedLabel, () => setState(() => _sheetPage = 'main')),
                 const SizedBox(height: 8),
                 _buildPlaybackSpeedSubmenu(cs),
               ],
@@ -176,7 +177,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.aspect_ratio_rounded),
-            title: const Text('Image Fit Mode'),
+            title: Text(context.l10n.imageFitModeLabel),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -199,12 +200,12 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.timer_outlined),
-              title: const Text('Slideshow Delay'),
+              title: Text(context.l10n.slideshowDelayLabel),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '${_currentSlideshowDelaySeconds}s',
+                    context.l10n.slideshowDelaySecondsValue(_currentSlideshowDelaySeconds),
                     style: TextStyle(color: cs.primary, fontSize: 13),
                   ),
                   const SizedBox(width: 4),
@@ -228,12 +229,12 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.slow_motion_video_rounded),
-            title: const Text('Playback Speed'),
+            title: Text(context.l10n.playbackSpeedLabel),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${_currentPlaybackSpeed}x',
+                  context.l10n.playbackSpeedValue('$_currentPlaybackSpeed'),
                   style: TextStyle(color: cs.primary, fontSize: 13),
                 ),
                 const SizedBox(width: 4),
@@ -250,7 +251,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               secondary: const Icon(Icons.subtitles_rounded),
-              title: const Text('Subtitles'),
+              title: Text(context.l10n.subtitlesLabel),
               value: _currentSubtitlesEnabled,
               activeThumbColor: cs.primary,
               onChanged: (val) {
@@ -305,7 +306,7 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
         return ListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(
-            '$delay seconds',
+            context.l10n.nSecondsDelay(delay),
             style: TextStyle(
               color: isSelected ? cs.primary : null,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -335,7 +336,9 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
         return ListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(
-            '${speed}x${speed == 1.0 ? " (Normal)" : ""}',
+            speed == 1.0
+                ? context.l10n.playbackSpeedNormal('$speed')
+                : context.l10n.playbackSpeedValue('$speed'),
             style: TextStyle(
               color: isSelected ? cs.primary : null,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,

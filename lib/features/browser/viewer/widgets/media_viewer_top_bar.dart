@@ -4,6 +4,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class MediaViewerTopBar extends StatelessWidget {
   final MountedContainer container;
@@ -56,7 +57,7 @@ class MediaViewerTopBar extends StatelessWidget {
           // M3 Tactile Back Button
           _TopBarCircleButton(
             icon: Icons.arrow_back_rounded,
-            tooltip: 'Back',
+            tooltip: context.l10n.backTooltip,
             onPressed: onBackPressed,
           ),
           const SizedBox(width: 12),
@@ -80,8 +81,12 @@ class MediaViewerTopBar extends StatelessWidget {
                 if (playlistController.isPlaylistMode || playlistController.isScanningSubfolders)
                   Text(
                     playlistController.isPlaylistMode
-                        ? '${playlistController.currentIndex + 1} of $totalCount${playlistController.isScanningSubfolders ? '  ·  scanning…' : ''}'
-                        : 'Scanning…',
+                        ? (playlistController.isScanningSubfolders
+                            ? context.l10n.mediaViewerPlaylistPositionScanningLabel(
+                                playlistController.currentIndex + 1, totalCount)
+                            : context.l10n.mediaViewerPlaylistPositionLabel(
+                                playlistController.currentIndex + 1, totalCount))
+                        : context.l10n.mediaViewerScanningLabel,
                     style: textTheme.bodySmall?.copyWith(
                       color: Colors.white.withValues(alpha: 0.7),
                     ),
@@ -122,7 +127,7 @@ class MediaViewerTopBar extends StatelessWidget {
       builder: (ctx, controller, child) => _TopBarCircleButton(
         icon: isPlaylist ? Icons.playlist_play_rounded : Icons.playlist_add_rounded,
         iconColor: isPlaylist ? cs.primary : Colors.white,
-        tooltip: isPlaylist ? 'Playlist Options' : 'Enable Playlist',
+        tooltip: isPlaylist ? context.l10n.playlistOptionsTooltip : context.l10n.enablePlaylistTooltip,
         onPressed: () {
           HapticFeedback.lightImpact();
           controller.isOpen ? controller.close() : controller.open();
@@ -152,7 +157,7 @@ class MediaViewerTopBar extends StatelessWidget {
           leadingIcon: isThisFolderSelected
               ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
               : const SizedBox(width: 18),
-          child: const Text('This Folder'),
+          child: Text(context.l10n.thisFolderMenu),
         ),
         MenuItemButton(
           style: MenuItemButton.styleFrom(
@@ -177,7 +182,7 @@ class MediaViewerTopBar extends StatelessWidget {
           leadingIcon: isAllSelected
               ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
               : const SizedBox(width: 18),
-          child: const Text('All (Incl. Subfolders)'),
+          child: Text(context.l10n.allInclSubfoldersMenu),
         ),
         if (playlistController.isPlaylistMode) ...[
           const PopupMenuDivider(),
@@ -204,8 +209,8 @@ class MediaViewerTopBar extends StatelessWidget {
             ),
             child: Text(
               playlistController.isShuffled
-                  ? 'Disable Shuffle'
-                  : 'Shuffle Playlist',
+                  ? context.l10n.disableShuffleMenu
+                  : context.l10n.shufflePlaylistMenu,
             ),
           ),
         ],
@@ -230,7 +235,7 @@ class MediaViewerTopBar extends StatelessWidget {
       style: menuStyle,
       builder: (ctx, controller, child) => _TopBarCircleButton(
         icon: Icons.more_vert_rounded,
-        tooltip: 'More Actions',
+        tooltip: context.l10n.moreActionsTooltip,
         onPressed: () {
           HapticFeedback.lightImpact();
           controller.isOpen ? controller.close() : controller.open();
@@ -248,7 +253,7 @@ class MediaViewerTopBar extends StatelessWidget {
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Failed to open in external app: $e'),
+                    content: Text(context.l10n.failedToOpenExternalApp('$e')),
                     backgroundColor: Theme.of(context).colorScheme.error,
                   ),
                 );
@@ -260,7 +265,7 @@ class MediaViewerTopBar extends StatelessWidget {
             size: 18,
             color: cs.onSurfaceVariant,
           ),
-          child: const Text('Open with App'),
+          child: Text(context.l10n.openWithAppAction),
         ),
         SubmenuButton(
           leadingIcon: Icon(
@@ -276,7 +281,7 @@ class MediaViewerTopBar extends StatelessWidget {
                   DeviceOrientation.portraitUp,
                 ]);
               },
-              child: const Text('Force Portrait'),
+              child: Text(context.l10n.forcePortraitMenu),
             ),
             MenuItemButton(
               onPressed: () {
@@ -286,17 +291,17 @@ class MediaViewerTopBar extends StatelessWidget {
                   DeviceOrientation.landscapeRight,
                 ]);
               },
-              child: const Text('Force Landscape'),
+              child: Text(context.l10n.forceLandscapeMenu),
             ),
             MenuItemButton(
               onPressed: () {
                 HapticFeedback.lightImpact();
                 SystemChrome.setPreferredOrientations(DeviceOrientation.values);
               },
-              child: const Text('Auto-Rotate (Sensor)'),
+              child: Text(context.l10n.autoRotateSensorMenu),
             ),
           ],
-          child: const Text('Screen Orientation'),
+          child: Text(context.l10n.screenOrientationMenu),
         ),
         SubmenuButton(
           leadingIcon: Icon(
@@ -324,7 +329,7 @@ class MediaViewerTopBar extends StatelessWidget {
               child: Text(effect.label),
             );
           }).toList(),
-          child: const Text('Playlist Transition'),
+          child: Text(context.l10n.playlistTransitionMenu),
         ),
         const PopupMenuDivider(),
         MenuItemButton(
@@ -337,7 +342,7 @@ class MediaViewerTopBar extends StatelessWidget {
             size: 18,
             color: cs.error,
           ),
-          child: const Text('Delete File'),
+          child: Text(context.l10n.deleteFileMenu),
         ),
       ],
     );

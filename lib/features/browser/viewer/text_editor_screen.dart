@@ -6,6 +6,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class TextEditorScreen extends StatefulWidget {
   final MountedContainer container;
@@ -92,7 +93,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       );
 
       if (!ok) {
-        throw Exception('Failed to decrypt file from vault.');
+        throw Exception(context.l10n.textEditorDecryptFailedMessage);
       }
 
       final bytes = await _tempFile!.readAsBytes();
@@ -100,8 +101,8 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       try {
         text = utf8.decode(bytes);
       } on FormatException {
-        throw const FormatException(
-          'The file does not appear to be a valid text file.',
+        throw FormatException(
+          context.l10n.textEditorInvalidTextFileMessage,
         );
       }
 
@@ -140,7 +141,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       );
 
       if (!ok) {
-        throw Exception('Failed to write file back to vault.');
+        throw Exception(context.l10n.textEditorWriteBackFailedMessage);
       }
 
       setState(() {
@@ -151,7 +152,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       if (mounted) {
         showAppSnackBar(
           context,
-          message: 'Changes saved successfully',
+          message: context.l10n.changesSavedSuccessfully,
           tone: AppBannerTone.success,
         );
       }
@@ -163,7 +164,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       if (mounted) {
         showAppSnackBar(
           context,
-          message: 'Save failed: $e',
+          message: context.l10n.saveFailedWithError('$e'),
           tone: AppBannerTone.error,
         );
       }
@@ -177,25 +178,25 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Unsaved Changes'),
-        content: const Text(
-          'You have unsaved changes. Would you like to save before closing?',
+        title: Text(context.l10n.unsavedChangesTitle),
+        content: Text(
+          context.l10n.unsavedChangesMessage,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop('discard'),
             child: Text(
-              'Discard',
+              context.l10n.discardButton,
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop('cancel'),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop('save'),
-            child: const Text('Save'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
@@ -242,7 +243,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                         Icons.save_rounded,
                         color: _isDirty ? cs.primary : cs.outline,
                       ),
-                tooltip: 'Save changes',
+                tooltip: context.l10n.saveChangesTooltip,
                 onPressed: (_isDirty && !_isSaving) ? _saveFile : null,
               ),
           ],
@@ -257,13 +258,13 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
 
   Widget _buildBody(ColorScheme cs, TextTheme textTheme) {
     if (_isLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(strokeWidth: 2.5),
             SizedBox(height: 16),
-            Text('Decrypting file content...'),
+            Text(context.l10n.decryptingFileContent),
           ],
         ),
       );
@@ -279,7 +280,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
               Icon(Icons.error_outline_rounded, color: cs.error, size: 48),
               const SizedBox(height: 16),
               Text(
-                'Cannot open file',
+                context.l10n.cannotOpenFile,
                 style: textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -296,7 +297,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
               OutlinedButton.icon(
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.arrow_back_rounded),
-                label: const Text('Go back'),
+                label: Text(context.l10n.goBack),
               ),
             ],
           ),
@@ -348,13 +349,13 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       child: Row(
         children: [
           Text(
-            'Lines: $_lineCount  |  Chars: $_charCount',
+            '${context.l10n.linesCount(_lineCount)}  |  ${context.l10n.charsCount(_charCount)}',
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
           ),
           const Spacer(),
           if (_isDirty)
             Text(
-              'Unsaved Changes',
+              context.l10n.unsavedChangesLabel,
               style: TextStyle(
                 color: context.semanticColors.warning,
                 fontSize: 12,
@@ -363,7 +364,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
             )
           else
             Text(
-              'Saved to vault',
+              context.l10n.savedToVault,
               style: TextStyle(
                 color: context.semanticColors.success,
                 fontSize: 12,

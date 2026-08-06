@@ -2474,6 +2474,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saveChangesTooltip => 'Save changes';
 
   @override
+  String get textEditorDecryptFailedMessage => 'Failed to decrypt file from vault.';
+
+  @override
+  String get textEditorInvalidTextFileMessage => 'The file does not appear to be a valid text file.';
+
+  @override
+  String get textEditorWriteBackFailedMessage => 'Failed to write file back to vault.';
+
+  @override
   String get backTooltip => 'Back';
 
   @override
@@ -2563,6 +2572,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get closeTooltip => 'Close';
 
   @override
+  String get diagnosticsPlaybackSection => 'Playback';
+
+  @override
+  String get diagnosticsEngineSection => 'Engine';
+
+  @override
+  String get diagnosticsStateLabel => 'State';
+
+  @override
+  String get diagnosticsResolutionLabel => 'Resolution';
+
+  @override
+  String get diagnosticsAspectRatioLabel => 'Aspect Ratio';
+
+  @override
+  String get diagnosticsPositionLabel => 'Position';
+
+  @override
+  String get diagnosticsDurationLabel => 'Duration';
+
+  @override
+  String get diagnosticsErrorLabel => 'Error';
+
+  @override
+  String get diagnosticsPlayerLabel => 'Player';
+
+  @override
+  String get diagnosticsDecodingLabel => 'Decoding';
+
+  @override
+  String get diagnosticsExoPlayerValue => 'ExoPlayer (Android)';
+
+  @override
+  String get diagnosticsHardwareAcceleratedValue => 'Hardware-accelerated';
+
+  @override
+  String get diagnosticsUnknownValue => 'Unknown';
+
+  @override
+  String get diagnosticsStateBuffering => 'Buffering';
+
+  @override
+  String get diagnosticsStatePlaying => 'Playing';
+
+  @override
+  String get diagnosticsStatePaused => 'Paused';
+
+  @override
+  String get diagnosticsDurationUnavailable => '--:--';
+
+  @override
   String get rotate90Label => 'Rotate 90°';
 
   @override
@@ -2600,6 +2660,21 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String playbackSpeedNormal(String speed) {
     return '${speed}x (Normal)';
+  }
+
+  @override
+  String playbackSpeedValue(String speed) {
+    return '${speed}x';
+  }
+
+  @override
+  String slideshowDelaySecondsValue(int seconds) {
+    return '${seconds}s';
+  }
+
+  @override
+  String rotationDegreesValue(int degrees) {
+    return '$degrees°';
   }
 
   @override
@@ -3061,4 +3136,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get invalidOrCorruptedImageMessage => 'Invalid or corrupted image format.';
+
+  @override
+  String mediaViewerPlaylistPositionLabel(num current, num total) {
+    return '$current of $total';
+  }
+
+  @override
+  String mediaViewerPlaylistPositionScanningLabel(num current, num total) {
+    return '$current of $total  ·  scanning…';
+  }
+
+  @override
+  String get mediaViewerScanningLabel => 'Scanning…';
 }

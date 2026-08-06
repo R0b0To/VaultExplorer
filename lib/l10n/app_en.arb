@@ -3338,6 +3338,18 @@
   "@saveChangesTooltip": {
     "description": "Tooltip for save icon button in text editor"
   },
+  "textEditorDecryptFailedMessage": "Failed to decrypt file from vault.",
+  "@textEditorDecryptFailedMessage": {
+    "description": "Exception message when the text editor fails to decrypt a file from the vault for editing"
+  },
+  "textEditorInvalidTextFileMessage": "The file does not appear to be a valid text file.",
+  "@textEditorInvalidTextFileMessage": {
+    "description": "Exception message when a file's bytes cannot be decoded as UTF-8 text in the text editor"
+  },
+  "textEditorWriteBackFailedMessage": "Failed to write file back to vault.",
+  "@textEditorWriteBackFailedMessage": {
+    "description": "Exception message when the text editor fails to write edited content back into the vault"
+  },
   "backTooltip": "Back",
   "@backTooltip": {
     "description": "Generic back navigation tooltip"
@@ -3457,6 +3469,74 @@
   "@closeTooltip": {
     "description": "Tooltip for close button"
   },
+  "diagnosticsPlaybackSection": "Playback",
+  "@diagnosticsPlaybackSection": {
+    "description": "Section header for playback stats in the diagnostics sheet"
+  },
+  "diagnosticsEngineSection": "Engine",
+  "@diagnosticsEngineSection": {
+    "description": "Section header for engine stats in the diagnostics sheet"
+  },
+  "diagnosticsStateLabel": "State",
+  "@diagnosticsStateLabel": {
+    "description": "Stat row label for playback state in the diagnostics sheet"
+  },
+  "diagnosticsResolutionLabel": "Resolution",
+  "@diagnosticsResolutionLabel": {
+    "description": "Stat row label for video resolution in the diagnostics sheet"
+  },
+  "diagnosticsAspectRatioLabel": "Aspect Ratio",
+  "@diagnosticsAspectRatioLabel": {
+    "description": "Stat row label for aspect ratio in the diagnostics sheet"
+  },
+  "diagnosticsPositionLabel": "Position",
+  "@diagnosticsPositionLabel": {
+    "description": "Stat row label for playback position in the diagnostics sheet"
+  },
+  "diagnosticsDurationLabel": "Duration",
+  "@diagnosticsDurationLabel": {
+    "description": "Stat row label for media duration in the diagnostics sheet"
+  },
+  "diagnosticsErrorLabel": "Error",
+  "@diagnosticsErrorLabel": {
+    "description": "Stat row label and playback state value for an error condition in the diagnostics sheet"
+  },
+  "diagnosticsPlayerLabel": "Player",
+  "@diagnosticsPlayerLabel": {
+    "description": "Stat row label for the playback engine name in the diagnostics sheet"
+  },
+  "diagnosticsDecodingLabel": "Decoding",
+  "@diagnosticsDecodingLabel": {
+    "description": "Stat row label for the decoding method in the diagnostics sheet"
+  },
+  "diagnosticsExoPlayerValue": "ExoPlayer (Android)",
+  "@diagnosticsExoPlayerValue": {
+    "description": "Stat row value naming the playback engine in the diagnostics sheet"
+  },
+  "diagnosticsHardwareAcceleratedValue": "Hardware-accelerated",
+  "@diagnosticsHardwareAcceleratedValue": {
+    "description": "Stat row value describing the decoding method in the diagnostics sheet"
+  },
+  "diagnosticsUnknownValue": "Unknown",
+  "@diagnosticsUnknownValue": {
+    "description": "Fallback stat value in the diagnostics sheet when resolution or aspect ratio is unavailable"
+  },
+  "diagnosticsStateBuffering": "Buffering",
+  "@diagnosticsStateBuffering": {
+    "description": "Playback state value shown in the diagnostics sheet while the player is buffering"
+  },
+  "diagnosticsStatePlaying": "Playing",
+  "@diagnosticsStatePlaying": {
+    "description": "Playback state value shown in the diagnostics sheet while media is playing"
+  },
+  "diagnosticsStatePaused": "Paused",
+  "@diagnosticsStatePaused": {
+    "description": "Playback state value shown in the diagnostics sheet while media is paused"
+  },
+  "diagnosticsDurationUnavailable": "--:--",
+  "@diagnosticsDurationUnavailable": {
+    "description": "Fallback duration/position value in the diagnostics sheet when the time is negative or unavailable"
+  },
   "rotate90Label": "Rotate 90°",
   "@rotate90Label": {
     "description": "Label for rotate 90 degrees action"
@@ -3509,6 +3589,27 @@
     "description": "Playback speed label with Normal tag",
     "placeholders": {
       "speed": { "type": "String" }
+    }
+  },
+  "playbackSpeedValue": "{speed}x",
+  "@playbackSpeedValue": {
+    "description": "Plain playback speed multiplier trailing badge (non-default speeds)",
+    "placeholders": {
+      "speed": { "type": "String" }
+    }
+  },
+  "slideshowDelaySecondsValue": "{seconds}s",
+  "@slideshowDelaySecondsValue": {
+    "description": "Compact trailing badge showing the current slideshow delay in seconds",
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "rotationDegreesValue": "{degrees}°",
+  "@rotationDegreesValue": {
+    "description": "Trailing badge showing the current rotation in degrees",
+    "placeholders": {
+      "degrees": { "type": "int" }
     }
   },
   "settingsTooltipShort": "Settings",
@@ -4064,6 +4165,26 @@
   "invalidOrCorruptedImageMessage": "Invalid or corrupted image format.",
   "@invalidOrCorruptedImageMessage": {
     "description": "Error message shown when an image fails to decode/render"
+  },
+  "mediaViewerPlaylistPositionLabel": "{current} of {total}",
+  "@mediaViewerPlaylistPositionLabel": {
+    "description": "Current position within the media viewer playlist",
+    "placeholders": {
+      "current": { "type": "num" },
+      "total": { "type": "num" }
+    }
+  },
+  "mediaViewerPlaylistPositionScanningLabel": "{current} of {total}  ·  scanning…",
+  "@mediaViewerPlaylistPositionScanningLabel": {
+    "description": "Current position within the media viewer playlist while subfolders are still being scanned",
+    "placeholders": {
+      "current": { "type": "num" },
+      "total": { "type": "num" }
+    }
+  },
+  "mediaViewerScanningLabel": "Scanning…",
+  "@mediaViewerScanningLabel": {
+    "description": "Subtitle shown in the media viewer top bar while subfolders are being scanned and no playlist is active yet"
   }
 }
 

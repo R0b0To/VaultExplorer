@@ -1,6 +1,7 @@
 // File: lib/features/browser/viewer/widgets/media_diagnostics_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 import '../native_video_controller.dart';
 
@@ -20,29 +21,29 @@ class MediaDiagnosticsSheet extends StatelessWidget {
     final value = controller.value;
     final lines = <String>[
       'File: $fileName',
-      'State: ${_stateLabel(value)}',
-      'Resolution: ${_formatResolution(value.size.width, value.size.height)}',
-      'Aspect Ratio: ${value.size.width > 0 ? value.aspectRatio.toStringAsFixed(3) : 'Unknown'}',
-      'Position: ${_formatDuration(value.position)}',
-      'Duration: ${_formatDuration(value.duration)}',
+      'State: ${_stateLabel(context, value)}',
+      'Resolution: ${_formatResolution(context, value.size.width, value.size.height)}',
+      'Aspect Ratio: ${value.size.width > 0 ? value.aspectRatio.toStringAsFixed(3) : context.l10n.diagnosticsUnknownValue}',
+      'Position: ${_formatDuration(context, value.position)}',
+      'Duration: ${_formatDuration(context, value.duration)}',
       'Playback Speed: ${playbackSpeed.toStringAsFixed(2)}x',
       if (value.hasError) 'Error: ${value.errorDescription}',
-      'Engine: ExoPlayer (Android, hardware-accelerated)',
+      'Engine: ${context.l10n.diagnosticsExoPlayerValue} (Android, ${context.l10n.diagnosticsHardwareAcceleratedValue})',
     ];
     await Clipboard.setData(ClipboardData(text: lines.join('\n')));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Diagnostics copied to clipboard'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(context.l10n.diagnosticsCopiedToClipboard),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  String _stateLabel(NativeVideoValue value) {
-    if (value.hasError) return 'Error';
-    if (value.isBuffering) return 'Buffering';
-    return value.isPlaying ? 'Playing' : 'Paused';
+  String _stateLabel(BuildContext context, NativeVideoValue value) {
+    if (value.hasError) return context.l10n.diagnosticsErrorLabel;
+    if (value.isBuffering) return context.l10n.diagnosticsStateBuffering;
+    return value.isPlaying ? context.l10n.diagnosticsStatePlaying : context.l10n.diagnosticsStatePaused;
   }
 
   @override
@@ -69,31 +70,31 @@ class MediaDiagnosticsSheet extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSectionLabel(cs, 'Playback'),
+                        _buildSectionLabel(cs, context.l10n.diagnosticsPlaybackSection),
                         ValueListenableBuilder<NativeVideoValue>(
                           valueListenable: controller,
                           builder: (context, value, _) {
                             return Column(
                               children: [
-                                _buildStatRow(cs, 'State', _stateLabel(value)),
-                                _buildStatRow(cs, 'Resolution', _formatResolution(value.size.width, value.size.height)),
+                                _buildStatRow(cs, context.l10n.diagnosticsStateLabel, _stateLabel(context, value)),
+                                _buildStatRow(cs, context.l10n.diagnosticsResolutionLabel, _formatResolution(context, value.size.width, value.size.height)),
                                 _buildStatRow(
                                   cs,
-                                  'Aspect Ratio',
-                                  value.size.width > 0 ? value.aspectRatio.toStringAsFixed(3) : 'Unknown',
+                                  context.l10n.diagnosticsAspectRatioLabel,
+                                  value.size.width > 0 ? value.aspectRatio.toStringAsFixed(3) : context.l10n.diagnosticsUnknownValue,
                                 ),
-                                _buildStatRow(cs, 'Position', _formatDuration(value.position)),
-                                _buildStatRow(cs, 'Duration', _formatDuration(value.duration)),
-                                _buildStatRow(cs, 'Playback Speed', '${playbackSpeed.toStringAsFixed(2)}x'),
+                                _buildStatRow(cs, context.l10n.diagnosticsPositionLabel, _formatDuration(context, value.position)),
+                                _buildStatRow(cs, context.l10n.diagnosticsDurationLabel, _formatDuration(context, value.duration)),
+                                _buildStatRow(cs, context.l10n.playbackSpeedLabel, '${playbackSpeed.toStringAsFixed(2)}x'),
                                 if (value.hasError)
-                                  _buildStatRow(cs, 'Error', value.errorDescription),
+                                  _buildStatRow(cs, context.l10n.diagnosticsErrorLabel, value.errorDescription),
                               ],
                             );
                           },
                         ),
-                        _buildSectionLabel(cs, 'Engine'),
-                        _buildStatRow(cs, 'Player', 'ExoPlayer (Android)'),
-                        _buildStatRow(cs, 'Decoding', 'Hardware-accelerated'),
+                        _buildSectionLabel(cs, context.l10n.diagnosticsEngineSection),
+                        _buildStatRow(cs, context.l10n.diagnosticsPlayerLabel, context.l10n.diagnosticsExoPlayerValue),
+                        _buildStatRow(cs, context.l10n.diagnosticsDecodingLabel, context.l10n.diagnosticsHardwareAcceleratedValue),
                       ],
                     ),
                   ),
@@ -114,17 +115,17 @@ class MediaDiagnosticsSheet extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Diagnostics',
+            context.l10n.diagnosticsTitle,
             style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
         ),
         IconButton(
-          tooltip: 'Copy diagnostics',
+          tooltip: context.l10n.copyDiagnosticsTooltip,
           icon: Icon(Icons.copy_rounded, size: 20, color: cs.onSurfaceVariant),
           onPressed: () => _copyDiagnostics(context),
         ),
         IconButton(
-          tooltip: 'Close',
+          tooltip: context.l10n.closeTooltip,
           icon: Icon(Icons.close_rounded, color: cs.onSurfaceVariant),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
@@ -170,13 +171,13 @@ class MediaDiagnosticsSheet extends StatelessWidget {
   }
 }
 
-String _formatResolution(double width, double height) {
-  if (width <= 0 || height <= 0) return 'Unknown';
+String _formatResolution(BuildContext context, double width, double height) {
+  if (width <= 0 || height <= 0) return context.l10n.diagnosticsUnknownValue;
   return '${width.toInt()} × ${height.toInt()}';
 }
 
-String _formatDuration(Duration d) {
-  if (d.isNegative) return '--:--';
+String _formatDuration(BuildContext context, Duration d) {
+  if (d.isNegative) return context.l10n.diagnosticsDurationUnavailable;
   final hours = d.inHours;
   final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
   final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');

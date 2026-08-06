@@ -7,6 +7,7 @@ import 'package:vaultexplorer/features/browser/viewer/video_playback_manager.dar
 import 'package:vaultexplorer/features/browser/viewer/widgets/media_player_widget.dart';
 
 import '../native_video_controller.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class MediaViewerBottomControls extends StatelessWidget {
   final PlaylistController playlistController;
@@ -105,7 +106,7 @@ class MediaViewerBottomControls extends StatelessWidget {
                 flex: 1,
                 child: Align(
                   alignment: Alignment.centerLeft,
-                  child: _buildLeftControls(cs),
+                  child: _buildLeftControls(context, cs),
                 ),
               ),
               _buildBottomTransportControls(cs),
@@ -113,7 +114,7 @@ class MediaViewerBottomControls extends StatelessWidget {
                 flex: 1,
                 child: Align(
                   alignment: Alignment.centerRight,
-                  child: _buildRightControls(cs),
+                  child: _buildRightControls(context, cs),
                 ),
               ),
             ],
@@ -213,7 +214,7 @@ class MediaViewerBottomControls extends StatelessWidget {
     );
   }
 
-  Widget _buildRightControls(ColorScheme cs) {
+  Widget _buildRightControls(BuildContext context, ColorScheme cs) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -224,7 +225,7 @@ class MediaViewerBottomControls extends StatelessWidget {
             child: _CircleOverlayButton(
               icon: Icons.view_carousel_rounded,
               iconColor: isCarouselVisible ? cs.primary : Colors.white,
-              tooltip: 'Thumbnail Carousel',
+              tooltip: context.l10n.thumbnailCarouselTooltip,
               onPressed: () {
                 HapticFeedback.lightImpact();
                 onToggleCarousel?.call();
@@ -239,7 +240,7 @@ class MediaViewerBottomControls extends StatelessWidget {
           button: true,
           child: _CircleOverlayButton(
             icon: Icons.tune_rounded,
-            tooltip: 'Advanced Settings',
+            tooltip: context.l10n.advancedSettingsTooltip,
             onPressed: () {
               HapticFeedback.lightImpact();
               onAdvancedSettingsPressed();
@@ -256,7 +257,7 @@ class MediaViewerBottomControls extends StatelessWidget {
     );
   }
 
-  Widget _buildLeftControls(ColorScheme cs) {
+  Widget _buildLeftControls(BuildContext context, ColorScheme cs) {
     if (isImage) {
       if (!isPlaylistMode) return const SizedBox.shrink();
       return Semantics(
@@ -279,7 +280,7 @@ class MediaViewerBottomControls extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                autoAdvance ? '${slideshowDelaySeconds}s' : 'Static',
+                autoAdvance ? context.l10n.slideshowDelaySecondsValue(slideshowDelaySeconds) : context.l10n.staticLabel,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
@@ -297,17 +298,17 @@ class MediaViewerBottomControls extends StatelessWidget {
       switch (videoPlaybackMode) {
         case VideoPlaybackMode.playOnce:
           modeIcon = Icons.repeat_rounded;
-          modeTooltip = 'Play Once (Auto-Advance Disabled)';
+          modeTooltip = context.l10n.playOnceDisabledTooltip;
           modeColor = Colors.white54;
           break;
         case VideoPlaybackMode.playAndAdvance:
           modeIcon = Icons.queue_play_next_rounded;
-          modeTooltip = 'Play & Advance to Next';
+          modeTooltip = context.l10n.playAndAdvanceTooltip;
           modeColor = cs.primary;
           break;
         case VideoPlaybackMode.loop:
           modeIcon = Icons.repeat_rounded;
-          modeTooltip = 'Loop Current Video';
+          modeTooltip = context.l10n.loopCurrentVideoTooltip;
           modeColor = cs.primary;
           break;
       }
@@ -320,7 +321,7 @@ class MediaViewerBottomControls extends StatelessWidget {
             child: _CircleOverlayButton(
               icon: isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
               iconColor: isMuted ? cs.error : Colors.white,
-              tooltip: isMuted ? 'Unmute' : 'Mute',
+              tooltip: isMuted ? context.l10n.unmuteTooltip : context.l10n.muteTooltip,
               onPressed: onToggleMute,
             ),
           ),
@@ -373,6 +374,7 @@ class MediaViewerBottomControls extends StatelessWidget {
         if (isImage || activeCtrl == null) {
           final bool isPlayingState = isImage ? autoAdvance : false;
           return _buildTransportRow(
+            context: context,
             cs: cs,
             isFirst: isFirst,
             isLast: isLast,
@@ -385,6 +387,7 @@ class MediaViewerBottomControls extends StatelessWidget {
           builder: (context, playerValue, _) {
             final bool isPlayingState = playerValue.isPlaying;
             return _buildTransportRow(
+              context: context,
               cs: cs,
               isFirst: isFirst,
               isLast: isLast,
@@ -397,6 +400,7 @@ class MediaViewerBottomControls extends StatelessWidget {
   }
 
   Widget _buildTransportRow({
+    required BuildContext context,
     required ColorScheme cs,
     required bool isFirst,
     required bool isLast,
@@ -419,7 +423,7 @@ class MediaViewerBottomControls extends StatelessWidget {
                   icon: Icons.skip_previous_rounded,
                   iconSize: 22,
                   containerSize: 44,
-                  tooltip: 'Previous',
+                  tooltip: context.l10n.previousTooltip,
                   onPressed: isFirst
                       ? null
                       : () {
@@ -466,7 +470,7 @@ class MediaViewerBottomControls extends StatelessWidget {
                   icon: Icons.skip_next_rounded,
                   iconSize: 22,
                   containerSize: 44,
-                  tooltip: 'Next',
+                  tooltip: context.l10n.nextTooltip,
                   onPressed: isLast
                       ? null
                       : () {

@@ -4178,6 +4178,24 @@ abstract class AppLocalizations {
   /// **'Save changes'**
   String get saveChangesTooltip;
 
+  /// Exception message when the text editor fails to decrypt a file from the vault for editing
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to decrypt file from vault.'**
+  String get textEditorDecryptFailedMessage;
+
+  /// Exception message when a file's bytes cannot be decoded as UTF-8 text in the text editor
+  ///
+  /// In en, this message translates to:
+  /// **'The file does not appear to be a valid text file.'**
+  String get textEditorInvalidTextFileMessage;
+
+  /// Exception message when the text editor fails to write edited content back into the vault
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to write file back to vault.'**
+  String get textEditorWriteBackFailedMessage;
+
   /// Generic back navigation tooltip
   ///
   /// In en, this message translates to:
@@ -4352,6 +4370,108 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get closeTooltip;
 
+  /// Section header for playback stats in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Playback'**
+  String get diagnosticsPlaybackSection;
+
+  /// Section header for engine stats in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Engine'**
+  String get diagnosticsEngineSection;
+
+  /// Stat row label for playback state in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'State'**
+  String get diagnosticsStateLabel;
+
+  /// Stat row label for video resolution in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Resolution'**
+  String get diagnosticsResolutionLabel;
+
+  /// Stat row label for aspect ratio in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Aspect Ratio'**
+  String get diagnosticsAspectRatioLabel;
+
+  /// Stat row label for playback position in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Position'**
+  String get diagnosticsPositionLabel;
+
+  /// Stat row label for media duration in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get diagnosticsDurationLabel;
+
+  /// Stat row label and playback state value for an error condition in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get diagnosticsErrorLabel;
+
+  /// Stat row label for the playback engine name in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Player'**
+  String get diagnosticsPlayerLabel;
+
+  /// Stat row label for the decoding method in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Decoding'**
+  String get diagnosticsDecodingLabel;
+
+  /// Stat row value naming the playback engine in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'ExoPlayer (Android)'**
+  String get diagnosticsExoPlayerValue;
+
+  /// Stat row value describing the decoding method in the diagnostics sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware-accelerated'**
+  String get diagnosticsHardwareAcceleratedValue;
+
+  /// Fallback stat value in the diagnostics sheet when resolution or aspect ratio is unavailable
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get diagnosticsUnknownValue;
+
+  /// Playback state value shown in the diagnostics sheet while the player is buffering
+  ///
+  /// In en, this message translates to:
+  /// **'Buffering'**
+  String get diagnosticsStateBuffering;
+
+  /// Playback state value shown in the diagnostics sheet while media is playing
+  ///
+  /// In en, this message translates to:
+  /// **'Playing'**
+  String get diagnosticsStatePlaying;
+
+  /// Playback state value shown in the diagnostics sheet while media is paused
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get diagnosticsStatePaused;
+
+  /// Fallback duration/position value in the diagnostics sheet when the time is negative or unavailable
+  ///
+  /// In en, this message translates to:
+  /// **'--:--'**
+  String get diagnosticsDurationUnavailable;
+
   /// Label for rotate 90 degrees action
   ///
   /// In en, this message translates to:
@@ -4423,6 +4543,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{speed}x (Normal)'**
   String playbackSpeedNormal(String speed);
+
+  /// Plain playback speed multiplier trailing badge (non-default speeds)
+  ///
+  /// In en, this message translates to:
+  /// **'{speed}x'**
+  String playbackSpeedValue(String speed);
+
+  /// Compact trailing badge showing the current slideshow delay in seconds
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds}s'**
+  String slideshowDelaySecondsValue(int seconds);
+
+  /// Trailing badge showing the current rotation in degrees
+  ///
+  /// In en, this message translates to:
+  /// **'{degrees}°'**
+  String rotationDegreesValue(int degrees);
 
   /// Tooltip for settings menu button
   ///
@@ -5191,6 +5329,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invalid or corrupted image format.'**
   String get invalidOrCorruptedImageMessage;
+
+  /// Current position within the media viewer playlist
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}'**
+  String mediaViewerPlaylistPositionLabel(num current, num total);
+
+  /// Current position within the media viewer playlist while subfolders are still being scanned
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}  ·  scanning…'**
+  String mediaViewerPlaylistPositionScanningLabel(num current, num total);
+
+  /// Subtitle shown in the media viewer top bar while subfolders are being scanned and no playlist is active yet
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning…'**
+  String get mediaViewerScanningLabel;
 }
 
 class _AppLocalizationsDelegate

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_screen.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// App-bar settings button: a "Filters" submenu plus a link to the toolbar
 /// settings screen.
@@ -66,19 +67,19 @@ class SettingsMenuButton extends StatelessWidget {
         onPressed: () =>
             controller.isOpen ? controller.close() : controller.open(),
         icon: const Icon(Icons.settings_outlined),
-        tooltip: 'Settings',
+        tooltip: context.l10n.settingsTooltipShort,
       ),
       menuChildren: [
         SubmenuButton(
           leadingIcon: Icon(Icons.filter_alt_outlined, color: cs.onSurfaceVariant),
           menuChildren: [
-            _buildFilterMenuButton(null, 'All Files', Icons.all_inclusive_rounded, cs, textTheme),
-            _buildFilterMenuButton('image', 'Images', Icons.image_outlined, cs, textTheme),
-            _buildFilterMenuButton('video', 'Videos', Icons.videocam_outlined, cs, textTheme),
-            _buildFilterMenuButton('audio', 'Audio', Icons.audiotrack_rounded, cs, textTheme),
-            _buildFilterMenuButton('document', 'Documents', Icons.description_outlined, cs, textTheme),
+            _buildFilterMenuButton(null, context.l10n.filterAllFilesOption, Icons.all_inclusive_rounded, cs, textTheme),
+            _buildFilterMenuButton('image', context.l10n.filterImagesOption, Icons.image_outlined, cs, textTheme),
+            _buildFilterMenuButton('video', context.l10n.filterVideosOption, Icons.videocam_outlined, cs, textTheme),
+            _buildFilterMenuButton('audio', context.l10n.filterAudioOption, Icons.audiotrack_rounded, cs, textTheme),
+            _buildFilterMenuButton('document', context.l10n.filterDocumentsOption, Icons.description_outlined, cs, textTheme),
           ],
-          child: const Text('Filters'),
+          child: Text(context.l10n.filtersMenuItem),
         ),
         const PopupMenuDivider(),
         MenuItemButton(
@@ -90,7 +91,7 @@ class SettingsMenuButton extends StatelessWidget {
             );
             await onSettingsClosed();
           },
-          child: const Text('Settings'),
+          child: Text(context.l10n.settingsMenuItem),
         ),
       ],
     );

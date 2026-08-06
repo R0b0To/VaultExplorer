@@ -3181,10 +3181,6 @@
   "@searchInThisFolderHint": {
     "description": "Hint text for the bottom search bar"
   },
-  "closeSearchTooltip": "Close search",
-  "@closeSearchTooltip": {
-    "description": "Tooltip for close search button"
-  },
   "clearTooltip": "Clear",
   "@clearTooltip": {
     "description": "Tooltip for clear text button"
@@ -3913,6 +3909,10 @@
   "@mountedReadOnlyTooltip": {
     "description": "Tooltip/badge shown next to the container name when it's mounted read-only"
   },
+  "readOnlyBadgeAbbreviation": "RO",
+  "@readOnlyBadgeAbbreviation": {
+    "description": "Short abbreviation shown inside the read-only badge next to the container name (paired with mountedReadOnlyTooltip)"
+  },
   "freeSpaceLabel": "{bytes} free",
   "@freeSpaceLabel": {
     "description": "Label showing free storage space remaining",
@@ -3923,6 +3923,147 @@
   "filteredLabel": "filtered",
   "@filteredLabel": {
     "description": "Label indicating the current file list is filtered"
+  },
+  "statsStorageSectionHeader": "STORAGE",
+  "@statsStorageSectionHeader": {
+    "description": "Section header label above the storage stats in the vertical (landscape sidebar) stats bar layout"
+  },
+  "statsFolderCount": "{count, plural, =1{1 folder} other{# folders}}",
+  "@statsFolderCount": {
+    "description": "Count of folders shown in the stats bar",
+    "placeholders": {
+      "count": { "type": "num" }
+    }
+  },
+  "statsFileCount": "{count, plural, =1{1 file} other{# files}}",
+  "@statsFileCount": {
+    "description": "Count of files shown in the stats bar",
+    "placeholders": {
+      "count": { "type": "num" }
+    }
+  },
+  "filterAllFilesOption": "All Files",
+  "@filterAllFilesOption": {
+    "description": "Browser file-type filter menu option: show all files"
+  },
+  "filterImagesOption": "Images",
+  "@filterImagesOption": {
+    "description": "Browser file-type filter menu option: images only"
+  },
+  "filterVideosOption": "Videos",
+  "@filterVideosOption": {
+    "description": "Browser file-type filter menu option: videos only"
+  },
+  "filterAudioOption": "Audio",
+  "@filterAudioOption": {
+    "description": "Browser file-type filter menu option: audio only"
+  },
+  "filterDocumentsOption": "Documents",
+  "@filterDocumentsOption": {
+    "description": "Browser file-type filter menu option: documents only"
+  },
+  "folderExposedAsStorageExplanation": "This folder is exposed as its own storage location, so other apps can browse and open its files directly.",
+  "@folderExposedAsStorageExplanation": {
+    "description": "Explanation body text in the folder document provider sheet"
+  },
+  "conflictItemsAlreadyExistTitle": "{count, plural, =1{1 item already exists} other{# items already exist}}",
+  "@conflictItemsAlreadyExistTitle": {
+    "description": "Header title in the conflict resolution sheet showing how many items collided",
+    "placeholders": {
+      "count": { "type": "num" }
+    }
+  },
+  "conflictResolutionSubtitle": "Choose what happens to each item, or apply one choice to all.",
+  "@conflictResolutionSubtitle": {
+    "description": "Subtitle in the conflict resolution sheet"
+  },
+  "skipAllChipLabel": "Skip all",
+  "@skipAllChipLabel": {
+    "description": "Apply-to-all chip: skip every conflicting item"
+  },
+  "overwriteAllChipLabel": "Overwrite all",
+  "@overwriteAllChipLabel": {
+    "description": "Apply-to-all chip: overwrite every conflicting item"
+  },
+  "overwriteItemDropdownLabel": "Overwrite",
+  "@overwriteItemDropdownLabel": {
+    "description": "Per-item conflict resolution dropdown option: overwrite a file"
+  },
+  "overwriteFolderDropdownLabel": "Overwrite folder",
+  "@overwriteFolderDropdownLabel": {
+    "description": "Per-item conflict resolution dropdown option: overwrite a folder"
+  },
+  "fileOpsTransfersInProgressTitle": "Transfers in progress",
+  "@fileOpsTransfersInProgressTitle": {
+    "description": "File operations sheet header title while at least one transfer is active"
+  },
+  "fileOpsRecentTransfersTitle": "Recent transfers",
+  "@fileOpsRecentTransfersTitle": {
+    "description": "File operations sheet header title when no transfer is currently active"
+  },
+  "fileOpsNoRecentTransfersMessage": "No recent transfers",
+  "@fileOpsNoRecentTransfersMessage": {
+    "description": "Empty state message in the file operations sheet"
+  },
+  "fileOpsCancelTooltip": "Cancel",
+  "@fileOpsCancelTooltip": {
+    "description": "Tooltip for the cancel button on an active file operation row"
+  },
+  "fileOpsRootDestinationLabel": "Root",
+  "@fileOpsRootDestinationLabel": {
+    "description": "Destination label for a file operation targeting the root directory"
+  },
+  "fileOpsCancelledStatusLabel": "Cancelled",
+  "@fileOpsCancelledStatusLabel": {
+    "description": "Status label for a cancelled file operation"
+  },
+  "fileOpsItemsFailedLabel": "{count, plural, =1{1 item failed:} other{# items failed:}}",
+  "@fileOpsItemsFailedLabel": {
+    "description": "Label introducing the list of failed items in a batch file operation",
+    "placeholders": {
+      "count": { "type": "num" }
+    }
+  },
+  "fileOpsMoreItemsLabel": "+ {count} more",
+  "@fileOpsMoreItemsLabel": {
+    "description": "Label indicating additional items beyond the displayed limit in a batch file operation",
+    "placeholders": {
+      "count": { "type": "num" }
+    }
+  },
+  "archiveErrorReadingFile": "Error reading file: {error}",
+  "@archiveErrorReadingFile": {
+    "description": "Error message shown when reading a text file inside the archive viewer fails",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "archivePreviewNotAvailableMessage": "Preview not available for this file type.",
+  "@archivePreviewNotAvailableMessage": {
+    "description": "Fallback message in the archive file viewer when no preview can be shown"
+  },
+  "avifFailedToRenderMessage": "Failed to render AVIF",
+  "@avifFailedToRenderMessage": {
+    "description": "Fallback error message when an AVIF image fails to decode/render"
+  },
+  "encryptedImageLoadFailedMessage": "Failed to load encrypted image",
+  "@encryptedImageLoadFailedMessage": {
+    "description": "Error message when decrypting/loading an image fails with no further detail"
+  },
+  "encryptedImageLoadFailedWithReasonMessage": "Failed to load encrypted image: {error}",
+  "@encryptedImageLoadFailedWithReasonMessage": {
+    "description": "Error message when decrypting/loading an image fails with an underlying error",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "retryButton": "Retry",
+  "@retryButton": {
+    "description": "Button to retry a failed operation"
+  },
+  "invalidOrCorruptedImageMessage": "Invalid or corrupted image format.",
+  "@invalidOrCorruptedImageMessage": {
+    "description": "Error message shown when an image fails to decode/render"
   }
 }
 

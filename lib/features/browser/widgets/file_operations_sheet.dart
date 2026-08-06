@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class FileOperationsSheet extends StatelessWidget {
   const FileOperationsSheet({super.key});
@@ -52,8 +53,8 @@ class FileOperationsSheet extends StatelessWidget {
                       Expanded(
                         child: Text(
                           hasActive
-                              ? 'Transfers in progress'
-                              : 'Recent transfers',
+                              ? context.l10n.fileOpsTransfersInProgressTitle
+                              : context.l10n.fileOpsRecentTransfersTitle,
                           style: textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
@@ -73,7 +74,7 @@ class FileOperationsSheet extends StatelessWidget {
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          child: const Text('Clear all'),
+                          child: Text(context.l10n.clearAllButton),
                         ),
                       const SizedBox(width: 4),
                     ],
@@ -119,7 +120,7 @@ class _EmptyState extends StatelessWidget {
         Icon(Icons.check_circle_outline_rounded, size: 40, color: cs.outline),
         const SizedBox(height: 12),
         Text(
-          'No recent transfers',
+          context.l10n.fileOpsNoRecentTransfersMessage,
           style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
         ),
       ],
@@ -184,7 +185,7 @@ class _OperationRow extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          _routeLabel(op),
+                          _routeLabel(context, op),
                           style: textTheme.bodySmall?.copyWith(
                             color: cs.onSurfaceVariant,
                           ),
@@ -201,7 +202,7 @@ class _OperationRow extends StatelessWidget {
                         size: 18,
                         color: cs.onSurfaceVariant,
                       ),
-                      tooltip: 'Cancel',
+                      tooltip: context.l10n.fileOpsCancelTooltip,
                       onPressed: op.requestCancel,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
@@ -275,7 +276,7 @@ class _OperationRow extends StatelessWidget {
               if (isCancelled) ...[
                 const SizedBox(height: 4),
                 Text(
-                  'Cancelled',
+                  context.l10n.fileOpsCancelledStatusLabel,
                   style: textTheme.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
@@ -292,11 +293,11 @@ class _OperationRow extends StatelessWidget {
     );
   }
 
-  String _routeLabel(FileOperation op) {
+  String _routeLabel(BuildContext context, FileOperation op) {
     if (op.isCrossContainer) {
       return '${op.sourceDisplayName} → ${op.destDisplayName}';
     }
-    final dest = op.destDirPath.isEmpty ? 'Root' : op.destDirPath;
+    final dest = op.destDirPath.isEmpty ? context.l10n.fileOpsRootDestinationLabel : op.destDirPath;
     return '→ $dest';
   }
 }
@@ -362,7 +363,7 @@ class _BatchItemsDetail extends StatelessWidget {
         if (hasErrors) ...[
           const SizedBox(height: 6),
           Text(
-            '${op.failCount} item${op.failCount == 1 ? '' : 's'} failed:',
+            context.l10n.fileOpsItemsFailedLabel(op.failCount),
             style: textTheme.bodySmall?.copyWith(
               color: cs.error,
               fontWeight: FontWeight.w600,
@@ -370,12 +371,12 @@ class _BatchItemsDetail extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 6),
-        ..._buildItemList(),
+        ..._buildItemList(context),
       ],
     );
   }
 
-  List<Widget> _buildItemList() {
+  List<Widget> _buildItemList(BuildContext context) {
     // Sort so failures are at the top
     final sorted = List<FileItemStatus>.from(op.itemStatuses)
       ..sort((a, b) {
@@ -424,7 +425,7 @@ class _BatchItemsDetail extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(left: 20, bottom: 4, top: 2),
           child: Text(
-            '+ ${sorted.length - displayCount} more',
+            context.l10n.fileOpsMoreItemsLabel(sorted.length - displayCount),
             style: textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant.withValues(alpha: 0.7),
               fontStyle: FontStyle.italic,

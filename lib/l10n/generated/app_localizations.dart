@@ -4994,6 +4994,12 @@ abstract class AppLocalizations {
   /// **'Mounted read-only'**
   String get mountedReadOnlyTooltip;
 
+  /// Short abbreviation shown inside the read-only badge next to the container name (paired with mountedReadOnlyTooltip)
+  ///
+  /// In en, this message translates to:
+  /// **'RO'**
+  String get readOnlyBadgeAbbreviation;
+
   /// Label showing free storage space remaining
   ///
   /// In en, this message translates to:
@@ -5005,6 +5011,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'filtered'**
   String get filteredLabel;
+
+  /// Section header label above the storage stats in the vertical (landscape sidebar) stats bar layout
+  ///
+  /// In en, this message translates to:
+  /// **'STORAGE'**
+  String get statsStorageSectionHeader;
+
+  /// Count of folders shown in the stats bar
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 folder} other{# folders}}'**
+  String statsFolderCount(num count);
+
+  /// Count of files shown in the stats bar
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 file} other{# files}}'**
+  String statsFileCount(num count);
+
+  /// Browser file-type filter menu option: show all files
+  ///
+  /// In en, this message translates to:
+  /// **'All Files'**
+  String get filterAllFilesOption;
+
+  /// Browser file-type filter menu option: images only
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get filterImagesOption;
+
+  /// Browser file-type filter menu option: videos only
+  ///
+  /// In en, this message translates to:
+  /// **'Videos'**
+  String get filterVideosOption;
+
+  /// Browser file-type filter menu option: audio only
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get filterAudioOption;
+
+  /// Browser file-type filter menu option: documents only
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get filterDocumentsOption;
+
+  /// Explanation body text in the folder document provider sheet
+  ///
+  /// In en, this message translates to:
+  /// **'This folder is exposed as its own storage location, so other apps can browse and open its files directly.'**
+  String get folderExposedAsStorageExplanation;
+
+  /// Header title in the conflict resolution sheet showing how many items collided
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item already exists} other{# items already exist}}'**
+  String conflictItemsAlreadyExistTitle(num count);
+
+  /// Subtitle in the conflict resolution sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Choose what happens to each item, or apply one choice to all.'**
+  String get conflictResolutionSubtitle;
+
+  /// Apply-to-all chip: skip every conflicting item
+  ///
+  /// In en, this message translates to:
+  /// **'Skip all'**
+  String get skipAllChipLabel;
+
+  /// Apply-to-all chip: overwrite every conflicting item
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite all'**
+  String get overwriteAllChipLabel;
+
+  /// Per-item conflict resolution dropdown option: overwrite a file
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite'**
+  String get overwriteItemDropdownLabel;
+
+  /// Per-item conflict resolution dropdown option: overwrite a folder
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite folder'**
+  String get overwriteFolderDropdownLabel;
+
+  /// File operations sheet header title while at least one transfer is active
+  ///
+  /// In en, this message translates to:
+  /// **'Transfers in progress'**
+  String get fileOpsTransfersInProgressTitle;
+
+  /// File operations sheet header title when no transfer is currently active
+  ///
+  /// In en, this message translates to:
+  /// **'Recent transfers'**
+  String get fileOpsRecentTransfersTitle;
+
+  /// Empty state message in the file operations sheet
+  ///
+  /// In en, this message translates to:
+  /// **'No recent transfers'**
+  String get fileOpsNoRecentTransfersMessage;
+
+  /// Tooltip for the cancel button on an active file operation row
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get fileOpsCancelTooltip;
+
+  /// Destination label for a file operation targeting the root directory
+  ///
+  /// In en, this message translates to:
+  /// **'Root'**
+  String get fileOpsRootDestinationLabel;
+
+  /// Status label for a cancelled file operation
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get fileOpsCancelledStatusLabel;
+
+  /// Label introducing the list of failed items in a batch file operation
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item failed:} other{# items failed:}}'**
+  String fileOpsItemsFailedLabel(num count);
+
+  /// Label indicating additional items beyond the displayed limit in a batch file operation
+  ///
+  /// In en, this message translates to:
+  /// **'+ {count} more'**
+  String fileOpsMoreItemsLabel(num count);
+
+  /// Error message shown when reading a text file inside the archive viewer fails
+  ///
+  /// In en, this message translates to:
+  /// **'Error reading file: {error}'**
+  String archiveErrorReadingFile(String error);
+
+  /// Fallback message in the archive file viewer when no preview can be shown
+  ///
+  /// In en, this message translates to:
+  /// **'Preview not available for this file type.'**
+  String get archivePreviewNotAvailableMessage;
+
+  /// Fallback error message when an AVIF image fails to decode/render
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to render AVIF'**
+  String get avifFailedToRenderMessage;
+
+  /// Error message when decrypting/loading an image fails with no further detail
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load encrypted image'**
+  String get encryptedImageLoadFailedMessage;
+
+  /// Error message when decrypting/loading an image fails with an underlying error
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load encrypted image: {error}'**
+  String encryptedImageLoadFailedWithReasonMessage(String error);
+
+  /// Button to retry a failed operation
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retryButton;
+
+  /// Error message shown when an image fails to decode/render
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid or corrupted image format.'**
+  String get invalidOrCorruptedImageMessage;
 }
 
 class _AppLocalizationsDelegate

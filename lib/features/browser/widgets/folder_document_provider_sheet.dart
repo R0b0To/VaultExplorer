@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/sheets/app_bottom_sheet.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 enum FolderDocumentProviderAction { unmount }
 
@@ -73,15 +74,14 @@ class _FolderDocumentProviderSheetState
           ),
           const SizedBox(height: 12),
           Text(
-            'This folder is exposed as its own storage location, so other '
-            'apps can browse and open its files directly.',
+            context.l10n.folderExposedAsStorageExplanation,
             style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 8),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Auto-mount when container unlocks'),
-            subtitle: const Text('Expose this folder again automatically next time'),
+            title: Text(context.l10n.autoMountWhenUnlocksTitle),
+            subtitle: Text(context.l10n.autoMountWhenUnlocksSubtitle),
             value: _autoMount,
             onChanged: (value) {
               setState(() => _autoMount = value);
@@ -97,7 +97,7 @@ class _FolderDocumentProviderSheetState
                 foregroundColor: cs.onErrorContainer,
               ),
               icon: const Icon(Icons.link_off_rounded),
-              label: const Text('Unmount'),
+              label: Text(context.l10n.unmountButton),
               onPressed: () => Navigator.of(context)
                   .pop(FolderDocumentProviderAction.unmount),
             ),

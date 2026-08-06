@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'native_avif_widget.dart';
 
 class EncryptedImageWidget extends StatefulWidget {
@@ -128,7 +129,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
 
       if (data == null) {
         if (_bytes == null) {
-          setState(() => _error = 'Failed to load encrypted image');
+          setState(() => _error = context.l10n.encryptedImageLoadFailedMessage);
         }
         return;
       }
@@ -141,7 +142,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     } catch (e) {
       if (_limiterCompleter == completer) _limiterCompleter = null;
       if (mounted && _currentlyLoadingFile == targetFile && _bytes == null) {
-        setState(() => _error = 'Failed to load encrypted image: $e');
+        setState(() => _error = context.l10n.encryptedImageLoadFailedWithReasonMessage('$e'));
       }
     } finally {
       if (!_isFullResLoaded && _currentlyLoadingFile == targetFile) {
@@ -181,7 +182,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
                   _loadImage();
                 },
                 icon: const Icon(Icons.refresh, size: 16),
-                label: const Text('Retry'),
+                label: Text(context.l10n.retryButton),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: cs.errorContainer,
                   foregroundColor: cs.onErrorContainer,
@@ -250,7 +251,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       gaplessPlayback: true,
       errorBuilder: (context, error, stackTrace) => Center(
         child: Text(
-          'Invalid or corrupted image format.',
+          context.l10n.invalidOrCorruptedImageMessage,
           style: TextStyle(color: cs.error),
         ),
       ),

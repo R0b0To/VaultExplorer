@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/file_operation.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// A name collision discovered during the pre-paste scan.
 @immutable
@@ -110,7 +111,7 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '$count item${count == 1 ? '' : 's'} already exist',
+                      context.l10n.conflictItemsAlreadyExistTitle(count),
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -123,7 +124,7 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
               child: Text(
-                'Choose what happens to each item, or apply one choice to all.',
+                context.l10n.conflictResolutionSubtitle,
                 style: textTheme.bodySmall?.copyWith(
                   color: cs.onSurfaceVariant,
                 ),
@@ -138,7 +139,7 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
                   children: [
                     Expanded(
                       child: _ApplyAllChip(
-                        label: 'Skip all',
+                        label: context.l10n.skipAllChipLabel,
                         icon: Icons.block_rounded,
                         onTap: () => _applyToAll(ConflictResolution.skip),
                       ),
@@ -146,7 +147,7 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _ApplyAllChip(
-                        label: 'Overwrite all',
+                        label: context.l10n.overwriteAllChipLabel,
                         icon: Icons.find_replace_rounded,
                         isDestructive: true,
                         onTap: () => _applyToAll(ConflictResolution.overwrite),
@@ -155,7 +156,7 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: _ApplyAllChip(
-                        label: 'Keep both',
+                        label: context.l10n.keepBothButton,
                         icon: Icons.content_copy_rounded,
                         onTap: () => _applyToAll(ConflictResolution.keepBoth),
                       ),
@@ -201,7 +202,7 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(context, null),
-                      child: const Text('Cancel paste'),
+                      child: Text(context.l10n.cancelPasteButton),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -209,7 +210,7 @@ class _ConflictResolutionSheetState extends State<ConflictResolutionSheet> {
                     child: FilledButton(
                       onPressed: () =>
                           Navigator.pop(context, Map.of(_resolutions)),
-                      child: const Text('Continue'),
+                      child: Text(context.l10n.continueButton),
                     ),
                   ),
                 ],
@@ -322,18 +323,20 @@ class _ConflictRow extends StatelessWidget {
               items: [
                 DropdownMenuItem(
                   value: ConflictResolution.skip,
-                  child: const Text('Skip'),
+                  child: Text(context.l10n.skipButton),
                 ),
                 DropdownMenuItem(
                   value: ConflictResolution.overwrite,
                   child: Text(
-                    conflict.destIsDir ? 'Overwrite folder' : 'Overwrite',
+                    conflict.destIsDir
+                        ? context.l10n.overwriteFolderDropdownLabel
+                        : context.l10n.overwriteItemDropdownLabel,
                     style: TextStyle(color: cs.error),
                   ),
                 ),
                 DropdownMenuItem(
                   value: ConflictResolution.keepBoth,
-                  child: const Text('Keep both'),
+                  child: Text(context.l10n.keepBothButton),
                 ),
               ],
               onChanged: (v) {

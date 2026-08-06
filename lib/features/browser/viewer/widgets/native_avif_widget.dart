@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class NativeAvifWidget extends StatefulWidget {
   final Uint8List avifBytes;
@@ -120,7 +121,7 @@ class _NativeAvifWidgetState extends State<NativeAvifWidget> {
     if (_error != null || _currentFrame == null) {
       return Center(
         child: Text(
-          _error ?? 'Failed to render AVIF',
+          _error ?? context.l10n.avifFailedToRenderMessage,
           style: TextStyle(color: Theme.of(context).colorScheme.error),
         ),
       );

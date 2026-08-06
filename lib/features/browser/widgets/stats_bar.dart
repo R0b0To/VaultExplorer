@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// The folder/file count + free-space summary shown above the file
 /// list/grid (horizontal strip in portrait, a vertical sidebar panel in
@@ -35,7 +36,7 @@ class StatsBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'STORAGE',
+              context.l10n.statsStorageSectionHeader,
               style: textTheme.labelSmall?.copyWith(
                 color: cs.primary,
                 fontWeight: FontWeight.bold,
@@ -43,11 +44,11 @@ class StatsBar extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            _stat(context, Icons.folder_rounded, '$dirCount folders'),
+            _stat(context, Icons.folder_rounded, context.l10n.statsFolderCount(dirCount)),
             const SizedBox(height: 8),
-            _stat(context, Icons.description_rounded, '$fileCount files'),
+            _stat(context, Icons.description_rounded, context.l10n.statsFileCount(fileCount)),
             const SizedBox(height: 8),
-            _stat(context, Icons.storage_rounded, '${formatBytes(freeSpaceBytes)} free'),
+            _stat(context, Icons.storage_rounded, context.l10n.freeSpaceLabel(formatBytes(freeSpaceBytes))),
             if (isFiltered) ...[
               const SizedBox(height: 8),
               Container(
@@ -57,7 +58,7 @@ class StatsBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
                 child: Text(
-                  'filtered',
+                  context.l10n.filteredLabel,
                   style: textTheme.labelSmall?.copyWith(
                     color: cs.onPrimaryContainer,
                     fontSize: 8,
@@ -76,9 +77,9 @@ class StatsBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         children: [
-          _stat(context, Icons.folder_rounded, '$dirCount folders'),
+          _stat(context, Icons.folder_rounded, context.l10n.statsFolderCount(dirCount)),
           const SizedBox(width: 12),
-          _stat(context, Icons.description_rounded, '$fileCount files'),
+          _stat(context, Icons.description_rounded, context.l10n.statsFileCount(fileCount)),
           const Spacer(),
           if (isFiltered) ...[
             Container(
@@ -88,7 +89,7 @@ class StatsBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               child: Text(
-                'filtered',
+                context.l10n.filteredLabel,
                 style: textTheme.labelSmall?.copyWith(
                   color: cs.onPrimaryContainer,
                   fontSize: 8,
@@ -98,7 +99,7 @@ class StatsBar extends StatelessWidget {
             ),
             const SizedBox(width: 12),
           ],
-          _stat(context, Icons.storage_rounded, '${formatBytes(freeSpaceBytes)} free'),
+          _stat(context, Icons.storage_rounded, context.l10n.freeSpaceLabel(formatBytes(freeSpaceBytes))),
         ],
       ),
     );

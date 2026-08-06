@@ -209,7 +209,7 @@ PreferredSizeWidget buildBrowserAppBar(
                       Icon(Icons.lock_outline_rounded, size: 11, color: cs.onSurfaceVariant),
                       const SizedBox(width: 3),
                       Text(
-                        'RO',
+                        context.l10n.readOnlyBadgeAbbreviation,
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,

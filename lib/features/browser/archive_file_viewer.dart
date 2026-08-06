@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class ArchiveFileViewer extends StatefulWidget {
   final File file;
@@ -36,12 +37,12 @@ class _ArchiveFileViewerState extends State<ArchiveFileViewer> {
         elevation: 0,
       ),
       body: Center(
-        child: _buildContent(isImage, isText),
+        child: _buildContent(context, isImage, isText),
       ),
     );
   }
 
-  Widget _buildContent(bool isImage, bool isText) {
+  Widget _buildContent(BuildContext context, bool isImage, bool isText) {
     if (isImage) {
       return InteractiveViewer(
         minScale: 0.5,
@@ -58,7 +59,7 @@ class _ArchiveFileViewerState extends State<ArchiveFileViewer> {
             return const CircularProgressIndicator();
           }
           if (snapshot.hasError) {
-            return Text('Error reading file: ${snapshot.error}');
+            return Text(context.l10n.archiveErrorReadingFile('${snapshot.error}'));
           }
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -80,7 +81,7 @@ class _ArchiveFileViewerState extends State<ArchiveFileViewer> {
         Icon(Icons.insert_drive_file_outlined, size: 64, color: Colors.grey[400]),
         const SizedBox(height: 16),
         Text(
-          'Preview not available for this file type.',
+          context.l10n.archivePreviewNotAvailableMessage,
           style: TextStyle(color: Colors.grey[600]),
         ),
       ],

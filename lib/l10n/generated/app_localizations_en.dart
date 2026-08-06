@@ -2921,10 +2921,144 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mountedReadOnlyTooltip => 'Mounted read-only';
 
   @override
+  String get readOnlyBadgeAbbreviation => 'RO';
+
+  @override
   String freeSpaceLabel(String bytes) {
     return '$bytes free';
   }
 
   @override
   String get filteredLabel => 'filtered';
+
+  @override
+  String get statsStorageSectionHeader => 'STORAGE';
+
+  @override
+  String statsFolderCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# folders',
+      one: '1 folder',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String statsFileCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# files',
+      one: '1 file',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get filterAllFilesOption => 'All Files';
+
+  @override
+  String get filterImagesOption => 'Images';
+
+  @override
+  String get filterVideosOption => 'Videos';
+
+  @override
+  String get filterAudioOption => 'Audio';
+
+  @override
+  String get filterDocumentsOption => 'Documents';
+
+  @override
+  String get folderExposedAsStorageExplanation =>
+      'This folder is exposed as its own storage location, so other apps can browse and open its files directly.';
+
+  @override
+  String conflictItemsAlreadyExistTitle(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# items already exist',
+      one: '1 item already exists',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get conflictResolutionSubtitle =>
+      'Choose what happens to each item, or apply one choice to all.';
+
+  @override
+  String get skipAllChipLabel => 'Skip all';
+
+  @override
+  String get overwriteAllChipLabel => 'Overwrite all';
+
+  @override
+  String get overwriteItemDropdownLabel => 'Overwrite';
+
+  @override
+  String get overwriteFolderDropdownLabel => 'Overwrite folder';
+
+  @override
+  String get fileOpsTransfersInProgressTitle => 'Transfers in progress';
+
+  @override
+  String get fileOpsRecentTransfersTitle => 'Recent transfers';
+
+  @override
+  String get fileOpsNoRecentTransfersMessage => 'No recent transfers';
+
+  @override
+  String get fileOpsCancelTooltip => 'Cancel';
+
+  @override
+  String get fileOpsRootDestinationLabel => 'Root';
+
+  @override
+  String get fileOpsCancelledStatusLabel => 'Cancelled';
+
+  @override
+  String fileOpsItemsFailedLabel(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# items failed:',
+      one: '1 item failed:',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String fileOpsMoreItemsLabel(num count) {
+    return '+ $count more';
+  }
+
+  @override
+  String archiveErrorReadingFile(String error) {
+    return 'Error reading file: $error';
+  }
+
+  @override
+  String get archivePreviewNotAvailableMessage =>
+      'Preview not available for this file type.';
+
+  @override
+  String get avifFailedToRenderMessage => 'Failed to render AVIF';
+
+  @override
+  String get encryptedImageLoadFailedMessage => 'Failed to load encrypted image';
+
+  @override
+  String encryptedImageLoadFailedWithReasonMessage(String error) {
+    return 'Failed to load encrypted image: $error';
+  }
+
+  @override
+  String get retryButton => 'Retry';
+
+  @override
+  String get invalidOrCorruptedImageMessage => 'Invalid or corrupted image format.';
 }

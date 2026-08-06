@@ -5,30 +5,6 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// Landscape-mode selection AppBar -- the wide-screen sibling of
 /// [SelectionAppBar] (`selection_app_bar.dart`), which is used in portrait.
-///
-/// Extracted verbatim from `FileBrowserScreen`'s private `_buildAppBar`
-/// (the `isLandscape` branch inside `if (isSelectionMode)`) -- fifth slice
-/// of the `file_browser_screen.dart` decomposition (docs/tech-debt.md
-/// TD-8). Unlike the four popup-button slices, this one was deliberately
-/// read in full and designed before being touched, the same way TD-7 was:
-/// it looked riskier at first glance (three local closures --
-/// `onRename`/`onOpenWithApp`/`onToggleDocumentProvider` -- shared between
-/// this branch and the portrait `SelectionAppBar` call), but those closures
-/// turned out not to need moving or dissecting at all. They already get
-/// passed into `SelectionAppBar` as plain `VoidCallback`s today; this
-/// widget receives them the identical way. No behavior change, only a
-/// location change.
-///
-/// This genuinely was an *unfinished* extraction, not just an unextracted
-/// one: it duplicates most of what [SelectionAppBar] already covers, laid
-/// out differently (a single AppBar row with an overflow menu, instead of
-/// [SelectionAppBar]'s own layout) because landscape has less vertical
-/// space to work with. Kept as its own widget rather than unified with
-/// [SelectionAppBar] into one parameterized widget, since the two really do
-/// have different visual shapes, not just different data -- unifying them
-/// would be a UX-level call, not a pure decomposition, the same reasoning
-/// that kept [SortMenuButton] separate from the unused `SortOptionsSheet`
-/// (TD-13).
 class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget {
   final int selectedCount;
   final String selectionLabel;

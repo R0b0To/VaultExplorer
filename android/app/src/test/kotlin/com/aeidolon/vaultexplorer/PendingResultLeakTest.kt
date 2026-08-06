@@ -9,10 +9,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Regression coverage for the pendingFlutterResult leak this file used to
- * just describe in a comment instead of actually testing (see
- * docs/tech-debt.md TD-4).
- *
  * The hazard: [PendingActivityResult.stash] calls `.error()` on whatever
  * Result was previously stashed, to cancel it. If a handler ever replies to
  * a Result *directly* (e.g. on an early validation failure) and *also*

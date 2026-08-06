@@ -520,9 +520,7 @@ the following changes:
 
 4. **Removed ADR-022 historical digression**: The inline narrative about
    the prior broken `session.javaClass.simpleName` string-match
-   implementation was removed from §3.2. The current correct behavior
-   (`skipsPerVolumeLock` property) is documented; the bug history lives in
-   `docs/tech-debt.md` TD-6 where it is already cross-referenced.
+   implementation was removed from §3.2.
 
 5. **Pruned conversational asides**: Removed editorial phrases ("This is a
    hard-fought property", "If you're tempted to", "that's exactly the bug

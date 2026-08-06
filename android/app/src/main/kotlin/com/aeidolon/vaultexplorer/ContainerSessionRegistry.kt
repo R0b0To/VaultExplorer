@@ -34,8 +34,7 @@ object ContainerSessionRegistry {
     // (ContainerEngine.lock -> removeSession), and the per-volId locks in
     // [locks] guard native calls only, not this map. Mirrors the same
     // precedent already established by VaultBackendRegistry.sessions
-    // (VaultBackend.kt) for the pure-Kotlin backends. See docs/architecture.md
-    // ownership rule #8 and Finding TD-1 in docs/tech-debt.md.
+    // (VaultBackend.kt) for the pure-Kotlin backends.
     val activeSessions = java.util.concurrent.ConcurrentHashMap<Int, ContainerSession>()
 
     fun isUnlocked(volId: Int) = activeSessions.containsKey(volId)

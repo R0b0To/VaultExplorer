@@ -3,20 +3,6 @@ import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// App-bar popup button for choosing the current sort field/direction.
-///
-/// Extracted verbatim from `FileBrowserScreen`'s private
-/// `_buildSortPopupButton` as the first slice of the `file_browser_screen.dart`
-/// decomposition (docs/tech-debt.md TD-8) -- no behavior change, only a
-/// location change. [sortBy]/[sortAscending] are read-only inputs;
-/// [onSortChanged] is invoked with the tapped field, exactly as the parent's
-/// `_onSortChanged` was invoked directly before.
-///
-/// Not to be confused with [SortOptionsSheet] (`sort_options_sheet.dart`),
-/// an already-built but entirely unused widget covering the same four sort
-/// fields via a *different* UI (a bottom-sheet list of rows, not an app-bar
-/// menu) -- see docs/tech-debt.md TD-13. That widget wasn't reused here
-/// because switching this button's UI from a popup menu to a bottom sheet
-/// would be a user-visible UX change, not a pure decomposition.
 class SortMenuButton extends StatefulWidget {
   final SortBy sortBy;
   final bool sortAscending;

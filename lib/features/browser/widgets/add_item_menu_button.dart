@@ -8,17 +8,6 @@ import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 
 /// App-bar "add item" popup button: new folder/file, camera capture, import
 /// files/folder, and the "Secure Item" submenu for each vault format.
-///
-/// Extracted verbatim from `FileBrowserScreen`'s private
-/// `_buildAddPopupButton` -- fourth slice of the `file_browser_screen.dart`
-/// decomposition (docs/tech-debt.md TD-8), and deliberately the last of the
-/// four `_build*PopupButton`-style methods to be extracted: it has roughly
-/// 14 distinct dependencies versus 2-3 for each of the other three, so it
-/// was held back for its own careful pass rather than rushed through on the
-/// same momentum. Every dependency below is either a read-only value or a
-/// callback, each checked against the original method's exact usage before
-/// being wired up -- no behavior change, only a location change.
-///
 /// [hasArchiveContext] is a plain bool rather than the actual
 /// `ArchiveContext?` value: the original method only ever null-checked it
 /// (`if (_archiveContext != null)`), never read a property off it, so

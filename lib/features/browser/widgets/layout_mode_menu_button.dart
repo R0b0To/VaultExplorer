@@ -4,17 +4,6 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// App-bar popup button for choosing the current file-list layout mode
 /// (list/compact/grid/masonry).
-///
-/// Extracted verbatim from `FileBrowserScreen`'s private
-/// `_buildViewTogglePopupButton` -- second slice of the
-/// `file_browser_screen.dart` decomposition (docs/tech-debt.md TD-8),
-/// following the same pattern as [SortMenuButton]. No behavior change,
-/// only a location change. [layoutMode] is read-only (it also drives the
-/// actual content rendering elsewhere in the parent, so it can't be owned
-/// locally here the way this widget's `_menuIsOpen` is);
-/// [onLayoutModeChanged] is invoked with the tapped mode, exactly as the
-/// parent's inline `onPressed` callback used to update `_layoutMode` and
-/// persist it directly.
 class LayoutModeMenuButton extends StatefulWidget {
   final BrowserLayoutMode layoutMode;
   final ValueChanged<BrowserLayoutMode> onLayoutModeChanged;

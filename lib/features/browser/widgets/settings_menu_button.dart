@@ -4,17 +4,6 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// App-bar settings button: a "Filters" submenu plus a link to the toolbar
 /// settings screen.
-///
-/// Extracted verbatim from `FileBrowserScreen`'s private
-/// `_buildSettingsMenuButton` (and the `_buildFilterMenuButton` helper it
-/// exclusively called, five times, for the five filter options) -- third
-/// slice of the `file_browser_screen.dart` decomposition
-/// (docs/tech-debt.md TD-8). No behavior change, only a location change.
-///
-/// Unlike [SortMenuButton]/[LayoutModeMenuButton], this is a
-/// [StatelessWidget]: the original `_buildSettingsMenuButton`'s `MenuAnchor`
-/// had no `onOpen`/`onClose` handling at all, so there's no local
-/// `_menuIsOpen`-style state to carry over.
 class SettingsMenuButton extends StatelessWidget {
   final String? currentFilter;
   final ValueChanged<String?> onFilterChanged;

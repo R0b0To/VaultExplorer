@@ -247,10 +247,6 @@ PreferredSizeWidget buildBrowserAppBar(
   );
 }
 
-/// TD-8: extracted alongside [buildBrowserAppBar] -- was already a small,
-/// self-contained method (`_buildAppBarStatsSubtitle`), just given
-/// `freeSpace` as an explicit parameter instead of reading `_freeSpace`
-/// directly, since it no longer has privileged access to the State object.
 Widget buildBrowserAppBarStatsSubtitle(
   BuildContext context, {
   required int dirCount,

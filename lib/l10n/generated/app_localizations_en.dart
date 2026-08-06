@@ -3271,10 +3271,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get playlistScrollModeMenu => 'Playlist Scroll Mode';
 
   @override
-  String get playlistScrollHorizontalLabel => 'Horizontal (Left / Right)';
+  String get playlistScrollHorizontalLabel => 'Horizontal';
 
   @override
-  String get playlistScrollVerticalPageLabel => 'Vertical Paged (Up / Down)';
+  String get playlistScrollVerticalPageLabel => 'Vertical Paged';
 
   @override
   String get playlistScrollVerticalContinuousLabel => 'Vertical Continuous';

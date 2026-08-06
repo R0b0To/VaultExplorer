@@ -5555,13 +5555,13 @@ abstract class AppLocalizations {
   /// Playlist scroll mode: horizontal pagination
   ///
   /// In en, this message translates to:
-  /// **'Horizontal (Left / Right)'**
+  /// **'Horizontal'**
   String get playlistScrollHorizontalLabel;
 
   /// Playlist scroll mode: vertical pagination
   ///
   /// In en, this message translates to:
-  /// **'Vertical Paged (Up / Down)'**
+  /// **'Vertical Paged'**
   String get playlistScrollVerticalPageLabel;
 
   /// Playlist scroll mode: continuous vertical scrolling

@@ -4331,11 +4331,11 @@
   "@playlistScrollModeMenu": {
     "description": "Submenu title for playlist scroll mode options in media viewer"
   },
-  "playlistScrollHorizontalLabel": "Horizontal (Left / Right)",
+  "playlistScrollHorizontalLabel": "Horizontal",
   "@playlistScrollHorizontalLabel": {
     "description": "Playlist scroll mode: horizontal pagination"
   },
-  "playlistScrollVerticalPageLabel": "Vertical Paged (Up / Down)",
+  "playlistScrollVerticalPageLabel": "Vertical Paged",
   "@playlistScrollVerticalPageLabel": {
     "description": "Playlist scroll mode: vertical pagination"
   },

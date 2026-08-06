@@ -19,6 +19,8 @@ class MediaViewerTopBar extends StatelessWidget {
   final VoidCallback onBackPressed;
   final VoidCallback onDeletePressed;
   final VoidCallback onPlaylistChanged;
+  final VoidCallback? onMenuOpened;
+  final VoidCallback? onMenuClosed;
 
   const MediaViewerTopBar({
     super.key,
@@ -33,6 +35,8 @@ class MediaViewerTopBar extends StatelessWidget {
     required this.onBackPressed,
     required this.onDeletePressed,
     required this.onPlaylistChanged,
+    this.onMenuOpened,
+    this.onMenuClosed,
   });
 
   @override
@@ -126,6 +130,8 @@ class MediaViewerTopBar extends StatelessWidget {
 
     return MenuAnchor(
       style: menuStyle,
+      onOpen: onMenuOpened,
+      onClose: onMenuClosed,
       builder: (ctx, controller, child) => _TopBarCircleButton(
         icon: isPlaylist ? Icons.playlist_play_rounded : Icons.playlist_add_rounded,
         iconColor: isPlaylist ? cs.primary : Colors.white,
@@ -226,6 +232,8 @@ class MediaViewerTopBar extends StatelessWidget {
 
     return MenuAnchor(
       style: menuStyle,
+      onOpen: onMenuOpened,
+      onClose: onMenuClosed,
       builder: (ctx, controller, child) => _TopBarCircleButton(
         icon: Icons.more_vert_rounded,
         tooltip: context.l10n.moreActionsTooltip,
@@ -338,18 +346,18 @@ class MediaViewerTopBar extends StatelessWidget {
                 onTransitionEffectChanged(effect);
               },
               leadingIcon: isSelected
-                                ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
-                                : SizedBox(
-                                    width: 18,
-                                    child: Icon(
-                                      effect.icon,
-                                      size: 16,
-                                      color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                                    ),
-                                  ),
-                            child: Text(effect.getLocalizedLabel(context.l10n)),
-                          );
-                        }).toList(),
+                  ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+                  : SizedBox(
+                      width: 18,
+                      child: Icon(
+                        effect.icon,
+                        size: 16,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                      ),
+                    ),
+              child: Text(effect.getLocalizedLabel(context.l10n)),
+            );
+          }).toList(),
           child: Text(context.l10n.playlistTransitionMenu),
         ),
         const PopupMenuDivider(),

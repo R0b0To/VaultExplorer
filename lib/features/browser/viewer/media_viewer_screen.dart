@@ -764,6 +764,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   Future<void> _deleteCurrentFile() async {
+    _menuOpened();
     final cs = Theme.of(context).colorScheme;
     final confirm = await showDialog<bool>(
       context: context,
@@ -783,6 +784,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         ],
       ),
     );
+    _menuClosed();
     if (confirm != true) return;
     final fileToDelete = _playlistController.currentFile;
     bool success = false;
@@ -1304,6 +1306,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     },
                     onDeletePressed: _deleteCurrentFile,
                     onPlaylistChanged: _onPlaylistChanged,
+                    onMenuOpened: _menuOpened,
+                    onMenuClosed: _menuClosed,
                   ),
                 ),
               ),

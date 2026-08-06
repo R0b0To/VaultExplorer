@@ -9,9 +9,9 @@ enum PlaylistScrollMode {
   String get label {
     switch (this) {
       case PlaylistScrollMode.horizontal:
-        return 'Horizontal (Left / Right)';
+        return 'Horizontal';
       case PlaylistScrollMode.verticalPage:
-        return 'Vertical Paged (Up / Down)';
+        return 'Vertical Paged';
       case PlaylistScrollMode.verticalContinuous:
         return 'Vertical Continuous';
     }

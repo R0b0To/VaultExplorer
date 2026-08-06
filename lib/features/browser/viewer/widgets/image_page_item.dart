@@ -17,6 +17,7 @@ class ImagePageItem extends StatefulWidget {
   final ValueChanged<bool> onZoomChanged;
   final void Function(int width, int height)? onSizeKnown;
   final VoidCallback? onError;
+  final bool enableZoom;
 
   const ImagePageItem({
     super.key,
@@ -30,6 +31,7 @@ class ImagePageItem extends StatefulWidget {
     required this.onZoomChanged,
     this.onSizeKnown,
     this.onError,
+    this.enableZoom = true,
   });
 
   @override
@@ -122,6 +124,26 @@ class _ImagePageItemState extends State<ImagePageItem> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.enableZoom) {
+      return GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => widget.onToggleUI(!widget.showUI),
+        child: SizedBox.expand(
+          child: Center(
+            child: RotatedBox(
+              quarterTurns: widget.rotationQuarterTurns,
+              child: EncryptedImageWidget(
+                container: widget.container,
+                fileName: widget.fileName,
+                prefetchedBytes: widget.prefetchedBytes,
+                fit: widget.imageFit,
+                onError: widget.onError,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: () => widget.onToggleUI(!widget.showUI),

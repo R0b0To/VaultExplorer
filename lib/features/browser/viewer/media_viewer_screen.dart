@@ -60,6 +60,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   late final VideoPlaybackManager _playbackManager;
   late PageController _pageController;
   late final ScrollController _listScrollController;
+  late final TransformationController _continuousTransformationController;
+  double _continuousScale = 1.0;
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
@@ -119,6 +121,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _playbackManager = VideoPlaybackManager();
     _pageController = PageController(initialPage: widget.initialIndex);
     _listScrollController = ScrollController();
+    _continuousTransformationController = TransformationController();
     _playlistController.addListener(_onPlaylistUpdate);
     _playbackManager.activeControllerNotifier.addListener(
       _onActiveVideoControllerChanged,
@@ -942,6 +945,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _hideTimer?.cancel();
     _pageController.dispose();
     _listScrollController.dispose();
+    _continuousTransformationController.dispose();
     _playbackManager.dispose();
     _swipePhysicsNotifier.dispose();
     _videoProgressNotifier.dispose();
@@ -971,6 +975,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               imageFit: _scrollMode.isContinuous ? BoxFit.fitWidth : _imageFit,
               rotationQuarterTurns: _rotations[fileName] ?? 0,
               showUI: _showUI,
+              enableZoom: !_scrollMode.isContinuous,
               onToggleUI: _setUIVisibility,
               onZoomChanged: (allowSwipe) {
                 _swipePhysicsNotifier.value = allowSwipe
@@ -990,6 +995,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               playbackManager: _playbackManager,
               posterBytes: prefetchedBytes,
               showUI: _showUI,
+              enableZoom: !_scrollMode.isContinuous,
               onToggleUI: _setUIVisibility,
               skipSeconds: _doubleTapSkipSeconds,
               isAudio: isAudio,
@@ -1075,7 +1081,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
           Widget mainScrollView;
           if (_scrollMode.isContinuous) {
-            mainScrollView = ListView.builder(
+            Widget listWidget = ListView.builder(
               key: builderKey,
               controller: _listScrollController,
               scrollDirection: Axis.vertical,
@@ -1089,6 +1095,26 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   child: _buildMediaItem(index),
                 );
               },
+            );
+
+            mainScrollView = InteractiveViewer(
+              transformationController: _continuousTransformationController,
+              minScale: 1.0,
+              maxScale: MediaViewerConstants.maxImageZoom,
+              clipBehavior: Clip.none,
+              onInteractionUpdate: (details) {
+                final s = _continuousTransformationController.value.getMaxScaleOnAxis();
+                if (s != _continuousScale) {
+                  setState(() => _continuousScale = s);
+                }
+              },
+              onInteractionEnd: (details) {
+                final s = _continuousTransformationController.value.getMaxScaleOnAxis();
+                if (s <= 1.01 && _continuousScale != 1.0) {
+                  setState(() => _continuousScale = 1.0);
+                }
+              },
+              child: listWidget,
             );
           } else {
             mainScrollView = PageView.builder(

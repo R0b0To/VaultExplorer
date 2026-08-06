@@ -65,6 +65,7 @@ class MediaPlayerWidget extends StatefulWidget {
   final VoidCallback? onError;
   final VideoPlaybackManager playbackManager;
   final Uint8List? posterBytes;
+  final bool enableZoom;
 
   const MediaPlayerWidget({
     super.key,
@@ -85,6 +86,7 @@ class MediaPlayerWidget extends StatefulWidget {
     this.onSizeKnown,
     this.posterBytes,
     this.onError,
+    this.enableZoom = true,
   });
 
   @override
@@ -571,7 +573,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         ),
       ),
     );
-    if (!widget.isAudio) {
+    if (!widget.isAudio && widget.enableZoom) {
       corePlayerWidget = InteractiveViewer(
         key: _interactiveViewerKey,
         transformationController: _videoTransformationController,

@@ -59,7 +59,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   late final PlaylistController _playlistController;
   late final VideoPlaybackManager _playbackManager;
   late PageController _pageController;
-  late final ScrollController _listScrollController;
+  late ScrollController _listScrollController;
   late final TransformationController _continuousTransformationController;
   double _continuousScale = 1.0;
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
@@ -91,7 +91,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _isMuted = false;
   bool _isSwiping = false;
   bool _isProgrammaticScrolling = false;
-  bool _isOrientationChanging = false;
   final Set<String> _prefetchingFullRes = {};
   final Map<String, int> _rotations = {};
   final Map<String, GlobalKey> _mediaKeys = {};
@@ -242,97 +241,72 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   double _getOffsetForIndex(int targetIndex, double viewportWidth, double viewportHeight) {
-    if (targetIndex <= 0) return 0.0;
     final playlist = _playlistController.playlist;
-    final count = math.min(targetIndex, playlist.length);
+    if (playlist.isEmpty || targetIndex <= 0) return 0.0;
+    if (targetIndex >= playlist.length) targetIndex = playlist.length - 1;
 
     double sumPrevHeights = 0.0;
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < targetIndex; i++) {
       sumPrevHeights += _getItemHeight(i, viewportWidth, viewportHeight);
     }
 
     final currentItemHeight = _getItemHeight(targetIndex, viewportWidth, viewportHeight);
-
+    double idealOffset;
     if (currentItemHeight >= viewportHeight) {
-      return sumPrevHeights.clamp(0.0, double.infinity);
+      idealOffset = sumPrevHeights;
     } else {
-      final targetOffset = sumPrevHeights - (viewportHeight - currentItemHeight) / 2.0;
-      return targetOffset.clamp(0.0, double.infinity);
+      idealOffset = sumPrevHeights - (viewportHeight - currentItemHeight) / 2.0;
     }
+
+    double totalListHeight = sumPrevHeights + currentItemHeight;
+    for (int i = targetIndex + 1; i < playlist.length; i++) {
+      totalListHeight += _getItemHeight(i, viewportWidth, viewportHeight);
+    }
+    final maxScrollExtent = math.max(0.0, totalListHeight - viewportHeight);
+
+    return idealOffset.clamp(0.0, maxScrollExtent);
   }
 
   int _getIndexForOffset(double offset, double viewportWidth, double viewportHeight) {
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty) return 0;
-    if (viewportHeight <= 0) return _playlistController.currentIndex;
+    if (playlist.length == 1) return 0;
 
-    if (offset <= 10.0) return 0;
+    final currentIdx = _playlistController.currentIndex.clamp(0, playlist.length - 1);
 
-    double totalListHeight = 0.0;
+    double sumPrev = 0.0;
+    final targetOffsets = <double>[];
     final heights = <double>[];
     for (int i = 0; i < playlist.length; i++) {
       final h = _getItemHeight(i, viewportWidth, viewportHeight);
       heights.add(h);
-      totalListHeight += h;
+      targetOffsets.add(sumPrev);
+      sumPrev += h;
     }
-
+    final totalListHeight = sumPrev;
     final maxScrollExtent = math.max(0.0, totalListHeight - viewportHeight);
-    if (maxScrollExtent > 0 && offset >= maxScrollExtent - 10.0) {
-      return playlist.length - 1;
-    }
-
-    final viewportCenter = offset + (viewportHeight / 2.0);
-    final currentIndex = _playlistController.currentIndex;
-
-    double currentItemDistance = double.infinity;
-    double tempY = 0.0;
-    for (int i = 0; i < playlist.length; i++) {
-      final itemHeight = heights[i];
-      if (i == currentIndex) {
-        final itemCenter = tempY + (itemHeight / 2.0);
-        final visibleHeight = math.max(
-          0.0,
-          math.min(offset + viewportHeight, tempY + itemHeight) - math.max(offset, tempY),
-        );
-        if (visibleHeight > 0) {
-          currentItemDistance = (itemCenter - viewportCenter).abs();
-        }
-        break;
-      }
-      tempY += itemHeight;
-    }
-
-    double minDistance = double.infinity;
-    int minDistanceIndex = currentIndex;
-    double currentY = 0.0;
 
     for (int i = 0; i < playlist.length; i++) {
-      final itemHeight = heights[i];
-      final itemBottom = currentY + itemHeight;
-
-      final visibleHeight = math.max(
-        0.0,
-        math.min(offset + viewportHeight, itemBottom) - math.max(offset, currentY),
-      );
-      if (visibleHeight > 0) {
-        final itemCenter = currentY + (itemHeight / 2.0);
-        final distance = (itemCenter - viewportCenter).abs();
-        if (distance < minDistance) {
-          minDistance = distance;
-          minDistanceIndex = i;
-        }
-      }
-      currentY = itemBottom;
+      final sumPrevI = targetOffsets[i];
+      final hI = heights[i];
+      final ideal = (hI >= viewportHeight)
+          ? sumPrevI
+          : sumPrevI - (viewportHeight - hI) / 2.0;
+      targetOffsets[i] = ideal.clamp(0.0, maxScrollExtent);
     }
 
-    if (minDistanceIndex != currentIndex) {
-      if (currentItemDistance == double.infinity || (currentItemDistance - minDistance) > 40.0) {
-        return minDistanceIndex;
-      } else {
-        return currentIndex;
+    int bestIdx = currentIdx;
+    double minDiff = (offset - targetOffsets[currentIdx]).abs();
+
+    for (int i = 0; i < playlist.length; i++) {
+      final diff = (offset - targetOffsets[i]).abs();
+      if (diff < minDiff - 10.0) {
+        minDiff = diff;
+        bestIdx = i;
       }
     }
-    return currentIndex;
+
+    return bestIdx;
   }
 
   void _scrollToCurrentIndex({bool animate = false}) {
@@ -344,15 +318,25 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         final target = _getOffsetForIndex(index, _viewportWidth, _viewportHeight);
         if (animate) {
           _isProgrammaticScrolling = true;
-          _listScrollController.animateTo(
+          _listScrollController
+              .animateTo(
             target,
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
-          ).then((_) {
-            if (mounted) _isProgrammaticScrolling = false;
+          )
+              .then((_) {
+            if (mounted) {
+              _isProgrammaticScrolling = false;
+              _activateCurrentMedia();
+              _onScrollEnd();
+            }
           });
         } else {
+          _isProgrammaticScrolling = true;
           _listScrollController.jumpTo(target);
+          _isProgrammaticScrolling = false;
+          _activateCurrentMedia();
+          _onScrollEnd();
         }
       }
     } else {
@@ -421,13 +405,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final controller = _playbackManager.activeController;
     if (controller == null || controller.value.hasError) return;
     _updateWakelock(controller.value.isPlaying);
-
     final isInitialized = controller.value.isInitialized;
     final position = controller.value.position;
     final duration = controller.value.duration;
-
     if (!isInitialized || duration <= Duration.zero) return;
-
     if (_videoPlaybackMode == VideoPlaybackMode.loop) {
       if (position >= duration || (!controller.value.isPlaying && position >= duration - const Duration(milliseconds: 200))) {
         controller.seekTo(Duration.zero);
@@ -435,9 +416,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         return;
       }
     }
-
     if (_isAutoAdvancing) return;
-
     if (_videoPlaybackMode == VideoPlaybackMode.playAndAdvance && position >= duration) {
       _isAutoAdvancing = true;
       try {
@@ -1153,44 +1132,39 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         builder: (context, constraints) {
           final newWidth = constraints.maxWidth;
           final newHeight = constraints.maxHeight;
-
           final bool dimsChanged = (_viewportWidth > 0 && _viewportHeight > 0) &&
               (newWidth != _viewportWidth || newHeight != _viewportHeight);
 
           if (dimsChanged) {
-            _isOrientationChanging = true;
-          }
-
-          _viewportWidth = newWidth;
-          _viewportHeight = newHeight;
-
-          if (dimsChanged && _scrollMode.isContinuous && _listScrollController.hasClients) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted && _listScrollController.hasClients) {
-                final targetOffset = _getOffsetForIndex(
-                  _playlistController.currentIndex,
-                  _viewportWidth,
-                  _viewportHeight,
-                );
-                _isProgrammaticScrolling = true;
-                _listScrollController.jumpTo(targetOffset);
-                _isProgrammaticScrolling = false;
-                Future.delayed(const Duration(milliseconds: 100), () {
-                  if (mounted) _isOrientationChanging = false;
-                });
-              } else if (mounted) {
-                _isOrientationChanging = false;
-              }
-            });
-          } else if (!dimsChanged) {
-            _isOrientationChanging = false;
+            _viewportWidth = newWidth;
+            _viewportHeight = newHeight;
+            if (_scrollMode.isContinuous) {
+              final targetOffset = _getOffsetForIndex(
+                _playlistController.currentIndex,
+                newWidth,
+                newHeight,
+              );
+              final oldController = _listScrollController;
+              _listScrollController = ScrollController(initialScrollOffset: targetOffset);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                oldController.dispose();
+                if (mounted) {
+                  _activateCurrentMedia();
+                  _onScrollEnd();
+                }
+              });
+            }
+          } else {
+            _viewportWidth = newWidth;
+            _viewportHeight = newHeight;
           }
 
           final builderKey = ValueKey(
             '${_playlistController.isPlaylistMode}_'
             '${_playlistController.selectedFolder}_'
             '${_playlistController.isShuffled}_'
-            '$_scrollMode',
+            '${_scrollMode}_'
+            '${_viewportWidth}_$_viewportHeight',
           );
           Widget mainScrollView;
           if (_scrollMode.isContinuous) {
@@ -1218,12 +1192,18 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 final s = _continuousTransformationController.value.getMaxScaleOnAxis();
                 if (s != _continuousScale) {
                   setState(() => _continuousScale = s);
+                  _swipePhysicsNotifier.value = s > 1.01
+                      ? const NeverScrollableScrollPhysics()
+                      : const BouncingScrollPhysics();
                 }
               },
               onInteractionEnd: (details) {
                 final s = _continuousTransformationController.value.getMaxScaleOnAxis();
-                if (s <= 1.01 && _continuousScale != 1.0) {
-                  setState(() => _continuousScale = 1.0);
+                if (s <= 1.01) {
+                  if (_continuousScale != 1.0) {
+                    setState(() => _continuousScale = 1.0);
+                  }
+                  _swipePhysicsNotifier.value = const BouncingScrollPhysics();
                 }
               },
               child: listWidget,
@@ -1258,7 +1238,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   return NotificationListener<ScrollNotification>(
                     onNotification: (ScrollNotification notification) {
                       if (notification.depth == 0) {
-                        if (_isOrientationChanging || _isProgrammaticScrolling) {
+                        if (_isProgrammaticScrolling) {
                           return false;
                         }
                         if (notification is ScrollStartNotification &&

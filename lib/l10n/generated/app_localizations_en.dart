@@ -3266,4 +3266,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get closeCarouselTooltip => 'Close Carousel';
+
+  @override
+  String get playlistScrollModeMenu => 'Playlist Scroll Mode';
+
+  @override
+  String get playlistScrollHorizontalLabel => 'Horizontal (Left / Right)';
+
+  @override
+  String get playlistScrollVerticalPageLabel => 'Vertical Paged (Up / Down)';
+
+  @override
+  String get playlistScrollVerticalContinuousLabel => 'Vertical Continuous';
 }

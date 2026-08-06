@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
@@ -62,9 +61,11 @@ class MediaPlayerWidget extends StatefulWidget {
   final int rotationQuarterTurns;
   final ValueChanged<bool> onSubtitlesAvailableChanged;
   final ValueNotifier<VideoPlaybackProgress> progressNotifier;
+  final void Function(int width, int height)? onSizeKnown;
   final VoidCallback? onError;
   final VideoPlaybackManager playbackManager;
   final Uint8List? posterBytes;
+
   const MediaPlayerWidget({
     super.key,
     required this.container,
@@ -81,9 +82,11 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.onSubtitlesAvailableChanged,
     required this.progressNotifier,
     required this.playbackManager,
+    this.onSizeKnown,
     this.posterBytes,
     this.onError,
   });
+
   @override
   State<MediaPlayerWidget> createState() => _MediaPlayerWidgetState();
 }
@@ -114,8 +117,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   @override
   void initState() {
     super.initState();
-    // Synchronously check in-memory thumbnail cache for poster frame instead of invoking
-    // async native getVideoThumbnail frame extractions that compete for MediaCodec slots.
     _localPosterBytes = widget.posterBytes ??
         ThumbnailCacheService.getFromMemory(
           widget.container,
@@ -230,6 +231,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         newSize.width.round(),
         newSize.height.round(),
       );
+      widget.onSizeKnown?.call(newSize.width.round(), newSize.height.round());
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() {});
       });
@@ -398,12 +400,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
 
   Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
     final poster = _localPosterBytes ?? widget.posterBytes;
-    // Finding F-10 (lower severity here since poster bytes are already
-    // thumbnail-sized JPEGs, not full-res source files): cap the decode
-    // target to the physical viewport width so Skia never has a reason to
-    // decode past what's actually rendered. Single dimension only (no
-    // cacheHeight) so the decoder preserves the poster's aspect ratio
-    // automatically instead of stretching it.
     final posterCacheWidth =
         (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio)
             .round()
@@ -513,15 +509,12 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // 1. Poster thumbnail ALWAYS rendered as base layer to prevent 1-frame black flash
             _buildPoster(cs, isLoading: _isActive),
-            // 2. Native Video Texture rendered ON TOP of thumbnail when ready
             if (!widget.isAudio && controller != null && isVideoReady)
               RotatedBox(
                 quarterTurns: widget.rotationQuarterTurns,
                 child: NativeVideoPlayerView(controller: controller),
               ),
-            // 3. Subtitles / Audio Visualizer
             if (widget.isAudio && controller != null && isVideoReady)
               _buildAudioCenterVisual(cs, isPlaying: controller.value.isPlaying)
             else if (!widget.isAudio && widget.subtitlesEnabled)
@@ -549,7 +542,6 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
                   },
                 ),
               ),
-            // 4. Gesture detector overlay
             Positioned.fill(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -748,6 +740,7 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   final List<double> _heights = [0.2, 0.5, 0.8, 0.4, 0.9, 0.3, 0.7, 0.5, 0.2];
+
   @override
   void initState() {
     super.initState();
@@ -757,6 +750,7 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
     );
     if (widget.isPlaying) _controller.repeat(reverse: true);
   }
+
   @override
   void didUpdateWidget(covariant _AudioVisualizer oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -766,11 +760,13 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
       _controller.stop();
     }
   }
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

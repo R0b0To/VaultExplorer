@@ -4326,6 +4326,22 @@
   "closeCarouselTooltip": "Close Carousel",
   "@closeCarouselTooltip": {
     "description": "Tooltip for the button that closes the playlist thumbnail carousel overlay"
+  },
+  "playlistScrollModeMenu": "Playlist Scroll Mode",
+  "@playlistScrollModeMenu": {
+    "description": "Submenu title for playlist scroll mode options in media viewer"
+  },
+  "playlistScrollHorizontalLabel": "Horizontal (Left / Right)",
+  "@playlistScrollHorizontalLabel": {
+    "description": "Playlist scroll mode: horizontal pagination"
+  },
+  "playlistScrollVerticalPageLabel": "Vertical Paged (Up / Down)",
+  "@playlistScrollVerticalPageLabel": {
+    "description": "Playlist scroll mode: vertical pagination"
+  },
+  "playlistScrollVerticalContinuousLabel": "Vertical Continuous",
+  "@playlistScrollVerticalContinuousLabel": {
+    "description": "Playlist scroll mode: continuous vertical scrolling"
   }
 }
 

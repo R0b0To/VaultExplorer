@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -7,10 +8,12 @@ import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
+import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -56,10 +59,12 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   late final PlaylistController _playlistController;
   late final VideoPlaybackManager _playbackManager;
   late PageController _pageController;
+  late final ScrollController _listScrollController;
   final ValueNotifier<ScrollPhysics> _swipePhysicsNotifier =
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
       ValueNotifier<VideoPlaybackProgress>(const VideoPlaybackProgress());
+
   bool _showUI = false;
   bool _isContainerLocked = false;
   int _activeMenuCount = 0;
@@ -79,7 +84,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   final int _doubleTapSkipSeconds = 5;
   BoxFit _imageFit = BoxFit.contain;
   PlaylistTransitionEffect _transitionEffect = PlaylistTransitionEffect.slide;
-  Axis _scrollDirection = Axis.horizontal;
+  PlaylistScrollMode _scrollMode = PlaylistScrollMode.horizontal;
+  double _viewportWidth = 0.0;
+  double _viewportHeight = 0.0;
   bool _isMuted = false;
   bool _isSwiping = false;
   final Set<String> _prefetchingFullRes = {};
@@ -111,6 +118,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _wasEmpty = _playlistController.isEmpty;
     _playbackManager = VideoPlaybackManager();
     _pageController = PageController(initialPage: widget.initialIndex);
+    _listScrollController = ScrollController();
     _playlistController.addListener(_onPlaylistUpdate);
     _playbackManager.activeControllerNotifier.addListener(
       _onActiveVideoControllerChanged,
@@ -159,7 +167,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           _isCarouselVisible = false;
         }
         _transitionEffect = appSettings.playlistTransitionEffect;
-        _scrollDirection = appSettings.playlistScrollDirection;
+        _scrollMode = appSettings.playlistScrollMode;
       });
       if (config.autoStartPlaylistMode && !_playlistController.isPlaylistMode) {
         final targetFile = _playlistController.currentFile;
@@ -209,6 +217,83 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
+  double _getItemHeight(int index, double viewportWidth, double viewportHeight) {
+    if (index < 0 || index >= _playlistController.playlist.length) {
+      return viewportHeight;
+    }
+    final fileName = _playlistController.playlist[index];
+    final isAudio = MediaViewerConstants.isAudio(fileName);
+    if (isAudio) {
+      return 320.0;
+    }
+
+    final ratio = MediaAspectRatioCache.get(widget.container, fileName);
+    if (ratio != null && ratio > 0 && viewportWidth > 0) {
+      final rotation = _rotations[fileName] ?? 0;
+      final effectiveRatio = (rotation % 2 != 0) ? 1.0 / ratio : ratio;
+      final calculatedHeight = viewportWidth / effectiveRatio;
+      return calculatedHeight.clamp(120.0, viewportHeight * 2.0);
+    }
+
+    return (viewportWidth / (16 / 9)).clamp(200.0, viewportHeight);
+  }
+
+  double _getOffsetForIndex(int targetIndex, double viewportWidth, double viewportHeight) {
+    double offset = 0.0;
+    final count = math.min(targetIndex, _playlistController.playlist.length);
+    for (int i = 0; i < count; i++) {
+      offset += _getItemHeight(i, viewportWidth, viewportHeight);
+    }
+    return offset;
+  }
+
+  int _getIndexForOffset(double offset, double viewportWidth, double viewportHeight) {
+    double currentY = 0.0;
+    final playlist = _playlistController.playlist;
+    final centerOffset = offset + (viewportHeight / 2);
+
+    for (int i = 0; i < playlist.length; i++) {
+      final itemHeight = _getItemHeight(i, viewportWidth, viewportHeight);
+      if (centerOffset >= currentY && centerOffset < currentY + itemHeight) {
+        return i;
+      }
+      currentY += itemHeight;
+    }
+    return (playlist.length - 1).clamp(0, math.max(0, playlist.length - 1));
+  }
+
+  void _scrollToCurrentIndex({bool animate = false}) {
+    final index = _playlistController.currentIndex;
+    if (_scrollMode.isContinuous) {
+      if (_listScrollController.hasClients &&
+          _listScrollController.positions.length == 1 &&
+          _viewportHeight > 0) {
+        final target = _getOffsetForIndex(index, _viewportWidth, _viewportHeight);
+        if (animate) {
+          _listScrollController.animateTo(
+            target,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+          );
+        } else {
+          _listScrollController.jumpTo(target);
+        }
+      }
+    } else {
+      if (_pageController.hasClients && _pageController.positions.length == 1) {
+        if (animate) {
+          _pageController.animateToPage(
+            index,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+          );
+        } else {
+          _pageController.jumpToPage(index);
+        }
+      }
+    }
+  }
+
   void _onPlaylistChanged() {
     _startHideTimer();
     if (!_playlistController.isPlaylistMode) {
@@ -229,7 +314,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
     setState(() {});
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _onScrollEnd();
+      if (mounted) {
+        _scrollToCurrentIndex(animate: false);
+        _onScrollEnd();
+      }
     });
   }
 
@@ -292,7 +380,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final index = _playlistController.currentIndex;
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty) return;
-
     for (final delta in [1, -1, 2, -2]) {
       final i = index + delta;
       if (i >= 0 && i < playlist.length) {
@@ -496,17 +583,36 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
       if (mounted) _prefetchSurroundingItems();
     });
-    if (_pageController.hasClients && _pageController.positions.length == 1) {
-      if (animate) {
-        await _pageController.animateToPage(
-          index,
-          duration: duration,
-          curve: curve,
-        );
-      } else {
-        _pageController.jumpToPage(index);
+
+    if (_scrollMode.isContinuous) {
+      if (_listScrollController.hasClients &&
+          _listScrollController.positions.length == 1 &&
+          _viewportHeight > 0) {
+        final target = _getOffsetForIndex(index, _viewportWidth, _viewportHeight);
+        if (animate) {
+          await _listScrollController.animateTo(
+            target,
+            duration: duration,
+            curve: curve,
+          );
+        } else {
+          _listScrollController.jumpTo(target);
+        }
+      }
+    } else {
+      if (_pageController.hasClients && _pageController.positions.length == 1) {
+        if (animate) {
+          await _pageController.animateToPage(
+            index,
+            duration: duration,
+            curve: curve,
+          );
+        } else {
+          _pageController.jumpToPage(index);
+        }
       }
     }
+
     if (mounted && _transitionToken == token) {
       _isSwiping = false;
       _isAutoAdvancing = false;
@@ -575,6 +681,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _isSwiping = false;
     if (_playbackManager.currentFileNotifier.value != _playlistController.currentFile) {
       _activateCurrentMedia();
+    } else if (_autoPlay) {
+      _playbackManager.activeController?.play();
     }
     final currentFile = _playlistController.currentFile;
     if (MediaViewerConstants.isImage(currentFile)) {
@@ -833,12 +941,91 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _cancelSlideshowTimer();
     _hideTimer?.cancel();
     _pageController.dispose();
+    _listScrollController.dispose();
     _playbackManager.dispose();
     _swipePhysicsNotifier.dispose();
     _videoProgressNotifier.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
+  }
+
+  Widget _buildMediaItem(int index) {
+    final fileName = _playlistController.playlist[index];
+    final contentUriString = _contentUriFor(fileName);
+    final prefetchedBytes = _prefetchedBytesFor(fileName);
+    if (prefetchedBytes == null) {
+      unawaited(_prefetchThumbnail(fileName));
+    }
+    final isImg = MediaViewerConstants.isImage(fileName);
+    final isAudio = MediaViewerConstants.isAudio(fileName);
+
+    final itemWidget = Container(
+      color: Colors.black,
+      child: isImg
+          ? ImagePageItem(
+              key: _getMediaKey(fileName),
+              fileName: fileName,
+              prefetchedBytes: prefetchedBytes,
+              container: widget.container,
+              imageFit: _scrollMode.isContinuous ? BoxFit.fitWidth : _imageFit,
+              rotationQuarterTurns: _rotations[fileName] ?? 0,
+              showUI: _showUI,
+              onToggleUI: _setUIVisibility,
+              onZoomChanged: (allowSwipe) {
+                _swipePhysicsNotifier.value = allowSwipe
+                    ? const BouncingScrollPhysics()
+                    : const NeverScrollableScrollPhysics();
+              },
+              onSizeKnown: (w, h) {
+                if (mounted) setState(() {});
+              },
+              onError: () => _handleMediaError(fileName),
+            )
+          : MediaPlayerWidget(
+              key: _getMediaKey(fileName),
+              container: widget.container,
+              fileName: fileName,
+              contentUriString: contentUriString,
+              playbackManager: _playbackManager,
+              posterBytes: prefetchedBytes,
+              showUI: _showUI,
+              onToggleUI: _setUIVisibility,
+              skipSeconds: _doubleTapSkipSeconds,
+              isAudio: isAudio,
+              subtitlesEnabled: _subtitlesEnabled,
+              playbackSpeed: _playbackSpeed,
+              rotationQuarterTurns: _rotations[fileName] ?? 0,
+              progressNotifier: _videoProgressNotifier,
+              onSubtitlesAvailableChanged: (val) {
+                _playbackManager.updateSubtitleStatus(fileName, val);
+                if (fileName == _playlistController.currentFile) {
+                  setState(() {});
+                }
+              },
+              onSizeKnown: (w, h) {
+                if (mounted) setState(() {});
+              },
+              onZoomChanged: (allowSwipe) {
+                _swipePhysicsNotifier.value = allowSwipe
+                    ? const BouncingScrollPhysics()
+                    : const NeverScrollableScrollPhysics();
+              },
+              onError: () => _handleMediaError(fileName),
+            ),
+    );
+
+    if (_scrollMode.isContinuous) {
+      return itemWidget;
+    }
+
+    return PlaylistTransitionTransformer(
+      pageController: _pageController,
+      index: index,
+      effect: _transitionEffect,
+      scrollDirection: _scrollMode.axis,
+      child: itemWidget,
+    );
   }
 
   @override
@@ -861,6 +1048,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         ),
       );
     }
+
     final isCurrentAnImage =
         MediaViewerConstants.isImage(_playlistController.currentFile);
     bool isPlayingState = false;
@@ -871,235 +1059,217 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           _playbackManager.activeController?.value.isPlaying ?? false;
     }
     _updateWakelock(isPlayingState);
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          ValueListenableBuilder<ScrollPhysics>(
-            valueListenable: _swipePhysicsNotifier,
-            builder: (context, physics, child) {
-              return NotificationListener<ScrollNotification>(
-                onNotification: (ScrollNotification notification) {
-                  if (notification.depth == 0) {
-                    if (notification is ScrollStartNotification &&
-                        notification.dragDetails != null) {
-                      _onScrollStart();
-                    } else if (notification is ScrollEndNotification) {
-                      _onScrollEnd();
-                    }
-                  }
-                  return false;
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          _viewportWidth = constraints.maxWidth;
+          _viewportHeight = constraints.maxHeight;
+          final builderKey = ValueKey(
+            '${_playlistController.isPlaylistMode}_'
+            '${_playlistController.selectedFolder}_'
+            '${_playlistController.isShuffled}_'
+            '$_scrollMode',
+          );
+
+          Widget mainScrollView;
+          if (_scrollMode.isContinuous) {
+            mainScrollView = ListView.builder(
+              key: builderKey,
+              controller: _listScrollController,
+              scrollDirection: Axis.vertical,
+              physics: _swipePhysicsNotifier.value,
+              itemCount: _playlistController.playlist.length,
+              itemBuilder: (context, index) {
+                final itemHeight = _getItemHeight(index, constraints.maxWidth, constraints.maxHeight);
+                return SizedBox(
+                  height: itemHeight,
+                  width: constraints.maxWidth,
+                  child: _buildMediaItem(index),
+                );
+              },
+            );
+          } else {
+            mainScrollView = PageView.builder(
+              key: builderKey,
+              controller: _pageController,
+              scrollDirection: _scrollMode.axis,
+              physics: _swipePhysicsNotifier.value,
+              itemCount: _playlistController.playlist.length,
+              onPageChanged: (index) {
+                if (_playlistController.currentIndex != index) {
+                  _playlistController.updateIndex(index);
+                  _activateCurrentMedia();
+                }
+                _prefetchDebounceTimer?.cancel();
+                _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+                  if (mounted) _prefetchSurroundingItems();
+                });
+              },
+              itemBuilder: (context, index) {
+                return _buildMediaItem(index);
+              },
+            );
+          }
+
+          return Stack(
+            children: [
+              ValueListenableBuilder<ScrollPhysics>(
+                valueListenable: _swipePhysicsNotifier,
+                builder: (context, physics, child) {
+                  return NotificationListener<ScrollNotification>(
+                    onNotification: (ScrollNotification notification) {
+                      if (notification.depth == 0) {
+                        if (notification is ScrollStartNotification &&
+                            notification.dragDetails != null) {
+                          _onScrollStart();
+                        } else if (notification is ScrollUpdateNotification) {
+                          if (_scrollMode.isContinuous &&
+                              _viewportHeight > 0 &&
+                              _listScrollController.hasClients) {
+                            final offset = _listScrollController.offset;
+                            final newIndex = _getIndexForOffset(offset, _viewportWidth, _viewportHeight);
+                            if (_playlistController.currentIndex != newIndex) {
+                              _playlistController.updateIndex(newIndex);
+                              _activateCurrentMedia();
+                            }
+                          }
+                        } else if (notification is ScrollEndNotification) {
+                          _onScrollEnd();
+                        }
+                      }
+                      return false;
+                    },
+                    child: mainScrollView,
+                  );
                 },
-                child: PageView.builder(
-                  key: ValueKey(
-                    '${_playlistController.isPlaylistMode}_'
-                    '${_playlistController.selectedFolder}_'
-                    '${_playlistController.isShuffled}_'
-                    '$_scrollDirection',
+              ),
+              AnimatedPositioned(
+                duration: MediaViewerConstants.animationDuration,
+                curve: Curves.easeOut,
+                top: _showUI ? 0 : -120,
+                left: 0,
+                right: 0,
+                child: ListenableBuilder(
+                  listenable: _playlistController,
+                  builder: (context, _) => MediaViewerTopBar(
+                    container: widget.container,
+                    playlistController: _playlistController,
+                    currentFileName: _playlistController.currentFile,
+                    totalCount: _playlistController.playlist.length,
+                    currentTransitionEffect: _transitionEffect,
+                    onTransitionEffectChanged: (newEffect) async {
+                      setState(() {
+                        _transitionEffect = newEffect;
+                      });
+                      final appSettings = await AppSettingsService.loadSettings();
+                      await AppSettingsService.saveSettings(
+                        appSettings.copyWith(playlistTransitionEffect: newEffect),
+                      );
+                    },
+                    currentScrollMode: _scrollMode,
+                    onScrollModeChanged: (newMode) async {
+                      setState(() {
+                        _scrollMode = newMode;
+                      });
+                      final appSettings = await AppSettingsService.loadSettings();
+                      await AppSettingsService.saveSettings(
+                        appSettings.copyWith(playlistScrollMode: newMode),
+                      );
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted) _scrollToCurrentIndex(animate: false);
+                      });
+                    },
+                    onBackPressed: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.pop(context);
+                    },
+                    onDeletePressed: _deleteCurrentFile,
+                    onPlaylistChanged: _onPlaylistChanged,
                   ),
-                  controller: _pageController,
-                  scrollDirection: _scrollDirection,
-                  physics: physics,
-                  itemCount: _playlistController.playlist.length,
-                  onPageChanged: (index) {
-                    if (_playlistController.currentIndex != index) {
-                      _playlistController.updateIndex(index);
-                      _activateCurrentMedia();
-                    }
-                    _prefetchDebounceTimer?.cancel();
-                    _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
-                      if (mounted) _prefetchSurroundingItems();
-                    });
-                  },
-                  itemBuilder: (context, index) {
-                    final fileName = _playlistController.playlist[index];
-                    final contentUriString = _contentUriFor(fileName);
-                    final prefetchedBytes = _prefetchedBytesFor(fileName);
-                    if (prefetchedBytes == null) {
-                      unawaited(_prefetchThumbnail(fileName));
-                    }
-                    final isImg = MediaViewerConstants.isImage(fileName);
-                    final isAudio = MediaViewerConstants.isAudio(fileName);
-                    final itemWidget = Container(
-                      color: Colors.black,
-                      child: isImg
-                          ? ImagePageItem(
-                              key: _getMediaKey(fileName),
-                              fileName: fileName,
-                              prefetchedBytes: prefetchedBytes,
-                              container: widget.container,
-                              imageFit: _imageFit,
-                              rotationQuarterTurns: _rotations[fileName] ?? 0,
-                              showUI: _showUI,
-                              onToggleUI: _setUIVisibility,
-                              onZoomChanged: (allowSwipe) {
-                                _swipePhysicsNotifier.value = allowSwipe
-                                    ? const BouncingScrollPhysics()
-                                    : const NeverScrollableScrollPhysics();
-                              },
-                              onError: () => _handleMediaError(fileName),
-                            )
-                          : MediaPlayerWidget(
-                              key: _getMediaKey(fileName),
-                              container: widget.container,
-                              fileName: fileName,
-                              contentUriString: contentUriString,
-                              playbackManager: _playbackManager,
-                              posterBytes: prefetchedBytes,
-                              showUI: _showUI,
-                              onToggleUI: _setUIVisibility,
-                              skipSeconds: _doubleTapSkipSeconds,
-                              isAudio: isAudio,
-                              subtitlesEnabled: _subtitlesEnabled,
-                              playbackSpeed: _playbackSpeed,
-                              rotationQuarterTurns: _rotations[fileName] ?? 0,
-                              progressNotifier: _videoProgressNotifier,
-                              onSubtitlesAvailableChanged: (val) {
-                                _playbackManager.updateSubtitleStatus(fileName, val);
-                                if (fileName == _playlistController.currentFile) {
-                                  setState(() {});
-                                }
-                              },
-                              onZoomChanged: (allowSwipe) {
-                                _swipePhysicsNotifier.value = allowSwipe
-                                    ? const BouncingScrollPhysics()
-                                    : const NeverScrollableScrollPhysics();
-                              },
-                              onError: () => _handleMediaError(fileName),
-                            ),
-                    );
-                    return PlaylistTransitionTransformer(
-                      pageController: _pageController,
-                      index: index,
-                      effect: _transitionEffect,
-                      scrollDirection: _scrollDirection,
-                      child: itemWidget,
+                ),
+              ),
+              AnimatedPositioned(
+                duration: MediaViewerConstants.animationDuration,
+                curve: Curves.easeOut,
+                left: 0,
+                right: 0,
+                bottom: _showUI ? 0 : -200,
+                child: ListenableBuilder(
+                  listenable: _playlistController,
+                  builder: (context, _) {
+                    final isImg =
+                        MediaViewerConstants.isImage(_playlistController.currentFile);
+                    return MediaViewerBottomControls(
+                      playlistController: _playlistController,
+                      playbackManager: _playbackManager,
+                      videoProgressNotifier: _videoProgressNotifier,
+                      isImage: isImg,
+                      showUI: _showUI,
+                      isPlaylistMode: _playlistController.isPlaylistMode,
+                      autoAdvance: _autoAdvance,
+                      slideshowDelaySeconds: _slideshowDelaySeconds,
+                      isMuted: _isMuted,
+                      videoPlaybackMode: _videoPlaybackMode,
+                      onNavigateToPrev: _navigateToPrev,
+                      onNavigateToNext: _navigateToNext,
+                      onTogglePlayPause: (wasPlaying) {
+                        _startHideTimer();
+                        if (isImg) {
+                          _updatePlaybackMode(
+                            wasPlaying ? VideoPlaybackMode.playOnce : VideoPlaybackMode.playAndAdvance,
+                          );
+                        } else {
+                          final controller = _playbackManager.activeController;
+                          if (controller != null) {
+                            if (controller.value.isPlaying) {
+                              controller.pause();
+                            } else {
+                              controller.play();
+                            }
+                          }
+                        }
+                      },
+                      onPlaybackModeChanged: _updatePlaybackMode,
+                      onToggleMute: () {
+                        HapticFeedback.lightImpact();
+                        _startHideTimer();
+                        setState(() => _isMuted = !_isMuted);
+                        _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
+                      },
+                      onAdvancedSettingsPressed: () => _showAdvancedSettings(context, isImg),
+                      onDiagnosticsPressed: isImg ? null : () => _showDiagnostics(context),
+                      onStartHideTimer: _startHideTimer,
+                      onShowUIChanged: _setUIVisibility,
+                      isCarouselVisible: _isCarouselVisible,
+                      onToggleCarousel: (_enableCarousel && _playlistController.isPlaylistMode) ? _toggleCarousel : null,
                     );
                   },
                 ),
-              );
-            },
-          ),
-          AnimatedPositioned(
-            duration: MediaViewerConstants.animationDuration,
-            curve: Curves.easeOut,
-            top: _showUI ? 0 : -120,
-            left: 0,
-            right: 0,
-            child: ListenableBuilder(
-              listenable: _playlistController,
-              builder: (context, _) => MediaViewerTopBar(
-                container: widget.container,
-                playlistController: _playlistController,
-                currentFileName: _playlistController.currentFile,
-                totalCount: _playlistController.playlist.length,
-                currentTransitionEffect: _transitionEffect,
-                onTransitionEffectChanged: (newEffect) async {
-                  setState(() {
-                    _transitionEffect = newEffect;
-                  });
-                  final appSettings = await AppSettingsService.loadSettings();
-                  await AppSettingsService.saveSettings(
-                    appSettings.copyWith(playlistTransitionEffect: newEffect),
-                  );
-                },
-                currentScrollDirection: _scrollDirection,
-                onScrollDirectionChanged: (newDirection) async {
-                  setState(() {
-                    _scrollDirection = newDirection;
-                  });
-                  final appSettings = await AppSettingsService.loadSettings();
-                  await AppSettingsService.saveSettings(
-                    appSettings.copyWith(playlistScrollDirection: newDirection),
-                  );
-                },
-                onBackPressed: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.pop(context);
-                },
-                onDeletePressed: _deleteCurrentFile,
-                onPlaylistChanged: _onPlaylistChanged,
               ),
-            ),
-          ),
-          AnimatedPositioned(
-            duration: MediaViewerConstants.animationDuration,
-            curve: Curves.easeOut,
-            left: 0,
-            right: 0,
-            bottom: _showUI ? 0 : -200,
-            child: ListenableBuilder(
-              listenable: _playlistController,
-              builder: (context, _) {
-                final isImg =
-                    MediaViewerConstants.isImage(_playlistController.currentFile);
-                return MediaViewerBottomControls(
-                  playlistController: _playlistController,
-                  playbackManager: _playbackManager,
-                  videoProgressNotifier: _videoProgressNotifier,
-                  isImage: isImg,
-                  showUI: _showUI,
-                  isPlaylistMode: _playlistController.isPlaylistMode,
-                  autoAdvance: _autoAdvance,
-                  slideshowDelaySeconds: _slideshowDelaySeconds,
-                  isMuted: _isMuted,
-                  videoPlaybackMode: _videoPlaybackMode,
-                  onNavigateToPrev: _navigateToPrev,
-                  onNavigateToNext: _navigateToNext,
-                  onTogglePlayPause: (wasPlaying) {
-                    _startHideTimer();
-                    if (isImg) {
-                      _updatePlaybackMode(
-                        wasPlaying ? VideoPlaybackMode.playOnce : VideoPlaybackMode.playAndAdvance,
-                      );
-                    } else {
-                      final controller = _playbackManager.activeController;
-                      if (controller != null) {
-                        if (controller.value.isPlaying) {
-                          controller.pause();
-                        } else {
-                          controller.play();
-                        }
-                      }
-                    }
-                  },
-                  onPlaybackModeChanged: _updatePlaybackMode,
-                  onToggleMute: () {
-                    HapticFeedback.lightImpact();
-                    _startHideTimer();
-                    setState(() => _isMuted = !_isMuted);
-                    _playbackManager.activeController?.setVolume(_isMuted ? 0 : 100);
-                  },
-                  onAdvancedSettingsPressed: () => _showAdvancedSettings(context, isImg),
-                  onDiagnosticsPressed: isImg ? null : () => _showDiagnostics(context),
-                  onStartHideTimer: _startHideTimer,
-                  onShowUIChanged: _setUIVisibility,
-                  isCarouselVisible: _isCarouselVisible,
-                  onToggleCarousel: (_enableCarousel && _playlistController.isPlaylistMode) ? _toggleCarousel : null,
-                );
-              },
-            ),
-          ),
-          if (_enableCarousel && _isCarouselVisible && _showUI)
-            AnimatedPositioned(
-              duration: MediaViewerConstants.animationDuration,
-              curve: Curves.easeOut,
-              left: 0,
-              right: 0,
-              bottom: (_isCarouselVisible && _showUI)
-                  ? 0
-                  : -PlaylistCarouselOverlay.height,
-              child: PlaylistCarouselOverlay(
-                container: widget.container,
-                playlist: _playlistController.playlist,
-                currentIndex: _playlistController.currentIndex,
-                thumbnailQuality: widget.thumbnailQuality,
-                thumbnailCacheMode: widget.thumbnailCacheMode,
-                onSelect: _selectFromCarousel,
-                onClose: _toggleCarousel,
-              ),
-            ),
-        ],
+              if (_enableCarousel && _isCarouselVisible && _showUI)
+                AnimatedPositioned(
+                  duration: MediaViewerConstants.animationDuration,
+                  curve: Curves.easeOut,
+                  left: 0,
+                  right: 0,
+                  bottom: (_isCarouselVisible && _showUI)
+                      ? 0
+                      : -PlaylistCarouselOverlay.height,
+                  child: PlaylistCarouselOverlay(
+                    container: widget.container,
+                    playlist: _playlistController.playlist,
+                    currentIndex: _playlistController.currentIndex,
+                    thumbnailQuality: widget.thumbnailQuality,
+                    thumbnailCacheMode: widget.thumbnailCacheMode,
+                    onSelect: _selectFromCarousel,
+                    onClose: _toggleCarousel,
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }

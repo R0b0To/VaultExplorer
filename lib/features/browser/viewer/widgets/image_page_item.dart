@@ -2,6 +2,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/features/browser/viewer/widgets/encrypted_image_widget.dart';
 
@@ -14,6 +15,7 @@ class ImagePageItem extends StatefulWidget {
   final bool showUI;
   final ValueChanged<bool> onToggleUI;
   final ValueChanged<bool> onZoomChanged;
+  final void Function(int width, int height)? onSizeKnown;
   final VoidCallback? onError;
 
   const ImagePageItem({
@@ -26,6 +28,7 @@ class ImagePageItem extends StatefulWidget {
     required this.showUI,
     required this.onToggleUI,
     required this.onZoomChanged,
+    this.onSizeKnown,
     this.onError,
   });
 
@@ -38,7 +41,6 @@ class _ImagePageItemState extends State<ImagePageItem> {
   double _scale = 1.0;
   TapDownDetails? _doubleTapDetails;
   Size? _imageSize;
-
   BoxFit? _lastFit;
   int? _lastRotation;
   Size? _lastViewportSize;
@@ -54,15 +56,17 @@ class _ImagePageItemState extends State<ImagePageItem> {
     if (widget.prefetchedBytes != null && widget.prefetchedBytes!.isNotEmpty) {
       final targetBytes = widget.prefetchedBytes!;
       decodeImageFromList(targetBytes).then((image) {
-        // Staleness guard (Finding F-07): didUpdateWidget may have swapped
-        // widget.prefetchedBytes for a different file while this decode was
-        // in flight (e.g. fast A -> B -> A swiping resolving out of order).
-        // Only apply the result if it's still for the bytes we started
-        // decoding.
         if (mounted && identical(widget.prefetchedBytes, targetBytes)) {
           setState(() {
             _imageSize = Size(image.width.toDouble(), image.height.toDouble());
           });
+          MediaAspectRatioCache.put(
+            widget.container,
+            widget.fileName,
+            image.width,
+            image.height,
+          );
+          widget.onSizeKnown?.call(image.width, image.height);
         }
       });
     }
@@ -74,22 +78,19 @@ class _ImagePageItemState extends State<ImagePageItem> {
     if (oldWidget.prefetchedBytes != widget.prefetchedBytes ||
         oldWidget.fileName != widget.fileName) {
       _imageSize = null;
-      _lastViewportSize = null; 
+      _lastViewportSize = null;
       _loadImageSize();
     }
   }
 
   void _centerImageInitially(BoxConstraints constraints) {
     if (_imageSize == null) return;
-
     double ar = _imageSize!.width / _imageSize!.height;
     if (widget.rotationQuarterTurns % 2 != 0) {
       ar = 1 / ar;
     }
-
     double? childWidth;
     double? childHeight;
-
     if (widget.imageFit == BoxFit.fitWidth) {
       childWidth = constraints.maxWidth;
       childHeight = constraints.maxWidth / ar;
@@ -97,21 +98,17 @@ class _ImagePageItemState extends State<ImagePageItem> {
       childHeight = constraints.maxHeight;
       childWidth = constraints.maxHeight * ar;
     }
-
     if (childWidth != null && childHeight != null) {
       final canvasWidth = max(constraints.maxWidth, childWidth);
       final canvasHeight = max(constraints.maxHeight, childHeight);
-
       double x = 0.0;
       double y = 0.0;
-
       if (canvasWidth > constraints.maxWidth) {
         x = -(canvasWidth - constraints.maxWidth) / 2;
       }
       if (canvasHeight > constraints.maxHeight) {
         y = -(canvasHeight - constraints.maxHeight) / 2;
       }
-
       _transformationController.value = Matrix4.translationValues(x, y, 0.0);
       _scale = 1.0;
     }
@@ -158,13 +155,11 @@ class _ImagePageItemState extends State<ImagePageItem> {
             double? canvasWidth;
             double? canvasHeight;
             bool isConstrained = true;
-
             if (_imageSize != null) {
               double ar = _imageSize!.width / _imageSize!.height;
               if (widget.rotationQuarterTurns % 2 != 0) {
                 ar = 1 / ar;
               }
-
               if (widget.imageFit == BoxFit.fitWidth) {
                 childWidth = constraints.maxWidth;
                 childHeight = constraints.maxWidth / ar;
@@ -174,12 +169,10 @@ class _ImagePageItemState extends State<ImagePageItem> {
                 childWidth = constraints.maxHeight * ar;
                 isConstrained = false;
               }
-
               if (childWidth != null && childHeight != null) {
                 canvasWidth = max(constraints.maxWidth, childWidth);
                 canvasHeight = max(constraints.maxHeight, childHeight);
               }
-
               final viewportSize = Size(constraints.maxWidth, constraints.maxHeight);
               if (_lastFit != widget.imageFit ||
                   _lastRotation != widget.rotationQuarterTurns ||
@@ -187,7 +180,6 @@ class _ImagePageItemState extends State<ImagePageItem> {
                 _lastFit = widget.imageFit;
                 _lastRotation = widget.rotationQuarterTurns;
                 _lastViewportSize = viewportSize;
-
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted) {
                     _centerImageInitially(constraints);
@@ -195,7 +187,6 @@ class _ImagePageItemState extends State<ImagePageItem> {
                 });
               }
             }
-
             return InteractiveViewer(
               transformationController: _transformationController,
               maxScale: MediaViewerConstants.maxImageZoom,

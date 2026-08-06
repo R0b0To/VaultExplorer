@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/browser/viewer/playlist_controller.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -13,8 +14,8 @@ class MediaViewerTopBar extends StatelessWidget {
   final int totalCount;
   final PlaylistTransitionEffect currentTransitionEffect;
   final ValueChanged<PlaylistTransitionEffect> onTransitionEffectChanged;
-  final Axis currentScrollDirection;
-  final ValueChanged<Axis> onScrollDirectionChanged;
+  final PlaylistScrollMode currentScrollMode;
+  final ValueChanged<PlaylistScrollMode> onScrollModeChanged;
   final VoidCallback onBackPressed;
   final VoidCallback onDeletePressed;
   final VoidCallback onPlaylistChanged;
@@ -27,8 +28,8 @@ class MediaViewerTopBar extends StatelessWidget {
     required this.totalCount,
     required this.currentTransitionEffect,
     required this.onTransitionEffectChanged,
-    this.currentScrollDirection = Axis.horizontal,
-    required this.onScrollDirectionChanged,
+    this.currentScrollMode = PlaylistScrollMode.horizontal,
+    required this.onScrollModeChanged,
     required this.onBackPressed,
     required this.onDeletePressed,
     required this.onPlaylistChanged,
@@ -38,6 +39,7 @@ class MediaViewerTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.paddingOf(context).top + 8,
@@ -109,6 +111,7 @@ class MediaViewerTopBar extends StatelessWidget {
     final folderScope = playlistController.selectedFolder;
     final isThisFolderSelected = isPlaylist && folderScope == 'Current Folder Only';
     final isAllSelected = isPlaylist && folderScope == 'All';
+
     final menuStyle = MenuStyle(
       elevation: const WidgetStatePropertyAll(4),
       shape: WidgetStatePropertyAll(
@@ -120,6 +123,7 @@ class MediaViewerTopBar extends StatelessWidget {
         EdgeInsets.symmetric(vertical: 8),
       ),
     );
+
     return MenuAnchor(
       style: menuStyle,
       builder: (ctx, controller, child) => _TopBarCircleButton(
@@ -219,6 +223,7 @@ class MediaViewerTopBar extends StatelessWidget {
         EdgeInsets.symmetric(vertical: 8),
       ),
     );
+
     return MenuAnchor(
       style: menuStyle,
       builder: (ctx, controller, child) => _TopBarCircleButton(
@@ -257,35 +262,31 @@ class MediaViewerTopBar extends StatelessWidget {
         ),
         SubmenuButton(
           leadingIcon: Icon(
-            currentScrollDirection == Axis.vertical
-                ? Icons.swap_vert_rounded
-                : Icons.swap_horiz_rounded,
+            currentScrollMode.icon,
             size: 18,
             color: cs.onSurfaceVariant,
           ),
-          menuChildren: [
-            MenuItemButton(
+          menuChildren: PlaylistScrollMode.values.map((mode) {
+            final isSelected = mode == currentScrollMode;
+            return MenuItemButton(
               onPressed: () {
                 HapticFeedback.lightImpact();
-                onScrollDirectionChanged(Axis.horizontal);
+                onScrollModeChanged(mode);
               },
-              leadingIcon: currentScrollDirection == Axis.horizontal
+              leadingIcon: isSelected
                   ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
-                  : const SizedBox(width: 18),
-              child: const Text('Horizontal (Left / Right)'),
-            ),
-            MenuItemButton(
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                onScrollDirectionChanged(Axis.vertical);
-              },
-              leadingIcon: currentScrollDirection == Axis.vertical
-                  ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
-                  : const SizedBox(width: 18),
-              child: const Text('Vertical (Up / Down)'),
-            ),
-          ],
-          child: const Text('Playlist Direction'),
+                  : SizedBox(
+                      width: 18,
+                      child: Icon(
+                        mode.icon,
+                        size: 16,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                      ),
+                    ),
+              child: Text(mode.getLocalizedLabel(context.l10n)),
+            );
+          }).toList(),
+          child: Text(context.l10n.playlistScrollModeMenu),
         ),
         SubmenuButton(
           leadingIcon: Icon(

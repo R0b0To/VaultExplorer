@@ -5545,6 +5545,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close Carousel'**
   String get closeCarouselTooltip;
+
+  /// Submenu title for playlist scroll mode options in media viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist Scroll Mode'**
+  String get playlistScrollModeMenu;
+
+  /// Playlist scroll mode: horizontal pagination
+  ///
+  /// In en, this message translates to:
+  /// **'Horizontal (Left / Right)'**
+  String get playlistScrollHorizontalLabel;
+
+  /// Playlist scroll mode: vertical pagination
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical Paged (Up / Down)'**
+  String get playlistScrollVerticalPageLabel;
+
+  /// Playlist scroll mode: continuous vertical scrolling
+  ///
+  /// In en, this message translates to:
+  /// **'Vertical Continuous'**
+  String get playlistScrollVerticalContinuousLabel;
 }
 
 class _AppLocalizationsDelegate

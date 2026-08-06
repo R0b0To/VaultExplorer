@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
+import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -38,7 +39,7 @@ class AppSettings {
   bool defaultFileSortAscending;
   bool htmlEnableJavaScript;
   PlaylistTransitionEffect playlistTransitionEffect;
-  Axis playlistScrollDirection;
+  PlaylistScrollMode playlistScrollMode;
   String? languageCode;
   String? _masterPasswordHash;
   String? _masterPasswordSalt;
@@ -64,7 +65,7 @@ class AppSettings {
     this.defaultFileSortAscending = true,
     this.htmlEnableJavaScript = false,
     this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
-    this.playlistScrollDirection = Axis.horizontal,
+    this.playlistScrollMode = PlaylistScrollMode.horizontal,
     this.languageCode,
     Map<String, String>? extensionPreferences,
     String? masterPasswordHash,
@@ -72,6 +73,13 @@ class AppSettings {
   })  : extensionPreferences = extensionPreferences ?? {},
         _masterPasswordHash = masterPasswordHash,
         _masterPasswordSalt = masterPasswordSalt;
+
+  Axis get playlistScrollDirection => playlistScrollMode.axis;
+  set playlistScrollDirection(Axis axis) {
+    playlistScrollMode = axis == Axis.vertical
+        ? PlaylistScrollMode.verticalPage
+        : PlaylistScrollMode.horizontal;
+  }
 
   String? get masterPasswordHash => _masterPasswordHash;
   String? get masterPasswordSalt => _masterPasswordSalt;
@@ -115,6 +123,7 @@ class AppSettings {
     bool? defaultFileSortAscending,
     bool? htmlEnableJavaScript,
     PlaylistTransitionEffect? playlistTransitionEffect,
+    PlaylistScrollMode? playlistScrollMode,
     Axis? playlistScrollDirection,
     String? languageCode,
   }) {
@@ -142,7 +151,12 @@ class AppSettings {
       defaultFileSortAscending: defaultFileSortAscending ?? this.defaultFileSortAscending,
       htmlEnableJavaScript: htmlEnableJavaScript ?? this.htmlEnableJavaScript,
       playlistTransitionEffect: playlistTransitionEffect ?? this.playlistTransitionEffect,
-      playlistScrollDirection: playlistScrollDirection ?? this.playlistScrollDirection,
+      playlistScrollMode: playlistScrollMode ??
+          (playlistScrollDirection != null
+              ? (playlistScrollDirection == Axis.vertical
+                  ? PlaylistScrollMode.verticalPage
+                  : PlaylistScrollMode.horizontal)
+              : this.playlistScrollMode),
       languageCode: languageCode ?? this.languageCode,
     );
   }
@@ -169,7 +183,12 @@ class AppSettings {
     'defaultFileSortAscending': defaultFileSortAscending,
     'htmlEnableJavaScript': htmlEnableJavaScript,
     'playlistTransitionEffect': playlistTransitionEffect.toJson(),
-    'playlistScrollDirection': playlistScrollDirection == Axis.vertical ? 'vertical' : 'horizontal',
+    'playlistScrollMode': playlistScrollMode.toJson(),
+    'playlistScrollDirection': playlistScrollMode == PlaylistScrollMode.verticalPage
+        ? 'vertical'
+        : (playlistScrollMode == PlaylistScrollMode.verticalContinuous
+            ? 'verticalContinuous'
+            : 'horizontal'),
     'languageCode': languageCode,
   };
 
@@ -208,7 +227,9 @@ class AppSettings {
     defaultFileSortAscending: j['defaultFileSortAscending'] as bool? ?? true,
     htmlEnableJavaScript: j['htmlEnableJavaScript'] as bool? ?? false,
     playlistTransitionEffect: PlaylistTransitionEffect.fromJson(j['playlistTransitionEffect'] as String?),
-    playlistScrollDirection: j['playlistScrollDirection'] == 'vertical' ? Axis.vertical : Axis.horizontal,
+    playlistScrollMode: PlaylistScrollMode.fromJson(
+      j['playlistScrollMode'] as String? ?? j['playlistScrollDirection'] as String?,
+    ),
     languageCode: j['languageCode'] as String?,
   );
 }

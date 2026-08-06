@@ -504,7 +504,7 @@ class _UnlockSheetState extends State<UnlockSheet>
       });
 
       try {
-        final name = _selectedName ?? 'Vault';
+        final name = _selectedName ?? context.l10n.defaultVaultName;
         ContainerRecord? cryfsRecord;
         var shouldCacheDerivedKey = false;
         Uint8List? resolvedPreservedKey;
@@ -589,7 +589,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         }
 
         if (result == null) {
-          setState(() => _error = 'Incorrect password or invalid vault');
+          setState(() => _error = context.l10n.incorrectPasswordOrInvalidVault);
           return;
         }
 
@@ -636,7 +636,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         if (mounted) Navigator.pop(context);
       } on PlatformException catch (e) {
         if (e.code != 'CANCELLED') {
-          setState(() => _error = e.message ?? 'Unknown error');
+          setState(() => _error = e.message ?? context.l10n.genericUnknownError);
         }
       } finally {
         if (mounted) setState(() => _loading = false);
@@ -648,7 +648,7 @@ class _UnlockSheetState extends State<UnlockSheet>
 
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
-      final name = _selectedName ?? 'Container';
+      final name = _selectedName ?? context.l10n.defaultContainerName;
       final records = await ContainerRepository.instance.loadAll();
       final record = records[_selectedUri!];
       final appSettings = await AppSettingsService.loadSettings();
@@ -778,11 +778,11 @@ class _UnlockSheetState extends State<UnlockSheet>
         TextInput.finishAutofillContext(shouldSave: false);
         if (mounted) Navigator.pop(context);
       } else {
-        setState(() => _error = 'Incorrect password or invalid container');
+        setState(() => _error = context.l10n.incorrectPasswordOrInvalidContainer);
       }
     } on PlatformException catch (e) {
       if (e.code != 'CANCELLED') {
-        setState(() => _error = e.message ?? 'Unknown error');
+        setState(() => _error = e.message ?? context.l10n.genericUnknownError);
       }
     } finally {
       if (mounted) {
@@ -800,28 +800,28 @@ class _UnlockSheetState extends State<UnlockSheet>
 
   String get _unlockProgressLabel {
     final p = _progress;
-    if (p == null || p.total <= 0) return 'Decrypting...';
+    if (p == null || p.total <= 0) return context.l10n.decryptingLabel;
 
     if (_isLuks) {
       return p.total > 1
-          ? 'Trying keyslot ${p.attempted} of ${p.total}…'
-          : 'Trying keyslot…';
+          ? context.l10n.luksKeyslotProgress(p.attempted, p.total)
+          : context.l10n.luksKeyslotProgressUnknown;
     }
     
     if (_isBitlocker) {
       return p.total > 1
-          ? 'Verifying credential ${p.attempted} of ${p.total}…'
-          : 'Verifying credential…';
+          ? context.l10n.bitlockerCredentialProgress(p.attempted, p.total)
+          : context.l10n.bitlockerCredentialProgressUnknown;
     }
 
     final hashName = hashAlgorithmName(p.hashId);
     final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
-    final slotName = p.slot == 1 ? 'Hidden Volume' : 'Standard Volume';
+    final slotName = p.slot == 1 ? context.l10n.hiddenVolumeSlotName : context.l10n.standardVolumeSlotName;
 
     final algo = cipherName.isNotEmpty ? '$hashName + $cipherName' : hashName;
     return p.total > 1
-        ? 'Trying $algo ($slotName)…'
-        : 'Trying $algo ($slotName)…';
+        ? context.l10n.veracryptAlgoProgress(algo, slotName)
+        : context.l10n.veracryptAlgoProgress(algo, slotName);
   }
 
   @override
@@ -858,7 +858,7 @@ class _UnlockSheetState extends State<UnlockSheet>
         appBar: AppBar(
           backgroundColor: cs.surfaceContainerHigh,
           title: Text(
-            widget.initialUri != null ? 'Unlock Container' : 'Mount Container',
+            widget.initialUri != null ? context.l10n.unlockContainerTitle : context.l10n.mountContainerTitle,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
           bottom: _loading
@@ -891,16 +891,16 @@ class _UnlockSheetState extends State<UnlockSheet>
                   children: [
                     if (widget.initialUri == null) ...[
                       SegmentedButton<String>(
-                        segments: const [
+                        segments: [
                           ButtonSegment(
                             value: 'container',
-                            label: Text('Container File'),
-                            icon: Icon(Icons.folder_zip_rounded),
+                            label: Text(context.l10n.vaultKindContainerFile),
+                            icon: const Icon(Icons.folder_zip_rounded),
                           ),
                           ButtonSegment(
                             value: 'directory_vault',
-                            label: Text('Folder Vault'),
-                            icon: Icon(Icons.folder_shared_rounded),
+                            label: Text(context.l10n.vaultKindFolderVault),
+                            icon: const Icon(Icons.folder_shared_rounded),
                           ),
                         ],
                         selected: {
@@ -977,7 +977,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                                               ? 'BitLocker Drive'
                                                               : _containerFormat == 'veracrypt'
                                                                   ? 'VeraCrypt Container'
-                                                                  : 'Encrypted Container')
+                                                                  : context.l10n.encryptedContainerLabel)
                                           : (_isFolderVault
                                               ? 'Cryptomator | Gocryptfs | CryFS'
                                               : 'VeraCrypt | LUKS | BitLocker'),
@@ -993,8 +993,8 @@ class _UnlockSheetState extends State<UnlockSheet>
                                     Text(
                                       _selectedName ??
                                           (_isFolderVault
-                                              ? 'Tap to select vault folder…'
-                                              : 'Tap to select container file…'),
+                                              ? context.l10n.tapToSelectVaultFolder
+                                              : context.l10n.tapToSelectContainerFile),
                                       style: textTheme.bodyLarge?.copyWith(
                                         color: _selectedUri != null
                                             ? cs.onSurface
@@ -1047,13 +1047,13 @@ class _UnlockSheetState extends State<UnlockSheet>
                     if (_isFolderVault && !_hasAllStorageAccess) ...[
                       InlineBanner(
                         _isCryfs
-                            ? 'CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.'
-                            : 'Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.',
+                            ? context.l10n.cryfsStorageAccessWarning
+                            : context.l10n.folderVaultStorageAccessWarning,
                         tone: AppBannerTone.warning,
                         icon: Icons.speed_rounded,
                         trailing: TextButton(
                           onPressed: _requestStoragePermission,
-                          child: const Text('Enable'),
+                          child: Text(context.l10n.enableButtonLabel),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1099,7 +1099,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          'Container Missing',
+                                          context.l10n.containerMissingTitle,
                                           style: textTheme.titleMedium?.copyWith(
                                             fontWeight: FontWeight.bold,
                                             color: cs.onErrorContainer,
@@ -1107,7 +1107,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          'File path could not be resolved',
+                                          context.l10n.containerMissingSubtitle,
                                           style: textTheme.bodySmall?.copyWith(
                                             color: cs.onErrorContainer.withValues(alpha: 0.8),
                                           ),
@@ -1119,7 +1119,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                               ),
                               const SizedBox(height: 14),
                               Text(
-                                'The container file may have been moved, deleted, or its host storage is currently disconnected.',
+                                context.l10n.containerMissingExplanation,
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: cs.onSurfaceVariant,
                                   height: 1.4,
@@ -1145,7 +1145,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                         backgroundColor: cs.surfaceContainerHighest,
                                         foregroundColor: cs.primary,
                                       ),
-                                      child: const Text('Retry'),
+                                      child: Text(context.l10n.retryButtonLabel),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -1158,7 +1158,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                           borderRadius: BorderRadius.circular(16),
                                         ),
                                       ),
-                                      child: const Text('Locate File'),
+                                      child: Text(context.l10n.locateFileButtonLabel),
                                     ),
                                   ),
                                 ],
@@ -1195,13 +1195,13 @@ class _UnlockSheetState extends State<UnlockSheet>
                               ),
                               const SizedBox(height: 20),
                               Text(
-                                'Biometric Unlock',
+                                context.l10n.biometricUnlockTitle,
                                 style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Authenticate to securely mount the container',
+                                context.l10n.biometricUnlockSubtitle,
                                 style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                                 textAlign: TextAlign.center,
                               ),
@@ -1219,7 +1219,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                         backgroundColor: cs.surfaceContainerHighest,
                                         foregroundColor: cs.primary,
                                       ),
-                                      child: const Text('Use Password'),
+                                      child: Text(context.l10n.usePasswordButtonLabel),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -1232,7 +1232,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                           borderRadius: BorderRadius.circular(16),
                                         ),
                                       ),
-                                      child: const Text('Authenticate'),
+                                      child: Text(context.l10n.authenticateButtonLabel),
                                     ),
                                   ),
                                 ],
@@ -1256,12 +1256,14 @@ class _UnlockSheetState extends State<UnlockSheet>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                'Draw Unlock Pattern',
+                                context.l10n.drawUnlockPatternTitle,
                                 style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                _patternError ? 'Wrong pattern — try again' : 'Connect your pattern sequence',
+                                _patternError
+                                    ? context.l10n.wrongPatternTryAgain
+                                    : context.l10n.connectYourPatternSequence,
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: _patternError ? cs.error : cs.onSurfaceVariant,
                                   fontWeight: _patternError ? FontWeight.bold : null,
@@ -1284,7 +1286,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                   backgroundColor: cs.surfaceContainerHighest,
                                   foregroundColor: cs.primary,
                                 ),
-                                child: const Text('Use Password instead'),
+                                child: Text(context.l10n.usePasswordInsteadButtonLabel),
                               ),
                             ],
                           ),
@@ -1307,12 +1309,12 @@ class _UnlockSheetState extends State<UnlockSheet>
                                 decoration: InputDecoration(
                                   filled: true,
                                   fillColor: cs.surfaceContainerHighest,
-                                  labelText: 'Password',
+                                  labelText: context.l10n.passwordFieldLabel,
                                   hintText: _isFolderVault
-                                      ? 'Enter vault password'
+                                      ? context.l10n.passwordHintFolderVault
                                       : _isBitlocker
-                                          ? 'Enter password or recovery key'
-                                          : 'Enter container password',
+                                          ? context.l10n.passwordHintBitlocker
+                                          : context.l10n.passwordHintContainer,
                                   prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
                                   suffixIcon: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -1321,7 +1323,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                         Padding(
                                           padding: const EdgeInsets.only(right: 4),
                                           child: Tooltip(
-                                            message: 'Using saved password',
+                                            message: context.l10n.usingSavedPasswordTooltip,
                                             child: Icon(
                                               Icons.bookmark_rounded,
                                               size: 20,
@@ -1354,7 +1356,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                                     if (_isLuks && keyfiles.isNotEmpty) ...[
                                       const SizedBox(height: 6),
                                       Text(
-                                        'For LUKS containers the keyfile replaces the password.',
+                                        context.l10n.luksKeyfileReplacesPasswordNote,
                                         style: textTheme.bodySmall?.copyWith(
                                           color: cs.onSurfaceVariant,
                                         ),
@@ -1383,11 +1385,11 @@ class _UnlockSheetState extends State<UnlockSheet>
                                       setState(() => _readOnly = val);
                                     },
                               title: Text(
-                                'Read-only mode',
+                                context.l10n.readOnlyModeLabel,
                                 style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               subtitle: Text(
-                                'Mount without allowing changes to this container',
+                                context.l10n.readOnlyModeContainerSubtitle,
                                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                               ),
                               secondary: Icon(Icons.visibility_outlined, color: cs.primary),
@@ -1401,11 +1403,11 @@ class _UnlockSheetState extends State<UnlockSheet>
                                   setState(() => _remember = val);
                                 },
                                 title: Text(
-                                  'Remember container',
+                                  context.l10n.rememberContainerLabel,
                                   style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                                 ),
                                 subtitle: Text(
-                                  'Pin container on dashboard for quick access',
+                                  context.l10n.rememberContainerSubtitle,
                                   style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                                 ),
                                 secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
@@ -1450,7 +1452,9 @@ class _UnlockSheetState extends State<UnlockSheet>
                                 ],
                               )
                             : Text(
-                                _isFolderVault ? 'Unlock Vault' : 'Unlock Container',
+                                _isFolderVault
+                                    ? context.l10n.unlockVaultButtonLabel
+                                    : context.l10n.unlockContainerLabel,
                                 style: textTheme.titleMedium?.copyWith(
                                   color: cs.onPrimary,
                                   fontWeight: FontWeight.bold,
@@ -1462,7 +1466,7 @@ class _UnlockSheetState extends State<UnlockSheet>
                         Center(
                           child: TextButton(
                             onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
-                            child: const Text('Cancel Unlock'),
+                            child: Text(context.l10n.cancelUnlockButtonLabel),
                           ),
                         ),
                       ],

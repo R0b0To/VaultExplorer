@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -246,7 +247,7 @@ class SavedContainerCard extends StatelessWidget {
     // Removed the dummy progressBar line here
 
     final subtitleWidget = Text(
-      isUsb ? 'USB Drive · Locked' : 'Locked container',
+      isUsb ? context.l10n.usbDriveLockedLabel : context.l10n.lockedContainerLabel,
       style: textTheme.bodySmall?.copyWith(
         color: cs.onSurfaceVariant,
       ),
@@ -345,7 +346,7 @@ class _LockButtonState extends State<_LockButton> {
       if (mounted) {
         showAppSnackBar(
           context,
-          message: 'An operation is in progress. Please wait before locking.',
+          message: context.l10n.operationInProgressWaitMessage,
           tone: AppBannerTone.warning,
         );
       }
@@ -360,7 +361,7 @@ class _LockButtonState extends State<_LockButton> {
       if (mounted) {
         showAppSnackBar(
           context,
-          message: 'Lock failed: ${e.runtimeType}',
+          message: context.l10n.lockFailedMessage(e.runtimeType.toString()),
           tone: AppBannerTone.error,
         );
       }
@@ -379,7 +380,7 @@ class _LockButtonState extends State<_LockButton> {
       onPressed: _lock,
       backgroundColor: cs.primaryContainer,
       foregroundColor: cs.onPrimaryContainer,
-      tooltip: 'Lock container',
+      tooltip: context.l10n.lockContainerTooltip,
     );
   }
 }
@@ -405,7 +406,7 @@ class _UnlockButton extends StatelessWidget {
       },
       backgroundColor: cs.secondaryContainer,
       foregroundColor: cs.onSecondaryContainer,
-      tooltip: isUsb ? 'Reconnect USB' : 'Unlock container',
+      tooltip: isUsb ? context.l10n.reconnectUsbTooltip : context.l10n.unlockContainerTooltip,
     );
   }
 }

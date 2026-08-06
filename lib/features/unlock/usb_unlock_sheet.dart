@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/usb_device_info.dart';
@@ -137,7 +138,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   @override
   ({bool ready, String? blockMessage}) get preAuthReadiness {
     if (widget.existingRecord == null) return (ready: false, blockMessage: null);
-    if (_selected == null) return (ready: false, blockMessage: 'Select a USB drive first');
+    if (_selected == null) return (ready: false, blockMessage: context.l10n.selectUsbDriveFirst);
     return (ready: true, blockMessage: null);
   }
 
@@ -158,13 +159,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   String get containerUri => widget.existingRecord!.uri;
 
   @override
-  String get biometricPromptSubject => 'USB drive';
+  String get biometricPromptSubject => context.l10n.biometricSubjectUsbDrive;
 
   @override
-  String get noSavedCredentialsForBiometricMessage => 'No saved password found. Please enter it manually.';
+  String get noSavedCredentialsForBiometricMessage => context.l10n.usbNoSavedCredentialsMessage;
 
   @override
-  String get noSavedCredentialsForPatternMessage => 'No saved password found. Please enter it manually.';
+  String get noSavedCredentialsForPatternMessage => context.l10n.usbNoSavedCredentialsMessage;
 
   @override
   String get debugLogTag => 'usb unlock';
@@ -181,27 +182,27 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
 
   String get _unlockProgressLabel {
     final p = _progress;
-    if (p == null || p.total <= 0) return 'Decrypting drive...';
+    if (p == null || p.total <= 0) return context.l10n.decryptingDriveLabel;
 
     if (_isLuks) {
       return p.total > 1
-          ? 'Trying keyslot ${p.attempted} of ${p.total}…'
-          : 'Trying keyslot…';
+          ? context.l10n.luksKeyslotProgress(p.attempted, p.total)
+          : context.l10n.luksKeyslotProgressUnknown;
     }
     if (_isBitlocker) {
       return p.total > 1
-          ? 'Verifying credential ${p.attempted} of ${p.total}…'
-          : 'Verifying credential…';
+          ? context.l10n.bitlockerCredentialProgress(p.attempted, p.total)
+          : context.l10n.bitlockerCredentialProgressUnknown;
     }
 
     final hashName = hashAlgorithmName(p.hashId);
     final cipherName = p.cipherId != 255 ? cipherAlgorithmName(p.cipherId) : '';
-    final slotName = p.slot == 1 ? 'Hidden Volume' : 'Standard Volume';
+    final slotName = p.slot == 1 ? context.l10n.hiddenVolumeSlotName : context.l10n.standardVolumeSlotName;
 
     final algo = cipherName.isNotEmpty ? '$hashName + $cipherName' : hashName;
     return p.total > 1
-        ? 'Trying $algo ($slotName)…'
-        : 'Trying $algo ($slotName)…';
+        ? context.l10n.veracryptAlgoProgress(algo, slotName)
+        : context.l10n.veracryptAlgoProgress(algo, slotName);
   }
 
   @override
@@ -318,7 +319,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
     if (mounted) {
       setState(() {
         _requestingPermission = false;
-        if (!granted) _error = 'USB permission denied';
+        if (!granted) _error = context.l10n.usbPermissionDenied;
       });
     }
     if (granted) await _loadDevices();
@@ -341,13 +342,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
   }) async {
     final device = _selected;
     if (device == null) {
-      setState(() => _error = 'Select a USB drive first');
+      setState(() => _error = context.l10n.selectUsbDriveFirst);
       return;
     }
 
     final newUri = 'usb:${device.deviceName}';
     if (widget.mountedUris.contains(newUri)) {
-      setState(() => _error = 'This USB device is already active and mounted.');
+      setState(() => _error = context.l10n.usbDeviceAlreadyActiveMounted);
       return;
     }
 
@@ -355,7 +356,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
     final effectiveKeyfilePaths =
         keyfilePathsOverride ?? keyfiles.map((k) => k.uri).toList();
     if (effectivePassword.isEmpty && preservedKey == null && effectiveKeyfilePaths.isEmpty) {
-      setState(() => _error = 'Password or keyfiles required');
+      setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
       return;
     }
 
@@ -366,7 +367,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
         await _ensurePermission(device);
         final refreshed = _devices.firstWhere((d) => d.deviceName == device.deviceName, orElse: () => device);
         if (!refreshed.hasPermission) {
-          setState(() => _error = 'USB permission is required to continue');
+          setState(() => _error = context.l10n.usbPermissionRequiredToContinue);
           return;
         }
       }
@@ -579,7 +580,9 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
         title: Text(
-          isReconnect ? 'Reconnect "${widget.existingRecord!.label}"' : 'Unlock USB Drive',
+          isReconnect
+              ? context.l10n.reconnectUsbDriveTitle(widget.existingRecord!.label)
+              : context.l10n.unlockUsbDriveTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         bottom: _unlocking
@@ -637,7 +640,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'Couldn\'t find "${widget.existingRecord!.label}"',
+                                context.l10n.couldntFindDevice(widget.existingRecord!.label),
                                 style: textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: cs.onTertiaryContainer,
@@ -646,7 +649,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Plug the drive back in and tap Retry, or select it below if it shows up under a different name.',
+                                context.l10n.plugDriveBackInRetry,
                                 style: textTheme.bodySmall?.copyWith(
                                   color: cs.onTertiaryContainer.withValues(alpha: 0.85),
                                   height: 1.35,
@@ -657,7 +660,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                               FilledButton.tonalIcon(
                                 onPressed: _loadDevices,
                                 icon: const Icon(Icons.refresh_rounded, size: 16),
-                                label: const Text('Retry Connection'),
+                                label: Text(context.l10n.retryConnectionButton),
                                 style: FilledButton.styleFrom(
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
@@ -696,13 +699,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'No USB Storage Detected',
+                                context.l10n.noUsbStorageDetectedTitle,
                                 style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Connect an OTG flash drive to mount',
+                                context.l10n.connectOtgDriveToMount,
                                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                                 textAlign: TextAlign.center,
                               ),
@@ -710,7 +713,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                               FilledButton.icon(
                                 onPressed: _loadDevices,
                                 icon: const Icon(Icons.refresh_rounded, size: 18),
-                                label: const Text('Refresh Devices'),
+                                label: Text(context.l10n.refreshDevicesButton),
                                 style: FilledButton.styleFrom(shape: const StadiumBorder()),
                               ),
                             ],
@@ -724,7 +727,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12, left: 4),
                             child: Text(
-                              'Select USB Drive',
+                              context.l10n.selectUsbDriveLabel,
                               style: textTheme.labelLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: cs.onSurfaceVariant,
@@ -808,10 +811,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                                 const SizedBox(height: 2),
                                                 Text(
                                                   isAlreadyMounted
-                                                      ? 'Already active'
+                                                      ? context.l10n.alreadyActive
                                                       : d.hasPermission
-                                                          ? 'Ready to unlock'
-                                                          : 'Permission required',
+                                                          ? context.l10n.readyToUnlock
+                                                          : context.l10n.permissionRequired,
                                                   style: textTheme.bodySmall?.copyWith(
                                                     color: isAlreadyMounted
                                                         ? cs.error
@@ -834,7 +837,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                                 borderRadius: BorderRadius.circular(12),
                                               ),
                                               child: Text(
-                                                'Active',
+                                                context.l10n.active,
                                                 style: textTheme.labelSmall?.copyWith(
                                                   color: cs.onSurfaceVariant.withValues(alpha: 0.7),
                                                   fontWeight: FontWeight.bold,
@@ -896,13 +899,13 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                 ),
                                 const SizedBox(height: 20),
                                 Text(
-                                  'Biometric Authentication',
+                                  context.l10n.biometricAuthenticationTitle,
                                   style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  'Authenticate to unlock and mount this USB device',
+                                  context.l10n.biometricAuthUsbSubtitle,
                                   style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                                   textAlign: TextAlign.center,
                                 ),
@@ -920,7 +923,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                           backgroundColor: cs.surfaceContainerHighest,
                                           foregroundColor: cs.primary,
                                         ),
-                                        child: const Text('Use Password'),
+                                        child: Text(context.l10n.usePasswordButtonLabel),
                                       ),
                                     ),
                                     const SizedBox(width: 12),
@@ -933,7 +936,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                             borderRadius: BorderRadius.circular(16),
                                           ),
                                         ),
-                                        child: const Text('Authenticate'),
+                                        child: Text(context.l10n.authenticateButtonLabel),
                                       ),
                                     ),
                                   ],
@@ -957,12 +960,12 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  'Draw Unlock Pattern',
+                                  context.l10n.drawUnlockPatternTitle,
                                   style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  _patternError ? 'Wrong pattern — try again' : 'Connect your pattern sequence to mount',
+                                  _patternError ? context.l10n.wrongPatternTryAgain : context.l10n.connectPatternSequenceToMount,
                                   style: textTheme.bodyMedium?.copyWith(
                                     color: _patternError ? cs.error : cs.onSurfaceVariant,
                                     fontWeight: _patternError ? FontWeight.bold : null,
@@ -985,7 +988,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                     backgroundColor: cs.surfaceContainerHighest,
                                     foregroundColor: cs.primary,
                                   ),
-                                  child: const Text('Use Password instead'),
+                                  child: Text(context.l10n.usePasswordInsteadButtonLabel),
                                 ),
                               ],
                             ),
@@ -1002,10 +1005,10 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                 obscureText: _obscure,
                                 enabled: !busy,
                                 decoration: InputDecoration(
-                                  labelText: 'Password',
+                                  labelText: context.l10n.passwordFieldLabel,
                                   hintText: _isBitlocker
-                                      ? 'Enter password or recovery key'
-                                      : 'Enter USB partition password',
+                                      ? context.l10n.passwordHintBitlocker
+                                      : context.l10n.enterUsbPartitionPassword,
                                   prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
                                   suffixIcon: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -1014,7 +1017,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                         Padding(
                                           padding: const EdgeInsets.only(right: 4),
                                           child: Tooltip(
-                                            message: 'Using saved password',
+                                            message: context.l10n.usingSavedPasswordTooltip,
                                             child: Icon(
                                               Icons.bookmark_rounded,
                                               size: 20,
@@ -1048,7 +1051,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                     if (_isLuks && keyfiles.isNotEmpty) ...[
                                       const SizedBox(height: 6),
                                       Text(
-                                        'For LUKS containers the keyfile replaces the password.',
+                                        context.l10n.luksKeyfileReplacesPasswordNote,
                                         style: textTheme.bodySmall?.copyWith(
                                           color: cs.onSurfaceVariant,
                                         ),
@@ -1077,11 +1080,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                       setState(() => _readOnly = val);
                                     },
                               title: Text(
-                                'Read-only mode',
+                                context.l10n.readOnlyModeLabel,
                                 style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               subtitle: Text(
-                                'Mount without allowing changes to this drive',
+                                context.l10n.readOnlyModeUsbSubtitle,
                                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                               ),
                               secondary: Icon(Icons.visibility_outlined, color: cs.primary),
@@ -1092,11 +1095,11 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                 value: _remember,
                                 onChanged: busy ? null : (val) => setState(() => _remember = val),
                                 title: Text(
-                                  'Remember drive',
+                                  context.l10n.rememberDriveLabel,
                                   style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                                 ),
                                 subtitle: Text(
-                                  'Pin drive on dashboard for quick access',
+                                  context.l10n.rememberDriveSubtitle,
                                   style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                                 ),
                                 secondary: Icon(Icons.push_pin_outlined, color: cs.primary),
@@ -1130,7 +1133,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                     const SizedBox(width: 12),
                                     Flexible(
                                       child: Text(
-                                        _unlocking ? _unlockProgressLabel : 'Requesting permission...',
+                                        _unlocking ? _unlockProgressLabel : context.l10n.requestingPermission,
                                         overflow: TextOverflow.ellipsis,
                                         style: textTheme.titleMedium?.copyWith(
                                           color: cs.primary,
@@ -1141,7 +1144,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                                   ],
                                 )
                               : Text(
-                                  isReconnect ? 'Unlock & Mount' : 'Unlock Drive',
+                                  isReconnect ? context.l10n.unlockAndMountButton : context.l10n.unlockDriveButton,
                                   style: textTheme.titleMedium?.copyWith(
                                       color: cs.onPrimary,
                                       fontWeight: FontWeight.bold,
@@ -1153,7 +1156,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
                           Center(
                             child: TextButton(
                               onPressed: () => vaultExplorerApi.cancelUnlock(_activeVolId!),
-                              child: const Text('Cancel Unlock'),
+                              child: Text(context.l10n.cancelUnlockButtonLabel),
                             ),
                           ),
                         ],

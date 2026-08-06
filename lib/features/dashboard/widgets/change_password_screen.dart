@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   final String uri;
@@ -64,7 +65,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         });
       }
     } on PlatformException catch (e) {
-      if (mounted) setState(() => _errorMsg = e.message ?? 'Could not pick keyfiles');
+      if (mounted) setState(() => _errorMsg = e.message ?? context.l10n.couldNotPickKeyfiles);
     } finally {
       if (mounted) setState(() => _pickingOldKeyfiles = false);
     }
@@ -88,7 +89,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         });
       }
     } on PlatformException catch (e) {
-      if (mounted) setState(() => _errorMsg = e.message ?? 'Could not pick keyfiles');
+      if (mounted) setState(() => _errorMsg = e.message ?? context.l10n.couldNotPickKeyfiles);
     } finally {
       if (mounted) setState(() => _pickingNewKeyfiles = false);
     }
@@ -103,11 +104,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final newPassword = _newPasswordCtrl.text;
     final confirmPassword = _confirmPasswordCtrl.text;
     if (newPassword.isEmpty && _newKeyfiles.isEmpty) {
-      setState(() => _errorMsg = 'New password or keyfiles are required.');
+      setState(() => _errorMsg = context.l10n.newPasswordOrKeyfilesRequired);
       return;
     }
     if (newPassword != confirmPassword) {
-      setState(() => _errorMsg = 'New passwords do not match.');
+      setState(() => _errorMsg = context.l10n.newPasswordsDoNotMatch);
       return;
     }
     setState(() {
@@ -130,10 +131,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (mounted) {
       setState(() => _isProcessing = false);
       if (success) {
-        showAppSnackBar(context, message: 'Password changed successfully.', tone: AppBannerTone.success);
+        showAppSnackBar(context, message: context.l10n.passwordChangedSuccessfullyMessage, tone: AppBannerTone.success);
         Navigator.pop(context, _newKeyfiles);
       } else {
-        setState(() => _errorMsg = 'Failed to change password. Check old credentials.');
+        setState(() => _errorMsg = context.l10n.failedToChangePasswordMessage);
       }
     }
   }
@@ -142,7 +143,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader('Current Credentials'),
+        SectionHeader(context.l10n.currentCredentialsSectionHeader),
         SectionCard(
           children: [
             Padding(
@@ -153,7 +154,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 onChanged: (_) => setState(() {}),
                 autofillHints: const [AutofillHints.password],
                 decoration: InputDecoration(
-                  labelText: 'Old Password',
+                  labelText: context.l10n.oldPasswordLabel,
                   prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: cs.primary),
                   suffixIcon: PasswordVisibilityToggle(
                     obscured: _oldObscure,
@@ -168,7 +169,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 controller: _oldPimCtrl,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: 'Old PIM (Optional)',
+                  labelText: context.l10n.oldPimOptionalLabel,
                   prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
                 ),
               ),
@@ -190,7 +191,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SectionHeader('New Credentials'),
+        SectionHeader(context.l10n.newCredentialsSectionHeader),
         SectionCard(
           children: [
             Padding(
@@ -201,7 +202,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 onChanged: (_) => setState(() {}),
                 autofillHints: const [AutofillHints.newPassword],
                 decoration: InputDecoration(
-                  labelText: 'New Password',
+                  labelText: context.l10n.newPasswordLabel,
                   prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
                   suffixIcon: PasswordVisibilityToggle(
                     obscured: _newObscure,
@@ -218,7 +219,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 onChanged: (_) => setState(() {}),
                 autofillHints: const [AutofillHints.newPassword],
                 decoration: InputDecoration(
-                  labelText: 'Confirm New Password',
+                  labelText: context.l10n.confirmNewPasswordLabel,
                   prefixIcon: Icon(Icons.check_circle_outline_rounded, size: 20, color: cs.primary),
                   suffixIcon: PasswordVisibilityToggle(
                     obscured: _confirmObscure,
@@ -233,7 +234,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 controller: _newPimCtrl,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
-                  labelText: 'New PIM (Optional)',
+                  labelText: context.l10n.newPimOptionalLabel,
                   prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
                 ),
               ),
@@ -294,9 +295,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     valueColor: AlwaysStoppedAnimation(cs.onPrimary),
                   ),
                 )
-              : const Text(
-                  'Change Password',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              : Text(
+                  context.l10n.changePasswordTitle,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
         ),
       ],
@@ -304,9 +305,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
-        title: const Text(
-          'Change Password',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          context.l10n.changePasswordTitle,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
       body: Theme(

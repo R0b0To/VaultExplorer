@@ -1636,14 +1636,6 @@
   "@tapToSelectContainerFile": {
     "description": "Placeholder hint prompting the user to pick a container file"
   },
-  "cryfsPerformanceWarning": "CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.",
-  "@cryfsPerformanceWarning": {
-    "description": "Banner warning about CryFS performance without Direct Storage Access"
-  },
-  "folderVaultPerformanceWarning": "Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.",
-  "@folderVaultPerformanceWarning": {
-    "description": "Banner warning about folder vault performance without Direct Storage Access"
-  },
   "containerMissingTitle": "Container Missing",
   "@containerMissingTitle": {
     "description": "Title shown when a saved container's underlying file/folder can no longer be found"
@@ -1720,6 +1712,10 @@
   "@readOnlyModeUsbSubtitle": {
     "description": "Subtitle explaining read-only mode for a USB drive"
   },
+  "readOnlyModeContainerSubtitle": "Mount without allowing changes to this container",
+  "@readOnlyModeContainerSubtitle": {
+    "description": "Subtitle explaining read-only mode for a container"
+  },
   "rememberContainerLabel": "Remember container",
   "@rememberContainerLabel": {
     "description": "Toggle label to remember/pin a newly mounted container"
@@ -1735,6 +1731,37 @@
   "biometricSubjectContainer": "container",
   "@biometricSubjectContainer": {
     "description": "Noun substituted into the biometric prompt reason when unlocking a local container, e.g. 'Authenticate to unlock container'"
+  },
+  "biometricSubjectUsbDrive": "USB drive",
+  "@biometricSubjectUsbDrive": {
+    "description": "Noun substituted into the biometric prompt reason when unlocking a USB drive, e.g. 'Authenticate to unlock USB drive'"
+  },
+  "usbNoSavedCredentialsMessage": "No saved password found. Please enter it manually.",
+  "@usbNoSavedCredentialsMessage": {
+    "description": "Fallback message when no saved password exists for biometric/pattern unlock of a USB drive"
+  },
+  "decryptingDriveLabel": "Decrypting drive…",
+  "@decryptingDriveLabel": {
+    "description": "Progress label shown while a USB drive is being decrypted"
+  },
+  "usbDeviceAlreadyActiveMounted": "This USB device is already active and mounted.",
+  "@usbDeviceAlreadyActiveMounted": {
+    "description": "Error shown when trying to unlock a USB device that is already mounted"
+  },
+  "reconnectUsbDriveTitle": "Reconnect \"{label}\"",
+  "@reconnectUsbDriveTitle": {
+    "description": "AppBar title when reconnecting a previously saved USB drive",
+    "placeholders": {
+      "label": { "type": "String" }
+    }
+  },
+  "unlockUsbDriveTitle": "Unlock USB Drive",
+  "@unlockUsbDriveTitle": {
+    "description": "AppBar title when unlocking a new USB drive"
+  },
+  "noUsbStorageDetectedTitle": "No USB Storage Detected",
+  "@noUsbStorageDetectedTitle": {
+    "description": "Title shown when no USB storage devices are found"
   },
   "authenticateToUnlockPrompt": "Authenticate to unlock {subject}",
   "@authenticateToUnlockPrompt": {
@@ -3539,6 +3566,317 @@
   "loopCurrentVideoTooltip": "Loop Current Video",
   "@loopCurrentVideoTooltip": {
     "description": "Tooltip for loop video mode"
+  },
+  "clearThumbnailCacheDialogTitle": "Clear Thumbnail Cache?",
+  "@clearThumbnailCacheDialogTitle": {
+    "description": "Confirmation dialog title for clearing a vault's thumbnail cache"
+  },
+  "clearThumbnailCacheDialogMessage": "This will delete cached thumbnails for this vault. They will be regenerated the next time you browse media.",
+  "@clearThumbnailCacheDialogMessage": {
+    "description": "Confirmation dialog message for clearing a vault's thumbnail cache"
+  },
+  "clearCacheButton": "Clear Cache",
+  "@clearCacheButton": {
+    "description": "Confirm button label for clearing thumbnail cache"
+  },
+  "appCacheClearedUnlockMessage": "App cache cleared. Unlock container to clear inside cache.",
+  "@appCacheClearedUnlockMessage": {
+    "description": "Snackbar shown when app-level cache is cleared but the container is locked"
+  },
+  "allThumbnailCachesClearedMessage": "All thumbnail caches cleared successfully.",
+  "@allThumbnailCachesClearedMessage": {
+    "description": "Snackbar shown when both app and in-container thumbnail caches are cleared"
+  },
+  "appCacheClearedContainerFailedMessage": "App cache cleared, but failed to clear inside container.",
+  "@appCacheClearedContainerFailedMessage": {
+    "description": "Snackbar shown when app cache clears but the in-container cache fails to clear"
+  },
+  "failedToClearThumbnailCachesMessage": "Failed to clear thumbnail caches.",
+  "@failedToClearThumbnailCachesMessage": {
+    "description": "Snackbar shown when clearing thumbnail caches fails entirely"
+  },
+  "authenticateToModifySettingsPrompt": "Authenticate to modify settings",
+  "@authenticateToModifySettingsPrompt": {
+    "description": "Biometric prompt reason shown when unlocking container settings for editing"
+  },
+  "usbVaultSettingsTitle": "USB Vault Settings",
+  "@usbVaultSettingsTitle": {
+    "description": "AppBar title for the settings screen of a USB-backed vault"
+  },
+  "vaultSettingsTitle": "Vault Settings",
+  "@vaultSettingsTitle": {
+    "description": "AppBar title for the settings screen of a regular container vault"
+  },
+  "generalSectionHeader": "General",
+  "@generalSectionHeader": {
+    "description": "Section header for general container settings"
+  },
+  "securityCredentialsSectionHeader": "Security & Credentials",
+  "@securityCredentialsSectionHeader": {
+    "description": "Section header for security and credential settings"
+  },
+  "securityOptionsLockedTitle": "Security Options Locked",
+  "@securityOptionsLockedTitle": {
+    "description": "Title shown when security settings are locked pending authentication"
+  },
+  "authenticateOriginalCredentialsMessage": "Authenticate with original container credentials to modify security settings.",
+  "@authenticateOriginalCredentialsMessage": {
+    "description": "Explanation shown while security settings are locked"
+  },
+  "unlockCredentialsLabel": "Unlock Credentials",
+  "@unlockCredentialsLabel": {
+    "description": "Label for the option picker choosing the container's unlock method"
+  },
+  "unavailableSuffixLabel": "(Unavailable)",
+  "@unavailableSuffixLabel": {
+    "description": "Suffix appended to an unlock method label when it is currently unavailable, e.g. 'Biometric Unlock (Unavailable)'"
+  },
+  "patternSetupRequiredBeforeSaving": "Set up a pattern before saving.",
+  "@patternSetupRequiredBeforeSaving": {
+    "description": "Warning shown when trying to save container settings without setting up a pattern"
+  },
+  "passwordKeystoreEncryptedHelperText": "Password is encrypted using Android Keystore. Leave blank if using keyfiles only.",
+  "@passwordKeystoreEncryptedHelperText": {
+    "description": "Helper text under the password field when updating saved container credentials"
+  },
+  "changePatternButton": "Change Pattern",
+  "@changePatternButton": {
+    "description": "Button label to change an already-configured unlock pattern"
+  },
+  "setPatternButton": "Set Pattern",
+  "@setPatternButton": {
+    "description": "Button label to configure an unlock pattern for the first time"
+  },
+  "cacheDerivedKeyLabel": "Cache Derived Key",
+  "@cacheDerivedKeyLabel": {
+    "description": "Switch title for caching the derived encryption key for this container"
+  },
+  "cryfsSkipScryptKdfSubtitle": "Skip CryFS's scrypt KDF next time (key kept in Android Keystore)",
+  "@cryfsSkipScryptKdfSubtitle": {
+    "description": "Subtitle for the cache-derived-key switch when the container is a CryFS vault"
+  },
+  "reuseKeyMaterialKeystoreSubtitle": "Reuse key material in Android Keystore",
+  "@reuseKeyMaterialKeystoreSubtitle": {
+    "description": "Subtitle for the cache-derived-key switch for non-CryFS containers"
+  },
+  "pinAlgorithmSkipAutoDetectSubtitle": "Pin algorithm to skip auto-detection on unlock.",
+  "@pinAlgorithmSkipAutoDetectSubtitle": {
+    "description": "Subtitle explaining the advanced cipher/hash pinning option"
+  },
+  "changeContainerPasswordTitle": "Change Container Password",
+  "@changeContainerPasswordTitle": {
+    "description": "List tile title to change a container's password"
+  },
+  "luksPasswordChangeNotSupportedMessage": "LUKS password changing is not supported in-app. Use cryptsetup on Linux.",
+  "@luksPasswordChangeNotSupportedMessage": {
+    "description": "Warning shown when attempting to change the password of a LUKS container"
+  },
+  "cryptomatorPasswordChangeNotSupportedMessage": "Cryptomator vault passwords cannot be changed in-app.",
+  "@cryptomatorPasswordChangeNotSupportedMessage": {
+    "description": "Warning shown when attempting to change the password of a Cryptomator vault"
+  },
+  "gocryptfsPasswordChangeNotSupportedMessage": "Gocryptfs vault passwords cannot be changed in-app.",
+  "@gocryptfsPasswordChangeNotSupportedMessage": {
+    "description": "Warning shown when attempting to change the password of a Gocryptfs vault"
+  },
+  "cryfsPasswordChangeNotSupportedMessage": "CryFS vault passwords cannot be changed in-app.",
+  "@cryfsPasswordChangeNotSupportedMessage": {
+    "description": "Warning shown when attempting to change the password of a CryFS vault"
+  },
+  "bitlockerCredentialsChangeNotSupportedMessage": "BitLocker credentials cannot be changed in-app. Use \"Manage BitLocker\" on Windows.",
+  "@bitlockerCredentialsChangeNotSupportedMessage": {
+    "description": "Warning shown when attempting to change the credentials of a BitLocker drive"
+  },
+  "systemIntegrationSectionHeader": "System & Integration",
+  "@systemIntegrationSectionHeader": {
+    "description": "Section header for system/OS integration settings"
+  },
+  "autoLockDurationLabel": "Auto-Lock Duration",
+  "@autoLockDurationLabel": {
+    "description": "Label for the per-container auto-lock duration option picker"
+  },
+  "neverAutoLockOption": "Never",
+  "@neverAutoLockOption": {
+    "description": "Option meaning the container will never auto-lock"
+  },
+  "androidFileProviderTitle": "Android File Provider",
+  "@androidFileProviderTitle": {
+    "description": "Switch title for exposing container content via the Android document provider"
+  },
+  "exposeContentToFilePickerSubtitle": "Expose content to System File Picker when unlocked",
+  "@exposeContentToFilePickerSubtitle": {
+    "description": "Subtitle explaining the Android File Provider switch"
+  },
+  "thumbnailStorageSectionHeader": "Thumbnail Storage",
+  "@thumbnailStorageSectionHeader": {
+    "description": "Section header for per-container thumbnail cache settings"
+  },
+  "cacheModeLabel": "Cache Mode",
+  "@cacheModeLabel": {
+    "description": "Label for the thumbnail cache mode option picker"
+  },
+  "useGlobalDefaultSubtitle": "Use global default",
+  "@useGlobalDefaultSubtitle": {
+    "description": "Subtitle shown when a container uses the app's global default thumbnail cache mode"
+  },
+  "thumbnailQualityLabel": "Thumbnail Quality",
+  "@thumbnailQualityLabel": {
+    "description": "Label for the thumbnail quality tile"
+  },
+  "clearThumbnailCacheTitle": "Clear Thumbnail Cache",
+  "@clearThumbnailCacheTitle": {
+    "description": "List tile title for the clear-thumbnail-cache action"
+  },
+  "removeCachedThumbnailsSubtitle": "Remove cached image and video thumbnails",
+  "@removeCachedThumbnailsSubtitle": {
+    "description": "Subtitle for the clear-thumbnail-cache list tile"
+  },
+  "patternSetupRequiredAboveBeforeSaving": "Set up a pattern above before saving.",
+  "@patternSetupRequiredAboveBeforeSaving": {
+    "description": "Inline validation error shown near the save button when a pattern hasn't been set up"
+  },
+  "passwordOrCacheDerivedKeyRequiredMessage": "A password or \"Cache Derived Key\" with keyfiles is required for this unlock method.",
+  "@passwordOrCacheDerivedKeyRequiredMessage": {
+    "description": "Inline validation error shown near the save button when neither a password nor cached derived key with keyfiles is provided"
+  },
+  "saveConfigurationButton": "Save Configuration",
+  "@saveConfigurationButton": {
+    "description": "Primary button label to save container configuration changes"
+  },
+  "incorrectPatternError": "Incorrect pattern",
+  "@incorrectPatternError": {
+    "description": "Error shown when a pattern verification attempt fails"
+  },
+  "verifyPatternTitle": "Verify Pattern",
+  "@verifyPatternTitle": {
+    "description": "Title for the pattern verification bottom sheet"
+  },
+  "incorrectPasswordError": "Incorrect password",
+  "@incorrectPasswordError": {
+    "description": "Error shown when a folder-vault password verification attempt fails"
+  },
+  "verificationFailedError": "Verification failed",
+  "@verificationFailedError": {
+    "description": "Generic error shown when credential verification fails unexpectedly"
+  },
+  "incorrectCredentialsError": "Incorrect credentials",
+  "@incorrectCredentialsError": {
+    "description": "Error shown when a container password/keyfile verification attempt fails"
+  },
+  "containerPasswordOptionalLabel": "Container password (optional for keyfile-only)",
+  "@containerPasswordOptionalLabel": {
+    "description": "Label for the password field when keyfiles alone may be sufficient"
+  },
+  "pimOptionalLabel": "PIM (optional)",
+  "@pimOptionalLabel": {
+    "description": "Label for the optional VeraCrypt PIM field"
+  },
+  "usbDriveLockedLabel": "USB Drive · Locked",
+  "@usbDriveLockedLabel": {
+    "description": "Subtitle shown on a dashboard card for a locked USB drive"
+  },
+  "lockedContainerLabel": "Locked container",
+  "@lockedContainerLabel": {
+    "description": "Subtitle shown on a dashboard card for a locked container"
+  },
+  "operationInProgressWaitMessage": "An operation is in progress. Please wait before locking.",
+  "@operationInProgressWaitMessage": {
+    "description": "Message shown when trying to lock a container while another operation is running"
+  },
+  "reconnectUsbTooltip": "Reconnect USB",
+  "@reconnectUsbTooltip": {
+    "description": "Tooltip for reconnecting a saved but disconnected USB drive"
+  },
+  "unlockContainerTooltip": "Unlock container",
+  "@unlockContainerTooltip": {
+    "description": "Tooltip for unlocking a container from the dashboard"
+  },
+  "lockFailedMessage": "Lock failed: {errorType}",
+  "@lockFailedMessage": {
+    "description": "Snackbar shown when locking a container throws an unexpected error",
+    "placeholders": {
+      "errorType": { "type": "String" }
+    }
+  },
+  "newPasswordOrKeyfilesRequired": "New password or keyfiles are required.",
+  "@newPasswordOrKeyfilesRequired": {
+    "description": "Validation error when changing a container password without a new password or keyfiles"
+  },
+  "newPasswordsDoNotMatch": "New passwords do not match.",
+  "@newPasswordsDoNotMatch": {
+    "description": "Validation error when the new password and confirmation don't match"
+  },
+  "passwordChangedSuccessfullyMessage": "Password changed successfully.",
+  "@passwordChangedSuccessfullyMessage": {
+    "description": "Snackbar shown after a container password change succeeds"
+  },
+  "failedToChangePasswordMessage": "Failed to change password. Check old credentials.",
+  "@failedToChangePasswordMessage": {
+    "description": "Error shown when a container password change fails"
+  },
+  "currentCredentialsSectionHeader": "Current Credentials",
+  "@currentCredentialsSectionHeader": {
+    "description": "Section header for the current/old credentials on the change password screen"
+  },
+  "oldPasswordLabel": "Old Password",
+  "@oldPasswordLabel": {
+    "description": "Label for the old/current password field"
+  },
+  "oldPimOptionalLabel": "Old PIM (Optional)",
+  "@oldPimOptionalLabel": {
+    "description": "Label for the old/current VeraCrypt PIM field"
+  },
+  "newCredentialsSectionHeader": "New Credentials",
+  "@newCredentialsSectionHeader": {
+    "description": "Section header for the new credentials on the change password screen"
+  },
+  "newPimOptionalLabel": "New PIM (Optional)",
+  "@newPimOptionalLabel": {
+    "description": "Label for the new VeraCrypt PIM field"
+  },
+  "changePasswordTitle": "Change Password",
+  "@changePasswordTitle": {
+    "description": "Title for the change password screen/button"
+  },
+  "noContainersYetTitle": "No containers yet",
+  "@noContainersYetTitle": {
+    "description": "Title for the dashboard's empty state when no vaults exist"
+  },
+  "dashboardEmptyStateMessage": "Mount a VeraCrypt container, connect a USB drive, or create a brand-new encrypted vault to get started.",
+  "@dashboardEmptyStateMessage": {
+    "description": "Message for the dashboard's empty state when no vaults exist"
+  },
+  "sortFieldName": "Name",
+  "@sortFieldName": {
+    "description": "Sort menu option: sort by file/folder name"
+  },
+  "sortFieldSize": "Size",
+  "@sortFieldSize": {
+    "description": "Sort menu option: sort by file size"
+  },
+  "sortFieldType": "Type",
+  "@sortFieldType": {
+    "description": "Sort menu option: sort by file type/extension"
+  },
+  "sortFieldDate": "Date",
+  "@sortFieldDate": {
+    "description": "Sort menu option: sort by modification date"
+  },
+  "layoutModeDetailedList": "Detailed List",
+  "@layoutModeDetailedList": {
+    "description": "Layout mode option: detailed list view"
+  },
+  "layoutModeCompactList": "Compact List",
+  "@layoutModeCompactList": {
+    "description": "Layout mode option: compact list view"
+  },
+  "layoutModeGalleryGrid": "Gallery Grid",
+  "@layoutModeGalleryGrid": {
+    "description": "Layout mode option: gallery grid view"
+  },
+  "layoutModeMasonry": "Masonry",
+  "@layoutModeMasonry": {
+    "description": "Layout mode option: masonry grid view"
   }
 }
 

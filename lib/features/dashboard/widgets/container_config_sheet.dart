@@ -6,6 +6,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/crypto_forms/keyfile_picker_mixin.dart';
@@ -135,10 +136,9 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
   Future<void> _clearThumbnailCache() async {
     final confirm = await showAppConfirmDialog(
       context,
-      title: 'Clear Thumbnail Cache?',
-      message:
-          'This will delete cached thumbnails for this vault. They will be regenerated the next time you browse media.',
-      confirmLabel: 'Clear Cache',
+      title: context.l10n.clearThumbnailCacheDialogTitle,
+      message: context.l10n.clearThumbnailCacheDialogMessage,
+      confirmLabel: context.l10n.clearCacheButton,
       isDestructive: true,
     );
     if (!confirm || !mounted) return;
@@ -165,25 +165,25 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
         if (isLocked) {
           showAppSnackBar(
             context,
-            message: 'App cache cleared. Unlock container to clear inside cache.',
+            message: context.l10n.appCacheClearedUnlockMessage,
             tone: AppBannerTone.warning,
           );
         } else if (appCacheCleared && containerCacheCleared) {
           showAppSnackBar(
             context,
-            message: 'All thumbnail caches cleared successfully.',
+            message: context.l10n.allThumbnailCachesClearedMessage,
             tone: AppBannerTone.success,
           );
         } else if (appCacheCleared) {
           showAppSnackBar(
             context,
-            message: 'App cache cleared, but failed to clear inside container.',
+            message: context.l10n.appCacheClearedContainerFailedMessage,
             tone: AppBannerTone.warning,
           );
         } else {
           showAppSnackBar(
             context,
-            message: 'Failed to clear thumbnail caches.',
+            message: context.l10n.failedToClearThumbnailCachesMessage,
             tone: AppBannerTone.error,
           );
         }
@@ -301,7 +301,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
     if (_needsPatternSetup) {
       showAppSnackBar(
         context,
-        message: 'Set up a pattern before saving.',
+        message: context.l10n.patternSetupRequiredBeforeSaving,
         tone: AppBannerTone.warning,
       );
       return;
@@ -368,7 +368,7 @@ Future<void> _authenticateSettings() async {
       try {
         final localAuth = LocalAuthentication();
         final ok = await localAuth.authenticate(
-          localizedReason: 'Authenticate to modify settings',
+          localizedReason: context.l10n.authenticateToModifySettingsPrompt,
           persistAcrossBackgrounding: true,
         );
         if (ok && mounted) {
@@ -451,7 +451,7 @@ Future<void> _authenticateSettings() async {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              widget.uri.startsWith('usb:') ? 'USB Vault Settings' : 'Vault Settings',
+              widget.uri.startsWith('usb:') ? context.l10n.usbVaultSettingsTitle : context.l10n.vaultSettingsTitle,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             Text(
@@ -475,7 +475,7 @@ Future<void> _authenticateSettings() async {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  SectionHeader('General'),
+                  SectionHeader(context.l10n.generalSectionHeader),
                   SectionCard(
                     children: [
                       ListTile(
@@ -488,7 +488,7 @@ Future<void> _authenticateSettings() async {
                           ),
                         trailing: IconButton(
                           icon: const Icon(Icons.edit_outlined),
-                          tooltip: 'Rename',
+                          tooltip: context.l10n.renameTooltip,
                           onPressed: _editDisplayName,
                         ),
                         onTap: _editDisplayName,
@@ -497,7 +497,7 @@ Future<void> _authenticateSettings() async {
                   ),
                   const SizedBox(height: 16),
 
-                  SectionHeader('Security & Credentials'),
+                  SectionHeader(context.l10n.securityCredentialsSectionHeader),
                   SectionCard(
                     children: [
                       if (_settingsLocked) ...[
@@ -514,13 +514,13 @@ Future<void> _authenticateSettings() async {
                             child: Column(
                               children: [
                                 Text(
-                                  'Security Options Locked',
+                                  context.l10n.securityOptionsLockedTitle,
                                   style: textTheme.titleMedium
                                       ?.copyWith(fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Authenticate with original container credentials to modify security settings.',
+                                  context.l10n.authenticateOriginalCredentialsMessage,
                                   style: textTheme.bodySmall
                                       ?.copyWith(color: cs.onSurfaceVariant),
                                   textAlign: TextAlign.center,
@@ -535,7 +535,7 @@ Future<void> _authenticateSettings() async {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                  label: const Text('Unlock Settings'),
+                                  label: Text(context.l10n.unlockSettingsButton),
                                 ),
                               ],
                             ),
@@ -543,7 +543,7 @@ Future<void> _authenticateSettings() async {
                         ),
                       ] else ...[
                         OptionPickerTile<ContainerUnlockMethod>(
-                          label: 'Unlock Credentials',
+                          label: context.l10n.unlockCredentialsLabel,
                           value: _unlockMethod,
                           subtitle: _unlockMethod.subtitle,
                           options: ContainerUnlockMethod.values
@@ -558,7 +558,7 @@ Future<void> _authenticateSettings() async {
                                 return SelectOption(
                                   value: m,
                                   label: isUnavailableBio
-                                      ? '${m.label} (Unavailable)'
+                                      ? '${m.label} ${context.l10n.unavailableSuffixLabel}'
                                       : m.label,
                                   subtitle: m.subtitle,
                                 );
@@ -586,7 +586,7 @@ Future<void> _authenticateSettings() async {
                               onPressed: () =>
                                   setState(() => _changePassword = true),
                               icon: const Icon(Icons.key_rounded, size: 18),
-                              label: const Text('Update Saved Credentials'),
+                              label: Text(context.l10n.updateSavedCredentialsButton),
                               style: FilledButton.styleFrom(
                                 minimumSize: const Size(double.infinity, 44),
                                 shape: RoundedRectangleBorder(
@@ -633,7 +633,7 @@ Future<void> _authenticateSettings() async {
                                           IconButton(
                                             icon: const Icon(Icons.close_rounded,
                                                 size: 20),
-                                            tooltip: 'Cancel updating password',
+                                            tooltip: context.l10n.cancelUpdatingPasswordTooltip,
                                             onPressed: () => setState(() {
                                               _changePassword = false;
                                               _passwordCtrl.clear();
@@ -641,7 +641,7 @@ Future<void> _authenticateSettings() async {
                                           ),
                                       ],
                                     ),
-                                    hintText: 'Enter container password',
+                                    hintText: context.l10n.passwordHintContainer,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(18),
                                       borderSide: BorderSide.none,
@@ -652,7 +652,7 @@ Future<void> _authenticateSettings() async {
                                 Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 4),
                                   child: Text(
-                                    'Password is encrypted using Android Keystore. Leave blank if using keyfiles only.',
+                                    context.l10n.passwordKeystoreEncryptedHelperText,
                                     style: textTheme.bodySmall?.copyWith(
                                         color: cs.onSurfaceVariant, height: 1.3),
                                   ),
@@ -683,8 +683,8 @@ Future<void> _authenticateSettings() async {
                                 ),
                               ),
                               child: Text(_patternHash != null
-                                  ? 'Change Pattern'
-                                  : 'Set Pattern'),
+                                  ? context.l10n.changePatternButton
+                                  : context.l10n.setPatternButton),
                             ),
                           ),
                         ],
@@ -695,13 +695,13 @@ Future<void> _authenticateSettings() async {
                           SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
-                            title: Text('Cache Derived Key',
+                            title: Text(context.l10n.cacheDerivedKeyLabel,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
                                 _isCryfs
-                                    ? 'Skip CryFS\'s scrypt KDF next time (key kept in Android Keystore)'
-                                    : 'Reuse key material in Android Keystore',
+                                    ? context.l10n.cryfsSkipScryptKdfSubtitle
+                                    : context.l10n.reuseKeyMaterialKeystoreSubtitle,
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant)),
                             value: _cacheDerivedKey,
@@ -712,7 +712,7 @@ Future<void> _authenticateSettings() async {
                               cipherId: _cipherId,
                               hashId: _hashId,
                               subtitle:
-                                  'Pin algorithm to skip auto-detection on unlock.',
+                                  context.l10n.pinAlgorithmSkipAutoDetectSubtitle,
                               onCipherChanged: (val) =>
                                   setState(() => _cipherId = val),
                               onHashChanged: (val) =>
@@ -727,7 +727,7 @@ Future<void> _authenticateSettings() async {
                               horizontal: 16, vertical: 4),
                           leading: Icon(Icons.key_rounded, color: cs.primary),
                           title: Text(
-                            'Change Container Password',
+                            context.l10n.changeContainerPasswordTitle,
                             style: textTheme.bodyMedium
                                 ?.copyWith(fontWeight: FontWeight.w600),
                           ),
@@ -739,35 +739,35 @@ Future<void> _authenticateSettings() async {
                               showAppSnackBar(
                                 context,
                                 message:
-                                    'LUKS password changing is not supported in-app. Use cryptsetup on Linux.',
+                                    context.l10n.luksPasswordChangeNotSupportedMessage,
                                 tone: AppBannerTone.warning,
                               );
                             } else if (fmt == 'cryptomator') {
                               showAppSnackBar(
                                 context,
                                 message:
-                                    'Cryptomator vault passwords cannot be changed in-app.',
+                                    context.l10n.cryptomatorPasswordChangeNotSupportedMessage,
                                 tone: AppBannerTone.warning,
                               );
                             } else if (fmt == 'gocryptfs') {
                               showAppSnackBar(
                                 context,
                                 message:
-                                    'Gocryptfs vault passwords cannot be changed in-app.',
+                                    context.l10n.gocryptfsPasswordChangeNotSupportedMessage,
                                 tone: AppBannerTone.warning,
                               );
                             } else if (fmt == 'cryfs') {
                               showAppSnackBar(
                                 context,
                                 message:
-                                    'CryFS vault passwords cannot be changed in-app.',
+                                    context.l10n.cryfsPasswordChangeNotSupportedMessage,
                                 tone: AppBannerTone.warning,
                               );
                             } else if (fmt == 'bitlocker') {
                               showAppSnackBar(
                                 context,
                                 message:
-                                    'BitLocker credentials cannot be changed in-app. Use "Manage BitLocker" on Windows.',
+                                    context.l10n.bitlockerCredentialsChangeNotSupportedMessage,
                                 tone: AppBannerTone.warning,
                               );
                             } else {
@@ -797,18 +797,16 @@ Future<void> _authenticateSettings() async {
                   ),
                   const SizedBox(height: 16),
 
-                  SectionHeader('System & Integration'),
+                  SectionHeader(context.l10n.systemIntegrationSectionHeader),
                   SectionCard(
                     children: [
                       OptionPickerTile<int>(
-                        label: 'Auto-Lock Duration',
+                        label: context.l10n.autoLockDurationLabel,
                         value: _autoCloseMins,
                         options: _autoCloseOptions.map((mins) {
                           final label = mins == 0
-                              ? 'Never'
-                              : mins == 1
-                                  ? '1 minute'
-                                  : '$mins minutes';
+                              ? context.l10n.neverAutoLockOption
+                              : context.l10n.nMinutes(mins);
                           return SelectOption(value: mins, label: label);
                         }).toList(),
                         onChanged: (v) => setState(() => _autoCloseMins = v),
@@ -816,11 +814,11 @@ Future<void> _authenticateSettings() async {
                       SwitchListTile(
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 16),
-                        title: Text('Android File Provider',
+                        title: Text(context.l10n.androidFileProviderTitle,
                             style: textTheme.bodyMedium
                                 ?.copyWith(fontWeight: FontWeight.w600)),
                         subtitle: Text(
-                            'Expose content to System File Picker when unlocked',
+                            context.l10n.exposeContentToFilePickerSubtitle,
                             style: textTheme.bodySmall
                                 ?.copyWith(color: cs.onSurfaceVariant)),
                         value: _documentProvider,
@@ -830,7 +828,7 @@ Future<void> _authenticateSettings() async {
                   ),
                   const SizedBox(height: 16),
 
-                  SectionHeader('Thumbnail Storage'),
+                  SectionHeader(context.l10n.thumbnailStorageSectionHeader),
                   SectionCard(
                     children: [
                       if (_loadingPassword)
@@ -846,9 +844,9 @@ Future<void> _authenticateSettings() async {
                         )
                       else ...[
                         OptionPickerTile<ThumbnailCacheMode>(
-                          label: 'Cache Mode',
+                          label: context.l10n.cacheModeLabel,
                           value: _thumbnailCacheMode ?? ThumbnailCacheMode.appCache,
-                          subtitle: _thumbnailCacheMode?.label ?? 'Use global default',
+                          subtitle: _thumbnailCacheMode?.label ?? context.l10n.useGlobalDefaultSubtitle,
                           options: ThumbnailCacheMode.values.map((mode) {
                             return SelectOption(
                               value: mode,
@@ -859,7 +857,7 @@ Future<void> _authenticateSettings() async {
                           onChanged: (v) => setState(() => _thumbnailCacheMode = v),
                         ),
                         ThumbnailQualityTile(
-                          label: 'Thumbnail Quality',
+                          label: context.l10n.thumbnailQualityLabel,
                           value: _thumbnailQuality ?? ThumbnailQuality.defaultQuality,
                           onChanged: (v) => setState(() => _thumbnailQuality = v),
                         ),
@@ -869,13 +867,13 @@ Future<void> _authenticateSettings() async {
                             vertical: 4,
                           ),
                           title: Text(
-                            'Clear Thumbnail Cache',
+                            context.l10n.clearThumbnailCacheTitle,
                             style: textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           subtitle: Text(
-                            'Remove cached image and video thumbnails',
+                            context.l10n.removeCachedThumbnailsSubtitle,
                             style: textTheme.bodySmall?.copyWith(
                               color: cs.onSurfaceVariant,
                             ),
@@ -942,8 +940,8 @@ Future<void> _authenticateSettings() async {
                           Expanded(
                             child: Text(
                       _needsPatternSetup
-                          ? 'Set up a pattern above before saving.'
-                          : 'A password or "Cache Derived Key" with keyfiles is required for this unlock method.',
+                          ? context.l10n.patternSetupRequiredAboveBeforeSaving
+                          : context.l10n.passwordOrCacheDerivedKeyRequiredMessage,
                       style: textTheme.bodySmall?.copyWith(
                                 color: cs.error,
                                 fontWeight: FontWeight.bold,
@@ -967,8 +965,8 @@ Future<void> _authenticateSettings() async {
                               child: CircularProgressIndicator(
                                   strokeWidth: 2.5, color: Colors.white),
                             )
-                          : const Text(
-                              'Save Configuration',
+                          : Text(
+                              context.l10n.saveConfigurationButton,
                               style: TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 15),
                             ),
@@ -1000,7 +998,7 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
       if (mounted) Navigator.pop(context, widget.storedHash);
     } else {
       setState(() {
-        _error = 'Incorrect pattern';
+        _error = context.l10n.incorrectPatternError;
         _showError = true;
       });
       Future.delayed(const Duration(milliseconds: 800), () {
@@ -1024,7 +1022,7 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Verify Pattern',
+          Text(context.l10n.verifyPatternTitle,
               style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 24),
           PatternLockView(
@@ -1039,7 +1037,7 @@ class _PatternVerifySheetState extends State<_PatternVerifySheet> {
           const SizedBox(height: 20),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
         ],
       ),
@@ -1114,7 +1112,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
 
   Future<void> _verify() async {
     if (_pwCtrl.text.isEmpty && keyfiles.isEmpty) {
-      setState(() => _error = 'Password or keyfiles required');
+      setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
       return;
     }
 
@@ -1144,7 +1142,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
                   );
                   
         if (result == null) {
-          if (mounted) setState(() { _loading = false; _error = 'Incorrect password'; });
+          if (mounted) setState(() { _loading = false; _error = context.l10n.incorrectPasswordError; });
           return;
         }
 
@@ -1160,7 +1158,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
       } catch (e) {
         final isCancelled = e is PlatformException && e.code == 'CANCELLED';
         if (mounted && !isCancelled) {
-          setState(() { _loading = false; _error = 'Verification failed'; });
+          setState(() { _loading = false; _error = context.l10n.verificationFailedError; });
         }
       }
       return;
@@ -1197,7 +1195,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
             );
 
       if (result == null) {
-        if (mounted) setState(() { _loading = false; _error = 'Incorrect credentials'; });
+        if (mounted) setState(() { _loading = false; _error = context.l10n.incorrectCredentialsError; });
         return;
       }
 
@@ -1213,7 +1211,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
     } catch (e) {
       final isCancelled = e is PlatformException && e.code == 'CANCELLED';
       if (mounted && !isCancelled) {
-        setState(() { _loading = false; _error = 'Verification failed'; });
+        setState(() { _loading = false; _error = context.l10n.verificationFailedError; });
       }
     }
   }
@@ -1224,7 +1222,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
     final textTheme = Theme.of(context).textTheme;
 
     return AlertDialog(
-      title: const Text('Verify Credentials'),
+      title: Text(context.l10n.verifyCredentialsTitle),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1237,7 +1235,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
               decoration: InputDecoration(
                 filled: true,
                 fillColor: cs.surfaceContainerHighest,
-                labelText: 'Container password (optional for keyfile-only)',
+                labelText: context.l10n.containerPasswordOptionalLabel,
                 suffixIcon: PasswordVisibilityToggle(
                   obscured: _obscure,
                   onToggle: () => setState(() => _obscure = !_obscure),
@@ -1264,7 +1262,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: cs.surfaceContainerHighest,
-                  labelText: 'PIM (optional)',
+                  labelText: context.l10n.pimOptionalLabel,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
@@ -1290,7 +1288,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
             }
             Navigator.pop(context);
           },
-          child: const Text('Cancel'),
+          child: Text(context.l10n.cancel),
         ),
         FilledButton(
           onPressed: _loading ? null : _verify,
@@ -1302,7 +1300,7 @@ class _RealPasswordGateDialogState extends State<_RealPasswordGateDialog>
           ),
           child: _loading
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Verify'),
+              : Text(context.l10n.verifyButton),
         ),
       ],
     );
@@ -1336,21 +1334,21 @@ class _DisplayNameDialogState extends State<_DisplayNameDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Display Name'),
+      title: Text(context.l10n.displayNameTitle),
       content: TextField(
         controller: _controller,
         autofocus: true,
-        decoration: const InputDecoration(hintText: 'Container name'),
+        decoration: InputDecoration(hintText: context.l10n.containerNameHint),
         onSubmitted: (value) => Navigator.pop(context, value),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.cancel),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context, _controller.text),
-          child: const Text('Save'),
+          child: Text(context.l10n.save),
         ),
       ],
     );

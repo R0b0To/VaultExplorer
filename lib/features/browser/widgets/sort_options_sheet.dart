@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class SortOptionsSheet extends StatelessWidget {
   final SortBy sortBy;
@@ -67,7 +68,7 @@ class SortOptionsSheet extends StatelessWidget {
         maxWidth: 240,
       ),
       items: [
-        for (final (field, label, icon) in _fields)
+        for (final (field, label, icon) in _fieldsFor(context))
           PopupMenuItem<SortBy>(
             value: field,
             child: Row(
@@ -103,12 +104,12 @@ class SortOptionsSheet extends StatelessWidget {
     }
   }
 
-  static const _fields = [
-    (SortBy.name, 'Name', Icons.sort_by_alpha_rounded),
-    (SortBy.size, 'Size', Icons.data_usage_rounded),
-    (SortBy.extension, 'Type', Icons.category_outlined),
-    (SortBy.date, 'Date', Icons.schedule_rounded),
-  ];
+  static List<(SortBy, String, IconData)> _fieldsFor(BuildContext context) => [
+        (SortBy.name, context.l10n.sortFieldName, Icons.sort_by_alpha_rounded),
+        (SortBy.size, context.l10n.sortFieldSize, Icons.data_usage_rounded),
+        (SortBy.extension, context.l10n.sortFieldType, Icons.category_outlined),
+        (SortBy.date, context.l10n.sortFieldDate, Icons.schedule_rounded),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +123,7 @@ class SortOptionsSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            for (final (field, label, icon) in _fields)
+            for (final (field, label, icon) in _fieldsFor(context))
               _SortRow(
                 icon: icon,
                 label: label,

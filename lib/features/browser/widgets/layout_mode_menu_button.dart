@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// App-bar popup button for choosing the current file-list layout mode
 /// (list/compact/grid/masonry).
@@ -46,7 +47,7 @@ class _LayoutModeMenuButtonState extends State<LayoutModeMenuButton> {
     return MenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: Icon(currentIcon),
-        tooltip: 'Layout options',
+        tooltip: context.l10n.layoutOptionsTooltip,
         onPressed: () {
           if (controller.isOpen) {
             controller.close();
@@ -58,11 +59,11 @@ class _LayoutModeMenuButtonState extends State<LayoutModeMenuButton> {
       onOpen: () => setState(() => _menuIsOpen = true),
       onClose: () => setState(() => _menuIsOpen = false),
       menuChildren: [
-        for (final (mode, label, icon) in const [
-          (BrowserLayoutMode.list, 'Detailed List', Icons.view_list_rounded),
-          (BrowserLayoutMode.compact, 'Compact List', Icons.list_rounded),
-          (BrowserLayoutMode.grid, 'Gallery Grid', Icons.grid_view_rounded),
-          (BrowserLayoutMode.masonry, 'Masonry', Icons.dashboard_rounded),
+        for (final (mode, label, icon) in [
+          (BrowserLayoutMode.list, context.l10n.layoutModeDetailedList, Icons.view_list_rounded),
+          (BrowserLayoutMode.compact, context.l10n.layoutModeCompactList, Icons.list_rounded),
+          (BrowserLayoutMode.grid, context.l10n.layoutModeGalleryGrid, Icons.grid_view_rounded),
+          (BrowserLayoutMode.masonry, context.l10n.layoutModeMasonry, Icons.dashboard_rounded),
         ])
           MenuItemButton(
             leadingIcon: Icon(icon, color: widget.layoutMode == mode ? cs.primary : cs.onSurfaceVariant),

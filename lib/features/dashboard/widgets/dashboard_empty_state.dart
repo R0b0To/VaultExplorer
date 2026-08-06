@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// Dashboard's "no containers yet" state. Kept as its own named widget
 /// (rather than inlining [AppEmptyState] at the call site) so the copy and
@@ -13,9 +14,8 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppEmptyState(
       icon: Icons.lock_outline_rounded,
-      title: 'No containers yet',
-      message: 'Mount a VeraCrypt container, connect a USB drive, or create '
-          'a brand-new encrypted vault to get started.',
+      title: context.l10n.noContainersYetTitle,
+      message: context.l10n.dashboardEmptyStateMessage,
     );
   }
 }

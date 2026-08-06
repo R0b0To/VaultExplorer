@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// App-bar popup button for choosing the current sort field/direction.
 ///
@@ -45,7 +46,7 @@ class _SortMenuButtonState extends State<SortMenuButton> {
     return MenuAnchor(
       builder: (context, controller, child) => IconButton(
         icon: const Icon(Icons.sort_by_alpha_rounded),
-        tooltip: 'Sort options',
+        tooltip: context.l10n.sortOptionsTooltip,
         onPressed: () {
           if (controller.isOpen) {
             controller.close();
@@ -57,11 +58,11 @@ class _SortMenuButtonState extends State<SortMenuButton> {
       onOpen: () => setState(() => _menuIsOpen = true),
       onClose: () => setState(() => _menuIsOpen = false),
       menuChildren: [
-        for (final (field, label, icon) in const [
-          (SortBy.name, 'Name', Icons.sort_by_alpha_rounded),
-          (SortBy.size, 'Size', Icons.data_usage_rounded),
-          (SortBy.extension, 'Type', Icons.category_outlined),
-          (SortBy.date, 'Date', Icons.schedule_rounded),
+        for (final (field, label, icon) in [
+          (SortBy.name, context.l10n.sortFieldName, Icons.sort_by_alpha_rounded),
+          (SortBy.size, context.l10n.sortFieldSize, Icons.data_usage_rounded),
+          (SortBy.extension, context.l10n.sortFieldType, Icons.category_outlined),
+          (SortBy.date, context.l10n.sortFieldDate, Icons.schedule_rounded),
         ])
           MenuItemButton(
             leadingIcon: Icon(icon, color: widget.sortBy == field ? cs.primary : cs.onSurfaceVariant),

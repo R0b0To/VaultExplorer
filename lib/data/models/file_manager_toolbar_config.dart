@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
+import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 
 enum FileDetailColumn {
   date,
@@ -44,6 +45,7 @@ class FileManagerToolbarConfig {
   final int gridColumnsLandscape;
   final int masonryColumnsPortrait;
   final int masonryColumnsLandscape;
+  final PlaylistTransitionEffect playlistTransitionEffect;
 
   const FileManagerToolbarConfig({
     required this.order,
@@ -65,6 +67,7 @@ class FileManagerToolbarConfig {
     this.gridColumnsLandscape = 5,
     this.masonryColumnsPortrait = 2,
     this.masonryColumnsLandscape = 4,
+    this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
   });
 
   factory FileManagerToolbarConfig.defaults() => const FileManagerToolbarConfig(
@@ -93,6 +96,7 @@ class FileManagerToolbarConfig {
         gridColumnsLandscape: 5,
         masonryColumnsPortrait: 2,
         masonryColumnsLandscape: 4,
+        playlistTransitionEffect: PlaylistTransitionEffect.slide,
       );
 
   List<FileManagerAction> get visible =>
@@ -118,6 +122,7 @@ class FileManagerToolbarConfig {
     int? gridColumnsLandscape,
     int? masonryColumnsPortrait,
     int? masonryColumnsLandscape,
+    PlaylistTransitionEffect? playlistTransitionEffect,
   }) =>
       FileManagerToolbarConfig(
         order: order ?? this.order,
@@ -139,6 +144,8 @@ class FileManagerToolbarConfig {
             masonryColumnsPortrait ?? this.masonryColumnsPortrait,
         masonryColumnsLandscape:
             masonryColumnsLandscape ?? this.masonryColumnsLandscape,
+        playlistTransitionEffect:
+            playlistTransitionEffect ?? this.playlistTransitionEffect,
       );
 
   Map<String, dynamic> toJson() => {
@@ -159,6 +166,7 @@ class FileManagerToolbarConfig {
         'gridColumnsLandscape': gridColumnsLandscape,
         'masonryColumnsPortrait': masonryColumnsPortrait,
         'masonryColumnsLandscape': masonryColumnsLandscape,
+        'playlistTransitionEffect': playlistTransitionEffect.toJson(),
       };
 
   factory FileManagerToolbarConfig.fromJson(Map<String, dynamic>? j) {
@@ -211,6 +219,9 @@ class FileManagerToolbarConfig {
           (j['masonryColumnsPortrait'] as num?)?.toInt() ?? 2,
       masonryColumnsLandscape:
           (j['masonryColumnsLandscape'] as num?)?.toInt() ?? 4,
+      playlistTransitionEffect: PlaylistTransitionEffect.fromJson(
+        j['playlistTransitionEffect'] as String?,
+      ),
     );
   }
 }

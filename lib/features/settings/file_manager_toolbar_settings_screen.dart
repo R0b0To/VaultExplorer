@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
+import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 
@@ -94,6 +95,7 @@ class _FileManagerToolbarSettingsScreenState
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
@@ -427,6 +429,21 @@ class _FileManagerToolbarSettingsScreenState
                                     ?.copyWith(color: cs.onSurfaceVariant)),
                             secondary: Icon(Icons.view_carousel_rounded,
                                 color: cs.primary),
+                          ),
+                          OptionPickerTile<PlaylistTransitionEffect>(
+                            label: context.l10n.playlistTransitionAnimationLabel,
+                            value: _config.playlistTransitionEffect,
+                            options: PlaylistTransitionEffect.values.map((effect) {
+                              return SelectOption(
+                                value: effect,
+                                label: effect.getLocalizedLabel(context.l10n),
+                              );
+                            }).toList(),
+                            onChanged: (v) {
+                              setState(() => _config =
+                                  _config.copyWith(playlistTransitionEffect: v));
+                              _persist();
+                            },
                           ),
                         ],
                       ),

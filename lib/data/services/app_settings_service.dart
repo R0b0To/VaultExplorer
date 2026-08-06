@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
-import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/playlist_scroll_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -38,7 +37,6 @@ class AppSettings {
   SortBy defaultFileSortBy;
   bool defaultFileSortAscending;
   bool htmlEnableJavaScript;
-  PlaylistTransitionEffect playlistTransitionEffect;
   PlaylistScrollMode playlistScrollMode;
   String? languageCode;
   String? _masterPasswordHash;
@@ -64,7 +62,6 @@ class AppSettings {
     this.defaultFileSortBy = SortBy.name,
     this.defaultFileSortAscending = true,
     this.htmlEnableJavaScript = false,
-    this.playlistTransitionEffect = PlaylistTransitionEffect.slide,
     this.playlistScrollMode = PlaylistScrollMode.horizontal,
     this.languageCode,
     Map<String, String>? extensionPreferences,
@@ -122,7 +119,6 @@ class AppSettings {
     SortBy? defaultFileSortBy,
     bool? defaultFileSortAscending,
     bool? htmlEnableJavaScript,
-    PlaylistTransitionEffect? playlistTransitionEffect,
     PlaylistScrollMode? playlistScrollMode,
     Axis? playlistScrollDirection,
     String? languageCode,
@@ -150,7 +146,6 @@ class AppSettings {
       defaultFileSortBy: defaultFileSortBy ?? this.defaultFileSortBy,
       defaultFileSortAscending: defaultFileSortAscending ?? this.defaultFileSortAscending,
       htmlEnableJavaScript: htmlEnableJavaScript ?? this.htmlEnableJavaScript,
-      playlistTransitionEffect: playlistTransitionEffect ?? this.playlistTransitionEffect,
       playlistScrollMode: playlistScrollMode ??
           (playlistScrollDirection != null
               ? (playlistScrollDirection == Axis.vertical
@@ -182,7 +177,6 @@ class AppSettings {
     'defaultFileSortBy': defaultFileSortBy.toJson(),
     'defaultFileSortAscending': defaultFileSortAscending,
     'htmlEnableJavaScript': htmlEnableJavaScript,
-    'playlistTransitionEffect': playlistTransitionEffect.toJson(),
     'playlistScrollMode': playlistScrollMode.toJson(),
     'playlistScrollDirection': playlistScrollMode == PlaylistScrollMode.verticalPage
         ? 'vertical'
@@ -226,7 +220,6 @@ class AppSettings {
     defaultFileSortBy: SortBy.fromJson(j['defaultFileSortBy'] as String?),
     defaultFileSortAscending: j['defaultFileSortAscending'] as bool? ?? true,
     htmlEnableJavaScript: j['htmlEnableJavaScript'] as bool? ?? false,
-    playlistTransitionEffect: PlaylistTransitionEffect.fromJson(j['playlistTransitionEffect'] as String?),
     playlistScrollMode: PlaylistScrollMode.fromJson(
       j['playlistScrollMode'] as String? ?? j['playlistScrollDirection'] as String?,
     ),

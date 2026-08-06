@@ -5,7 +5,6 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/features/settings/about_screen.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
-import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
@@ -34,6 +33,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   bool _obscurePw = true;
   bool _obscureConfirm = true;
   String? _pwError;
+
   bool _biometricAvailable = false;
   final _localAuth = LocalAuthentication();
 
@@ -102,9 +102,11 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
           await _localAuth.canCheckBiometrics &&
           await _localAuth.isDeviceSupported();
     } catch (_) {}
+
     const api = VaultExplorerApi();
     final hasAccess = await api.hasAllFilesAccess();
     final disguiseMode = await disguiseModeApi.getMode();
+
     if (mounted) {
       setState(() {
         _settings = s;
@@ -116,7 +118,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     }
   }
 
-  // ✅ FIXED CODE:
   Future<void> _setDiscreteMode(bool enable) async {
     final confirmed = await showAppConfirmDialog(
       context,
@@ -138,11 +139,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
             ? context.l10n.discreteModeEnabledSnack
             : context.l10n.discreteModeDisabledSnack,
       );
-      // Close the app after a brief delay so the user sees the snackbar.
-      // A cold restart ensures the Flutter engine initialises cleanly
-      // under the new launcher-alias configuration (otherwise the
-      // activity recreation caused by the component flip can leave the
-      // engine in a stale state, especially during debug hot-reload).
       await Future<void>.delayed(const Duration(milliseconds: 1500));
       SystemNavigator.pop();
     } catch (_) {
@@ -169,7 +165,6 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
     }
   }
 
-
   void _toggleMasterPassword(bool enabled) {
     setState(() {
       _settings.useMasterPassword = enabled;
@@ -190,6 +185,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   Future<void> _confirmPassword() async {
     final pw = _pwCtrl.text;
     final confirm = _pwConfirmCtrl.text;
+
     if (pw.isEmpty) {
       setState(() => _pwError = context.l10n.passwordCannotBeEmpty);
       return;
@@ -202,20 +198,24 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       setState(() => _pwError = context.l10n.passwordsDoNotMatch);
       return;
     }
+
     setState(() {
       _saving = true;
       _pwError = null;
     });
+
     try {
       final (:hash, :salt) = await PasswordHasher.deriveHash(pw);
       if (!mounted) return;
       await AppSettingsService.saveMasterPassword(_settings, hash, salt);
+
       setState(() {
         _showPwFields = false;
         _pwCtrl.clear();
         _pwConfirmCtrl.clear();
         _saving = false;
       });
+
       if (mounted) {
         showAppSnackBar(
           context,
@@ -244,6 +244,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
@@ -661,7 +662,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                           SwitchListTile(
+                          SwitchListTile(
                             contentPadding:
                                 const EdgeInsets.symmetric(horizontal: 16),
                             title: Text(context.l10n.enableJsHtmlTitle,
@@ -732,25 +733,10 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                           ),
                           ThumbnailQualityTile(
                             label: context.l10n.thumbnailQualityDefaultLabel,
-                            value: _settings.defaultThumbnailQuality,                            
+                            value: _settings.defaultThumbnailQuality,
                             onChanged: (v) {
                               setState(
                                   () => _settings.defaultThumbnailQuality = v);
-                              _persist();
-                            },
-                          ),
-                          OptionPickerTile<PlaylistTransitionEffect>(
-                            label: context.l10n.playlistTransitionAnimationLabel,
-                            value: _settings.playlistTransitionEffect,
-                            options: PlaylistTransitionEffect.values.map((effect) {
-                              return SelectOption(
-                                value: effect,
-                                label: effect.getLocalizedLabel(context.l10n),
-                              );
-                            }).toList(),
-                            onChanged: (v) {
-                              setState(() =>
-                                  _settings.playlistTransitionEffect = v);
                               _persist();
                             },
                           ),

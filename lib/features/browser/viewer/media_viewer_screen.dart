@@ -160,7 +160,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
-  Future<void> _loadConfig() async {
+   Future<void> _loadConfig() async {
     final config = await FileManagerToolbarService.instance.load();
     final appSettings = await AppSettingsService.loadSettings();
     if (mounted) {
@@ -169,7 +169,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         if (!_enableCarousel) {
           _isCarouselVisible = false;
         }
-        _transitionEffect = appSettings.playlistTransitionEffect;
+        _transitionEffect = config.playlistTransitionEffect;
         _scrollMode = appSettings.playlistScrollMode;
       });
       if (config.autoStartPlaylistMode && !_playlistController.isPlaylistMode) {
@@ -1185,15 +1185,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     currentFileName: _playlistController.currentFile,
                     totalCount: _playlistController.playlist.length,
                     currentTransitionEffect: _transitionEffect,
-                    onTransitionEffectChanged: (newEffect) async {
-                      setState(() {
-                        _transitionEffect = newEffect;
-                      });
-                      final appSettings = await AppSettingsService.loadSettings();
-                      await AppSettingsService.saveSettings(
-                        appSettings.copyWith(playlistTransitionEffect: newEffect),
-                      );
-                    },
+                       onTransitionEffectChanged: (newEffect) async {
+                    setState(() {
+                      _transitionEffect = newEffect;
+                    });
+                    final config = await FileManagerToolbarService.instance.load();
+                    await FileManagerToolbarService.instance.save(
+                      config.copyWith(playlistTransitionEffect: newEffect),
+                    );
+                  },
                     currentScrollMode: _scrollMode,
                     onScrollModeChanged: (newMode) async {
                       setState(() {

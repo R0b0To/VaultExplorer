@@ -30,27 +30,24 @@ class AboutScreen extends StatelessWidget {
 
   Future<void> _copyVersionInfo(BuildContext context) async {
     await Clipboard.setData(
-      ClipboardData(text: 'VaultExplorer v$appVersion (Android)'),
+      ClipboardData(text: context.l10n.aboutVersionClipboardText(appVersion)),
     );
     if (context.mounted) {
       _showSnack(
         context,
-        'Version info copied — handy for bug reports',
+        context.l10n.aboutVersionCopiedMessage,
         tone: AppBannerTone.success,
       );
     }
   }
 
   Future<void> _shareApp(BuildContext context) async {
-    const text =
-        'VaultExplorer — a free, open-source, offline vault for Android.\n\n'
-        'Store passwords, notes, and files inside an encrypted container '
-        '(VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n$_kGithubUrl';
-    await Clipboard.setData(const ClipboardData(text: text));
+    final text = context.l10n.aboutShareText(_kGithubUrl);
+    await Clipboard.setData(ClipboardData(text: text));
     if (context.mounted) {
       _showSnack(
         context,
-        'Copied a shareable link to your clipboard',
+        context.l10n.aboutShareLinkCopiedMessage,
         tone: AppBannerTone.success,
       );
     }
@@ -124,7 +121,7 @@ class AboutScreen extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Free · Open Source · Offline Encrypted Vault',
+          context.l10n.aboutTagline,
           style: textTheme.bodyMedium?.copyWith(
             color: cs.onSurfaceVariant,
           ),
@@ -181,19 +178,19 @@ class AboutScreen extends StatelessWidget {
                 const SizedBox(height: 24),
 
                 // ── Application Section ──────────────────────────────────
-                SectionHeader('Application'),
+                SectionHeader(context.l10n.aboutApplicationSectionHeader),
                 SectionCard(
                   children: [
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 4),
                       title: Text(
-                        'Version',
+                        context.l10n.aboutVersionTitle,
                         style: textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'v$appVersion · Tap to copy version info for bug reports',
+                        context.l10n.aboutVersionSubtitle(appVersion),
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -203,12 +200,12 @@ class AboutScreen extends StatelessWidget {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 4),
                       title: Text(
-                        "What's New",
+                        context.l10n.aboutWhatsNewTitle,
                         style: textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'See recent changes and release notes',
+                        context.l10n.aboutWhatsNewSubtitle,
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -218,12 +215,12 @@ class AboutScreen extends StatelessWidget {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 4),
                       title: Text(
-                        'Privacy & Security',
+                        context.l10n.aboutPrivacySecurityTitle,
                         style: textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'Zero-trust, 100% offline, local memory security design',
+                        context.l10n.aboutPrivacySecuritySubtitle,
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -234,7 +231,7 @@ class AboutScreen extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 // ── Volume Formats Section ──────────────────────────────
-                SectionHeader('Supported Formats'),
+                SectionHeader(context.l10n.aboutSupportedFormatsSectionHeader),
                 SectionCard(
                   children: [
                     ListTile(
@@ -242,12 +239,12 @@ class AboutScreen extends StatelessWidget {
                           horizontal: 16, vertical: 4),
                       leading: Icon(Icons.shield_rounded, color: cs.primary),
                       title: Text(
-                        'VeraCrypt & LUKS1/2',
+                        context.l10n.aboutVeraCryptLuksTitle,
                         style: textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'Standard & hidden volumes, custom PIM, keyfiles, xts-plain64, Argon2id/i',
+                        context.l10n.aboutVeraCryptLuksSubtitle,
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -257,12 +254,12 @@ class AboutScreen extends StatelessWidget {
                           horizontal: 16, vertical: 4),
                       leading: Icon(Icons.key_rounded, color: cs.primary),
                       title: Text(
-                        'BitLocker & BitLocker To Go',
+                        context.l10n.aboutBitLockerTitle,
                         style: textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'User passphrases and 48-digit numerical recovery key support',
+                        context.l10n.aboutBitLockerSubtitle,
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -272,12 +269,12 @@ class AboutScreen extends StatelessWidget {
                           horizontal: 16, vertical: 4),
                       leading: Icon(Icons.folder_zip_rounded, color: cs.primary),
                       title: Text(
-                        'Directory Vaults',
+                        context.l10n.aboutDirectoryVaultsTitle,
                         style: textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'Cryptomator (v7/v8 SIV_GCM), gocryptfs (v2 EME), CryFS (0.10 Merkle)',
+                        context.l10n.aboutDirectoryVaultsSubtitle,
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -287,12 +284,12 @@ class AboutScreen extends StatelessWidget {
                           horizontal: 16, vertical: 4),
                       leading: Icon(Icons.disc_full_rounded, color: cs.primary),
                       title: Text(
-                        'Virtual Hard Disks (VHD / VHDX)',
+                        context.l10n.aboutVhdTitle,
                         style: textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'BAT translation for fixed and dynamic expandable disk images',
+                        context.l10n.aboutVhdSubtitle,
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -302,7 +299,7 @@ class AboutScreen extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 // ── Native C++ Architecture Section ────────────────────────
-                SectionHeader('Native Core Engine'),
+                SectionHeader(context.l10n.aboutNativeCoreEngineSectionHeader),
                 SectionCard(
                   children: [
                     Padding(
@@ -311,20 +308,14 @@ class AboutScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Compiled C++ Libraries',
+                            context.l10n.aboutCompiledLibrariesTitle,
                             style: textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            '• mbedTLS v3.6.0 (ARMv8 Hardware Crypto & SHA-2)\n'
-                            '• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n'
-                            '• Tuxera NTFS-3G & embedded mkntfs\n'
-                            '• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n'
-                            '• Dislocker Virtual I/O (BitLocker FVE / To Go)\n'
-                            '• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n'
-                            '• cJSON v1.7.18 (LUKS2 & Cryptomator metadata)',
+                            context.l10n.aboutCompiledLibrariesBody,
                             style: textTheme.bodySmall?.copyWith(
                               color: cs.onSurfaceVariant,
                               height: 1.45,
@@ -338,19 +329,19 @@ class AboutScreen extends StatelessWidget {
                 const SizedBox(height: 16),
 
                 // ── Community & Legal Section ─────────────────────────────
-                SectionHeader('Community & Open Source'),
+                SectionHeader(context.l10n.aboutCommunitySectionHeader),
                 SectionCard(
                   children: [
                     ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 4),
                       title: Text(
-                        'Report an Issue',
+                        context.l10n.aboutReportIssueTitle,
                         style: textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'Found a bug? Submit an issue on GitHub',
+                        context.l10n.aboutReportIssueSubtitle,
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -360,12 +351,12 @@ class AboutScreen extends StatelessWidget {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 4),
                       title: Text(
-                        'Contributors',
+                        context.l10n.aboutContributorsTitle,
                         style: textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'People who helped build VaultExplorer',
+                        context.l10n.aboutContributorsSubtitle,
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -375,12 +366,12 @@ class AboutScreen extends StatelessWidget {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 4),
                       title: Text(
-                        'Open Source Licenses',
+                        context.l10n.aboutLicensesTitle,
                         style: textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       subtitle: Text(
-                        'Third-party libraries used in this app',
+                        context.l10n.aboutLicensesSubtitle,
                         style: textTheme.bodySmall
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -391,7 +382,7 @@ class AboutScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 Center(
                   child: Text(
-                    'Made with ❤ for privacy.',
+                    context.l10n.aboutFooterMadeWithLove,
                     style: textTheme.bodySmall
                         ?.copyWith(color: cs.onSurfaceVariant),
                   ),
@@ -447,32 +438,32 @@ class _PrivacySheet extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final points = <(String, String)>[
       (
-        'No network access required',
-        'VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.',
+        context.l10n.privacyPointNoNetworkTitle,
+        context.l10n.privacyPointNoNetworkBody,
       ),
       (
-        'Zero unencrypted disk leaks',
-        'Decryption and re-encryption happen entirely in system memory. Temporary unencrypted files are never saved to device storage.',
+        context.l10n.privacyPointNoDiskLeaksTitle,
+        context.l10n.privacyPointNoDiskLeaksBody,
       ),
       (
-        'No analytics or telemetry',
-        'There is zero crash reporting, usage tracking, or third-party SDK collecting data about you or your device.',
+        context.l10n.privacyPointNoAnalyticsTitle,
+        context.l10n.privacyPointNoAnalyticsBody,
       ),
       (
-        'Secrets stay in Android Keystore',
-        'Remembered passwords, patterns, and cached derived keys are sealed using AES-256-GCM in the hardware-backed Android Keystore.',
+        context.l10n.privacyPointKeystoreTitle,
+        context.l10n.privacyPointKeystoreBody,
       ),
       (
-        'POSIX Acceleration & Storage Access',
-        'Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.',
+        context.l10n.privacyPointPosixTitle,
+        context.l10n.privacyPointPosixBody,
       ),
       (
-        'Screen & Clipboard Protection',
-        'Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.',
+        context.l10n.privacyPointScreenClipboardTitle,
+        context.l10n.privacyPointScreenClipboardBody,
       ),
       (
-        'External links open in browser',
-        'Tapping links hands off to your default browser app, which handles the request.',
+        context.l10n.privacyPointExternalLinksTitle,
+        context.l10n.privacyPointExternalLinksBody,
       ),
     ];
 
@@ -491,14 +482,14 @@ class _PrivacySheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Privacy & Data Security',
+                    context.l10n.aboutPrivacySheetTitle,
                     style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '100% offline, local memory security design',
+                    context.l10n.aboutPrivacySheetSubtitle,
                     style: textTheme.bodySmall?.copyWith(
                       color: cs.onSurfaceVariant,
                     ),

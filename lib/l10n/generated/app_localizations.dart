@@ -5677,6 +5677,312 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Encrypting video…'**
   String get cameraEncryptingVideoLabel;
+
+  /// Section header on the about screen for the application info section
+  ///
+  /// In en, this message translates to:
+  /// **'Application'**
+  String get aboutApplicationSectionHeader;
+
+  /// Tagline shown under the app name on the about screen
+  ///
+  /// In en, this message translates to:
+  /// **'Free · Open Source · Offline Encrypted Vault'**
+  String get aboutTagline;
+
+  /// List tile title on the about screen for the app version entry
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get aboutVersionTitle;
+
+  /// List tile subtitle on the about screen showing the app version
+  ///
+  /// In en, this message translates to:
+  /// **'v{version} · Tap to copy version info for bug reports'**
+  String aboutVersionSubtitle(String version);
+
+  /// List tile title on the about screen linking to release notes
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s New'**
+  String get aboutWhatsNewTitle;
+
+  /// List tile subtitle on the about screen for the release notes entry
+  ///
+  /// In en, this message translates to:
+  /// **'See recent changes and release notes'**
+  String get aboutWhatsNewSubtitle;
+
+  /// List tile title on the about screen opening the privacy details sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy & Security'**
+  String get aboutPrivacySecurityTitle;
+
+  /// List tile subtitle on the about screen for the privacy & security entry
+  ///
+  /// In en, this message translates to:
+  /// **'Zero-trust, 100% offline, local memory security design'**
+  String get aboutPrivacySecuritySubtitle;
+
+  /// Section header on the about screen listing supported container formats
+  ///
+  /// In en, this message translates to:
+  /// **'Supported Formats'**
+  String get aboutSupportedFormatsSectionHeader;
+
+  /// List tile title on the about screen for the VeraCrypt/LUKS format entry
+  ///
+  /// In en, this message translates to:
+  /// **'VeraCrypt & LUKS1/2'**
+  String get aboutVeraCryptLuksTitle;
+
+  /// List tile subtitle on the about screen describing VeraCrypt/LUKS capabilities
+  ///
+  /// In en, this message translates to:
+  /// **'Standard & hidden volumes, custom PIM, keyfiles, xts-plain64, Argon2id/i'**
+  String get aboutVeraCryptLuksSubtitle;
+
+  /// List tile title on the about screen for the BitLocker format entry
+  ///
+  /// In en, this message translates to:
+  /// **'BitLocker & BitLocker To Go'**
+  String get aboutBitLockerTitle;
+
+  /// List tile subtitle on the about screen describing BitLocker capabilities
+  ///
+  /// In en, this message translates to:
+  /// **'User passphrases and 48-digit numerical recovery key support'**
+  String get aboutBitLockerSubtitle;
+
+  /// List tile title on the about screen for the directory vault formats entry
+  ///
+  /// In en, this message translates to:
+  /// **'Directory Vaults'**
+  String get aboutDirectoryVaultsTitle;
+
+  /// List tile subtitle on the about screen describing directory vault format support
+  ///
+  /// In en, this message translates to:
+  /// **'Cryptomator (v7/v8 SIV_GCM), gocryptfs (v2 EME), CryFS (0.10 Merkle)'**
+  String get aboutDirectoryVaultsSubtitle;
+
+  /// List tile title on the about screen for the VHD/VHDX format entry
+  ///
+  /// In en, this message translates to:
+  /// **'Virtual Hard Disks (VHD / VHDX)'**
+  String get aboutVhdTitle;
+
+  /// List tile subtitle on the about screen describing VHD/VHDX format support
+  ///
+  /// In en, this message translates to:
+  /// **'BAT translation for fixed and dynamic expandable disk images'**
+  String get aboutVhdSubtitle;
+
+  /// Section header on the about screen for the native engine details
+  ///
+  /// In en, this message translates to:
+  /// **'Native Core Engine'**
+  String get aboutNativeCoreEngineSectionHeader;
+
+  /// Title above the list of compiled native libraries on the about screen
+  ///
+  /// In en, this message translates to:
+  /// **'Compiled C++ Libraries'**
+  String get aboutCompiledLibrariesTitle;
+
+  /// Bulleted list of compiled native libraries and versions used by the app
+  ///
+  /// In en, this message translates to:
+  /// **'• mbedTLS v3.6.0 (ARMv8 Hardware Crypto & SHA-2)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & embedded mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2 & Cryptomator metadata)'**
+  String get aboutCompiledLibrariesBody;
+
+  /// Section header on the about screen for community/legal links
+  ///
+  /// In en, this message translates to:
+  /// **'Community & Open Source'**
+  String get aboutCommunitySectionHeader;
+
+  /// List tile title on the about screen linking to the GitHub issue tracker
+  ///
+  /// In en, this message translates to:
+  /// **'Report an Issue'**
+  String get aboutReportIssueTitle;
+
+  /// List tile subtitle on the about screen for the report-an-issue entry
+  ///
+  /// In en, this message translates to:
+  /// **'Found a bug? Submit an issue on GitHub'**
+  String get aboutReportIssueSubtitle;
+
+  /// List tile title on the about screen linking to the contributors list
+  ///
+  /// In en, this message translates to:
+  /// **'Contributors'**
+  String get aboutContributorsTitle;
+
+  /// List tile subtitle on the about screen for the contributors entry
+  ///
+  /// In en, this message translates to:
+  /// **'People who helped build VaultExplorer'**
+  String get aboutContributorsSubtitle;
+
+  /// List tile title on the about screen opening the OSS license page
+  ///
+  /// In en, this message translates to:
+  /// **'Open Source Licenses'**
+  String get aboutLicensesTitle;
+
+  /// List tile subtitle on the about screen for the licenses entry
+  ///
+  /// In en, this message translates to:
+  /// **'Third-party libraries used in this app'**
+  String get aboutLicensesSubtitle;
+
+  /// Footer text at the bottom of the about screen
+  ///
+  /// In en, this message translates to:
+  /// **'Made with ❤ for privacy.'**
+  String get aboutFooterMadeWithLove;
+
+  /// Snackbar message shown after copying version info to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Version info copied — handy for bug reports'**
+  String get aboutVersionCopiedMessage;
+
+  /// Text copied to the clipboard when the user taps the version entry
+  ///
+  /// In en, this message translates to:
+  /// **'VaultExplorer v{version} (Android)'**
+  String aboutVersionClipboardText(String version);
+
+  /// Shareable promotional text copied to the clipboard when the user taps share
+  ///
+  /// In en, this message translates to:
+  /// **'VaultExplorer — a free, open-source, offline vault for Android.\n\nStore passwords, notes, and files inside an encrypted container (VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n{url}'**
+  String aboutShareText(String url);
+
+  /// Snackbar message shown after copying the shareable app link to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Copied a shareable link to your clipboard'**
+  String get aboutShareLinkCopiedMessage;
+
+  /// Title of the privacy details bottom sheet on the about screen
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy & Data Security'**
+  String get aboutPrivacySheetTitle;
+
+  /// Subtitle of the privacy details bottom sheet on the about screen
+  ///
+  /// In en, this message translates to:
+  /// **'100% offline, local memory security design'**
+  String get aboutPrivacySheetSubtitle;
+
+  /// Privacy sheet point title: no network access
+  ///
+  /// In en, this message translates to:
+  /// **'No network access required'**
+  String get privacyPointNoNetworkTitle;
+
+  /// Privacy sheet point body: no network access
+  ///
+  /// In en, this message translates to:
+  /// **'VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.'**
+  String get privacyPointNoNetworkBody;
+
+  /// Privacy sheet point title: no unencrypted disk leaks
+  ///
+  /// In en, this message translates to:
+  /// **'Zero unencrypted disk leaks'**
+  String get privacyPointNoDiskLeaksTitle;
+
+  /// Privacy sheet point body: no unencrypted disk leaks
+  ///
+  /// In en, this message translates to:
+  /// **'Decryption and re-encryption happen entirely in system memory. Temporary unencrypted files are never saved to device storage.'**
+  String get privacyPointNoDiskLeaksBody;
+
+  /// Privacy sheet point title: no analytics or telemetry
+  ///
+  /// In en, this message translates to:
+  /// **'No analytics or telemetry'**
+  String get privacyPointNoAnalyticsTitle;
+
+  /// Privacy sheet point body: no analytics or telemetry
+  ///
+  /// In en, this message translates to:
+  /// **'There is zero crash reporting, usage tracking, or third-party SDK collecting data about you or your device.'**
+  String get privacyPointNoAnalyticsBody;
+
+  /// Privacy sheet point title: secrets stay in Android Keystore
+  ///
+  /// In en, this message translates to:
+  /// **'Secrets stay in Android Keystore'**
+  String get privacyPointKeystoreTitle;
+
+  /// Privacy sheet point body: secrets stay in Android Keystore
+  ///
+  /// In en, this message translates to:
+  /// **'Remembered passwords, patterns, and cached derived keys are sealed using AES-256-GCM in the hardware-backed Android Keystore.'**
+  String get privacyPointKeystoreBody;
+
+  /// Privacy sheet point title: POSIX acceleration and storage access
+  ///
+  /// In en, this message translates to:
+  /// **'POSIX Acceleration & Storage Access'**
+  String get privacyPointPosixTitle;
+
+  /// Privacy sheet point body: POSIX acceleration and storage access
+  ///
+  /// In en, this message translates to:
+  /// **'Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.'**
+  String get privacyPointPosixBody;
+
+  /// Privacy sheet point title: screen and clipboard protection
+  ///
+  /// In en, this message translates to:
+  /// **'Screen & Clipboard Protection'**
+  String get privacyPointScreenClipboardTitle;
+
+  /// Privacy sheet point body: screen and clipboard protection
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.'**
+  String get privacyPointScreenClipboardBody;
+
+  /// Privacy sheet point title: external links open in browser
+  ///
+  /// In en, this message translates to:
+  /// **'External links open in browser'**
+  String get privacyPointExternalLinksTitle;
+
+  /// Privacy sheet point body: external links open in browser
+  ///
+  /// In en, this message translates to:
+  /// **'Tapping links hands off to your default browser app, which handles the request.'**
+  String get privacyPointExternalLinksBody;
+
+  /// Warning banner shown above the file list when a folder's listing was capped at the max item count
+  ///
+  /// In en, this message translates to:
+  /// **'Showing first 50,000 items — this folder has more files.'**
+  String get truncatedListingWarning;
+
+  /// Summary line showing the configured thumbnail size and JPEG compression quality
+  ///
+  /// In en, this message translates to:
+  /// **'{size} px · {quality}% quality'**
+  String thumbnailQualitySummary(int size, int quality);
+
+  /// On-screen indicator shown while holding down to fast-forward playback at a multiplier
+  ///
+  /// In en, this message translates to:
+  /// **'{speed}× Speed'**
+  String holdToSpeedIndicatorLabel(String speed);
 }
 
 class _AppLocalizationsDelegate

@@ -617,8 +617,7 @@ Future<void> _authenticateSettings() async {
                                   decoration: InputDecoration(
                                     filled: true,
                                     fillColor: cs.surfaceContainerHighest,
-                                    labelText:
-                                        'Container password (optional for keyfile-only)',
+                                    labelText: context.l10n.containerPasswordOptionalLabel,
                                     suffixIcon: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [

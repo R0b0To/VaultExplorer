@@ -3344,4 +3344,187 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cameraEncryptingVideoLabel => 'Encrypting video…';
+
+  @override
+  String get aboutApplicationSectionHeader => 'Application';
+
+  @override
+  String get aboutTagline => 'Free · Open Source · Offline Encrypted Vault';
+
+  @override
+  String get aboutVersionTitle => 'Version';
+
+  @override
+  String aboutVersionSubtitle(String version) {
+    return 'v$version · Tap to copy version info for bug reports';
+  }
+
+  @override
+  String get aboutWhatsNewTitle => 'What\'s New';
+
+  @override
+  String get aboutWhatsNewSubtitle => 'See recent changes and release notes';
+
+  @override
+  String get aboutPrivacySecurityTitle => 'Privacy & Security';
+
+  @override
+  String get aboutPrivacySecuritySubtitle =>
+      'Zero-trust, 100% offline, local memory security design';
+
+  @override
+  String get aboutSupportedFormatsSectionHeader => 'Supported Formats';
+
+  @override
+  String get aboutVeraCryptLuksTitle => 'VeraCrypt & LUKS1/2';
+
+  @override
+  String get aboutVeraCryptLuksSubtitle =>
+      'Standard & hidden volumes, custom PIM, keyfiles, xts-plain64, Argon2id/i';
+
+  @override
+  String get aboutBitLockerTitle => 'BitLocker & BitLocker To Go';
+
+  @override
+  String get aboutBitLockerSubtitle =>
+      'User passphrases and 48-digit numerical recovery key support';
+
+  @override
+  String get aboutDirectoryVaultsTitle => 'Directory Vaults';
+
+  @override
+  String get aboutDirectoryVaultsSubtitle =>
+      'Cryptomator (v7/v8 SIV_GCM), gocryptfs (v2 EME), CryFS (0.10 Merkle)';
+
+  @override
+  String get aboutVhdTitle => 'Virtual Hard Disks (VHD / VHDX)';
+
+  @override
+  String get aboutVhdSubtitle =>
+      'BAT translation for fixed and dynamic expandable disk images';
+
+  @override
+  String get aboutNativeCoreEngineSectionHeader => 'Native Core Engine';
+
+  @override
+  String get aboutCompiledLibrariesTitle => 'Compiled C++ Libraries';
+
+  @override
+  String get aboutCompiledLibrariesBody =>
+      '• mbedTLS v3.6.0 (ARMv8 Hardware Crypto & SHA-2)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & embedded mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2 & Cryptomator metadata)';
+
+  @override
+  String get aboutCommunitySectionHeader => 'Community & Open Source';
+
+  @override
+  String get aboutReportIssueTitle => 'Report an Issue';
+
+  @override
+  String get aboutReportIssueSubtitle =>
+      'Found a bug? Submit an issue on GitHub';
+
+  @override
+  String get aboutContributorsTitle => 'Contributors';
+
+  @override
+  String get aboutContributorsSubtitle =>
+      'People who helped build VaultExplorer';
+
+  @override
+  String get aboutLicensesTitle => 'Open Source Licenses';
+
+  @override
+  String get aboutLicensesSubtitle => 'Third-party libraries used in this app';
+
+  @override
+  String get aboutFooterMadeWithLove => 'Made with ❤ for privacy.';
+
+  @override
+  String get aboutVersionCopiedMessage =>
+      'Version info copied — handy for bug reports';
+
+  @override
+  String aboutVersionClipboardText(String version) {
+    return 'VaultExplorer v$version (Android)';
+  }
+
+  @override
+  String aboutShareText(String url) {
+    return 'VaultExplorer — a free, open-source, offline vault for Android.\n\nStore passwords, notes, and files inside an encrypted container (VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n$url';
+  }
+
+  @override
+  String get aboutShareLinkCopiedMessage =>
+      'Copied a shareable link to your clipboard';
+
+  @override
+  String get aboutPrivacySheetTitle => 'Privacy & Data Security';
+
+  @override
+  String get aboutPrivacySheetSubtitle =>
+      '100% offline, local memory security design';
+
+  @override
+  String get privacyPointNoNetworkTitle => 'No network access required';
+
+  @override
+  String get privacyPointNoNetworkBody =>
+      'VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.';
+
+  @override
+  String get privacyPointNoDiskLeaksTitle => 'Zero unencrypted disk leaks';
+
+  @override
+  String get privacyPointNoDiskLeaksBody =>
+      'Decryption and re-encryption happen entirely in system memory. Temporary unencrypted files are never saved to device storage.';
+
+  @override
+  String get privacyPointNoAnalyticsTitle => 'No analytics or telemetry';
+
+  @override
+  String get privacyPointNoAnalyticsBody =>
+      'There is zero crash reporting, usage tracking, or third-party SDK collecting data about you or your device.';
+
+  @override
+  String get privacyPointKeystoreTitle => 'Secrets stay in Android Keystore';
+
+  @override
+  String get privacyPointKeystoreBody =>
+      'Remembered passwords, patterns, and cached derived keys are sealed using AES-256-GCM in the hardware-backed Android Keystore.';
+
+  @override
+  String get privacyPointPosixTitle => 'POSIX Acceleration & Storage Access';
+
+  @override
+  String get privacyPointPosixBody =>
+      'Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.';
+
+  @override
+  String get privacyPointScreenClipboardTitle =>
+      'Screen & Clipboard Protection';
+
+  @override
+  String get privacyPointScreenClipboardBody =>
+      'Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.';
+
+  @override
+  String get privacyPointExternalLinksTitle => 'External links open in browser';
+
+  @override
+  String get privacyPointExternalLinksBody =>
+      'Tapping links hands off to your default browser app, which handles the request.';
+
+  @override
+  String get truncatedListingWarning =>
+      'Showing first 50,000 items — this folder has more files.';
+
+  @override
+  String thumbnailQualitySummary(int size, int quality) {
+    return '$size px · $quality% quality';
+  }
+
+  @override
+  String holdToSpeedIndicatorLabel(String speed) {
+    return '$speed× Speed';
+  }
 }

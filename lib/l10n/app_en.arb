@@ -4429,6 +4429,226 @@
   "cameraEncryptingVideoLabel": "Encrypting video…",
   "@cameraEncryptingVideoLabel": {
     "description": "Busy overlay label shown while a recorded video is being encrypted into the vault"
+  },
+  "aboutApplicationSectionHeader": "Application",
+  "@aboutApplicationSectionHeader": {
+    "description": "Section header on the about screen for the application info section"
+  },
+  "aboutTagline": "Free · Open Source · Offline Encrypted Vault",
+  "@aboutTagline": {
+    "description": "Tagline shown under the app name on the about screen"
+  },
+  "aboutVersionTitle": "Version",
+  "@aboutVersionTitle": {
+    "description": "List tile title on the about screen for the app version entry"
+  },
+  "aboutVersionSubtitle": "v{version} · Tap to copy version info for bug reports",
+  "@aboutVersionSubtitle": {
+    "description": "List tile subtitle on the about screen showing the app version",
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "aboutWhatsNewTitle": "What's New",
+  "@aboutWhatsNewTitle": {
+    "description": "List tile title on the about screen linking to release notes"
+  },
+  "aboutWhatsNewSubtitle": "See recent changes and release notes",
+  "@aboutWhatsNewSubtitle": {
+    "description": "List tile subtitle on the about screen for the release notes entry"
+  },
+  "aboutPrivacySecurityTitle": "Privacy & Security",
+  "@aboutPrivacySecurityTitle": {
+    "description": "List tile title on the about screen opening the privacy details sheet"
+  },
+  "aboutPrivacySecuritySubtitle": "Zero-trust, 100% offline, local memory security design",
+  "@aboutPrivacySecuritySubtitle": {
+    "description": "List tile subtitle on the about screen for the privacy & security entry"
+  },
+  "aboutSupportedFormatsSectionHeader": "Supported Formats",
+  "@aboutSupportedFormatsSectionHeader": {
+    "description": "Section header on the about screen listing supported container formats"
+  },
+  "aboutVeraCryptLuksTitle": "VeraCrypt & LUKS1/2",
+  "@aboutVeraCryptLuksTitle": {
+    "description": "List tile title on the about screen for the VeraCrypt/LUKS format entry"
+  },
+  "aboutVeraCryptLuksSubtitle": "Standard & hidden volumes, custom PIM, keyfiles, xts-plain64, Argon2id/i",
+  "@aboutVeraCryptLuksSubtitle": {
+    "description": "List tile subtitle on the about screen describing VeraCrypt/LUKS capabilities"
+  },
+  "aboutBitLockerTitle": "BitLocker & BitLocker To Go",
+  "@aboutBitLockerTitle": {
+    "description": "List tile title on the about screen for the BitLocker format entry"
+  },
+  "aboutBitLockerSubtitle": "User passphrases and 48-digit numerical recovery key support",
+  "@aboutBitLockerSubtitle": {
+    "description": "List tile subtitle on the about screen describing BitLocker capabilities"
+  },
+  "aboutDirectoryVaultsTitle": "Directory Vaults",
+  "@aboutDirectoryVaultsTitle": {
+    "description": "List tile title on the about screen for the directory vault formats entry"
+  },
+  "aboutDirectoryVaultsSubtitle": "Cryptomator (v7/v8 SIV_GCM), gocryptfs (v2 EME), CryFS (0.10 Merkle)",
+  "@aboutDirectoryVaultsSubtitle": {
+    "description": "List tile subtitle on the about screen describing directory vault format support"
+  },
+  "aboutVhdTitle": "Virtual Hard Disks (VHD / VHDX)",
+  "@aboutVhdTitle": {
+    "description": "List tile title on the about screen for the VHD/VHDX format entry"
+  },
+  "aboutVhdSubtitle": "BAT translation for fixed and dynamic expandable disk images",
+  "@aboutVhdSubtitle": {
+    "description": "List tile subtitle on the about screen describing VHD/VHDX format support"
+  },
+  "aboutNativeCoreEngineSectionHeader": "Native Core Engine",
+  "@aboutNativeCoreEngineSectionHeader": {
+    "description": "Section header on the about screen for the native engine details"
+  },
+  "aboutCompiledLibrariesTitle": "Compiled C++ Libraries",
+  "@aboutCompiledLibrariesTitle": {
+    "description": "Title above the list of compiled native libraries on the about screen"
+  },
+  "aboutCompiledLibrariesBody": "• mbedTLS v3.6.0 (ARMv8 Hardware Crypto & SHA-2)\n• ChaN FatFs v4.0.4 (FAT12/16/32 & exFAT)\n• Tuxera NTFS-3G & embedded mkntfs\n• e2fsprogs v1.47.4 libext2fs (ext2/ext3/ext4)\n• Dislocker Virtual I/O (BitLocker FVE / To Go)\n• VeraCrypt 1.26.29 (Twofish, Serpent, Camellia, Kuznyechik, Whirlpool, Streebog, BLAKE2s, Argon2id/i)\n• cJSON v1.7.18 (LUKS2 & Cryptomator metadata)",
+  "@aboutCompiledLibrariesBody": {
+    "description": "Bulleted list of compiled native libraries and versions used by the app"
+  },
+  "aboutCommunitySectionHeader": "Community & Open Source",
+  "@aboutCommunitySectionHeader": {
+    "description": "Section header on the about screen for community/legal links"
+  },
+  "aboutReportIssueTitle": "Report an Issue",
+  "@aboutReportIssueTitle": {
+    "description": "List tile title on the about screen linking to the GitHub issue tracker"
+  },
+  "aboutReportIssueSubtitle": "Found a bug? Submit an issue on GitHub",
+  "@aboutReportIssueSubtitle": {
+    "description": "List tile subtitle on the about screen for the report-an-issue entry"
+  },
+  "aboutContributorsTitle": "Contributors",
+  "@aboutContributorsTitle": {
+    "description": "List tile title on the about screen linking to the contributors list"
+  },
+  "aboutContributorsSubtitle": "People who helped build VaultExplorer",
+  "@aboutContributorsSubtitle": {
+    "description": "List tile subtitle on the about screen for the contributors entry"
+  },
+  "aboutLicensesTitle": "Open Source Licenses",
+  "@aboutLicensesTitle": {
+    "description": "List tile title on the about screen opening the OSS license page"
+  },
+  "aboutLicensesSubtitle": "Third-party libraries used in this app",
+  "@aboutLicensesSubtitle": {
+    "description": "List tile subtitle on the about screen for the licenses entry"
+  },
+  "aboutFooterMadeWithLove": "Made with ❤ for privacy.",
+  "@aboutFooterMadeWithLove": {
+    "description": "Footer text at the bottom of the about screen"
+  },
+  "aboutVersionCopiedMessage": "Version info copied — handy for bug reports",
+  "@aboutVersionCopiedMessage": {
+    "description": "Snackbar message shown after copying version info to the clipboard"
+  },
+  "aboutVersionClipboardText": "VaultExplorer v{version} (Android)",
+  "@aboutVersionClipboardText": {
+    "description": "Text copied to the clipboard when the user taps the version entry",
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "aboutShareText": "VaultExplorer — a free, open-source, offline vault for Android.\n\nStore passwords, notes, and files inside an encrypted container (VeraCrypt, LUKS, BitLocker, Cryptomator, Gocryptfs, CryFS).\n\n{url}",
+  "@aboutShareText": {
+    "description": "Shareable promotional text copied to the clipboard when the user taps share",
+    "placeholders": {
+      "url": { "type": "String" }
+    }
+  },
+  "aboutShareLinkCopiedMessage": "Copied a shareable link to your clipboard",
+  "@aboutShareLinkCopiedMessage": {
+    "description": "Snackbar message shown after copying the shareable app link to the clipboard"
+  },
+  "aboutPrivacySheetTitle": "Privacy & Data Security",
+  "@aboutPrivacySheetTitle": {
+    "description": "Title of the privacy details bottom sheet on the about screen"
+  },
+  "aboutPrivacySheetSubtitle": "100% offline, local memory security design",
+  "@aboutPrivacySheetSubtitle": {
+    "description": "Subtitle of the privacy details bottom sheet on the about screen"
+  },
+  "privacyPointNoNetworkTitle": "No network access required",
+  "@privacyPointNoNetworkTitle": {
+    "description": "Privacy sheet point title: no network access"
+  },
+  "privacyPointNoNetworkBody": "VaultExplorer does not request the android.permission.INTERNET permission on Android. It cannot communicate over any network.",
+  "@privacyPointNoNetworkBody": {
+    "description": "Privacy sheet point body: no network access"
+  },
+  "privacyPointNoDiskLeaksTitle": "Zero unencrypted disk leaks",
+  "@privacyPointNoDiskLeaksTitle": {
+    "description": "Privacy sheet point title: no unencrypted disk leaks"
+  },
+  "privacyPointNoDiskLeaksBody": "Decryption and re-encryption happen entirely in system memory. Temporary unencrypted files are never saved to device storage.",
+  "@privacyPointNoDiskLeaksBody": {
+    "description": "Privacy sheet point body: no unencrypted disk leaks"
+  },
+  "privacyPointNoAnalyticsTitle": "No analytics or telemetry",
+  "@privacyPointNoAnalyticsTitle": {
+    "description": "Privacy sheet point title: no analytics or telemetry"
+  },
+  "privacyPointNoAnalyticsBody": "There is zero crash reporting, usage tracking, or third-party SDK collecting data about you or your device.",
+  "@privacyPointNoAnalyticsBody": {
+    "description": "Privacy sheet point body: no analytics or telemetry"
+  },
+  "privacyPointKeystoreTitle": "Secrets stay in Android Keystore",
+  "@privacyPointKeystoreTitle": {
+    "description": "Privacy sheet point title: secrets stay in Android Keystore"
+  },
+  "privacyPointKeystoreBody": "Remembered passwords, patterns, and cached derived keys are sealed using AES-256-GCM in the hardware-backed Android Keystore.",
+  "@privacyPointKeystoreBody": {
+    "description": "Privacy sheet point body: secrets stay in Android Keystore"
+  },
+  "privacyPointPosixTitle": "POSIX Acceleration & Storage Access",
+  "@privacyPointPosixTitle": {
+    "description": "Privacy sheet point title: POSIX acceleration and storage access"
+  },
+  "privacyPointPosixBody": "Files inside container volumes are read and written locally. Bypasses SAF when direct path access is available for up to 1000x faster I/O.",
+  "@privacyPointPosixBody": {
+    "description": "Privacy sheet point body: POSIX acceleration and storage access"
+  },
+  "privacyPointScreenClipboardTitle": "Screen & Clipboard Protection",
+  "@privacyPointScreenClipboardTitle": {
+    "description": "Privacy sheet point title: screen and clipboard protection"
+  },
+  "privacyPointScreenClipboardBody": "Screenshot/task-switcher preview blocking (FLAG_SECURE) and automatic corrupt clipboard sanitization upon window focus.",
+  "@privacyPointScreenClipboardBody": {
+    "description": "Privacy sheet point body: screen and clipboard protection"
+  },
+  "privacyPointExternalLinksTitle": "External links open in browser",
+  "@privacyPointExternalLinksTitle": {
+    "description": "Privacy sheet point title: external links open in browser"
+  },
+  "privacyPointExternalLinksBody": "Tapping links hands off to your default browser app, which handles the request.",
+  "@privacyPointExternalLinksBody": {
+    "description": "Privacy sheet point body: external links open in browser"
+  },
+  "truncatedListingWarning": "Showing first 50,000 items — this folder has more files.",
+  "@truncatedListingWarning": {
+    "description": "Warning banner shown above the file list when a folder's listing was capped at the max item count"
+  },
+  "thumbnailQualitySummary": "{size} px · {quality}% quality",
+  "@thumbnailQualitySummary": {
+    "description": "Summary line showing the configured thumbnail size and JPEG compression quality",
+    "placeholders": {
+      "size": { "type": "int" },
+      "quality": { "type": "int" }
+    }
+  },
+  "holdToSpeedIndicatorLabel": "{speed}× Speed",
+  "@holdToSpeedIndicatorLabel": {
+    "description": "On-screen indicator shown while holding down to fast-forward playback at a multiplier",
+    "placeholders": {
+      "speed": { "type": "String" }
+    }
   }
 }
 

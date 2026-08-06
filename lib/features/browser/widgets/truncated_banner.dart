@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// Warning strip shown above the file list/grid when a folder's listing was
 /// capped (see [FileBrowserScreen._isListingTruncated]).
@@ -18,7 +19,7 @@ class TruncatedBanner extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            'Showing first 50,000 items — this folder has more files.',
+            context.l10n.truncatedListingWarning,
             style: textTheme.bodySmall?.copyWith(
               color: cs.onTertiaryContainer,
               fontWeight: FontWeight.w600,

@@ -878,8 +878,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      "Folder vaults don't support keyfiles, PIM, hidden "
-                      'volumes, or VeraCrypt/LUKS cipher choices.',
+                      context.l10n.folderVaultLimitationsNote,
                       style: textTheme.bodySmall
                           ?.copyWith(color: cs.onSurfaceVariant, height: 1.3),
                     ),

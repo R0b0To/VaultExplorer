@@ -4,22 +4,7 @@ analyzer:
   exclude:
     - vaultexplorer-i18n-wip/**
     - lib/l10n/generated/**
-
-# Incremental additions on top of the flutter_lints defaults -- added a few
-# rules at a time rather than all at once, per docs/tech-debt.md TD-10, so
-# each addition can be triaged on its own rather than landing as one large,
-# unrelated-looking diff. Both rules below are info/warning severity, not
-# error severity, so they surface analyzer signal without failing a plain
-# `flutter analyze` (see .github/workflows/test.yml).
 linter:
   rules:
-    # No existing violations in lib/ as of this addition (verified by
-    # search) -- purely preventative.
     avoid_print: true
-    # Directly relevant to docs/tech-debt.md TD-9: a fire-and-forget async
-    # call (e.g. a widget's dispose() calling into an async cleanup method)
-    # should be wrapped in `unawaited()` deliberately, not left as a bare
-    # statement that discards its Future by accident. May surface existing
-    # instances to triage -- that's the intended, non-blocking value of
-    # adding this now rather than leaving them invisible.
     unawaited_futures: true

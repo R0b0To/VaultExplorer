@@ -155,6 +155,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         contentUriString: _contentUriFor(file),
         autoPlay: _autoPlay,
         playbackSpeed: _playbackSpeed,
+        looping: _videoPlaybackMode == VideoPlaybackMode.loop,
       ));
     } else {
       _playbackManager.pauseActive();
@@ -267,28 +268,71 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
     if (offset <= 10.0) return 0;
 
-    final viewportCenter = offset + (viewportHeight / 2.0);
-
-    int bestIndex = 0;
-    double minDistance = double.infinity;
-
-    double currentY = 0.0;
+    double totalListHeight = 0.0;
+    final heights = <double>[];
     for (int i = 0; i < playlist.length; i++) {
-      final itemHeight = _getItemHeight(i, viewportWidth, viewportHeight);
+      final h = _getItemHeight(i, viewportWidth, viewportHeight);
+      heights.add(h);
+      totalListHeight += h;
+    }
+
+    final maxScrollExtent = math.max(0.0, totalListHeight - viewportHeight);
+    if (maxScrollExtent > 0 && offset >= maxScrollExtent - 10.0) {
+      return playlist.length - 1;
+    }
+
+    final viewportCenter = offset + (viewportHeight / 2.0);
+    final currentIndex = _playlistController.currentIndex;
+
+    double currentItemDistance = double.infinity;
+    double tempY = 0.0;
+    for (int i = 0; i < playlist.length; i++) {
+      final itemHeight = heights[i];
+      if (i == currentIndex) {
+        final itemCenter = tempY + (itemHeight / 2.0);
+        final visibleHeight = math.max(
+          0.0,
+          math.min(offset + viewportHeight, tempY + itemHeight) - math.max(offset, tempY),
+        );
+        if (visibleHeight > 0) {
+          currentItemDistance = (itemCenter - viewportCenter).abs();
+        }
+        break;
+      }
+      tempY += itemHeight;
+    }
+
+    double minDistance = double.infinity;
+    int minDistanceIndex = currentIndex;
+    double currentY = 0.0;
+
+    for (int i = 0; i < playlist.length; i++) {
+      final itemHeight = heights[i];
       final itemBottom = currentY + itemHeight;
 
-      final visibleHeight = math.max(0.0, math.min(offset + viewportHeight, itemBottom) - math.max(offset, currentY));
+      final visibleHeight = math.max(
+        0.0,
+        math.min(offset + viewportHeight, itemBottom) - math.max(offset, currentY),
+      );
       if (visibleHeight > 0) {
         final itemCenter = currentY + (itemHeight / 2.0);
         final distance = (itemCenter - viewportCenter).abs();
         if (distance < minDistance) {
           minDistance = distance;
-          bestIndex = i;
+          minDistanceIndex = i;
         }
       }
       currentY = itemBottom;
     }
-    return bestIndex;
+
+    if (minDistanceIndex != currentIndex) {
+      if (currentItemDistance == double.infinity || (currentItemDistance - minDistance) > 40.0) {
+        return minDistanceIndex;
+      } else {
+        return currentIndex;
+      }
+    }
+    return currentIndex;
   }
 
   void _scrollToCurrentIndex({bool animate = false}) {
@@ -377,14 +421,24 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final controller = _playbackManager.activeController;
     if (controller == null || controller.value.hasError) return;
     _updateWakelock(controller.value.isPlaying);
-    if (_isAutoAdvancing) return;
+
     final isInitialized = controller.value.isInitialized;
     final position = controller.value.position;
     final duration = controller.value.duration;
-    if (isInitialized &&
-        _videoPlaybackMode == VideoPlaybackMode.playAndAdvance &&
-        duration > Duration.zero &&
-        position >= duration) {
+
+    if (!isInitialized || duration <= Duration.zero) return;
+
+    if (_videoPlaybackMode == VideoPlaybackMode.loop) {
+      if (position >= duration || (!controller.value.isPlaying && position >= duration - const Duration(milliseconds: 200))) {
+        controller.seekTo(Duration.zero);
+        controller.play();
+        return;
+      }
+    }
+
+    if (_isAutoAdvancing) return;
+
+    if (_videoPlaybackMode == VideoPlaybackMode.playAndAdvance && position >= duration) {
       _isAutoAdvancing = true;
       try {
         controller.removeListener(_onControllerTickUpdate);
@@ -872,7 +926,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _cancelSlideshowTimer();
       }
     });
-    _playbackManager.activeController?.setLooping(mode == VideoPlaybackMode.loop);
+    final controller = _playbackManager.activeController;
+    controller?.setLooping(mode == VideoPlaybackMode.loop);
   }
 
   void _showAdvancedSettings(BuildContext context, bool isImage) {
@@ -1120,6 +1175,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 _isProgrammaticScrolling = true;
                 _listScrollController.jumpTo(targetOffset);
                 _isProgrammaticScrolling = false;
+                Future.delayed(const Duration(milliseconds: 100), () {
+                  if (mounted) _isOrientationChanging = false;
+                });
+              } else if (mounted) {
                 _isOrientationChanging = false;
               }
             });

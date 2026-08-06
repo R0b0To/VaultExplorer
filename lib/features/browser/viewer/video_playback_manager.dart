@@ -28,6 +28,7 @@ class VideoPlaybackManager {
     required String contentUriString,
     required bool autoPlay,
     required double playbackSpeed,
+    bool looping = false,
   }) async {
     final token = ++_activationToken;
     final previousFuture = _currentActivationFuture;
@@ -47,6 +48,7 @@ class VideoPlaybackManager {
         final ctrl = _controllers[fileName]!;
         if (!ctrl.isDisposed && !ctrl.value.hasError) {
           await ctrl.setPlaybackSpeed(playbackSpeed);
+          await ctrl.setLooping(looping);
           if (autoPlay) await ctrl.play();
           return;
         }
@@ -71,9 +73,12 @@ class VideoPlaybackManager {
             initialSpeed: playbackSpeed,
           );
           _controllers[fileName] = controller;
-          unawaited(controller.initialize());
+          unawaited(controller.initialize().then((_) {
+            controller.setLooping(looping);
+          }));
         } else {
           await controller.setPlaybackSpeed(playbackSpeed);
+          await controller.setLooping(looping);
           if (autoPlay) await controller.play();
         }
       } else {
@@ -83,7 +88,9 @@ class VideoPlaybackManager {
           initialSpeed: playbackSpeed,
         );
         _controllers[fileName] = controller;
-        unawaited(controller.initialize());
+        unawaited(controller.initialize().then((_) {
+          controller.setLooping(looping);
+        }));
       }
       activeControllerNotifier.value = controller;
       currentFileNotifier.value = fileName;

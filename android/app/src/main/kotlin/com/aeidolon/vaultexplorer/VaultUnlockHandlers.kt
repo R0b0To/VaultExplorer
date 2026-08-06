@@ -21,8 +21,7 @@ import kotlin.concurrent.withLock
  * that part differs enough between the two handlers -- different native
  * engine calls, different pre-checks, different cleanup on failure -- that
  * folding it into this same abstraction would trade real, testable
- * behavior for a smaller diff. See TD-17 in docs/tech-debt.md for why only
- * this slice was extracted, not the full handler bodies.
+ * behavior for a smaller diff.
  */
 data class UnlockArgs(
     val password: String,

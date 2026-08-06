@@ -3,6 +3,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// Manages item-selection mode.  Mix into any [State] that needs a multi-select
 /// UI — the mixin owns [isSelectionMode] and [selectedItems] so the host class
@@ -109,33 +110,26 @@ mixin SelectionMixin<T extends StatefulWidget> on State<T> {
     final fc = selectedFolderCount;
     final fileSize = selectedFileBytes;
     final total = selectedTotalBytes;
-
-    // ── file part ─────────────────────────────────────────────────────────
     final fileCount = selectedFileCount;
+    final l10n = context.l10n;
     final filePart = fileCount > 0
-        ? '$fileCount ${fileCount == 1 ? 'file' : 'files'}'
+        ? '${l10n.statsFileCount(fileCount)}'
               '${fileSize > 0 ? ' · ${formatBytes(fileSize)}' : ''}'
         : '';
-
     if (fc == 0) return filePart;
-
-    // ── folder part ───────────────────────────────────────────────────────
-    final folderLabel = '$fc ${fc == 1 ? 'folder' : 'folders'}';
-
+    final folderLabel = l10n.statsFolderCount(fc);
     final String folderSizePart;
     if (hasPendingFolderSizes) {
-      folderSizePart = '(calculating…)';
+      folderSizePart = '(${l10n.sizeCalculatingLabel})';
     } else {
       final resolvedBytes = total - fileSize;
       folderSizePart = resolvedBytes > 0
           ? '· ${formatBytes(resolvedBytes)}'
           : '';
     }
-
     final folderPart = '$folderLabel $folderSizePart'.trim();
-
     if (filePart.isEmpty) return folderPart;
-    return '$filePart + $folderPart';
+    return l10n.selectionSummaryCombined(filePart, folderPart);
   }
 
   // ── Async folder-size resolution ───────────────────────────────────────────

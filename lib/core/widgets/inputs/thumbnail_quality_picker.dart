@@ -34,10 +34,10 @@ class ThumbnailQualityTile extends StatelessWidget {
         label,
         style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
       ),
-      subtitle: Padding(
+subtitle: Padding(
         padding: const EdgeInsets.only(top: 4),
         child: Text(
-          '${value.size} px · ${value.quality}% quality',
+          context.l10n.thumbnailQualitySummary(value.size, value.quality),
           style: textTheme.bodySmall?.copyWith(
             color: cs.onSurfaceVariant,
             height: 1.25,

@@ -6061,6 +6061,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Drive usable capacity: {mb} MB. Must not exceed this.'**
   String driveUsableCapacity(int mb);
+
+  /// Container unlock method label
+  ///
+  /// In en, this message translates to:
+  /// **'Manual Password'**
+  String get unlockMethodManualPassword;
+
+  /// Container unlock method label
+  ///
+  /// In en, this message translates to:
+  /// **'Remember Password'**
+  String get unlockMethodRememberPassword;
+
+  /// Container unlock method label
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric Unlock'**
+  String get unlockMethodBiometrics;
+
+  /// Container unlock method label
+  ///
+  /// In en, this message translates to:
+  /// **'Pattern Unlock'**
+  String get unlockMethodPattern;
+
+  /// Subtitle explaining manual password unlock method
+  ///
+  /// In en, this message translates to:
+  /// **'Type the password every time'**
+  String get unlockMethodSubtitlePassword;
+
+  /// Subtitle explaining stored password unlock method
+  ///
+  /// In en, this message translates to:
+  /// **'Stored securely in Android Keystore'**
+  String get unlockMethodSubtitleRememberPassword;
+
+  /// Subtitle explaining biometric unlock method
+  ///
+  /// In en, this message translates to:
+  /// **'Use fingerprint or face to unlock'**
+  String get unlockMethodSubtitleBiometrics;
+
+  /// Subtitle explaining pattern unlock method
+  ///
+  /// In en, this message translates to:
+  /// **'Draw a pattern to unlock'**
+  String get unlockMethodSubtitlePattern;
+
+  /// Combines file selection and folder selection summaries
+  ///
+  /// In en, this message translates to:
+  /// **'{filePart} + {folderPart}'**
+  String selectionSummaryCombined(String filePart, String folderPart);
+
+  /// Error description when video player initialization fails
+  ///
+  /// In en, this message translates to:
+  /// **'Video decoder unavailable — hardware codec contention'**
+  String get videoDecoderUnavailableError;
+
+  /// Fallback error description for video playback failure
+  ///
+  /// In en, this message translates to:
+  /// **'Media stream initialization failed'**
+  String get mediaStreamInitFailedError;
 }
 
 class _AppLocalizationsDelegate

@@ -518,7 +518,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                         OptionPickerTile<ContainerUnlockMethod>(
                           label: context.l10n.unlockCredentialsLabel,
                           value: _unlockMethod,
-                          subtitle: _unlockMethod.subtitle,
+                          subtitle: _unlockMethod.getLocalizedSubtitle(context.l10n),
                           options: ContainerUnlockMethod.values
                               .where((m) =>
                                   m != ContainerUnlockMethod.biometrics ||
@@ -531,9 +531,9 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                                 return SelectOption(
                                   value: m,
                                   label: isUnavailableBio
-                                      ? '${m.label} ${context.l10n.unavailableSuffixLabel}'
-                                      : m.label,
-                                  subtitle: m.subtitle,
+                                      ? '${m.getLocalizedLabel(context.l10n)} ${context.l10n.unavailableSuffixLabel}'
+                                      : m.getLocalizedLabel(context.l10n),
+                                  subtitle: m.getLocalizedSubtitle(context.l10n),
                                 );
                               })
                               .toList(),

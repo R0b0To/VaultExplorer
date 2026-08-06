@@ -595,7 +595,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             options: ContainerSortMode.values.map((mode) {
                               return SelectOption(
                                 value: mode,
-                                label: mode.label,
+                                label: mode.getLocalizedLabel(context.l10n),
                               );
                             }).toList(),
                             onChanged: (v) {

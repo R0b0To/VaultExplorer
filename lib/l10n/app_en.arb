@@ -4711,6 +4711,54 @@
     "placeholders": {
       "mb": { "type": "int" }
     }
+  },
+  "unlockMethodManualPassword": "Manual Password",
+  "@unlockMethodManualPassword": {
+    "description": "Container unlock method label"
+  },
+  "unlockMethodRememberPassword": "Remember Password",
+  "@unlockMethodRememberPassword": {
+    "description": "Container unlock method label"
+  },
+  "unlockMethodBiometrics": "Biometric Unlock",
+  "@unlockMethodBiometrics": {
+    "description": "Container unlock method label"
+  },
+  "unlockMethodPattern": "Pattern Unlock",
+  "@unlockMethodPattern": {
+    "description": "Container unlock method label"
+  },
+  "unlockMethodSubtitlePassword": "Type the password every time",
+  "@unlockMethodSubtitlePassword": {
+    "description": "Subtitle explaining manual password unlock method"
+  },
+  "unlockMethodSubtitleRememberPassword": "Stored securely in Android Keystore",
+  "@unlockMethodSubtitleRememberPassword": {
+    "description": "Subtitle explaining stored password unlock method"
+  },
+  "unlockMethodSubtitleBiometrics": "Use fingerprint or face to unlock",
+  "@unlockMethodSubtitleBiometrics": {
+    "description": "Subtitle explaining biometric unlock method"
+  },
+  "unlockMethodSubtitlePattern": "Draw a pattern to unlock",
+  "@unlockMethodSubtitlePattern": {
+    "description": "Subtitle explaining pattern unlock method"
+  },
+  "selectionSummaryCombined": "{filePart} + {folderPart}",
+  "@selectionSummaryCombined": {
+    "description": "Combines file selection and folder selection summaries",
+    "placeholders": {
+      "filePart": { "type": "String" },
+      "folderPart": { "type": "String" }
+    }
+  },
+  "videoDecoderUnavailableError": "Video decoder unavailable — hardware codec contention",
+  "@videoDecoderUnavailableError": {
+    "description": "Error description when video player initialization fails"
+  },
+  "mediaStreamInitFailedError": "Media stream initialization failed",
+  "@mediaStreamInitFailedError": {
+    "description": "Fallback error description for video playback failure"
   }
 }
 

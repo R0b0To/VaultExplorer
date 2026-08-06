@@ -208,7 +208,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
             setState(() {
               _playerError = controller.value.errorDescription.isNotEmpty
                   ? controller.value.errorDescription
-                  : 'Media stream initialization failed';
+                  : context.l10n.mediaStreamInitFailedError;
             });
             widget.onError?.call();
           }

@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
-import 'package:vaultexplorer/data/services/container_repository.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/lock/widgets/pattern_lock_view.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 import 'unlock_biometric_source.dart';
 
@@ -89,7 +89,7 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
       if (!canCheck || !isSupported) {
         if (mounted) {
           setState(() {
-            unlockError = 'Biometrics not available on this device';
+            unlockError = context.l10n.biometricNotAvailable;
             showPasswordFallback = true;
           });
         }
@@ -152,7 +152,7 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
       }
       if (mounted) {
         setState(() {
-          unlockError = 'Biometric error: ${e.code.name}';
+          unlockError = context.l10n.biometricErrorWithCode(e.code.name);
           showPasswordFallback = true;
         });
       }
@@ -164,7 +164,7 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
       }
       if (mounted) {
         setState(() {
-          unlockError = 'Biometric error: ${e.message}';
+          unlockError = context.l10n.biometricErrorWithCode(e.message ?? '');
           showPasswordFallback = true;
         });
       }
@@ -177,18 +177,17 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
     final source = unlockSource;
     if (!source.isReadyForPattern) return;
 
-    if (storedPatternHash == null) {
+if (storedPatternHash == null) {
       setState(() {
-        unlockError = 'No pattern configured. Please enter password manually.';
+        unlockError = context.l10n.noPatternConfiguredMessage;
         showPasswordFallback = true;
       });
       return;
     }
-
     final lockout = await _PatternUnlockThrottle.currentLockout(source.containerUri);
     if (lockout != null) {
       setState(() {
-        unlockError = 'Too many failed attempts. Try again in ${lockout.inSeconds} second(s).';
+        unlockError = context.l10n.tooManyFailedAttempts(lockout.inSeconds);
         patternError = true;
       });
       Future.delayed(const Duration(milliseconds: 800), () {
@@ -248,7 +247,7 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
       setState(() {
         patternError = true;
         if (newLockout != null) {
-          unlockError = 'Too many failed attempts. Locked for ${newLockout.inSeconds}s.';
+          unlockError = context.l10n.patternLockedForSeconds(newLockout.inSeconds);
         }
       });
       Future.delayed(const Duration(milliseconds: 800), () {

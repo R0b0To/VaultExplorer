@@ -338,18 +338,18 @@ class MediaViewerTopBar extends StatelessWidget {
                 onTransitionEffectChanged(effect);
               },
               leadingIcon: isSelected
-                  ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
-                  : SizedBox(
-                      width: 18,
-                      child: Icon(
-                        effect.icon,
-                        size: 16,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.7),
-                      ),
-                    ),
-              child: Text(effect.label),
-            );
-          }).toList(),
+                                ? Icon(Icons.check_rounded, size: 18, color: cs.primary)
+                                : SizedBox(
+                                    width: 18,
+                                    child: Icon(
+                                      effect.icon,
+                                      size: 16,
+                                      color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                            child: Text(effect.getLocalizedLabel(context.l10n)),
+                          );
+                        }).toList(),
           child: Text(context.l10n.playlistTransitionMenu),
         ),
         const PopupMenuDivider(),

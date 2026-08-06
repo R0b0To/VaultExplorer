@@ -76,8 +76,18 @@ class FileBrowserScreen extends StatefulWidget {
 
 class _FileBrowserScreenState extends State<FileBrowserScreen>
     with SelectionMixin<FileBrowserScreen>, SortMixin<FileBrowserScreen> {
-  final List<PathSegment> _pathStack = [const PathSegment('Root', '')];
+  late final List<PathSegment> _pathStack;
+  bool _pathStackInitialized = false;
   List<RawEntry> _currentItems = [];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_pathStackInitialized) {
+      _pathStack = [PathSegment(context.l10n.rootFolderLabel, '')];
+      _pathStackInitialized = true;
+    }
+  }
   bool _isLoading = false;
   int _freeSpace = 0;
   bool _isListingTruncated = false;

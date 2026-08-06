@@ -3574,4 +3574,42 @@ class AppLocalizationsEn extends AppLocalizations {
   String driveUsableCapacity(int mb) {
     return 'Drive usable capacity: $mb MB. Must not exceed this.';
   }
+
+  @override
+  String get unlockMethodManualPassword => 'Manual Password';
+
+  @override
+  String get unlockMethodRememberPassword => 'Remember Password';
+
+  @override
+  String get unlockMethodBiometrics => 'Biometric Unlock';
+
+  @override
+  String get unlockMethodPattern => 'Pattern Unlock';
+
+  @override
+  String get unlockMethodSubtitlePassword => 'Type the password every time';
+
+  @override
+  String get unlockMethodSubtitleRememberPassword =>
+      'Stored securely in Android Keystore';
+
+  @override
+  String get unlockMethodSubtitleBiometrics =>
+      'Use fingerprint or face to unlock';
+
+  @override
+  String get unlockMethodSubtitlePattern => 'Draw a pattern to unlock';
+
+  @override
+  String selectionSummaryCombined(String filePart, String folderPart) {
+    return '$filePart + $folderPart';
+  }
+
+  @override
+  String get videoDecoderUnavailableError =>
+      'Video decoder unavailable — hardware codec contention';
+
+  @override
+  String get mediaStreamInitFailedError => 'Media stream initialization failed';
 }

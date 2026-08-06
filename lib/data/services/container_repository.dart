@@ -7,6 +7,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 void _logSwallowed(String method, Object error) {
   debugPrint('[ContainerRepository] $method failed: $error');
@@ -53,6 +54,18 @@ enum ContainerUnlockMethod {
           'Stored securely in Android Keystore',
         ContainerUnlockMethod.biometrics => 'Use fingerprint or face to unlock',
         ContainerUnlockMethod.pattern => 'Draw a pattern to unlock',
+      };
+  String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
+        ContainerUnlockMethod.password => l10n.unlockMethodManualPassword,
+        ContainerUnlockMethod.rememberPassword => l10n.unlockMethodRememberPassword,
+        ContainerUnlockMethod.biometrics => l10n.unlockMethodBiometrics,
+        ContainerUnlockMethod.pattern => l10n.unlockMethodPattern,
+      };
+  String getLocalizedSubtitle(AppLocalizations l10n) => switch (this) {
+        ContainerUnlockMethod.password => l10n.unlockMethodSubtitlePassword,
+        ContainerUnlockMethod.rememberPassword => l10n.unlockMethodSubtitleRememberPassword,
+        ContainerUnlockMethod.biometrics => l10n.unlockMethodSubtitleBiometrics,
+        ContainerUnlockMethod.pattern => l10n.unlockMethodSubtitlePattern,
       };
   IconData get icon => switch (this) {
         ContainerUnlockMethod.password => Icons.key_rounded,

@@ -966,17 +966,17 @@ class _UnlockSheetState extends State<UnlockSheet>
                                     Text(
                                       _selectedUri != null
                                           ? (_isLuks
-                                              ? 'LUKS Container'
+                                              ? context.l10n.formatContainerLabel('LUKS') 
                                               : _isCryptomator
-                                                  ? 'Cryptomator Vault'
+                                                  ? context.l10n.formatVaultLabel('Cryptomator')
                                                   : _isGocryptfs
-                                                      ? 'Gocryptfs Vault'
+                                                      ? context.l10n.formatVaultLabel('Gocryptfs')
                                                       : _isCryfs
-                                                          ? 'CryFS Vault'
+                                                          ? context.l10n.formatVaultLabel('CryFS')
                                                           : _isBitlocker
-                                                              ? 'BitLocker Drive'
+                                                              ? context.l10n.formatContainerLabel('BitLocker')
                                                               : _containerFormat == 'veracrypt'
-                                                                  ? 'VeraCrypt Container'
+                                                                  ? context.l10n.formatContainerLabel('VeraCrypt')
                                                                   : context.l10n.encryptedContainerLabel)
                                           : (_isFolderVault
                                               ? 'Cryptomator | Gocryptfs | CryFS'

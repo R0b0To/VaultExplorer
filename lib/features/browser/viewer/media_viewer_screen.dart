@@ -165,7 +165,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
 
-  Future<void> _loadConfig() async {
+Future<void> _loadConfig() async {
     final config = await FileManagerToolbarService.instance.load();
     final appSettings = await AppSettingsService.loadSettings();
     if (mounted) {
@@ -177,9 +177,41 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _transitionEffect = appSettings.playlistTransitionEffect;
       });
       if (config.autoStartPlaylistMode && !_playlistController.isPlaylistMode) {
+        final targetFile = _playlistController.currentFile;
         await _playlistController.enablePlaylist('Current Folder Only');
+        if (mounted) {
+          final newIndex = _playlistController.playlist.indexOf(targetFile);
+          if (newIndex != -1) {
+            _playlistController.updateIndex(newIndex);
+          }
+          _onPlaylistChanged();
+        }
       }
     }
+  }
+
+    void _onPlaylistChanged() {
+    _startHideTimer();
+    if (!_playlistController.isPlaylistMode) {
+      if (_isCarouselVisible) _toggleCarousel();
+      if (_autoAdvance) {
+        _updatePlaybackMode(VideoPlaybackMode.playOnce);
+      }
+    }
+    final oldController = _pageController;
+    _pageController =
+        PageController(initialPage: _playlistController.currentIndex);
+    if (oldController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        oldController.dispose();
+      });
+    } else {
+      oldController.dispose();
+    }
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onScrollEnd();
+    });
   }
 
   GlobalKey _getMediaKey(String fileName) {
@@ -1032,26 +1064,7 @@ void _onScrollEnd() {
                   Navigator.pop(context);
                 },
                 onDeletePressed: _deleteCurrentFile,
-                onPlaylistChanged: () {
-                  _startHideTimer();
-                  if (!_playlistController.isPlaylistMode) {
-                    if (_isCarouselVisible) _toggleCarousel();
-                    if (_autoAdvance) {
-                      _updatePlaybackMode(VideoPlaybackMode.playOnce);
-                    }
-                  }
-                  if (_pageController.hasClients) {
-                    final oldController = _pageController;
-                    _pageController = PageController(initialPage: _playlistController.currentIndex);
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      oldController.dispose();
-                    });
-                  }
-                  setState(() {});
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) _onScrollEnd();
-                  });
-                },
+                onPlaylistChanged:_onPlaylistChanged,
               ),
             ),
           ),

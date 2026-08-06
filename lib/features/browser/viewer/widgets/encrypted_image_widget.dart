@@ -1,11 +1,12 @@
-// lib/screens/browser/viewer/widgets/encrypted_image_widget.dart
 import 'dart:async';
-
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/full_res_image_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'native_avif_widget.dart';
@@ -50,7 +51,6 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       _bytes = cachedFullRes;
       _isFullResLoaded = true;
     } else {
-      _bytes = _thumbnailBytes;
       _loadImage();
     }
   }
@@ -71,17 +71,16 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
         _isFullResLoaded = true;
       } else {
         _isFullResLoaded = false;
-        _bytes = _thumbnailBytes;
+        _bytes = null;
         _loadImage();
       }
     } else if (!_isFullResLoaded && _currentlyLoadingFile == null) {
       _loadImage();
     } else if (!_isFullResLoaded &&
         widget.prefetchedBytes != null &&
-        _bytes == null) {
+        _thumbnailBytes == null) {
       setState(() {
         _thumbnailBytes = widget.prefetchedBytes;
-        _bytes = widget.prefetchedBytes;
       });
     }
   }
@@ -99,6 +98,14 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     if (_isFullResLoaded && _currentlyLoadingFile == targetFile) return;
     if (_currentlyLoadingFile == targetFile) return;
 
+    if (_thumbnailBytes == null) {
+      final memThumb =
+          ThumbnailCacheService.getFromMemory(widget.container, targetFile);
+      if (memThumb != null) {
+        _thumbnailBytes = memThumb;
+      }
+    }
+
     final cachedFullRes = FullResImageCache.get(widget.container, targetFile);
     if (cachedFullRes != null) {
       if (mounted) {
@@ -115,31 +122,26 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     final completer = Completer<void>();
     _limiterCompleter = completer;
 
+    if (_thumbnailBytes == null) {
+      _loadThumbnailFromCache(targetFile);
+    }
+
     try {
-      // Gated through FullResImageCache's shared LIFO limiter + in-flight
-      // de-dup (see full_res_image_cache.dart) instead of calling
-      // vaultExplorerApi directly: this caps how many full-resolution
-      // reads can ever be in native flight at once from the media viewer,
-      // and lets this specific request drop out of the queue entirely
-      // (via the completer above) if the user swipes past this page
-      // before it's granted a turn.
       final data = await FullResImageCache.fetch(
         widget.container,
         targetFile,
         completer,
         isStillWanted: () => mounted && _currentlyLoadingFile == targetFile,
       );
-
       if (_limiterCompleter == completer) _limiterCompleter = null;
       if (!mounted || _currentlyLoadingFile != targetFile) return;
-
       if (data == null) {
-        if (_bytes == null) {
-          setState(() => _error = context.l10n.encryptedImageLoadFailedMessage);
+        if (_bytes == null && _thumbnailBytes == null) {
+          setState(
+              () => _error = context.l10n.encryptedImageLoadFailedMessage);
         }
         return;
       }
-
       setState(() {
         _error = null;
         _bytes = data;
@@ -147,8 +149,12 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       });
     } catch (e) {
       if (_limiterCompleter == completer) _limiterCompleter = null;
-      if (mounted && _currentlyLoadingFile == targetFile && _bytes == null) {
-        setState(() => _error = context.l10n.encryptedImageLoadFailedWithReasonMessage('$e'));
+      if (mounted &&
+          _currentlyLoadingFile == targetFile &&
+          _bytes == null &&
+          _thumbnailBytes == null) {
+        setState(() => _error =
+            context.l10n.encryptedImageLoadFailedWithReasonMessage('$e'));
       }
     } finally {
       if (!_isFullResLoaded && _currentlyLoadingFile == targetFile) {
@@ -157,16 +163,34 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     }
   }
 
+  Future<void> _loadThumbnailFromCache(String targetFile) async {
+    try {
+      final thumb = await ThumbnailCacheService.get(
+        container: widget.container,
+        filePath: targetFile,
+        mode: ThumbnailCacheMode.appCache,
+        quality: ThumbnailQuality.defaultQuality,
+      );
+      if (thumb != null &&
+          mounted &&
+          _currentlyLoadingFile == targetFile &&
+          !_isFullResLoaded) {
+        setState(() {
+          _thumbnailBytes = thumb;
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _cancelPendingLoad();
     super.dispose();
   }
 
- @override
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     if (_error != null) {
       return Center(
         child: Padding(
@@ -200,7 +224,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       );
     }
 
-    if (_bytes == null) {
+    if (_bytes == null && _thumbnailBytes == null) {
       return Center(
         child: CircularProgressIndicator(
           strokeWidth: 2.5,
@@ -209,7 +233,6 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       );
     }
 
-    // ── Check if the file is AVIF ──
     final isAvif = widget.fileName.toLowerCase().endsWith('.avif');
     if (isAvif) {
       return Stack(
@@ -223,7 +246,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
               height: double.infinity,
               errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
-          if (_isFullResLoaded)
+          if (_isFullResLoaded && _bytes != null)
             NativeAvifWidget(
               avifBytes: _bytes!,
               fit: widget.fit,
@@ -232,31 +255,46 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
       );
     }
 
-    // ── Standard Image rendering for JPG, PNG, WEBP, GIF ──
     final mq = MediaQuery.of(context);
     final dpr = mq.devicePixelRatio;
     final headroom = MediaViewerConstants.fullResDecodeZoomHeadroom;
+    final capWidth =
+        (mq.size.width * dpr * headroom).round().clamp(1, 1 << 20);
+    final capHeight =
+        (mq.size.height * dpr * headroom).round().clamp(1, 1 << 20);
 
-    final capWidth = (mq.size.width * dpr * headroom).round().clamp(1, 1 << 20);
-    final capHeight = (mq.size.height * dpr * headroom).round().clamp(1, 1 << 20);
-
-    return Image(
-      image: ResizeImage(
-        MemoryImage(_bytes!),
-        width: capWidth,
-        height: capHeight,
-        policy: ResizeImagePolicy.fit,
-      ),
-      fit: widget.fit,
-      width: double.infinity,
-      height: double.infinity,
-      gaplessPlayback: true,
-      errorBuilder: (context, error, stackTrace) => Center(
-        child: Text(
-          context.l10n.invalidOrCorruptedImageMessage,
-          style: TextStyle(color: cs.error),
-        ),
-      ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (_thumbnailBytes != null)
+          Image.memory(
+            _thumbnailBytes!,
+            fit: widget.fit,
+            width: double.infinity,
+            height: double.infinity,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+          ),
+        if (_isFullResLoaded && _bytes != null)
+          Image(
+            image: ResizeImage(
+              MemoryImage(_bytes!),
+              width: capWidth,
+              height: capHeight,
+              policy: ResizeImagePolicy.fit,
+            ),
+            fit: widget.fit,
+            width: double.infinity,
+            height: double.infinity,
+            gaplessPlayback: true,
+            errorBuilder: (context, error, stackTrace) => Center(
+              child: Text(
+                context.l10n.invalidOrCorruptedImageMessage,
+                style: TextStyle(color: cs.error),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

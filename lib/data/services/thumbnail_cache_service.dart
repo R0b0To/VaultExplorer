@@ -222,14 +222,27 @@ class ThumbnailCacheService {
   /// quality setting in scope. Callers that fetch/store real thumbnails at a
   /// specific quality should always pass it explicitly so they read back
   /// exactly what they wrote.
-  static Uint8List? getFromMemory(
+static Uint8List? getFromMemory(
     MountedContainer container,
     String filePath, [
     ThumbnailQuality quality = ThumbnailQuality.defaultQuality,
   ]) {
     final stored = _memoryCache[_memKey(container, filePath, quality)];
-    if (stored == null) return null;
-    return _unpackSize(stored).$1;
+    if (stored != null) return _unpackSize(stored).$1;
+
+    // Fallback search across common thumbnail qualities in RAM
+    for (final q in [
+      ThumbnailQuality.defaultQuality,
+      const ThumbnailQuality(quality: 80, size: 180),
+      const ThumbnailQuality(quality: 90, size: 280),
+      const ThumbnailQuality(quality: 40, size: 140),
+      const ThumbnailQuality(quality: 98, size: 360),
+    ]) {
+      if (q == quality) continue;
+      final alt = _memoryCache[_memKey(container, filePath, q)];
+      if (alt != null) return _unpackSize(alt).$1;
+    }
+    return null;
   }
 
   /// Same lookup as [getFromMemory], but also returns the width/height that

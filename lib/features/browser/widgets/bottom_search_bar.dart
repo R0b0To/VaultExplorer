@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// Search field pinned above the on-screen keyboard, docked at the bottom
 /// of the screen.
@@ -64,7 +65,7 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
                 // Back arrow (close search) — left side
                 IconButton(
                   icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                  tooltip: 'Close search',
+                  tooltip: context.l10n.closeSearchTooltip,
                   visualDensity: VisualDensity.compact,
                   onPressed: widget.onClose,
                 ),
@@ -77,7 +78,7 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
                     textInputAction: TextInputAction.search,
                     style: const TextStyle(fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: 'Search in this folder…',
+                      hintText: context.l10n.searchInThisFolderHint,
                       hintStyle: TextStyle(
                         color: cs.onSurfaceVariant,
                         fontSize: 14,
@@ -97,7 +98,7 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
                     if (value.text.isEmpty) return const SizedBox.shrink();
                     return IconButton(
                       icon: const Icon(Icons.clear_rounded, size: 18),
-                      tooltip: 'Clear',
+                      tooltip: context.l10n.clearTooltip,
                       visualDensity: VisualDensity.compact,
                       onPressed: () {
                         _ctrl.clear();

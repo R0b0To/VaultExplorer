@@ -2891,4 +2891,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get layoutModeGalleryGrid => 'Gallery Grid';
+
+  @override
+  String get readOnlyCantDeleteTooltip => 'Read-only — can\'t delete';
+
+  @override
+  String get readOnlyCantMoveTooltip => 'Read-only — can\'t move';
+
+  @override
+  String get readOnlyCantRenameTooltip => 'Read-only — can\'t rename';
+
+  @override
+  String sizeCalculatingWithBytesLabel(String bytes) {
+    return '$bytes (calculating…)';
+  }
+
+  @override
+  String get sizeCalculatingLabel => 'calculating…';
+
+  @override
+  String get editSecureItemsToRenameMessage =>
+      'Edit secure items to rename them';
+
+  @override
+  String get vaultItemsCannotBeOpenedExternallyMessage =>
+      'Vault items cannot be opened in external apps';
+
+  @override
+  String get mountedReadOnlyTooltip => 'Mounted read-only';
+
+  @override
+  String freeSpaceLabel(String bytes) {
+    return '$bytes free';
+  }
+
+  @override
+  String get filteredLabel => 'filtered';
 }

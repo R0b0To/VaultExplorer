@@ -4945,6 +4945,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Gallery Grid'**
   String get layoutModeGalleryGrid;
+
+  /// Tooltip for the delete action when the container is read-only
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only — can\'t delete'**
+  String get readOnlyCantDeleteTooltip;
+
+  /// Tooltip for the move action when the container is read-only
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only — can\'t move'**
+  String get readOnlyCantMoveTooltip;
+
+  /// Tooltip for the rename action when the container is read-only
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only — can\'t rename'**
+  String get readOnlyCantRenameTooltip;
+
+  /// Selected-items size label while a folder size total is still being calculated, showing a running partial total
+  ///
+  /// In en, this message translates to:
+  /// **'{bytes} (calculating…)'**
+  String sizeCalculatingWithBytesLabel(String bytes);
+
+  /// Selected-items size label while a folder size total is still being calculated and no partial total is available yet
+  ///
+  /// In en, this message translates to:
+  /// **'calculating…'**
+  String get sizeCalculatingLabel;
+
+  /// Status message shown when trying to rename a vault item directly instead of editing it
+  ///
+  /// In en, this message translates to:
+  /// **'Edit secure items to rename them'**
+  String get editSecureItemsToRenameMessage;
+
+  /// Status message shown when trying to open a vault item with an external app
+  ///
+  /// In en, this message translates to:
+  /// **'Vault items cannot be opened in external apps'**
+  String get vaultItemsCannotBeOpenedExternallyMessage;
+
+  /// Tooltip/badge shown next to the container name when it's mounted read-only
+  ///
+  /// In en, this message translates to:
+  /// **'Mounted read-only'**
+  String get mountedReadOnlyTooltip;
+
+  /// Label showing free storage space remaining
+  ///
+  /// In en, this message translates to:
+  /// **'{bytes} free'**
+  String freeSpaceLabel(String bytes);
+
+  /// Label indicating the current file list is filtered
+  ///
+  /// In en, this message translates to:
+  /// **'filtered'**
+  String get filteredLabel;
 }
 
 class _AppLocalizationsDelegate

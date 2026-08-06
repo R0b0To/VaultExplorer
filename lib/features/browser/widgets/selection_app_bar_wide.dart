@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 /// Landscape-mode selection AppBar -- the wide-screen sibling of
 /// [SelectionAppBar] (`selection_app_bar.dart`), which is used in portrait.
@@ -89,7 +90,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     return AppBar(
       leading: IconButton(
         icon: const Icon(Icons.close_rounded),
-        tooltip: 'Clear selection',
+        tooltip: context.l10n.clearSelectionTooltip,
         onPressed: onClose,
       ),
       titleSpacing: 0,
@@ -126,12 +127,12 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             Icons.delete_outline_rounded,
             color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : cs.error,
           ),
-          tooltip: readOnly ? 'Read-only — can\'t delete' : 'Delete',
+          tooltip: readOnly ? context.l10n.readOnlyCantDeleteTooltip : context.l10n.delete,
           onPressed: onDelete,
         ),
         IconButton(
           icon: const Icon(Icons.copy_rounded),
-          tooltip: 'Copy',
+          tooltip: context.l10n.copyTooltip,
           onPressed: onCopy,
         ),
         IconButton(
@@ -139,7 +140,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             Icons.cut_rounded,
             color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
           ),
-          tooltip: readOnly ? 'Read-only — can\'t move' : 'Move',
+          tooltip: readOnly ? context.l10n.readOnlyCantMoveTooltip : context.l10n.moveAction,
           onPressed: onCut,
         ),
         IconButton(
@@ -147,12 +148,12 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             Icons.drive_file_rename_outline_rounded,
             color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.5) : null,
           ),
-          tooltip: readOnly ? 'Read-only — can\'t rename' : 'Rename',
+          tooltip: readOnly ? context.l10n.readOnlyCantRenameTooltip : context.l10n.renameTooltip,
           onPressed: onRename,
         ),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert_rounded),
-          tooltip: 'More options',
+          tooltip: context.l10n.moreOptionsTooltip,
           onSelected: (value) {
             if (value == 'export') onExport();
             if (value == 'pin') onPin();
@@ -162,9 +163,9 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'select_all') onSelectAll();
           },
           itemBuilder: (context) => [
-            const PopupMenuItem<String>(
+            PopupMenuItem<String>(
               value: 'select_all',
-              child: Text('Select All'),
+              child: Text(context.l10n.selectAllAction),
             ),
             PopupMenuItem<String>(
               value: 'export',
@@ -176,7 +177,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     size: AppIconSize.small,
                   ),
                   const SizedBox(width: 12),
-                  const Text('Export to device'),
+                  Text(context.l10n.exportToDeviceAction),
                 ],
               ),
             ),
@@ -191,7 +192,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    Text(selectedCount > 1 ? 'Pin selected' : 'Pin'),
+                    Text(selectedCount > 1 ? context.l10n.pinSelectedAction : context.l10n.pinAction),
                   ],
                 ),
               ),
@@ -206,7 +207,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    Text(selectedCount > 1 ? 'Unpin selected' : 'Unpin'),
+                    Text(selectedCount > 1 ? context.l10n.unpinSelectedAction : context.l10n.unpinAction),
                   ],
                 ),
               ),
@@ -221,7 +222,7 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    const Text('Open with App'),
+                    Text(context.l10n.openWithAppAction),
                   ],
                 ),
               ),
@@ -239,8 +240,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     ),
                     const SizedBox(width: 12),
                     Text(folderDocumentProviderMounted
-                        ? 'Document Provider Settings'
-                        : 'Expose as Document Provider'),
+                        ? context.l10n.documentProviderSettingsMenu
+                        : context.l10n.exposeAsDocumentProviderMenu),
                   ],
                 ),
               ),

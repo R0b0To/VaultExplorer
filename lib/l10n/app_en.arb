@@ -3877,6 +3877,52 @@
   "layoutModeMasonry": "Masonry",
   "@layoutModeMasonry": {
     "description": "Layout mode option: masonry grid view"
+  },
+  "readOnlyCantDeleteTooltip": "Read-only — can't delete",
+  "@readOnlyCantDeleteTooltip": {
+    "description": "Tooltip for the delete action when the container is read-only"
+  },
+  "readOnlyCantMoveTooltip": "Read-only — can't move",
+  "@readOnlyCantMoveTooltip": {
+    "description": "Tooltip for the move action when the container is read-only"
+  },
+  "readOnlyCantRenameTooltip": "Read-only — can't rename",
+  "@readOnlyCantRenameTooltip": {
+    "description": "Tooltip for the rename action when the container is read-only"
+  },
+  "sizeCalculatingWithBytesLabel": "{bytes} (calculating…)",
+  "@sizeCalculatingWithBytesLabel": {
+    "description": "Selected-items size label while a folder size total is still being calculated, showing a running partial total",
+    "placeholders": {
+      "bytes": { "type": "String" }
+    }
+  },
+  "sizeCalculatingLabel": "calculating…",
+  "@sizeCalculatingLabel": {
+    "description": "Selected-items size label while a folder size total is still being calculated and no partial total is available yet"
+  },
+  "editSecureItemsToRenameMessage": "Edit secure items to rename them",
+  "@editSecureItemsToRenameMessage": {
+    "description": "Status message shown when trying to rename a vault item directly instead of editing it"
+  },
+  "vaultItemsCannotBeOpenedExternallyMessage": "Vault items cannot be opened in external apps",
+  "@vaultItemsCannotBeOpenedExternallyMessage": {
+    "description": "Status message shown when trying to open a vault item with an external app"
+  },
+  "mountedReadOnlyTooltip": "Mounted read-only",
+  "@mountedReadOnlyTooltip": {
+    "description": "Tooltip/badge shown next to the container name when it's mounted read-only"
+  },
+  "freeSpaceLabel": "{bytes} free",
+  "@freeSpaceLabel": {
+    "description": "Label showing free storage space remaining",
+    "placeholders": {
+      "bytes": { "type": "String" }
+    }
+  },
+  "filteredLabel": "filtered",
+  "@filteredLabel": {
+    "description": "Label indicating the current file list is filtered"
   }
 }
 

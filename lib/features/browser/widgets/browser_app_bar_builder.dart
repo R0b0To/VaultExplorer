@@ -11,6 +11,7 @@ import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar_wide.dart';
 import 'package:vaultexplorer/features/browser/widgets/settings_menu_button.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 
 PreferredSizeWidget buildBrowserAppBar(
@@ -72,8 +73,8 @@ PreferredSizeWidget buildBrowserAppBar(
     final isPending = hasPendingFolderSizes;
     final sizeLabel = isPending
         ? (totalBytes > 0
-              ? '${formatBytes(totalBytes)} (calculating…)'
-              : 'calculating…')
+              ? context.l10n.sizeCalculatingWithBytesLabel(formatBytes(totalBytes))
+              : context.l10n.sizeCalculatingLabel)
         : formatBytes(totalBytes);
     void doRename() {
       final entries = selectedItems.toList();
@@ -81,7 +82,7 @@ PreferredSizeWidget buildBrowserAppBar(
         final parts = entry.name.split('.');
         final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
         if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-          onSetStatus('Edit secure items to rename them', error: false);
+          onSetStatus(context.l10n.editSecureItemsToRenameMessage, error: false);
           onExitSelectionMode();
           return;
         }
@@ -106,7 +107,7 @@ PreferredSizeWidget buildBrowserAppBar(
       final ext = parts.length > 1 ? parts.last.toLowerCase() : '';
       onExitSelectionMode();
       if (VaultItemType.values.any((t) => t.name.toLowerCase() == ext)) {
-        onSetStatus('Vault items cannot be opened in external apps', error: true);
+        onSetStatus(context.l10n.vaultItemsCannotBeOpenedExternallyMessage, error: true);
         return;
       }
       final settings = await AppSettingsService.loadSettings();
@@ -175,7 +176,7 @@ PreferredSizeWidget buildBrowserAppBar(
   return AppBar(
     leading: IconButton(
       icon: const Icon(Icons.arrow_back),
-      tooltip: 'Back to dashboard',
+      tooltip: context.l10n.backToDashboardTooltip,
       onPressed: () => Navigator.of(context).pop(),
     ),
     title: Column(
@@ -195,7 +196,7 @@ PreferredSizeWidget buildBrowserAppBar(
             if (isReadOnly) ...[
               const SizedBox(width: 8),
               Tooltip(
-                message: 'Mounted read-only',
+                message: context.l10n.mountedReadOnlyTooltip,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -261,8 +262,8 @@ Widget buildBrowserAppBarStatsSubtitle(
   final textTheme = Theme.of(context).textTheme;
   final style = textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant);
   final parts = <String>[
-    if (freeSpace >= 0) '${formatBytes(freeSpace)} free',
-    if (isFiltered) 'filtered',
+    if (freeSpace >= 0) context.l10n.freeSpaceLabel(formatBytes(freeSpace)),
+    if (isFiltered) context.l10n.filteredLabel,
   ];
   return Text(
     parts.join(' · '),

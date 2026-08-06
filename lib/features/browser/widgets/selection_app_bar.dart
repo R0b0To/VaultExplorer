@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final int selectedCount;
@@ -66,12 +67,12 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
       shape: Border(bottom: BorderSide(color: cs.outlineVariant)),
       leading: IconButton(
         icon: const Icon(Icons.close_rounded),
-        tooltip: 'Clear selection',
+        tooltip: context.l10n.clearSelectionTooltip,
         onPressed: onClose,
       ),
       titleSpacing: 0,
       title: PopupMenuButton<String>(
-        tooltip: 'Selection options',
+        tooltip: context.l10n.selectionOptionsTooltip,
         offset: const Offset(0, 48),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -122,13 +123,13 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
           if (value == 'clear') onClose();
         },
         itemBuilder: (context) => [
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: 'select_all',
-            child: Text('Select All'),
+            child: Text(context.l10n.selectAllAction),
           ),
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             value: 'clear',
-            child: Text('Clear Selection'),
+            child: Text(context.l10n.clearSelectionAction),
           ),
         ],
       ),
@@ -138,30 +139,30 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             Icons.delete_outline_rounded,
             color: readOnly ? cs.onSurfaceVariant.withValues(alpha: 0.4) : cs.error,
           ),
-          tooltip: readOnly ? 'Read-only container' : 'Delete',
+          tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.delete,
           onPressed: readOnly ? null : onDelete,
         ),
         if (showCopy)
           IconButton(
             icon: const Icon(Icons.copy_rounded),
-            tooltip: 'Copy',
+            tooltip: context.l10n.copyTooltip,
             onPressed: onCopy,
           ),
         if (showCut)
           IconButton(
             icon: const Icon(Icons.cut_rounded),
-            tooltip: readOnly ? 'Read-only container' : 'Move',
+            tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.moveAction,
             onPressed: readOnly ? null : onCut,
           ),
         if (showRename)
           IconButton(
             icon: const Icon(Icons.drive_file_rename_outline_rounded),
-            tooltip: readOnly ? 'Read-only container' : 'Rename',
+            tooltip: readOnly ? context.l10n.readOnlyContainerTooltip : context.l10n.renameTooltip,
             onPressed: readOnly ? null : onRename,
           ),
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert_rounded),
-          tooltip: 'More options',
+          tooltip: context.l10n.moreOptionsTooltip,
           onSelected: (value) {
             if (value == 'copy') onCopy();
             if (value == 'cut') onCut();
@@ -184,7 +185,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    const Text('Copy'),
+                    Text(context.l10n.copyAction),
                   ],
                 ),
               ),
@@ -200,7 +201,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    const Text('Move'),
+                    Text(context.l10n.moveAction),
                   ],
                 ),
               ),
@@ -216,7 +217,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    const Text('Rename'),
+                    Text(context.l10n.renameAction),
                   ],
                 ),
               ),
@@ -230,7 +231,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     size: AppIconSize.small,
                   ),
                   const SizedBox(width: 12),
-                  const Text('Export to device'),
+                  Text(context.l10n.exportToDeviceAction),
                 ],
               ),
             ),
@@ -245,7 +246,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    Text(selectedCount > 1 ? 'Pin selected' : 'Pin'),
+                    Text(selectedCount > 1 ? context.l10n.pinSelectedAction : context.l10n.pinAction),
                   ],
                 ),
               ),
@@ -260,7 +261,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    Text(selectedCount > 1 ? 'Unpin selected' : 'Unpin'),
+                    Text(selectedCount > 1 ? context.l10n.unpinSelectedAction : context.l10n.unpinAction),
                   ],
                 ),
               ),
@@ -275,7 +276,7 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                       size: AppIconSize.small,
                     ),
                     const SizedBox(width: 12),
-                    const Text('Open with App'),
+                    Text(context.l10n.openWithAppAction),
                   ],
                 ),
               ),
@@ -293,8 +294,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                     const SizedBox(width: 12),
                     Text(folderDocumentProviderMounted
-                        ? 'Document Provider Settings'
-                        : 'Expose as Document Provider'),
+                        ? context.l10n.documentProviderSettingsMenu
+                        : context.l10n.exposeAsDocumentProviderMenu),
                   ],
                 ),
               ),

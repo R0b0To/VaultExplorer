@@ -101,6 +101,7 @@ VaultExplorer pins and compiles all C++ native dependencies directly during buil
 | Library | Version / Commit | Purpose |
 | :--- | :--- | :--- |
 | **mbedTLS** | v3.6.0 | AES, SHA-1/2, HMAC, PBKDF2, Argon2id, hardware crypto extensions |
+| **libavif & libgav1** | Pinned Commit | Native AVIF image decoding engine |
 | **FatFs** | 4.0.4 | FAT12 / FAT16 / FAT32 / exFAT filesystem backend |
 | **NTFS-3G** | Release Tag | Full read/write NTFS filesystem driver & `mkntfs` volume formatter |
 | **e2fsprogs** | v1.47.4 (`libext2fs`) | Full read/write ext2, ext3, and ext4 filesystem engine |

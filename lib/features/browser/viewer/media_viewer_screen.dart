@@ -242,10 +242,26 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     return (viewportWidth / (16 / 9)).clamp(120.0, viewportHeight);
   }
 
+  EdgeInsets _getContinuousListPadding(double viewportWidth, double viewportHeight) {
+    final playlist = _playlistController.playlist;
+    if (playlist.isEmpty || viewportHeight <= 0) return EdgeInsets.zero;
+
+    final h0 = _getItemHeight(0, viewportWidth, viewportHeight);
+    final topPadding = math.max(0.0, (viewportHeight - h0) / 2.0);
+
+    final hLast = _getItemHeight(playlist.length - 1, viewportWidth, viewportHeight);
+    final bottomPadding = math.max(0.0, (viewportHeight - hLast) / 2.0);
+
+    return EdgeInsets.only(top: topPadding, bottom: bottomPadding);
+  }
+
   double _getOffsetForIndex(int targetIndex, double viewportWidth, double viewportHeight) {
     final playlist = _playlistController.playlist;
-    if (playlist.isEmpty || targetIndex <= 0) return 0.0;
+    if (playlist.isEmpty || viewportHeight <= 0) return 0.0;
+    if (targetIndex <= 0) return 0.0;
     if (targetIndex >= playlist.length) targetIndex = playlist.length - 1;
+
+    final padding = _getContinuousListPadding(viewportWidth, viewportHeight);
 
     double sumPrevHeights = 0.0;
     for (int i = 0; i < targetIndex; i++) {
@@ -255,16 +271,16 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final currentItemHeight = _getItemHeight(targetIndex, viewportWidth, viewportHeight);
     double idealOffset;
     if (currentItemHeight >= viewportHeight) {
-      idealOffset = sumPrevHeights;
+      idealOffset = padding.top + sumPrevHeights;
     } else {
-      idealOffset = sumPrevHeights - (viewportHeight - currentItemHeight) / 2.0;
+      idealOffset = padding.top + sumPrevHeights - (viewportHeight - currentItemHeight) / 2.0;
     }
 
-    double totalListHeight = sumPrevHeights + currentItemHeight;
+    double totalContentHeight = padding.top + sumPrevHeights + currentItemHeight + padding.bottom;
     for (int i = targetIndex + 1; i < playlist.length; i++) {
-      totalListHeight += _getItemHeight(i, viewportWidth, viewportHeight);
+      totalContentHeight += _getItemHeight(i, viewportWidth, viewportHeight);
     }
-    final maxScrollExtent = math.max(0.0, totalListHeight - viewportHeight);
+    final maxScrollExtent = math.max(0.0, totalContentHeight - viewportHeight);
 
     return idealOffset.clamp(0.0, maxScrollExtent);
   }
@@ -275,26 +291,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     if (playlist.length == 1) return 0;
 
     final currentIdx = _playlistController.currentIndex.clamp(0, playlist.length - 1);
+    final padding = _getContinuousListPadding(viewportWidth, viewportHeight);
 
     double sumPrev = 0.0;
     final targetOffsets = <double>[];
-    final heights = <double>[];
     for (int i = 0; i < playlist.length; i++) {
       final h = _getItemHeight(i, viewportWidth, viewportHeight);
-      heights.add(h);
-      targetOffsets.add(sumPrev);
+      final ideal = (h >= viewportHeight)
+          ? padding.top + sumPrev
+          : padding.top + sumPrev - (viewportHeight - h) / 2.0;
+      targetOffsets.add(ideal);
       sumPrev += h;
-    }
-    final totalListHeight = sumPrev;
-    final maxScrollExtent = math.max(0.0, totalListHeight - viewportHeight);
-
-    for (int i = 0; i < playlist.length; i++) {
-      final sumPrevI = targetOffsets[i];
-      final hI = heights[i];
-      final ideal = (hI >= viewportHeight)
-          ? sumPrevI
-          : sumPrevI - (viewportHeight - hI) / 2.0;
-      targetOffsets[i] = ideal.clamp(0.0, maxScrollExtent);
     }
 
     int bestIdx = currentIdx;
@@ -1177,6 +1184,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               controller: _listScrollController,
               scrollDirection: Axis.vertical,
               physics: const BouncingScrollPhysics(),
+              padding: _getContinuousListPadding(constraints.maxWidth, constraints.maxHeight),
               itemCount: _playlistController.playlist.length,
               itemBuilder: (context, index) {
                 final itemHeight = _getItemHeight(index, constraints.maxWidth, constraints.maxHeight);

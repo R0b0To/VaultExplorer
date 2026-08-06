@@ -5569,6 +5569,114 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Vertical Continuous'**
   String get playlistScrollVerticalContinuousLabel;
+
+  /// Tooltip for the undo button in the text editor
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undoTooltip;
+
+  /// Tooltip for the redo button in the text editor
+  ///
+  /// In en, this message translates to:
+  /// **'Redo'**
+  String get redoTooltip;
+
+  /// Status label shown while the text editor is autosaving
+  ///
+  /// In en, this message translates to:
+  /// **'Autosaving…'**
+  String get autosavingLabel;
+
+  /// Status label shown while the text editor is saving
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get savingLabel;
+
+  /// Status label showing the time of the last autosave in the text editor
+  ///
+  /// In en, this message translates to:
+  /// **'Autosaved at {time}'**
+  String autosavedAtLabel(String time);
+
+  /// Error message shown when the camera device drops out unexpectedly
+  ///
+  /// In en, this message translates to:
+  /// **'Camera disconnected: {message}'**
+  String cameraDisconnectedError(String message);
+
+  /// Generic fallback text used when no specific error detail is available
+  ///
+  /// In en, this message translates to:
+  /// **'unknown error'**
+  String get unknownErrorFallback;
+
+  /// Error message shown when camera/microphone permissions are denied
+  ///
+  /// In en, this message translates to:
+  /// **'Camera and microphone permissions are required to use the camera.'**
+  String get cameraPermissionsRequiredMessage;
+
+  /// Generic camera initialization error message
+  ///
+  /// In en, this message translates to:
+  /// **'Camera error: {error}'**
+  String cameraErrorMessage(String error);
+
+  /// Error toast when taking a photo fails with no further detail
+  ///
+  /// In en, this message translates to:
+  /// **'Photo capture failed'**
+  String get cameraPhotoCaptureFailedMessage;
+
+  /// Error toast when starting a video recording fails with no further detail
+  ///
+  /// In en, this message translates to:
+  /// **'Recording failed'**
+  String get cameraRecordingFailedMessage;
+
+  /// Error toast when starting a video recording throws an exception
+  ///
+  /// In en, this message translates to:
+  /// **'Recording failed: {error}'**
+  String cameraRecordingFailedWithReasonMessage(String error);
+
+  /// Error toast when a video recording is discarded for being too short
+  ///
+  /// In en, this message translates to:
+  /// **'Recording was too short to save'**
+  String get cameraRecordingTooShortMessage;
+
+  /// Error toast when saving a finished video recording fails with no further detail
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save recording'**
+  String get cameraCouldNotSaveRecordingMessage;
+
+  /// Error toast when saving a finished video recording throws an exception
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save recording: {error}'**
+  String cameraCouldNotSaveRecordingWithReasonMessage(String error);
+
+  /// Error toast when switching to a different camera lens fails
+  ///
+  /// In en, this message translates to:
+  /// **'Could not switch lens'**
+  String get cameraCouldNotSwitchLensMessage;
+
+  /// Busy overlay label shown while a captured photo is being encrypted into the vault
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypting photo…'**
+  String get cameraEncryptingPhotoLabel;
+
+  /// Busy overlay label shown while a recorded video is being encrypted into the vault
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypting video…'**
+  String get cameraEncryptingVideoLabel;
 }
 
 class _AppLocalizationsDelegate

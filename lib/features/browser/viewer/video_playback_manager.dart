@@ -4,18 +4,14 @@ import 'package:vaultexplorer/features/browser/viewer/native_video_controller.da
 
 class VideoPlaybackManager {
   final Map<String, NativeVideoController> _controllers = {};
-  
   final ValueNotifier<String?> currentFileNotifier = ValueNotifier<String?>(null);
   String? get currentFileName => currentFileNotifier.value;
-
   final ValueNotifier<NativeVideoController?> activeControllerNotifier =
       ValueNotifier<NativeVideoController?>(null);
   NativeVideoController? get activeController => activeControllerNotifier.value;
-
   final Map<String, bool> _subtitlesAvailableMap = {};
   bool isSubtitleAvailable(String fileName) => _subtitlesAvailableMap[fileName] ?? false;
 
-  // Track activation queue to prevent concurrent decoder allocations
   int _activationToken = 0;
   Future<void>? _currentActivationFuture;
 
@@ -34,50 +30,52 @@ class VideoPlaybackManager {
     required double playbackSpeed,
   }) async {
     final token = ++_activationToken;
-
-    // Chain activations sequentially so previous decoders are fully disposed first
     final previousFuture = _currentActivationFuture;
     final completer = Completer<void>();
     _currentActivationFuture = completer.future;
-
     if (previousFuture != null) {
       try {
         await previousFuture;
       } catch (_) {}
     }
-
-    // Cancel if a newer activation request came in while waiting in queue
     if (token != _activationToken) {
       completer.complete();
       return;
     }
-
     try {
       if (currentFileNotifier.value == fileName && _controllers.containsKey(fileName)) {
         final ctrl = _controllers[fileName]!;
-        await ctrl.setPlaybackSpeed(playbackSpeed);
-        if (autoPlay) await ctrl.play();
-        return;
+        if (!ctrl.isDisposed && !ctrl.value.hasError) {
+          await ctrl.setPlaybackSpeed(playbackSpeed);
+          if (autoPlay) await ctrl.play();
+          return;
+        }
       }
-
       final previousFile = currentFileNotifier.value;
       if (previousFile != null && previousFile != fileName) {
         final prevCtrl = _controllers.remove(previousFile);
         if (prevCtrl != null) {
           prevCtrl.pause();
-          // Fully teardown hardware pipeline before instantiating next controller
           await prevCtrl.dispose();
         }
       }
-
-      // Check token again after async teardown
       if (token != _activationToken) return;
-
       NativeVideoController controller;
       if (_controllers.containsKey(fileName)) {
         controller = _controllers[fileName]!;
-        await controller.setPlaybackSpeed(playbackSpeed);
-        if (autoPlay) await controller.play();
+        if (controller.isDisposed || controller.value.hasError) {
+          _controllers.remove(fileName);
+          controller = NativeVideoController(
+            contentUriString: contentUriString,
+            autoPlay: autoPlay,
+            initialSpeed: playbackSpeed,
+          );
+          _controllers[fileName] = controller;
+          unawaited(controller.initialize());
+        } else {
+          await controller.setPlaybackSpeed(playbackSpeed);
+          if (autoPlay) await controller.play();
+        }
       } else {
         controller = NativeVideoController(
           contentUriString: contentUriString,
@@ -87,10 +85,8 @@ class VideoPlaybackManager {
         _controllers[fileName] = controller;
         unawaited(controller.initialize());
       }
-
       activeControllerNotifier.value = controller;
       currentFileNotifier.value = fileName;
-
       _cleanupOldControllers(keepFiles: {fileName});
     } finally {
       completer.complete();

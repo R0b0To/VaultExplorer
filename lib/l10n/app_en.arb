@@ -4342,6 +4342,93 @@
   "playlistScrollVerticalContinuousLabel": "Vertical Continuous",
   "@playlistScrollVerticalContinuousLabel": {
     "description": "Playlist scroll mode: continuous vertical scrolling"
+  },
+  "undoTooltip": "Undo",
+  "@undoTooltip": {
+    "description": "Tooltip for the undo button in the text editor"
+  },
+  "redoTooltip": "Redo",
+  "@redoTooltip": {
+    "description": "Tooltip for the redo button in the text editor"
+  },
+  "autosavingLabel": "Autosaving…",
+  "@autosavingLabel": {
+    "description": "Status label shown while the text editor is autosaving"
+  },
+  "savingLabel": "Saving…",
+  "@savingLabel": {
+    "description": "Status label shown while the text editor is saving"
+  },
+  "autosavedAtLabel": "Autosaved at {time}",
+  "@autosavedAtLabel": {
+    "description": "Status label showing the time of the last autosave in the text editor",
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+  "cameraDisconnectedError": "Camera disconnected: {message}",
+  "@cameraDisconnectedError": {
+    "description": "Error message shown when the camera device drops out unexpectedly",
+    "placeholders": {
+      "message": { "type": "String" }
+    }
+  },
+  "unknownErrorFallback": "unknown error",
+  "@unknownErrorFallback": {
+    "description": "Generic fallback text used when no specific error detail is available"
+  },
+  "cameraPermissionsRequiredMessage": "Camera and microphone permissions are required to use the camera.",
+  "@cameraPermissionsRequiredMessage": {
+    "description": "Error message shown when camera/microphone permissions are denied"
+  },
+  "cameraErrorMessage": "Camera error: {error}",
+  "@cameraErrorMessage": {
+    "description": "Generic camera initialization error message",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "cameraPhotoCaptureFailedMessage": "Photo capture failed",
+  "@cameraPhotoCaptureFailedMessage": {
+    "description": "Error toast when taking a photo fails with no further detail"
+  },
+  "cameraRecordingFailedMessage": "Recording failed",
+  "@cameraRecordingFailedMessage": {
+    "description": "Error toast when starting a video recording fails with no further detail"
+  },
+  "cameraRecordingFailedWithReasonMessage": "Recording failed: {error}",
+  "@cameraRecordingFailedWithReasonMessage": {
+    "description": "Error toast when starting a video recording throws an exception",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "cameraRecordingTooShortMessage": "Recording was too short to save",
+  "@cameraRecordingTooShortMessage": {
+    "description": "Error toast when a video recording is discarded for being too short"
+  },
+  "cameraCouldNotSaveRecordingMessage": "Could not save recording",
+  "@cameraCouldNotSaveRecordingMessage": {
+    "description": "Error toast when saving a finished video recording fails with no further detail"
+  },
+  "cameraCouldNotSaveRecordingWithReasonMessage": "Could not save recording: {error}",
+  "@cameraCouldNotSaveRecordingWithReasonMessage": {
+    "description": "Error toast when saving a finished video recording throws an exception",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "cameraCouldNotSwitchLensMessage": "Could not switch lens",
+  "@cameraCouldNotSwitchLensMessage": {
+    "description": "Error toast when switching to a different camera lens fails"
+  },
+  "cameraEncryptingPhotoLabel": "Encrypting photo…",
+  "@cameraEncryptingPhotoLabel": {
+    "description": "Busy overlay label shown while a captured photo is being encrypted into the vault"
+  },
+  "cameraEncryptingVideoLabel": "Encrypting video…",
+  "@cameraEncryptingVideoLabel": {
+    "description": "Busy overlay label shown while a recorded video is being encrypted into the vault"
   }
 }
 

@@ -270,12 +270,12 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.undo_rounded),
-                        tooltip: 'Undo',
+                        tooltip: context.l10n.undoTooltip,
                         onPressed: value.canUndo ? () => _undoController.undo() : null,
                       ),
                       IconButton(
                         icon: const Icon(Icons.redo_rounded),
-                        tooltip: 'Redo',
+                        tooltip: context.l10n.redoTooltip,
                         onPressed: value.canRedo ? () => _undoController.redo() : null,
                       ),
                     ],
@@ -419,7 +419,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
             ),
             const SizedBox(width: 6),
             Text(
-              'Autosaving…',
+              context.l10n.autosavingLabel,
               style: TextStyle(
                 color: cs.primary,
                 fontSize: 12,
@@ -428,7 +428,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
             ),
           ] else if (_isSaving) ...[
             Text(
-              'Saving…',
+              context.l10n.savingLabel,
               style: TextStyle(
                 color: cs.primary,
                 fontSize: 12,
@@ -452,7 +452,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
             ),
             const SizedBox(width: 4),
             Text(
-              timeStr != null ? 'Autosaved at $timeStr' : context.l10n.savedToVault,
+              timeStr != null ? context.l10n.autosavedAtLabel(timeStr) : context.l10n.savedToVault,
               style: TextStyle(
                 color: context.semanticColors.success,
                 fontSize: 12,

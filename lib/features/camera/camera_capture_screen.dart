@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import '../../data/services/vault_engine/vault_explorer_api.dart';
 import 'camera_vault_service.dart';
 import 'vault_camera_controller.dart';
@@ -56,7 +57,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   bool _isCountingDown = false;
   int _countdownValue = 0;
 
-  String _busyLabel = 'Saving…';
+  String _busyLabel = '';
   String _timerText = '00:00';
   DateTime? _recordingStart;
   Timer? _timer;
@@ -100,7 +101,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     // just sit there frozen with no indication anything went wrong.
     setState(() {
       _isInitialized = false;
-      _permissionError = 'Camera disconnected: ${event['message'] ?? 'unknown error'}';
+      _permissionError = context.l10n.cameraDisconnectedError(event['message'] ?? context.l10n.unknownErrorFallback);
     });
   }
 
@@ -171,7 +172,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
           if (mounted) {
             setState(() {
               _isInitialized = false;
-              _permissionError = 'Camera and microphone permissions are required to use the camera.';
+              _permissionError = context.l10n.cameraPermissionsRequiredMessage;
             });
           }
           return;
@@ -207,7 +208,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
       if (mounted) {
         setState(() {
           _isInitialized = false;
-          _permissionError = 'Camera error: $e';
+          _permissionError = context.l10n.cameraErrorMessage('$e');
         });
       }
     }
@@ -325,7 +326,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
     _triggerShutterFlash();
 
-    setState(() { _isEncrypting = true; _busyLabel = 'Encrypting photo…'; });
+    setState(() { _isEncrypting = true; _busyLabel = context.l10n.cameraEncryptingPhotoLabel; });
     await Future.delayed(const Duration(milliseconds: 50));
 
     try {
@@ -345,7 +346,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
           Navigator.pop(context, (savedName: name, isVideo: false));
         }
       } else {
-        if (mounted) _showErrorToast(result.error ?? 'Photo capture failed');
+        if (mounted) _showErrorToast(result.error ?? context.l10n.cameraPhotoCaptureFailedMessage);
       }
     } finally {
       if (mounted) setState(() => _isEncrypting = false);
@@ -372,7 +373,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
       );
 
       if (!result.success) {
-        _showErrorToast(result.error ?? 'Recording failed');
+        _showErrorToast(result.error ?? context.l10n.cameraRecordingFailedMessage);
         return;
       }
 
@@ -387,7 +388,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
         setState(() => _timerText = '${(elapsed ~/ 60).toString().padLeft(2, '0')}:${(elapsed % 60).toString().padLeft(2, '0')}');
       });
     } catch (e) {
-      _showErrorToast('Recording failed: $e');
+      _showErrorToast(context.l10n.cameraRecordingFailedWithReasonMessage('$e'));
     } finally {
       _isStartingVideo = false;
       if (_pendingStopAfterStart) {
@@ -404,7 +405,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
     final startedAt = _recordingStart;
     _recordingStart = null;
 
-    setState(() { _isRecording = false; _isEncrypting = true; _busyLabel = 'Encrypting video…'; });
+    setState(() { _isRecording = false; _isEncrypting = true; _busyLabel = context.l10n.cameraEncryptingVideoLabel; });
     await Future.delayed(const Duration(milliseconds: 50));
 
     try {
@@ -412,7 +413,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
 
       final elapsedMs = startedAt == null ? 9999 : DateTime.now().difference(startedAt).inMilliseconds;
       if (elapsedMs < 500) {
-        if (mounted) _showErrorToast('Recording was too short to save');
+        if (mounted) _showErrorToast(context.l10n.cameraRecordingTooShortMessage);
         return;
       }
 
@@ -424,10 +425,10 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
           Navigator.pop(context, (savedName: _currentRecordingName, isVideo: true));
         }
       } else {
-        if (mounted) _showErrorToast(result.error ?? 'Could not save recording');
+        if (mounted) _showErrorToast(result.error ?? context.l10n.cameraCouldNotSaveRecordingMessage);
       }
     } catch (e) {
-      if (mounted) _showErrorToast('Could not save recording: $e');
+      if (mounted) _showErrorToast(context.l10n.cameraCouldNotSaveRecordingWithReasonMessage('$e'));
     } finally {
       if (mounted) setState(() => _isEncrypting = false);
     }
@@ -710,7 +711,7 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
                 // standalone stream; fall back to re-opening the previously
                 // selected lens instead of leaving the screen stuck on a
                 // blank/uninitialized preview.
-                if (mounted) _showErrorToast('Could not switch lens');
+                if (mounted) _showErrorToast(context.l10n.cameraCouldNotSwitchLensMessage);
                 await _initCamera(cameraId: _selectedCameraId);
               }
               return;

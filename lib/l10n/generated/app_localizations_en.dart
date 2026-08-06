@@ -3278,4 +3278,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playlistScrollVerticalContinuousLabel => 'Vertical Continuous';
+
+  @override
+  String get undoTooltip => 'Undo';
+
+  @override
+  String get redoTooltip => 'Redo';
+
+  @override
+  String get autosavingLabel => 'Autosaving…';
+
+  @override
+  String get savingLabel => 'Saving…';
+
+  @override
+  String autosavedAtLabel(String time) {
+    return 'Autosaved at $time';
+  }
+
+  @override
+  String cameraDisconnectedError(String message) {
+    return 'Camera disconnected: $message';
+  }
+
+  @override
+  String get unknownErrorFallback => 'unknown error';
+
+  @override
+  String get cameraPermissionsRequiredMessage =>
+      'Camera and microphone permissions are required to use the camera.';
+
+  @override
+  String cameraErrorMessage(String error) {
+    return 'Camera error: $error';
+  }
+
+  @override
+  String get cameraPhotoCaptureFailedMessage => 'Photo capture failed';
+
+  @override
+  String get cameraRecordingFailedMessage => 'Recording failed';
+
+  @override
+  String cameraRecordingFailedWithReasonMessage(String error) {
+    return 'Recording failed: $error';
+  }
+
+  @override
+  String get cameraRecordingTooShortMessage =>
+      'Recording was too short to save';
+
+  @override
+  String get cameraCouldNotSaveRecordingMessage => 'Could not save recording';
+
+  @override
+  String cameraCouldNotSaveRecordingWithReasonMessage(String error) {
+    return 'Could not save recording: $error';
+  }
+
+  @override
+  String get cameraCouldNotSwitchLensMessage => 'Could not switch lens';
+
+  @override
+  String get cameraEncryptingPhotoLabel => 'Encrypting photo…';
+
+  @override
+  String get cameraEncryptingVideoLabel => 'Encrypting video…';
 }

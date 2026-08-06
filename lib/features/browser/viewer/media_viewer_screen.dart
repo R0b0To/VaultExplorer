@@ -66,7 +66,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
       ValueNotifier<VideoPlaybackProgress>(const VideoPlaybackProgress());
-
   bool _showUI = false;
   bool _isContainerLocked = false;
   int _activeMenuCount = 0;
@@ -91,6 +90,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   double _viewportHeight = 0.0;
   bool _isMuted = false;
   bool _isSwiping = false;
+  bool _isProgrammaticScrolling = false;
+  bool _isOrientationChanging = false;
   final Set<String> _prefetchingFullRes = {};
   final Map<String, int> _rotations = {};
   final Map<String, GlobalKey> _mediaKeys = {};
@@ -160,7 +161,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
-   Future<void> _loadConfig() async {
+  Future<void> _loadConfig() async {
     final config = await FileManagerToolbarService.instance.load();
     final appSettings = await AppSettingsService.loadSettings();
     if (mounted) {
@@ -227,42 +228,67 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final fileName = _playlistController.playlist[index];
     final isAudio = MediaViewerConstants.isAudio(fileName);
     if (isAudio) {
-      return 320.0;
+      return math.min(320.0, viewportHeight);
     }
-
     final ratio = MediaAspectRatioCache.get(widget.container, fileName);
     if (ratio != null && ratio > 0 && viewportWidth > 0) {
       final rotation = _rotations[fileName] ?? 0;
       final effectiveRatio = (rotation % 2 != 0) ? 1.0 / ratio : ratio;
       final calculatedHeight = viewportWidth / effectiveRatio;
-      return calculatedHeight.clamp(120.0, viewportHeight * 2.0);
+      return calculatedHeight.clamp(120.0, viewportHeight);
     }
-
-    return (viewportWidth / (16 / 9)).clamp(200.0, viewportHeight);
+    return (viewportWidth / (16 / 9)).clamp(120.0, viewportHeight);
   }
 
   double _getOffsetForIndex(int targetIndex, double viewportWidth, double viewportHeight) {
-    double offset = 0.0;
-    final count = math.min(targetIndex, _playlistController.playlist.length);
+    if (targetIndex <= 0) return 0.0;
+    final playlist = _playlistController.playlist;
+    final count = math.min(targetIndex, playlist.length);
+
+    double sumPrevHeights = 0.0;
     for (int i = 0; i < count; i++) {
-      offset += _getItemHeight(i, viewportWidth, viewportHeight);
+      sumPrevHeights += _getItemHeight(i, viewportWidth, viewportHeight);
     }
-    return offset;
+
+    final currentItemHeight = _getItemHeight(targetIndex, viewportWidth, viewportHeight);
+
+    if (currentItemHeight >= viewportHeight) {
+      return sumPrevHeights.clamp(0.0, double.infinity);
+    } else {
+      final targetOffset = sumPrevHeights - (viewportHeight - currentItemHeight) / 2.0;
+      return targetOffset.clamp(0.0, double.infinity);
+    }
   }
 
   int _getIndexForOffset(double offset, double viewportWidth, double viewportHeight) {
-    double currentY = 0.0;
     final playlist = _playlistController.playlist;
-    final centerOffset = offset + (viewportHeight / 2);
+    if (playlist.isEmpty) return 0;
+    if (viewportHeight <= 0) return _playlistController.currentIndex;
 
+    if (offset <= 10.0) return 0;
+
+    final viewportCenter = offset + (viewportHeight / 2.0);
+
+    int bestIndex = 0;
+    double minDistance = double.infinity;
+
+    double currentY = 0.0;
     for (int i = 0; i < playlist.length; i++) {
       final itemHeight = _getItemHeight(i, viewportWidth, viewportHeight);
-      if (centerOffset >= currentY && centerOffset < currentY + itemHeight) {
-        return i;
+      final itemBottom = currentY + itemHeight;
+
+      final visibleHeight = math.max(0.0, math.min(offset + viewportHeight, itemBottom) - math.max(offset, currentY));
+      if (visibleHeight > 0) {
+        final itemCenter = currentY + (itemHeight / 2.0);
+        final distance = (itemCenter - viewportCenter).abs();
+        if (distance < minDistance) {
+          minDistance = distance;
+          bestIndex = i;
+        }
       }
-      currentY += itemHeight;
+      currentY = itemBottom;
     }
-    return (playlist.length - 1).clamp(0, math.max(0, playlist.length - 1));
+    return bestIndex;
   }
 
   void _scrollToCurrentIndex({bool animate = false}) {
@@ -273,11 +299,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           _viewportHeight > 0) {
         final target = _getOffsetForIndex(index, _viewportWidth, _viewportHeight);
         if (animate) {
+          _isProgrammaticScrolling = true;
           _listScrollController.animateTo(
             target,
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOutCubic,
-          );
+          ).then((_) {
+            if (mounted) _isProgrammaticScrolling = false;
+          });
         } else {
           _listScrollController.jumpTo(target);
         }
@@ -580,13 +609,13 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final token = ++_transitionToken;
     _cancelSlideshowTimer();
     _startHideTimer();
+    _isProgrammaticScrolling = true;
     _playlistController.updateIndex(index);
     _activateCurrentMedia();
     _prefetchDebounceTimer?.cancel();
     _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
       if (mounted) _prefetchSurroundingItems();
     });
-
     if (_scrollMode.isContinuous) {
       if (_listScrollController.hasClients &&
           _listScrollController.positions.length == 1 &&
@@ -615,8 +644,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         }
       }
     }
-
     if (mounted && _transitionToken == token) {
+      _isProgrammaticScrolling = false;
       _isSwiping = false;
       _isAutoAdvancing = false;
       final currentFile = _playlistController.currentFile;
@@ -627,6 +656,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _startHideTimer();
       }
       if (mounted) setState(() {});
+    } else {
+      _isProgrammaticScrolling = false;
     }
   }
 
@@ -963,7 +994,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
     final isImg = MediaViewerConstants.isImage(fileName);
     final isAudio = MediaViewerConstants.isAudio(fileName);
-
     final itemWidget = Container(
       color: Colors.black,
       child: isImg
@@ -972,7 +1002,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               fileName: fileName,
               prefetchedBytes: prefetchedBytes,
               container: widget.container,
-              imageFit: _scrollMode.isContinuous ? BoxFit.fitWidth : _imageFit,
+              imageFit: _scrollMode.isContinuous ? BoxFit.contain : _imageFit,
               rotationQuarterTurns: _rotations[fileName] ?? 0,
               showUI: _showUI,
               enableZoom: !_scrollMode.isContinuous,
@@ -1020,11 +1050,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               onError: () => _handleMediaError(fileName),
             ),
     );
-
     if (_scrollMode.isContinuous) {
       return itemWidget;
     }
-
     return PlaylistTransitionTransformer(
       pageController: _pageController,
       index: index,
@@ -1054,7 +1082,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         ),
       );
     }
-
     final isCurrentAnImage =
         MediaViewerConstants.isImage(_playlistController.currentFile);
     bool isPlayingState = false;
@@ -1065,20 +1092,47 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           _playbackManager.activeController?.value.isPlaying ?? false;
     }
     _updateWakelock(isPlayingState);
-
     return Scaffold(
       backgroundColor: Colors.black,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          _viewportWidth = constraints.maxWidth;
-          _viewportHeight = constraints.maxHeight;
+          final newWidth = constraints.maxWidth;
+          final newHeight = constraints.maxHeight;
+
+          final bool dimsChanged = (_viewportWidth > 0 && _viewportHeight > 0) &&
+              (newWidth != _viewportWidth || newHeight != _viewportHeight);
+
+          if (dimsChanged) {
+            _isOrientationChanging = true;
+          }
+
+          _viewportWidth = newWidth;
+          _viewportHeight = newHeight;
+
+          if (dimsChanged && _scrollMode.isContinuous && _listScrollController.hasClients) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && _listScrollController.hasClients) {
+                final targetOffset = _getOffsetForIndex(
+                  _playlistController.currentIndex,
+                  _viewportWidth,
+                  _viewportHeight,
+                );
+                _isProgrammaticScrolling = true;
+                _listScrollController.jumpTo(targetOffset);
+                _isProgrammaticScrolling = false;
+                _isOrientationChanging = false;
+              }
+            });
+          } else if (!dimsChanged) {
+            _isOrientationChanging = false;
+          }
+
           final builderKey = ValueKey(
             '${_playlistController.isPlaylistMode}_'
             '${_playlistController.selectedFolder}_'
             '${_playlistController.isShuffled}_'
             '$_scrollMode',
           );
-
           Widget mainScrollView;
           if (_scrollMode.isContinuous) {
             Widget listWidget = ListView.builder(
@@ -1096,7 +1150,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 );
               },
             );
-
             mainScrollView = InteractiveViewer(
               transformationController: _continuousTransformationController,
               minScale: 1.0,
@@ -1138,7 +1191,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               },
             );
           }
-
           return Stack(
             children: [
               ValueListenableBuilder<ScrollPhysics>(
@@ -1147,6 +1199,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   return NotificationListener<ScrollNotification>(
                     onNotification: (ScrollNotification notification) {
                       if (notification.depth == 0) {
+                        if (_isOrientationChanging || _isProgrammaticScrolling) {
+                          return false;
+                        }
                         if (notification is ScrollStartNotification &&
                             notification.dragDetails != null) {
                           _onScrollStart();
@@ -1185,15 +1240,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                     currentFileName: _playlistController.currentFile,
                     totalCount: _playlistController.playlist.length,
                     currentTransitionEffect: _transitionEffect,
-                       onTransitionEffectChanged: (newEffect) async {
-                    setState(() {
-                      _transitionEffect = newEffect;
-                    });
-                    final config = await FileManagerToolbarService.instance.load();
-                    await FileManagerToolbarService.instance.save(
-                      config.copyWith(playlistTransitionEffect: newEffect),
-                    );
-                  },
+                    onTransitionEffectChanged: (newEffect) async {
+                      setState(() {
+                        _transitionEffect = newEffect;
+                      });
+                      final config = await FileManagerToolbarService.instance.load();
+                      await FileManagerToolbarService.instance.save(
+                        config.copyWith(playlistTransitionEffect: newEffect),
+                      );
+                    },
                     currentScrollMode: _scrollMode,
                     onScrollModeChanged: (newMode) async {
                       setState(() {

@@ -1200,6 +1200,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       destDirPath: _currentDirPath,
       items: items,
       conflictPlan: conflictPlan,
+      l10n: context.l10n,
     );
     _clip.clear();
     void listener() {
@@ -1313,6 +1314,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _currentDirPath,
         opId,
       ),
+      l10n: context.l10n,
     );
     void listener() {
       if (!mounted) {
@@ -1390,6 +1392,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         _currentDirPath,
         opId,
       ),
+      l10n: context.l10n,
     );
     void listener() {
       if (!mounted) {

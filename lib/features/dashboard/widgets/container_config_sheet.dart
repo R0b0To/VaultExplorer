@@ -807,15 +807,15 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                           ),
                         )
                       else ...[
-                        OptionPickerTile<ThumbnailCacheMode>(
+                          OptionPickerTile<ThumbnailCacheMode>(
                           label: context.l10n.cacheModeLabel,
                           value: _thumbnailCacheMode ?? ThumbnailCacheMode.appCache,
-                          subtitle: _thumbnailCacheMode?.label ?? context.l10n.useGlobalDefaultSubtitle,
+                          subtitle: _thumbnailCacheMode?.getLocalizedLabel(context.l10n) ?? context.l10n.useGlobalDefaultSubtitle,
                           options: ThumbnailCacheMode.values.map((mode) {
                             return SelectOption(
                               value: mode,
-                              label: mode.label,
-                              subtitle: mode.description,
+                              label: mode.getLocalizedLabel(context.l10n),
+                              subtitle: mode.getLocalizedDescription(context.l10n),
                             );
                           }).toList(),
                           onChanged: (v) => setState(() => _thumbnailCacheMode = v),

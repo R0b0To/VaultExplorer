@@ -9,6 +9,7 @@ import 'package:vaultexplorer/data/models/clipboard_item.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
 part '../services/file_operation_service.dart';
 
@@ -97,9 +98,7 @@ class FileOperation extends ChangeNotifier {
   final String destDirPath;
   final List<ClipboardItem> items;
   final bool isImport;
-
-  // ── Mutable state (read-only externally) ──────────────────────────────────
-
+  final AppLocalizations l10n;
   FileOperationStatus _status = FileOperationStatus.pending;
   FileOperationStatus get status => _status;
 
@@ -201,40 +200,28 @@ class FileOperation extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool get isCrossContainer => !isImport && sourceVolId != destVolId;
-  String get verb => isImport ? 'Import' : (isCut ? 'Move' : 'Copy');
-  String get verbPast => isImport ? 'Imported' : (isCut ? 'Moved' : 'Copied');
-  String get verbIng => isImport ? 'Importing' : (isCut ? 'Moving' : 'Copying');
-
+ bool get isCrossContainer => !isImport && sourceVolId != destVolId;
+  String get verb => isImport ? l10n.verbImport : (isCut ? l10n.verbMove : l10n.verbCopy);
+  String get verbPast => isImport ? l10n.verbImported : (isCut ? l10n.verbMoved : l10n.verbCopied);
+  String get verbIng => isImport ? l10n.verbImporting : (isCut ? l10n.verbMoving : l10n.verbCopying);
   String get shortSummary {
     final n = items.length;
-    final label = n == 1 ? items.first.name : '$n items';
+    final label = n == 1 ? items.first.name : l10n.fileOpItemsCount(n);
     final isActive = _status == FileOperationStatus.pending || _status == FileOperationStatus.running;
     return '${isActive ? verbIng : verbPast} $label';
   }
-
   String get completionSummary {
     final parts = <String>[];
-    if (_doneCount > 0) parts.add('$_doneCount item${_doneCount == 1 ? '' : 's'} ${verbPast.toLowerCase()}');
-    if (_skipCount > 0) parts.add('$_skipCount skipped');
-    if (_failCount > 0) parts.add('$_failCount failed');
-    
+    if (_doneCount > 0) parts.add(l10n.fileOpSummaryCount(_doneCount, verbPast.toLowerCase()));
+    if (_skipCount > 0) parts.add(l10n.fileOpSummarySkipped(_skipCount));
+    if (_failCount > 0) parts.add(l10n.fileOpSummaryFailed(_failCount));
     if (parts.isEmpty) {
-      if (_status == FileOperationStatus.cancelled) return 'Cancelled';
-      if (_status == FileOperationStatus.failed) return 'Failed';
-      return 'Completed';
+      if (_status == FileOperationStatus.cancelled) return l10n.statusCancelled;
+      if (_status == FileOperationStatus.failed) return l10n.statusFailed;
+      return l10n.statusCompleted;
     }
     return parts.join(' · ');
   }
-
-  // ── Internal constructor — callable only from this library ────────────────
-  //
-  // Dart's library-privacy rules mean anything prefixed with `_` is accessible
-  // anywhere within the same *library* (i.e. the same `part of` compilation
-  // unit). Since FileOperationService is declared as `part of` this library
-  // (see file_operation_service.dart), it can call FileOperation._internal()
-  // and all _set* methods below. External code cannot.
-
   FileOperation._internal({
     required this.id,
     required this.isCut,
@@ -245,12 +232,10 @@ class FileOperation extends ChangeNotifier {
     required this.destDirPath,
     required this.items,
     this.isImport = false,
+    required this.l10n,
   }) : _itemStatuses = items
            .map((i) => FileItemStatus(item: i))
            .toList(growable: false);
-
-  // ── Mutation API — library-private ────────────────────────────────────────
-
   void _setImportProgress({
     required int done,
     required int total,
@@ -262,17 +247,11 @@ class FileOperation extends ChangeNotifier {
     _importTotal = total;
     _importTransferredBytes = transferredBytes;
     _importTotalBytes = totalBytes;
-
-    // Byte/percent stats are surfaced separately by the UI (progress ring +
-    // sublabel), so currentActivity only needs to name what's in flight —
-    // mirrors how copy/move set theirs via _setActivity.
     _currentActivity = currentName.isNotEmpty
-        ? 'Importing $currentName…'
-        : 'Importing…';
+        ? l10n.fileOpImportingName(currentName)
+        : l10n.fileOpImporting;
     notifyListeners();
   }
-
-
   void _setStatus(FileOperationStatus s) {
     _status = s;
     notifyListeners();

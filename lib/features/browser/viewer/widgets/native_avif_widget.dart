@@ -37,8 +37,8 @@ class _NativeAvifWidgetState extends State<NativeAvifWidget> {
   Future<void> _loadAndAnimate() async {
     try {
       final decoded = await vaultExplorerApi.decodeAvif(widget.avifBytes);
-      if (decoded == null || decoded.frames.isEmpty) {
-        if (mounted) setState(() { _error = 'Invalid AVIF image'; _isLoading = false; });
+        if (decoded == null || decoded.frames.isEmpty) {
+        if (mounted) setState(() { _error = context.l10n.invalidAvifImage; _isLoading = false; });
         return;
       }
 

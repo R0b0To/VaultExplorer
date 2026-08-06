@@ -6127,6 +6127,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Media stream initialization failed'**
   String get mediaStreamInitFailedError;
+
+  /// Error message when an AVIF image is corrupt or invalid
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid AVIF image'**
+  String get invalidAvifImage;
+
+  /// Verb: Import
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get verbImport;
+
+  /// Verb: Move
+  ///
+  /// In en, this message translates to:
+  /// **'Move'**
+  String get verbMove;
+
+  /// Verb: Copy
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get verbCopy;
+
+  /// Past-tense verb: Imported
+  ///
+  /// In en, this message translates to:
+  /// **'Imported'**
+  String get verbImported;
+
+  /// Past-tense verb: Moved
+  ///
+  /// In en, this message translates to:
+  /// **'Moved'**
+  String get verbMoved;
+
+  /// Past-tense verb: Copied
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get verbCopied;
+
+  /// Present-continuous verb: Importing
+  ///
+  /// In en, this message translates to:
+  /// **'Importing'**
+  String get verbImporting;
+
+  /// Present-continuous verb: Moving
+  ///
+  /// In en, this message translates to:
+  /// **'Moving'**
+  String get verbMoving;
+
+  /// Present-continuous verb: Copying
+  ///
+  /// In en, this message translates to:
+  /// **'Copying'**
+  String get verbCopying;
+
+  /// Pluralized count of items in a file operation
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item} other{# items}}'**
+  String fileOpItemsCount(num count);
+
+  /// Completion summary count of items processed
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 item {verb}} other{# items {verb}}}'**
+  String fileOpSummaryCount(num count, String verb);
+
+  /// Completion summary count of skipped items
+  ///
+  /// In en, this message translates to:
+  /// **'{count} skipped'**
+  String fileOpSummarySkipped(num count);
+
+  /// Completion summary count of failed items
+  ///
+  /// In en, this message translates to:
+  /// **'{count} failed'**
+  String fileOpSummaryFailed(num count);
+
+  /// Status label for cancelled operations
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get statusCancelled;
+
+  /// Status label for failed operations
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get statusFailed;
+
+  /// Status label for completed operations
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get statusCompleted;
+
+  /// Status message while checking available space before a file operation
+  ///
+  /// In en, this message translates to:
+  /// **'Checking available space…'**
+  String get fileOpCheckingSpace;
+
+  /// Status message while resolving file name conflicts before a file operation
+  ///
+  /// In en, this message translates to:
+  /// **'Resolving conflicts…'**
+  String get fileOpResolvingConflicts;
+
+  /// Error message when storage space is insufficient for a file operation
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough space — need {required}, only {free} free'**
+  String fileOpNotEnoughSpace(String required, String free);
+
+  /// Error message when disk becomes full during a file operation and partial files are cleaned up
+  ///
+  /// In en, this message translates to:
+  /// **'Disk full — partial files removed'**
+  String get fileOpDiskFullPartialRemoved;
+
+  /// Error message when moving a file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Move failed'**
+  String get fileOpMoveFailed;
+
+  /// Error message when copying a file fails
+  ///
+  /// In en, this message translates to:
+  /// **'Copy failed'**
+  String get fileOpCopyFailed;
+
+  /// Error message when disk becomes full
+  ///
+  /// In en, this message translates to:
+  /// **'Disk full'**
+  String get fileOpDiskFull;
+
+  /// Status message while importing
+  ///
+  /// In en, this message translates to:
+  /// **'Importing…'**
+  String get fileOpImporting;
+
+  /// Status message while importing a specific item
+  ///
+  /// In en, this message translates to:
+  /// **'Importing {name}…'**
+  String fileOpImportingName(String name);
+
+  /// Status message while moving a specific item
+  ///
+  /// In en, this message translates to:
+  /// **'Moving {name}…'**
+  String fileOpMovingName(String name);
+
+  /// Status message while copying a specific item
+  ///
+  /// In en, this message translates to:
+  /// **'Copying {name}…'**
+  String fileOpCopyingName(String name);
 }
 
 class _AppLocalizationsDelegate

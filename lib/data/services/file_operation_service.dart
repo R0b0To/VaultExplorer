@@ -83,9 +83,8 @@ class FileOperationService extends ChangeNotifier {
     required String destDirPath,
     required List<ClipboardItem> items,
     ConflictPlan? conflictPlan,
+    required AppLocalizations l10n,
   }) {
-    // FileOperation._internal() is accessible here because this file is
-    // declared `part of 'file_operation.dart'`.
     final op = FileOperation._internal(
       id: _nextId++,
       isCut: isCut,
@@ -95,25 +94,19 @@ class FileOperationService extends ChangeNotifier {
       destDisplayName: dest.displayName,
       destDirPath: destDirPath,
       items: items,
+      l10n: l10n,
     );
     _operations.add(op);
     notifyListeners();
-
     _run(op, source, dest, conflictPlan ?? {});
     return op;
   }
-
-  /// Enqueues and starts a background native import operation.
-  ///
-  /// [performImport] receives the new operation's [FileOperation.id] as
-  /// `opId` — the caller threads it into the native `importFile`/
-  /// `importFolder` call so progress pushes and [VaultExplorerApi.cancelImport]
-  /// can be matched back to this operation.
   FileOperation enqueueImport({
     required MountedContainer dest,
     required String destDirPath,
     required bool isFolder,
     required Future<int> Function(int opId) performImport,
+    required AppLocalizations l10n,
   }) {
     final op = FileOperation._internal(
       id: _nextId++,
@@ -131,10 +124,10 @@ class FileOperationService extends ChangeNotifier {
         )
       ],
       isImport: true,
+      l10n: l10n,
     );
     _operations.add(op);
     notifyListeners();
-
     _runImport(op, performImport);
     return op;
   }
@@ -220,7 +213,7 @@ class FileOperationService extends ChangeNotifier {
     Future<int> Function(int opId) performImport,
   ) async {
     op._setStatus(FileOperationStatus.running);
-    op._setActivity('Importing…');
+    op._setActivity(op.l10n.fileOpImporting);
 
 void onProgress(ImportProgress p) {
       if (p.opId != op.id) return;
@@ -271,14 +264,10 @@ void onProgress(ImportProgress p) {
   ) async {
     // _setStatus / _setActivity / etc. are accessible because this file is
     // part of the same library as FileOperation.
-    op._setStatus(FileOperationStatus.running);
-
+   op._setStatus(FileOperationStatus.running);
     vaultExplorerApi.beginBatch(dest.volId);
-
     try {
-      // ── Space pre-flight ────────────────────────────────────────────────
-      op._setActivity('Checking available space…');
-
+      op._setActivity(op.l10n.fileOpCheckingSpace);
       int requiredBytes = 0;
 if (!(op.isCut && src.volId == dest.volId)) {
         for (final item in op.items) {
@@ -287,25 +276,22 @@ if (!(op.isCut && src.volId == dest.volId)) {
         }
       }
       op._setTotalBytes(requiredBytes);
-
-
 final spaceInfo = await vaultExplorerApi.getSpaceInfo(dest);
 final freeBytes = (spaceInfo != null && spaceInfo.length > 1 && spaceInfo[1] >= 0)
     ? spaceInfo[1]
-    : null; // destination doesn't report free space — skip the check
-
+    : null;
 if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
   op._setError(
-    'Not enough space — need ${formatBytes(requiredBytes)}, '
-    'only ${formatBytes(freeBytes)} free',
+    op.l10n.fileOpNotEnoughSpace(
+      formatBytes(requiredBytes),
+      formatBytes(freeBytes),
+    ),
   );
   op._setStatus(FileOperationStatus.failed);
   notifyListeners();
   return;
 }
-
-      // ── Resolve destination names ─────────────────────────────────────
-      op._setActivity('Resolving conflicts…');
+      op._setActivity(op.l10n.fileOpResolvingConflicts);
 
       final existingRaw =
           await vaultExplorerApi.listDirectory(dest, op.destDirPath) ?? [];
@@ -390,10 +376,11 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
                 return;
               }
 
-              op._setActivity(
-                '${op.isCut ? "Moving" : "Copying"} ${r.item.name}…',
+             op._setActivity(
+                op.isCut
+                    ? op.l10n.fileOpMovingName(r.item.name)
+                    : op.l10n.fileOpCopyingName(r.item.name),
               );
-
               bool ok = false;
               if (op.isCut && src.volId == dest.volId) {
                 ok = await vaultExplorerApi.renameFile(
@@ -405,7 +392,7 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
                   op._recordItemResult(
                     idx,
                     FileItemResult.failed,
-                    errorMessage: 'Move failed',
+                    errorMessage: op.l10n.fileOpMoveFailed,
                   );
                 } else {
                   op._recordItemResult(idx, FileItemResult.success);
@@ -421,12 +408,11 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
                   op,
                   r.item.modifiedSecs,
                 );
-
                 if (!ok) {
                   op._recordItemResult(
                     idx,
                     FileItemResult.failed,
-                    errorMessage: 'Copy failed',
+                    errorMessage: op.l10n.fileOpCopyFailed,
                   );
                 } else if (op.isCut) {
                   await _deleteEntryRecursive(src, r.item.path, r.item.isDir);
@@ -439,14 +425,14 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
               op._recordItemResult(
                 idx,
                 FileItemResult.failed,
-                errorMessage: 'Disk full',
+                errorMessage: op.l10n.fileOpDiskFull,
               );
               rethrow;
             } on _CancelledException {
               op._recordItemResult(
                 idx,
                 FileItemResult.skipped,
-                errorMessage: 'Cancelled',
+                errorMessage: op.l10n.statusCancelled,
               );
               rethrow;
             } catch (e) {
@@ -465,19 +451,16 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
           debugPrint('FileOperationService unhandled: $e');
         }
       }
-
-      // ── Final status ──────────────────────────────────────────────────
       final diskFull = op.itemStatuses.any(
-        (s) => s.errorMessage == 'Disk full',
+        (s) => s.errorMessage == 'Disk full' || s.errorMessage == op.l10n.fileOpDiskFull,
       );
-
       if (diskFull) {
         for (final path in createdDestPaths.reversed) {
           try {
             await _deleteEntryRecursive(dest, path, false);
           } catch (_) {}
         }
-        op._setError('Disk full — partial files removed');
+        op._setError(op.l10n.fileOpDiskFullPartialRemoved);
         op._setStatus(FileOperationStatus.diskFull);
       } else if (op.cancelRequested) {
         op._setStatus(FileOperationStatus.cancelled);
@@ -556,7 +539,9 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
     int modifiedSecs,
   ) async {
     op._setActivity(
-      '${op.isCut ? "Moving" : "Copying"} ${destPath.split('/').last}…',
+      op.isCut
+          ? op.l10n.fileOpMovingName(destPath.split('/').last)
+          : op.l10n.fileOpCopyingName(destPath.split('/').last),
     );
     try {
       final size = await vaultExplorerApi.getFileSize(src, srcPath);

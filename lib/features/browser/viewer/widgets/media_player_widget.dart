@@ -205,9 +205,12 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
       if (_playerError == null) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _playerError == null) {
+            final rawError = controller.value.errorDescription;
             setState(() {
-              _playerError = controller.value.errorDescription.isNotEmpty
-                  ? controller.value.errorDescription
+              _playerError = rawError.isNotEmpty
+                  ? (rawError == 'Video decoder unavailable — hardware codec contention'
+                      ? context.l10n.videoDecoderUnavailableError
+                      : rawError)
                   : context.l10n.mediaStreamInitFailedError;
             });
             widget.onError?.call();

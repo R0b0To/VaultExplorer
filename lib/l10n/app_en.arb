@@ -4759,6 +4759,144 @@
   "mediaStreamInitFailedError": "Media stream initialization failed",
   "@mediaStreamInitFailedError": {
     "description": "Fallback error description for video playback failure"
+  },
+ "invalidAvifImage": "Invalid AVIF image",
+  "@invalidAvifImage": {
+    "description": "Error message when an AVIF image is corrupt or invalid"
+  },
+  "verbImport": "Import",
+  "@verbImport": {
+    "description": "Verb: Import"
+  },
+  "verbMove": "Move",
+  "@verbMove": {
+    "description": "Verb: Move"
+  },
+  "verbCopy": "Copy",
+  "@verbCopy": {
+    "description": "Verb: Copy"
+  },
+  "verbImported": "Imported",
+  "@verbImported": {
+    "description": "Past-tense verb: Imported"
+  },
+  "verbMoved": "Moved",
+  "@verbMoved": {
+    "description": "Past-tense verb: Moved"
+  },
+  "verbCopied": "Copied",
+  "@verbCopied": {
+    "description": "Past-tense verb: Copied"
+  },
+  "verbImporting": "Importing",
+  "@verbImporting": {
+    "description": "Present-continuous verb: Importing"
+  },
+  "verbMoving": "Moving",
+  "@verbMoving": {
+    "description": "Present-continuous verb: Moving"
+  },
+  "verbCopying": "Copying",
+  "@verbCopying": {
+    "description": "Present-continuous verb: Copying"
+  },
+  "fileOpItemsCount": "{count, plural, =1{1 item} other{# items}}",
+  "@fileOpItemsCount": {
+    "description": "Pluralized count of items in a file operation",
+    "placeholders": {
+      "count": { "type": "num" }
+    }
+  },
+  "fileOpSummaryCount": "{count, plural, =1{1 item {verb}} other{# items {verb}}}",
+  "@fileOpSummaryCount": {
+    "description": "Completion summary count of items processed",
+    "placeholders": {
+      "count": { "type": "num" },
+      "verb": { "type": "String" }
+    }
+  },
+  "fileOpSummarySkipped": "{count} skipped",
+  "@fileOpSummarySkipped": {
+    "description": "Completion summary count of skipped items",
+    "placeholders": {
+      "count": { "type": "num" }
+    }
+  },
+  "fileOpSummaryFailed": "{count} failed",
+  "@fileOpSummaryFailed": {
+    "description": "Completion summary count of failed items",
+    "placeholders": {
+      "count": { "type": "num" }
+    }
+  },
+  "statusCancelled": "Cancelled",
+  "@statusCancelled": {
+    "description": "Status label for cancelled operations"
+  },
+  "statusFailed": "Failed",
+  "@statusFailed": {
+    "description": "Status label for failed operations"
+  },
+  "statusCompleted": "Completed",
+  "@statusCompleted": {
+    "description": "Status label for completed operations"
+  },
+  "fileOpCheckingSpace": "Checking available space…",
+  "@fileOpCheckingSpace": {
+    "description": "Status message while checking available space before a file operation"
+  },
+  "fileOpResolvingConflicts": "Resolving conflicts…",
+  "@fileOpResolvingConflicts": {
+    "description": "Status message while resolving file name conflicts before a file operation"
+  },
+  "fileOpNotEnoughSpace": "Not enough space — need {required}, only {free} free",
+  "@fileOpNotEnoughSpace": {
+    "description": "Error message when storage space is insufficient for a file operation",
+    "placeholders": {
+      "required": { "type": "String" },
+      "free": { "type": "String" }
+    }
+  },
+  "fileOpDiskFullPartialRemoved": "Disk full — partial files removed",
+  "@fileOpDiskFullPartialRemoved": {
+    "description": "Error message when disk becomes full during a file operation and partial files are cleaned up"
+  },
+  "fileOpMoveFailed": "Move failed",
+  "@fileOpMoveFailed": {
+    "description": "Error message when moving a file fails"
+  },
+  "fileOpCopyFailed": "Copy failed",
+  "@fileOpCopyFailed": {
+    "description": "Error message when copying a file fails"
+  },
+  "fileOpDiskFull": "Disk full",
+  "@fileOpDiskFull": {
+    "description": "Error message when disk becomes full"
+  },
+  "fileOpImporting": "Importing…",
+  "@fileOpImporting": {
+    "description": "Status message while importing"
+  },
+  "fileOpImportingName": "Importing {name}…",
+  "@fileOpImportingName": {
+    "description": "Status message while importing a specific item",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "fileOpMovingName": "Moving {name}…",
+  "@fileOpMovingName": {
+    "description": "Status message while moving a specific item",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "fileOpCopyingName": "Copying {name}…",
+  "@fileOpCopyingName": {
+    "description": "Status message while copying a specific item",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
   }
 }
 

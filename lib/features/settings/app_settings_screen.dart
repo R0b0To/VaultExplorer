@@ -715,14 +715,14 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                               _persist();
                             },
                           ),
-                          OptionPickerTile<ThumbnailCacheMode>(
+                            OptionPickerTile<ThumbnailCacheMode>(
                             label: context.l10n.thumbnailCachingDefaultLabel,
                             value: _settings.defaultThumbnailCacheMode,
                             options: ThumbnailCacheMode.values.map((mode) {
                               return SelectOption(
                                 value: mode,
-                                label: mode.label,
-                                subtitle: mode.description,
+                                label: mode.getLocalizedLabel(context.l10n),
+                                subtitle: mode.getLocalizedDescription(context.l10n),
                               );
                             }).toList(),
                             onChanged: (v) {

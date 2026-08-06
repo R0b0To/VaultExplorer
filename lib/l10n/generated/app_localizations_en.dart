@@ -3612,4 +3612,117 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mediaStreamInitFailedError => 'Media stream initialization failed';
+
+  @override
+  String get invalidAvifImage => 'Invalid AVIF image';
+
+  @override
+  String get verbImport => 'Import';
+
+  @override
+  String get verbMove => 'Move';
+
+  @override
+  String get verbCopy => 'Copy';
+
+  @override
+  String get verbImported => 'Imported';
+
+  @override
+  String get verbMoved => 'Moved';
+
+  @override
+  String get verbCopied => 'Copied';
+
+  @override
+  String get verbImporting => 'Importing';
+
+  @override
+  String get verbMoving => 'Moving';
+
+  @override
+  String get verbCopying => 'Copying';
+
+  @override
+  String fileOpItemsCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String fileOpSummaryCount(num count, String verb) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '# items $verb',
+      one: '1 item $verb',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String fileOpSummarySkipped(num count) {
+    return '$count skipped';
+  }
+
+  @override
+  String fileOpSummaryFailed(num count) {
+    return '$count failed';
+  }
+
+  @override
+  String get statusCancelled => 'Cancelled';
+
+  @override
+  String get statusFailed => 'Failed';
+
+  @override
+  String get statusCompleted => 'Completed';
+
+  @override
+  String get fileOpCheckingSpace => 'Checking available space…';
+
+  @override
+  String get fileOpResolvingConflicts => 'Resolving conflicts…';
+
+  @override
+  String fileOpNotEnoughSpace(String required, String free) {
+    return 'Not enough space — need $required, only $free free';
+  }
+
+  @override
+  String get fileOpDiskFullPartialRemoved =>
+      'Disk full — partial files removed';
+
+  @override
+  String get fileOpMoveFailed => 'Move failed';
+
+  @override
+  String get fileOpCopyFailed => 'Copy failed';
+
+  @override
+  String get fileOpDiskFull => 'Disk full';
+
+  @override
+  String get fileOpImporting => 'Importing…';
+
+  @override
+  String fileOpImportingName(String name) {
+    return 'Importing $name…';
+  }
+
+  @override
+  String fileOpMovingName(String name) {
+    return 'Moving $name…';
+  }
+
+  @override
+  String fileOpCopyingName(String name) {
+    return 'Copying $name…';
+  }
 }

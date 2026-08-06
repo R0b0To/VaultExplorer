@@ -32,6 +32,7 @@ class EncryptedImageWidget extends StatefulWidget {
 
 class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
   Uint8List? _bytes;
+  Uint8List? _thumbnailBytes;
   String? _error;
   bool _isFullResLoaded = false;
   String? _currentlyLoadingFile;
@@ -40,15 +41,16 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
   @override
   void initState() {
     super.initState();
+    _thumbnailBytes = widget.prefetchedBytes ??
+        ThumbnailCacheService.getFromMemory(
+            widget.container, widget.fileName);
     final cachedFullRes =
         FullResImageCache.get(widget.container, widget.fileName);
     if (cachedFullRes != null) {
       _bytes = cachedFullRes;
       _isFullResLoaded = true;
     } else {
-      _bytes = widget.prefetchedBytes ??
-          ThumbnailCacheService.getFromMemory(
-              widget.container, widget.fileName);
+      _bytes = _thumbnailBytes;
       _loadImage();
     }
   }
@@ -59,6 +61,9 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     if (widget.fileName != oldWidget.fileName) {
       _cancelPendingLoad();
       _error = null;
+      _thumbnailBytes = widget.prefetchedBytes ??
+          ThumbnailCacheService.getFromMemory(
+              widget.container, widget.fileName);
       final cachedFullRes =
           FullResImageCache.get(widget.container, widget.fileName);
       if (cachedFullRes != null) {
@@ -66,9 +71,7 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
         _isFullResLoaded = true;
       } else {
         _isFullResLoaded = false;
-        _bytes = widget.prefetchedBytes ??
-            ThumbnailCacheService.getFromMemory(
-                widget.container, widget.fileName);
+        _bytes = _thumbnailBytes;
         _loadImage();
       }
     } else if (!_isFullResLoaded && _currentlyLoadingFile == null) {
@@ -76,7 +79,10 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     } else if (!_isFullResLoaded &&
         widget.prefetchedBytes != null &&
         _bytes == null) {
-      setState(() => _bytes = widget.prefetchedBytes);
+      setState(() {
+        _thumbnailBytes = widget.prefetchedBytes;
+        _bytes = widget.prefetchedBytes;
+      });
     }
   }
 
@@ -206,27 +212,23 @@ class _EncryptedImageWidgetState extends State<EncryptedImageWidget> {
     // ── Check if the file is AVIF ──
     final isAvif = widget.fileName.toLowerCase().endsWith('.avif');
     if (isAvif) {
-      // If full-res AVIF has not finished loading, display the JPEG thumbnail
-      // preview using Image.memory until the raw .avif file bytes arrive.
-      if (!_isFullResLoaded) {
-        return Image.memory(
-          _bytes!,
-          fit: widget.fit,
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (_, __, ___) => Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-              valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          if (_thumbnailBytes != null)
+            Image.memory(
+              _thumbnailBytes!,
+              fit: widget.fit,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             ),
-          ),
-        );
-      }
-
-      // Once full-res is loaded, pass the raw .avif file bytes to NativeAvifWidget
-      return NativeAvifWidget(
-        avifBytes: _bytes!,
-        fit: widget.fit,
+          if (_isFullResLoaded)
+            NativeAvifWidget(
+              avifBytes: _bytes!,
+              fit: widget.fit,
+            ),
+        ],
       );
     }
 

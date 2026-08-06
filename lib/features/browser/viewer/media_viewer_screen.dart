@@ -120,7 +120,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     );
     _loadConfig();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _activateCurrentMedia();
+       _activateCurrentMedia();
       _startSlideshowTimerIfNeeded();
 
       // 2. Wait for ExoPlayer initialization to complete before background prefetching starts
@@ -138,23 +138,26 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   // exactly the kind of overlap this whole fix is meant to prevent.
   int _activateToken = 0;
 
-  Future<void> _activateCurrentMedia() async {
+  void _activateCurrentMedia() {
     if (_playlistController.isEmpty) return;
     final file = _playlistController.currentFile;
     final token = ++_activateToken;
 
-    // Set throttle active FIRST so thumbnail queues block new video thumbnail jobs
-    await PlaybackThrottleController.setActive(MediaViewerConstants.isVideo(file));
-    if (!mounted || token != _activateToken) return; // superseded by a newer call
+    final isVid = MediaViewerConstants.isVideo(file);
+    final isAud = MediaViewerConstants.isAudio(file);
 
-    if (MediaViewerConstants.isVideo(file) || MediaViewerConstants.isAudio(file)) {
+    unawaited(PlaybackThrottleController.setActive(isVid));
+    if (!mounted || token != _activateToken) return;
+
+    if (isVid || isAud) {
       PlaybackThrottleController.setInitializing();
-      _playbackManager.activate(
+      // Call activate asynchronously - Manager internal queue handles safety
+      unawaited(_playbackManager.activate(
         fileName: file,
         contentUriString: _contentUriFor(file),
         autoPlay: _autoPlay,
         playbackSpeed: _playbackSpeed,
-      );
+      ));
     } else {
       _playbackManager.pauseActive();
     }
@@ -254,16 +257,21 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         '$volId%3Afile%3A$escapedPath';
   }
 
-  void _prefetchSurroundingItems() {
+void _prefetchSurroundingItems() {
     final index = _playlistController.currentIndex;
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty) return;
+
     final next = index + 1;
     final prev = index - 1;
     final nextFile = next < playlist.length ? playlist[next] : null;
     final prevFile = prev >= 0 ? playlist[prev] : null;
+
+    // Prefetch Thumbnails
     if (nextFile != null) _prefetchThumbnail(nextFile);
     if (prevFile != null) _prefetchThumbnail(prevFile);
+
+    // Prefetch Full-Res Image if next is an image
     final currentFile = _playlistController.currentFile;
     if (MediaViewerConstants.isImage(currentFile) && nextFile != null) {
       _prefetchFullRes(nextFile);
@@ -430,13 +438,22 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
-  Future<void> _transitionTo(int index, {bool animate = true}) async {
+Future<void> _transitionTo(int index, {bool animate = true}) async {
     if (index < 0 || index >= _playlistController.playlist.length) return;
     final token = ++_transitionToken;
     _cancelSlideshowTimer();
     _startHideTimer();
-    _playbackManager.pauseActive();
+
+    // Update index immediately
     _playlistController.updateIndex(index);
+
+    // ACTIVATE NOW: Native teardown & initialization run DURING the 220ms animation
+    _activateCurrentMedia();
+
+    _prefetchDebounceTimer?.cancel();
+    _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+      if (mounted) _prefetchSurroundingItems();
+    });
 
     if (_pageController.hasClients && _pageController.positions.length == 1) {
       if (animate) {
@@ -451,7 +468,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
 
     if (mounted && _transitionToken == token) {
-      _onScrollEnd();
+      _isSwiping = false;
+      final currentFile = _playlistController.currentFile;
+      if (MediaViewerConstants.isImage(currentFile)) {
+        _startSlideshowTimerIfNeeded();
+      }
+      if (_showUI) {
+        _startHideTimer();
+      }
+      if (mounted) setState(() {});
     }
   }
 
@@ -490,9 +515,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
   }
 
-  void _onScrollEnd() {
+void _onScrollEnd() {
     _isSwiping = false;
-    _activateCurrentMedia();
+    
+    // Fallback check in case page scroll completed without index change
+    if (_playbackManager.currentFileNotifier.value != _playlistController.currentFile) {
+      _activateCurrentMedia();
+    }
+
     final currentFile = _playlistController.currentFile;
     if (MediaViewerConstants.isImage(currentFile)) {
       _startSlideshowTimerIfNeeded();
@@ -824,17 +854,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                   physics: physics,
                   itemCount: _playlistController.playlist.length,
                   onPageChanged: (index) {
+                  if (_playlistController.currentIndex != index) {
                     _playlistController.updateIndex(index);
-                    // Activation is handled by _onScrollEnd (fired via the
-                    // ScrollEndNotification below for swipes, and directly
-                    // by _transitionTo for programmatic navigation) --
-                    // calling _activateCurrentMedia() here too would race
-                    // a second concurrent activation against it.
-                    _prefetchDebounceTimer?.cancel();
-                    _prefetchDebounceTimer = Timer(const Duration(milliseconds: 200), () {
-                      if (mounted) _prefetchSurroundingItems();
-                    });
-                  },
+                    // Immediately start hardware decoder switch when swipe crosses midpoint
+                    _activateCurrentMedia();
+                  }
+
+                  _prefetchDebounceTimer?.cancel();
+                  _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+                    if (mounted) _prefetchSurroundingItems();
+                  });
+                },
 
                   itemBuilder: (context, index) {
                     final fileName = _playlistController.playlist[index];

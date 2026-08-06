@@ -15,6 +15,10 @@ class VideoPlaybackManager {
   final Map<String, bool> _subtitlesAvailableMap = {};
   bool isSubtitleAvailable(String fileName) => _subtitlesAvailableMap[fileName] ?? false;
 
+  // Track activation queue to prevent concurrent decoder allocations
+  int _activationToken = 0;
+  Future<void>? _currentActivationFuture;
+
   void updateSubtitleStatus(String fileName, bool available) {
     _subtitlesAvailableMap[fileName] = available;
   }
@@ -29,58 +33,68 @@ class VideoPlaybackManager {
     required bool autoPlay,
     required double playbackSpeed,
   }) async {
-    if (currentFileNotifier.value == fileName && _controllers.containsKey(fileName)) {
-      final ctrl = _controllers[fileName]!;
-      await ctrl.setPlaybackSpeed(playbackSpeed);
-      if (autoPlay) await ctrl.play();
+    final token = ++_activationToken;
+
+    // Chain activations sequentially so previous decoders are fully disposed first
+    final previousFuture = _currentActivationFuture;
+    final completer = Completer<void>();
+    _currentActivationFuture = completer.future;
+
+    if (previousFuture != null) {
+      try {
+        await previousFuture;
+      } catch (_) {}
+    }
+
+    // Cancel if a newer activation request came in while waiting in queue
+    if (token != _activationToken) {
+      completer.complete();
       return;
     }
 
-    final previousFile = currentFileNotifier.value;
-    if (previousFile != null && previousFile != fileName) {
-      final prevCtrl = _controllers.remove(previousFile);
-      if (prevCtrl != null) {
-        prevCtrl.pause();
-        // Mobile SoCs typically expose only a single active hardware video
-        // decoding pipeline (e.g. one 4K-capable c2.qti.vp9.decoder
-        // instance). The previous controller must be fully torn down
-        // *before* the next one is created below -- deferring this via a
-        // timer let two decoders be briefly alive at once, which exceeded
-        // hardware buffer limits and threw NO_MEMORY on 4K playback.
-        await prevCtrl.dispose();
+    try {
+      if (currentFileNotifier.value == fileName && _controllers.containsKey(fileName)) {
+        final ctrl = _controllers[fileName]!;
+        await ctrl.setPlaybackSpeed(playbackSpeed);
+        if (autoPlay) await ctrl.play();
+        return;
       }
+
+      final previousFile = currentFileNotifier.value;
+      if (previousFile != null && previousFile != fileName) {
+        final prevCtrl = _controllers.remove(previousFile);
+        if (prevCtrl != null) {
+          prevCtrl.pause();
+          // Fully teardown hardware pipeline before instantiating next controller
+          await prevCtrl.dispose();
+        }
+      }
+
+      // Check token again after async teardown
+      if (token != _activationToken) return;
+
+      NativeVideoController controller;
+      if (_controllers.containsKey(fileName)) {
+        controller = _controllers[fileName]!;
+        await controller.setPlaybackSpeed(playbackSpeed);
+        if (autoPlay) await controller.play();
+      } else {
+        controller = NativeVideoController(
+          contentUriString: contentUriString,
+          autoPlay: autoPlay,
+          initialSpeed: playbackSpeed,
+        );
+        _controllers[fileName] = controller;
+        unawaited(controller.initialize());
+      }
+
+      activeControllerNotifier.value = controller;
+      currentFileNotifier.value = fileName;
+
+      _cleanupOldControllers(keepFiles: {fileName});
+    } finally {
+      completer.complete();
     }
-
-    NativeVideoController controller;
-    if (_controllers.containsKey(fileName)) {
-      controller = _controllers[fileName]!;
-      await controller.setPlaybackSpeed(playbackSpeed);
-      if (autoPlay) await controller.play();
-    } else {
-      controller = NativeVideoController(
-        contentUriString: contentUriString,
-        autoPlay: autoPlay,
-        initialSpeed: playbackSpeed,
-      );
-      _controllers[fileName] = controller;
-      unawaited(controller.initialize());
-    }
-
-    // Assign the resolved controller *before* currentFileNotifier fires --
-    // listeners on currentFileNotifier (e.g. the screen's per-navigation
-    // resync) read activeController synchronously as soon as
-    // currentFileNotifier notifies, so activeControllerNotifier must already
-    // point at this (correct, just-resolved) controller by then. Doing this
-    // in the other order was what made a file-change handler apply settings
-    // like playback speed to the *previous* file's controller instead of the
-    // new one -- previousFile's controller was still "active" at the moment
-    // that listener ran.
-    activeControllerNotifier.value = controller;
-    currentFileNotifier.value = fileName;
-
-    // The previous controller is already disposed and removed above, so
-    // only the newly-active controller needs to be kept alive here.
-    _cleanupOldControllers(keepFiles: {fileName});
   }
 
   void _cleanupOldControllers({required Set<String> keepFiles}) {
@@ -94,6 +108,7 @@ class VideoPlaybackManager {
   void pauseActive() => activeController?.pause();
 
   void dispose() {
+    _activationToken++;
     currentFileNotifier.dispose();
     activeControllerNotifier.dispose();
     _subtitlesAvailableMap.clear();

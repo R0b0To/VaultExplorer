@@ -1,3 +1,5 @@
+// File: features/browser/viewer/media_viewer_screen.dart
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -1172,7 +1174,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               key: builderKey,
               controller: _listScrollController,
               scrollDirection: Axis.vertical,
-              physics: _swipePhysicsNotifier.value,
+              physics: const BouncingScrollPhysics(),
               itemCount: _playlistController.playlist.length,
               itemBuilder: (context, index) {
                 final itemHeight = _getItemHeight(index, constraints.maxWidth, constraints.maxHeight);
@@ -1188,22 +1190,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               minScale: 1.0,
               maxScale: MediaViewerConstants.maxImageZoom,
               clipBehavior: Clip.none,
+              panEnabled: true,
               onInteractionUpdate: (details) {
                 final s = _continuousTransformationController.value.getMaxScaleOnAxis();
                 if (s != _continuousScale) {
                   setState(() => _continuousScale = s);
-                  _swipePhysicsNotifier.value = s > 1.01
-                      ? const NeverScrollableScrollPhysics()
-                      : const BouncingScrollPhysics();
                 }
               },
               onInteractionEnd: (details) {
                 final s = _continuousTransformationController.value.getMaxScaleOnAxis();
-                if (s <= 1.01) {
-                  if (_continuousScale != 1.0) {
-                    setState(() => _continuousScale = 1.0);
-                  }
-                  _swipePhysicsNotifier.value = const BouncingScrollPhysics();
+                if (s <= 1.01 && _continuousScale != 1.0) {
+                  setState(() => _continuousScale = 1.0);
                 }
               },
               child: listWidget,

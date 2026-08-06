@@ -1,3 +1,5 @@
+
+
 import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -156,18 +158,17 @@ class _ImagePageItemState extends State<ImagePageItem> {
             final x = -position.dx * (_scale - 1);
             final y = -position.dy * (_scale - 1);
             _transformationController.value = Matrix4.identity()
-              ..translateByDouble(x, y, 0.0, 1.0)
-              ..scaleByDouble(_scale, _scale, _scale, 1.0);
+              ..translate(x, y, 0.0)
+              ..scale(_scale, _scale, 1.0);
           } else {
             _transformationController.value = Matrix4.identity()
-            ..scaleByDouble(_scale, _scale, _scale, 1.0);
+              ..scale(_scale, _scale, 1.0);
           }
-          widget.onZoomChanged(false);
         } else {
           _scale = 1.0;
           _transformationController.value = Matrix4.identity();
-          widget.onZoomChanged(true);
         }
+        widget.onZoomChanged(true);
       },
       child: SizedBox.expand(
         child: LayoutBuilder(
@@ -215,18 +216,23 @@ class _ImagePageItemState extends State<ImagePageItem> {
               minScale: 0.5,
               boundaryMargin: EdgeInsets.zero,
               constrained: isConstrained,
+              onInteractionStart: (details) {
+                if (details.pointerCount >= 2) {
+                  widget.onZoomChanged(false);
+                }
+              },
               onInteractionUpdate: (details) {
                 final s = _transformationController.value.getMaxScaleOnAxis();
                 if (s != _scale) {
                   _scale = s;
-                  widget.onZoomChanged(s <= 1.01);
                 }
               },
               onInteractionEnd: (details) {
                 final s = _transformationController.value.getMaxScaleOnAxis();
                 if (s <= 1.01) {
-                  widget.onZoomChanged(true);
+                  _scale = 1.0;
                 }
+                widget.onZoomChanged(true);
               },
               child: SizedBox(
                 width: canvasWidth,

@@ -362,8 +362,8 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     setState(() {
       _videoScale = targetScale;
       _videoTransformationController.value = targetMatrix;
-      widget.onZoomChanged(!zoomIn);
     });
+    widget.onZoomChanged(true);
   }
 
   Future<void> _skip({required bool backwards}) async {
@@ -580,16 +580,23 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
         maxScale: MediaViewerConstants.maxVideoZoom,
         minScale: 1.0,
         clipBehavior: Clip.none,
+        onInteractionStart: (details) {
+          if (details.pointerCount >= 2) {
+            widget.onZoomChanged(false);
+          }
+        },
         onInteractionUpdate: (details) {
           final s = _videoTransformationController.value.getMaxScaleOnAxis();
           if (s != _videoScale) {
             setState(() => _videoScale = s);
-            widget.onZoomChanged(s <= 1.01);
           }
         },
         onInteractionEnd: (details) {
           final s = _videoTransformationController.value.getMaxScaleOnAxis();
-          if (s <= 1.01) widget.onZoomChanged(true);
+          if (s <= 1.01) {
+            _videoScale = _minZoomScale;
+          }
+          widget.onZoomChanged(true);
         },
         child: corePlayerWidget,
       );
@@ -742,7 +749,6 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   final List<double> _heights = [0.2, 0.5, 0.8, 0.4, 0.9, 0.3, 0.7, 0.5, 0.2];
-
   @override
   void initState() {
     super.initState();
@@ -752,7 +758,6 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
     );
     if (widget.isPlaying) _controller.repeat(reverse: true);
   }
-
   @override
   void didUpdateWidget(covariant _AudioVisualizer oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -762,13 +767,11 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
       _controller.stop();
     }
   }
-
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

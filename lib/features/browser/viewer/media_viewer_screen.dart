@@ -72,6 +72,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   Timer? _prefetchDebounceTimer;
   final bool _autoPlay = true;
   bool _autoAdvance = false;
+  bool _isAutoAdvancing = false;
   int _slideshowDelaySeconds = 4;
   VideoPlaybackMode _videoPlaybackMode = VideoPlaybackMode.playOnce;
   double _playbackSpeed = 1.0;
@@ -235,18 +236,41 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _videoProgressNotifier.value = const VideoPlaybackProgress();
   }
 
-  void _onControllerTickUpdate() {
+void _onControllerTickUpdate() {
     final controller = _playbackManager.activeController;
     if (controller == null || controller.value.hasError) return;
     _updateWakelock(controller.value.isPlaying);
+
+    if (_isAutoAdvancing) return;
+
     final isInitialized = controller.value.isInitialized;
     final position = controller.value.position;
     final duration = controller.value.duration;
+
     if (isInitialized &&
         _videoPlaybackMode == VideoPlaybackMode.playAndAdvance &&
         duration > Duration.zero &&
         position >= duration) {
-      _navigateToNext();
+      // 1. Immediately set flag to block subsequent ticks
+      _isAutoAdvancing = true;
+
+      // 2. Remove listener from this controller so it stops notifying
+      try {
+        controller.removeListener(_onControllerTickUpdate);
+      } catch (_) {}
+
+      // 3. Pause playback
+      _playbackManager.pauseActive();
+
+      // 4. Schedule a SINGLE auto-advance timer
+      _cancelSlideshowTimer();
+      _slideshowTimer = Timer(const Duration(milliseconds: 300), () {
+        if (mounted && _videoPlaybackMode == VideoPlaybackMode.playAndAdvance) {
+          _autoAdvanceToNext();
+        } else {
+          _isAutoAdvancing = false;
+        }
+      });
     }
   }
 
@@ -278,25 +302,48 @@ void _prefetchSurroundingItems() {
     }
   }
 
-  Future<void> _prefetchThumbnail(String fileName) async {
-  final isImg = MediaViewerConstants.isImage(fileName);
-  final isVid = MediaViewerConstants.isVideo(fileName);
-  if (!isImg && !isVid) return;
+Future<void> _prefetchThumbnail(String fileName) async {
+    final isImg = MediaViewerConstants.isImage(fileName);
+    final isVid = MediaViewerConstants.isVideo(fileName);
+    if (!isImg && !isVid) return;
 
-  // NEVER prefetch video thumbnails in the background during playback.
-  // Hardware video decoders cannot handle concurrent 4K decoding contexts.
-  if (isVid && PlaybackThrottleController.isPlaybackActive.value) {
-    return;
-  }
+    // 1. Check memory cache first
+    if (ThumbnailCacheService.getFromMemory(
+          widget.container,
+          fileName,
+          widget.thumbnailQuality,
+        ) !=
+        null) {
+      return;
+    }
 
-  if (ThumbnailCacheService.getFromMemory(
-        widget.container,
-        fileName,
-        widget.thumbnailQuality,
-      ) !=
-      null) {
-    return;
-  }
+    // 2. ALWAYS CHECK DISK CACHE (Fast file I/O, uses 0 hardware video decoders!)
+    final mode = widget.thumbnailCacheMode;
+    if (mode != ThumbnailCacheMode.disabled) {
+      final cached = await ThumbnailCacheService.get(
+        container: widget.container,
+        filePath: fileName,
+        mode: mode,
+        quality: widget.thumbnailQuality,
+      );
+      if (cached != null && cached.isNotEmpty) {
+        ThumbnailCacheService.putInMemory(
+          widget.container,
+          fileName,
+          cached,
+          widget.thumbnailQuality,
+        );
+        if (mounted) setState(() {});
+        return;
+      }
+    }
+
+    // 3. ONLY block heavy native hardware extraction if playback is actively playing
+    if (isVid && PlaybackThrottleController.isPlaybackActive.value) {
+      return;
+    }
+
+    // 4. Proceed with native extraction queue
     final key = '${widget.container.volId}:'
         '${widget.container.mountedAt.millisecondsSinceEpoch}:$fileName';
     final existing = ThumbnailConcurrency.inFlightThumbnails[key];
@@ -307,6 +354,7 @@ void _prefetchSurroundingItems() {
       if (mounted) setState(() {});
       return;
     }
+
     final limiter = isVid
         ? ThumbnailConcurrency.videoLimiter
         : ThumbnailConcurrency.imageLimiter;
@@ -438,16 +486,18 @@ void _prefetchSurroundingItems() {
     }
   }
 
-Future<void> _transitionTo(int index, {bool animate = true}) async {
+Future<void> _transitionTo(
+    int index, {
+    bool animate = true,
+    Duration duration = const Duration(milliseconds: 250),
+    Curve curve = Curves.easeOutCubic,
+  }) async {
     if (index < 0 || index >= _playlistController.playlist.length) return;
     final token = ++_transitionToken;
     _cancelSlideshowTimer();
     _startHideTimer();
 
-    // Update index immediately
     _playlistController.updateIndex(index);
-
-    // ACTIVATE NOW: Native teardown & initialization run DURING the 220ms animation
     _activateCurrentMedia();
 
     _prefetchDebounceTimer?.cancel();
@@ -459,8 +509,8 @@ Future<void> _transitionTo(int index, {bool animate = true}) async {
       if (animate) {
         await _pageController.animateToPage(
           index,
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
+          duration: duration,
+          curve: curve,
         );
       } else {
         _pageController.jumpToPage(index);
@@ -469,6 +519,7 @@ Future<void> _transitionTo(int index, {bool animate = true}) async {
 
     if (mounted && _transitionToken == token) {
       _isSwiping = false;
+      _isAutoAdvancing = false; // Reset guard flag when page arrives
       final currentFile = _playlistController.currentFile;
       if (MediaViewerConstants.isImage(currentFile)) {
         _startSlideshowTimerIfNeeded();
@@ -477,6 +528,20 @@ Future<void> _transitionTo(int index, {bool animate = true}) async {
         _startHideTimer();
       }
       if (mounted) setState(() {});
+    }
+  }
+
+void _autoAdvanceToNext() {
+    final index = _playlistController.currentIndex;
+    if (index < _playlistController.playlist.length - 1) {
+      _transitionTo(
+        index + 1,
+        animate: true,
+        duration: const Duration(milliseconds: 550),
+        curve: Curves.easeInOutCubic,
+      );
+    } else {
+      _isAutoAdvancing = false;
     }
   }
 
@@ -502,7 +567,7 @@ Future<void> _transitionTo(int index, {bool animate = true}) async {
     final currentFile = _playlistController.currentFile;
     if (MediaViewerConstants.isImage(currentFile)) {
       _slideshowTimer = Timer(Duration(seconds: _slideshowDelaySeconds), () {
-        if (mounted) _navigateToNext();
+        if (mounted) _autoAdvanceToNext();
       });
     }
   }
@@ -510,6 +575,7 @@ Future<void> _transitionTo(int index, {bool animate = true}) async {
   void _onScrollStart() {
     if (!_isSwiping) {
       _isSwiping = true;
+      _isAutoAdvancing = false; // Cancel auto-advance if user manually swipes
       _playbackManager.activeController?.pause();
       _cancelSlideshowTimer();
     }
@@ -866,10 +932,16 @@ void _onScrollEnd() {
                   });
                 },
 
-                  itemBuilder: (context, index) {
+                itemBuilder: (context, index) {
                     final fileName = _playlistController.playlist[index];
                     final contentUriString = _contentUriFor(fileName);
                     final prefetchedBytes = _prefetchedBytesFor(fileName);
+
+                    // IF THUMBNAIL IS MISSING FROM MEMORY, TRIGGER DISK CACHE LOAD IMMEDIATELY
+                    if (prefetchedBytes == null) {
+                      unawaited(_prefetchThumbnail(fileName));
+                    }
+
                     final isImg = MediaViewerConstants.isImage(fileName);
                     final isAudio = MediaViewerConstants.isAudio(fileName);
                     final itemWidget = Container(

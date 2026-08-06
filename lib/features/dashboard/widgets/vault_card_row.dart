@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/vault_list_item.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_card.dart';
@@ -353,8 +354,8 @@ class _VaultCardRowState extends State<VaultCardRow>
                 child: _maybeDragWrap(
                   child: Semantics(
                     customSemanticsActions: {
-                      const CustomSemanticsAction(label: 'Edit'): widget.onEdit,
-                      const CustomSemanticsAction(label: 'Delete'): widget.onDelete,
+                      CustomSemanticsAction(label: context.l10n.edit): widget.onEdit,
+                      CustomSemanticsAction(label: context.l10n.delete): widget.onDelete,
                     },
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(AppRadius.xl),

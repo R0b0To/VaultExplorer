@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
@@ -18,11 +19,11 @@ class AboutScreen extends StatelessWidget {
     try {
       final ok = await vaultExplorerApi.launchUrl(url);
       if (!ok && context.mounted) {
-        _showSnack(context, 'Could not open link', tone: AppBannerTone.error);
+        _showSnack(context, context.l10n.couldNotOpenLinkMessage, tone: AppBannerTone.error);
       }
     } catch (_) {
       if (context.mounted) {
-        _showSnack(context, 'Could not open link', tone: AppBannerTone.error);
+        _showSnack(context, context.l10n.couldNotOpenLinkMessage, tone: AppBannerTone.error);
       }
     }
   }
@@ -135,19 +136,19 @@ class AboutScreen extends StatelessWidget {
           children: [
             _HeaderIconButton(
               icon: Icons.code_rounded,
-              tooltip: 'Source Code',
+              tooltip: context.l10n.sourceCodeTooltip,
               onTap: () => _openUrl(context, _kGithubUrl),
             ),
             const SizedBox(width: 12),
             _HeaderIconButton(
               icon: Icons.favorite_rounded,
-              tooltip: 'Donate',
+              tooltip: context.l10n.donateTooltip,
               onTap: () => _openUrl(context, _kKofiUrl),
             ),
             const SizedBox(width: 12),
             _HeaderIconButton(
               icon: Icons.share_rounded,
-              tooltip: 'Share App',
+              tooltip: context.l10n.shareAppTooltip,
               onTap: () => _shareApp(context),
             ),
           ],
@@ -165,7 +166,7 @@ class AboutScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
         title:
-            const Text('About', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(context.l10n.aboutScreenTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: Align(
@@ -544,8 +545,8 @@ class _PrivacySheet extends StatelessWidget {
                 minimumSize: const Size.fromHeight(48),
                 shape: const StadiumBorder(),
               ),
-              child: const Text('Close',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(context.l10n.close,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
             ),
           ],
         ),

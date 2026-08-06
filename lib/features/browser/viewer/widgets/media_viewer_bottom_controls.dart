@@ -154,7 +154,7 @@ class MediaViewerBottomControls extends StatelessWidget {
                 ),
                 Expanded(
                   child: Semantics(
-                    label: 'Video playback position slider',
+                    label: context.l10n.videoPlaybackSliderLabel,
                     value: '${(progress.sliderValue * 100).toStringAsFixed(0)}%',
                     child: Slider(
                       value: progress.sliderValue.clamp(0.0, 1.0),
@@ -220,7 +220,7 @@ class MediaViewerBottomControls extends StatelessWidget {
       children: [
         if (isPlaylistMode && onToggleCarousel != null) ...[
           Semantics(
-            label: 'Toggle thumbnail carousel',
+            label: context.l10n.thumbnailCarouselTooltip,
             button: true,
             child: _CircleOverlayButton(
               icon: Icons.view_carousel_rounded,
@@ -235,8 +235,8 @@ class MediaViewerBottomControls extends StatelessWidget {
           const SizedBox(width: 8),
         ],
         Semantics(
-          label: 'Advanced settings',
-          hint: onDiagnosticsPressed != null ? 'Long press for playback diagnostics' : null,
+          label: context.l10n.advancedSettingsTooltip,
+          hint: onDiagnosticsPressed != null ? context.l10n.longPressPlaybackDiagnosticsHint : null,
           button: true,
           child: _CircleOverlayButton(
             icon: Icons.tune_rounded,
@@ -262,8 +262,8 @@ class MediaViewerBottomControls extends StatelessWidget {
       if (!isPlaylistMode) return const SizedBox.shrink();
       return Semantics(
         label: autoAdvance
-            ? 'Slideshow mode active with $slideshowDelaySeconds seconds delay'
-            : 'Static image mode',
+            ? context.l10n.slideshowModeActiveLabel(slideshowDelaySeconds)
+            : context.l10n.staticImageModeLabel,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
@@ -316,7 +316,7 @@ class MediaViewerBottomControls extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Semantics(
-            label: isMuted ? 'Unmute volume' : 'Mute volume',
+            label: isMuted ? context.l10n.unmuteTooltip : context.l10n.muteTooltip,
             button: true,
             child: _CircleOverlayButton(
               icon: isMuted ? Icons.volume_off_rounded : Icons.volume_up_rounded,
@@ -327,7 +327,7 @@ class MediaViewerBottomControls extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Semantics(
-            label: 'Video playback mode: $modeTooltip',
+            label: context.l10n.videoPlaybackModeLabel(modeTooltip),
             button: true,
             child: _CircleOverlayButton(
               icon: modeIcon,
@@ -417,7 +417,7 @@ class MediaViewerBottomControls extends StatelessWidget {
           children: [
             if (isPlaylistMode) ...[
               Semantics(
-                label: 'Previous file',
+                label: context.l10n.previousTooltip,
                 button: true,
                 child: _CircleOverlayButton(
                   icon: Icons.skip_previous_rounded,
@@ -435,7 +435,7 @@ class MediaViewerBottomControls extends StatelessWidget {
               const SizedBox(width: 12),
             ],
             Semantics(
-              label: isPlayingState ? 'Pause' : 'Play',
+              label: isPlayingState ? context.l10n.pauseLabel : context.l10n.playLabel,
               button: true,
               child: SizedBox(
                 width: 56,
@@ -464,7 +464,7 @@ class MediaViewerBottomControls extends StatelessWidget {
             if (isPlaylistMode) ...[
               const SizedBox(width: 12),
               Semantics(
-                label: 'Next file',
+                label: context.l10n.nextTooltip,
                 button: true,
                 child: _CircleOverlayButton(
                   icon: Icons.skip_next_rounded,

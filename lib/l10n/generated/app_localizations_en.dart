@@ -2474,13 +2474,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saveChangesTooltip => 'Save changes';
 
   @override
-  String get textEditorDecryptFailedMessage => 'Failed to decrypt file from vault.';
+  String get textEditorDecryptFailedMessage =>
+      'Failed to decrypt file from vault.';
 
   @override
-  String get textEditorInvalidTextFileMessage => 'The file does not appear to be a valid text file.';
+  String get textEditorInvalidTextFileMessage =>
+      'The file does not appear to be a valid text file.';
 
   @override
-  String get textEditorWriteBackFailedMessage => 'Failed to write file back to vault.';
+  String get textEditorWriteBackFailedMessage =>
+      'Failed to write file back to vault.';
 
   @override
   String get backTooltip => 'Back';
@@ -2493,6 +2496,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get optionsTooltip => 'Options';
+
+  @override
+  String get htmlViewerErrorTitle => 'Cannot display this page';
+
+  @override
+  String get htmlViewerLoadFailedMessage => 'Failed to load file';
+
+  @override
+  String get enableJavaScriptDialogTitle => 'Enable JavaScript?';
+
+  @override
+  String get enableJavaScriptDialogMessage =>
+      'The page will be allowed to run its own local scripts. It still has no network access — nothing in this vault can be sent or received over the internet.';
 
   @override
   String get disableJavaScriptMenu => 'Disable JavaScript';
@@ -3124,7 +3140,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get avifFailedToRenderMessage => 'Failed to render AVIF';
 
   @override
-  String get encryptedImageLoadFailedMessage => 'Failed to load encrypted image';
+  String get encryptedImageLoadFailedMessage =>
+      'Failed to load encrypted image';
 
   @override
   String encryptedImageLoadFailedWithReasonMessage(String error) {
@@ -3135,7 +3152,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get retryButton => 'Retry';
 
   @override
-  String get invalidOrCorruptedImageMessage => 'Invalid or corrupted image format.';
+  String get invalidOrCorruptedImageMessage =>
+      'Invalid or corrupted image format.';
 
   @override
   String mediaViewerPlaylistPositionLabel(num current, num total) {
@@ -3149,4 +3167,103 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mediaViewerScanningLabel => 'Scanning…';
+
+  @override
+  String get mediaFileDeletedMessage => 'File deleted successfully';
+
+  @override
+  String get mediaFileDeleteFailedMessage => 'Failed to delete file';
+
+  @override
+  String get aboutScreenTitle => 'About';
+
+  @override
+  String get couldNotOpenLinkMessage => 'Could not open link';
+
+  @override
+  String get fileManagerSettingsTitle => 'File Manager Settings';
+
+  @override
+  String get showMediaThumbnailsLabel => 'Show Media Thumbnails';
+
+  @override
+  String get showMediaThumbnailsDesc =>
+      'Display thumbnail previews for images and videos in list view';
+
+  @override
+  String get showFileNamesLabel => 'Show File Names';
+
+  @override
+  String get showFileNamesDesc =>
+      'Display text labels under items in grid layout';
+
+  @override
+  String get showBreadcrumbBarLabel => 'Show Breadcrumb Bar';
+
+  @override
+  String get showBreadcrumbBarDesc => 'Path navigation bar at top of browser';
+
+  @override
+  String get showStatsBarLabel => 'Show Stats Bar';
+
+  @override
+  String get showStatsBarDesc => 'File count and free space info banner';
+
+  @override
+  String get autoStartPlaylistModeLabel => 'Auto-start Playlist Mode';
+
+  @override
+  String get autoStartPlaylistModeDesc =>
+      'Automatically start in playlist mode when opening a media item';
+
+  @override
+  String get showPlaylistCarouselLabel => 'Show Playlist Carousel';
+
+  @override
+  String get showPlaylistCarouselDesc =>
+      'Show thumbnail carousel button when viewing media playlists';
+
+  @override
+  String get videoPlaybackSliderLabel => 'Video playback position slider';
+
+  @override
+  String get longPressPlaybackDiagnosticsHint =>
+      'Long press for playback diagnostics';
+
+  @override
+  String get staticImageModeLabel => 'Static image mode';
+
+  @override
+  String slideshowModeActiveLabel(int seconds) {
+    return 'Slideshow mode active with $seconds seconds delay';
+  }
+
+  @override
+  String videoPlaybackModeLabel(String mode) {
+    return 'Video playback mode: $mode';
+  }
+
+  @override
+  String get pauseLabel => 'Pause';
+
+  @override
+  String get playLabel => 'Play';
+
+  @override
+  String get emptyFolderTitle => 'Empty Folder';
+
+  @override
+  String get emptyFolderMessage =>
+      'Use the Add action to create files or import from device.';
+
+  @override
+  String get noResultsTitle => 'No results';
+
+  @override
+  String noResultsForQueryMessage(String query) {
+    return 'Nothing in this folder matches \"$query\".';
+  }
+
+  @override
+  String get closeCarouselTooltip => 'Close Carousel';
 }

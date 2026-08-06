@@ -3366,6 +3366,22 @@
   "@optionsTooltip": {
     "description": "Options menu tooltip"
   },
+  "htmlViewerErrorTitle": "Cannot display this page",
+  "@htmlViewerErrorTitle": {
+    "description": "Error state title shown when the HTML viewer fails to render a page"
+  },
+  "htmlViewerLoadFailedMessage": "Failed to load file",
+  "@htmlViewerLoadFailedMessage": {
+    "description": "Fallback error message shown in the HTML viewer when a page fails to load and the platform side did not supply a more specific message"
+  },
+  "enableJavaScriptDialogTitle": "Enable JavaScript?",
+  "@enableJavaScriptDialogTitle": {
+    "description": "Confirmation dialog title shown before enabling JavaScript in the HTML viewer"
+  },
+  "enableJavaScriptDialogMessage": "The page will be allowed to run its own local scripts. It still has no network access — nothing in this vault can be sent or received over the internet.",
+  "@enableJavaScriptDialogMessage": {
+    "description": "Confirmation dialog message explaining the effect of enabling JavaScript in the HTML viewer"
+  },
   "disableJavaScriptMenu": "Disable JavaScript",
   "@disableJavaScriptMenu": {
     "description": "Menu item to disable JavaScript in HTML viewer"
@@ -4185,6 +4201,132 @@
   "mediaViewerScanningLabel": "Scanning…",
   "@mediaViewerScanningLabel": {
     "description": "Subtitle shown in the media viewer top bar while subfolders are being scanned and no playlist is active yet"
+  },
+  "mediaFileDeletedMessage": "File deleted successfully",
+  "@mediaFileDeletedMessage": {
+    "description": "Snackbar message after successfully deleting the currently viewed file in the media viewer"
+  },
+  "mediaFileDeleteFailedMessage": "Failed to delete file",
+  "@mediaFileDeleteFailedMessage": {
+    "description": "Snackbar message when deleting the currently viewed file in the media viewer fails"
+  },
+  "aboutScreenTitle": "About",
+  "@aboutScreenTitle": {
+    "description": "AppBar title for the About screen"
+  },
+  "couldNotOpenLinkMessage": "Could not open link",
+  "@couldNotOpenLinkMessage": {
+    "description": "Snackbar error shown when an external link fails to open from the About screen"
+  },
+  "fileManagerSettingsTitle": "File Manager Settings",
+  "@fileManagerSettingsTitle": {
+    "description": "AppBar title for the file manager toolbar settings screen"
+  },
+  "showMediaThumbnailsLabel": "Show Media Thumbnails",
+  "@showMediaThumbnailsLabel": {
+    "description": "Toggle label for showing media thumbnails in list view"
+  },
+  "showMediaThumbnailsDesc": "Display thumbnail previews for images and videos in list view",
+  "@showMediaThumbnailsDesc": {
+    "description": "Toggle description for showing media thumbnails in list view"
+  },
+  "showFileNamesLabel": "Show File Names",
+  "@showFileNamesLabel": {
+    "description": "Toggle label for showing file names in grid view"
+  },
+  "showFileNamesDesc": "Display text labels under items in grid layout",
+  "@showFileNamesDesc": {
+    "description": "Toggle description for showing file names in grid view"
+  },
+  "showBreadcrumbBarLabel": "Show Breadcrumb Bar",
+  "@showBreadcrumbBarLabel": {
+    "description": "Toggle label for showing the breadcrumb navigation bar"
+  },
+  "showBreadcrumbBarDesc": "Path navigation bar at top of browser",
+  "@showBreadcrumbBarDesc": {
+    "description": "Toggle description for showing the breadcrumb navigation bar"
+  },
+  "showStatsBarLabel": "Show Stats Bar",
+  "@showStatsBarLabel": {
+    "description": "Toggle label for showing the file stats bar"
+  },
+  "showStatsBarDesc": "File count and free space info banner",
+  "@showStatsBarDesc": {
+    "description": "Toggle description for showing the file stats bar"
+  },
+  "autoStartPlaylistModeLabel": "Auto-start Playlist Mode",
+  "@autoStartPlaylistModeLabel": {
+    "description": "Toggle label for automatically starting playlist mode"
+  },
+  "autoStartPlaylistModeDesc": "Automatically start in playlist mode when opening a media item",
+  "@autoStartPlaylistModeDesc": {
+    "description": "Toggle description for automatically starting playlist mode"
+  },
+  "showPlaylistCarouselLabel": "Show Playlist Carousel",
+  "@showPlaylistCarouselLabel": {
+    "description": "Toggle label for showing the playlist thumbnail carousel"
+  },
+  "showPlaylistCarouselDesc": "Show thumbnail carousel button when viewing media playlists",
+  "@showPlaylistCarouselDesc": {
+    "description": "Toggle description for showing the playlist thumbnail carousel"
+  },
+  "videoPlaybackSliderLabel": "Video playback position slider",
+  "@videoPlaybackSliderLabel": {
+    "description": "Accessibility label for the video playback position slider"
+  },
+  "longPressPlaybackDiagnosticsHint": "Long press for playback diagnostics",
+  "@longPressPlaybackDiagnosticsHint": {
+    "description": "Accessibility hint on the advanced settings button explaining the long-press action"
+  },
+  "staticImageModeLabel": "Static image mode",
+  "@staticImageModeLabel": {
+    "description": "Accessibility label shown for an image in the playlist when slideshow auto-advance is off"
+  },
+  "slideshowModeActiveLabel": "Slideshow mode active with {seconds} seconds delay",
+  "@slideshowModeActiveLabel": {
+    "description": "Accessibility label shown for an image in the playlist when slideshow auto-advance is on",
+    "placeholders": {
+      "seconds": { "type": "int" }
+    }
+  },
+  "videoPlaybackModeLabel": "Video playback mode: {mode}",
+  "@videoPlaybackModeLabel": {
+    "description": "Accessibility label describing the current video playback mode button",
+    "placeholders": {
+      "mode": { "type": "String" }
+    }
+  },
+  "pauseLabel": "Pause",
+  "@pauseLabel": {
+    "description": "Accessibility label for the pause playback button in the media viewer"
+  },
+  "playLabel": "Play",
+  "@playLabel": {
+    "description": "Accessibility label for the play playback button in the media viewer"
+  },
+  "emptyFolderTitle": "Empty Folder",
+  "@emptyFolderTitle": {
+    "description": "Empty state title shown when the current folder has no items"
+  },
+  "emptyFolderMessage": "Use the Add action to create files or import from device.",
+  "@emptyFolderMessage": {
+    "description": "Empty state message shown when the current folder has no items"
+  },
+  "noResultsTitle": "No results",
+  "@noResultsTitle": {
+    "description": "Empty state title shown when a search finds no matches"
+  },
+  "noResultsForQueryMessage": "Nothing in this folder matches \"{query}\".",
+  "@noResultsForQueryMessage": {
+    "description": "Empty state message shown when a search finds no matches",
+    "placeholders": {
+      "query": { "type": "String" }
+    }
+  },
+  "closeCarouselTooltip": "Close Carousel",
+  "@closeCarouselTooltip": {
+    "description": "Tooltip for the button that closes the playlist thumbnail carousel overlay"
   }
 }
+
 

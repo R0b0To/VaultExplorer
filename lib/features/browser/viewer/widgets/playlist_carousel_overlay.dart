@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
@@ -149,7 +150,7 @@ class _PlaylistCarouselOverlayState extends State<PlaylistCarouselOverlay> {
               child: Align(
                 alignment: Alignment.centerRight,
                 child: Tooltip(
-                  message: 'Close Carousel',
+                  message: context.l10n.closeCarouselTooltip,
                   child: Material(
                     color: Colors.white.withValues(alpha: 0.14),
                     shape: const CircleBorder(),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
 import '../../../data/services/vault_engine/vault_explorer_api.dart';
 
@@ -94,7 +95,7 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
         setState(() {
           _isLoading = false;
           _hasError = true;
-          _errorMessage = (raw['message'] as String?) ?? 'Failed to load file';
+          _errorMessage = (raw['message'] as String?) ?? context.l10n.htmlViewerLoadFailedMessage;
         });
     }
   }
@@ -103,11 +104,9 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
     if (!_jsEnabled) {
       final confirm = await showAppConfirmDialog(
         context,
-        title: 'Enable JavaScript?',
-        message: 'The page will be allowed to run its own local scripts. '
-            'It still has no network access — nothing in this vault can be '
-            'sent or received over the internet.',
-        confirmLabel: 'Enable',
+        title: context.l10n.enableJavaScriptDialogTitle,
+        message: context.l10n.enableJavaScriptDialogMessage,
+        confirmLabel: context.l10n.enable,
       );
       if (!confirm) return;
     }
@@ -168,17 +167,17 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                 actions: [
                   IconButton(
                     icon: const Icon(Icons.chevron_left_rounded),
-                    tooltip: 'Back',
+                    tooltip: context.l10n.backTooltip,
                     onPressed: _canGoBack ? () => _method?.invokeMethod('goBack') : null,
                   ),
                   IconButton(
                     icon: const Icon(Icons.chevron_right_rounded),
-                    tooltip: 'Forward',
+                    tooltip: context.l10n.forwardTooltip,
                     onPressed: _canGoForward ? () => _method?.invokeMethod('goForward') : null,
                   ),
                   IconButton(
                     icon: const Icon(Icons.refresh_rounded),
-                    tooltip: 'Reload',
+                    tooltip: context.l10n.reloadTooltip,
                     onPressed: _method == null
                         ? null
                         : () {
@@ -187,7 +186,7 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                           },
                   ),
                   PopupMenuButton<String>(
-                    tooltip: 'Options',
+                    tooltip: context.l10n.optionsTooltip,
                     onSelected: (value) {
                       switch (value) {
                         case 'js':
@@ -209,7 +208,11 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                               color: cs.onSurface,
                             ),
                             const SizedBox(width: 12),
-                            Text(_jsEnabled ? 'Disable JavaScript' : 'Enable JavaScript'),
+                            Text(
+                              _jsEnabled
+                                  ? context.l10n.disableJavaScriptMenu
+                                  : context.l10n.enableJavaScriptMenu,
+                            ),
                           ],
                         ),
                       ),
@@ -220,7 +223,7 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                           children: [
                             Icon(Icons.fullscreen_rounded, color: cs.onSurface),
                             const SizedBox(width: 12),
-                            const Text('Enter Fullscreen'),
+                            Text(context.l10n.enterFullscreenMenu),
                           ],
                         ),
                       ),
@@ -266,7 +269,7 @@ class _HtmlViewerScreenState extends State<HtmlViewerScreen> {
                         Icon(Icons.error_outline_rounded, color: cs.error, size: 48),
                         const SizedBox(height: 16),
                         Text(
-                          'Cannot display this page',
+                          context.l10n.htmlViewerErrorTitle,
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
                               ),

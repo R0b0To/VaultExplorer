@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/feedback/app_empty_state.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
@@ -47,9 +48,9 @@ Widget buildBrowserBody(
   if (currentItems.isEmpty) {
     return AppEmptyState(
       icon: Icons.folder_open_rounded,
-      title: 'Empty Folder',
-      message: 'Use the Add action to create files or import from device.',
-      actionLabel: atRoot ? null : 'Go back',
+      title: context.l10n.emptyFolderTitle,
+      message: context.l10n.emptyFolderMessage,
+      actionLabel: atRoot ? null : context.l10n.goBack,
       actionIcon: Icons.arrow_upward_rounded,
       onAction: onNavigateUp,
     );
@@ -57,8 +58,8 @@ Widget buildBrowserBody(
   if (searchQuery.trim().isNotEmpty && items.isEmpty) {
     return AppEmptyState(
       icon: Icons.search_off_rounded,
-      title: 'No results',
-      message: 'Nothing in this folder matches "${searchQuery.trim()}".',
+      title: context.l10n.noResultsTitle,
+      message: context.l10n.noResultsForQueryMessage(searchQuery.trim()),
     );
   }
   final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;

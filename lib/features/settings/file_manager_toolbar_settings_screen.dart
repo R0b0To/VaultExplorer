@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
@@ -96,14 +97,14 @@ class _FileManagerToolbarSettingsScreenState
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cs.surfaceContainerHigh,
-        title: const Text(
-          'File Manager Settings',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          context.l10n.fileManagerSettingsTitle,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.restart_alt_rounded),
-            tooltip: 'Reset to defaults',
+            tooltip: context.l10n.resetToDefaultsTooltip,
             onPressed: _resetToDefaults,
           ),
           const SizedBox(width: 4),
@@ -217,11 +218,11 @@ class _FileManagerToolbarSettingsScreenState
                                   _config.copyWith(showListThumbnails: v));
                               _persist();
                             },
-                            title: Text('Show Media Thumbnails',
+                            title: Text(context.l10n.showMediaThumbnailsLabel,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                                'Display thumbnail previews for images and videos in list view',
+                                context.l10n.showMediaThumbnailsDesc,
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant)),
                             secondary: Icon(Icons.image_outlined,
@@ -330,11 +331,11 @@ class _FileManagerToolbarSettingsScreenState
                                   _config = _config.copyWith(showGridFileNames: v));
                               _persist();
                             },
-                            title: Text('Show File Names',
+                            title: Text(context.l10n.showFileNamesLabel,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                                'Display text labels under items in grid layout',
+                                context.l10n.showFileNamesDesc,
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant)),
                             secondary: Icon(Icons.label_outlined,
@@ -355,10 +356,10 @@ class _FileManagerToolbarSettingsScreenState
                                   _config.copyWith(showBreadcrumbBar: v));
                               _persist();
                             },
-                            title: Text('Show Breadcrumb Bar',
+                            title: Text(context.l10n.showBreadcrumbBarLabel,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
-                            subtitle: Text('Path navigation bar at top of browser',
+                            subtitle: Text(context.l10n.showBreadcrumbBarDesc,
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant)),
                             secondary: Icon(Icons.linear_scale_rounded,
@@ -373,11 +374,11 @@ class _FileManagerToolbarSettingsScreenState
                                   _config = _config.copyWith(showStatsBar: v));
                               _persist();
                             },
-                            title: Text('Show Stats Bar',
+                            title: Text(context.l10n.showStatsBarLabel,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                                'File count and free space info banner',
+                                context.l10n.showStatsBarDesc,
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant)),
                             secondary: Icon(Icons.analytics_outlined,
@@ -398,11 +399,11 @@ class _FileManagerToolbarSettingsScreenState
                                   _config.copyWith(autoStartPlaylistMode: v));
                               _persist();
                             },
-                            title: Text('Auto-start Playlist Mode',
+                            title: Text(context.l10n.autoStartPlaylistModeLabel,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                                'Automatically start in playlist mode when opening a media item',
+                                context.l10n.autoStartPlaylistModeDesc,
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant)),
                             secondary: Icon(Icons.playlist_play_rounded,
@@ -417,11 +418,11 @@ class _FileManagerToolbarSettingsScreenState
                                   _config.copyWith(showMediaCarousel: v));
                               _persist();
                             },
-                            title: Text('Show Playlist Carousel',
+                            title: Text(context.l10n.showPlaylistCarouselLabel,
                                 style: textTheme.bodyMedium
                                     ?.copyWith(fontWeight: FontWeight.w600)),
                             subtitle: Text(
-                                'Show thumbnail carousel button when viewing media playlists',
+                                context.l10n.showPlaylistCarouselDesc,
                                 style: textTheme.bodySmall
                                     ?.copyWith(color: cs.onSurfaceVariant)),
                             secondary: Icon(Icons.view_carousel_rounded,

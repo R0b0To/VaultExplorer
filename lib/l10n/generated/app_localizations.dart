@@ -2810,7 +2810,7 @@ abstract class AppLocalizations {
   /// **'Failed to extract: {type}'**
   String failedToExtractGeneric(String type);
 
-  /// Tooltip for close search button
+  /// Tooltip for closing the in-folder search bar
   ///
   /// In en, this message translates to:
   /// **'Close search'**
@@ -4220,6 +4220,30 @@ abstract class AppLocalizations {
   /// **'Options'**
   String get optionsTooltip;
 
+  /// Error state title shown when the HTML viewer fails to render a page
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot display this page'**
+  String get htmlViewerErrorTitle;
+
+  /// Fallback error message shown in the HTML viewer when a page fails to load and the platform side did not supply a more specific message
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load file'**
+  String get htmlViewerLoadFailedMessage;
+
+  /// Confirmation dialog title shown before enabling JavaScript in the HTML viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Enable JavaScript?'**
+  String get enableJavaScriptDialogTitle;
+
+  /// Confirmation dialog message explaining the effect of enabling JavaScript in the HTML viewer
+  ///
+  /// In en, this message translates to:
+  /// **'The page will be allowed to run its own local scripts. It still has no network access — nothing in this vault can be sent or received over the internet.'**
+  String get enableJavaScriptDialogMessage;
+
   /// Menu item to disable JavaScript in HTML viewer
   ///
   /// In en, this message translates to:
@@ -5347,6 +5371,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Scanning…'**
   String get mediaViewerScanningLabel;
+
+  /// Snackbar message after successfully deleting the currently viewed file in the media viewer
+  ///
+  /// In en, this message translates to:
+  /// **'File deleted successfully'**
+  String get mediaFileDeletedMessage;
+
+  /// Snackbar message when deleting the currently viewed file in the media viewer fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete file'**
+  String get mediaFileDeleteFailedMessage;
+
+  /// AppBar title for the About screen
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get aboutScreenTitle;
+
+  /// Snackbar error shown when an external link fails to open from the About screen
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open link'**
+  String get couldNotOpenLinkMessage;
+
+  /// AppBar title for the file manager toolbar settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'File Manager Settings'**
+  String get fileManagerSettingsTitle;
+
+  /// Toggle label for showing media thumbnails in list view
+  ///
+  /// In en, this message translates to:
+  /// **'Show Media Thumbnails'**
+  String get showMediaThumbnailsLabel;
+
+  /// Toggle description for showing media thumbnails in list view
+  ///
+  /// In en, this message translates to:
+  /// **'Display thumbnail previews for images and videos in list view'**
+  String get showMediaThumbnailsDesc;
+
+  /// Toggle label for showing file names in grid view
+  ///
+  /// In en, this message translates to:
+  /// **'Show File Names'**
+  String get showFileNamesLabel;
+
+  /// Toggle description for showing file names in grid view
+  ///
+  /// In en, this message translates to:
+  /// **'Display text labels under items in grid layout'**
+  String get showFileNamesDesc;
+
+  /// Toggle label for showing the breadcrumb navigation bar
+  ///
+  /// In en, this message translates to:
+  /// **'Show Breadcrumb Bar'**
+  String get showBreadcrumbBarLabel;
+
+  /// Toggle description for showing the breadcrumb navigation bar
+  ///
+  /// In en, this message translates to:
+  /// **'Path navigation bar at top of browser'**
+  String get showBreadcrumbBarDesc;
+
+  /// Toggle label for showing the file stats bar
+  ///
+  /// In en, this message translates to:
+  /// **'Show Stats Bar'**
+  String get showStatsBarLabel;
+
+  /// Toggle description for showing the file stats bar
+  ///
+  /// In en, this message translates to:
+  /// **'File count and free space info banner'**
+  String get showStatsBarDesc;
+
+  /// Toggle label for automatically starting playlist mode
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-start Playlist Mode'**
+  String get autoStartPlaylistModeLabel;
+
+  /// Toggle description for automatically starting playlist mode
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically start in playlist mode when opening a media item'**
+  String get autoStartPlaylistModeDesc;
+
+  /// Toggle label for showing the playlist thumbnail carousel
+  ///
+  /// In en, this message translates to:
+  /// **'Show Playlist Carousel'**
+  String get showPlaylistCarouselLabel;
+
+  /// Toggle description for showing the playlist thumbnail carousel
+  ///
+  /// In en, this message translates to:
+  /// **'Show thumbnail carousel button when viewing media playlists'**
+  String get showPlaylistCarouselDesc;
+
+  /// Accessibility label for the video playback position slider
+  ///
+  /// In en, this message translates to:
+  /// **'Video playback position slider'**
+  String get videoPlaybackSliderLabel;
+
+  /// Accessibility hint on the advanced settings button explaining the long-press action
+  ///
+  /// In en, this message translates to:
+  /// **'Long press for playback diagnostics'**
+  String get longPressPlaybackDiagnosticsHint;
+
+  /// Accessibility label shown for an image in the playlist when slideshow auto-advance is off
+  ///
+  /// In en, this message translates to:
+  /// **'Static image mode'**
+  String get staticImageModeLabel;
+
+  /// Accessibility label shown for an image in the playlist when slideshow auto-advance is on
+  ///
+  /// In en, this message translates to:
+  /// **'Slideshow mode active with {seconds} seconds delay'**
+  String slideshowModeActiveLabel(int seconds);
+
+  /// Accessibility label describing the current video playback mode button
+  ///
+  /// In en, this message translates to:
+  /// **'Video playback mode: {mode}'**
+  String videoPlaybackModeLabel(String mode);
+
+  /// Accessibility label for the pause playback button in the media viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get pauseLabel;
+
+  /// Accessibility label for the play playback button in the media viewer
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get playLabel;
+
+  /// Empty state title shown when the current folder has no items
+  ///
+  /// In en, this message translates to:
+  /// **'Empty Folder'**
+  String get emptyFolderTitle;
+
+  /// Empty state message shown when the current folder has no items
+  ///
+  /// In en, this message translates to:
+  /// **'Use the Add action to create files or import from device.'**
+  String get emptyFolderMessage;
+
+  /// Empty state title shown when a search finds no matches
+  ///
+  /// In en, this message translates to:
+  /// **'No results'**
+  String get noResultsTitle;
+
+  /// Empty state message shown when a search finds no matches
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing in this folder matches \"{query}\".'**
+  String noResultsForQueryMessage(String query);
+
+  /// Tooltip for the button that closes the playlist thumbnail carousel overlay
+  ///
+  /// In en, this message translates to:
+  /// **'Close Carousel'**
+  String get closeCarouselTooltip;
 }
 
 class _AppLocalizationsDelegate

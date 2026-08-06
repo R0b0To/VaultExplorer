@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
 import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:vaultexplorer/core/widgets/thumbnail/async_thumbnail.dart';
@@ -507,17 +508,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete file?'),
-        content: const Text('This action is permanent and cannot be undone.'),
+        title: Text(context.l10n.deleteFileDialogTitle),
+        content: Text(context.l10n.deleteFilePermanentWarning),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             style: TextButton.styleFrom(foregroundColor: cs.error),
-            child: const Text('Delete'),
+            child: Text(context.l10n.delete),
           ),
         ],
       ),
@@ -558,14 +559,14 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       if (mounted) {
         showAppSnackBar(
           context,
-          message: 'File deleted successfully',
+          message: context.l10n.mediaFileDeletedMessage,
           tone: AppBannerTone.success,
         );
       }
     } else if (mounted) {
       showAppSnackBar(
         context,
-        message: 'Failed to delete file',
+        message: context.l10n.mediaFileDeleteFailedMessage,
         tone: AppBannerTone.error,
       );
     }

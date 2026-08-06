@@ -887,7 +887,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openSettings => 'Open Settings';
 
   @override
-  String get androidFileProviderTitle => 'Android File Provider (default)';
+  String get androidFileProviderTitle => 'Android File Provider';
 
   @override
   String get androidFileProviderSubtitle =>
@@ -1194,14 +1194,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tapToSelectContainerFile => 'Tap to select container file…';
 
   @override
-  String get cryfsPerformanceWarning =>
-      'CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.';
-
-  @override
-  String get folderVaultPerformanceWarning =>
-      'Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.';
-
-  @override
   String get containerMissingTitle => 'Container Missing';
 
   @override
@@ -1260,6 +1252,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Mount without allowing changes to this drive';
 
   @override
+  String get readOnlyModeContainerSubtitle =>
+      'Mount without allowing changes to this container';
+
+  @override
   String get rememberContainerLabel => 'Remember container';
 
   @override
@@ -1271,6 +1267,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get biometricSubjectContainer => 'container';
+
+  @override
+  String get biometricSubjectUsbDrive => 'USB drive';
+
+  @override
+  String get usbNoSavedCredentialsMessage =>
+      'No saved password found. Please enter it manually.';
+
+  @override
+  String get decryptingDriveLabel => 'Decrypting drive…';
+
+  @override
+  String get usbDeviceAlreadyActiveMounted =>
+      'This USB device is already active and mounted.';
+
+  @override
+  String reconnectUsbDriveTitle(String label) {
+    return 'Reconnect \"$label\"';
+  }
+
+  @override
+  String get unlockUsbDriveTitle => 'Unlock USB Drive';
+
+  @override
+  String get noUsbStorageDetectedTitle => 'No USB Storage Detected';
 
   @override
   String authenticateToUnlockPrompt(String subject) {
@@ -2005,7 +2026,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get containerConfigTitle => 'Vault Configuration';
 
   @override
-  String get changePasswordTitle => 'Change Vault Password';
+  String get changePasswordTitle => 'Change Password';
 
   @override
   String get confirmNewPasswordLabel => 'Confirm New Password';
@@ -2068,7 +2089,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get layoutModeGrid => 'Grid View';
 
   @override
-  String get layoutModeMasonry => 'Masonry View';
+  String get layoutModeMasonry => 'Masonry';
 
   @override
   String get fileOperationsTitle => 'File Operations';
@@ -2619,4 +2640,255 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get loopCurrentVideoTooltip => 'Loop Current Video';
+
+  @override
+  String get clearThumbnailCacheDialogTitle => 'Clear Thumbnail Cache?';
+
+  @override
+  String get clearThumbnailCacheDialogMessage =>
+      'This will delete cached thumbnails for this vault. They will be regenerated the next time you browse media.';
+
+  @override
+  String get clearCacheButton => 'Clear Cache';
+
+  @override
+  String get appCacheClearedUnlockMessage =>
+      'App cache cleared. Unlock container to clear inside cache.';
+
+  @override
+  String get allThumbnailCachesClearedMessage =>
+      'All thumbnail caches cleared successfully.';
+
+  @override
+  String get appCacheClearedContainerFailedMessage =>
+      'App cache cleared, but failed to clear inside container.';
+
+  @override
+  String get failedToClearThumbnailCachesMessage =>
+      'Failed to clear thumbnail caches.';
+
+  @override
+  String get authenticateToModifySettingsPrompt =>
+      'Authenticate to modify settings';
+
+  @override
+  String get usbVaultSettingsTitle => 'USB Vault Settings';
+
+  @override
+  String get vaultSettingsTitle => 'Vault Settings';
+
+  @override
+  String get generalSectionHeader => 'General';
+
+  @override
+  String get securityCredentialsSectionHeader => 'Security & Credentials';
+
+  @override
+  String get securityOptionsLockedTitle => 'Security Options Locked';
+
+  @override
+  String get authenticateOriginalCredentialsMessage =>
+      'Authenticate with original container credentials to modify security settings.';
+
+  @override
+  String get unlockCredentialsLabel => 'Unlock Credentials';
+
+  @override
+  String get unavailableSuffixLabel => '(Unavailable)';
+
+  @override
+  String get patternSetupRequiredBeforeSaving =>
+      'Set up a pattern before saving.';
+
+  @override
+  String get passwordKeystoreEncryptedHelperText =>
+      'Password is encrypted using Android Keystore. Leave blank if using keyfiles only.';
+
+  @override
+  String get changePatternButton => 'Change Pattern';
+
+  @override
+  String get setPatternButton => 'Set Pattern';
+
+  @override
+  String get cacheDerivedKeyLabel => 'Cache Derived Key';
+
+  @override
+  String get cryfsSkipScryptKdfSubtitle =>
+      'Skip CryFS\'s scrypt KDF next time (key kept in Android Keystore)';
+
+  @override
+  String get reuseKeyMaterialKeystoreSubtitle =>
+      'Reuse key material in Android Keystore';
+
+  @override
+  String get pinAlgorithmSkipAutoDetectSubtitle =>
+      'Pin algorithm to skip auto-detection on unlock.';
+
+  @override
+  String get changeContainerPasswordTitle => 'Change Container Password';
+
+  @override
+  String get luksPasswordChangeNotSupportedMessage =>
+      'LUKS password changing is not supported in-app. Use cryptsetup on Linux.';
+
+  @override
+  String get cryptomatorPasswordChangeNotSupportedMessage =>
+      'Cryptomator vault passwords cannot be changed in-app.';
+
+  @override
+  String get gocryptfsPasswordChangeNotSupportedMessage =>
+      'Gocryptfs vault passwords cannot be changed in-app.';
+
+  @override
+  String get cryfsPasswordChangeNotSupportedMessage =>
+      'CryFS vault passwords cannot be changed in-app.';
+
+  @override
+  String get bitlockerCredentialsChangeNotSupportedMessage =>
+      'BitLocker credentials cannot be changed in-app. Use \"Manage BitLocker\" on Windows.';
+
+  @override
+  String get systemIntegrationSectionHeader => 'System & Integration';
+
+  @override
+  String get autoLockDurationLabel => 'Auto-Lock Duration';
+
+  @override
+  String get neverAutoLockOption => 'Never';
+
+  @override
+  String get exposeContentToFilePickerSubtitle =>
+      'Expose content to System File Picker when unlocked';
+
+  @override
+  String get thumbnailStorageSectionHeader => 'Thumbnail Storage';
+
+  @override
+  String get cacheModeLabel => 'Cache Mode';
+
+  @override
+  String get useGlobalDefaultSubtitle => 'Use global default';
+
+  @override
+  String get thumbnailQualityLabel => 'Thumbnail Quality';
+
+  @override
+  String get clearThumbnailCacheTitle => 'Clear Thumbnail Cache';
+
+  @override
+  String get removeCachedThumbnailsSubtitle =>
+      'Remove cached image and video thumbnails';
+
+  @override
+  String get patternSetupRequiredAboveBeforeSaving =>
+      'Set up a pattern above before saving.';
+
+  @override
+  String get passwordOrCacheDerivedKeyRequiredMessage =>
+      'A password or \"Cache Derived Key\" with keyfiles is required for this unlock method.';
+
+  @override
+  String get saveConfigurationButton => 'Save Configuration';
+
+  @override
+  String get incorrectPatternError => 'Incorrect pattern';
+
+  @override
+  String get verifyPatternTitle => 'Verify Pattern';
+
+  @override
+  String get incorrectPasswordError => 'Incorrect password';
+
+  @override
+  String get verificationFailedError => 'Verification failed';
+
+  @override
+  String get incorrectCredentialsError => 'Incorrect credentials';
+
+  @override
+  String get containerPasswordOptionalLabel =>
+      'Container password (optional for keyfile-only)';
+
+  @override
+  String get pimOptionalLabel => 'PIM (optional)';
+
+  @override
+  String get usbDriveLockedLabel => 'USB Drive · Locked';
+
+  @override
+  String get lockedContainerLabel => 'Locked container';
+
+  @override
+  String get operationInProgressWaitMessage =>
+      'An operation is in progress. Please wait before locking.';
+
+  @override
+  String get reconnectUsbTooltip => 'Reconnect USB';
+
+  @override
+  String get unlockContainerTooltip => 'Unlock container';
+
+  @override
+  String lockFailedMessage(String errorType) {
+    return 'Lock failed: $errorType';
+  }
+
+  @override
+  String get newPasswordOrKeyfilesRequired =>
+      'New password or keyfiles are required.';
+
+  @override
+  String get newPasswordsDoNotMatch => 'New passwords do not match.';
+
+  @override
+  String get passwordChangedSuccessfullyMessage =>
+      'Password changed successfully.';
+
+  @override
+  String get failedToChangePasswordMessage =>
+      'Failed to change password. Check old credentials.';
+
+  @override
+  String get currentCredentialsSectionHeader => 'Current Credentials';
+
+  @override
+  String get oldPasswordLabel => 'Old Password';
+
+  @override
+  String get oldPimOptionalLabel => 'Old PIM (Optional)';
+
+  @override
+  String get newCredentialsSectionHeader => 'New Credentials';
+
+  @override
+  String get newPimOptionalLabel => 'New PIM (Optional)';
+
+  @override
+  String get noContainersYetTitle => 'No containers yet';
+
+  @override
+  String get dashboardEmptyStateMessage =>
+      'Mount a VeraCrypt container, connect a USB drive, or create a brand-new encrypted vault to get started.';
+
+  @override
+  String get sortFieldName => 'Name';
+
+  @override
+  String get sortFieldSize => 'Size';
+
+  @override
+  String get sortFieldType => 'Type';
+
+  @override
+  String get sortFieldDate => 'Date';
+
+  @override
+  String get layoutModeDetailedList => 'Detailed List';
+
+  @override
+  String get layoutModeCompactList => 'Compact List';
+
+  @override
+  String get layoutModeGalleryGrid => 'Gallery Grid';
 }

@@ -1520,10 +1520,10 @@ abstract class AppLocalizations {
   /// **'Open Settings'**
   String get openSettings;
 
-  /// Settings toggle title
+  /// Switch title for exposing container content via the Android document provider
   ///
   /// In en, this message translates to:
-  /// **'Android File Provider (default)'**
+  /// **'Android File Provider'**
   String get androidFileProviderTitle;
 
   /// Settings toggle subtitle
@@ -2006,18 +2006,6 @@ abstract class AppLocalizations {
   /// **'Tap to select container file…'**
   String get tapToSelectContainerFile;
 
-  /// Banner warning about CryFS performance without Direct Storage Access
-  ///
-  /// In en, this message translates to:
-  /// **'CryFS vaults use thousands of small block files. Without Direct Storage Access, performance will be significantly slower.'**
-  String get cryfsPerformanceWarning;
-
-  /// Banner warning about folder vault performance without Direct Storage Access
-  ///
-  /// In en, this message translates to:
-  /// **'Direct Storage Access is disabled. Opening and reading files in folder vaults may be slower.'**
-  String get folderVaultPerformanceWarning;
-
   /// Error card title when the container file cannot be found
   ///
   /// In en, this message translates to:
@@ -2126,6 +2114,12 @@ abstract class AppLocalizations {
   /// **'Mount without allowing changes to this drive'**
   String get readOnlyModeUsbSubtitle;
 
+  /// Subtitle explaining read-only mode for a container
+  ///
+  /// In en, this message translates to:
+  /// **'Mount without allowing changes to this container'**
+  String get readOnlyModeContainerSubtitle;
+
   /// Toggle label to remember/pin a newly mounted container
   ///
   /// In en, this message translates to:
@@ -2149,6 +2143,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'container'**
   String get biometricSubjectContainer;
+
+  /// Noun substituted into the biometric prompt reason when unlocking a USB drive, e.g. 'Authenticate to unlock USB drive'
+  ///
+  /// In en, this message translates to:
+  /// **'USB drive'**
+  String get biometricSubjectUsbDrive;
+
+  /// Fallback message when no saved password exists for biometric/pattern unlock of a USB drive
+  ///
+  /// In en, this message translates to:
+  /// **'No saved password found. Please enter it manually.'**
+  String get usbNoSavedCredentialsMessage;
+
+  /// Progress label shown while a USB drive is being decrypted
+  ///
+  /// In en, this message translates to:
+  /// **'Decrypting drive…'**
+  String get decryptingDriveLabel;
+
+  /// Error shown when trying to unlock a USB device that is already mounted
+  ///
+  /// In en, this message translates to:
+  /// **'This USB device is already active and mounted.'**
+  String get usbDeviceAlreadyActiveMounted;
+
+  /// AppBar title when reconnecting a previously saved USB drive
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect \"{label}\"'**
+  String reconnectUsbDriveTitle(String label);
+
+  /// AppBar title when unlocking a new USB drive
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock USB Drive'**
+  String get unlockUsbDriveTitle;
+
+  /// Title shown when no USB storage devices are found
+  ///
+  /// In en, this message translates to:
+  /// **'No USB Storage Detected'**
+  String get noUsbStorageDetectedTitle;
 
   /// Reason shown by the OS biometric prompt, combined with a source-specific subject noun
   ///
@@ -3320,10 +3356,10 @@ abstract class AppLocalizations {
   /// **'Vault Configuration'**
   String get containerConfigTitle;
 
-  /// Title for change vault password screen
+  /// Title for the change password screen/button
   ///
   /// In en, this message translates to:
-  /// **'Change Vault Password'**
+  /// **'Change Password'**
   String get changePasswordTitle;
 
   /// Label for confirm new password input field
@@ -3428,10 +3464,10 @@ abstract class AppLocalizations {
   /// **'Grid View'**
   String get layoutModeGrid;
 
-  /// Menu option for masonry layout mode
+  /// Layout mode option: masonry grid view
   ///
   /// In en, this message translates to:
-  /// **'Masonry View'**
+  /// **'Masonry'**
   String get layoutModeMasonry;
 
   /// Title for file operations action sheet
@@ -4465,6 +4501,450 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loop Current Video'**
   String get loopCurrentVideoTooltip;
+
+  /// Confirmation dialog title for clearing a vault's thumbnail cache
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Thumbnail Cache?'**
+  String get clearThumbnailCacheDialogTitle;
+
+  /// Confirmation dialog message for clearing a vault's thumbnail cache
+  ///
+  /// In en, this message translates to:
+  /// **'This will delete cached thumbnails for this vault. They will be regenerated the next time you browse media.'**
+  String get clearThumbnailCacheDialogMessage;
+
+  /// Confirm button label for clearing thumbnail cache
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Cache'**
+  String get clearCacheButton;
+
+  /// Snackbar shown when app-level cache is cleared but the container is locked
+  ///
+  /// In en, this message translates to:
+  /// **'App cache cleared. Unlock container to clear inside cache.'**
+  String get appCacheClearedUnlockMessage;
+
+  /// Snackbar shown when both app and in-container thumbnail caches are cleared
+  ///
+  /// In en, this message translates to:
+  /// **'All thumbnail caches cleared successfully.'**
+  String get allThumbnailCachesClearedMessage;
+
+  /// Snackbar shown when app cache clears but the in-container cache fails to clear
+  ///
+  /// In en, this message translates to:
+  /// **'App cache cleared, but failed to clear inside container.'**
+  String get appCacheClearedContainerFailedMessage;
+
+  /// Snackbar shown when clearing thumbnail caches fails entirely
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to clear thumbnail caches.'**
+  String get failedToClearThumbnailCachesMessage;
+
+  /// Biometric prompt reason shown when unlocking container settings for editing
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate to modify settings'**
+  String get authenticateToModifySettingsPrompt;
+
+  /// AppBar title for the settings screen of a USB-backed vault
+  ///
+  /// In en, this message translates to:
+  /// **'USB Vault Settings'**
+  String get usbVaultSettingsTitle;
+
+  /// AppBar title for the settings screen of a regular container vault
+  ///
+  /// In en, this message translates to:
+  /// **'Vault Settings'**
+  String get vaultSettingsTitle;
+
+  /// Section header for general container settings
+  ///
+  /// In en, this message translates to:
+  /// **'General'**
+  String get generalSectionHeader;
+
+  /// Section header for security and credential settings
+  ///
+  /// In en, this message translates to:
+  /// **'Security & Credentials'**
+  String get securityCredentialsSectionHeader;
+
+  /// Title shown when security settings are locked pending authentication
+  ///
+  /// In en, this message translates to:
+  /// **'Security Options Locked'**
+  String get securityOptionsLockedTitle;
+
+  /// Explanation shown while security settings are locked
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticate with original container credentials to modify security settings.'**
+  String get authenticateOriginalCredentialsMessage;
+
+  /// Label for the option picker choosing the container's unlock method
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock Credentials'**
+  String get unlockCredentialsLabel;
+
+  /// Suffix appended to an unlock method label when it is currently unavailable, e.g. 'Biometric Unlock (Unavailable)'
+  ///
+  /// In en, this message translates to:
+  /// **'(Unavailable)'**
+  String get unavailableSuffixLabel;
+
+  /// Warning shown when trying to save container settings without setting up a pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Set up a pattern before saving.'**
+  String get patternSetupRequiredBeforeSaving;
+
+  /// Helper text under the password field when updating saved container credentials
+  ///
+  /// In en, this message translates to:
+  /// **'Password is encrypted using Android Keystore. Leave blank if using keyfiles only.'**
+  String get passwordKeystoreEncryptedHelperText;
+
+  /// Button label to change an already-configured unlock pattern
+  ///
+  /// In en, this message translates to:
+  /// **'Change Pattern'**
+  String get changePatternButton;
+
+  /// Button label to configure an unlock pattern for the first time
+  ///
+  /// In en, this message translates to:
+  /// **'Set Pattern'**
+  String get setPatternButton;
+
+  /// Switch title for caching the derived encryption key for this container
+  ///
+  /// In en, this message translates to:
+  /// **'Cache Derived Key'**
+  String get cacheDerivedKeyLabel;
+
+  /// Subtitle for the cache-derived-key switch when the container is a CryFS vault
+  ///
+  /// In en, this message translates to:
+  /// **'Skip CryFS\'s scrypt KDF next time (key kept in Android Keystore)'**
+  String get cryfsSkipScryptKdfSubtitle;
+
+  /// Subtitle for the cache-derived-key switch for non-CryFS containers
+  ///
+  /// In en, this message translates to:
+  /// **'Reuse key material in Android Keystore'**
+  String get reuseKeyMaterialKeystoreSubtitle;
+
+  /// Subtitle explaining the advanced cipher/hash pinning option
+  ///
+  /// In en, this message translates to:
+  /// **'Pin algorithm to skip auto-detection on unlock.'**
+  String get pinAlgorithmSkipAutoDetectSubtitle;
+
+  /// List tile title to change a container's password
+  ///
+  /// In en, this message translates to:
+  /// **'Change Container Password'**
+  String get changeContainerPasswordTitle;
+
+  /// Warning shown when attempting to change the password of a LUKS container
+  ///
+  /// In en, this message translates to:
+  /// **'LUKS password changing is not supported in-app. Use cryptsetup on Linux.'**
+  String get luksPasswordChangeNotSupportedMessage;
+
+  /// Warning shown when attempting to change the password of a Cryptomator vault
+  ///
+  /// In en, this message translates to:
+  /// **'Cryptomator vault passwords cannot be changed in-app.'**
+  String get cryptomatorPasswordChangeNotSupportedMessage;
+
+  /// Warning shown when attempting to change the password of a Gocryptfs vault
+  ///
+  /// In en, this message translates to:
+  /// **'Gocryptfs vault passwords cannot be changed in-app.'**
+  String get gocryptfsPasswordChangeNotSupportedMessage;
+
+  /// Warning shown when attempting to change the password of a CryFS vault
+  ///
+  /// In en, this message translates to:
+  /// **'CryFS vault passwords cannot be changed in-app.'**
+  String get cryfsPasswordChangeNotSupportedMessage;
+
+  /// Warning shown when attempting to change the credentials of a BitLocker drive
+  ///
+  /// In en, this message translates to:
+  /// **'BitLocker credentials cannot be changed in-app. Use \"Manage BitLocker\" on Windows.'**
+  String get bitlockerCredentialsChangeNotSupportedMessage;
+
+  /// Section header for system/OS integration settings
+  ///
+  /// In en, this message translates to:
+  /// **'System & Integration'**
+  String get systemIntegrationSectionHeader;
+
+  /// Label for the per-container auto-lock duration option picker
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-Lock Duration'**
+  String get autoLockDurationLabel;
+
+  /// Option meaning the container will never auto-lock
+  ///
+  /// In en, this message translates to:
+  /// **'Never'**
+  String get neverAutoLockOption;
+
+  /// Subtitle explaining the Android File Provider switch
+  ///
+  /// In en, this message translates to:
+  /// **'Expose content to System File Picker when unlocked'**
+  String get exposeContentToFilePickerSubtitle;
+
+  /// Section header for per-container thumbnail cache settings
+  ///
+  /// In en, this message translates to:
+  /// **'Thumbnail Storage'**
+  String get thumbnailStorageSectionHeader;
+
+  /// Label for the thumbnail cache mode option picker
+  ///
+  /// In en, this message translates to:
+  /// **'Cache Mode'**
+  String get cacheModeLabel;
+
+  /// Subtitle shown when a container uses the app's global default thumbnail cache mode
+  ///
+  /// In en, this message translates to:
+  /// **'Use global default'**
+  String get useGlobalDefaultSubtitle;
+
+  /// Label for the thumbnail quality tile
+  ///
+  /// In en, this message translates to:
+  /// **'Thumbnail Quality'**
+  String get thumbnailQualityLabel;
+
+  /// List tile title for the clear-thumbnail-cache action
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Thumbnail Cache'**
+  String get clearThumbnailCacheTitle;
+
+  /// Subtitle for the clear-thumbnail-cache list tile
+  ///
+  /// In en, this message translates to:
+  /// **'Remove cached image and video thumbnails'**
+  String get removeCachedThumbnailsSubtitle;
+
+  /// Inline validation error shown near the save button when a pattern hasn't been set up
+  ///
+  /// In en, this message translates to:
+  /// **'Set up a pattern above before saving.'**
+  String get patternSetupRequiredAboveBeforeSaving;
+
+  /// Inline validation error shown near the save button when neither a password nor cached derived key with keyfiles is provided
+  ///
+  /// In en, this message translates to:
+  /// **'A password or \"Cache Derived Key\" with keyfiles is required for this unlock method.'**
+  String get passwordOrCacheDerivedKeyRequiredMessage;
+
+  /// Primary button label to save container configuration changes
+  ///
+  /// In en, this message translates to:
+  /// **'Save Configuration'**
+  String get saveConfigurationButton;
+
+  /// Error shown when a pattern verification attempt fails
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect pattern'**
+  String get incorrectPatternError;
+
+  /// Title for the pattern verification bottom sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Verify Pattern'**
+  String get verifyPatternTitle;
+
+  /// Error shown when a folder-vault password verification attempt fails
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect password'**
+  String get incorrectPasswordError;
+
+  /// Generic error shown when credential verification fails unexpectedly
+  ///
+  /// In en, this message translates to:
+  /// **'Verification failed'**
+  String get verificationFailedError;
+
+  /// Error shown when a container password/keyfile verification attempt fails
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect credentials'**
+  String get incorrectCredentialsError;
+
+  /// Label for the password field when keyfiles alone may be sufficient
+  ///
+  /// In en, this message translates to:
+  /// **'Container password (optional for keyfile-only)'**
+  String get containerPasswordOptionalLabel;
+
+  /// Label for the optional VeraCrypt PIM field
+  ///
+  /// In en, this message translates to:
+  /// **'PIM (optional)'**
+  String get pimOptionalLabel;
+
+  /// Subtitle shown on a dashboard card for a locked USB drive
+  ///
+  /// In en, this message translates to:
+  /// **'USB Drive · Locked'**
+  String get usbDriveLockedLabel;
+
+  /// Subtitle shown on a dashboard card for a locked container
+  ///
+  /// In en, this message translates to:
+  /// **'Locked container'**
+  String get lockedContainerLabel;
+
+  /// Message shown when trying to lock a container while another operation is running
+  ///
+  /// In en, this message translates to:
+  /// **'An operation is in progress. Please wait before locking.'**
+  String get operationInProgressWaitMessage;
+
+  /// Tooltip for reconnecting a saved but disconnected USB drive
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect USB'**
+  String get reconnectUsbTooltip;
+
+  /// Tooltip for unlocking a container from the dashboard
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock container'**
+  String get unlockContainerTooltip;
+
+  /// Snackbar shown when locking a container throws an unexpected error
+  ///
+  /// In en, this message translates to:
+  /// **'Lock failed: {errorType}'**
+  String lockFailedMessage(String errorType);
+
+  /// Validation error when changing a container password without a new password or keyfiles
+  ///
+  /// In en, this message translates to:
+  /// **'New password or keyfiles are required.'**
+  String get newPasswordOrKeyfilesRequired;
+
+  /// Validation error when the new password and confirmation don't match
+  ///
+  /// In en, this message translates to:
+  /// **'New passwords do not match.'**
+  String get newPasswordsDoNotMatch;
+
+  /// Snackbar shown after a container password change succeeds
+  ///
+  /// In en, this message translates to:
+  /// **'Password changed successfully.'**
+  String get passwordChangedSuccessfullyMessage;
+
+  /// Error shown when a container password change fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to change password. Check old credentials.'**
+  String get failedToChangePasswordMessage;
+
+  /// Section header for the current/old credentials on the change password screen
+  ///
+  /// In en, this message translates to:
+  /// **'Current Credentials'**
+  String get currentCredentialsSectionHeader;
+
+  /// Label for the old/current password field
+  ///
+  /// In en, this message translates to:
+  /// **'Old Password'**
+  String get oldPasswordLabel;
+
+  /// Label for the old/current VeraCrypt PIM field
+  ///
+  /// In en, this message translates to:
+  /// **'Old PIM (Optional)'**
+  String get oldPimOptionalLabel;
+
+  /// Section header for the new credentials on the change password screen
+  ///
+  /// In en, this message translates to:
+  /// **'New Credentials'**
+  String get newCredentialsSectionHeader;
+
+  /// Label for the new VeraCrypt PIM field
+  ///
+  /// In en, this message translates to:
+  /// **'New PIM (Optional)'**
+  String get newPimOptionalLabel;
+
+  /// Title for the dashboard's empty state when no vaults exist
+  ///
+  /// In en, this message translates to:
+  /// **'No containers yet'**
+  String get noContainersYetTitle;
+
+  /// Message for the dashboard's empty state when no vaults exist
+  ///
+  /// In en, this message translates to:
+  /// **'Mount a VeraCrypt container, connect a USB drive, or create a brand-new encrypted vault to get started.'**
+  String get dashboardEmptyStateMessage;
+
+  /// Sort menu option: sort by file/folder name
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get sortFieldName;
+
+  /// Sort menu option: sort by file size
+  ///
+  /// In en, this message translates to:
+  /// **'Size'**
+  String get sortFieldSize;
+
+  /// Sort menu option: sort by file type/extension
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get sortFieldType;
+
+  /// Sort menu option: sort by modification date
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get sortFieldDate;
+
+  /// Layout mode option: detailed list view
+  ///
+  /// In en, this message translates to:
+  /// **'Detailed List'**
+  String get layoutModeDetailedList;
+
+  /// Layout mode option: compact list view
+  ///
+  /// In en, this message translates to:
+  /// **'Compact List'**
+  String get layoutModeCompactList;
+
+  /// Layout mode option: gallery grid view
+  ///
+  /// In en, this message translates to:
+  /// **'Gallery Grid'**
+  String get layoutModeGalleryGrid;
 }
 
 class _AppLocalizationsDelegate

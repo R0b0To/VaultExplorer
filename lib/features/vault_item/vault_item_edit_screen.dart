@@ -46,11 +46,13 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
   bool _saving = false;
   late final FilesystemType _fsType;
   bool _isContainerLocked = false;
+  bool _isInitialized = false; // Flag to track initialization
   
   // Track initial values to determine if actual text edits occurred
   late final String _initialTitle;
   late final Map<String, String> _initialFieldValues;
   bool _wasDirty = false;
+
   void _onContainerLockedEvent(int volId) {
     if (volId == widget.container.volId && mounted) {
       setState(() => _isContainerLocked = true);
@@ -67,26 +69,36 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
     _initialTitle = existing?.title ?? '';
     _titleCtrl = TextEditingController(text: _initialTitle);
     _titleCtrl.addListener(_onTextChanged);
+  }
 
-    _fields = VaultItemTemplate.fieldsFor(widget.type, context.l10n)
-        .map((t) => VaultField.fromTemplate(t, existing?.fields ?? {}))
-        .toList();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      _isInitialized = true;
+      final existing = widget.existing;
 
-    _initialFieldValues = {};
-    for (final f in _fields) {
-      final val = f.value;
-      _initialFieldValues[f.key] = val;
+      // Safely access context.l10n here
+      _fields = VaultItemTemplate.fieldsFor(widget.type, context.l10n)
+          .map((t) => VaultField.fromTemplate(t, existing?.fields ?? {}))
+          .toList();
 
-      final ctrl = TextEditingController(text: val);
-      ctrl.addListener(_onTextChanged);
-      _ctrls[f.key] = ctrl;
-      _revealed[f.key] = false;
+      _initialFieldValues = {};
+      for (final f in _fields) {
+        final val = f.value;
+        _initialFieldValues[f.key] = val;
+
+        final ctrl = TextEditingController(text: val);
+        ctrl.addListener(_onTextChanged);
+        _ctrls[f.key] = ctrl;
+        _revealed[f.key] = false;
+      }
     }
   }
 
   @override
   void dispose() {
-     VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
+    VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
     _titleCtrl.removeListener(_onTextChanged);
     _titleCtrl.dispose();
     for (final c in _ctrls.values) {

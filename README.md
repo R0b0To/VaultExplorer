@@ -70,6 +70,14 @@
 
 ---
 
+### ☁️ Cloud Storage & Remote Vault Access (via SAF)
+
+Although VaultExplorer intentionally has **zero internet permissions** for complete data privacy, you can still access encrypted containers and directory vaults hosted on cloud services through Android's Storage Access Framework (SAF):
+*   **Native Cloud Document Providers**: Official cloud apps like **Google Drive** and **pCloud** automatically act as system Document Providers when installed on your Android device. VaultExplorer can open, read, edit, and save encrypted vaults directly from these cloud providers via SAF.
+*   **Sync Bridge Apps (e.g., Round-Sync)**: For cloud services without native SAF document providers (or for protocols like WebDAV, Nextcloud, SFTP, S3, OneDrive, Dropbox, etc.), you can use open-source bridge applications like **Round-Sync** (Rclone for Android). Round-Sync can expose remote cloud storages as a local Document Provider or synced SAF directory, bridging them straight into VaultExplorer.
+
+---
+
 ### 📁 In-Vault Studio, Media Streaming & Editors
 
 *   **Multi-Layout File Explorer**: Detailed List, Grid, and Masonry view modes with gesture-based pinch-to-zoom column adjustments, breadcrumbs, search term highlighting, and instant folder size calculations.
@@ -86,7 +94,7 @@
 
 ### 🛡️ Security & Privacy
 
-*   **Zero Internet Permission**: The application binary does not request or possess network access (`android.permission.INTERNET` is absent).
+*   **Zero Internet Permission**: The application binary does not request or possess network access (`android.permission.INTERNET` is completely absent). Any cloud storage access is safely brokered through Android's system Document Providers (SAF).
 *   **Master Lock**: Protect the entire app with a Master Password, Biometric Unlock (Fingerprint / Face via Android Keystore), or Pattern Lock backed by exponential lockout backoff surviving app force-kills.
 *   **Hardware-Bound Key Caching**: Optional AES-256-GCM key caching stored securely in the hardware-backed Android Keystore for instant re-unlocks.
 *   **3-Tier Thumbnail Cache**: In-Memory LRU $\rightarrow$ AES-256-GCM Encrypted Disk/In-Container Cache $\rightarrow$ Native Generation. Can be completely disabled for maximum privacy.

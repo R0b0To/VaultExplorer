@@ -1797,6 +1797,8 @@ bool _matchesFilter(String fileName) {
         appBar: buildBrowserAppBar(
           context,
           container: widget.container,
+          pathStack: _pathStack,
+          onJumpTo: _jumpTo,
           filteredItems: filteredItems,
           dirCount: dirCount,
           fileCount: fileCount,

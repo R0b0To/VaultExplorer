@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/core/widgets/activity/app_bar_clipboard_chip.dart';
@@ -8,15 +9,17 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/models/vault_item.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/features/browser/browser_dialogs.dart';
+import 'package:vaultexplorer/features/browser/file_browser_screen.dart' show PathSegment;
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/selection_app_bar_wide.dart';
 import 'package:vaultexplorer/features/browser/widgets/settings_menu_button.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
-
 PreferredSizeWidget buildBrowserAppBar(
   BuildContext context, {
   required MountedContainer container,
+  required List<PathSegment> pathStack,
+  required ValueChanged<int> onJumpTo,
   required List<RawEntry> filteredItems,
   required int dirCount,
   required int fileCount,
@@ -172,6 +175,194 @@ PreferredSizeWidget buildBrowserAppBar(
       onUnpin: () => onTogglePin(pin: false),
     );
   }
+
+  final hasParents = pathStack.length > 1;
+  final currentSegment = pathStack.last;
+  final currentTitle = pathStack.length == 1
+      ? container.displayName
+      : currentSegment.label;
+
+  Widget buildReadOnlyBadge() {
+    return Tooltip(
+      message: context.l10n.mountedReadOnlyTooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(100),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_outline_rounded, size: 11, color: cs.onSurfaceVariant),
+            const SizedBox(width: 3),
+            Text(
+              context.l10n.readOnlyBadgeAbbreviation,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _buildLeftTruncatedPath(
+    String rootName,
+    List<PathSegment> stack,
+    double maxWidth,
+    TextStyle style,
+  ) {
+    if (stack.length == 1) return rootName;
+
+    final allLabels = [rootName, ...stack.sublist(1).map((s) => s.label)];
+    final fullPath = allLabels.join('/');
+
+    double measure(String text) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: style),
+        maxLines: 1,
+        textDirection: TextDirection.ltr,
+      )..layout();
+      return painter.width;
+    }
+
+    if (measure(fullPath) <= maxWidth) {
+      return fullPath;
+    }
+
+    int low = 0;
+    int high = fullPath.length - 1;
+    int bestK = fullPath.length - 1;
+
+    while (low <= high) {
+      final mid = (low + high) ~/ 2;
+      final candidate = '…${fullPath.substring(mid)}';
+      if (measure(candidate) <= maxWidth) {
+        bestK = mid;
+        high = mid - 1;
+      } else {
+        low = mid + 1;
+      }
+    }
+
+    return '…${fullPath.substring(bestK)}';
+  }
+
+  Widget buildTitleHeader() {
+    final textTheme = Theme.of(context).textTheme;
+    final style = textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold) ??
+        const TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
+
+    if (!hasParents) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              container.displayName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            ),
+          ),
+          if (isReadOnly) ...[
+            const SizedBox(width: 8),
+            buildReadOnlyBadge(),
+          ],
+        ],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final reservedSpace = 22.0 + (isReadOnly ? 46.0 : 0.0) + 12.0;
+        final availableWidth =
+            (constraints.maxWidth - reservedSpace).clamp(60.0, 2000.0);
+
+        final displayTitle = _buildLeftTruncatedPath(
+          container.displayName,
+          pathStack,
+          availableWidth,
+          style,
+        );
+
+        return MenuAnchor(
+          builder: (ctx, controller, child) => InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () {
+              if (controller.isOpen) {
+                controller.close();
+              } else {
+                controller.open();
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      displayTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: style,
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_drop_down_rounded,
+                    size: 22,
+                    color: cs.primary,
+                  ),
+                  if (isReadOnly) ...[
+                    const SizedBox(width: 6),
+                    buildReadOnlyBadge(),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          menuChildren: [
+        for (int i = 0; i < pathStack.length; i++) ...[
+          (() {
+            final segment = pathStack[i];
+            final isCurrent = i == pathStack.length - 1;
+            final isRoot = i == 0;
+            final label = isRoot ? container.displayName : segment.label;
+            final IconData icon = isRoot
+                ? Icons.home_rounded
+                : (segment.isArchiveRoot ? Icons.archive_rounded : Icons.folder_rounded);
+            final Color iconColor = isRoot
+                ? cs.primary
+                : (segment.isArchiveRoot ? const Color(0xFFFF8F00) : cs.secondary);
+
+            return MenuItemButton(
+              onPressed: isCurrent ? null : () => onJumpTo(i),
+              leadingIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (i > 0) SizedBox(width: (i - 1) * 12.0),
+                  Icon(icon, size: 18, color: isCurrent ? cs.primary : iconColor),
+                ],
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                  color: isCurrent ? cs.primary : cs.onSurface,
+                ),
+              ),
+            );
+          })(),
+        ],
+      ],
+    );
+  });}
+
   return AppBar(
     leading: IconButton(
       icon: const Icon(Icons.arrow_back),
@@ -182,46 +373,7 @@ PreferredSizeWidget buildBrowserAppBar(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                container.displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (isReadOnly) ...[
-              const SizedBox(width: 8),
-              Tooltip(
-                message: context.l10n.mountedReadOnlyTooltip,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.lock_outline_rounded, size: 11, color: cs.onSurfaceVariant),
-                      const SizedBox(width: 3),
-                      Text(
-                        context.l10n.readOnlyBadgeAbbreviation,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+        buildTitleHeader(),
         if (toolbarConfig.showStatsBar)
           buildBrowserAppBarStatsSubtitle(
             context,

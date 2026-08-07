@@ -127,6 +127,16 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         disguiseModeHandlers.updateActivityIdentity()
+        // Wipes any vx_vid_*.mp4 left behind in cacheDir by a previous
+        // process death mid-recording (crash, force-stop, OOM kill) --
+        // the normal cleanup path only runs when a recording finishes or
+        // fails cleanly. Runs on ioExecutor since it may need to overwrite
+        // a large leftover file; happens before configureFlutterEngine()
+        // sets up VaultCameraPlugin, so there's no risk of racing a
+        // legitimate new recording's temp file.
+        ioExecutor.execute {
+            com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

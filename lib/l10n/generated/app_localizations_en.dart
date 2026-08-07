@@ -3351,6 +3351,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cameraCouldNotSwitchLensMessage => 'Could not switch lens';
 
   @override
+  String get cameraRecordingStoppedVaultLockedMessage =>
+      'Vault locked — recording stopped and discarded';
+
+  @override
   String get cameraEncryptingPhotoLabel => 'Encrypting photo…';
 
   @override

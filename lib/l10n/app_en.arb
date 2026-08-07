@@ -4425,6 +4425,10 @@
   "@cameraCouldNotSwitchLensMessage": {
     "description": "Error toast when switching to a different camera lens fails"
   },
+  "cameraRecordingStoppedVaultLockedMessage": "Vault locked — recording stopped and discarded",
+  "@cameraRecordingStoppedVaultLockedMessage": {
+    "description": "Error toast shown when the vault auto-locks while a video recording is in progress; the in-progress recording could not be written to the vault and was discarded"
+  },
   "cameraEncryptingPhotoLabel": "Encrypting photo…",
   "@cameraEncryptingPhotoLabel": {
     "description": "Busy overlay label shown while a captured photo is being encrypted into the vault"

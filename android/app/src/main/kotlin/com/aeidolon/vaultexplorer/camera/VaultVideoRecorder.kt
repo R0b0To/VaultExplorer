@@ -81,6 +81,75 @@ class VaultVideoRecorder(
     private val recordAudio: Boolean = true,
     private val cacheDir: File? = null,
 ) {
+    companion object {
+        private const val TEMP_PREFIX = "vx_vid_"
+        private const val TEMP_SUFFIX = ".mp4"
+
+        /**
+         * Sweeps [cacheDir] for plaintext recording temp files left behind
+         * by a previous process death -- a crash, force-stop, or OOM kill
+         * between MediaRecorder writing one of these (see prepareEncoder())
+         * and secureDeleteTempFile() wiping it in writeTo()/releaseEncoder()
+         * only covers the normal completion paths, not the process simply
+         * dying mid-recording. Left uncleaned, a leftover file is an
+         * unencrypted copy of whatever was being recorded sitting on disk
+         * indefinitely -- exactly what this app exists to avoid.
+         *
+         * Intended to run once at app startup (see MainActivity.onCreate),
+         * off the main thread, before any camera session could plausibly
+         * create a *new* temp file of this shape -- so there's no risk of
+         * this sweep racing a legitimate in-progress recording.
+         *
+         * Returns how many orphaned files were found and wiped, for logging.
+         */
+        fun sweepOrphanedTempFiles(cacheDir: File?): Int {
+            val dir = cacheDir ?: return 0
+            val orphans = dir.listFiles { f ->
+                f.isFile && f.name.startsWith(TEMP_PREFIX) && f.name.endsWith(TEMP_SUFFIX)
+            } ?: return 0
+            var wiped = 0
+            for (file in orphans) {
+                if (secureDeleteFile(file)) wiped++
+            }
+            if (wiped > 0) {
+                android.util.Log.i(TAG, "sweepOrphanedTempFiles: wiped $wiped orphaned recording temp file(s)")
+            }
+            return wiped
+        }
+
+        /** Overwrites [file] with zeros before deleting it, so a leftover
+         *  plaintext recording isn't just unlinked (which on most Android
+         *  filesystems leaves the content readable until the blocks are
+         *  reused). Shared by the per-recording cleanup below and by
+         *  [sweepOrphanedTempFiles]. Returns false if the file couldn't be
+         *  fully wiped -- the caller falls back to at least trying delete(). */
+        private fun secureDeleteFile(file: File): Boolean {
+            return try {
+                if (file.exists()) {
+                    val len = file.length()
+                    if (len > 0) {
+                        RandomAccessFile(file, "rws").use { raf ->
+                            val zeros = ByteArray(64 * 1024)
+                            var remaining = len
+                            while (remaining > 0) {
+                                val writeLen = minOf(remaining, zeros.size.toLong()).toInt()
+                                raf.write(zeros, 0, writeLen)
+                                remaining -= writeLen
+                            }
+                        }
+                    }
+                    file.delete()
+                } else {
+                    true
+                }
+            } catch (e: Exception) {
+                android.util.Log.w(TAG, "secureDeleteFile failed", e)
+                try { file.delete() } catch (_: Exception) {}
+                false
+            }
+        }
+    }
+
     var inputSurface: Surface? = null
         private set
 
@@ -91,7 +160,7 @@ class VaultVideoRecorder(
 
     fun prepareEncoder(orientationDegrees: Int = 0) {
         releaseEncoder()
-        val temp = File.createTempFile("vx_vid_", ".mp4", cacheDir)
+        val temp = File.createTempFile(TEMP_PREFIX, TEMP_SUFFIX, cacheDir)
         tempFile = temp
         val useHevc = hevcEncoderAvailable
         val bitrate = if (useHevc) quality.bitrateHevc else quality.bitrateH264
@@ -192,24 +261,6 @@ class VaultVideoRecorder(
     private fun secureDeleteTempFile() {
         val temp = tempFile ?: return
         tempFile = null
-        try {
-            if (temp.exists()) {
-                val len = temp.length()
-                if (len > 0) {
-                    RandomAccessFile(temp, "rws").use { raf ->
-                        val zeros = ByteArray(64 * 1024)
-                        var remaining = len
-                        while (remaining > 0) {
-                            val writeLen = minOf(remaining, zeros.size.toLong()).toInt()
-                            raf.write(zeros, 0, writeLen)
-                            remaining -= writeLen
-                        }
-                    }
-                }
-                temp.delete()
-            }
-        } catch (_: Exception) {
-            try { temp.delete() } catch (_: Exception) {}
-        }
+        secureDeleteFile(temp)
     }
 }

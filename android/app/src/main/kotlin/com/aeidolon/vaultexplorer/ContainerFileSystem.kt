@@ -7,7 +7,16 @@ import java.io.FileNotFoundException
  *
  * Wraps every ContainerEngine Tier-2 call with:
  *   - synchronized(ContainerSessionRegistry.locks[volId]) — JVM-side serialization
- *   - requireSession()                              — fast existence check
+ *
+ * Every write-path call (and the two read paths that can't take the fast
+ * skipsPerVolumeLock route) also calls requireSession() up front, so a call
+ * against an already-locked/never-unlocked volume fails fast with a clear
+ * FileNotFoundException from Kotlin rather than only surfacing once it
+ * reaches the native JNI session check. That native check is still the
+ * authoritative guard -- it holds the per-volume mutex the whole call
+ * happens under, so it's what actually protects against a lock racing in
+ * between this check and the native call -- this is a defense-in-depth,
+ * fail-fast layer on top of it, not a replacement for it.
  *
  * Both MainActivity and ContainerDocumentsProvider call
  * through here so locking and error-dispatch live in one place.
@@ -53,17 +62,25 @@ object ContainerFileSystem {
 
     // ── Directory operations (Write) ───────────────────────────────────────
 
-    fun createDirectory(volId: Int, dirPath: String): Boolean =
-        withWriteLock(volId) { ContainerEngine.createDirectory(dirPath, volId) }
+    fun createDirectory(volId: Int, dirPath: String): Boolean {
+        requireSession(volId)
+        return withWriteLock(volId) { ContainerEngine.createDirectory(dirPath, volId) }
+    }
 
-    fun renameFile(volId: Int, oldPath: String, newPath: String): Boolean =
-        withWriteLock(volId) { ContainerEngine.renameFile(oldPath, newPath, volId) }
+    fun renameFile(volId: Int, oldPath: String, newPath: String): Boolean {
+        requireSession(volId)
+        return withWriteLock(volId) { ContainerEngine.renameFile(oldPath, newPath, volId) }
+    }
 
-    fun setLastModifiedTime(volId: Int, fatPath: String, epochSeconds: Long): Boolean =
-        withWriteLock(volId) { ContainerEngine.setLastModifiedTime(fatPath, epochSeconds, volId) }
+    fun setLastModifiedTime(volId: Int, fatPath: String, epochSeconds: Long): Boolean {
+        requireSession(volId)
+        return withWriteLock(volId) { ContainerEngine.setLastModifiedTime(fatPath, epochSeconds, volId) }
+    }
 
-    fun deleteFile(volId: Int, fatPath: String): Boolean =
-        withWriteLock(volId) { ContainerEngine.deleteFile(fatPath, volId) }
+    fun deleteFile(volId: Int, fatPath: String): Boolean {
+        requireSession(volId)
+        return withWriteLock(volId) { ContainerEngine.deleteFile(fatPath, volId) }
+    }
 
     // ── File I/O (Read-Only) ───────────────────────────────────────────────
 
@@ -93,11 +110,15 @@ object ContainerFileSystem {
 
     // ── File I/O (Write) ───────────────────────────────────────────────────
 
-    fun writeFileChunk(volId: Int, fatPath: String, offset: Long, data: ByteArray): Boolean =
-        withWriteLock(volId) { ContainerEngine.writeFileChunk(fatPath, offset, data, volId) }
+    fun writeFileChunk(volId: Int, fatPath: String, offset: Long, data: ByteArray): Boolean {
+        requireSession(volId)
+        return withWriteLock(volId) { ContainerEngine.writeFileChunk(fatPath, offset, data, volId) }
+    }
 
-    fun writeBackFile(volId: Int, fatPath: String, sourcePath: String): Boolean =
-        withWriteLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId) }
+    fun writeBackFile(volId: Int, fatPath: String, sourcePath: String): Boolean {
+        requireSession(volId)
+        return withWriteLock(volId) { ContainerEngine.writeBackFile(fatPath, sourcePath, volId) }
+    }
 
     // ── Space info (Read-Only) ─────────────────────────────────────────────
 

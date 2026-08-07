@@ -5678,6 +5678,12 @@ abstract class AppLocalizations {
   /// **'Could not switch lens'**
   String get cameraCouldNotSwitchLensMessage;
 
+  /// Error toast shown when the vault auto-locks while a video recording is in progress; the in-progress recording could not be written to the vault and was discarded
+  ///
+  /// In en, this message translates to:
+  /// **'Vault locked — recording stopped and discarded'**
+  String get cameraRecordingStoppedVaultLockedMessage;
+
   /// Busy overlay label shown while a captured photo is being encrypted into the vault
   ///
   /// In en, this message translates to:

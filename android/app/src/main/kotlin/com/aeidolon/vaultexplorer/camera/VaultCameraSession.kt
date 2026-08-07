@@ -127,27 +127,59 @@ class VaultCameraSession(
 
     fun listLenses(): List<CameraLensInfo> = listCameraLenses(cameraManager)
 
+    // ── Thread confinement ──────────────────────────────────────────────
+    //
+    // Every field on this class (cameraDevice, captureSession, videoRecorder,
+    // isRecording, recordingChunkWriter, pending*Callback, etc.) is read and
+    // written ONLY from bgThread's looper. Camera2 already delivers all of
+    // its callbacks there (openCamera/createCaptureSession/ImageReader are
+    // all handed `bgHandler` explicitly below), but the public entry points
+    // on this class used to run on whatever thread called them -- in
+    // practice the Flutter platform (main) thread, via VaultCameraPlugin's
+    // MethodChannel handler. That meant two threads could read/write the
+    // same non-volatile, unsynchronized fields concurrently with no
+    // happens-before relationship between them: a classic data race, whose
+    // symptoms are intermittent and hard to reproduce (a zoom/flash call
+    // landing mid-reconfigure silently no-ops, a stale captureSession
+    // reference throws, etc.) rather than a clean crash every time.
+    //
+    // runOnCameraThread() posts every entry point's body onto bgHandler so
+    // ALL field access -- from external callers and from Camera2's own
+    // callbacks alike -- happens on a single thread. That also gets rid of
+    // the "*Locked" naming on the private helpers below, which used to imply
+    // a synchronization discipline that was never actually enforced by a
+    // lock; thread confinement now provides the real guarantee.
+    private fun runOnCameraThread(block: () -> Unit) {
+        if (Thread.currentThread() === bgThread) block() else bgHandler.post(block)
+    }
+
     // ── Open / close ────────────────────────────────────────────────────
 
     fun open(cameraId: String, videoQuality: VaultVideoQuality, callback: (Boolean, String?) -> Unit) {
-        closeCameraOnly {
-            openInternal(cameraId, videoQuality, callback)
+        runOnCameraThread {
+            closeCameraOnly {
+                openInternal(cameraId, videoQuality, callback)
+            }
         }
     }
 
     fun switchLens(cameraId: String, callback: (Boolean, String?) -> Unit) {
-        closeCameraOnly {
-            openInternal(cameraId, pendingQuality, callback)
+        runOnCameraThread {
+            closeCameraOnly {
+                openInternal(cameraId, pendingQuality, callback)
+            }
         }
     }
 
     fun dispose() {
-        closeCameraOnly {
-            jpegReader?.close()
-            jpegReader = null
-            previewSurface = null
-            try { textureEntry.release() } catch (_: Exception) {}
-            bgThread.quitSafely()
+        runOnCameraThread {
+            closeCameraOnly {
+                jpegReader?.close()
+                jpegReader = null
+                previewSurface = null
+                try { textureEntry.release() } catch (_: Exception) {}
+                bgThread.quitSafely()
+            }
         }
     }
 
@@ -325,32 +357,36 @@ class VaultCameraSession(
     }
 
     fun setExposureOffsetEv(ev: Double) {
-        val steps = if (exposureStepValue == 0.0) 0 else (ev / exposureStepValue).toInt()
-        currentExposureSteps = steps.coerceIn(minExposureSteps, maxExposureSteps)
-        updateRepeatingRequest()
+        runOnCameraThread {
+            val steps = if (exposureStepValue == 0.0) 0 else (ev / exposureStepValue).toInt()
+            currentExposureSteps = steps.coerceIn(minExposureSteps, maxExposureSteps)
+            updateRepeatingRequest()
+        }
     }
 
     /** [nx]/[ny] normalized (0..1) tap position within the preview. */
     fun setFocusAndExposurePoint(nx: Float, ny: Float) {
-        val rect = sensorArraySize ?: return
-        val session = captureSession ?: return
-        val halfW = (rect.width() * 0.05f).toInt().coerceAtLeast(1)
-        val halfH = (rect.height() * 0.05f).toInt().coerceAtLeast(1)
-        val cx = (rect.left + (nx.coerceIn(0f, 1f) * rect.width()).toInt()).coerceIn(rect.left, rect.right)
-        val cy = (rect.top + (ny.coerceIn(0f, 1f) * rect.height()).toInt()).coerceIn(rect.top, rect.bottom)
-        val left = (cx - halfW).coerceIn(rect.left, rect.right - 1)
-        val top = (cy - halfH).coerceIn(rect.top, rect.bottom - 1)
-        val right = (cx + halfW).coerceIn(left + 1, rect.right)
-        val bottom = (cy + halfH).coerceIn(top + 1, rect.bottom)
-        val region = MeteringRectangle(left, top, right - left, bottom - top, MeteringRectangle.METERING_WEIGHT_MAX)
-        try {
-            val builder = newRequestBuilder()
-            builder.set(CaptureRequest.CONTROL_AF_REGIONS, arrayOf(region))
-            builder.set(CaptureRequest.CONTROL_AE_REGIONS, arrayOf(region))
-            builder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START)
-            session.capture(builder.build(), null, bgHandler)
-        } catch (e: Exception) {
-            android.util.Log.e("VaultCameraSession", "focus/expose failed", e)
+        runOnCameraThread {
+            val rect = sensorArraySize ?: return@runOnCameraThread
+            val session = captureSession ?: return@runOnCameraThread
+            val halfW = (rect.width() * 0.05f).toInt().coerceAtLeast(1)
+            val halfH = (rect.height() * 0.05f).toInt().coerceAtLeast(1)
+            val cx = (rect.left + (nx.coerceIn(0f, 1f) * rect.width()).toInt()).coerceIn(rect.left, rect.right)
+            val cy = (rect.top + (ny.coerceIn(0f, 1f) * rect.height()).toInt()).coerceIn(rect.top, rect.bottom)
+            val left = (cx - halfW).coerceIn(rect.left, rect.right - 1)
+            val top = (cy - halfH).coerceIn(rect.top, rect.bottom - 1)
+            val right = (cx + halfW).coerceIn(left + 1, rect.right)
+            val bottom = (cy + halfH).coerceIn(top + 1, rect.bottom)
+            val region = MeteringRectangle(left, top, right - left, bottom - top, MeteringRectangle.METERING_WEIGHT_MAX)
+            try {
+                val builder = newRequestBuilder()
+                builder.set(CaptureRequest.CONTROL_AF_REGIONS, arrayOf(region))
+                builder.set(CaptureRequest.CONTROL_AE_REGIONS, arrayOf(region))
+                builder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START)
+                session.capture(builder.build(), null, bgHandler)
+            } catch (e: Exception) {
+                android.util.Log.e("VaultCameraSession", "focus/expose failed", e)
+            }
         }
     }
 
@@ -383,13 +419,17 @@ class VaultCameraSession(
     }
 
     fun setZoom(zoom: Float) {
-        currentZoom = zoom.coerceIn(zoomMinCurrent, zoomMaxCurrent)
-        updateRepeatingRequest()
+        runOnCameraThread {
+            currentZoom = zoom.coerceIn(zoomMinCurrent, zoomMaxCurrent)
+            updateRepeatingRequest()
+        }
     }
 
     fun setFlash(mode: VaultFlashMode) {
-        flashMode = mode
-        updateRepeatingRequest()
+        runOnCameraThread {
+            flashMode = mode
+            updateRepeatingRequest()
+        }
     }
 
     /** [deviceRotationDegrees]: 0/90/180/270, how far the physical device is
@@ -397,22 +437,24 @@ class VaultCameraSession(
      *  the old lockCaptureOrientation()-based Dart code already computed
      *  from the accelerometer. Applied to the next photo/video capture. */
     fun setOrientationDegrees(deviceRotationDegrees: Int) {
-        val normalized = ((deviceRotationDegrees % 360) + 360) % 360
-        if (normalized == lastOrientationDegrees) return
-        lastOrientationDegrees = normalized
+        runOnCameraThread {
+            val normalized = ((deviceRotationDegrees % 360) + 360) % 360
+            if (normalized == lastOrientationDegrees) return@runOnCameraThread
+            lastOrientationDegrees = normalized
 
-        // Bake the new orientation into the video encoder right away, while
-        // the phone is just sitting in preview -- not only after a recording
-        // stops. Previously the encoder's orientation hint was set once when
-        // the session/lens was opened (or right after the *previous* clip
-        // finished) and never touched again, so a video recorded after
-        // rotating the phone kept the old, wrong rotation baked into its
-        // MP4 metadata. Skipped mid-recording since MediaRecorder can't be
-        // reconfigured once started -- that recording keeps the orientation
-        // it began with, which is correct for it; the rotation will be
-        // picked up for the recording after it via the same post-stop path.
-        if (!isRecording) {
-            reprepareVideoRecorder(force = false, reason = "orientation changed")
+            // Bake the new orientation into the video encoder right away, while
+            // the phone is just sitting in preview -- not only after a recording
+            // stops. Previously the encoder's orientation hint was set once when
+            // the session/lens was opened (or right after the *previous* clip
+            // finished) and never touched again, so a video recorded after
+            // rotating the phone kept the old, wrong rotation baked into its
+            // MP4 metadata. Skipped mid-recording since MediaRecorder can't be
+            // reconfigured once started -- that recording keeps the orientation
+            // it began with, which is correct for it; the rotation will be
+            // picked up for the recording after it via the same post-stop path.
+            if (!isRecording) {
+                reprepareVideoRecorder(force = false, reason = "orientation changed")
+            }
         }
     }
 
@@ -462,25 +504,27 @@ class VaultCameraSession(
     // ── Photo capture ───────────────────────────────────────────────────
 
     fun takePhoto(volId: Int, virtualPath: String, callback: (Boolean, String?) -> Unit) {
-        val device = cameraDevice
-        val session = captureSession
-        val reader = jpegReader
-        if (device == null || session == null || reader == null) {
-            callback(false, "camera not ready")
-            return
-        }
-        pendingPhotoCallback = callback
-        pendingPhotoTarget = volId to virtualPath
-        try {
-            val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
-            builder.addTarget(reader.surface)
-            applyControls(builder)
-            builder.set(CaptureRequest.JPEG_ORIENTATION, computeCaptureOrientation())
-            session.capture(builder.build(), null, bgHandler)
-        } catch (e: Exception) {
-            pendingPhotoCallback = null
-            pendingPhotoTarget = null
-            callback(false, e.message)
+        runOnCameraThread {
+            val device = cameraDevice
+            val session = captureSession
+            val reader = jpegReader
+            if (device == null || session == null || reader == null) {
+                callback(false, "camera not ready")
+                return@runOnCameraThread
+            }
+            pendingPhotoCallback = callback
+            pendingPhotoTarget = volId to virtualPath
+            try {
+                val builder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+                builder.addTarget(reader.surface)
+                applyControls(builder)
+                builder.set(CaptureRequest.JPEG_ORIENTATION, computeCaptureOrientation())
+                session.capture(builder.build(), null, bgHandler)
+            } catch (e: Exception) {
+                pendingPhotoCallback = null
+                pendingPhotoTarget = null
+                callback(false, e.message)
+            }
         }
     }
 
@@ -513,40 +557,48 @@ class VaultCameraSession(
     // ── Video recording ─────────────────────────────────────────────────
 
     fun startRecording(volId: Int, virtualPath: String, callback: (Boolean, String?) -> Unit) {
-        val recorder = videoRecorder
-        if (recorder == null || isRecording) {
-            android.util.Log.w(TAG, "startRecording: not ready (recorder=$recorder, isRecording=$isRecording)")
-            callback(false, "not ready")
-            return
-        }
-        try {
-            android.util.Log.d(TAG, "startRecording: $virtualPath")
-            recorder.beginRecording()
-            recordingChunkWriter = VaultChunkWriter(volId, virtualPath)
-            isRecording = true
-            updateRepeatingRequest()
-            callback(true, null)
-        } catch (e: Exception) {
-            android.util.Log.e(TAG, "startRecording failed", e)
-            callback(false, e.message)
+        runOnCameraThread {
+            val recorder = videoRecorder
+            if (recorder == null || isRecording) {
+                android.util.Log.w(TAG, "startRecording: not ready (recorder=$recorder, isRecording=$isRecording)")
+                callback(false, "not ready")
+                return@runOnCameraThread
+            }
+            try {
+                android.util.Log.d(TAG, "startRecording: $virtualPath")
+                recorder.beginRecording()
+                recordingChunkWriter = VaultChunkWriter(volId, virtualPath)
+                isRecording = true
+                updateRepeatingRequest()
+                callback(true, null)
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "startRecording failed", e)
+                callback(false, e.message)
+            }
         }
     }
 
     fun stopRecording(callback: (Boolean, Long, String?) -> Unit) {
-        val recorder = videoRecorder
-        val writer = recordingChunkWriter
-        if (recorder == null || !isRecording || writer == null) {
-            android.util.Log.w(TAG, "stopRecording: not recording (recorder=$recorder, isRecording=$isRecording, writer=$writer)")
-            callback(false, 0, "not recording")
-            return
-        }
-        isRecording = false
-        // Nothing else should target this recorder's surface once it stops
-        // -- the repeating request falls back to preview-only immediately,
-        // before the (blocking, native) stop()/write-out below even runs.
-        videoRecorder = null
-        updateRepeatingRequest()
-        bgHandler.post {
+        // The whole method now runs on bgThread (see runOnCameraThread), so
+        // the "blocking, native" recorder.requestStop()/writeTo() calls
+        // below -- previously pushed onto bgHandler specifically to get
+        // them off whatever thread called stopRecording() -- no longer need
+        // a second, nested post: they already run off the caller's thread
+        // simply by virtue of this whole body being camera-thread-confined.
+        runOnCameraThread {
+            val recorder = videoRecorder
+            val writer = recordingChunkWriter
+            if (recorder == null || !isRecording || writer == null) {
+                android.util.Log.w(TAG, "stopRecording: not recording (recorder=$recorder, isRecording=$isRecording, writer=$writer)")
+                callback(false, 0, "not recording")
+                return@runOnCameraThread
+            }
+            isRecording = false
+            // Nothing else should target this recorder's surface once it
+            // stops -- the repeating request falls back to preview-only
+            // immediately, before the stop()/write-out below even runs.
+            videoRecorder = null
+            updateRepeatingRequest()
             val result = recorder.requestStop()
             val ok = recorder.writeTo(writer)
             recordingChunkWriter = null

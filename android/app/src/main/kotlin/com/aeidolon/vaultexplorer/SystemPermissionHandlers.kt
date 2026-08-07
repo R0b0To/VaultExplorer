@@ -64,6 +64,29 @@ class SystemPermissionHandlers(private val activity: MainActivity) {
         result.success(true)
     }
 
+    /** Copies vault-secret text to the primary clip, marking it sensitive
+     *  ([ClipDescription.EXTRA_IS_SENSITIVE], API 33+) so the system
+     *  clipboard preview / cross-device clipboard / OEM clipboard history
+     *  redact it instead of showing the plaintext value. No-op fallback
+     *  (plain copy) below API 33, where that flag doesn't exist. */
+    fun handleSetSensitiveClipboardText(call: MethodCall, result: MethodChannel.Result) {
+        val text = call.argument<String>("text") ?: ""
+        try {
+            val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                ?: return result.success(false)
+            val clip = ClipData.newPlainText("", text)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                clip.description.extras = android.os.PersistableBundle().apply {
+                    putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                }
+            }
+            clipboard.setPrimaryClip(clip)
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("CLIPBOARD_ERROR", e.message, null)
+        }
+    }
+
     /** Guards against a rare OEM clipboard bug where a corrupted primary
      *  clip (a mime-type entry that resolves to null) crashes any app that
      *  touches the clipboard; called from MainActivity.onWindowFocusChanged. */

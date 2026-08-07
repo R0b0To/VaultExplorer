@@ -13,6 +13,7 @@ import 'package:vaultexplorer/core/filesystem/illegal_char_input_formatter.dart'
 import 'package:vaultexplorer/core/filesystem/mounted_container_filesystem.dart';
 import 'package:vaultexplorer/core/filesystem/name_validation.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
+import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 
 import '../../core/filesystem/filesystem_type.dart';
 
@@ -276,6 +277,8 @@ class _VaultItemEditScreenState extends State<VaultItemEditScreen> {
             TextField(
               controller: _titleCtrl,
               autofocus: _isNew,
+              enableSuggestions: false,
+              autocorrect: false,
               textCapitalization: TextCapitalization.words,
               inputFormatters: [IllegalCharacterInputFormatter(_fsType)],
               decoration: InputDecoration(
@@ -339,6 +342,10 @@ class _FieldInput extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: obscure,
+      // Every field here is vault content, not just `secret`-typed ones —
+      // don't let the IME learn or cloud-sync any of it via predictive text.
+      enableSuggestions: false,
+      autocorrect: false,
       maxLines: isMultiline ? null : 1,
       minLines: isMultiline ? 12 : 1,
       keyboardType: _keyboardType(field.type),
@@ -358,7 +365,7 @@ class _FieldInput extends StatelessWidget {
                   IconButton(
                     icon: Icon(Icons.copy_rounded, size: AppIconSize.small),
                     onPressed: () {
-                      Clipboard.setData(ClipboardData(text: controller.text));
+                      SensitiveClipboard.copy(controller.text);
 
                       showAppSnackBar(
                         context,

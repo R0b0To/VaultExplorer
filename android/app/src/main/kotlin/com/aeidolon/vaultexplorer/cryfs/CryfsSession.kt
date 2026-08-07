@@ -42,7 +42,7 @@ override fun listDirectory(virtualPath: String): Array<String>? {
                 DirEntryWire.encode(entry.name, isDir, size, entry.mtimeEpochSec)
             }.toTypedArray()
         } catch (e: Exception) {
-            android.util.Log.e("CryfsSession", "listDirectory failed for path: \"$virtualPath\"", e)
+            android.util.Log.e("CryfsSession", "listDirectory failed (pathLen=${virtualPath.length})", e)
             null
         }
     }
@@ -61,7 +61,7 @@ override fun listDirectory(virtualPath: String): Array<String>? {
             tree.addEntry(parentBlobId, CryfsDirBlob.newEntry(CryfsEntryType.DIR, nameOf(normalized), newDirBlobId, DEFAULT_DIR_MODE, now))
             true
         } catch (e: Exception) {
-            android.util.Log.e("CryfsSession", "createDirectory failed for $virtualPath", e)
+            android.util.Log.e("CryfsSession", "createDirectory failed (pathLen=${virtualPath.length})", e)
             false
         }
     }

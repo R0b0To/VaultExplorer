@@ -450,6 +450,22 @@ Future<bool> openWithApp(
     }
   }
 
+  /// Copies [text] to the primary clip marked as sensitive on API 33+
+  /// (excluded from clipboard preview / history). Falls back to `false` on
+  /// failure so callers can fall back to a plain [Clipboard.setData].
+  Future<bool> setSensitiveClipboardText(String text) async {
+    try {
+      final bool? success = await _channel.invokeMethod<bool>(
+        ChannelMethods.setSensitiveClipboardText,
+        {'text': text},
+      );
+      return success ?? false;
+    } catch (e) {
+      _logSwallowed('setSensitiveClipboardText', e);
+      return false;
+    }
+  }
+
   Future<bool> setKeepScreenOn(bool enabled) async {
     try {
       final bool? success = await _channel.invokeMethod<bool>(

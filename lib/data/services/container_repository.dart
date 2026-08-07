@@ -135,6 +135,24 @@ class ContainerRepository {
       await _secure.delete(key: _pinnedKey(record.uri));
     }
 
+    // documentProviderFolders names paths *inside* the vault; keyfiles names
+    // external files used to unlock it. Both go to Keystore-backed storage,
+    // same as favourites/pinned, instead of the clear-text containers file.
+    if (record.documentProviderFolders.isNotEmpty) {
+      await _secure.write(
+        key: _docFoldersKey(record.uri),
+        value: jsonEncode(record.documentProviderFolders.map((f) => f.toJson()).toList()),
+      );
+    } else {
+      await _secure.delete(key: _docFoldersKey(record.uri));
+    }
+
+    if (record.keyfiles.isNotEmpty) {
+      await _secure.write(key: _keyfilesKey(record.uri), value: jsonEncode(record.keyfiles));
+    } else {
+      await _secure.delete(key: _keyfilesKey(record.uri));
+    }
+
     await _persist();
   }
 
@@ -163,6 +181,8 @@ class ContainerRepository {
     await _secure.delete(key: _patternHashKey(uri));
     await _secure.delete(key: _favouriteKey(uri));
     await _secure.delete(key: _pinnedKey(uri));
+    await _secure.delete(key: _docFoldersKey(uri));
+    await _secure.delete(key: _keyfilesKey(uri));
     try {
       await vaultExplorerApi.clearDerivedKey(uri);
     } catch (e) {
@@ -187,6 +207,7 @@ class ContainerRepository {
       folders.add(DocumentProviderFolder(path: path, autoMount: autoMount));
     }
     _cache![uri] = existing.copyWith(documentProviderFolders: folders);
+    await _persistDocumentProviderFolders(uri, folders);
     await _persist();
   }
 
@@ -198,7 +219,22 @@ class ContainerRepository {
         .map((f) => f.path == path ? f.copyWith(autoMount: autoMount) : f)
         .toList();
     _cache![uri] = existing.copyWith(documentProviderFolders: folders);
+    await _persistDocumentProviderFolders(uri, folders);
     await _persist();
+  }
+
+  Future<void> _persistDocumentProviderFolders(
+    String uri,
+    List<DocumentProviderFolder> folders,
+  ) async {
+    if (folders.isNotEmpty) {
+      await _secure.write(
+        key: _docFoldersKey(uri),
+        value: jsonEncode(folders.map((f) => f.toJson()).toList()),
+      );
+    } else {
+      await _secure.delete(key: _docFoldersKey(uri));
+    }
   }
 
   Future<String?> getPassword(String uri) => _secure.read(key: _keystoreKey(uri));
@@ -230,6 +266,18 @@ class ContainerRepository {
     return 'vc2_pin_$trimmed';
   }
 
+  static String _docFoldersKey(String uri) {
+    final encoded = base64Url.encode(utf8.encode(uri));
+    final trimmed = encoded.length > 170 ? encoded.substring(0, 170) : encoded;
+    return 'vc2_docfolders_$trimmed';
+  }
+
+  static String _keyfilesKey(String uri) {
+    final encoded = base64Url.encode(utf8.encode(uri));
+    final trimmed = encoded.length > 170 ? encoded.substring(0, 170) : encoded;
+    return 'vc2_keyfiles_$trimmed';
+  }
+
   Future<void> _ensureLoaded() async {
     if (_cache == null) await _hydrate();
   }
@@ -250,13 +298,27 @@ class ContainerRepository {
         // Read the encrypted paths back from Keystore
         final favJson = secureData[_favouriteKey(rawRecord.uri)];
         final pinJson = secureData[_pinnedKey(rawRecord.uri)];
-        
+        final docFoldersJson = secureData[_docFoldersKey(rawRecord.uri)];
+        final keyfilesJson = secureData[_keyfilesKey(rawRecord.uri)];
+
         final favPaths = favJson != null ? List<String>.from(jsonDecode(favJson)) : <String>[];
         final pinPaths = pinJson != null ? List<String>.from(jsonDecode(pinJson)) : <String>[];
+        final docFolders = docFoldersJson != null
+            ? (jsonDecode(docFoldersJson) as List<dynamic>)
+                .map((e) => DocumentProviderFolder.fromJson(Map<String, dynamic>.from(e as Map)))
+                .toList()
+            : <DocumentProviderFolder>[];
+        final keyfiles = keyfilesJson != null
+            ? (jsonDecode(keyfilesJson) as List<dynamic>)
+                .map((e) => Map<String, String>.from(e as Map))
+                .toList()
+            : <Map<String, String>>[];
 
         final secureRecord = rawRecord.copyWith(
           favouritePaths: favPaths,
           pinnedPaths: pinPaths,
+          documentProviderFolders: docFolders,
+          keyfiles: keyfiles,
         );
 
         _cache![secureRecord.uri] = secureRecord;
@@ -378,8 +440,6 @@ class ContainerRecord {
         'unlockMethod': unlockMethod.toJson(),
         'autoCloseMins': autoCloseMins,
         'documentProvider': documentProvider,
-        'documentProviderFolders':
-            documentProviderFolders.map((f) => f.toJson()).toList(),
         if (thumbnailCacheMode != null)
           'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
         if (thumbnailQuality != null)
@@ -389,10 +449,11 @@ class ContainerRecord {
         'cipherId': cipherId,
         'hashId': hashId,
         'containerFormat': containerFormat,
-        'keyfiles': keyfiles,
-        
-        // EXCLUDED FOR SECURITY: `favouritePaths` & `pinnedPaths`
-        // They are no longer serialized into the clear-text file.
+
+        // EXCLUDED FOR SECURITY: `favouritePaths`, `pinnedPaths`,
+        // `documentProviderFolders` and `keyfiles` all name paths on disk
+        // (inside the vault, or to external keyfiles) and are Keystore-
+        // encrypted instead of being serialized into this clear-text file.
       };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
@@ -404,9 +465,8 @@ class ContainerRecord {
       unlockMethod: method,
       autoCloseMins: j['autoCloseMins'] as int? ?? 0,
       documentProvider: j['documentProvider'] as bool? ?? false,
-      documentProviderFolders: (j['documentProviderFolders'] as List<dynamic>? ?? [])
-          .map((e) => DocumentProviderFolder.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList(),
+      // Populated from secure storage in _hydrate(), not from this file.
+      documentProviderFolders: const [],
       thumbnailCacheMode: j.containsKey('thumbnailCacheMode')
           ? ThumbnailCacheMode.fromJson(j['thumbnailCacheMode'] as String?)
           : null,
@@ -418,10 +478,8 @@ class ContainerRecord {
       cipherId: j['cipherId'] as int? ?? 255,
       hashId: j['hashId'] as int? ?? 255,
       containerFormat: j['containerFormat'] as String? ?? 'veracrypt',
-      keyfiles: (j['keyfiles'] as List<dynamic>? ?? [])
-          .map((e) => Map<String, String>.from(e as Map))
-          .toList(),
-      
+      // Populated from secure storage in _hydrate(), not from this file.
+      keyfiles: const [],
       pinnedPaths: [],
       favouritePaths: [],
     );

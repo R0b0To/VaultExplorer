@@ -58,6 +58,7 @@ private object ChannelMethods {
     const val CLEAR_DERIVED_KEY         = "clearDerivedKey"
     const val WRITE_FILE_CHUNK          = "writeFileChunk"
     const val SET_SECURE_SCREEN         = "setSecureScreen"
+    const val SET_SENSITIVE_CLIPBOARD_TEXT = "setSensitiveClipboardText"
     const val UPDATE_CONTAINER_SETTINGS = "updateContainerSettings"
     const val LIST_USB_DEVICES          = "listUsbDevices"
     const val REQUEST_USB_PERMISSION    = "requestUsbPermission"
@@ -294,6 +295,7 @@ class MainActivity : FlutterFragmentActivity() {
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 ChannelMethods.SET_SECURE_SCREEN -> systemHandlers.handleSetSecureScreen(call, result)
+                ChannelMethods.SET_SENSITIVE_CLIPBOARD_TEXT -> systemHandlers.handleSetSensitiveClipboardText(call, result)
                 ChannelMethods.HAS_ALL_FILES_ACCESS -> systemHandlers.handleHasAllFilesAccess(call, result)
                 ChannelMethods.REQUEST_ALL_FILES_ACCESS -> systemHandlers.handleRequestAllFilesAccess(call, result)
                 ChannelMethods.LIST_USB_DEVICES -> usbHandlers.handleListUsbDevices(call, result)

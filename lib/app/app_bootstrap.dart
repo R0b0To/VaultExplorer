@@ -50,20 +50,23 @@ Future<void> _cleanupOrphanedTempFiles() async {
   try {
     final tmpDir = await getTemporaryDirectory();
     await for (final entity in tmpDir.list()) {
-      if (entity is! File) continue;
       final name = entity.path.split('/').last;
-      if (name.startsWith('cb_copy_') ||
+      final matches = name.startsWith('cb_copy_') ||
           name.startsWith('cb_empty_') ||
           name.startsWith('cb_edit_') ||
           name.startsWith('xclip_') ||
           name.startsWith('tmp_') ||
           name.startsWith('vx_pdf_') ||
           name.startsWith('archive_browse_') ||
-          name.startsWith('archive_extract_')) {
-        try {
+          name.startsWith('archive_extract_');
+      if (!matches) continue;
+      try {
+        if (entity is Directory) {
+          await entity.delete(recursive: true);
+        } else {
           await entity.delete();
-        } catch (_) {}
-      }
+        }
+      } catch (_) {}
     }
   } catch (_) {}
 }

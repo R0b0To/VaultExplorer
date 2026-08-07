@@ -131,7 +131,7 @@ class GocryptfsSession(
             tree.invalidate(parentPath)
             true
         } catch (e: Exception) {
-            android.util.Log.e("GocryptfsSession", "createDirectory failed for $virtualPath", e)
+            android.util.Log.e("GocryptfsSession", "createDirectory failed (pathLen=${virtualPath.length})", e)
             false
         }
     }

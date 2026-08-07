@@ -9,6 +9,7 @@ import 'package:vaultexplorer/data/services/vault_items_service.dart';
 import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
+import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 
 class VaultItemDetailScreen extends StatefulWidget {
@@ -95,7 +96,7 @@ class _VaultItemDetailScreenState extends State<VaultItemDetailScreen> {
   }
 
   void _copy(String label, String value) {
-    Clipboard.setData(ClipboardData(text: value));
+    SensitiveClipboard.copy(value);
     showAppSnackBar(
       context,
       message: context.l10n.labelCopiedToClipboard(label),

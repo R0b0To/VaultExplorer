@@ -244,7 +244,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             delegate.invalidateCacheAfterWrite(normalized)
             true
         } catch (e: Exception) {
-            android.util.Log.e("ChunkedFileEngine", "writeBackStream failed for $virtualPath", e)
+            android.util.Log.e("ChunkedFileEngine", "writeBackStream failed (pathLen=${virtualPath.length})", e)
             false
         }
     }
@@ -301,7 +301,7 @@ class ChunkedFileEngine<H>(private val delegate: ChunkedEngineDelegate<H>) {
             delegate.invalidateCacheAfterWrite(normalized)
             true
        } catch (e: Exception) {
-            android.util.Log.e("ChunkedFileEngine", "writeBackFile failed for $virtualPath", e)
+            android.util.Log.e("ChunkedFileEngine", "writeBackFile failed (pathLen=${virtualPath.length})", e)
             false
         }
     }

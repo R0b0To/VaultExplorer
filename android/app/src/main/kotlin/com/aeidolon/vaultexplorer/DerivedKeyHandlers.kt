@@ -243,7 +243,7 @@ fun handleDecodeAvif(call: MethodCall, result: MethodChannel.Result) {
      *  MethodChannel call ([handleStoreDerivedKey]). */
     fun storeDerivedKeyBytes(filePath: String, derivedKey: ByteArray): Boolean {
         val alias = derivedKeyAlias(filePath)
-        Log.i("VaultExplorer_C++", "Storing derived key for ${filePath} (${derivedKey.size} bytes)")
+        Log.i("VaultExplorer_C++", "Storing derived key (${derivedKey.size} bytes)")
         val encrypted = encryptDerivedKey(derivedKey, alias) ?: return false
         val encoded = android.util.Base64.encodeToString(encrypted, android.util.Base64.NO_WRAP)
         activity.getSharedPreferences("vc2_derived_keys", Context.MODE_PRIVATE)
@@ -260,7 +260,7 @@ fun handleDecodeAvif(call: MethodCall, result: MethodChannel.Result) {
         val encrypted = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
         val decrypted = decryptDerivedKey(encrypted, alias)
         if (decrypted != null) {
-            Log.i("VaultExplorer_C++", "Loaded derived key for ${filePath} from Keystore-backed storage (${decrypted.size} bytes)")
+            Log.i("VaultExplorer_C++", "Loaded derived key from Keystore-backed storage (${decrypted.size} bytes)")
         }
         return decrypted
     }

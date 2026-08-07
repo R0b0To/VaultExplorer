@@ -201,7 +201,7 @@ class VaultCameraPlugin(
                 "startVideoRecording" -> withSession(call, result) { session, args ->
                     val volId = (args["volId"] as? Number)?.toInt() ?: return@withSession result.error("bad_args", "volId required", null)
                     val path = args["virtualPath"] as? String ?: return@withSession result.error("bad_args", "virtualPath required", null)
-                    android.util.Log.d(TAG, "startVideoRecording: $path")
+                    android.util.Log.d(TAG, "startVideoRecording (pathLen=${path.length})")
                     session.startRecording(volId, path) { ok, error ->
                         mainHandler.post {
                             android.util.Log.d(TAG, "startVideoRecording result: ok=$ok error=$error")

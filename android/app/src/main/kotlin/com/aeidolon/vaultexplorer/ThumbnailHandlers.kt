@@ -161,10 +161,10 @@ class ThumbnailHandlers(
         quality: Int,
     ): VideoFrameResult? {
         if (isPlaybackActive) {
-            Log.d(TAG, "Playback active: attempting software MediaCodec frame extraction for $fileName")
+            Log.d(TAG, "Playback active: attempting software MediaCodec frame extraction (len=${fileName.length})")
             val swResult = extractVideoFrameSoftware(uriString, fileName, volId, targetSize, quality)
             if (swResult != null) return swResult
-            Log.d(TAG, "Software extraction unavailable or failed for $fileName while playing")
+            Log.d(TAG, "Software extraction unavailable or failed while playing (len=${fileName.length})")
             return null
         }
 
@@ -543,7 +543,7 @@ class ThumbnailHandlers(
             }
 
             val swCodecName = findSoftwareDecoderName(mimeType) ?: return null
-            Log.d(TAG, "Using software video decoder '$swCodecName' for thumbnail: $fileName")
+            Log.d(TAG, "Using software video decoder '$swCodecName' for thumbnail (len=${fileName.length})")
 
             extractor.selectTrack(videoTrackIndex)
 
@@ -613,7 +613,7 @@ class ThumbnailHandlers(
             }
             return null
         } catch (e: Exception) {
-            Log.w(TAG, "Software MediaCodec extraction failed for $fileName: ${e.message}")
+            Log.w(TAG, "Software MediaCodec extraction failed (len=${fileName.length}): ${e.message}")
             return null
         } finally {
             runCatching {

@@ -565,7 +565,7 @@ class VaultCameraSession(
                 return@runOnCameraThread
             }
             try {
-                android.util.Log.d(TAG, "startRecording: $virtualPath")
+                android.util.Log.d(TAG, "startRecording")
                 recorder.beginRecording()
                 recordingChunkWriter = VaultChunkWriter(volId, virtualPath)
                 isRecording = true

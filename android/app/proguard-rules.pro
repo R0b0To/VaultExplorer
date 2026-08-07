@@ -10,3 +10,12 @@
 # Force deterministic R8 builds
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# Strip verbose/debug logging from release builds (defense-in-depth on top of
+# not interpolating decrypted paths/filenames into log calls in the first
+# place). Log.e/Log.w are kept since they carry no path data after the
+# redaction pass and are useful for crash triage.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+}

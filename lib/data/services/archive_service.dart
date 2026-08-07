@@ -48,10 +48,15 @@ class ArchiveService {
     required String archivePathInContainer,
     required int pathStackEntryIndex,
   }) async {
-    // 1. Extract the archive from the encrypted container to temp storage
+    // 1. Extract the archive from the encrypted container to temp storage.
+    // The temp filename is randomized (not the real in-vault filename) so a
+    // plaintext directory listing never reveals what was opened.
     final tempDir = await getTemporaryDirectory();
-    final archiveBaseName = p.basename(archivePathInContainer);
-    final tempPath = p.join(tempDir.path, 'archive_browse_$archiveBaseName');
+    final extension = p.extension(archivePathInContainer);
+    final tempPath = p.join(
+      tempDir.path,
+      'archive_browse_${DateTime.now().microsecondsSinceEpoch}$extension',
+    );
 
     final success = await vaultExplorerApi.decryptFile(
       container,

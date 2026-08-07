@@ -101,7 +101,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# items',
+      other: '$count items',
       one: '1 item',
     );
     return '$verb $_temp0';
@@ -112,7 +112,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '+# more items',
+      other: '+$count more items',
       one: '+1 more item',
     );
     return '$_temp0';
@@ -141,7 +141,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# items',
+      other: '$count items',
       one: '1 item',
     );
     return '$verb $_temp0';
@@ -185,7 +185,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# transfers',
+      other: '$count transfers',
       one: '1 transfer',
     );
     return '$_temp0';
@@ -306,7 +306,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Delete # items?',
+      other: 'Delete $count items?',
       one: 'Delete 1 item?',
     );
     return '$_temp0';
@@ -334,7 +334,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Rename # items',
+      other: 'Rename $count items',
       one: 'Rename 1 item',
     );
     return '$_temp0';
@@ -1044,7 +1044,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       seconds,
       locale: localeName,
-      other: '# seconds',
+      other: '$seconds seconds',
       one: '1 second',
     );
     return 'Too many failed attempts. Try again in $_temp0.';
@@ -1058,7 +1058,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       attempts,
       locale: localeName,
-      other: '# failed attempts',
+      other: '$attempts failed attempts',
       one: '1 failed attempt',
     );
     return 'Incorrect password. Locked for ${seconds}s due to $_temp0.';
@@ -1069,7 +1069,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       attempts,
       locale: localeName,
-      other: '# failed attempts',
+      other: '$attempts failed attempts',
       one: '1 failed attempt',
     );
     return 'Incorrect password ($_temp0).';
@@ -1637,7 +1637,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Deleted # items',
+      other: 'Deleted $count items',
       one: 'Deleted 1 item',
     );
     return '$_temp0';
@@ -1653,7 +1653,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Exported # files',
+      other: 'Exported $count files',
       one: 'Exported 1 file',
     );
     return '$_temp0';
@@ -1689,7 +1689,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Deleted # original items',
+      other: 'Deleted $count original items',
       one: 'Deleted 1 original item',
     );
     return '$_temp0';
@@ -1722,7 +1722,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Extracted # files',
+      other: 'Extracted $count files',
       one: 'Extracted 1 file',
     );
     return '$_temp0';
@@ -3041,7 +3041,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# folders',
+      other: '$count folders',
       one: '1 folder',
     );
     return '$_temp0';
@@ -3052,7 +3052,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# files',
+      other: '$count files',
       one: '1 file',
     );
     return '$_temp0';
@@ -3082,7 +3082,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# items already exist',
+      other: '$count items already exist',
       one: '1 item already exists',
     );
     return '$_temp0';
@@ -3127,7 +3127,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# items failed:',
+      other: '$count items failed:',
       one: '1 item failed:',
     );
     return '$_temp0';
@@ -3659,7 +3659,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# items',
+      other: '$count items',
       one: '1 item',
     );
     return '$_temp0';
@@ -3670,7 +3670,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# items $verb',
+      other: '$count items $verb',
       one: '1 item $verb',
     );
     return '$_temp0';
@@ -3736,4 +3736,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String fileOpCopyingName(String name) {
     return 'Copying $name…';
   }
+
+  @override
+  String get searchInSubfoldersHint => 'Search all subfolders…';
+
+  @override
+  String get deepSearchEnabledTooltip =>
+      'Searching subfolders — tap for current folder only';
+
+  @override
+  String get deepSearchDisabledTooltip =>
+      'Searching current folder — tap to search subfolders';
+
+  @override
+  String get filterAction => 'Filter';
 }

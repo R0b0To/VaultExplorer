@@ -138,7 +138,7 @@
   "@clipboardDefaultSourceName": {
     "description": "Fallback source name shown when the clipboard source container has no display name"
   },
-  "clipboardHeaderCount": "{verb} {count, plural, =1{1 item} other{# items}}",
+  "clipboardHeaderCount": "{verb} {count, plural, =1{1 item} other{{count} items}}",
   "@clipboardHeaderCount": {
     "description": "Header showing the clipboard verb and item count",
     "placeholders": {
@@ -150,7 +150,7 @@
       }
     }
   },
-  "clipboardMoreItems": "{count, plural, =1{+1 more item} other{+# more items}}",
+  "clipboardMoreItems": "{count, plural, =1{+1 more item} other{+{count} more items}}",
   "@clipboardMoreItems": {
     "description": "Overflow indicator when more clipboard items exist than shown in the preview",
     "placeholders": {
@@ -183,7 +183,7 @@
   "@clipboardVerbCopying": {
     "description": "Progress verb shown while a copy clipboard operation is pending"
   },
-  "clipboardPillTitle": "{verb} {count, plural, =1{1 item} other{# items}}",
+  "clipboardPillTitle": "{verb} {count, plural, =1{1 item} other{{count} items}}",
   "@clipboardPillTitle": {
     "description": "Title of the floating clipboard activity pill",
     "placeholders": {
@@ -258,7 +258,7 @@
       }
     }
   },
-  "multiOpLabel": "{count, plural, =1{1 transfer} other{# transfers}}",
+ "multiOpLabel": "{count, plural, =1{1 transfer} other{{count} transfers}}",
   "@multiOpLabel": {
     "description": "Label shown when multiple file operations are running at once",
     "placeholders": {
@@ -477,7 +477,7 @@
   "@readOnlyContainerWarning": {
     "description": "Snackbar shown when trying to modify a read-only mounted container"
   },
-  "deleteItemsTitle": "{count, plural, =1{Delete 1 item?} other{Delete # items?}}",
+  "deleteItemsTitle": "{count, plural, =1{Delete 1 item?} other{Delete {count} items?}}",
   "@deleteItemsTitle": {
     "description": "Confirmation dialog title for deleting one or more items",
     "placeholders": {
@@ -506,7 +506,7 @@
   "@rename": {
     "description": "Generic Rename action label / single-item rename dialog title"
   },
-  "renameMultipleTitle": "{count, plural, =1{Rename 1 item} other{Rename # items}}",
+  "renameMultipleTitle": "{count, plural, =1{Rename 1 item} other{Rename {count} items}}",
   "@renameMultipleTitle": {
     "description": "Dialog title when renaming multiple items at once",
     "placeholders": {
@@ -1418,7 +1418,7 @@
       }
     }
   },
-  "tooManyFailedAttempts": "Too many failed attempts. Try again in {seconds, plural, =1{1 second} other{# seconds}}.",
+   "tooManyFailedAttempts": "Too many failed attempts. Try again in {seconds, plural, =1{1 second} other{{seconds} seconds}}.",
   "@tooManyFailedAttempts": {
     "description": "Error shown when the lock screen is in a lockout cooldown",
     "placeholders": {
@@ -1431,7 +1431,7 @@
   "@enterMasterPasswordPrompt": {
     "description": "Validation error when submitting the lock screen with an empty password field"
   },
-  "incorrectPasswordLockedFor": "Incorrect password. Locked for {seconds}s due to {attempts, plural, =1{1 failed attempt} other{# failed attempts}}.",
+  "incorrectPasswordLockedFor": "Incorrect password. Locked for {seconds}s due to {attempts, plural, =1{1 failed attempt} other{{attempts} failed attempts}}.",
   "@incorrectPasswordLockedFor": {
     "description": "Error shown when a failed attempt triggers a new lockout",
     "placeholders": {
@@ -1443,7 +1443,7 @@
       }
     }
   },
-  "incorrectPasswordAttempts": "Incorrect password ({attempts, plural, =1{1 failed attempt} other{# failed attempts}}).",
+  "incorrectPasswordAttempts": "Incorrect password ({attempts, plural, =1{1 failed attempt} other{{attempts} failed attempts}}).",
   "@incorrectPasswordAttempts": {
     "description": "Error shown after a failed attempt that doesn't (yet) trigger a lockout",
     "placeholders": {
@@ -2217,7 +2217,7 @@
   "@readOnlyCantDelete": {
     "description": "Error when attempting to delete items from a read-only container"
   },
-  "deletedCount": "{count, plural, =1{Deleted 1 item} other{Deleted # items}}",
+  "deletedCount": "{count, plural, =1{Deleted 1 item} other{Deleted {count} items}}",
   "@deletedCount": {
     "description": "Status message after a successful batch delete",
     "placeholders": {
@@ -2238,7 +2238,7 @@
       }
     }
   },
-  "exportedCount": "{count, plural, =1{Exported 1 file} other{Exported # files}}",
+  "exportedCount": "{count, plural, =1{Exported 1 file} other{Exported {count} files}}",
   "@exportedCount": {
     "description": "Status message after exporting files to device storage",
     "placeholders": {
@@ -2280,7 +2280,7 @@
   "@deleteOriginalButton": {
     "description": "Button label to delete the original imported files/folder from-device"
   },
-  "deletedOriginalCount": "{count, plural, =1{Deleted 1 original item} other{Deleted # original items}}",
+  "deletedOriginalCount": "{count, plural, =1{Deleted 1 original item} other{Deleted {count} original items}}",
   "@deletedOriginalCount": {
     "description": "Status message after deleting import source files",
     "placeholders": {
@@ -2323,7 +2323,7 @@
   "@extract": {
     "description": "Button label to confirm extracting an archive"
   },
-  "extractedCount": "{count, plural, =1{Extracted 1 file} other{Extracted # files}}",
+  "extractedCount": "{count, plural, =1{Extracted 1 file} other{Extracted {count} files}}",
   "@extractedCount": {
     "description": "Status message after successfully extracting an archive",
     "placeholders": {
@@ -4048,14 +4048,14 @@
   "@statsStorageSectionHeader": {
     "description": "Section header label above the storage stats in the vertical (landscape sidebar) stats bar layout"
   },
-  "statsFolderCount": "{count, plural, =1{1 folder} other{# folders}}",
+  "statsFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
   "@statsFolderCount": {
     "description": "Count of folders shown in the stats bar",
     "placeholders": {
       "count": { "type": "num" }
     }
   },
-  "statsFileCount": "{count, plural, =1{1 file} other{# files}}",
+  "statsFileCount": "{count, plural, =1{1 file} other{{count} files}}",
   "@statsFileCount": {
     "description": "Count of files shown in the stats bar",
     "placeholders": {
@@ -4086,7 +4086,7 @@
   "@folderExposedAsStorageExplanation": {
     "description": "Explanation body text in the folder document provider sheet"
   },
-  "conflictItemsAlreadyExistTitle": "{count, plural, =1{1 item already exists} other{# items already exist}}",
+  "conflictItemsAlreadyExistTitle": "{count, plural, =1{1 item already exists} other{{count} items already exist}}",
   "@conflictItemsAlreadyExistTitle": {
     "description": "Header title in the conflict resolution sheet showing how many items collided",
     "placeholders": {
@@ -4137,7 +4137,7 @@
   "@fileOpsCancelledStatusLabel": {
     "description": "Status label for a cancelled file operation"
   },
-  "fileOpsItemsFailedLabel": "{count, plural, =1{1 item failed:} other{# items failed:}}",
+  "fileOpsItemsFailedLabel": "{count, plural, =1{1 item failed:} other{{count} items failed:}}",
   "@fileOpsItemsFailedLabel": {
     "description": "Label introducing the list of failed items in a batch file operation",
     "placeholders": {
@@ -4803,14 +4803,14 @@
   "@verbCopying": {
     "description": "Present-continuous verb: Copying"
   },
-  "fileOpItemsCount": "{count, plural, =1{1 item} other{# items}}",
+  "fileOpItemsCount": "{count, plural, =1{1 item} other{{count} items}}",
   "@fileOpItemsCount": {
     "description": "Pluralized count of items in a file operation",
     "placeholders": {
       "count": { "type": "num" }
     }
   },
-  "fileOpSummaryCount": "{count, plural, =1{1 item {verb}} other{# items {verb}}}",
+  "fileOpSummaryCount": "{count, plural, =1{1 item {verb}} other{{count} items {verb}}}",
   "@fileOpSummaryCount": {
     "description": "Completion summary count of items processed",
     "placeholders": {
@@ -4900,6 +4900,22 @@
     "placeholders": {
       "name": { "type": "String" }
     }
+  },
+  "searchInSubfoldersHint": "Search all subfolders…",
+  "@searchInSubfoldersHint": {
+    "description": "Hint text for searching recursively across subfolders"
+  },
+  "deepSearchEnabledTooltip": "Searching subfolders — tap for current folder only",
+  "@deepSearchEnabledTooltip": {
+    "description": "Tooltip when recursive subfolder search is active"
+  },
+  "deepSearchDisabledTooltip": "Searching current folder — tap to search subfolders",
+  "@deepSearchDisabledTooltip": {
+    "description": "Tooltip when local folder search is active"
+  },
+  "filterAction": "Filter",
+  "@filterAction": {
+    "description": "Label for filter toolbar action"
   }
 }
 

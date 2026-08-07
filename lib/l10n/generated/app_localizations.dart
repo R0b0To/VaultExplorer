@@ -253,13 +253,13 @@ abstract class AppLocalizations {
   /// Header showing the clipboard verb and item count
   ///
   /// In en, this message translates to:
-  /// **'{verb} {count, plural, =1{1 item} other{# items}}'**
+  /// **'{verb} {count, plural, =1{1 item} other{{count} items}}'**
   String clipboardHeaderCount(String verb, num count);
 
   /// Overflow indicator when more clipboard items exist than shown in the preview
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{+1 more item} other{+# more items}}'**
+  /// **'{count, plural, =1{+1 more item} other{+{count} more items}}'**
   String clipboardMoreItems(num count);
 
   /// Expansion tile title for PIM/cipher/hash advanced options
@@ -301,7 +301,7 @@ abstract class AppLocalizations {
   /// Title of the floating clipboard activity pill
   ///
   /// In en, this message translates to:
-  /// **'{verb} {count, plural, =1{1 item} other{# items}}'**
+  /// **'{verb} {count, plural, =1{1 item} other{{count} items}}'**
   String clipboardPillTitle(String verb, num count);
 
   /// Appended to the clipboard pill title to show the source container
@@ -361,7 +361,7 @@ abstract class AppLocalizations {
   /// Label shown when multiple file operations are running at once
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 transfer} other{# transfers}}'**
+  /// **'{count, plural, =1{1 transfer} other{{count} transfers}}'**
   String multiOpLabel(num count);
 
   /// Sublabel under the multi-operation activity pill
@@ -533,7 +533,7 @@ abstract class AppLocalizations {
   /// Confirmation dialog title for deleting one or more items
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Delete 1 item?} other{Delete # items?}}'**
+  /// **'{count, plural, =1{Delete 1 item?} other{Delete {count} items?}}'**
   String deleteItemsTitle(num count);
 
   /// Delete confirmation body when the selection includes at least one folder
@@ -569,7 +569,7 @@ abstract class AppLocalizations {
   /// Dialog title when renaming multiple items at once
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Rename 1 item} other{Rename # items}}'**
+  /// **'{count, plural, =1{Rename 1 item} other{Rename {count} items}}'**
   String renameMultipleTitle(num count);
 
   /// Create-folder dialog title
@@ -1781,7 +1781,7 @@ abstract class AppLocalizations {
   /// Error shown when the lock screen is in a lockout cooldown
   ///
   /// In en, this message translates to:
-  /// **'Too many failed attempts. Try again in {seconds, plural, =1{1 second} other{# seconds}}.'**
+  /// **'Too many failed attempts. Try again in {seconds, plural, =1{1 second} other{{seconds} seconds}}.'**
   String tooManyFailedAttempts(num seconds);
 
   /// Validation error when submitting the lock screen with an empty password field
@@ -1793,13 +1793,13 @@ abstract class AppLocalizations {
   /// Error shown when a failed attempt triggers a new lockout
   ///
   /// In en, this message translates to:
-  /// **'Incorrect password. Locked for {seconds}s due to {attempts, plural, =1{1 failed attempt} other{# failed attempts}}.'**
+  /// **'Incorrect password. Locked for {seconds}s due to {attempts, plural, =1{1 failed attempt} other{{attempts} failed attempts}}.'**
   String incorrectPasswordLockedFor(int seconds, num attempts);
 
   /// Error shown after a failed attempt that doesn't (yet) trigger a lockout
   ///
   /// In en, this message translates to:
-  /// **'Incorrect password ({attempts, plural, =1{1 failed attempt} other{# failed attempts}}).'**
+  /// **'Incorrect password ({attempts, plural, =1{1 failed attempt} other{{attempts} failed attempts}}).'**
   String incorrectPasswordAttempts(num attempts);
 
   /// The app's wordmark as displayed on the lock screen (intentionally spaceless stylization, distinct from the 'Vault Explorer' task-switcher/about-screen name)
@@ -2711,7 +2711,7 @@ abstract class AppLocalizations {
   /// Status message after a successful batch delete
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Deleted 1 item} other{Deleted # items}}'**
+  /// **'{count, plural, =1{Deleted 1 item} other{Deleted {count} items}}'**
   String deletedCount(num count);
 
   /// Status message after a batch delete with some failures
@@ -2723,7 +2723,7 @@ abstract class AppLocalizations {
   /// Status message after exporting files to device storage
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Exported 1 file} other{Exported # files}}'**
+  /// **'{count, plural, =1{Exported 1 file} other{Exported {count} files}}'**
   String exportedCount(num count);
 
   /// Status message when an export operation returns zero files
@@ -2771,7 +2771,7 @@ abstract class AppLocalizations {
   /// Status message after deleting import source files
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Deleted 1 original item} other{Deleted # original items}}'**
+  /// **'{count, plural, =1{Deleted 1 original item} other{Deleted {count} original items}}'**
   String deletedOriginalCount(num count);
 
   /// Error status when deleting import source files fails
@@ -2813,7 +2813,7 @@ abstract class AppLocalizations {
   /// Status message after successfully extracting an archive
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Extracted 1 file} other{Extracted # files}}'**
+  /// **'{count, plural, =1{Extracted 1 file} other{Extracted {count} files}}'**
   String extractedCount(num count);
 
   /// Error status when extracting an archive throws
@@ -5195,13 +5195,13 @@ abstract class AppLocalizations {
   /// Count of folders shown in the stats bar
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 folder} other{# folders}}'**
+  /// **'{count, plural, =1{1 folder} other{{count} folders}}'**
   String statsFolderCount(num count);
 
   /// Count of files shown in the stats bar
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 file} other{# files}}'**
+  /// **'{count, plural, =1{1 file} other{{count} files}}'**
   String statsFileCount(num count);
 
   /// Browser file-type filter menu option: show all files
@@ -5243,7 +5243,7 @@ abstract class AppLocalizations {
   /// Header title in the conflict resolution sheet showing how many items collided
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 item already exists} other{# items already exist}}'**
+  /// **'{count, plural, =1{1 item already exists} other{{count} items already exist}}'**
   String conflictItemsAlreadyExistTitle(num count);
 
   /// Subtitle in the conflict resolution sheet
@@ -5315,7 +5315,7 @@ abstract class AppLocalizations {
   /// Label introducing the list of failed items in a batch file operation
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 item failed:} other{# items failed:}}'**
+  /// **'{count, plural, =1{1 item failed:} other{{count} items failed:}}'**
   String fileOpsItemsFailedLabel(num count);
 
   /// Label indicating additional items beyond the displayed limit in a batch file operation
@@ -6203,13 +6203,13 @@ abstract class AppLocalizations {
   /// Pluralized count of items in a file operation
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 item} other{# items}}'**
+  /// **'{count, plural, =1{1 item} other{{count} items}}'**
   String fileOpItemsCount(num count);
 
   /// Completion summary count of items processed
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 item {verb}} other{# items {verb}}}'**
+  /// **'{count, plural, =1{1 item {verb}} other{{count} items {verb}}}'**
   String fileOpSummaryCount(num count, String verb);
 
   /// Completion summary count of skipped items
@@ -6307,6 +6307,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copying {name}…'**
   String fileOpCopyingName(String name);
+
+  /// Hint text for searching recursively across subfolders
+  ///
+  /// In en, this message translates to:
+  /// **'Search all subfolders…'**
+  String get searchInSubfoldersHint;
+
+  /// Tooltip when recursive subfolder search is active
+  ///
+  /// In en, this message translates to:
+  /// **'Searching subfolders — tap for current folder only'**
+  String get deepSearchEnabledTooltip;
+
+  /// Tooltip when local folder search is active
+  ///
+  /// In en, this message translates to:
+  /// **'Searching current folder — tap to search subfolders'**
+  String get deepSearchDisabledTooltip;
+
+  /// Label for filter toolbar action
+  ///
+  /// In en, this message translates to:
+  /// **'Filter'**
+  String get filterAction;
 }
 
 class _AppLocalizationsDelegate

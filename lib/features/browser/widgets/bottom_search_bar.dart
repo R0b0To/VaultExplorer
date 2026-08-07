@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
-/// Search field pinned above the on-screen keyboard, docked at the bottom
-/// of the screen.
+/// Search field pinned above the on-screen keyboard, docked at the bottom of the screen.
 class BottomSearchBar extends StatefulWidget {
   final String initialQuery;
   final ValueChanged<String> onChanged;
   final VoidCallback onClose;
+  final bool isDeepSearch;
+  final ValueChanged<bool>? onDeepSearchToggle;
+  final bool isSearchingSubfolders;
 
   const BottomSearchBar({
     super.key,
     required this.initialQuery,
     required this.onChanged,
     required this.onClose,
+    this.isDeepSearch = false,
+    this.onDeepSearchToggle,
+    this.isSearchingSubfolders = false,
   });
 
   @override
@@ -46,7 +51,6 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Padding(
-      // Sits slightly elevated above the keyboard or screen bottom
       padding: EdgeInsets.only(
         bottom: bottomInset + 8,
         left: 8,
@@ -57,19 +61,17 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
         child: Material(
           elevation: 6,
           color: cs.surfaceContainerHigh,
-          shape: const StadiumBorder(), // Modern pill-shape footprint
+          shape: const StadiumBorder(),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
             child: Row(
               children: [
-                // Back arrow (close search) — left side
                 IconButton(
                   icon: const Icon(Icons.arrow_back_rounded, size: 20),
                   tooltip: context.l10n.closeSearchTooltip,
                   visualDensity: VisualDensity.compact,
                   onPressed: widget.onClose,
                 ),
-                // Text field
                 Expanded(
                   child: TextField(
                     controller: _ctrl,
@@ -78,7 +80,9 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
                     textInputAction: TextInputAction.search,
                     style: const TextStyle(fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: context.l10n.searchInThisFolderHint,
+                      hintText: widget.isDeepSearch
+                          ? context.l10n.searchInSubfoldersHint
+                          : context.l10n.searchInThisFolderHint,
                       hintStyle: TextStyle(
                         color: cs.onSurfaceVariant,
                         fontSize: 14,
@@ -91,7 +95,18 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
                     ),
                   ),
                 ),
-                // Clear button — only when text is non-empty
+                if (widget.isSearchingSubfolders)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
                 ValueListenableBuilder<TextEditingValue>(
                   valueListenable: _ctrl,
                   builder: (context, value, child) {
@@ -107,11 +122,25 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
                     );
                   },
                 ),
-                // Search icon — right side
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(Icons.search_rounded, color: cs.primary, size: 20),
-                ),
+                if (widget.onDeepSearchToggle != null)
+                  Tooltip(
+                    message: widget.isDeepSearch
+                        ? context.l10n.deepSearchEnabledTooltip
+                        : context.l10n.deepSearchDisabledTooltip,
+                    child: IconButton(
+                      icon: Icon(
+                        widget.isDeepSearch
+                            ? Icons.account_tree_rounded
+                            : Icons.account_tree_outlined,
+                        color: widget.isDeepSearch ? cs.primary : cs.onSurfaceVariant,
+                        size: 20,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () =>
+                          widget.onDeepSearchToggle!(!widget.isDeepSearch),
+                    ),
+                  ),
+                const SizedBox(width: 4),
               ],
             ),
           ),

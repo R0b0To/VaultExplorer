@@ -6,6 +6,7 @@ enum FileManagerAction {
   add,
   viewToggle,
   sort,
+  filter,
   playMedia;
 
   String get label => switch (this) {
@@ -13,6 +14,7 @@ enum FileManagerAction {
         FileManagerAction.add => 'Add',
         FileManagerAction.viewToggle => 'View mode',
         FileManagerAction.sort => 'Sort',
+        FileManagerAction.filter => 'Filter',
         FileManagerAction.playMedia => 'Play media',
       };
 
@@ -21,6 +23,7 @@ enum FileManagerAction {
         FileManagerAction.add => l10n.add,
         FileManagerAction.viewToggle => l10n.viewModeAction,
         FileManagerAction.sort => l10n.sortAction,
+        FileManagerAction.filter => l10n.filterAction,
         FileManagerAction.playMedia => l10n.playMediaAction,
       };
 
@@ -29,6 +32,7 @@ enum FileManagerAction {
         FileManagerAction.add => Icons.add_rounded,
         FileManagerAction.viewToggle => Icons.grid_view_rounded,
         FileManagerAction.sort => Icons.sort_by_alpha_rounded,
+        FileManagerAction.filter => Icons.filter_alt_outlined,
         FileManagerAction.playMedia => Icons.play_circle_outline_rounded,
       };
 

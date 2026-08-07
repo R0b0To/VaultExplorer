@@ -127,6 +127,7 @@ class _AddItemMenuButtonState extends State<AddItemMenuButton> {
           child: Text(context.l10n.camera),
           onPressed: widget.onCaptureFromCamera,
         ),
+        const PopupMenuDivider(),
         MenuItemButton(
           leadingIcon: Icon(Icons.upload_file_outlined, color: cs.secondary),
           child: Text(context.l10n.importFiles),

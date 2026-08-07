@@ -165,7 +165,9 @@ class FileRowShell extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: HighlightedText(
-                  text: displayName.characters.join('\u200B'),
+                  text: (searchQuery != null && searchQuery!.isNotEmpty)
+                      ? displayName
+                      : displayName.characters.join('\u200B'),
                   query: searchQuery,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

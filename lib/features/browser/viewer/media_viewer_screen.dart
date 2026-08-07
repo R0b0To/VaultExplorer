@@ -42,6 +42,7 @@ class MediaViewerScreen extends StatefulWidget {
   final String? startingFolder;
   final ThumbnailQuality thumbnailQuality;
   final ThumbnailCacheMode thumbnailCacheMode;
+  final String? mediaFilter;
 
   const MediaViewerScreen({
     super.key,
@@ -51,6 +52,7 @@ class MediaViewerScreen extends StatefulWidget {
     this.startingFolder,
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     required this.thumbnailCacheMode,
+    this.mediaFilter,
   });
 
   @override
@@ -118,6 +120,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       initialMediaFiles: widget.mediaFiles,
       initialIndex: widget.initialIndex,
       startingFolder: widget.startingFolder,
+      mediaFilter: widget.mediaFilter,
     );
     _wasEmpty = _playlistController.isEmpty;
     _playbackManager = VideoPlaybackManager();

@@ -7,6 +7,7 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 class PlaylistController extends ChangeNotifier {
   final MountedContainer container;
   final String? startingFolder;
+  final String? mediaFilter;
 
   List<String> _originalList;
   List<String> _currentPlaylist;
@@ -25,6 +26,7 @@ class PlaylistController extends ChangeNotifier {
     required List<String> initialMediaFiles,
     required int initialIndex,
     this.startingFolder,
+    this.mediaFilter,
   }) : _originalList = List.from(initialMediaFiles),
        _currentPlaylist = List.from(initialMediaFiles),
        _currentIndex = initialIndex,
@@ -42,6 +44,18 @@ class PlaylistController extends ChangeNotifier {
   bool get isEmpty => _currentPlaylist.isEmpty;
   String get currentFile => isEmpty ? '' : _currentPlaylist[_currentIndex];
 
+  bool _isMediaMatching(String fileName) {
+    if (mediaFilter == 'image') {
+      return MediaViewerConstants.isImage(fileName);
+    } else if (mediaFilter == 'video') {
+      return MediaViewerConstants.isVideo(fileName);
+    } else if (mediaFilter == 'audio') {
+      return MediaViewerConstants.isAudio(fileName);
+    }
+    return MediaViewerConstants.isSupported(fileName);
+  }
+
+  
   void updateIndex(int index) {
     if (index >= 0 && index < _currentPlaylist.length && index != _currentIndex) {
       _currentIndex = index;
@@ -70,6 +84,8 @@ class PlaylistController extends ChangeNotifier {
       _allFilesScanned = true;
     }
   }
+
+  
 
   void toggleShuffle() {
     if (isEmpty || !_isPlaylistMode) return;
@@ -175,7 +191,7 @@ class PlaylistController extends ChangeNotifier {
         for (final item in items) {
           if (item.startsWith('System:')) continue;
           final entry = RawEntry.parse(item);
-          if (!entry.isDir && MediaViewerConstants.isSupported(entry.name)) {
+          if (!entry.isDir && _isMediaMatching(entry.name)) {
             final fullPath = baseDir.isEmpty
                 ? entry.name
                 : '$baseDir/${entry.name}';
@@ -209,7 +225,7 @@ class PlaylistController extends ChangeNotifier {
           if (entry.isDir) {
             subdirNames.add(entry.name);
           } else {
-            if (MediaViewerConstants.isSupported(entry.name)) {
+              if (_isMediaMatching(entry.name)) {
               final fullPath = baseDir.isEmpty
                   ? entry.name
                   : '$baseDir/${entry.name}';

@@ -47,7 +47,9 @@ import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
 import 'package:vaultexplorer/data/models/browser_layout_mode.dart';
+import 'package:vaultexplorer/features/browser/widgets/filter_menu_button.dart';
 
+import '../../core/utils/file_type_utils.dart';
 import '../../core/widgets/thumbnail/thumbnail_concurrency.dart';
 
 class PathSegment {
@@ -108,6 +110,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
   Set<String> _pinnedPaths = {};
   bool _isContainerLocked = false;
+  bool _isDeepSearch = false;
+  bool _isSearchingSubfolders = false;
+  List<RawEntry> _deepSearchResults = [];
+  int _searchGeneration = 0;
+  Timer? _searchDebounceTimer;
 
   static const int _maxScanDepth = 20;
   static const _documentExts = {
@@ -394,9 +401,143 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _archiveContext = null;
   }
 
-  void _clearSearch() {
+void _clearSearch() {
     _searchActive = false;
     _searchQuery = '';
+    _searchDebounceTimer?.cancel();
+    _searchGeneration++;
+    _isSearchingSubfolders = false;
+    _deepSearchResults = [];
+  }
+
+  void _onSearchQueryChanged(String query) {
+    setState(() => _searchQuery = query);
+    _searchDebounceTimer?.cancel();
+
+    if (!_isDeepSearch || query.trim().isEmpty) {
+      setState(() {
+        _isSearchingSubfolders = false;
+        _deepSearchResults = [];
+      });
+      return;
+    }
+
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted && _searchActive && _isDeepSearch) {
+        _runDeepSearch(query);
+      }
+    });
+  }
+
+  void _onDeepSearchToggled(bool enabled) {
+    setState(() => _isDeepSearch = enabled);
+    _onSearchQueryChanged(_searchQuery);
+  }
+
+  Future<List<String>?> _listDirEntries(String path) async {
+    if (_archiveContext != null) {
+      final archiveRootPath =
+          _pathStack[_archiveContext!.pathStackEntryIndex].fatPath;
+      String subPath = '';
+      if (path.length > archiveRootPath.length) {
+        subPath = path.substring(archiveRootPath.length);
+        if (subPath.startsWith('/')) subPath = subPath.substring(1);
+      }
+      return _archiveContext!.listDirectory(subPath);
+    }
+    return vaultExplorerApi.listDirectory(widget.container, path);
+  }
+
+  Future<void> _runDeepSearch(String query) async {
+    final gen = ++_searchGeneration;
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _deepSearchResults = [];
+          _isSearchingSubfolders = false;
+        });
+      }
+      return;
+    }
+
+    setState(() => _isSearchingSubfolders = true);
+
+    final results = <RawEntry>[];
+    await _scanDirectoryForQuery(
+      _currentDirPath,
+      q,
+      gen,
+      results,
+      relativePrefix: '',
+    );
+
+    if (!mounted || gen != _searchGeneration) return;
+
+    setState(() {
+      _deepSearchResults = results;
+      _isSearchingSubfolders = false;
+    });
+  }
+
+  Future<void> _scanDirectoryForQuery(
+    String dirPath,
+    String query,
+    int generation,
+    List<RawEntry> results, {
+    required String relativePrefix,
+    int depth = 0,
+  }) async {
+    if (generation != _searchGeneration || depth > 15) return;
+
+    try {
+      final rawList = await _listDirEntries(dirPath);
+      if (rawList == null || generation != _searchGeneration) return;
+
+      final entries = RawEntry.parseAll(rawList);
+      final subdirs = <RawEntry>[];
+
+      for (final entry in entries) {
+        if (generation != _searchGeneration) return;
+
+        final relPath = relativePrefix.isEmpty
+            ? entry.name
+            : '$relativePrefix/${entry.name}';
+        final nameMatches = entry.name.toLowerCase().contains(query);
+
+        if (nameMatches) {
+          results.add(RawEntry(
+            name: relPath,
+            isDir: entry.isDir,
+            sizeBytes: entry.sizeBytes,
+            modifiedSecs: entry.modifiedSecs,
+          ));
+        }
+
+        if (entry.isDir) {
+          subdirs.add(entry);
+        }
+      }
+
+      for (final sub in subdirs) {
+        if (generation != _searchGeneration) return;
+        final subRelPrefix =
+            relativePrefix.isEmpty ? sub.name : '$relativePrefix/${sub.name}';
+        final subFullPath =
+            dirPath.isEmpty ? sub.name : '$dirPath/${sub.name}';
+
+        await _scanDirectoryForQuery(
+          subFullPath,
+          query,
+          generation,
+          results,
+          relativePrefix: subRelPrefix,
+          depth: depth + 1,
+        );
+      }
+    } catch (e) {
+      debugPrint('Deep search error: $e');
+    }
   }
 
   void _enterDirectory(RawEntry entry) {
@@ -594,7 +735,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     );
   }
 
-  void _openMediaViewer(String fileName, String fullPath) {
+void _openMediaViewer(String fileName, String fullPath) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -605,6 +746,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           startingFolder: _currentDirPath,
           thumbnailQuality: _resolvedThumbnailQuality,
           thumbnailCacheMode: _resolvedThumbnailCacheMode,
+          mediaFilter: _currentFilter,
         ),
       ),
     );
@@ -915,16 +1057,23 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       }
       return compareItems(ea, eb);
     }
-    final sortedItems = _currentItems.where((e) => !e.isDir).toList()
+
+    // Filters files using _matchesFilter to respect active filter (e.g. Images or Videos)
+    final sortedItems = _currentItems
+        .where((e) => !e.isDir && _matchesFilter(e.name))
+        .toList()
       ..sort(compareOverall);
+
     final localMedia = sortedItems
         .map((e) => e.name)
         .where(_isSupportedMedia)
         .toList();
+
     if (localMedia.isNotEmpty) {
       final resolvedPaths = localMedia
           .map((f) => _currentDirPath.isEmpty ? f : '$_currentDirPath/$f')
           .toList();
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -935,16 +1084,19 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             startingFolder: _currentDirPath,
             thumbnailQuality: _resolvedThumbnailQuality,
             thumbnailCacheMode: _resolvedThumbnailCacheMode,
+            mediaFilter: _currentFilter,
           ),
         ),
       );
       return;
     }
+
     setState(() => _isLoading = true);
     _setStatus(
       context.l10n.scanningSubfoldersForMedia,
       autoClear: const Duration(seconds: 15),
     );
+
     try {
       final recursiveMedia = await _scanMediaRecursively(_currentDirPath);
       if (!mounted) return;
@@ -960,6 +1112,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
               startingFolder: _currentDirPath,
               thumbnailQuality: _resolvedThumbnailQuality,
               thumbnailCacheMode: _resolvedThumbnailCacheMode,
+              mediaFilter: _currentFilter,
             ),
           ),
         );
@@ -1442,8 +1595,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  bool _matchesFilter(String fileName) {
+bool _matchesFilter(String fileName) {
     if (_currentFilter == null) return true;
+    final ext = fileName.split('.').last.toLowerCase();
     switch (_currentFilter) {
       case 'image':
         return MediaViewerConstants.isImage(fileName);
@@ -1452,8 +1606,9 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       case 'audio':
         return MediaViewerConstants.isAudio(fileName);
       case 'document':
-        return _documentExts
-            .contains(fileName.split('.').last.toLowerCase());
+        return _documentExts.contains(ext);
+      case 'secure':
+        return vaultIconForExt(ext) != null;
       default:
         return true;
     }
@@ -1565,6 +1720,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
             sortAscending: sortAscending,
             onSortChanged: _onSortChanged,
           ),
+      FileManagerAction.filter: (context) => FilterMenuButton(
+            currentFilter: _currentFilter,
+            onFilterChanged: (value) => setState(() => _currentFilter = value),
+          ),
       FileManagerAction.playMedia: (context) => IconButton(
             icon: const Icon(Icons.play_circle_outline_rounded),
             tooltip: context.l10n.playMediaHereTooltip,
@@ -1595,7 +1754,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
 
     final query = _searchQuery.trim().toLowerCase();
-    final filteredItems = _currentItems.where((item) {
+    final baseItems = (_searchActive && _isDeepSearch && query.isNotEmpty)
+        ? _deepSearchResults
+        : _currentItems;
+
+    final filteredItems = baseItems.where((item) {
       final name = item.name;
       if (query.isNotEmpty && !name.toLowerCase().contains(query)) return false;
       if (item.isDir) {
@@ -1662,7 +1825,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
           onShowOpenWithDialog: _showOpenWithDialog,
           onShowFolderDocumentProviderSheet: _showFolderDocumentProviderSheet,
           onToggleFolderDocumentProvider: _toggleFolderDocumentProvider,
-          onFilterChanged: (value) => setState(() => _currentFilter = value),
           onSettingsClosed: _loadToolbarConfig,
           isFiltered: isFiltered,
           onPaste: _isReadOnly ? null : _paste,
@@ -1760,11 +1922,11 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                   if (_searchActive)
                     BottomSearchBar(
                       initialQuery: _searchQuery,
-                      onChanged: (q) => setState(() => _searchQuery = q),
-                      onClose: () => setState(() {
-                        _searchActive = false;
-                        _searchQuery = '';
-                      }),
+                      onChanged: _onSearchQueryChanged,
+                      isDeepSearch: _isDeepSearch,
+                      onDeepSearchToggle: _onDeepSearchToggled,
+                      isSearchingSubfolders: _isSearchingSubfolders,
+                      onClose: () => setState(() => _clearSearch()),
                     )
                   else
                     const Align(

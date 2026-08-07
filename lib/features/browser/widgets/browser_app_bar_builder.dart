@@ -51,7 +51,6 @@ PreferredSizeWidget buildBrowserAppBar(
   onShowOpenWithDialog,
   required Future<void> Function(RawEntry entry) onShowFolderDocumentProviderSheet,
   required Future<void> Function(RawEntry entry) onToggleFolderDocumentProvider,
-  required ValueChanged<String?> onFilterChanged,
   required Future<void> Function() onSettingsClosed,
   required bool isFiltered,
   required VoidCallback? onPaste,
@@ -239,8 +238,6 @@ PreferredSizeWidget buildBrowserAppBar(
         ...toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
       ],
       SettingsMenuButton(
-        currentFilter: currentFilter,
-        onFilterChanged: onFilterChanged,
         onSettingsClosed: onSettingsClosed,
       ),
     ],

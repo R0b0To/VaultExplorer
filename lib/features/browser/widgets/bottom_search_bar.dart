@@ -76,6 +76,8 @@ class _BottomSearchBarState extends State<BottomSearchBar> {
                   child: TextField(
                     controller: _ctrl,
                     focusNode: _focusNode,
+                    enableSuggestions: false,
+                    autocorrect: false,
                     onChanged: widget.onChanged,
                     textInputAction: TextInputAction.search,
                     style: const TextStyle(fontSize: 14),

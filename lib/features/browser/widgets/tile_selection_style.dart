@@ -82,8 +82,8 @@ class FileRowShell extends StatelessWidget {
       FileDetailColumn.type => _getTypeLabel(entry, context),
     };
     final double width = switch (col) {
-      FileDetailColumn.date => 70,
-      FileDetailColumn.size => 48,
+      FileDetailColumn.date => 75,
+      FileDetailColumn.size => 42,
       FileDetailColumn.type => 46,
     };
     return SizedBox(

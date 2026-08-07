@@ -4916,7 +4916,19 @@
   "filterAction": "Filter",
   "@filterAction": {
     "description": "Label for filter toolbar action"
-  }
+  },
+  "favouriteAction": "Favourite",
+  "unfavouriteAction": "Unfavourite",
+  "favouriteSelectedAction": "Favourite selected",
+  "unfavouriteSelectedAction": "Unfavourite selected",
+  "favouritedCount": "{count, plural, =1{Favourited 1 item} other{Favourited {count} items}}",
+  "unfavouritedCount": "{count, plural, =1{Unfavourited 1 item} other{Unfavourited {count} items}}",
+  "showBookmarkBarLabel": "Show Bookmark Bar",
+  "showBookmarkBarDesc": "Display favourite items in a bookmark bar or sidebar",
+  "bookmarkBarSectionHeader": "Bookmark Bar & Favourites",
+  "noBookmarksYet": "No favourite items bookmarked yet",
+  "reorderBookmarksTitle": "Rearrange Bookmarks",
+  "reorderBookmarksDesc": "Drag items to reorder them in the bookmark bar"
 }
 
 

@@ -39,4 +39,9 @@ class MediaAspectRatioCache {
   }
 
   static void clear() => _cache.clear();
+
+  static void clearForUri(String uri) {
+    final prefix = '$uri:';
+    _cache.removeWhere((key) => key.startsWith(prefix));
+  }
 }

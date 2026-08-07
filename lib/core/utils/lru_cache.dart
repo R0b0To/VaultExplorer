@@ -28,6 +28,13 @@ class LruCache<K, V> {
 
   void remove(K key) => _map.remove(key);
 
+  void removeWhere(bool Function(K key) test) {
+    final toRemove = _map.keys.where(test).toList(growable: false);
+    for (final key in toRemove) {
+      _map.remove(key);
+    }
+  }
+
   void clear() => _map.clear();
 
   int get length => _map.length;

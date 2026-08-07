@@ -57,7 +57,9 @@ Future<void> _cleanupOrphanedTempFiles() async {
           name.startsWith('cb_edit_') ||
           name.startsWith('xclip_') ||
           name.startsWith('tmp_') ||
-          name.startsWith('vx_pdf_')) {
+          name.startsWith('vx_pdf_') ||
+          name.startsWith('archive_browse_') ||
+          name.startsWith('archive_extract_')) {
         try {
           await entity.delete();
         } catch (_) {}

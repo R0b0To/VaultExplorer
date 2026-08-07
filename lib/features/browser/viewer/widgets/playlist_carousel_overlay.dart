@@ -328,7 +328,7 @@ class _CarouselThumb extends StatelessWidget {
       quality: quality.jpegQuality,
     );
     if (data == null || data.isEmpty) {
-      throw Exception('Empty image thumbnail: $path');
+      throw Exception('Empty image thumbnail');
     }
 
     ThumbnailCacheService.putInMemory(container, path, data, quality);
@@ -372,7 +372,7 @@ class _CarouselThumb extends StatelessWidget {
       targetSize: scaledTargetSize,
     );
     if (data == null || data.isEmpty) {
-      throw Exception('Empty video thumbnail: $path');
+      throw Exception('Empty video thumbnail');
     }
 
     ThumbnailCacheService.putInMemory(container, path, data, quality);

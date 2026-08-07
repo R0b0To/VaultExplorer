@@ -480,14 +480,14 @@ class _EncryptedImageGridThumb extends StatelessWidget {
     );
     if (thumbBytes == null || thumbBytes.isEmpty) {
       final size = await vaultExplorerApi.getFileSize(container, path);
-      if (size <= 0) throw Exception('Empty file: $path');
+      if (size <= 0) throw Exception('Empty file (size <= 0)');
       final raw = await vaultExplorerApi.readFileChunk(
         container,
         path,
         0,
         size,
       );
-      if (raw == null || raw.isEmpty) throw Exception('Read failed: $path');
+      if (raw == null || raw.isEmpty) throw Exception('File chunk read failed');
       if (raw.length < 200 * 1024) {
         ThumbnailCacheService.putInMemory(container, path, raw, quality);
       }
@@ -585,7 +585,7 @@ class _VideoThumb extends StatelessWidget {
       targetSize: quality.scaledSize(180),
     );
     if (data == null || data.isEmpty) {
-      throw StateError('Video thumbnail unavailable for $path');
+      throw StateError('Video thumbnail unavailable');
     }
     ThumbnailCacheService.putInMemory(container, path, data, quality);
 

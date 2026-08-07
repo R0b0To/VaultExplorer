@@ -49,13 +49,7 @@ class CameraVaultService {
           .map((e) => RawEntry.parse(e).name)
           .toSet();
     } catch (e) {
-      // Falling back to "treat as empty" is still the right behavior here
-      // (we'd rather offer a name than block saving the photo/video), but
-      // silently swallowing this used to make a real failure -- container
-      // locked, IO error -- indistinguishable from a genuinely empty
-      // directory, which could let the caller pick a name that collides
-      // with something it just couldn't see.
-      debugPrint('CameraVaultService: failed to list "$_normalizedTargetDir", assuming empty: $e');
+      debugPrint('CameraVaultService: failed to list target directory, assuming empty.');
       return {};
     }
   }

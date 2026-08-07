@@ -149,6 +149,12 @@ class FileOperationService extends ChangeNotifier {
     return deleted;
   }
 
+  /// Removes operations associated with a specific volume ID (used on container lock).
+  void clearForVolume(int volId) {
+    _operations.removeWhere((op) => op.sourceVolId == volId || op.destVolId == volId);
+    notifyListeners();
+  }
+
   /// Removes completed / failed / cancelled operations from history.
   void clearFinished() {
     _operations.removeWhere(

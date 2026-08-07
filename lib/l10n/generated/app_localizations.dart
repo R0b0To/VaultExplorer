@@ -6331,6 +6331,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Filter'**
   String get filterAction;
+
+  /// No description provided for @favouriteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Favourite'**
+  String get favouriteAction;
+
+  /// No description provided for @unfavouriteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfavourite'**
+  String get unfavouriteAction;
+
+  /// No description provided for @favouriteSelectedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Favourite selected'**
+  String get favouriteSelectedAction;
+
+  /// No description provided for @unfavouriteSelectedAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfavourite selected'**
+  String get unfavouriteSelectedAction;
+
+  /// No description provided for @favouritedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Favourited 1 item} other{Favourited {count} items}}'**
+  String favouritedCount(num count);
+
+  /// No description provided for @unfavouritedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Unfavourited 1 item} other{Unfavourited {count} items}}'**
+  String unfavouritedCount(num count);
+
+  /// No description provided for @showBookmarkBarLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Bookmark Bar'**
+  String get showBookmarkBarLabel;
+
+  /// No description provided for @showBookmarkBarDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Display favourite items in a bookmark bar or sidebar'**
+  String get showBookmarkBarDesc;
+
+  /// No description provided for @bookmarkBarSectionHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark Bar & Favourites'**
+  String get bookmarkBarSectionHeader;
+
+  /// No description provided for @noBookmarksYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No favourite items bookmarked yet'**
+  String get noBookmarksYet;
+
+  /// No description provided for @reorderBookmarksTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rearrange Bookmarks'**
+  String get reorderBookmarksTitle;
+
+  /// No description provided for @reorderBookmarksDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Drag items to reorder them in the bookmark bar'**
+  String get reorderBookmarksDesc;
 }
 
 class _AppLocalizationsDelegate

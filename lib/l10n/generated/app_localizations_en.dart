@@ -3750,4 +3750,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get filterAction => 'Filter';
+
+  @override
+  String get favouriteAction => 'Favourite';
+
+  @override
+  String get unfavouriteAction => 'Unfavourite';
+
+  @override
+  String get favouriteSelectedAction => 'Favourite selected';
+
+  @override
+  String get unfavouriteSelectedAction => 'Unfavourite selected';
+
+  @override
+  String favouritedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Favourited $count items',
+      one: 'Favourited 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String unfavouritedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Unfavourited $count items',
+      one: 'Unfavourited 1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get showBookmarkBarLabel => 'Show Bookmark Bar';
+
+  @override
+  String get showBookmarkBarDesc =>
+      'Display favourite items in a bookmark bar or sidebar';
+
+  @override
+  String get bookmarkBarSectionHeader => 'Bookmark Bar & Favourites';
+
+  @override
+  String get noBookmarksYet => 'No favourite items bookmarked yet';
+
+  @override
+  String get reorderBookmarksTitle => 'Rearrange Bookmarks';
+
+  @override
+  String get reorderBookmarksDesc =>
+      'Drag items to reorder them in the bookmark bar';
 }

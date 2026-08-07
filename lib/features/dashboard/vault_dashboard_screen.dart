@@ -29,6 +29,9 @@ import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_sheet.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
 
+import '../../data/models/file_operation.dart';
+import '../../data/services/media_aspect_ratio_cache.dart';
+
 class SlideRightRoute<T> extends PageRouteBuilder<T> {
   final Widget page;
   SlideRightRoute({required this.page})
@@ -302,11 +305,13 @@ class _VaultDashboardState extends State<VaultDashboard>
       final container = _mounted[idx];
       AppSecureStorage.instance.delete(key: 'temp_pw_${container.uri}');
       unawaited(ThumbnailCacheService.clearAppCacheFor(container));
+      MediaAspectRatioCache.clearForUri(container.uri);
     }
     final clip = CrossContainerClipboard.instance;
     if (clip.hasItems && clip.sourceVolId == volId) {
       clip.clear();
     }
+    FileOperationService.instance.clearForVolume(volId);
     FullResImageCache.clear();
     VaultExplorerApi.notifyContainerLocked(volId);
     if (mounted) {

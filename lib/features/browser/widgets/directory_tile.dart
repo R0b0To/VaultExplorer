@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/raw_entry.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/features/browser/widgets/tile_selection_style.dart';
@@ -15,6 +16,7 @@ class DirectoryTile extends StatelessWidget {
   final List<FileDetailColumn> detailColumns;
   final bool isDocumentProviderMounted;
   final bool isPinned;
+  final bool isFavourite;
 
   const DirectoryTile({
     super.key,
@@ -29,6 +31,7 @@ class DirectoryTile extends StatelessWidget {
     this.detailColumns = const [FileDetailColumn.date, FileDetailColumn.size],
     this.isDocumentProviderMounted = false,
     this.isPinned = false,
+    this.isFavourite = false,
   });
 
   @override
@@ -39,18 +42,30 @@ class DirectoryTile extends StatelessWidget {
         ? cs.tertiaryContainer.withValues(alpha: 0.4)
         : cs.secondaryContainer.withValues(alpha: 0.4);
 
-    Widget? pinBadge;
-    if (isPinned && !isSelected) {
-      pinBadge = Container(
+    Widget? badge;
+    if ((isPinned || isFavourite) && !isSelected) {
+      badge = Container(
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
           shape: BoxShape.circle,
         ),
-        child: Icon(
-          Icons.push_pin_rounded,
-          size: 10 * zoomLevel,
-          color: cs.onPrimaryContainer,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isPinned)
+              Icon(
+                Icons.push_pin_rounded,
+                size: 10 * zoomLevel,
+                color: cs.onPrimaryContainer,
+              ),
+            if (isFavourite)
+              Icon(
+                Icons.star_rounded,
+                size: 10 * zoomLevel,
+                color: context.semanticColors.favourite,
+              ),
+          ],
         ),
       );
     }
@@ -73,7 +88,7 @@ class DirectoryTile extends StatelessWidget {
       onLongPress: onLongPress,
       isCompact: isCompact,
       zoomLevel: zoomLevel,
-      iconBadge: pinBadge,
+      iconBadge: badge,
     );
   }
 }

@@ -3,8 +3,6 @@ import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 
-/// Landscape-mode selection AppBar -- the wide-screen sibling of
-/// [SelectionAppBar] (`selection_app_bar.dart`), which is used in portrait.
 class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget {
   final int selectedCount;
   final String selectionLabel;
@@ -14,6 +12,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final bool readOnly;
   final bool showPinOption;
   final bool showUnpinOption;
+  final bool showFavouriteOption;
+  final bool showUnfavouriteOption;
   final bool showActionBar;
   final List<FileManagerAction> visibleActions;
   final Map<FileManagerAction, WidgetBuilder> actionBuilders;
@@ -29,6 +29,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
   final VoidCallback onToggleDocumentProvider;
   final VoidCallback onPin;
   final VoidCallback onUnpin;
+  final VoidCallback onFavourite;
+  final VoidCallback onUnfavourite;
 
   const SelectionAppBarWide({
     super.key,
@@ -40,6 +42,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.readOnly,
     required this.showPinOption,
     required this.showUnpinOption,
+    required this.showFavouriteOption,
+    required this.showUnfavouriteOption,
     required this.showActionBar,
     required this.visibleActions,
     required this.actionBuilders,
@@ -54,6 +58,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
     required this.onToggleDocumentProvider,
     required this.onPin,
     required this.onUnpin,
+    required this.onFavourite,
+    required this.onUnfavourite,
   });
 
   @override
@@ -134,6 +140,8 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
             if (value == 'export') onExport();
             if (value == 'pin') onPin();
             if (value == 'unpin') onUnpin();
+            if (value == 'favourite') onFavourite();
+            if (value == 'unfavourite') onUnfavourite();
             if (value == 'open_with_app') onOpenWithApp();
             if (value == 'doc_provider') onToggleDocumentProvider();
             if (value == 'select_all') onSelectAll();
@@ -184,6 +192,36 @@ class SelectionAppBarWide extends StatelessWidget implements PreferredSizeWidget
                     ),
                     const SizedBox(width: 12),
                     Text(selectedCount > 1 ? context.l10n.unpinSelectedAction : context.l10n.unpinAction),
+                  ],
+                ),
+              ),
+            if (showFavouriteOption)
+              PopupMenuItem<String>(
+                value: 'favourite',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.star_rounded,
+                      color: context.semanticColors.favourite,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(selectedCount > 1 ? context.l10n.favouriteSelectedAction : context.l10n.favouriteAction),
+                  ],
+                ),
+              ),
+            if (showUnfavouriteOption)
+              PopupMenuItem<String>(
+                value: 'unfavourite',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.star_outline_rounded,
+                      color: cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(selectedCount > 1 ? context.l10n.unfavouriteSelectedAction : context.l10n.unfavouriteAction),
                   ],
                 ),
               ),

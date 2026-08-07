@@ -12,7 +12,6 @@ import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dar
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/features/browser/widgets/highlighted_text.dart';
 
-
 class FileGridView extends StatefulWidget {
   final MountedContainer container;
   final List<RawEntry> items;
@@ -31,6 +30,7 @@ class FileGridView extends StatefulWidget {
   final String? searchQuery;
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
+  final bool Function(RawEntry entry)? isFavourite;
 
   const FileGridView({
     super.key,
@@ -51,6 +51,7 @@ class FileGridView extends StatefulWidget {
     this.searchQuery,
     this.mountedFolderPaths = const {},
     this.isPinned,
+    this.isFavourite,
   });
 
   @override
@@ -159,7 +160,10 @@ class _FileGridViewState extends State<FileGridView> {
   Widget build(BuildContext context) {
     final total = widget.items.length;
     final gridKey = ValueKey(
-      widget.items.map((e) => '${e.raw}:${widget.isPinned?.call(e)}').join(';'),
+      widget.items
+          .map((e) =>
+              '${e.raw}:${widget.isPinned?.call(e)}:${widget.isFavourite?.call(e)}')
+          .join(';'),
     );
     return GestureDetector(
       onScaleStart: _handleScaleStart,
@@ -197,6 +201,7 @@ class _FileGridViewState extends State<FileGridView> {
   Widget _buildDirCell(BuildContext context, RawEntry entry) {
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
+    final isFav = widget.isFavourite?.call(entry) ?? false;
     final cs = Theme.of(context).colorScheme;
     final fullPath = widget.currentDirPath.isEmpty
         ? entry.name
@@ -207,6 +212,7 @@ class _FileGridViewState extends State<FileGridView> {
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
       isPinned: isPinned,
+      isFavourite: isFav,
       onTap: () => widget.onDirTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       preview: Center(
@@ -228,6 +234,7 @@ class _FileGridViewState extends State<FileGridView> {
         : '${widget.currentDirPath}/$cleanName';
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
+    final isFav = widget.isFavourite?.call(entry) ?? false;
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final vaultIcon = vaultIconForExt(ext);
@@ -278,6 +285,7 @@ class _FileGridViewState extends State<FileGridView> {
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
       isPinned: isPinned,
+      isFavourite: isFav,
       onTap: () => widget.onFileTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       onMoreTap: widget.isSelectionMode
@@ -301,6 +309,7 @@ class _GridCell extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
   final bool isPinned;
+  final bool isFavourite;
   const _GridCell({
     required this.preview,
     required this.label,
@@ -312,7 +321,9 @@ class _GridCell extends StatelessWidget {
     required this.onLongPress,
     this.onMoreTap,
     this.isPinned = false,
+    this.isFavourite = false,
   });
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -346,7 +357,7 @@ class _GridCell extends StatelessWidget {
                         color: cs.primary.withValues(alpha: 0.12),
                       ),
                     ),
-                  if (isPinned && !isSelected)
+                  if ((isPinned || isFavourite) && !isSelected)
                     Align(
                       alignment: Alignment.topLeft,
                       child: Padding(
@@ -354,13 +365,26 @@ class _GridCell extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
-                            color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
+                            color:
+                                cs.surfaceContainerHigh.withValues(alpha: 0.85),
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(
-                            Icons.push_pin_rounded,
-                            size: 14,
-                            color: cs.primary,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isPinned)
+                                Icon(
+                                  Icons.push_pin_rounded,
+                                  size: 14,
+                                  color: cs.primary,
+                                ),
+                              if (isFavourite)
+                                Icon(
+                                  Icons.star_rounded,
+                                  size: 14,
+                                  color: context.semanticColors.favourite,
+                                ),
+                            ],
                           ),
                         ),
                       ),
@@ -546,8 +570,6 @@ class _VideoThumb extends StatelessWidget {
     ThumbnailQuality quality,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
-
-
       final cached = await ThumbnailCacheService.get(
         container: container,
         filePath: path,

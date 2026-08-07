@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/core/utils/file_type_utils.dart';
 import 'package:vaultexplorer/data/models/file_manager_action.dart';
 import 'package:vaultexplorer/data/models/file_manager_toolbar_config.dart';
 import 'package:vaultexplorer/data/models/playlist_transition_effect.dart';
 import 'package:vaultexplorer/data/services/file_manager_toolbar_service.dart';
+import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 
 class FileManagerToolbarSettingsScreen extends StatefulWidget {
-  const FileManagerToolbarSettingsScreen({super.key});
+  final String? containerUri;
+
+  const FileManagerToolbarSettingsScreen({super.key, this.containerUri});
 
   @override
   State<FileManagerToolbarSettingsScreen> createState() =>
@@ -17,6 +21,7 @@ class FileManagerToolbarSettingsScreen extends StatefulWidget {
 class _FileManagerToolbarSettingsScreenState
     extends State<FileManagerToolbarSettingsScreen> {
   FileManagerToolbarConfig _config = FileManagerToolbarConfig.defaults();
+  ContainerRecord? _record;
   bool _loading = true;
 
   @override
@@ -27,15 +32,27 @@ class _FileManagerToolbarSettingsScreenState
 
   Future<void> _load() async {
     final config = await FileManagerToolbarService.instance.load();
+    ContainerRecord? record;
+    if (widget.containerUri != null) {
+      final records = await ContainerRepository.instance.loadAll();
+      record = records[widget.containerUri];
+    }
     if (!mounted) return;
     setState(() {
       _config = config;
+      _record = record;
       _loading = false;
     });
   }
 
   Future<void> _persist() async {
     await FileManagerToolbarService.instance.save(_config);
+  }
+
+  Future<void> _persistRecord() async {
+    if (_record != null) {
+      await ContainerRepository.instance.save(_record!);
+    }
   }
 
   void _onReorder(int oldIndex, int newIndex) {
@@ -86,9 +103,35 @@ class _FileManagerToolbarSettingsScreenState
     _persist();
   }
 
+  void _onReorderBookmarks(int oldIndex, int newIndex) {
+    if (_record == null) return;
+    if (newIndex > oldIndex) newIndex -= 1;
+    setState(() {
+      final paths = List<String>.from(_record!.favouritePaths);
+      final moved = paths.removeAt(oldIndex);
+      paths.insert(newIndex, moved);
+      _record = _record!.copyWith(favouritePaths: paths);
+    });
+    _persistRecord();
+  }
+
+  void _removeBookmark(String path) {
+    if (_record == null) return;
+    setState(() {
+      final paths = List<String>.from(_record!.favouritePaths)..remove(path);
+      _record = _record!.copyWith(favouritePaths: paths);
+    });
+    _persistRecord();
+  }
+
   Future<void> _resetToDefaults() async {
     setState(() => _config = FileManagerToolbarConfig.defaults());
     await _persist();
+  }
+
+  bool _isFolder(String path) {
+    final leaf = path.split('/').last;
+    return !leaf.contains('.') || path.endsWith('/');
   }
 
   @override
@@ -206,6 +249,143 @@ class _FileManagerToolbarSettingsScreenState
                           );
                         },
                       ),
+                      const SizedBox(height: 16),
+                      SectionHeader(context.l10n.bookmarkBarSectionHeader),
+                      SectionCard(
+                        children: [
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            value: _config.showBookmarkBar,
+                            onChanged: (v) {
+                              setState(() => _config =
+                                  _config.copyWith(showBookmarkBar: v));
+                              _persist();
+                            },
+                            title: Text(context.l10n.showBookmarkBarLabel,
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                                context.l10n.showBookmarkBarDesc,
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant)),
+                            secondary: Icon(Icons.star_rounded,
+                                color: cs.secondary),
+                          ),
+                        ],
+                      ),
+                      if (_record != null) ...[
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                context.l10n.reorderBookmarksTitle,
+                                style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                context.l10n.reorderBookmarksDesc,
+                                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_record!.favouritePaths.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 24, left: 4),
+                            child: Text(
+                              context.l10n.noBookmarksYet,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          )
+                        else
+                          ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            buildDefaultDragHandles: false,
+                            itemCount: _record!.favouritePaths.length,
+                            onReorder: _onReorderBookmarks,
+                            itemBuilder: (context, i) {
+                              final path = _record!.favouritePaths[i];
+                              final name = path.split('/').last;
+                              final isDir = _isFolder(path);
+                              final ext = name.contains('.') ? name.split('.').last : '';
+                              final icon = isDir
+                                  ? Icons.folder_rounded
+                                  : (vaultIconForExt(ext) ?? iconForFile(name));
+                              final iconColor = isDir
+                                  ? cs.secondary
+                                  : (vaultColorForExt(ext) ?? colorForFile(name));
+
+                              return Padding(
+                                key: ValueKey(path),
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Material(
+                                  color: cs.surfaceContainerHigh,
+                                  borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(i == 0 ? 20 : 4),
+                                    bottom: Radius.circular(
+                                        i == _record!.favouritePaths.length - 1 ? 20 : 4),
+                                  ),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 2),
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: cs.surfaceContainerHighest,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Icon(icon, size: 20, color: iconColor),
+                                    ),
+                                    title: Text(
+                                      name,
+                                      style: textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(Icons.close_rounded, size: 20, color: cs.error),
+                                          onPressed: () => _removeBookmark(path),
+                                          tooltip: context.l10n.unfavouriteAction,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        ReorderableDragStartListener(
+                                          index: i,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: cs.surfaceContainerHighest
+                                                  .withValues(alpha: 0.5),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Icon(
+                                              Icons.drag_handle_rounded,
+                                              color: cs.onSurfaceVariant,
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                      ],
                       const SizedBox(height: 16),
                       SectionHeader(context.l10n.listViewOptionsSectionHeader),
                       SectionCard(

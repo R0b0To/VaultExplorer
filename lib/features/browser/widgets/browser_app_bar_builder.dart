@@ -36,6 +36,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required Map<FileManagerAction, WidgetBuilder> actionBuilders,
   required bool Function(RawEntry entry) isFolderMounted,
   required bool Function(RawEntry entry) isPinned,
+  required bool Function(RawEntry entry) isFavourite,
   required VoidCallback onExitSelectionMode,
   required VoidCallback onSelectAll,
   required VoidCallback onCopy,
@@ -43,6 +44,7 @@ PreferredSizeWidget buildBrowserAppBar(
   required VoidCallback onExport,
   required VoidCallback onDelete,
   required void Function({required bool pin}) onTogglePin,
+  required void Function({required bool favourite}) onToggleFavourite,
   required void Function(String path) onDirectoryReload,
   required void Function(String msg, {required bool error}) onSetStatus,
   required Future<void> Function(
@@ -71,6 +73,8 @@ PreferredSizeWidget buildBrowserAppBar(
         singleFolder && isFolderMounted(selectedItems.first);
     final showPinOption = selectedItems.any((item) => !isPinned(item));
     final showUnpinOption = selectedItems.any((item) => isPinned(item));
+    final showFavouriteOption = selectedItems.any((item) => !isFavourite(item));
+    final showUnfavouriteOption = selectedItems.any((item) => isFavourite(item));
     final totalBytes = selectedTotalBytes;
     final isPending = hasPendingFolderSizes;
     final sizeLabel = isPending
@@ -139,6 +143,10 @@ PreferredSizeWidget buildBrowserAppBar(
         showUnpinOption: showUnpinOption,
         onPin: () => onTogglePin(pin: true),
         onUnpin: () => onTogglePin(pin: false),
+        showFavouriteOption: showFavouriteOption,
+        showUnfavouriteOption: showUnfavouriteOption,
+        onFavourite: () => onToggleFavourite(favourite: true),
+        onUnfavourite: () => onToggleFavourite(favourite: false),
         onClose: onExitSelectionMode,
         onSelectAll: onSelectAll,
         onRename: doRename,
@@ -159,6 +167,8 @@ PreferredSizeWidget buildBrowserAppBar(
       readOnly: isReadOnly,
       showPinOption: showPinOption,
       showUnpinOption: showUnpinOption,
+      showFavouriteOption: showFavouriteOption,
+      showUnfavouriteOption: showUnfavouriteOption,
       showActionBar: showActionBar,
       visibleActions: toolbarConfig.visible,
       actionBuilders: actionBuilders,
@@ -173,6 +183,8 @@ PreferredSizeWidget buildBrowserAppBar(
       onToggleDocumentProvider: doToggleDocProvider,
       onPin: () => onTogglePin(pin: true),
       onUnpin: () => onTogglePin(pin: false),
+      onFavourite: () => onToggleFavourite(favourite: true),
+      onUnfavourite: () => onToggleFavourite(favourite: false),
     );
   }
 
@@ -390,6 +402,7 @@ PreferredSizeWidget buildBrowserAppBar(
         ...toolbarConfig.visible.map((action) => actionBuilders[action]!(context)),
       ],
       SettingsMenuButton(
+        containerUri: container.uri,
         onSettingsClosed: onSettingsClosed,
       ),
     ],

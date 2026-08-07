@@ -88,6 +88,7 @@ class ContainerRepository {
   static final ContainerRepository instance = ContainerRepository._();
   static const _secure = AppSecureStorage.instance;
   Map<String, ContainerRecord>? _cache;
+  
   static Future<File> get _dataFile async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/containers_v2.json');
@@ -120,6 +121,20 @@ class ContainerRepository {
     } else if (record.unlockMethod != ContainerUnlockMethod.pattern) {
       await _secure.delete(key: _patternHashKey(record.uri));
     }
+
+    // Encrypt and store Favourite & Pinned paths securely in the Keystore
+    if (record.favouritePaths.isNotEmpty) {
+      await _secure.write(key: _favouriteKey(record.uri), value: jsonEncode(record.favouritePaths));
+    } else {
+      await _secure.delete(key: _favouriteKey(record.uri));
+    }
+
+    if (record.pinnedPaths.isNotEmpty) {
+      await _secure.write(key: _pinnedKey(record.uri), value: jsonEncode(record.pinnedPaths));
+    } else {
+      await _secure.delete(key: _pinnedKey(record.uri));
+    }
+
     await _persist();
   }
 
@@ -146,6 +161,8 @@ class ContainerRepository {
     _cache!.remove(uri);
     await _secure.delete(key: _keystoreKey(uri));
     await _secure.delete(key: _patternHashKey(uri));
+    await _secure.delete(key: _favouriteKey(uri));
+    await _secure.delete(key: _pinnedKey(uri));
     try {
       await vaultExplorerApi.clearDerivedKey(uri);
     } catch (e) {
@@ -184,10 +201,9 @@ class ContainerRepository {
     await _persist();
   }
 
-  Future<String?> getPassword(String uri) =>
-      _secure.read(key: _keystoreKey(uri));
-  Future<String?> getPatternHash(String uri) =>
-      _secure.read(key: _patternHashKey(uri));
+  Future<String?> getPassword(String uri) => _secure.read(key: _keystoreKey(uri));
+  Future<String?> getPatternHash(String uri) => _secure.read(key: _patternHashKey(uri));
+  
   void invalidate() => _cache = null;
 
   static String _keystoreKey(String uri) {
@@ -202,6 +218,18 @@ class ContainerRepository {
     return 'vc2_pattern_$trimmed';
   }
 
+  static String _favouriteKey(String uri) {
+    final encoded = base64Url.encode(utf8.encode(uri));
+    final trimmed = encoded.length > 170 ? encoded.substring(0, 170) : encoded;
+    return 'vc2_fav_$trimmed';
+  }
+
+  static String _pinnedKey(String uri) {
+    final encoded = base64Url.encode(utf8.encode(uri));
+    final trimmed = encoded.length > 170 ? encoded.substring(0, 170) : encoded;
+    return 'vc2_pin_$trimmed';
+  }
+
   Future<void> _ensureLoaded() async {
     if (_cache == null) await _hydrate();
   }
@@ -212,9 +240,26 @@ class ContainerRepository {
       final file = await _dataFile;
       if (!await file.exists()) return;
       final list = jsonDecode(await file.readAsString()) as List<dynamic>;
+      
+      // Fetch all secure encrypted preferences simultaneously to avoid N async calls
+      final secureData = await _secure.readAll(); 
+
       for (final item in list) {
-        final r = ContainerRecord.fromJson(item as Map<String, dynamic>);
-        _cache![r.uri] = r;
+        final rawRecord = ContainerRecord.fromJson(item as Map<String, dynamic>);
+
+        // Read the encrypted paths back from Keystore
+        final favJson = secureData[_favouriteKey(rawRecord.uri)];
+        final pinJson = secureData[_pinnedKey(rawRecord.uri)];
+        
+        final favPaths = favJson != null ? List<String>.from(jsonDecode(favJson)) : <String>[];
+        final pinPaths = pinJson != null ? List<String>.from(jsonDecode(pinJson)) : <String>[];
+
+        final secureRecord = rawRecord.copyWith(
+          favouritePaths: favPaths,
+          pinnedPaths: pinPaths,
+        );
+
+        _cache![secureRecord.uri] = secureRecord;
       }
     } catch (e) {
       _logSwallowed('_hydrate', e);
@@ -225,6 +270,7 @@ class ContainerRepository {
   Future<void> _persist() async {
     try {
       final file = await _dataFile;
+      // .toJson() inherently excludes the secure paths so they are never written to the clear-text file.
       final list = _cache!.values.map((r) => r.toJson()).toList();
       await file.writeAsString(jsonEncode(list));
     } catch (e) {
@@ -252,6 +298,7 @@ class ContainerRecord {
   final String containerFormat;
   final List<Map<String, String>> keyfiles;
   final List<String> pinnedPaths;
+  final List<String> favouritePaths;
 
   const ContainerRecord({
     required this.uri,
@@ -272,6 +319,7 @@ class ContainerRecord {
     this.containerFormat = 'veracrypt',
     this.keyfiles = const [],
     this.pinnedPaths = const [],
+    this.favouritePaths = const [],
   });
 
   bool get isUsbSource => uri.startsWith('usb:');
@@ -294,6 +342,7 @@ class ContainerRecord {
     String? containerFormat,
     List<Map<String, String>>? keyfiles,
     List<String>? pinnedPaths,
+    List<String>? favouritePaths,
   }) {
     return ContainerRecord(
       uri: uri,
@@ -318,6 +367,7 @@ class ContainerRecord {
       containerFormat: containerFormat ?? this.containerFormat,
       keyfiles: keyfiles ?? this.keyfiles,
       pinnedPaths: pinnedPaths ?? this.pinnedPaths,
+      favouritePaths: favouritePaths ?? this.favouritePaths,
     );
   }
 
@@ -340,7 +390,9 @@ class ContainerRecord {
         'hashId': hashId,
         'containerFormat': containerFormat,
         'keyfiles': keyfiles,
-        'pinnedPaths': pinnedPaths,
+        
+        // EXCLUDED FOR SECURITY: `favouritePaths` & `pinnedPaths`
+        // They are no longer serialized into the clear-text file.
       };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
@@ -369,7 +421,9 @@ class ContainerRecord {
       keyfiles: (j['keyfiles'] as List<dynamic>? ?? [])
           .map((e) => Map<String, String>.from(e as Map))
           .toList(),
-      pinnedPaths: (j['pinnedPaths'] as List<dynamic>? ?? []).cast<String>(),
+      
+      pinnedPaths: [],
+      favouritePaths: [],
     );
   }
 }

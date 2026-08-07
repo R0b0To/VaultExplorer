@@ -32,6 +32,7 @@ import 'package:vaultexplorer/features/browser/viewer/text_editor_screen.dart';
 import 'package:vaultexplorer/features/browser/viewer/pdf_viewer_screen.dart';
 import 'package:vaultexplorer/features/browser/mixins/selection_mixin.dart';
 import 'package:vaultexplorer/features/browser/mixins/sort_mixin.dart';
+import 'package:vaultexplorer/features/browser/widgets/bookmark_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/bottom_search_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/breadcrumb_bar.dart';
 import 'package:vaultexplorer/features/browser/widgets/conflict_resolution_sheet.dart';
@@ -109,6 +110,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   ThumbnailQuality _resolvedThumbnailQuality = ThumbnailQuality.defaultQuality;
   FileManagerToolbarConfig _toolbarConfig = FileManagerToolbarConfig.defaults();
   Set<String> _pinnedPaths = {};
+  List<String> _favouritePaths = [];
   bool _isContainerLocked = false;
   bool _isDeepSearch = false;
   bool _isSearchingSubfolders = false;
@@ -130,6 +132,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   bool _isFolderMounted(RawEntry entry) =>
       entry.isDir && _mountedDocProviderFolders.contains(_fullPathOf(entry));
   bool _isPinned(RawEntry entry) => _pinnedPaths.contains(_fullPathOf(entry));
+  bool _isFavourite(RawEntry entry) => _favouritePaths.contains(_fullPathOf(entry));
 
   void _onContainerLockedEvent(int volId) {
     if (volId == widget.container.volId && mounted) {
@@ -216,6 +219,42 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
+  Future<void> _saveFavouritePaths() async {
+    final records = await ContainerRepository.instance.loadAll();
+    var record = records[widget.container.uri];
+    record ??= ContainerRecord(
+      uri: widget.container.uri,
+      label: widget.container.displayName,
+      containerFormat: widget.container.containerFormat,
+    );
+    record = record.copyWith(favouritePaths: _favouritePaths);
+    await ContainerRepository.instance.save(record);
+  }
+
+  Future<void> _toggleFavouriteSelected({required bool favourite}) async {
+    _signalActivity();
+    final pathsToToggle = selectedItems.map((e) => _fullPathOf(e)).toList();
+    setState(() {
+      if (favourite) {
+        for (final p in pathsToToggle) {
+          if (!_favouritePaths.contains(p)) {
+            _favouritePaths.add(p);
+          }
+        }
+      } else {
+        _favouritePaths.removeWhere((p) => pathsToToggle.contains(p));
+      }
+    });
+    await _saveFavouritePaths();
+    final count = pathsToToggle.length;
+    _setStatus(
+      favourite
+          ? context.l10n.favouritedCount(count)
+          : context.l10n.unfavouritedCount(count),
+    );
+    exitSelectionMode();
+  }
+
   Future<void> _togglePinSelected({required bool pin}) async {
     _signalActivity();
     final pathsToToggle = selectedItems.map((e) => _fullPathOf(e)).toList();
@@ -263,6 +302,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         setState(() {
           if (record != null) {
             _pinnedPaths = Set<String>.from(record.pinnedPaths);
+            _favouritePaths = List<String>.from(record.favouritePaths);
           }
           _resolvedThumbnailCacheMode =
               widget.thumbnailCacheMode ??
@@ -292,10 +332,18 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     await _loadDirectoryContents(_currentDirPath);
   }
 
-  Future<void> _loadToolbarConfig() async {
+   Future<void> _loadToolbarConfig() async {
     final config = await FileManagerToolbarService.instance.load();
+    final records = await ContainerRepository.instance.loadAll();
+    final record = records[widget.container.uri];
     if (!mounted) return;
-    setState(() => _toolbarConfig = config);
+    setState(() {
+      _toolbarConfig = config;
+      if (record != null) {
+        _favouritePaths = List<String>.from(record.favouritePaths);
+        _pinnedPaths = Set<String>.from(record.pinnedPaths);
+      }
+    });
   }
 
   void _setStatus(String msg, {bool error = false, Duration? autoClear}) {
@@ -401,7 +449,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     _archiveContext = null;
   }
 
-void _clearSearch() {
+  void _clearSearch() {
     _searchActive = false;
     _searchQuery = '';
     _searchDebounceTimer?.cancel();
@@ -550,6 +598,69 @@ void _clearSearch() {
       _currentFilter = null;
     });
     _loadDirectoryContents(newPath);
+  }
+
+  Future<void> _navigateToPath(String fullPath, {required bool isDir}) async {
+    _signalActivity();
+    if (isSelectionMode) exitSelectionMode();
+
+    final segments = fullPath.isEmpty ? <String>[] : fullPath.split('/');
+    if (segments.isEmpty) return;
+
+    if (isDir) {
+      final newStack = <PathSegment>[
+        PathSegment(context.l10n.rootFolderLabel, ''),
+      ];
+      String current = '';
+      for (final seg in segments) {
+        current = current.isEmpty ? seg : '$current/$seg';
+        newStack.add(PathSegment(seg, current));
+      }
+      setState(() {
+        _pathStack
+          ..clear()
+          ..addAll(newStack);
+        _clearSearch();
+        _currentFilter = null;
+      });
+      await _loadDirectoryContents(current);
+    } else {
+      final parentPath = segments.length > 1
+          ? segments.sublist(0, segments.length - 1).join('/')
+          : '';
+      final fileName = segments.last;
+
+      final newStack = <PathSegment>[
+        PathSegment(context.l10n.rootFolderLabel, ''),
+      ];
+      if (parentPath.isNotEmpty) {
+        final parentSegments = parentPath.split('/');
+        String current = '';
+        for (final seg in parentSegments) {
+          current = current.isEmpty ? seg : '$current/$seg';
+          newStack.add(PathSegment(seg, current));
+        }
+      }
+      setState(() {
+        _pathStack
+          ..clear()
+          ..addAll(newStack);
+        _clearSearch();
+        _currentFilter = null;
+      });
+      await _loadDirectoryContents(parentPath);
+
+      final fileEntry = _currentItems.firstWhere(
+        (e) => !e.isDir && e.name == fileName,
+        orElse: () => RawEntry(
+          name: fileName,
+          isDir: false,
+          sizeBytes: 0,
+          modifiedSecs: 0,
+        ),
+      );
+      await _handleFileTap(fileEntry);
+    }
   }
 
   void _navigateUp() {
@@ -735,7 +846,7 @@ void _clearSearch() {
     );
   }
 
-void _openMediaViewer(String fileName, String fullPath) {
+  void _openMediaViewer(String fileName, String fullPath) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1058,7 +1169,6 @@ void _openMediaViewer(String fileName, String fullPath) {
       return compareItems(ea, eb);
     }
 
-    // Filters files using _matchesFilter to respect active filter (e.g. Images or Videos)
     final sortedItems = _currentItems
         .where((e) => !e.isDir && _matchesFilter(e.name))
         .toList()
@@ -1397,13 +1507,24 @@ void _openMediaViewer(String fileName, String fullPath) {
         );
         failCount = clipItems.length - deleted;
         final deletedPaths = clipItems.map((i) => i.path).toSet();
+        bool changed = false;
         if (_pinnedPaths.any((p) => deletedPaths.contains(p))) {
           _pinnedPaths.removeWhere((p) => deletedPaths.contains(p));
+          changed = true;
+        }
+        if (_favouritePaths.any((p) => deletedPaths.contains(p))) {
+          _favouritePaths.removeWhere((p) => deletedPaths.contains(p));
+          changed = true;
+        }
+        if (changed) {
           final records = await ContainerRepository.instance.loadAll();
           var record = records[widget.container.uri];
           if (record != null) {
             await ContainerRepository.instance.save(
-              record.copyWith(pinnedPaths: _pinnedPaths.toList()),
+              record.copyWith(
+                pinnedPaths: _pinnedPaths.toList(),
+                favouritePaths: _favouritePaths,
+              ),
             );
           }
         }
@@ -1595,7 +1716,7 @@ void _openMediaViewer(String fileName, String fullPath) {
     }
   }
 
-bool _matchesFilter(String fileName) {
+  bool _matchesFilter(String fileName) {
     if (_currentFilter == null) return true;
     final ext = fileName.split('.').last.toLowerCase();
     switch (_currentFilter) {
@@ -1774,10 +1895,11 @@ bool _matchesFilter(String fileName) {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final showActionBar = !_searchActive;
     final actionBuilders = _buildActionBuilders();
-    // Same computation _buildAppBar used to do internally; needed here now
-    // since it's a parameter to buildBrowserAppBar rather than something
-    // that function can read off private state itself.
     final isFiltered = query.isNotEmpty || _currentFilter != null;
+
+    final showBookmarkBar =
+        _toolbarConfig.showBookmarkBar && _favouritePaths.isNotEmpty;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -1815,6 +1937,7 @@ bool _matchesFilter(String fileName) {
           actionBuilders: actionBuilders,
           isFolderMounted: _isFolderMounted,
           isPinned: _isPinned,
+          isFavourite: _isFavourite,
           onExitSelectionMode: exitSelectionMode,
           onSelectAll: () => setState(() => selectedItems.addAll(filteredItems)),
           onCopy: () => _initClipboard(cut: false),
@@ -1822,6 +1945,7 @@ bool _matchesFilter(String fileName) {
           onExport: _exportSelectedToStorage,
           onDelete: _batchDelete,
           onTogglePin: _togglePinSelected,
+          onToggleFavourite: _toggleFavouriteSelected,
           onDirectoryReload: _loadDirectoryContents,
           onSetStatus: (msg, {required bool error}) => _setStatus(msg, error: error),
           onShowOpenWithDialog: _showOpenWithDialog,
@@ -1831,66 +1955,104 @@ bool _matchesFilter(String fileName) {
           isFiltered: isFiltered,
           onPaste: _isReadOnly ? null : _paste,
         ),
-        bottomNavigationBar: (!isLandscape && showActionBar)
-            ? FileManagerActionBar(
-                axis: Axis.horizontal,
-                actions: _toolbarConfig.visible,
-                builders: actionBuilders,
+        bottomNavigationBar: (!isLandscape && (showActionBar || showBookmarkBar))
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showBookmarkBar)
+                    BookmarkBar(
+                      favouritePaths: _favouritePaths,
+                      axis: Axis.horizontal,
+                      onTapItem: (path) {
+                        final isDir = !path.split('/').last.contains('.') ||
+                            path.endsWith('/');
+                        _navigateToPath(path, isDir: isDir);
+                      },
+                      onRemoveFavourite: (path) {
+                        setState(() => _favouritePaths.remove(path));
+                        _saveFavouritePaths();
+                      },
+                    ),
+                  if (!isLandscape && showActionBar)
+                    FileManagerActionBar(
+                      axis: Axis.horizontal,
+                      actions: _toolbarConfig.visible,
+                      builders: actionBuilders,
+                    ),
+                ],
               )
             : null,
         body: Stack(
           children: [
-            Column(
+            Row(
               children: [
-                if (_toolbarConfig.showBreadcrumbBar) ...[
-                  BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
-                  const Divider(),
-                ],
+                if (isLandscape && showBookmarkBar)
+                  BookmarkBar(
+                    favouritePaths: _favouritePaths,
+                    axis: Axis.vertical,
+                    onTapItem: (path) {
+                      final isDir = !path.split('/').last.contains('.') ||
+                          path.endsWith('/');
+                      _navigateToPath(path, isDir: isDir);
+                    },
+                    onRemoveFavourite: (path) {
+                      setState(() => _favouritePaths.remove(path));
+                      _saveFavouritePaths();
+                    },
+                  ),
                 Expanded(
-                  child: buildBrowserBody(
-                    context,
-                    filteredItems,
-                    isLoading: _isLoading,
-                    currentItems: _currentItems,
-                    atRoot: _atRoot,
-                    onNavigateUp: _atRoot ? null : _navigateUp,
-                    searchQuery: _searchQuery,
-                    layoutMode: _layoutMode,
-                    container: widget.container,
-                    currentDirPath: _currentDirPath,
-                    thumbnailCacheMode: _resolvedThumbnailCacheMode,
-                    thumbnailQuality: _resolvedThumbnailQuality,
-                    toolbarConfig: _toolbarConfig,
-                    isSelectionMode: isSelectionMode,
-                    selectedItems: selectedItems,
-                    searchActive: _searchActive,
-                    mountedDocProviderFolders: _mountedDocProviderFolders,
-                    isFolderMounted: _isFolderMounted,
-                    isPinned: _isPinned,
-                    onDirTap: _handleDirTap,
-                    onFileTap: _handleFileTap,
-                    onItemLongPress: _handleItemLongPress,
-                    // Exact original closure bodies, just relocated from
-                    // inside _buildBody to here -- see the doc comment on
-                    // buildBrowserBody for why these weren't rewritten.
-                    onGridColumnCountChanged: (count) {
-                      _toolbarConfig = isLandscape
+                  child: Column(
+                    children: [
+                      if (_toolbarConfig.showBreadcrumbBar) ...[
+                        BreadcrumbBar(stack: _pathStack, onTap: _jumpTo),
+                        const Divider(),
+                      ],
+                      Expanded(
+                        child: buildBrowserBody(
+                          context,
+                          filteredItems,
+                          isLoading: _isLoading,
+                          currentItems: _currentItems,
+                          atRoot: _atRoot,
+                          onNavigateUp: _atRoot ? null : _navigateUp,
+                          searchQuery: _searchQuery,
+                          layoutMode: _layoutMode,
+                          container: widget.container,
+                          currentDirPath: _currentDirPath,
+                          thumbnailCacheMode: _resolvedThumbnailCacheMode,
+                          thumbnailQuality: _resolvedThumbnailQuality,
+                          toolbarConfig: _toolbarConfig,
+                          isSelectionMode: isSelectionMode,
+                          selectedItems: selectedItems,
+                          searchActive: _searchActive,
+                          mountedDocProviderFolders: _mountedDocProviderFolders,
+                          isFolderMounted: _isFolderMounted,
+                          isPinned: _isPinned,
+                          isFavourite: _isFavourite,
+                          onDirTap: _handleDirTap,
+                          onFileTap: _handleFileTap,
+                          onItemLongPress: _handleItemLongPress,
+                          onGridColumnCountChanged: (count) {
+                            _toolbarConfig = isLandscape
                           ? _toolbarConfig.copyWith(gridColumnsLandscape: count)
-                          : _toolbarConfig.copyWith(gridColumnsPortrait: count);
-                      FileManagerToolbarService.instance.save(_toolbarConfig);
-                    },
-                    onMasonryColumnCountChanged: (count) {
-                      _toolbarConfig = isLandscape
-                          ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
-                          : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
-                      FileManagerToolbarService.instance.save(_toolbarConfig);
-                    },
-                    onListZoomLevelChanged: (newZoom) {
-                      _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
-                      FileManagerToolbarService.instance.save(_toolbarConfig);
-                    },
-                    onRefresh: () => _loadDirectoryContents(_currentDirPath),
-                    isListingTruncated: _isListingTruncated,
+                                : _toolbarConfig.copyWith(gridColumnsPortrait: count);
+                            FileManagerToolbarService.instance.save(_toolbarConfig);
+                          },
+                          onMasonryColumnCountChanged: (count) {
+                            _toolbarConfig = isLandscape
+                                ? _toolbarConfig.copyWith(masonryColumnsLandscape: count)
+                                : _toolbarConfig.copyWith(masonryColumnsPortrait: count);
+                            FileManagerToolbarService.instance.save(_toolbarConfig);
+                          },
+                          onListZoomLevelChanged: (newZoom) {
+                            _toolbarConfig = _toolbarConfig.copyWith(listZoomLevel: newZoom);
+                            FileManagerToolbarService.instance.save(_toolbarConfig);
+                          },
+                          onRefresh: () => _loadDirectoryContents(_currentDirPath),
+                          isListingTruncated: _isListingTruncated,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

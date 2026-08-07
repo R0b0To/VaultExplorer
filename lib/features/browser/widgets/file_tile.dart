@@ -31,6 +31,7 @@ class FileTile extends StatelessWidget {
   final ThumbnailQuality thumbnailQuality;
   final bool showThumbnail;
   final bool isPinned;
+  final bool isFavourite;
 
   const FileTile({
     super.key,
@@ -50,6 +51,7 @@ class FileTile extends StatelessWidget {
     this.thumbnailQuality = ThumbnailQuality.defaultQuality,
     this.showThumbnail = true,
     this.isPinned = false,
+    this.isFavourite = false,
   });
 
   @override
@@ -115,18 +117,30 @@ class FileTile extends StatelessWidget {
       }
     }
 
-    Widget? pinBadge;
-    if (isPinned && !isSelected) {
-      pinBadge = Container(
+    Widget? badge;
+    if ((isPinned || isFavourite) && !isSelected) {
+      badge = Container(
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
           shape: BoxShape.circle,
         ),
-        child: Icon(
-          Icons.push_pin_rounded,
-          size: 10 * zoomLevel,
-          color: cs.onPrimaryContainer,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isPinned)
+              Icon(
+                Icons.push_pin_rounded,
+                size: 10 * zoomLevel,
+                color: cs.onPrimaryContainer,
+              ),
+            if (isFavourite)
+              Icon(
+                Icons.star_rounded,
+                size: 10 * zoomLevel,
+                color: context.semanticColors.favourite,
+              ),
+          ],
         ),
       );
     }
@@ -146,7 +160,7 @@ class FileTile extends StatelessWidget {
       isCompact: isCompact,
       zoomLevel: zoomLevel,
       customLeading: customLeading,
-      iconBadge: pinBadge,
+      iconBadge: badge,
     );
   }
 }
@@ -295,7 +309,6 @@ class _ListVideoThumb extends StatelessWidget {
     ThumbnailQuality quality,
   ) async {
     if (mode != ThumbnailCacheMode.disabled) {
-
       final cached = await ThumbnailCacheService.get(
         container: container,
         filePath: path,

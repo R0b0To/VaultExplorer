@@ -6,10 +6,14 @@ import 'package:vaultexplorer/features/settings/file_manager_toolbar_settings_sc
 class SettingsMenuButton extends StatelessWidget {
   /// Called after returning from [FileManagerToolbarSettingsScreen].
   final Future<void> Function() onSettingsClosed;
+  
+  /// To pass to the settings screen for favourite reordering.
+  final String? containerUri;
 
   const SettingsMenuButton({
     super.key,
     required this.onSettingsClosed,
+    this.containerUri,
   });
 
   @override
@@ -21,7 +25,7 @@ class SettingsMenuButton extends StatelessWidget {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => const FileManagerToolbarSettingsScreen(),
+            builder: (_) => FileManagerToolbarSettingsScreen(containerUri: containerUri),
           ),
         );
         await onSettingsClosed();

@@ -12,7 +12,6 @@ import 'package:vaultexplorer/features/browser/widgets/file_list_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/file_masonry_view.dart';
 import 'package:vaultexplorer/features/browser/widgets/truncated_banner.dart';
 
-
 Widget buildBrowserBody(
   BuildContext context,
   List<RawEntry> items, {
@@ -33,6 +32,7 @@ Widget buildBrowserBody(
   required Set<String> mountedDocProviderFolders,
   required bool Function(RawEntry entry) isFolderMounted,
   required bool Function(RawEntry entry) isPinned,
+  required bool Function(RawEntry entry) isFavourite,
   required void Function(RawEntry entry) onDirTap,
   required void Function(RawEntry entry) onFileTap,
   required void Function(RawEntry entry) onItemLongPress,
@@ -83,6 +83,7 @@ Widget buildBrowserBody(
         searchQuery: searchActive ? searchQuery.trim().toLowerCase() : null,
         mountedFolderPaths: mountedDocProviderFolders,
         isPinned: isPinned,
+        isFavourite: isFavourite,
       ),
     BrowserLayoutMode.masonry => FileMasonryView(
         container: container,
@@ -103,6 +104,7 @@ Widget buildBrowserBody(
         searchQuery: searchActive ? searchQuery.trim().toLowerCase() : null,
         mountedFolderPaths: mountedDocProviderFolders,
         isPinned: isPinned,
+        isFavourite: isFavourite,
       ),
     BrowserLayoutMode.list ||
     BrowserLayoutMode.compact =>
@@ -125,6 +127,7 @@ Widget buildBrowserBody(
         searchQuery: searchActive ? searchQuery.trim().toLowerCase() : null,
         isFolderMounted: isFolderMounted,
         isPinned: isPinned,
+        isFavourite: isFavourite,
       ),
   };
   final refreshable = RefreshIndicator(

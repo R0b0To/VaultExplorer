@@ -23,6 +23,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool showUnpinOption;
   final VoidCallback onPin;
   final VoidCallback onUnpin;
+  final bool showFavouriteOption;
+  final bool showUnfavouriteOption;
+  final VoidCallback onFavourite;
+  final VoidCallback onUnfavourite;
 
   const SelectionAppBar({
     super.key,
@@ -46,6 +50,10 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
     required this.showUnpinOption,
     required this.onPin,
     required this.onUnpin,
+    required this.showFavouriteOption,
+    required this.showUnfavouriteOption,
+    required this.onFavourite,
+    required this.onUnfavourite,
   });
 
   @override
@@ -170,6 +178,8 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
             if (value == 'export') onExport();
             if (value == 'pin') onPin();
             if (value == 'unpin') onUnpin();
+            if (value == 'favourite') onFavourite();
+            if (value == 'unfavourite') onUnfavourite();
             if (value == 'open_with_app') onOpenWithApp();
             if (value == 'doc_provider') onToggleDocumentProvider?.call();
           },
@@ -262,6 +272,36 @@ class SelectionAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ),
                     const SizedBox(width: 12),
                     Text(selectedCount > 1 ? context.l10n.unpinSelectedAction : context.l10n.unpinAction),
+                  ],
+                ),
+              ),
+            if (showFavouriteOption)
+              PopupMenuItem<String>(
+                value: 'favourite',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.star_rounded,
+                      color: context.semanticColors.favourite,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(selectedCount > 1 ? context.l10n.favouriteSelectedAction : context.l10n.favouriteAction),
+                  ],
+                ),
+              ),
+            if (showUnfavouriteOption)
+              PopupMenuItem<String>(
+                value: 'unfavourite',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.star_outline_rounded,
+                      color: cs.onSurfaceVariant,
+                      size: AppIconSize.small,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(selectedCount > 1 ? context.l10n.unfavouriteSelectedAction : context.l10n.unfavouriteAction),
                   ],
                 ),
               ),

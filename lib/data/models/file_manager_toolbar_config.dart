@@ -41,6 +41,7 @@ class FileManagerToolbarConfig {
   final Set<FileManagerAction> hidden;
   final bool showBreadcrumbBar;
   final bool showStatsBar;
+  final bool showBookmarkBar;
   final bool showMediaCarousel;
   final bool autoStartPlaylistMode;
   final List<FileDetailColumn> detailColumnsOrder;
@@ -59,6 +60,7 @@ class FileManagerToolbarConfig {
     required this.hidden,
     this.showBreadcrumbBar = true,
     this.showStatsBar = true,
+    this.showBookmarkBar = true,
     this.showMediaCarousel = true,
     this.autoStartPlaylistMode = false,
     this.detailColumnsOrder = const [
@@ -89,6 +91,7 @@ class FileManagerToolbarConfig {
         hidden: {},
         showBreadcrumbBar: true,
         showStatsBar: true,
+        showBookmarkBar: true,
         showMediaCarousel: true,
         autoStartPlaylistMode: false,
         detailColumnsOrder: [
@@ -119,6 +122,7 @@ class FileManagerToolbarConfig {
     Set<FileManagerAction>? hidden,
     bool? showBreadcrumbBar,
     bool? showStatsBar,
+    bool? showBookmarkBar,
     bool? showMediaCarousel,
     bool? autoStartPlaylistMode,
     List<FileDetailColumn>? detailColumnsOrder,
@@ -137,6 +141,7 @@ class FileManagerToolbarConfig {
         hidden: hidden ?? this.hidden,
         showBreadcrumbBar: showBreadcrumbBar ?? this.showBreadcrumbBar,
         showStatsBar: showStatsBar ?? this.showStatsBar,
+        showBookmarkBar: showBookmarkBar ?? this.showBookmarkBar,
         showMediaCarousel: showMediaCarousel ?? this.showMediaCarousel,
         autoStartPlaylistMode:
             autoStartPlaylistMode ?? this.autoStartPlaylistMode,
@@ -161,6 +166,7 @@ class FileManagerToolbarConfig {
         'hidden': hidden.map((a) => a.toJson()).toList(),
         'showBreadcrumbBar': showBreadcrumbBar,
         'showStatsBar': showStatsBar,
+        'showBookmarkBar': showBookmarkBar,
         'showMediaCarousel': showMediaCarousel,
         'autoStartPlaylistMode': autoStartPlaylistMode,
         'detailColumnsOrder':
@@ -208,6 +214,7 @@ class FileManagerToolbarConfig {
       hidden: hidden,
       showBreadcrumbBar: j['showBreadcrumbBar'] as bool? ?? true,
       showStatsBar: j['showStatsBar'] as bool? ?? true,
+      showBookmarkBar: j['showBookmarkBar'] as bool? ?? true,
       showMediaCarousel: j['showMediaCarousel'] as bool? ?? true,
       autoStartPlaylistMode: j['autoStartPlaylistMode'] as bool? ?? false,
       detailColumnsOrder: rawDetailColumns.isEmpty

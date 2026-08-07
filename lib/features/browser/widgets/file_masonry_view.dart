@@ -33,6 +33,7 @@ class FileMasonryView extends StatefulWidget {
   final String? searchQuery;
   final Set<String> mountedFolderPaths;
   final bool Function(RawEntry entry)? isPinned;
+  final bool Function(RawEntry entry)? isFavourite;
 
   const FileMasonryView({
     super.key,
@@ -53,6 +54,7 @@ class FileMasonryView extends StatefulWidget {
     this.searchQuery,
     this.mountedFolderPaths = const {},
     this.isPinned,
+    this.isFavourite,
   });
 
   @override
@@ -169,7 +171,10 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       return const SizedBox.shrink();
     }
     final gridKey = ValueKey(
-      widget.items.map((e) => '${e.raw}:${widget.isPinned?.call(e)}').join(';'),
+      widget.items
+          .map((e) =>
+              '${e.raw}:${widget.isPinned?.call(e)}:${widget.isFavourite?.call(e)}')
+          .join(';'),
     );
     return GestureDetector(
       onScaleStart: _handleScaleStart,
@@ -194,6 +199,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
             final entry = widget.items[i];
             final isDir = entry.isDir;
             final isPinned = widget.isPinned?.call(entry) ?? false;
+            final isFav = widget.isFavourite?.call(entry) ?? false;
             final fullPath = widget.currentDirPath.isEmpty
                 ? entry.name
                 : '${widget.currentDirPath}/${entry.name}';
@@ -202,7 +208,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
                 hasVisualPreview: hasVisualPreview);
             return AspectRatio(
               key: ValueKey(
-                  '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}:$isPinned'),
+                  '${isDir ? 'dir' : 'file'}:${widget.currentDirPath}/${entry.name}:$isPinned:$isFav'),
               aspectRatio: ratio,
               child: isDir
                   ? _buildDirCell(context, entry, fullPath)
@@ -224,6 +230,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
   Widget _buildDirCell(BuildContext context, RawEntry entry, String fullPath) {
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
+    final isFav = widget.isFavourite?.call(entry) ?? false;
     final cs = Theme.of(context).colorScheme;
     final isMounted = widget.mountedFolderPaths.contains(fullPath);
     return _MasonryCell(
@@ -231,6 +238,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
       isPinned: isPinned,
+      isFavourite: isFav,
       onTap: () => widget.onDirTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       preview: Center(
@@ -249,6 +257,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
     final cleanName = entry.name;
     final isSelected = widget.selectedItems.contains(entry);
     final isPinned = widget.isPinned?.call(entry) ?? false;
+    final isFav = widget.isFavourite?.call(entry) ?? false;
     String displayName = cleanName;
     final ext = cleanName.split('.').last;
     final vaultIcon = vaultIconForExt(ext);
@@ -297,6 +306,7 @@ class _FileMasonryViewState extends State<FileMasonryView> {
       isSelectionMode: widget.isSelectionMode,
       showFileName: widget.showFileNames,
       isPinned: isPinned,
+      isFavourite: isFav,
       onTap: () => widget.onFileTap(entry),
       onLongPress: () => widget.onItemLongPress(entry),
       onMoreTap:
@@ -319,6 +329,7 @@ class _MasonryCell extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback? onMoreTap;
   final bool isPinned;
+  final bool isFavourite;
   const _MasonryCell({
     required this.preview,
     required this.label,
@@ -330,6 +341,7 @@ class _MasonryCell extends StatelessWidget {
     required this.onLongPress,
     this.onMoreTap,
     this.isPinned = false,
+    this.isFavourite = false,
   });
   @override
   Widget build(BuildContext context) {
@@ -361,7 +373,7 @@ class _MasonryCell extends StatelessWidget {
                   color: cs.primary.withValues(alpha: 0.12),
                 ),
               ),
-            if (isPinned && !isSelected)
+            if ((isPinned || isFavourite) && !isSelected)
               Align(
                 alignment: Alignment.topLeft,
                 child: Padding(
@@ -372,10 +384,22 @@ class _MasonryCell extends StatelessWidget {
                       color: cs.surfaceContainerHigh.withValues(alpha: 0.85),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      Icons.push_pin_rounded,
-                      size: 14,
-                      color: cs.primary,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isPinned)
+                          Icon(
+                            Icons.push_pin_rounded,
+                            size: 14,
+                            color: cs.primary,
+                          ),
+                        if (isFavourite)
+                          Icon(
+                            Icons.star_rounded,
+                            size: 14,
+                            color: context.semanticColors.favourite,
+                          ),
+                      ],
                     ),
                   ),
                 ),

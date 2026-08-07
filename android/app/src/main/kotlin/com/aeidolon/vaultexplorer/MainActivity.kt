@@ -18,6 +18,8 @@ import java.util.concurrent.ThreadPoolExecutor
 private object ChannelMethods {
     const val PICK_CONTAINER            = "pickContainer"
     const val PICK_KEYFILES             = "pickKeyfiles"
+    const val PICK_ARCHIVE_FILE         = "pickArchiveFile"
+    const val PICK_EXTRACT_FOLDER       = "pickExtractFolder"
     const val CREATE_CONTAINER          = "createContainer"
     const val CREATE_USB_CONTAINER      = "createUsbContainer"
     const val GET_USB_DEVICE_CAPACITY   = "getUsbDeviceCapacity"
@@ -292,6 +294,8 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.PICK_GOCRYPTFS_VAULT -> vaultPickerHandlers.handlePickGocryptfsVault(call, result)
                 ChannelMethods.PICK_CRYFS_VAULT -> vaultPickerHandlers.handlePickCryfsVault(call, result)
                 ChannelMethods.PICK_KEYFILES -> vaultPickerHandlers.handlePickKeyfiles(call, result)
+                ChannelMethods.PICK_ARCHIVE_FILE -> vaultPickerHandlers.handlePickArchiveFile(call, result)
+                ChannelMethods.PICK_EXTRACT_FOLDER -> vaultPickerHandlers.handlePickExtractFolder(call, result)
                 ChannelMethods.CREATE_CONTAINER -> vaultCreationHandlers.handleCreateContainer(call, result)
                 ChannelMethods.CREATE_USB_CONTAINER -> usbHandlers.handleCreateUsbContainer(call, result)
                 ChannelMethods.GET_USB_DEVICE_CAPACITY -> usbHandlers.handleGetUsbDeviceCapacity(call, result)

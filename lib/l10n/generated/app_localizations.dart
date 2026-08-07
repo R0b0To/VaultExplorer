@@ -1208,6 +1208,72 @@ abstract class AppLocalizations {
   /// **'Couldn\'t open that archive.'**
   String get archiveExplorerOpenFailed;
 
+  /// App-bar action on the decoy Archive Explorer screen to pick any .zip file via the system file picker, not just ones in Downloads
+  ///
+  /// In en, this message translates to:
+  /// **'Open archive…'**
+  String get archiveExplorerOpenArchive;
+
+  /// Error snackbar on the decoy Archive Explorer screen when a picked document can't be resolved to a real filesystem path
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t access that file directly. Try picking one from Downloads instead.'**
+  String get archiveExplorerUnresolvedPath;
+
+  /// Menu item on the decoy Archive Explorer screen to extract a zip archive to a user-chosen folder instead of the default location
+  ///
+  /// In en, this message translates to:
+  /// **'Extract to…'**
+  String get archiveExplorerExtractTo;
+
+  /// Menu item / action on the decoy Archive Explorer screen to browse a zip archive's contents without extracting it
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get archiveExplorerPreview;
+
+  /// Transient status shown on the decoy Archive Explorer screen while the folder picker for a custom extraction destination is open
+  ///
+  /// In en, this message translates to:
+  /// **'Choosing destination…'**
+  String get archiveExplorerChoosingDestination;
+
+  /// Snackbar shown on the decoy Archive Explorer screen when the user cancels the extraction-destination folder picker
+  ///
+  /// In en, this message translates to:
+  /// **'No destination chosen.'**
+  String get archiveExplorerNoDestinationChosen;
+
+  /// Confirmation snackbar after extracting a zip archive to a user-chosen destination on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Extracted {count} files to {path}'**
+  String archiveExplorerExtractSuccessTo(int count, String path);
+
+  /// Empty state title shown when browsing into an empty folder inside an archive on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Empty folder'**
+  String get archiveBrowserEmptyTitle;
+
+  /// Empty state message shown when browsing into an empty folder inside an archive on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'This folder doesn\'t contain any files.'**
+  String get archiveBrowserEmptyMessage;
+
+  /// Breadcrumb label for the root of an archive being browsed on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get archiveBrowserRoot;
+
+  /// Error snackbar shown when extracting a single entry for preview fails while browsing an archive on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open that file.'**
+  String get archiveBrowserOpenFileFailed;
+
   /// File association label: files open in the built-in text editor
   ///
   /// In en, this message translates to:

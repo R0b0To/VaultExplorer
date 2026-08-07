@@ -204,6 +204,41 @@ mixin _ContainerLifecycleOps {
     );
   }
 
+  /// Opens a SAF file picker filtered to `.zip` files, for the decoy
+  /// Archive Explorer screen's "Open archive…" action. Returns the real
+  /// filesystem path (not a content:// URI) plus a display name, or null
+  /// if the user cancelled.
+  ///
+  /// [path] can still be null even on a non-cancelled pick, if the chosen
+  /// document couldn't be resolved to a raw path (see
+  /// `VaultPickerHandlers.handlePickArchiveFile`) -- callers should treat
+  /// that the same as a failed open.
+  Future<({String? path, String displayName})?> pickArchiveFile() async {
+    final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+      ChannelMethods.pickArchiveFile,
+    );
+    if (raw == null) return null;
+    return (
+      path: raw['path'] as String?,
+      displayName: raw['displayName'] as String,
+    );
+  }
+
+  /// Opens a SAF folder picker (`ACTION_OPEN_DOCUMENT_TREE`) so the user
+  /// can choose where an archive gets extracted to, instead of the
+  /// default Download/Extracted location. Same raw-path contract as
+  /// [pickArchiveFile].
+  Future<({String? path, String displayName})?> pickExtractFolder() async {
+    final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+      ChannelMethods.pickExtractFolder,
+    );
+    if (raw == null) return null;
+    return (
+      path: raw['path'] as String?,
+      displayName: raw['displayName'] as String,
+    );
+  }
+
   Future<List<KeyfileRef>> pickKeyfiles() async {
     final raw = await _channel.invokeMethod<List<Object?>>(
       ChannelMethods.pickKeyfiles,

@@ -713,6 +713,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get archiveExplorerOpenFailed => 'Couldn\'t open that archive.';
 
   @override
+  String get archiveExplorerOpenArchive => 'Open archive…';
+
+  @override
+  String get archiveExplorerUnresolvedPath =>
+      'Couldn\'t access that file directly. Try picking one from Downloads instead.';
+
+  @override
+  String get archiveExplorerExtractTo => 'Extract to…';
+
+  @override
+  String get archiveExplorerPreview => 'Preview';
+
+  @override
+  String get archiveExplorerChoosingDestination => 'Choosing destination…';
+
+  @override
+  String get archiveExplorerNoDestinationChosen => 'No destination chosen.';
+
+  @override
+  String archiveExplorerExtractSuccessTo(int count, String path) {
+    return 'Extracted $count files to $path';
+  }
+
+  @override
+  String get archiveBrowserEmptyTitle => 'Empty folder';
+
+  @override
+  String get archiveBrowserEmptyMessage =>
+      'This folder doesn\'t contain any files.';
+
+  @override
+  String get archiveBrowserRoot => 'Archive';
+
+  @override
+  String get archiveBrowserOpenFileFailed => 'Couldn\'t open that file.';
+
+  @override
   String get fileAssocInAppTextEditor => 'In-app Text Editor';
 
   @override

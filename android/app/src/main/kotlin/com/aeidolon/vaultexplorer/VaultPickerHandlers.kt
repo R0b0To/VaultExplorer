@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.result.contract.ActivityResultContracts
+import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.ExecutorService
@@ -150,6 +151,58 @@ class VaultPickerHandlers(
         }
     }
 
+    // Used by the decoy Archive Explorer screen to let the user open a zip
+    // that isn't sitting in the public Downloads folder. Unlike the other
+    // launchers here, this doesn't take a persistable URI permission -- the
+    // decoy screen only ever operates through plain dart:io, so all it
+    // needs back is a real filesystem path (resolved via [UriToPath]) that
+    // it can hand to [ArchiveContext.open] the same way it already does
+    // for files it finds itself. If the picked document can't be resolved
+    // to a raw path (e.g. it lives on a provider with no on-disk backing,
+    // or "All files access" hasn't been granted), `path` comes back null
+    // and the Dart side shows a friendly error instead of trying to open
+    // a content:// URI the archive decoder doesn't understand.
+    private val pickArchiveFileLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingResult.take() ?: return@registerForActivityResult
+        val data = activityResult.data
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
+            val uri = data.data!!
+            ioExecutor.execute {
+                val path = UriToPath.getRawPath(activity, uri)
+                val name = UriNameResolver.resolve(activity.contentResolver, uri)
+                activity.runOnUiThread {
+                    res.success(mapOf("path" to path, "displayName" to name))
+                }
+            }
+        } else {
+            res.success(null)
+        }
+    }
+
+    // Folder-picker counterpart used when the user chooses a custom
+    // extraction destination from the decoy screen instead of the default
+    // Download/Extracted location. Same raw-path-only contract as above.
+    private val pickExtractFolderLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingResult.take() ?: return@registerForActivityResult
+        val data = activityResult.data
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
+            val uri = data.data!!
+            ioExecutor.execute {
+                val path = UriToPath.getRawPath(activity, uri)
+                val name = UriNameResolver.resolve(activity.contentResolver, uri)
+                activity.runOnUiThread {
+                    res.success(mapOf("path" to path, "displayName" to name))
+                }
+            }
+        } else {
+            res.success(null)
+        }
+    }
+
     private val pickKeyfilesLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -204,6 +257,22 @@ class VaultPickerHandlers(
         pendingResult.stash(result)
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
         pickCryfsVaultLauncher.launch(intent)
+    }
+
+    fun handlePickArchiveFile(call: MethodCall, result: MethodChannel.Result) {
+        pendingResult.stash(result)
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/zip"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/x-zip-compressed"))
+        }
+        pickArchiveFileLauncher.launch(intent)
+    }
+
+    fun handlePickExtractFolder(call: MethodCall, result: MethodChannel.Result) {
+        pendingResult.stash(result)
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+        pickExtractFolderLauncher.launch(intent)
     }
 
     fun handlePickKeyfiles(call: MethodCall, result: MethodChannel.Result) {

@@ -7,6 +7,13 @@ abstract final class ChannelMethods {
   // ── Container lifecycle ──────────────────────────────────────────────────
   static const pickContainer = 'pickContainer';
   static const pickKeyfiles = 'pickKeyfiles';
+
+  // Used by the decoy Archive Explorer screen: pick any .zip via SAF
+  // (not just ones sitting in Downloads) and pick a custom extraction
+  // destination. Both resolve to a raw filesystem path rather than a
+  // content:// URI -- see VaultPickerHandlers.kt for why.
+  static const pickArchiveFile = 'pickArchiveFile';
+  static const pickExtractFolder = 'pickExtractFolder';
   static const createContainer = 'createContainer';
   static const unlockContainer = 'unlockContainer';
   static const lockContainer = 'lockContainer';

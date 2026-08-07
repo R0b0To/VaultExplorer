@@ -8,6 +8,8 @@ import 'package:vaultexplorer/core/filesystem/file_size.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/archive_context.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
+import 'package:vaultexplorer/features/decoy/decoy_archive_browse_screen.dart';
+import 'package:vaultexplorer/features/decoy/decoy_archive_extract.dart';
 import 'package:vaultexplorer/features/decoy/widgets/hidden_vault_trigger.dart';
 
 class _ZipEntry {
@@ -156,29 +158,11 @@ class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen>
 
     try {
       // Extracts to a real temp dir via plain dart:io (no encrypted
-      // container involved) -- see ArchiveContext.extractAll.
-      final extracted = await ctx.extractAll();
-
+      // container involved) -- see ArchiveContext.extractAll. Shared with
+      // DecoyArchiveBrowseScreen's extraction actions.
       final downloads = await _downloadsDir();
       final destRoot = Directory(p.join(downloads.path, 'Extracted', archiveBaseName));
-      await destRoot.create(recursive: true);
-
-      var count = 0;
-      for (final mapEntry in extracted.entries) {
-        final relativePath = mapEntry.key;
-        final tempPath = mapEntry.value;
-        final destPath = p.join(destRoot.path, relativePath);
-        final destFile = File(destPath);
-        try {
-          await destFile.parent.create(recursive: true);
-          await File(tempPath).copy(destPath);
-          count++;
-        } finally {
-          try {
-            await File(tempPath).delete();
-          } catch (_) {}
-        }
-      }
+      final count = await extractArchiveContextTo(ctx, destRoot);
 
       if (!mounted) return;
       showAppSnackBar(
@@ -202,6 +186,94 @@ class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen>
     }
   }
 
+  /// Same as [_extractAll], but the user picks the destination folder
+  /// instead of it defaulting to Download/Extracted/<name>.
+  Future<void> _extractTo(_ZipEntry entry) async {
+    final archiveBaseName = p.basenameWithoutExtension(entry.name);
+    ArchiveContext? ctx;
+    try {
+      ctx = ArchiveContext.open(
+        archivePathInContainer: entry.name,
+        tempFilePath: entry.file.path,
+        pathStackEntryIndex: 0,
+      );
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.archiveExplorerOpenFailed,
+          tone: AppBannerTone.error,
+        );
+      }
+      return;
+    }
+
+    final picked = await _api.pickExtractFolder();
+    if (!mounted) return;
+    if (picked == null) {
+      showAppSnackBar(context, message: context.l10n.archiveExplorerNoDestinationChosen);
+      return;
+    }
+    final destPath = picked.path;
+    if (destPath == null) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.archiveExplorerUnresolvedPath,
+        tone: AppBannerTone.error,
+      );
+      return;
+    }
+
+    setState(() => _extractingPath = entry.file.path);
+    try {
+      final count = await extractArchiveContextTo(ctx, Directory(destPath));
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: context.l10n.archiveExplorerExtractSuccessTo(count, picked.displayName),
+        tone: AppBannerTone.success,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: context.l10n.archiveExplorerExtractFailed,
+        tone: AppBannerTone.error,
+      );
+    } finally {
+      if (mounted) setState(() => _extractingPath = null);
+    }
+  }
+
+  void _preview(_ZipEntry entry) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => DecoyArchiveBrowseScreen(archiveFile: entry.file, archiveName: entry.name),
+    ));
+  }
+
+  /// Lets the user open any `.zip` via the system file picker, not just
+  /// ones already sitting in the public Downloads folder, and jumps
+  /// straight into [DecoyArchiveBrowseScreen] to look inside it.
+  Future<void> _openArchive() async {
+    final picked = await _api.pickArchiveFile();
+    if (!mounted || picked == null) return;
+    final path = picked.path;
+    if (path == null) {
+      showAppSnackBar(
+        context,
+        message: context.l10n.archiveExplorerUnresolvedPath,
+        tone: AppBannerTone.error,
+      );
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => DecoyArchiveBrowseScreen(
+        archiveFile: File(path),
+        archiveName: picked.displayName,
+      ),
+    ));
+  }
+
   int _entryCount(_ZipEntry entry) {
     try {
       final ctx = ArchiveContext.open(
@@ -222,6 +294,11 @@ class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen>
         title: HiddenVaultTrigger(child: Text(context.l10n.appNameZipExplorer)),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.file_open_outlined),
+            tooltip: context.l10n.archiveExplorerOpenArchive,
+            onPressed: _openArchive,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: context.l10n.archiveExplorerRefreshTooltip,
@@ -273,15 +350,30 @@ class _DecoyArchiveExplorerScreenState extends State<DecoyArchiveExplorerScreen>
               '${FileSize.bytes(entry.sizeBytes).formatted} · '
               '${context.l10n.archiveExplorerEntryCount(_entryCount(entry))}',
             ),
+            onTap: isExtracting ? null : () => _preview(entry),
             trailing: isExtracting
                 ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : TextButton(
-                    onPressed: () => _extractAll(entry),
-                    child: Text(context.l10n.archiveExplorerExtractAll),
+                : PopupMenuButton<VoidCallback>(
+                    tooltip: context.l10n.archiveExplorerExtractAll,
+                    onSelected: (action) => action(),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: () => _preview(entry),
+                        child: Text(context.l10n.archiveExplorerPreview),
+                      ),
+                      PopupMenuItem(
+                        value: () => _extractAll(entry),
+                        child: Text(context.l10n.archiveExplorerExtractAll),
+                      ),
+                      PopupMenuItem(
+                        value: () => _extractTo(entry),
+                        child: Text(context.l10n.archiveExplorerExtractTo),
+                      ),
+                    ],
                   ),
           );
         },

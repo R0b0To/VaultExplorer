@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  flutter_analyze_and_test:
+    name: Flutter analyze & test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test
+
+  kotlin_unit_tests:
+    name: Kotlin unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Flutter
+        # The Android module is a Flutter add-to-app style subproject; Gradle
+        # invokes it via the Flutter SDK's Gradle plugin, so the toolchain
+        # needs to be on PATH even though this job never builds Dart code.
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: ./gradlew testDebugUnitTest
+        working-directory: android
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Upload Kotlin test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kotlin-unit-test-report
+          path: android/app/build/reports/tests/testDebugUnitTest
+          retention-days: 14
+
+  native_host_tests:
+    name: Native host-side tests (no NDK)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # These targets are explicitly gated on `if(NOT ANDROID)` in
+      # CMakeLists.txt and are written to be free of Android/JNI
+      # dependencies (see the "Host-side test, no Android toolchain
+      # required" comments in each test file) specifically so pure-logic
+      # bugs -- batching math, cache invalidation, KDF table lookups -- can
+      # be caught without spinning up an emulator or the NDK cross-compiler.
+      - name: Configure (host build)
+        run: cmake -S android/app/src/main/cpp -B build-host-tests -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build test binaries
+        run: cmake --build build-host-tests --target sector_batching_test fs_scan_test kdf_table_test decrypted_block_cache_test -j
+
+      - name: Run tests (ctest)
+        working-directory: build-host-tests
+        run: ctest --output-on-failure

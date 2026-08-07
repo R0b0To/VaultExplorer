@@ -17,15 +17,24 @@ class GocryptfsEme(private val key: ByteArray) {
     }
 
     fun encrypt(tweak: ByteArray, plaintext: ByteArray): ByteArray {
-        val nativeBytes = NativeEngine.gocryptfsEmeNative(key, tweak, plaintext, true)
+        val nativeBytes = nativeOrNull { NativeEngine.gocryptfsEmeNative(key, tweak, plaintext, true) }
         if (nativeBytes != null) return nativeBytes
         return transform(tweak, plaintext, encrypt = true)
     }
 
     fun decrypt(tweak: ByteArray, ciphertext: ByteArray): ByteArray {
-        val nativeBytes = NativeEngine.gocryptfsEmeNative(key, tweak, ciphertext, false)
+        val nativeBytes = nativeOrNull { NativeEngine.gocryptfsEmeNative(key, tweak, ciphertext, false) }
         if (nativeBytes != null) return nativeBytes
         return transform(tweak, ciphertext, encrypt = false)
+    }
+
+    /** See SivMode.nativeOrNull's doc comment -- same reason, same fix. */
+    private inline fun nativeOrNull(call: () -> ByteArray?): ByteArray? = try {
+        call()
+    } catch (e: UnsatisfiedLinkError) {
+        null
+    } catch (e: NoClassDefFoundError) {
+        null
     }
 
     // ---- Kotlin Fallback Implementation ------------------------------------

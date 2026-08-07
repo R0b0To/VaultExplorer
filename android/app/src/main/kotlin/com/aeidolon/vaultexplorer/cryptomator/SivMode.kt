@@ -12,7 +12,7 @@ class SivMode {
 
     fun encrypt(encKey: SecretKeySpec, macKey: SecretKeySpec, plaintext: ByteArray, vararg associatedData: ByteArray): ByteArray {
         val adList = if (associatedData.isNotEmpty()) associatedData.toList().toTypedArray() else null
-        val nativeBytes = NativeEngine.sivEncryptNative(encKey.encoded, macKey.encoded, plaintext, adList)
+        val nativeBytes = nativeOrNull { NativeEngine.sivEncryptNative(encKey.encoded, macKey.encoded, plaintext, adList) }
         if (nativeBytes != null) return nativeBytes
 
         val siv = s2v(macKey, associatedData.toList() + listOf(plaintext))
@@ -25,7 +25,7 @@ class SivMode {
             throw IllegalArgumentException("Ciphertext must be at least 16 bytes (SIV).")
         }
         val adList = if (associatedData.isNotEmpty()) associatedData.toList().toTypedArray() else null
-        val nativeBytes = NativeEngine.sivDecryptNative(encKey.encoded, macKey.encoded, ciphertext, adList)
+        val nativeBytes = nativeOrNull { NativeEngine.sivDecryptNative(encKey.encoded, macKey.encoded, ciphertext, adList) }
         if (nativeBytes != null) return nativeBytes
 
         val siv = ciphertext.copyOfRange(0, 16)
@@ -36,6 +36,30 @@ class SivMode {
             throw UnauthenticCiphertextException("SIV mismatch — wrong key or tampered/corrupt ciphertext.")
         }
         return plaintext
+    }
+
+    /**
+     * Runs a NativeEngine.* call, treating a failure to link the native
+     * library the same as the native call itself returning null (i.e. "use
+     * the Kotlin fallback"), rather than letting the call crash outright.
+     *
+     * This matters specifically because NativeEngine.init{} calls
+     * System.loadLibrary("vaultexplorer") unconditionally: on a real device
+     * that always succeeds (the .so ships in the APK), but SivMode is also
+     * exercised by plain-JVM unit tests with no native library on the
+     * classpath at all, where a bare `NativeEngine.sivEncryptNative(...)`
+     * call would throw UnsatisfiedLinkError (first touch) or
+     * NoClassDefFoundError (every touch after that, since the JVM caches a
+     * failed class initializer) instead of ever reaching this function's
+     * body -- the try/catch has to live at the call site, in an already-
+     * initialized class, for it to actually catch that.
+     */
+    private inline fun nativeOrNull(call: () -> ByteArray?): ByteArray? = try {
+        call()
+    } catch (e: UnsatisfiedLinkError) {
+        null
+    } catch (e: NoClassDefFoundError) {
+        null
     }
 
     // ---- Kotlin Fallback Implementation ------------------------------------

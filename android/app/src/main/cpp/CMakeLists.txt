@@ -512,17 +512,11 @@ target_link_libraries(
 if(NOT ANDROID)
     add_executable(sector_batching_test io/test/sector_batching_test.cpp)
     add_executable(fs_scan_test test/fs_scan_test.cpp)
-    # TODO(tech-debt): crypto/cascade.cpp + crypto/cipher_shim.cpp (the
-    # cipher-agnostic XTS + cascade chaining logic) has no test coverage.
-    # A prior cascade_test target referenced test/cascade_test.cpp, which
-    # didn't exist anywhere in this tree and was removed here rather than
-    # left as a permanently-broken commented-out block. Writing real
-    # coverage for cascade.cpp -- known-answer vectors per cipher, at
-    # minimum -- is tracked as follow-up work; don't re-add this target
-    # until that source file actually exists.
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
+    add_executable(decrypted_block_cache_test io/test/decrypted_block_cache_test.cpp)
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)
     add_test(NAME fs_scan_test COMMAND fs_scan_test)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
+    add_test(NAME decrypted_block_cache_test COMMAND decrypted_block_cache_test)
 endif()

@@ -42,6 +42,7 @@ import 'package:vaultexplorer/features/browser/widgets/layout_mode_menu_button.d
 import 'package:vaultexplorer/features/browser/widgets/browser_app_bar_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/browser_body_builder.dart';
 import 'package:vaultexplorer/features/browser/widgets/folder_document_provider_sheet.dart';
+import 'package:vaultexplorer/features/browser/services/folder_document_provider_service.dart';
 import 'package:vaultexplorer/features/camera/camera_capture_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_detail_screen.dart';
 import 'package:vaultexplorer/features/vault_item/vault_item_edit_screen.dart';
@@ -95,6 +96,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   bool _statusIsError = false;
   CrossContainerClipboard get _clip => CrossContainerClipboard.instance;
   FileOperationService get _opSvc => FileOperationService.instance;
+  static const _docProviderService = FolderDocumentProviderService();
   bool _searchActive = false;
   String _searchQuery = '';
   BrowserLayoutMode _layoutMode = BrowserLayoutMode.list;
@@ -148,27 +150,21 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   }
 
   Future<void> _refreshMountedDocProviderFolders() async {
-    final paths =
-        await vaultExplorerApi.getMountedContainerFolders(widget.container.uri);
+    final folders = await _docProviderService.loadMountedFolders(widget.container);
     if (!mounted) return;
-    setState(() => _mountedDocProviderFolders = paths.toSet());
+    setState(() => _mountedDocProviderFolders = folders);
   }
 
   Future<void> _toggleFolderDocumentProvider(RawEntry entry) async {
     final path = _fullPathOf(entry);
-    final ok = await vaultExplorerApi.mountContainerFolder(
-      widget.container.uri,
-      path,
-      displayName: entry.name,
-    );
+    final ok = await _docProviderService.mountNative(widget.container, path, entry.name);
     if (!mounted) return;
     if (!ok) {
       showAppSnackBar(context, message: context.l10n.couldNotExpose(entry.name));
       return;
     }
     setState(() => _mountedDocProviderFolders = {..._mountedDocProviderFolders, path});
-    await ContainerRepository.instance
-        .setFolderExposed(widget.container.uri, path, exposed: true);
+    await _docProviderService.persistExposed(widget.container, path, exposed: true);
     if (!mounted) return;
     showAppSnackBar(
       context,
@@ -178,7 +174,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
 
   Future<void> _unmountFolderDocumentProvider(RawEntry entry) async {
     final path = _fullPathOf(entry);
-    final ok = await vaultExplorerApi.unmountContainerFolder(widget.container.uri, path);
+    final ok = await _docProviderService.unmountNative(widget.container, path);
     if (!mounted) return;
     if (!ok) {
       showAppSnackBar(context, message: context.l10n.couldNotUnmount(entry.name));
@@ -187,14 +183,12 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     setState(() {
       _mountedDocProviderFolders = {..._mountedDocProviderFolders}..remove(path);
     });
-    await ContainerRepository.instance
-        .setFolderExposed(widget.container.uri, path, exposed: false);
+    await _docProviderService.persistExposed(widget.container, path, exposed: false);
   }
 
   Future<void> _setFolderAutoMount(RawEntry entry, bool autoMount) async {
     final path = _fullPathOf(entry);
-    await ContainerRepository.instance
-        .setFolderAutoMount(widget.container.uri, path, autoMount);
+    await _docProviderService.setAutoMount(widget.container, path, autoMount);
   }
 
   Future<void> _showFolderDocumentProviderSheet(RawEntry entry) async {

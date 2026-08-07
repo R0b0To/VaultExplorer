@@ -304,27 +304,8 @@ class CryptomatorSession(
     }
     override fun extractFile(virtualPath: String, destinationPath: String): Boolean =
         engine.extractFile(virtualPath, destinationPath)
-    override fun getSpaceInfo(): LongArray? {
-        return try {
-            val rootUri = android.provider.DocumentsContract.buildRootsUri(vaultRootUri.authority)
-            context.contentResolver.query(
-                rootUri,
-                arrayOf(android.provider.DocumentsContract.Root.COLUMN_AVAILABLE_BYTES, android.provider.DocumentsContract.Root.COLUMN_CAPACITY_BYTES),
-                null, null, null
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val availIdx = cursor.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_AVAILABLE_BYTES)
-                    val capIdx = cursor.getColumnIndex(android.provider.DocumentsContract.Root.COLUMN_CAPACITY_BYTES)
-                    val avail = if (availIdx >= 0) cursor.getLong(availIdx) else -1L
-                    val cap = if (capIdx >= 0) cursor.getLong(capIdx) else -1L
-                    if (cap > 0 && avail >= 0) return longArrayOf(cap, avail)
-                }
-            }
-            null
-        } catch (e: Exception) {
-            null
-        }
-    }
+    override fun getSpaceInfo(): LongArray? =
+        com.aeidolon.vaultexplorer.saf.VaultPathUtils.querySafSpaceInfo(context, vaultRootUri)
     private fun listFilesSafe(folder: DocumentFile): List<DocumentFile> = safOps.listChildren(folder)
     private fun createDirectorySafe(parent: DocumentFile, name: String): DocumentFile? =
         safOps.createDirectorySafe(parent, name)
@@ -372,14 +353,8 @@ class CryptomatorSession(
     private fun renameDocument(doc: DocumentFile, newName: String) = safOps.renameDocument(doc, newName)
     private fun deleteRecursively(folder: DocumentFile) = safOps.deleteRecursively(folder)
     private fun requireNonNull(doc: DocumentFile?): DocumentFile = doc ?: throw VaultIOException("Expected SAF document was null")
-    private fun normalize(path: String): String = path.trim('/')
-    private fun parentOf(normalizedPath: String): String {
-        val idx = normalizedPath.lastIndexOf('/')
-        return if (idx < 0) "" else normalizedPath.substring(0, idx)
-    }
-    private fun nameOf(normalizedPath: String): String {
-        val idx = normalizedPath.lastIndexOf('/')
-        return if (idx < 0) normalizedPath else normalizedPath.substring(idx + 1)
-    }
-    private fun joinPath(parent: String, name: String): String = if (parent.isEmpty()) name else "$parent/$name"
+    private fun normalize(path: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.normalize(path)
+    private fun parentOf(normalizedPath: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.parentOf(normalizedPath)
+    private fun nameOf(normalizedPath: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.nameOf(normalizedPath)
+    private fun joinPath(parent: String, name: String): String = com.aeidolon.vaultexplorer.saf.VaultPathUtils.joinPath(parent, name)
 }

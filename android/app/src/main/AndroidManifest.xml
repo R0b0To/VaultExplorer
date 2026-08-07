@@ -54,17 +54,17 @@
             </intent-filter>
         </activity-alias>
         <activity-alias
-            android:name=".HydroTrackerAlias"
+            android:name=".ZipExplorerAlias"
             android:targetActivity=".MainActivity"
             android:label="@string/decoy_app_name"
-            android:icon="@mipmap/ic_launcher_water"
-            android:roundIcon="@mipmap/ic_launcher_water"
+            android:icon="@mipmap/ic_launcher_zip"
+            android:roundIcon="@mipmap/ic_launcher_zip"
             android:enabled="false"
             android:exported="true">
             <intent-filter
                 android:label="@string/decoy_app_name"
-                android:icon="@mipmap/ic_launcher_water"
-                android:roundIcon="@mipmap/ic_launcher_water">
+                android:icon="@mipmap/ic_launcher_zip"
+                android:roundIcon="@mipmap/ic_launcher_zip">
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>

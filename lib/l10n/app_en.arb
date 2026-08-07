@@ -945,9 +945,70 @@
   "@appNameVaultExplorer": {
     "description": "The app's real (non-disguised) name, shown as the app title and Android task-switcher label"
   },
-  "appNameHydroTracker": "Hydro Tracker",
-  "@appNameHydroTracker": {
+  "appNameZipExplorer": "Archive Explorer",
+  "@appNameZipExplorer": {
     "description": "The decoy/disguise app name shown as the app title and Android task-switcher label when Mask Mode is active"
+  },
+  "archiveExplorerPermissionTitle": "Storage access needed",
+  "@archiveExplorerPermissionTitle": {
+    "description": "Title shown on the decoy Archive Explorer screen when file access hasn't been granted yet"
+  },
+  "archiveExplorerPermissionMessage": "Allow access to your files to browse and extract .zip archives from Downloads.",
+  "@archiveExplorerPermissionMessage": {
+    "description": "Explanatory message shown alongside the grant-access button on the decoy Archive Explorer screen"
+  },
+  "archiveExplorerGrantAccess": "Grant Access",
+  "@archiveExplorerGrantAccess": {
+    "description": "Button label to request all-files storage access from the decoy Archive Explorer screen"
+  },
+  "archiveExplorerEmptyTitle": "No archives found",
+  "@archiveExplorerEmptyTitle": {
+    "description": "Empty state title on the decoy Archive Explorer screen when no .zip files exist in Downloads"
+  },
+  "archiveExplorerEmptyMessage": "Zip files you download will show up here.",
+  "@archiveExplorerEmptyMessage": {
+    "description": "Empty state message on the decoy Archive Explorer screen when no .zip files exist in Downloads"
+  },
+  "archiveExplorerRefreshTooltip": "Refresh",
+  "@archiveExplorerRefreshTooltip": {
+    "description": "Tooltip for the refresh button on the decoy Archive Explorer screen"
+  },
+  "archiveExplorerEntryCount": "{count, plural, one{1 item} other{{count} items}}",
+  "@archiveExplorerEntryCount": {
+    "description": "Number of entries inside a zip archive shown on the decoy Archive Explorer screen",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "archiveExplorerExtractAll": "Extract All",
+  "@archiveExplorerExtractAll": {
+    "description": "Button label to extract every entry from a zip archive on the decoy Archive Explorer screen"
+  },
+  "archiveExplorerExtracting": "Extracting…",
+  "@archiveExplorerExtracting": {
+    "description": "Progress label shown while a zip archive is being extracted on the decoy Archive Explorer screen"
+  },
+  "archiveExplorerExtractSuccess": "Extracted {count} files to Download/Extracted/{name}",
+  "@archiveExplorerExtractSuccess": {
+    "description": "Confirmation snackbar after successfully extracting a zip archive on the decoy Archive Explorer screen",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "archiveExplorerExtractFailed": "Couldn't extract that archive.",
+  "@archiveExplorerExtractFailed": {
+    "description": "Error snackbar shown when extracting a zip archive fails on the decoy Archive Explorer screen"
+  },
+  "archiveExplorerOpenFailed": "Couldn't open that archive.",
+  "@archiveExplorerOpenFailed": {
+    "description": "Error snackbar shown when a zip archive can't be parsed on the decoy Archive Explorer screen"
   },
   "fileAssocInAppTextEditor": "In-app Text Editor",
   "@fileAssocInAppTextEditor": {
@@ -1071,11 +1132,11 @@
   "@discreteModeTitle": {
     "description": "Settings toggle title"
   },
-  "discreteModeActiveSubtitle": "Active — the app currently appears as \"Hydro Tracker\"",
+  "discreteModeActiveSubtitle": "Active — the app currently appears as \"Archive Explorer\"",
   "@discreteModeActiveSubtitle": {
     "description": "Settings toggle subtitle when Discrete Mode is on"
   },
-  "discreteModeInactiveSubtitle": "Disguise this app as a daily water tracker on the home screen",
+  "discreteModeInactiveSubtitle": "Disguise this app as a zip archive browser on the home screen",
   "@discreteModeInactiveSubtitle": {
     "description": "Settings toggle subtitle when Discrete Mode is off"
   },
@@ -1087,7 +1148,7 @@
   "@disableDiscreteModeTitle": {
     "description": "Confirmation dialog title when turning Discrete Mode off"
   },
-  "enableDiscreteModeMessage": "The app icon and name on your home screen will change to \"Hydro Tracker\". It will function as a daily water intake tracker.\n\nTo access your vault, open Hydro Tracker and hold your finger on the title or water gauge for 3 seconds.",
+  "enableDiscreteModeMessage": "The app icon and name on your home screen will change to \"Archive Explorer\". It will function as a zip archive browser and extractor.\n\nTo access your vault, open Archive Explorer and hold your finger on the title for 3 seconds.",
   "@enableDiscreteModeMessage": {
     "description": "Confirmation dialog body when turning Discrete Mode on"
   },
@@ -1875,123 +1936,13 @@
   "@pdfViewerNoDocumentLoaded": {
     "description": "Fallback text shown when the PDF viewer has no error, isn't loading, but has no document to display"
   },
-  "goalReachedSnack": "🎉 Daily hydration goal reached! Streak increased!",
-  "@goalReachedSnack": {
-    "description": "Snackbar shown when the user's water intake crosses the daily goal"
-  },
-  "addWaterDialogTitle": "Add Water",
-  "@addWaterDialogTitle": {
-    "description": "Dialog title for manually logging a custom water amount"
-  },
-  "amountWithUnitLabel": "Amount ({unit})",
-  "@amountWithUnitLabel": {
-    "description": "Text field label showing the active unit, e.g. 'Amount (ml)'",
-    "placeholders": {
-      "unit": {
-        "type": "String"
-      }
-    }
-  },
   "add": "Add",
   "@add": {
     "description": "Generic Add action button label"
   },
-  "resetTodayTitle": "Reset Today's Water Log?",
-  "@resetTodayTitle": {
-    "description": "Confirmation dialog title for resetting today's logged water intake"
-  },
-  "resetTodayMessage": "This will reset your logged water intake for today to 0.",
-  "@resetTodayMessage": {
-    "description": "Confirmation dialog body for resetting today's logged water intake"
-  },
   "reset": "Reset",
   "@reset": {
     "description": "Generic Reset action button label"
-  },
-  "resetTodayTooltip": "Reset Today",
-  "@resetTodayTooltip": {
-    "description": "AppBar icon button tooltip to reset today's water log"
-  },
-  "unitsTooltip": "Units",
-  "@unitsTooltip": {
-    "description": "AppBar icon button tooltip to switch between metric and imperial units"
-  },
-  "metricUnitLabel": "Metric (ml)",
-  "@metricUnitLabel": {
-    "description": "Menu item label for the metric unit option"
-  },
-  "imperialUnitLabel": "Imperial (fl oz)",
-  "@imperialUnitLabel": {
-    "description": "Menu item label for the imperial unit option"
-  },
-  "streakBadge": "{count} Day Streak",
-  "@streakBadge": {
-    "description": "Compact badge label showing the current daily-goal streak, e.g. '5 Day Streak'",
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "goalProgressLabel": "Goal: {goal} ({percent}%)",
-  "@goalProgressLabel": {
-    "description": "Label showing the daily goal amount and current progress percentage",
-    "placeholders": {
-      "goal": {
-        "type": "String"
-      },
-      "percent": {
-        "type": "int"
-      }
-    }
-  },
-  "quickLogHeader": "QUICK LOG",
-  "@quickLogHeader": {
-    "description": "Small all-caps section header above the quick-add water buttons"
-  },
-  "quickAddGlass": "Glass",
-  "@quickAddGlass": {
-    "description": "Quick-add button label for a small glass of water"
-  },
-  "quickAddBottle": "Bottle",
-  "@quickAddBottle": {
-    "description": "Quick-add button label for a bottle of water"
-  },
-  "quickAddLarge": "Large",
-  "@quickAddLarge": {
-    "description": "Quick-add button label for a large water serving"
-  },
-  "quickAddCustom": "Custom",
-  "@quickAddCustom": {
-    "description": "Quick-add button label to open the custom-amount dialog"
-  },
-  "quickAddDisplay": "+{amount} {unit}",
-  "@quickAddDisplay": {
-    "description": "Quick-add button amount text, e.g. '+250 ml'",
-    "placeholders": {
-      "amount": {
-        "type": "int"
-      },
-      "unit": {
-        "type": "String"
-      }
-    }
-  },
-  "unitMl": "ml",
-  "@unitMl": {
-    "description": "Abbreviation for millilitres (metric volume unit)"
-  },
-  "unitFlOz": "fl oz",
-  "@unitFlOz": {
-    "description": "Abbreviation for fluid ounces (imperial volume unit)"
-  },
-  "dailyHydrationTipTitle": "Daily Hydration Tip",
-  "@dailyHydrationTipTitle": {
-    "description": "Title of the hydration tip info card"
-  },
-  "hydrationTipBody": "Drink a glass of water right after waking up to kickstart your metabolism.",
-  "@hydrationTipBody": {
-    "description": "Body text of the hydration tip info card"
   },
   "couldNotExpose": "Could not expose \"{name}\".",
   "@couldNotExpose": {

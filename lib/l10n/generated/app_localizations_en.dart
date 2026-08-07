@@ -662,7 +662,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appNameVaultExplorer => 'Vault Explorer';
 
   @override
-  String get appNameHydroTracker => 'Hydro Tracker';
+  String get appNameZipExplorer => 'Archive Explorer';
+
+  @override
+  String get archiveExplorerPermissionTitle => 'Storage access needed';
+
+  @override
+  String get archiveExplorerPermissionMessage =>
+      'Allow access to your files to browse and extract .zip archives from Downloads.';
+
+  @override
+  String get archiveExplorerGrantAccess => 'Grant Access';
+
+  @override
+  String get archiveExplorerEmptyTitle => 'No archives found';
+
+  @override
+  String get archiveExplorerEmptyMessage =>
+      'Zip files you download will show up here.';
+
+  @override
+  String get archiveExplorerRefreshTooltip => 'Refresh';
+
+  @override
+  String archiveExplorerEntryCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count items',
+      one: '1 item',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get archiveExplorerExtractAll => 'Extract All';
+
+  @override
+  String get archiveExplorerExtracting => 'Extracting…';
+
+  @override
+  String archiveExplorerExtractSuccess(int count, String name) {
+    return 'Extracted $count files to Download/Extracted/$name';
+  }
+
+  @override
+  String get archiveExplorerExtractFailed => 'Couldn\'t extract that archive.';
+
+  @override
+  String get archiveExplorerOpenFailed => 'Couldn\'t open that archive.';
 
   @override
   String get fileAssocInAppTextEditor => 'In-app Text Editor';
@@ -765,11 +813,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get discreteModeActiveSubtitle =>
-      'Active — the app currently appears as \"Hydro Tracker\"';
+      'Active — the app currently appears as \"Archive Explorer\"';
 
   @override
   String get discreteModeInactiveSubtitle =>
-      'Disguise this app as a daily water tracker on the home screen';
+      'Disguise this app as a zip archive browser on the home screen';
 
   @override
   String get enableDiscreteModeTitle => 'Enable Mask Mode?';
@@ -779,7 +827,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get enableDiscreteModeMessage =>
-      'The app icon and name on your home screen will change to \"Hydro Tracker\". It will function as a daily water intake tracker.\n\nTo access your vault, open Hydro Tracker and hold your finger on the title or water gauge for 3 seconds.';
+      'The app icon and name on your home screen will change to \"Archive Explorer\". It will function as a zip archive browser and extractor.\n\nTo access your vault, open Archive Explorer and hold your finger on the title for 3 seconds.';
 
   @override
   String get disableDiscreteModeMessage =>
@@ -1378,84 +1426,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pdfViewerNoDocumentLoaded => 'No PDF document loaded.';
 
   @override
-  String get goalReachedSnack =>
-      '🎉 Daily hydration goal reached! Streak increased!';
-
-  @override
-  String get addWaterDialogTitle => 'Add Water';
-
-  @override
-  String amountWithUnitLabel(String unit) {
-    return 'Amount ($unit)';
-  }
-
-  @override
   String get add => 'Add';
 
   @override
-  String get resetTodayTitle => 'Reset Today\'s Water Log?';
-
-  @override
-  String get resetTodayMessage =>
-      'This will reset your logged water intake for today to 0.';
-
-  @override
   String get reset => 'Reset';
-
-  @override
-  String get resetTodayTooltip => 'Reset Today';
-
-  @override
-  String get unitsTooltip => 'Units';
-
-  @override
-  String get metricUnitLabel => 'Metric (ml)';
-
-  @override
-  String get imperialUnitLabel => 'Imperial (fl oz)';
-
-  @override
-  String streakBadge(int count) {
-    return '$count Day Streak';
-  }
-
-  @override
-  String goalProgressLabel(String goal, int percent) {
-    return 'Goal: $goal ($percent%)';
-  }
-
-  @override
-  String get quickLogHeader => 'QUICK LOG';
-
-  @override
-  String get quickAddGlass => 'Glass';
-
-  @override
-  String get quickAddBottle => 'Bottle';
-
-  @override
-  String get quickAddLarge => 'Large';
-
-  @override
-  String get quickAddCustom => 'Custom';
-
-  @override
-  String quickAddDisplay(int amount, String unit) {
-    return '+$amount $unit';
-  }
-
-  @override
-  String get unitMl => 'ml';
-
-  @override
-  String get unitFlOz => 'fl oz';
-
-  @override
-  String get dailyHydrationTipTitle => 'Daily Hydration Tip';
-
-  @override
-  String get hydrationTipBody =>
-      'Drink a glass of water right after waking up to kickstart your metabolism.';
 
   @override
   String couldNotExpose(String name) {

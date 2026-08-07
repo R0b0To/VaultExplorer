@@ -1133,8 +1133,80 @@ abstract class AppLocalizations {
   /// The decoy/disguise app name shown as the app title and Android task-switcher label when Mask Mode is active
   ///
   /// In en, this message translates to:
-  /// **'Hydro Tracker'**
-  String get appNameHydroTracker;
+  /// **'Archive Explorer'**
+  String get appNameZipExplorer;
+
+  /// Title shown on the decoy Archive Explorer screen when file access hasn't been granted yet
+  ///
+  /// In en, this message translates to:
+  /// **'Storage access needed'**
+  String get archiveExplorerPermissionTitle;
+
+  /// Explanatory message shown alongside the grant-access button on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Allow access to your files to browse and extract .zip archives from Downloads.'**
+  String get archiveExplorerPermissionMessage;
+
+  /// Button label to request all-files storage access from the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Grant Access'**
+  String get archiveExplorerGrantAccess;
+
+  /// Empty state title on the decoy Archive Explorer screen when no .zip files exist in Downloads
+  ///
+  /// In en, this message translates to:
+  /// **'No archives found'**
+  String get archiveExplorerEmptyTitle;
+
+  /// Empty state message on the decoy Archive Explorer screen when no .zip files exist in Downloads
+  ///
+  /// In en, this message translates to:
+  /// **'Zip files you download will show up here.'**
+  String get archiveExplorerEmptyMessage;
+
+  /// Tooltip for the refresh button on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get archiveExplorerRefreshTooltip;
+
+  /// Number of entries inside a zip archive shown on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, one{1 item} other{{count} items}}'**
+  String archiveExplorerEntryCount(int count);
+
+  /// Button label to extract every entry from a zip archive on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Extract All'**
+  String get archiveExplorerExtractAll;
+
+  /// Progress label shown while a zip archive is being extracted on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Extracting…'**
+  String get archiveExplorerExtracting;
+
+  /// Confirmation snackbar after successfully extracting a zip archive on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Extracted {count} files to Download/Extracted/{name}'**
+  String archiveExplorerExtractSuccess(int count, String name);
+
+  /// Error snackbar shown when extracting a zip archive fails on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t extract that archive.'**
+  String get archiveExplorerExtractFailed;
+
+  /// Error snackbar shown when a zip archive can't be parsed on the decoy Archive Explorer screen
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open that archive.'**
+  String get archiveExplorerOpenFailed;
 
   /// File association label: files open in the built-in text editor
   ///
@@ -1307,13 +1379,13 @@ abstract class AppLocalizations {
   /// Settings toggle subtitle when Discrete Mode is on
   ///
   /// In en, this message translates to:
-  /// **'Active — the app currently appears as \"Hydro Tracker\"'**
+  /// **'Active — the app currently appears as \"Archive Explorer\"'**
   String get discreteModeActiveSubtitle;
 
   /// Settings toggle subtitle when Discrete Mode is off
   ///
   /// In en, this message translates to:
-  /// **'Disguise this app as a daily water tracker on the home screen'**
+  /// **'Disguise this app as a zip archive browser on the home screen'**
   String get discreteModeInactiveSubtitle;
 
   /// Confirmation dialog title when turning Discrete Mode on
@@ -1331,7 +1403,7 @@ abstract class AppLocalizations {
   /// Confirmation dialog body when turning Discrete Mode on
   ///
   /// In en, this message translates to:
-  /// **'The app icon and name on your home screen will change to \"Hydro Tracker\". It will function as a daily water intake tracker.\n\nTo access your vault, open Hydro Tracker and hold your finger on the title or water gauge for 3 seconds.'**
+  /// **'The app icon and name on your home screen will change to \"Archive Explorer\". It will function as a zip archive browser and extractor.\n\nTo access your vault, open Archive Explorer and hold your finger on the title for 3 seconds.'**
   String get enableDiscreteModeMessage;
 
   /// Confirmation dialog body when turning Discrete Mode off
@@ -2324,143 +2396,17 @@ abstract class AppLocalizations {
   /// **'No PDF document loaded.'**
   String get pdfViewerNoDocumentLoaded;
 
-  /// Snackbar shown when the user's water intake crosses the daily goal
-  ///
-  /// In en, this message translates to:
-  /// **'🎉 Daily hydration goal reached! Streak increased!'**
-  String get goalReachedSnack;
-
-  /// Dialog title for manually logging a custom water amount
-  ///
-  /// In en, this message translates to:
-  /// **'Add Water'**
-  String get addWaterDialogTitle;
-
-  /// Text field label showing the active unit, e.g. 'Amount (ml)'
-  ///
-  /// In en, this message translates to:
-  /// **'Amount ({unit})'**
-  String amountWithUnitLabel(String unit);
-
   /// Generic Add action button label
   ///
   /// In en, this message translates to:
   /// **'Add'**
   String get add;
 
-  /// Confirmation dialog title for resetting today's logged water intake
-  ///
-  /// In en, this message translates to:
-  /// **'Reset Today\'s Water Log?'**
-  String get resetTodayTitle;
-
-  /// Confirmation dialog body for resetting today's logged water intake
-  ///
-  /// In en, this message translates to:
-  /// **'This will reset your logged water intake for today to 0.'**
-  String get resetTodayMessage;
-
   /// Generic Reset action button label
   ///
   /// In en, this message translates to:
   /// **'Reset'**
   String get reset;
-
-  /// AppBar icon button tooltip to reset today's water log
-  ///
-  /// In en, this message translates to:
-  /// **'Reset Today'**
-  String get resetTodayTooltip;
-
-  /// AppBar icon button tooltip to switch between metric and imperial units
-  ///
-  /// In en, this message translates to:
-  /// **'Units'**
-  String get unitsTooltip;
-
-  /// Menu item label for the metric unit option
-  ///
-  /// In en, this message translates to:
-  /// **'Metric (ml)'**
-  String get metricUnitLabel;
-
-  /// Menu item label for the imperial unit option
-  ///
-  /// In en, this message translates to:
-  /// **'Imperial (fl oz)'**
-  String get imperialUnitLabel;
-
-  /// Compact badge label showing the current daily-goal streak, e.g. '5 Day Streak'
-  ///
-  /// In en, this message translates to:
-  /// **'{count} Day Streak'**
-  String streakBadge(int count);
-
-  /// Label showing the daily goal amount and current progress percentage
-  ///
-  /// In en, this message translates to:
-  /// **'Goal: {goal} ({percent}%)'**
-  String goalProgressLabel(String goal, int percent);
-
-  /// Small all-caps section header above the quick-add water buttons
-  ///
-  /// In en, this message translates to:
-  /// **'QUICK LOG'**
-  String get quickLogHeader;
-
-  /// Quick-add button label for a small glass of water
-  ///
-  /// In en, this message translates to:
-  /// **'Glass'**
-  String get quickAddGlass;
-
-  /// Quick-add button label for a bottle of water
-  ///
-  /// In en, this message translates to:
-  /// **'Bottle'**
-  String get quickAddBottle;
-
-  /// Quick-add button label for a large water serving
-  ///
-  /// In en, this message translates to:
-  /// **'Large'**
-  String get quickAddLarge;
-
-  /// Quick-add button label to open the custom-amount dialog
-  ///
-  /// In en, this message translates to:
-  /// **'Custom'**
-  String get quickAddCustom;
-
-  /// Quick-add button amount text, e.g. '+250 ml'
-  ///
-  /// In en, this message translates to:
-  /// **'+{amount} {unit}'**
-  String quickAddDisplay(int amount, String unit);
-
-  /// Abbreviation for millilitres (metric volume unit)
-  ///
-  /// In en, this message translates to:
-  /// **'ml'**
-  String get unitMl;
-
-  /// Abbreviation for fluid ounces (imperial volume unit)
-  ///
-  /// In en, this message translates to:
-  /// **'fl oz'**
-  String get unitFlOz;
-
-  /// Title of the hydration tip info card
-  ///
-  /// In en, this message translates to:
-  /// **'Daily Hydration Tip'**
-  String get dailyHydrationTipTitle;
-
-  /// Body text of the hydration tip info card
-  ///
-  /// In en, this message translates to:
-  /// **'Drink a glass of water right after waking up to kickstart your metabolism.'**
-  String get hydrationTipBody;
 
   /// Error when exposing a folder to the Android Document Provider fails
   ///

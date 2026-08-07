@@ -24,7 +24,7 @@ class DisguiseModeHandlers(
 ) {
     companion object {
         private const val ALIAS_VAULT = "com.aeidolon.vaultexplorer.VaultLauncherAlias"
-        private const val ALIAS_DECOY = "com.aeidolon.vaultexplorer.HydroTrackerAlias"
+        private const val ALIAS_DECOY = "com.aeidolon.vaultexplorer.ZipExplorerAlias"
         private const val TAG = "DisguiseModeHandlers"
     }
 
@@ -45,7 +45,7 @@ class DisguiseModeHandlers(
     fun updateActivityIdentity() {
         val decoyActive = isAliasEnabled(ALIAS_DECOY) && !isAliasEnabled(ALIAS_VAULT)
         val label = if (decoyActive) activity.getString(R.string.decoy_app_name) else activity.getString(R.string.app_name)
-        val iconRes = if (decoyActive) R.mipmap.ic_launcher_water else R.mipmap.ic_launcher
+        val iconRes = if (decoyActive) R.mipmap.ic_launcher_zip else R.mipmap.ic_launcher
         activity.title = label
 
         val pm = activity.packageManager

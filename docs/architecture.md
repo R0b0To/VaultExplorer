@@ -116,7 +116,7 @@ new code must not violate. Each is traceable to specific enforcement code.
    thread-safety by pointing at `locks[volId]`; they are unrelated.
 
 9. **Exactly one of the two launcher `activity-alias` components
-   (`VaultLauncherAlias` / `HydroTrackerAlias`) is enabled at any time, never
+   (`VaultLauncherAlias` / `ZipExplorerAlias`) is enabled at any time, never
    zero or both (ADR-025).** `DisguiseModeHandlers.handleSetMode` is the only
    place allowed to call `PackageManager.setComponentEnabledSetting` for
    either of them, and it always flips both in the same call. Do not add a
@@ -411,7 +411,7 @@ Via the same channel's method-call handler in reverse — see
 ## 7. Mask Mode
 
 A presentation-layer disguise: the Android launcher shows either the real
-"Vault Explorer" identity or an innocuous "Hydro Tracker" identity, determined
+"Vault Explorer" identity or an innocuous "Archive Explorer" identity, determined
 by which of two `activity-alias` components is currently enabled (§2.9).
 Both aliases target the same `MainActivity` — this is never a second
 process, a second Activity class, or a second copy of the Flutter engine,
@@ -420,25 +420,25 @@ Mode is independent of cryptographic session state; a `volId` being
 Unlocked or Locked is unrelated to which launcher identity is active.
 
 While the decoy identity is active, the app functions as a real, usable
-daily water intake tracker (`DecoyWaterTrackerScreen`) — logging daily
-water intake and managing streaks uses local preferences and zero external
-files.
+zip archive browser (`DecoyArchiveExplorerScreen`) — listing and extracting
+.zip files from the device's public Downloads folder uses plain filesystem
+access and zero container/vault involvement.
 
 ### 7.1 State machine
 
 ```
     ┌────────────────────┐                        ┌────────────────────┐
     │   Vault identity   │   setMode(decoy)       │   Decoy identity   │
-    │ VaultLauncherAlias │ ─────────────────────▶│ HydroTrackerAlias  │
+    │ VaultLauncherAlias │ ─────────────────────▶│ ZipExplorerAlias   │
     │      enabled       │◀───────────────────── │      enabled       │
     └─────────┬──────────┘   setMode(vault)       └─────────┬──────────┘
               │           (AppSettingsScreen toggle,                  │
               │            both directions, explicit only)            │
               │                                                       │
-    boots into LockGateScreen                     boots into DecoyWaterTrackerScreen
-    (→ VaultDashboard on auth)                    (functional water tracker)
+    boots into LockGateScreen                     boots into DecoyArchiveExplorerScreen
+    (→ VaultDashboard on auth)                    (functional zip archive browser)
                                                              │
-                                                hold app-bar title / goal 3s
+                                                hold app-bar title 3s
                                                 (HiddenVaultTrigger, ADR-028)
                                                              │
                                                              ▼
@@ -446,11 +446,11 @@ files.
                                               (pushed on top of decoy UI)
 ```
 
-- **Vault identity** — `VaultLauncherAlias` enabled, `HydroTrackerAlias`
+- **Vault identity** — `VaultLauncherAlias` enabled, `ZipExplorerAlias`
   disabled. Manifest default on a fresh install. `_DisguiseModeGate` boots
   straight into `LockGateScreen`.
-- **Decoy identity** — `HydroTrackerAlias` enabled, `VaultLauncherAlias`
-  disabled. `_DisguiseModeGate` boots into `DecoyWaterTrackerScreen` instead.
+- **Decoy identity** — `ZipExplorerAlias` enabled, `VaultLauncherAlias`
+  disabled. `_DisguiseModeGate` boots into `DecoyArchiveExplorerScreen` instead.
 - The only transition between the two is `DisguiseModeApi.setMode`, called
   from exactly one place (`AppSettingsScreen._setDiscreteMode`), always with
   a confirmation dialog. Nothing else in the app may call `setMode` — in

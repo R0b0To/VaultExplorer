@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/services/disguise_mode_api.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
-import 'package:vaultexplorer/features/decoy/decoy_water_tracker_screen.dart';
+import 'package:vaultexplorer/features/decoy/decoy_archive_explorer_screen.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
@@ -74,7 +74,7 @@ class _DisguiseModeGateState extends State<_DisguiseModeGate> {
       return Scaffold(backgroundColor: Theme.of(context).colorScheme.surface);
     }
     return mode == DisguiseMode.decoy
-        ? const DecoyWaterTrackerScreen()
+        ? const DecoyArchiveExplorerScreen()
         : const LockGateScreen();
   }
 }
@@ -83,7 +83,7 @@ void applyDisguiseModeTaskSwitcherLabel(DisguiseMode mode, AppLocalizations l10n
   unawaited(
     SystemChrome.setApplicationSwitcherDescription(
       ApplicationSwitcherDescription(
-        label: mode == DisguiseMode.decoy ? l10n.appNameHydroTracker : l10n.appNameVaultExplorer,
+        label: mode == DisguiseMode.decoy ? l10n.appNameZipExplorer : l10n.appNameVaultExplorer,
       ),
     ),
   );

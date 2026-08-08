@@ -110,6 +110,44 @@ object CryfsVault {
         }
     }
 
+    /**
+     * Rewraps cryfs.config under [newPassword]: decrypts with [oldPassword]
+     * exactly like [open] does, then re-serializes the same (unchanged)
+     * config payload -- cipher, key, root blob ID, etc. -- with a fresh
+     * scrypt salt under the new password, overwriting cryfs.config in
+     * place. The encrypted block store itself is untouched, since the
+     * underlying encryption key never changes.
+     */
+    fun changePassword(
+        context: Context, vaultRootUri: Uri, oldPassword: CharArray, newPassword: CharArray,
+    ): VaultOpenResult<Unit> {
+        val root = DocumentFile.fromTreeUri(context, vaultRootUri)
+            ?: return VaultOpenResult.InvalidVault("Cannot access the selected folder.")
+        val configBytes = readConfigBytes(context, root)
+            ?: return VaultOpenResult.InvalidVault("No cryfs.config found — this doesn't look like a CryFS vault.")
+        val config = try {
+            CryfsConfigFile.parse(configBytes, oldPassword)
+        } catch (e: CryfsWrongPasswordException) {
+            return VaultOpenResult.WrongPassword
+        } catch (e: CryfsUnsupportedCipherException) {
+            return VaultOpenResult.InvalidVault(e.message ?: "Unsupported cipher")
+        } catch (e: CryfsConfigException) {
+            return VaultOpenResult.InvalidVault(e.message ?: "Malformed cryfs.config")
+        }
+        val saf = SafDocumentOps(context)
+        val configDoc = saf.childOf(root, CONFIG_FILE_NAME)
+            ?: return VaultOpenResult.InvalidVault("No cryfs.config found — this doesn't look like a CryFS vault.")
+        return try {
+            val random = SecureRandom()
+            val newConfigBytes = CryfsConfigFile.build(config, newPassword, random)
+            context.contentResolver.openOutputStream(configDoc.uri, "wt")?.use { it.write(newConfigBytes) }
+                ?: return VaultOpenResult.InvalidVault("Could not write cryfs.config")
+            VaultOpenResult.Success(Unit, root.name ?: "Vault")
+        } finally {
+            config.encryptionKey.fill(0)
+        }
+    }
+
     private fun buildSession(
         context: Context, vaultRootUri: Uri, root: DocumentFile, config: CryfsConfig, readOnly: Boolean,
         derivedKey: ByteArray? = null,

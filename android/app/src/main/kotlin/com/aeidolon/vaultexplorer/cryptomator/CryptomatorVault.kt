@@ -96,6 +96,56 @@ object CryptomatorVault {
     }
 
     /**
+     * Rewraps masterkey.cryptomator under [newPassphrase]: unlocks with
+     * [oldPassphrase] exactly like [open] does, then re-serializes the same
+     * (unchanged) masterkey bytes with a fresh scrypt salt under the new
+     * passphrase, overwriting the file in place. vault.cryptomator and the
+     * 'd/' data directory are untouched — only the masterkey's wrapping
+     * changes, not the key itself, so nothing else needs re-encrypting.
+     */
+    fun changePassword(
+        context: Context,
+        vaultRootUri: Uri,
+        oldPassphrase: CharArray,
+        newPassphrase: CharArray,
+    ): com.aeidolon.vaultexplorer.engine.VaultOpenResult<Unit> {
+        val root = DocumentFile.fromTreeUri(context, vaultRootUri)
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
+
+        val masterkeyDoc = root.listFiles().firstOrNull { it.name == MASTERKEY_FILE_NAME }
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("No masterkey.cryptomator found — this doesn't look like a Cryptomator vault.")
+
+        val masterkeyBytes = context.contentResolver.openInputStream(masterkeyDoc.uri)?.use { it.readBytes() }
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not read masterkey.cryptomator")
+
+        val parsed = try {
+            CryptomatorMasterkeyFile.parse(masterkeyBytes)
+        } catch (e: MasterkeyFileFormatException) {
+            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(e.message ?: "Malformed masterkey.cryptomator")
+        }
+
+        val masterkey = try {
+            CryptomatorMasterkeyFile.unlock(parsed, oldPassphrase)
+        } catch (e: InvalidPassphraseException) {
+            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword
+        }
+
+        return try {
+            val random = SecureRandom()
+            // Preserve the file's existing "version" field (and thus its
+            // versionMac) rather than resetting it -- it's unrelated to the
+            // password and format-7 vaults may rely on it for the legacy
+            // version check.
+            val newMasterkeyJson = CryptomatorMasterkeyFile.lock(masterkey, newPassphrase, random, vaultVersion = parsed.version)
+            context.contentResolver.openOutputStream(masterkeyDoc.uri, "wt")?.use { it.write(newMasterkeyJson) }
+                ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not write masterkey.cryptomator")
+            com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(Unit, root.name ?: "Vault")
+        } finally {
+            masterkey.destroy()
+        }
+    }
+
+    /**
      * Creates a brand-new vault in an empty (or non-existent-but-creatable)
      * SAF tree: writes masterkey.cryptomator, vault.cryptomator, and the
      * initial empty 'd/<hash(rootDirId="")>' two-level directory. Always

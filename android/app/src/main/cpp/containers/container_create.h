@@ -120,3 +120,30 @@ bool changeContainerPassword(int fd,
                               int cipherId, int hashId,
                               const int* oldKeyfileFds = nullptr, int oldKeyfileCount = 0,
                               const int* newKeyfileFds = nullptr, int newKeyfileCount = 0);
+
+// Rewraps a LUKS1/LUKS2 container's master key (whichever version [fd]
+// already is, auto-detected) under a new password: unlocks with
+// [oldPassword]/[oldKeyfileFds] exactly like unlocking normally would,
+// then re-derives and re-encrypts that same active keyslot with a fresh
+// salt under [newPassword]/[newKeyfileFds] — see luksChangeKeyslotPassword()
+// in crypto/luks_header.h for exactly what does and doesn't change on
+// disk. No PIM parameter: LUKS has no PIM concept (that's VeraCrypt-only),
+// and cipher/hash are read directly from the container's own header/JSON
+// metadata rather than passed in, unlike changeContainerPassword() above.
+//
+// oldKeyfileFds/newKeyfileFds: matches real `cryptsetup --key-file`
+// semantics (see createLuksContainer's doc comment) — when present, the
+// first keyfile's raw bytes REPLACE the corresponding typed password
+// entirely rather than mixing with it.
+//
+// Returns 0 on success, 1 if the old password/keyfile didn't verify
+// against any active keyslot, 2 on any other failure (I/O error, corrupt
+// or unsupported header, etc.) — mirrors LuksChangePasswordResult so the
+// JNI bridge can translate straight through without re-deriving the
+// distinction itself.
+//
+// Always takes ownership of [fd] and all keyfile fds.
+int changeLuksContainerPassword(int fd,
+                                const char* oldPassword, const char* newPassword,
+                                const int* oldKeyfileFds = nullptr, int oldKeyfileCount = 0,
+                                const int* newKeyfileFds = nullptr, int newKeyfileCount = 0);

@@ -90,8 +90,8 @@ struct LuksVolumeInfo {
 // Check if the header starts with LUKS magic bytes
 bool isLuksContainer(const uint8_t* header, size_t len);
 
-
 using LuksByteReader = std::function<bool(uint64_t offset, void* outData, size_t len)>;
+using LuksByteWriter = std::function<bool(uint64_t offset, const void* data, size_t len)>;
 
 bool luksRecoverMasterKey(const LuksByteReader& reader,
                           const uint8_t* password,
@@ -120,6 +120,38 @@ bool luksRecoverMasterKey(int fd,
                           std::function<void(int, int, int, int)> progressCallback = nullptr,
                           const uint8_t* candidateMasterKey = nullptr,
                           size_t candidateMasterKeyLen = 0);
+
+// ── Password change ─────────────────────────────────────────────────────
+
+// "Wrong password" is a distinct, expected outcome here (unlike
+// luksRecoverMasterKey's plain bool, which callers only invoke after a
+// password has already worked) — this three-way result lets callers show
+// the right message instead of a generic failure.
+enum class LuksChangePasswordResult {
+    kSuccess,
+    kWrongOldPassword,
+    kError, // I/O failure, corrupt/unsupported header, etc.
+};
+
+// Rewraps the SAME (unchanged) master key under [newPassword]: unlocks
+// exactly like luksRecoverMasterKey does (trying every active keyslot with
+// [oldPassword]), then re-derives and re-encrypts THAT SAME keyslot's KDF
+// material with a fresh salt under [newPassword] — reusing its existing
+// cost parameters (PBKDF2 iterations, or Argon2id time/memory/parallelism)
+// rather than re-benchmarking, since this app has no runtime PBKDF2/Argon2
+// benchmarking infrastructure (LUKS creation instead derives cost params
+// from a PIM-based formula — see argon2ParamsForPim()/iterationsForHash()
+// in container_create.cpp). Every other keyslot, the master-key digest
+// (LUKS1's mkDigest / LUKS2's digests object), and the data area are all
+// untouched, since none of them are keyed to the password.
+LuksChangePasswordResult luksChangeKeyslotPassword(const LuksByteReader& reader,
+                                                    const LuksByteWriter& writer,
+                                                    const uint8_t* oldPassword, size_t oldPasswordLen,
+                                                    const uint8_t* newPassword, size_t newPasswordLen);
+
+LuksChangePasswordResult luksChangeKeyslotPassword(int fd,
+                                                    const uint8_t* oldPassword, size_t oldPasswordLen,
+                                                    const uint8_t* newPassword, size_t newPasswordLen);
 
 // ── Container creation ──────────────────────────────────────────────────
 
@@ -153,7 +185,6 @@ struct LuksCreateParams {
     uint32_t pbkdf2Iterations = 0;
 };
 
-using LuksByteWriter = std::function<bool(uint64_t offset, const void* data, size_t len)>;
 // Writes a fresh LUKS1 or LUKS2 header, JSON metadata (LUKS2 only), and a
 // single occupied keyslot to [fd] — encrypting a freshly-generated random
 // master key with [password] (already resolved: for LUKS, a keyfile

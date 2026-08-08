@@ -20,6 +20,7 @@ abstract final class ChannelMethods {
   static const updateContainerSettings = 'updateContainerSettings';
   static const cancelUnlock = 'cancelUnlock';
   static const changeContainerPassword = 'changeContainerPassword';
+  static const changeLuksContainerPassword = 'changeLuksContainerPassword';
 
   static const getAvifInfo = 'getAvifInfo';
   static const decodeAvifFrame = 'decodeAvifFrame';
@@ -40,16 +41,19 @@ abstract final class ChannelMethods {
   static const pickCryptomatorVault = 'pickCryptomatorVault';
   static const unlockCryptomatorVault = 'unlockCryptomatorVault';
   static const createCryptomatorVault = 'createCryptomatorVault';
+  static const changeCryptomatorVaultPassword = 'changeCryptomatorVaultPassword';
   static const finishWriteIfCryptomator = 'finishWriteIfCryptomator';
 
   static const pickGocryptfsVault = 'pickGocryptfsVault';
   static const unlockGocryptfsVault = 'unlockGocryptfsVault';
   static const createGocryptfsVault = 'createGocryptfsVault';
+  static const changeGocryptfsVaultPassword = 'changeGocryptfsVaultPassword';
   static const isGocryptfsVault = 'isGocryptfsVault';
 
   static const pickCryfsVault = 'pickCryfsVault';
   static const unlockCryfsVault = 'unlockCryfsVault';
   static const createCryfsVault = 'createCryfsVault';
+  static const changeCryfsVaultPassword = 'changeCryfsVaultPassword';
   static const isCryfsVault = 'isCryfsVault';
 
   // ── File I/O ─────────────────────────────────────────────────────────────

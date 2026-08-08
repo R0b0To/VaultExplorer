@@ -193,6 +193,32 @@ mixin _ContainerLifecycleOps {
     }
   }
 
+  /// Unlike [changeContainerPassword], failures are NOT swallowed to
+  /// `false` -- a wrong [oldPassword] surfaces as a `PlatformException`
+  /// with code `AUTH_FAIL` (message pre-formatted for display), matching
+  /// the folder-vault change-password methods' error contract (see
+  /// [changeCryptomatorVaultPassword]'s doc comment), since LUKS's native
+  /// layer distinguishes wrong-password from other failures and that's
+  /// worth surfacing rather than a generic message. No PIM/cipherId/
+  /// hashId params: LUKS has neither concept.
+  Future<bool> changeLuksContainerPassword({
+    required String uri,
+    required String oldPassword,
+    required String newPassword,
+    List<String>? oldKeyfilePaths,
+    List<String>? newKeyfilePaths,
+  }) async {
+    final success = await _channel
+        .invokeMethod<bool>(ChannelMethods.changeLuksContainerPassword, {
+      'uri': uri,
+      'oldPassword': oldPassword,
+      'newPassword': newPassword,
+      'oldKeyfilePaths': oldKeyfilePaths ?? [],
+      'newKeyfilePaths': newKeyfilePaths ?? [],
+    });
+    return success ?? false;
+  }
+
   Future<({String uri, String displayName})?> pickContainer() async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.pickContainer,
@@ -312,6 +338,24 @@ mixin _ContainerLifecycleOps {
     }
   }
 
+  /// Rewraps a Cryptomator vault's masterkey under [newPassword]. Unlike
+  /// [createCryptomatorVault], failures are deliberately NOT swallowed to
+  /// `false` -- a wrong [oldPassword] surfaces as a `PlatformException`
+  /// with code `AUTH_FAIL` (message pre-formatted for display), matching
+  /// [unlockCryptomatorVault]'s error contract, so callers can show the
+  /// specific reason rather than a generic failure message.
+  Future<bool> changeCryptomatorVaultPassword(
+    String folderUri,
+    String oldPassword,
+    String newPassword,
+  ) async {
+    final success = await _channel.invokeMethod<bool>(
+      ChannelMethods.changeCryptomatorVaultPassword,
+      {'filePath': folderUri, 'oldPassword': oldPassword, 'newPassword': newPassword},
+    );
+    return success ?? false;
+  }
+
   Future<({String uri, String displayName, bool looksLikeVault, String? format})?> pickGocryptfsVault() async {
     try {
       final res = await _channel.invokeMapMethod<String, dynamic>(ChannelMethods.pickGocryptfsVault);
@@ -382,6 +426,21 @@ mixin _ContainerLifecycleOps {
       _logSwallowed('createGocryptfsVault', e);
       return false;
     }
+  }
+
+  /// Rewraps a gocryptfs vault's masterkey under [newPassword]. See
+  /// [changeCryptomatorVaultPassword]'s doc comment for the error contract
+  /// (errors propagate rather than collapsing to `false`).
+  Future<bool> changeGocryptfsVaultPassword(
+    String folderUri,
+    String oldPassword,
+    String newPassword,
+  ) async {
+    final success = await _channel.invokeMethod<bool>(
+      ChannelMethods.changeGocryptfsVaultPassword,
+      {'filePath': folderUri, 'oldPassword': oldPassword, 'newPassword': newPassword},
+    );
+    return success ?? false;
   }
 
   Future<({String uri, String displayName, bool looksLikeVault, String? format})?> pickCryfsVault() async {
@@ -458,6 +517,21 @@ mixin _ContainerLifecycleOps {
       _logSwallowed('createCryfsVault', e);
       return false;
     }
+  }
+
+  /// Rewraps a CryFS vault's config under [newPassword]. See
+  /// [changeCryptomatorVaultPassword]'s doc comment for the error contract
+  /// (errors propagate rather than collapsing to `false`).
+  Future<bool> changeCryfsVaultPassword(
+    String folderUri,
+    String oldPassword,
+    String newPassword,
+  ) async {
+    final success = await _channel.invokeMethod<bool>(
+      ChannelMethods.changeCryfsVaultPassword,
+      {'filePath': folderUri, 'oldPassword': oldPassword, 'newPassword': newPassword},
+    );
+    return success ?? false;
   }
 
   Future<bool> finishWriteIfCryptomator(

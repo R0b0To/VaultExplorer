@@ -121,6 +121,17 @@ internal object NativeEngine {
         oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null
     ): Boolean
 
+    /** Returns changeLuksContainerPassword()'s tri-state result directly
+     *  (0 = success, 1 = wrong old password/keyfile, 2 = any other
+     *  error) — see container_create.h's doc comment. No PIM/cipherId/
+     *  hashId params: LUKS has no PIM, and its cipher/hash live in the
+     *  container's own header/JSON metadata rather than being passed in. */
+    @JvmStatic
+    external fun changeLuksContainerPasswordNative(
+        fd: Int, oldPassword: String, newPassword: String,
+        oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null
+    ): Int
+
     /** PBKDF2-SHA512 via mbedTLS; no volId, no session required. */
     @JvmStatic
     external fun hashPasswordNative(

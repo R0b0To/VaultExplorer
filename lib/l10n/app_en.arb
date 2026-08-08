@@ -3783,22 +3783,6 @@
   "@changeContainerPasswordTitle": {
     "description": "List tile title to change a container's password"
   },
-  "luksPasswordChangeNotSupportedMessage": "LUKS password changing is not supported in-app. Use cryptsetup on Linux.",
-  "@luksPasswordChangeNotSupportedMessage": {
-    "description": "Warning shown when attempting to change the password of a LUKS container"
-  },
-  "cryptomatorPasswordChangeNotSupportedMessage": "Cryptomator vault passwords cannot be changed in-app.",
-  "@cryptomatorPasswordChangeNotSupportedMessage": {
-    "description": "Warning shown when attempting to change the password of a Cryptomator vault"
-  },
-  "gocryptfsPasswordChangeNotSupportedMessage": "Gocryptfs vault passwords cannot be changed in-app.",
-  "@gocryptfsPasswordChangeNotSupportedMessage": {
-    "description": "Warning shown when attempting to change the password of a Gocryptfs vault"
-  },
-  "cryfsPasswordChangeNotSupportedMessage": "CryFS vault passwords cannot be changed in-app.",
-  "@cryfsPasswordChangeNotSupportedMessage": {
-    "description": "Warning shown when attempting to change the password of a CryFS vault"
-  },
   "bitlockerCredentialsChangeNotSupportedMessage": "BitLocker credentials cannot be changed in-app. Use \"Manage BitLocker\" on Windows.",
   "@bitlockerCredentialsChangeNotSupportedMessage": {
     "description": "Warning shown when attempting to change the credentials of a BitLocker drive"
@@ -4424,10 +4408,6 @@
   "cameraCouldNotSwitchLensMessage": "Could not switch lens",
   "@cameraCouldNotSwitchLensMessage": {
     "description": "Error toast when switching to a different camera lens fails"
-  },
-  "cameraRecordingStoppedVaultLockedMessage": "Vault locked — recording stopped and discarded",
-  "@cameraRecordingStoppedVaultLockedMessage": {
-    "description": "Error toast shown when the vault auto-locks while a video recording is in progress; the in-progress recording could not be written to the vault and was discarded"
   },
   "cameraEncryptingPhotoLabel": "Encrypting photo…",
   "@cameraEncryptingPhotoLabel": {

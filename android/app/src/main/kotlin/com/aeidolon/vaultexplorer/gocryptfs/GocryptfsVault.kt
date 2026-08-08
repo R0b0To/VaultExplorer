@@ -80,7 +80,14 @@ object GocryptfsVault {
                 scryptKeyLen = MASTERKEY_LEN,
                 random = random,
             )
-            val configJson = buildConfigJson(encryptedKey, scryptSalt)
+            val configJson = buildConfigJson(
+                encryptedKey = encryptedKey,
+                scryptSalt = scryptSalt,
+                scryptN = DEFAULT_SCRYPT_N,
+                scryptR = DEFAULT_SCRYPT_R,
+                scryptP = DEFAULT_SCRYPT_P,
+                longNameMax = 0,
+            )
             val configDoc = root.createFile("application/octet-stream", CONFIG_FILE_NAME)
                 ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not create gocryptfs.conf")
             context.contentResolver.openOutputStream(configDoc.uri, "wt")?.use {
@@ -112,12 +119,19 @@ object GocryptfsVault {
         }
     }
 
-    private fun buildConfigJson(encryptedKey: ByteArray, scryptSalt: ByteArray): String {
+    private fun buildConfigJson(
+        encryptedKey: ByteArray,
+        scryptSalt: ByteArray,
+        scryptN: Int,
+        scryptR: Int,
+        scryptP: Int,
+        longNameMax: Int,
+    ): String {
         val scryptObject = JSONObject().apply {
             put("Salt", Base64.encodeToString(scryptSalt, Base64.NO_WRAP))
-            put("N", DEFAULT_SCRYPT_N)
-            put("R", DEFAULT_SCRYPT_R)
-            put("P", DEFAULT_SCRYPT_P)
+            put("N", scryptN)
+            put("R", scryptR)
+            put("P", scryptP)
             put("KeyLen", MASTERKEY_LEN)
         }
         val json = JSONObject().apply {
@@ -129,7 +143,70 @@ object GocryptfsVault {
                 "FeatureFlags",
                 JSONArray(listOf("GCMIV128", "DirIV", "EMENames", "LongNames", "Raw64", "HKDF")),
             )
+            if (longNameMax > 0) put("LongNameMax", longNameMax)
         }
         return json.toString(2)
+    }
+
+    /**
+     * Rewraps gocryptfs.conf's masterkey under [newPassword]: unlocks with
+     * [oldPassword] exactly like [open] does, then re-wraps the same
+     * (unchanged) masterkey with a fresh scrypt salt under the new
+     * password, overwriting gocryptfs.conf in place. The vault's other
+     * scrypt cost parameters (N/R/P) and feature flags are preserved as-is
+     * -- only the salt and wrapped key change. gocryptfs.diriv and the
+     * encrypted file tree are untouched, since the underlying masterkey
+     * never changes.
+     */
+    fun changePassword(
+        context: Context,
+        vaultRootUri: Uri,
+        oldPassword: CharArray,
+        newPassword: CharArray,
+    ): com.aeidolon.vaultexplorer.engine.VaultOpenResult<Unit> {
+        val root = DocumentFile.fromTreeUri(context, vaultRootUri)
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
+        val saf = SafDocumentOps(context)
+        val configDoc = saf.childOf(root, CONFIG_FILE_NAME)
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("No gocryptfs.conf found — this doesn't look like a gocryptfs vault.")
+        val configBytes = context.contentResolver.openInputStream(configDoc.uri)?.use { it.readBytes() }
+            ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not read gocryptfs.conf")
+        val config = try {
+            GocryptfsConfig.parse(configBytes)
+        } catch (e: GocryptfsConfigException) {
+            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault(e.message ?: "Malformed gocryptfs.conf")
+        }
+        val masterkey = try {
+            GocryptfsMasterkey.unlock(config, oldPassword)
+        } catch (e: GocryptfsWrongPasswordException) {
+            return com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword
+        }
+        return try {
+            val random = SecureRandom()
+            val newScryptSalt = ByteArray(SCRYPT_SALT_LEN).also { random.nextBytes(it) }
+            val newEncryptedKey = GocryptfsMasterkey.wrap(
+                masterkey = masterkey,
+                password = newPassword,
+                scryptSalt = newScryptSalt,
+                scryptN = config.scryptN,
+                scryptR = config.scryptR,
+                scryptKeyLen = config.scryptKeyLen,
+                random = random,
+            )
+            val newConfigJson = buildConfigJson(
+                encryptedKey = newEncryptedKey,
+                scryptSalt = newScryptSalt,
+                scryptN = config.scryptN,
+                scryptR = config.scryptR,
+                scryptP = config.scryptP,
+                longNameMax = config.longNameMax,
+            )
+            context.contentResolver.openOutputStream(configDoc.uri, "wt")?.use {
+                it.write(newConfigJson.toByteArray(Charsets.UTF_8))
+            } ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not write gocryptfs.conf")
+            com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(Unit, root.name ?: "Vault")
+        } finally {
+            masterkey.fill(0)
+        }
     }
 }

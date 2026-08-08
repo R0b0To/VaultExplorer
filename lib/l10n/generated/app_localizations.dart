@@ -4826,30 +4826,6 @@ abstract class AppLocalizations {
   /// **'Change Container Password'**
   String get changeContainerPasswordTitle;
 
-  /// Warning shown when attempting to change the password of a LUKS container
-  ///
-  /// In en, this message translates to:
-  /// **'LUKS password changing is not supported in-app. Use cryptsetup on Linux.'**
-  String get luksPasswordChangeNotSupportedMessage;
-
-  /// Warning shown when attempting to change the password of a Cryptomator vault
-  ///
-  /// In en, this message translates to:
-  /// **'Cryptomator vault passwords cannot be changed in-app.'**
-  String get cryptomatorPasswordChangeNotSupportedMessage;
-
-  /// Warning shown when attempting to change the password of a Gocryptfs vault
-  ///
-  /// In en, this message translates to:
-  /// **'Gocryptfs vault passwords cannot be changed in-app.'**
-  String get gocryptfsPasswordChangeNotSupportedMessage;
-
-  /// Warning shown when attempting to change the password of a CryFS vault
-  ///
-  /// In en, this message translates to:
-  /// **'CryFS vault passwords cannot be changed in-app.'**
-  String get cryfsPasswordChangeNotSupportedMessage;
-
   /// Warning shown when attempting to change the credentials of a BitLocker drive
   ///
   /// In en, this message translates to:
@@ -5677,12 +5653,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not switch lens'**
   String get cameraCouldNotSwitchLensMessage;
-
-  /// Error toast shown when the vault auto-locks while a video recording is in progress; the in-progress recording could not be written to the vault and was discarded
-  ///
-  /// In en, this message translates to:
-  /// **'Vault locked — recording stopped and discarded'**
-  String get cameraRecordingStoppedVaultLockedMessage;
 
   /// Busy overlay label shown while a captured photo is being encrypted into the vault
   ///

@@ -2831,22 +2831,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changeContainerPasswordTitle => 'Change Container Password';
 
   @override
-  String get luksPasswordChangeNotSupportedMessage =>
-      'LUKS password changing is not supported in-app. Use cryptsetup on Linux.';
-
-  @override
-  String get cryptomatorPasswordChangeNotSupportedMessage =>
-      'Cryptomator vault passwords cannot be changed in-app.';
-
-  @override
-  String get gocryptfsPasswordChangeNotSupportedMessage =>
-      'Gocryptfs vault passwords cannot be changed in-app.';
-
-  @override
-  String get cryfsPasswordChangeNotSupportedMessage =>
-      'CryFS vault passwords cannot be changed in-app.';
-
-  @override
   String get bitlockerCredentialsChangeNotSupportedMessage =>
       'BitLocker credentials cannot be changed in-app. Use \"Manage BitLocker\" on Windows.';
 
@@ -3349,10 +3333,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get cameraCouldNotSwitchLensMessage => 'Could not switch lens';
-
-  @override
-  String get cameraRecordingStoppedVaultLockedMessage =>
-      'Vault locked — recording stopped and discarded';
 
   @override
   String get cameraEncryptingPhotoLabel => 'Encrypting photo…';

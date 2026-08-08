@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vaultexplorer/data/models/container_format.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -9,11 +10,17 @@ class ChangePasswordScreen extends StatefulWidget {
   final int initialCipherId;
   final int initialHashId;
 
+  /// Wire-level format ('veracrypt', 'cryptomator', 'gocryptfs', 'cryfs',
+  /// ...) -- decides which underlying change-password call to make and
+  /// whether the PIM/keyfile fields apply (folder vaults have neither).
+  final String containerFormat;
+
   const ChangePasswordScreen({
     super.key,
     required this.uri,
     required this.initialCipherId,
     required this.initialHashId,
+    required this.containerFormat,
   });
 
   @override
@@ -35,6 +42,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _confirmObscure = true;
   bool _isProcessing = false;
   String? _errorMsg;
+
+  bool get _isCryptomator => ContainerFormat.isCryptomatorWire(widget.containerFormat);
+  bool get _isGocryptfs => ContainerFormat.isGocryptfsWire(widget.containerFormat);
+  bool get _isCryfs => ContainerFormat.isCryfsWire(widget.containerFormat);
+  // Folder vaults have neither a PIM (VeraCrypt-only) nor keyfile support,
+  // and their change-password call takes just old/new password.
+  bool get _isFolderVault => _isCryptomator || _isGocryptfs || _isCryfs;
+  // LUKS has keyfile support but no PIM concept (VeraCrypt-only), so it
+  // hides just the PIM fields while keeping the keyfile pickers.
+  bool get _isLuks => ContainerFormat.isLuksWire(widget.containerFormat);
+  bool get _hidePim => _isFolderVault || _isLuks;
 
   @override
   void initState() {
@@ -115,26 +133,59 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       _isProcessing = true;
       _errorMsg = null;
     });
-    final oldKeyfilePaths = _oldKeyfiles.map((k) => k.uri).toList();
-    final newKeyfilePaths = _newKeyfiles.map((k) => k.uri).toList();
-    final success = await vaultExplorerApi.changeContainerPassword(
-      uri: widget.uri,
-      oldPassword: oldPassword,
-      newPassword: newPassword,
-      oldPim: int.tryParse(_oldPimCtrl.text) ?? 0,
-      newPim: int.tryParse(_newPimCtrl.text) ?? 0,
-      cipherId: widget.initialCipherId,
-      hashId: widget.initialHashId,
-      oldKeyfilePaths: oldKeyfilePaths,
-      newKeyfilePaths: newKeyfilePaths,
-    );
-    if (mounted) {
-      setState(() => _isProcessing = false);
-      if (success) {
-        showAppSnackBar(context, message: context.l10n.passwordChangedSuccessfullyMessage, tone: AppBannerTone.success);
-        Navigator.pop(context, _newKeyfiles);
+    try {
+      bool success;
+      if (_isCryptomator) {
+        success = await vaultExplorerApi.changeCryptomatorVaultPassword(widget.uri, oldPassword, newPassword);
+      } else if (_isGocryptfs) {
+        success = await vaultExplorerApi.changeGocryptfsVaultPassword(widget.uri, oldPassword, newPassword);
+      } else if (_isCryfs) {
+        success = await vaultExplorerApi.changeCryfsVaultPassword(widget.uri, oldPassword, newPassword);
+      } else if (_isLuks) {
+        final oldKeyfilePaths = _oldKeyfiles.map((k) => k.uri).toList();
+        final newKeyfilePaths = _newKeyfiles.map((k) => k.uri).toList();
+        success = await vaultExplorerApi.changeLuksContainerPassword(
+          uri: widget.uri,
+          oldPassword: oldPassword,
+          newPassword: newPassword,
+          oldKeyfilePaths: oldKeyfilePaths,
+          newKeyfilePaths: newKeyfilePaths,
+        );
       } else {
-        setState(() => _errorMsg = context.l10n.failedToChangePasswordMessage);
+        final oldKeyfilePaths = _oldKeyfiles.map((k) => k.uri).toList();
+        final newKeyfilePaths = _newKeyfiles.map((k) => k.uri).toList();
+        success = await vaultExplorerApi.changeContainerPassword(
+          uri: widget.uri,
+          oldPassword: oldPassword,
+          newPassword: newPassword,
+          oldPim: int.tryParse(_oldPimCtrl.text) ?? 0,
+          newPim: int.tryParse(_newPimCtrl.text) ?? 0,
+          cipherId: widget.initialCipherId,
+          hashId: widget.initialHashId,
+          oldKeyfilePaths: oldKeyfilePaths,
+          newKeyfilePaths: newKeyfilePaths,
+        );
+      }
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        if (success) {
+          showAppSnackBar(context, message: context.l10n.passwordChangedSuccessfullyMessage, tone: AppBannerTone.success);
+          // Folder vaults don't support keyfiles, so there's nothing for
+          // the caller (ContainerConfigScreen) to merge back in.
+          Navigator.pop(context, _isFolderVault ? null : _newKeyfiles);
+        } else {
+          setState(() => _errorMsg = context.l10n.failedToChangePasswordMessage);
+        }
+      }
+    } on PlatformException catch (e) {
+      // Folder vaults report specific failures (wrong password, unreadable
+      // config, ...) as PlatformExceptions with a pre-formatted message --
+      // see changeCryptomatorVaultPassword's doc comment.
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _errorMsg = e.message ?? context.l10n.failedToChangePasswordMessage;
+        });
       }
     }
   }
@@ -163,24 +214,26 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _oldPimCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: context.l10n.oldPimOptionalLabel,
-                  prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+            if (!_hidePim)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: _oldPimCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: context.l10n.oldPimOptionalLabel,
+                    prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+                  ),
                 ),
               ),
-            ),
-            KeyfilesPicker(
-              keyfiles: _oldKeyfiles,
-              picking: _pickingOldKeyfiles,
-              onPick: _pickOldKeyfiles,
-              onRemove: _removeOldKeyfile,
-              enabled: !_isProcessing,
-            ),
+            if (!_isFolderVault)
+              KeyfilesPicker(
+                keyfiles: _oldKeyfiles,
+                picking: _pickingOldKeyfiles,
+                onPick: _pickOldKeyfiles,
+                onRemove: _removeOldKeyfile,
+                enabled: !_isProcessing,
+              ),
           ],
         ),
       ],
@@ -228,24 +281,26 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: TextField(
-                controller: _newPimCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: context.l10n.newPimOptionalLabel,
-                  prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+            if (!_hidePim)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: TextField(
+                  controller: _newPimCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: context.l10n.newPimOptionalLabel,
+                    prefixIcon: Icon(Icons.pin_rounded, size: 20, color: cs.primary),
+                  ),
                 ),
               ),
-            ),
-            KeyfilesPicker(
-              keyfiles: _newKeyfiles,
-              picking: _pickingNewKeyfiles,
-              onPick: _pickNewKeyfiles,
-              onRemove: _removeNewKeyfile,
-              enabled: !_isProcessing,
-            ),
+            if (!_isFolderVault)
+              KeyfilesPicker(
+                keyfiles: _newKeyfiles,
+                picking: _pickingNewKeyfiles,
+                onPick: _pickNewKeyfiles,
+                onRemove: _removeNewKeyfile,
+                enabled: !_isProcessing,
+              ),
           ],
         ),
       ],

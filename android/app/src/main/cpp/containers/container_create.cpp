@@ -1035,3 +1035,69 @@ bool changeContainerPassword(int fd,
     close(fd);
     return success;
 }
+
+int changeLuksContainerPassword(int fd,
+                                const char* oldPassword, const char* newPassword,
+                                const int* oldKeyfileFds, int oldKeyfileCount,
+                                const int* newKeyfileFds, int newKeyfileCount) {
+    // Same "keyfile REPLACES password" resolution createLuksContainer()
+    // uses (real cryptsetup --key-file semantics), applied independently
+    // to the old and new sides.
+    auto resolveEffectivePassword = [](const char* typedPassword,
+                                        const int* keyfileFds, int keyfileCount,
+                                        std::vector<unsigned char>& keyfileBuf) -> const unsigned char* {
+        if (keyfileCount > 0 && keyfileFds != nullptr && keyfileFds[0] >= 0) {
+            constexpr size_t kMaxKeyfileBytes = 1024 * 1024;
+            keyfileBuf.resize(kMaxKeyfileBytes);
+            ssize_t total = 0, n;
+            while (total < static_cast<ssize_t>(kMaxKeyfileBytes) &&
+                   (n = read(keyfileFds[0], keyfileBuf.data() + total, kMaxKeyfileBytes - total)) > 0) {
+                total += n;
+            }
+            keyfileBuf.resize(total > 0 ? total : 0);
+            closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+            return keyfileBuf.empty() ? nullptr : keyfileBuf.data();
+        }
+        closeUnusedKeyfileFds(keyfileFds, keyfileCount);
+        return reinterpret_cast<const unsigned char*>(typedPassword);
+    };
+
+    std::vector<unsigned char> oldKeyfileBuf;
+    const unsigned char* oldEffective = resolveEffectivePassword(oldPassword, oldKeyfileFds, oldKeyfileCount, oldKeyfileBuf);
+    size_t oldEffectiveLen = oldKeyfileBuf.empty() ? strlen(oldPassword) : oldKeyfileBuf.size();
+    if (oldEffective == nullptr) {
+        LOGI("changeLuksContainerPassword: old keyfile unreadable or empty");
+        closeUnusedKeyfileFds(newKeyfileFds, newKeyfileCount);
+        close(fd);
+        return 2;
+    }
+
+    std::vector<unsigned char> newKeyfileBuf;
+    const unsigned char* newEffective = resolveEffectivePassword(newPassword, newKeyfileFds, newKeyfileCount, newKeyfileBuf);
+    size_t newEffectiveLen = newKeyfileBuf.empty() ? strlen(newPassword) : newKeyfileBuf.size();
+    if (newEffective == nullptr || newEffectiveLen == 0) {
+        LOGI("changeLuksContainerPassword: new keyfile unreadable/empty, or empty new password");
+        close(fd);
+        return 2;
+    }
+    if (oldEffectiveLen == 0) {
+        LOGI("changeLuksContainerPassword: empty old password and no usable old keyfile");
+        close(fd);
+        return 2;
+    }
+
+    LuksChangePasswordResult result = luksChangeKeyslotPassword(
+        fd, oldEffective, oldEffectiveLen, newEffective, newEffectiveLen);
+
+    if (!oldKeyfileBuf.empty()) mbedtls_platform_zeroize(oldKeyfileBuf.data(), oldKeyfileBuf.size());
+    if (!newKeyfileBuf.empty()) mbedtls_platform_zeroize(newKeyfileBuf.data(), newKeyfileBuf.size());
+
+    if (result == LuksChangePasswordResult::kSuccess) fsync(fd);
+    close(fd);
+
+    switch (result) {
+        case LuksChangePasswordResult::kSuccess: return 0;
+        case LuksChangePasswordResult::kWrongOldPassword: return 1;
+        default: return 2;
+    }
+}

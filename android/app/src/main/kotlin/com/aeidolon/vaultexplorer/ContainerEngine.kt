@@ -106,6 +106,15 @@ object ContainerEngine {
         oldKeyfileFds, newKeyfileFds
     )
 
+    /** 0 = success, 1 = wrong old password/keyfile, 2 = other error. See
+     *  NativeEngine.changeLuksContainerPasswordNative's doc comment. */
+    fun changeLuksPassword(
+        fd: Int, oldPassword: String, newPassword: String,
+        oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null,
+    ): Int = NativeEngine.changeLuksContainerPasswordNative(
+        fd, oldPassword, newPassword, oldKeyfileFds, newKeyfileFds
+    )
+
     /** Locks/closes volId's session regardless of backend: zeroes the Cryptomator/Gocryptfs masterkey if it's a pure-Kotlin session, otherwise unmounts the native VeraCrypt/LUKS volume as before. */
     fun lock(volId: Int) {
         val session = VaultBackendRegistry.get(volId)

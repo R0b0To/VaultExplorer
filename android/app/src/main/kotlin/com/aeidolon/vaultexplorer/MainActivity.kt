@@ -67,18 +67,22 @@ private object ChannelMethods {
     const val WARM_CONTAINER            = "warmContainer"
     const val CANCEL_UNLOCK             = "cancelUnlock"
     const val CHANGE_CONTAINER_PASSWORD = "changeContainerPassword"
+    const val CHANGE_LUKS_CONTAINER_PASSWORD = "changeLuksContainerPassword"
     const val SET_LAST_MODIFIED_TIME    = "setLastModifiedTime"
     const val PICK_CRYPTOMATOR_VAULT    = "pickCryptomatorVault"
     const val UNLOCK_CRYPTOMATOR_VAULT  = "unlockCryptomatorVault"
     const val CREATE_CRYPTOMATOR_VAULT  = "createCryptomatorVault"
+    const val CHANGE_CRYPTOMATOR_VAULT_PASSWORD = "changeCryptomatorVaultPassword"
     const val PICK_GOCRYPTFS_VAULT      = "pickGocryptfsVault"
     const val UNLOCK_GOCRYPTFS_VAULT    = "unlockGocryptfsVault"
     const val CREATE_GOCRYPTFS_VAULT    = "createGocryptfsVault"
+    const val CHANGE_GOCRYPTFS_VAULT_PASSWORD = "changeGocryptfsVaultPassword"
     const val FINISH_WRITE_IF_CRYPTOMATOR = "finishWriteIfCryptomator"
     const val IS_GOCRYPTFS_VAULT        = "isGocryptfsVault"
     const val PICK_CRYFS_VAULT          = "pickCryfsVault"
     const val UNLOCK_CRYFS_VAULT        = "unlockCryfsVault"
     const val CREATE_CRYFS_VAULT        = "createCryfsVault"
+    const val CHANGE_CRYFS_VAULT_PASSWORD = "changeCryfsVaultPassword"
     const val IS_CRYFS_VAULT            = "isCryfsVault"
     const val MOUNT_CONTAINER_FOLDER    = "mountContainerFolder"
     const val UNMOUNT_CONTAINER_FOLDER  = "unmountContainerFolder"
@@ -316,15 +320,19 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.UNLOCK_GOCRYPTFS_VAULT -> vaultUnlockHandlers.handleUnlockGocryptfsVault(call, result)
                 ChannelMethods.UNLOCK_CRYFS_VAULT -> vaultUnlockHandlers.handleUnlockCryfsVault(call, result)
                 ChannelMethods.CREATE_CRYPTOMATOR_VAULT -> vaultCreationHandlers.handleCreateCryptomatorVault(call, result)
+                ChannelMethods.CHANGE_CRYPTOMATOR_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeCryptomatorVaultPassword(call, result)
                 ChannelMethods.CREATE_GOCRYPTFS_VAULT -> vaultCreationHandlers.handleCreateGocryptfsVault(call, result)
+                ChannelMethods.CHANGE_GOCRYPTFS_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeGocryptfsVaultPassword(call, result)
                 ChannelMethods.IS_GOCRYPTFS_VAULT -> vaultUnlockHandlers.handleIsGocryptfsVault(call, result)
                 ChannelMethods.CREATE_CRYFS_VAULT -> vaultCreationHandlers.handleCreateCryfsVault(call, result)
+                ChannelMethods.CHANGE_CRYFS_VAULT_PASSWORD -> vaultUnlockHandlers.handleChangeCryfsVaultPassword(call, result)
                 ChannelMethods.IS_CRYFS_VAULT -> vaultUnlockHandlers.handleIsCryfsVault(call, result)
                 ChannelMethods.FINISH_WRITE_IF_CRYPTOMATOR -> vaultUnlockHandlers.handleFinishWriteIfCryptomator(call, result)
                 ChannelMethods.CANCEL_UNLOCK -> vaultUnlockHandlers.handleCancelUnlock(call, result)
                 ChannelMethods.CANCEL_IMPORT -> importExportHandlers.handleCancelImport(call, result)
                 ChannelMethods.DELETE_IMPORT_SOURCES -> importExportHandlers.handleDeleteImportSources(call, result)
                 ChannelMethods.CHANGE_CONTAINER_PASSWORD -> vaultUnlockHandlers.handleChangeContainerPassword(call, result)
+                ChannelMethods.CHANGE_LUKS_CONTAINER_PASSWORD -> vaultUnlockHandlers.handleChangeLuksContainerPassword(call, result)
                 ChannelMethods.DERIVE_DERIVED_KEY -> derivedKeyHandlers.handleDeriveDerivedKey(call, result)
                 ChannelMethods.DOCUMENT_EXISTS -> vaultUnlockHandlers.handleDocumentExists(call, result)
                 ChannelMethods.WARM_CONTAINER -> vaultUnlockHandlers.handleWarmContainer(call, result)

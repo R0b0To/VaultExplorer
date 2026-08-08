@@ -1507,3 +1507,496 @@ bool luksCreateHeader(int fd, const uint8_t* password, size_t passwordLen,
     };
     return luksCreateHeader(writer, password, passwordLen, sizeBytes, params, outInfo);
 }
+
+// ── Password change ─────────────────────────────────────────────────────
+//
+// Both functions below share one shape: find the (single) active keyslot
+// the OLD password unlocks -- same derive/decrypt-AF/merge/verify-digest
+// steps as luks1Unlock/luks2Unlock, just scanned sequentially rather than
+// concurrently, since a password change is rare enough that multi-slot
+// thread fan-out isn't worth the complexity here -- then re-derive and
+// re-encrypt THAT SAME keyslot's key material with a fresh salt under the
+// NEW password, reusing its existing KDF cost parameters unchanged. The
+// master key itself, every other keyslot, the digest(s), and the data
+// area are never touched.
+
+static LuksChangePasswordResult luks1ChangeKeyslotPassword(
+    const LuksByteReader& reader, const LuksByteWriter& writer,
+    const uint8_t* oldPassword, size_t oldPasswordLen,
+    const uint8_t* newPassword, size_t newPasswordLen) {
+    Luks1Phdr phdr;
+    if (!reader(0, &phdr, sizeof(Luks1Phdr))) return LuksChangePasswordResult::kError;
+    if (readBE16((const uint8_t*)&phdr.version) != 1) return LuksChangePasswordResult::kError;
+
+    uint32_t keyBytes = readBE32((const uint8_t*)&phdr.keyBytes);
+    uint32_t mkDigestIter = readBE32((const uint8_t*)&phdr.mkDigestIter);
+    std::string hashSpec = phdr.hashSpec;
+    DigestSpec hashDigest = resolveHashSpec(hashSpec);
+    if (hashDigest.backend == HashBackend::kNone) return LuksChangePasswordResult::kError;
+
+    std::string cipherNameStr = phdr.cipherName;
+    CascadeId slotCipher;
+    if (!cascadeIdForCipherName(cipherNameStr, slotCipher)) return LuksChangePasswordResult::kError;
+
+    int foundSlot = -1;
+    std::vector<uint8_t> masterKey;
+    for (int i = 0; i < 8 && foundSlot < 0; i++) {
+        uint32_t active = readBE32((const uint8_t*)&phdr.keySlots[i].active);
+        if (active != 0x00AC71F3) continue;
+
+        uint32_t iterations = readBE32((const uint8_t*)&phdr.keySlots[i].iterations);
+        uint32_t stripes = readBE32((const uint8_t*)&phdr.keySlots[i].stripes);
+        uint32_t keyMaterialOffset = readBE32((const uint8_t*)&phdr.keySlots[i].keyMaterialOffset);
+
+        std::vector<uint8_t> slotKey(keyBytes);
+        if (!luksDeriveKdfKey(hashDigest, oldPassword, oldPasswordLen, phdr.keySlots[i].salt, 32,
+                               iterations, slotKey.data(), slotKey.size())) {
+            continue;
+        }
+
+        size_t afLen = (size_t)keyBytes * stripes;
+        std::vector<uint8_t> afMaterial(afLen);
+        if (!reader((uint64_t)keyMaterialOffset * 512, afMaterial.data(), afLen)) {
+            mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
+            continue;
+        }
+
+        std::vector<uint8_t> afDecrypted(afLen);
+        bool decOk = keyslotAreaCrypt(slotCipher, false, slotKey.data(), slotKey.size(),
+                                       afMaterial.data(), afDecrypted.data(), afLen);
+        mbedtls_platform_zeroize(slotKey.data(), slotKey.size());
+        if (!decOk) {
+            mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+            continue;
+        }
+
+        std::vector<uint8_t> candidateKey(keyBytes);
+        bool mergeOk = (afMerge(hashDigest, keyBytes, stripes, afDecrypted.data(), candidateKey.data()) == 0);
+        mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+        mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
+        if (!mergeOk) {
+            mbedtls_platform_zeroize(candidateKey.data(), candidateKey.size());
+            continue;
+        }
+
+        if (luksVerifyMasterKey(hashDigest, candidateKey.data(), keyBytes, phdr.mkDigestSalt, 32,
+                                 mkDigestIter, phdr.mkDigest, 20)) {
+            foundSlot = i;
+            masterKey = candidateKey;
+        } else {
+            mbedtls_platform_zeroize(candidateKey.data(), candidateKey.size());
+        }
+    }
+
+    if (foundSlot < 0) return LuksChangePasswordResult::kWrongOldPassword;
+
+    // Reused unchanged -- see this section's doc comment.
+    uint32_t iterations = readBE32((const uint8_t*)&phdr.keySlots[foundSlot].iterations);
+    uint32_t stripes = readBE32((const uint8_t*)&phdr.keySlots[foundSlot].stripes);
+    uint32_t keyMaterialOffset = readBE32((const uint8_t*)&phdr.keySlots[foundSlot].keyMaterialOffset);
+
+    uint8_t newSalt[32];
+    bool ok = randomBytes(newSalt, sizeof(newSalt));
+
+    std::vector<uint8_t> newSlotKey(keyBytes);
+    if (ok) {
+        ok = luksDeriveKdfKey(hashDigest, newPassword, newPasswordLen, newSalt, sizeof(newSalt),
+                               iterations, newSlotKey.data(), newSlotKey.size());
+    }
+
+    std::vector<uint8_t> afMaterial((size_t)keyBytes * stripes);
+    if (ok) ok = (afSplit(hashDigest, keyBytes, stripes, masterKey.data(), afMaterial.data()) == 0);
+    mbedtls_platform_zeroize(masterKey.data(), masterKey.size());
+
+    std::vector<uint8_t> afEncrypted(afMaterial.size());
+    if (ok) {
+        ok = keyslotAreaCrypt(slotCipher, true, newSlotKey.data(), newSlotKey.size(),
+                               afMaterial.data(), afEncrypted.data(), afMaterial.size());
+    }
+    mbedtls_platform_zeroize(newSlotKey.data(), newSlotKey.size());
+    mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+
+    if (!ok) {
+        mbedtls_platform_zeroize(afEncrypted.data(), afEncrypted.size());
+        return LuksChangePasswordResult::kError;
+    }
+
+    if (!writer((uint64_t)keyMaterialOffset * 512, afEncrypted.data(), afEncrypted.size())) {
+        mbedtls_platform_zeroize(afEncrypted.data(), afEncrypted.size());
+        return LuksChangePasswordResult::kError;
+    }
+    mbedtls_platform_zeroize(afEncrypted.data(), afEncrypted.size());
+
+    std::memcpy(phdr.keySlots[foundSlot].salt, newSalt, sizeof(newSalt));
+    if (!writer(0, &phdr, sizeof(phdr))) return LuksChangePasswordResult::kError;
+
+    LOGI("luks1ChangeKeyslotPassword: rewrapped slot %d", foundSlot);
+    return LuksChangePasswordResult::kSuccess;
+}
+
+static LuksChangePasswordResult luks2ChangeKeyslotPassword(
+    const LuksByteReader& reader, const LuksByteWriter& writer,
+    const uint8_t* oldPassword, size_t oldPasswordLen,
+    const uint8_t* newPassword, size_t newPasswordLen) {
+    uint8_t hdrBuf[4096];
+    if (!reader(0, hdrBuf, 4096)) return LuksChangePasswordResult::kError;
+    if (readBE16(hdrBuf + 6) != 2) return LuksChangePasswordResult::kError;
+
+    uint64_t hdrSize = readBE64(hdrBuf + 8);
+    if (hdrSize < 4096 || hdrSize > 8 * 1024 * 1024) return LuksChangePasswordResult::kError;
+
+    size_t jsonLen = hdrSize - 4096;
+    std::vector<char> jsonBuf(jsonLen + 1, 0);
+    if (!reader(4096, jsonBuf.data(), jsonLen)) return LuksChangePasswordResult::kError;
+
+    cJSON* root = cJSON_Parse(jsonBuf.data());
+    if (!root) return LuksChangePasswordResult::kError;
+
+    cJSON* keyslotsObj = cJSON_GetObjectItemCaseSensitive(root, "keyslots");
+    cJSON* digestsObj = cJSON_GetObjectItemCaseSensitive(root, "digests");
+    if (!keyslotsObj || !digestsObj) {
+        cJSON_Delete(root);
+        return LuksChangePasswordResult::kError;
+    }
+
+    cJSON* targetKeyslot = nullptr;
+    int targetIndex = -1;
+    std::vector<uint8_t> masterKey;
+    std::string targetAreaEncryption, targetAfHash, targetKdfType, targetKdfHash;
+    uint64_t targetAreaOffset = 0, targetAreaSize = 0;
+    uint32_t targetAreaKeySize = 0, targetKdfIterations = 0, targetKdfMemory = 0, targetKdfParallelism = 0;
+    int targetAfStripes = 0;
+    size_t targetSaltLen = 0;
+
+    cJSON* keyslotItem = keyslotsObj->child;
+    while (keyslotItem && !targetKeyslot) {
+        cJSON* type = cJSON_GetObjectItemCaseSensitive(keyslotItem, "type");
+        if (!type || !type->valuestring || std::strcmp(type->valuestring, "luks2") != 0) {
+            keyslotItem = keyslotItem->next;
+            continue;
+        }
+        cJSON* kdf = cJSON_GetObjectItemCaseSensitive(keyslotItem, "kdf");
+        cJSON* area = cJSON_GetObjectItemCaseSensitive(keyslotItem, "area");
+        cJSON* af = cJSON_GetObjectItemCaseSensitive(keyslotItem, "af");
+        if (!kdf || !area || !af) {
+            keyslotItem = keyslotItem->next;
+            continue;
+        }
+
+        std::string kdfType, kdfHash;
+        uint32_t iters = 0, memory = 0, cpus = 0;
+        std::vector<uint8_t> salt;
+        {
+            cJSON* t = cJSON_GetObjectItemCaseSensitive(kdf, "type");
+            cJSON* h = cJSON_GetObjectItemCaseSensitive(kdf, "hash");
+            cJSON* it = cJSON_GetObjectItemCaseSensitive(kdf, "iterations");
+            cJSON* tm = cJSON_GetObjectItemCaseSensitive(kdf, "time");
+            cJSON* mem = cJSON_GetObjectItemCaseSensitive(kdf, "memory");
+            cJSON* cp = cJSON_GetObjectItemCaseSensitive(kdf, "cpus");
+            cJSON* s = cJSON_GetObjectItemCaseSensitive(kdf, "salt");
+            if (t && t->valuestring) kdfType = t->valuestring;
+            if (h && h->valuestring) kdfHash = h->valuestring;
+            if (it) iters = it->valueint;
+            if (tm) iters = tm->valueint;
+            if (mem) memory = mem->valueint;
+            if (cp) cpus = cp->valueint;
+            if (s && s->valuestring) salt = base64Decode(s->valuestring);
+        }
+
+        uint64_t areaOffset = 0, areaSize = 0;
+        std::string areaEncryption;
+        uint32_t areaKeySize = 0;
+        {
+            cJSON* off = cJSON_GetObjectItemCaseSensitive(area, "offset");
+            cJSON* sz = cJSON_GetObjectItemCaseSensitive(area, "size");
+            cJSON* enc = cJSON_GetObjectItemCaseSensitive(area, "encryption");
+            cJSON* ksz = cJSON_GetObjectItemCaseSensitive(area, "key_size");
+            if (off && off->valuestring) areaOffset = std::strtoull(off->valuestring, nullptr, 10);
+            if (sz && sz->valuestring) areaSize = std::strtoull(sz->valuestring, nullptr, 10);
+            if (enc && enc->valuestring) areaEncryption = enc->valuestring;
+            if (ksz) areaKeySize = ksz->valueint;
+        }
+
+        int afStripes = 0;
+        std::string afHash;
+        {
+            cJSON* stripes = cJSON_GetObjectItemCaseSensitive(af, "stripes");
+            cJSON* hash = cJSON_GetObjectItemCaseSensitive(af, "hash");
+            if (stripes) afStripes = stripes->valueint;
+            if (hash && hash->valuestring) afHash = hash->valuestring;
+        }
+
+        const char* ksIndexStr = keyslotItem->string;
+        Luks2DigestInfo matchDigest;
+        bool foundDigest = false;
+        cJSON* digestItem = digestsObj->child;
+        while (digestItem && !foundDigest) {
+            cJSON* dKeyslots = cJSON_GetObjectItemCaseSensitive(digestItem, "keyslots");
+            if (dKeyslots) {
+                int sz = cJSON_GetArraySize(dKeyslots);
+                for (int i = 0; i < sz; i++) {
+                    cJSON* ksRef = cJSON_GetArrayItem(dKeyslots, i);
+                    if (ksRef && ksRef->valuestring && std::strcmp(ksRef->valuestring, ksIndexStr) == 0) {
+                        cJSON* hash = cJSON_GetObjectItemCaseSensitive(digestItem, "hash");
+                        cJSON* iters2 = cJSON_GetObjectItemCaseSensitive(digestItem, "iterations");
+                        cJSON* saltJ = cJSON_GetObjectItemCaseSensitive(digestItem, "salt");
+                        cJSON* dig = cJSON_GetObjectItemCaseSensitive(digestItem, "digest");
+                        if (hash && hash->valuestring) matchDigest.hashName = hash->valuestring;
+                        if (iters2) matchDigest.iterations = iters2->valueint;
+                        if (saltJ && saltJ->valuestring) matchDigest.salt = base64Decode(saltJ->valuestring);
+                        if (dig && dig->valuestring) matchDigest.digest = base64Decode(dig->valuestring);
+                        foundDigest = true;
+                        break;
+                    }
+                }
+            }
+            digestItem = digestItem->next;
+        }
+        if (!foundDigest) {
+            keyslotItem = keyslotItem->next;
+            continue;
+        }
+
+        size_t derivedKeyLen = areaKeySize ? areaKeySize : 64;
+        std::vector<uint8_t> derivedKey(derivedKeyLen);
+        DigestSpec kdfSpec = resolveHashSpec(kdfHash);
+        bool kdfOk = false;
+        if (kdfType == "pbkdf2") {
+            if (kdfSpec.backend != HashBackend::kNone) {
+                kdfOk = luksDeriveKdfKey(kdfSpec, oldPassword, oldPasswordLen, salt.data(), salt.size(),
+                                          iters, derivedKey.data(), derivedKeyLen);
+            }
+        } else if (kdfType == "argon2id" || kdfType == "argon2i") {
+            uint32_t memKiB = memory > 1048576 ? 1048576 : memory;
+            kdfOk = argon2idDeriveKey(oldPassword, oldPasswordLen, salt.data(), salt.size(),
+                                       memKiB, iters, cpus, derivedKey.data(), derivedKeyLen);
+        }
+        if (!kdfOk) {
+            mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
+            keyslotItem = keyslotItem->next;
+            continue;
+        }
+
+        std::vector<uint8_t> afMaterial(areaSize);
+        if (!reader(areaOffset, afMaterial.data(), areaSize)) {
+            mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
+            keyslotItem = keyslotItem->next;
+            continue;
+        }
+
+        CascadeId slotCipher;
+        std::string areaCipherName = areaEncryption;
+        size_t dash = areaCipherName.find('-');
+        if (dash != std::string::npos) areaCipherName = areaCipherName.substr(0, dash);
+        if (areaCipherName.empty() || !cascadeIdForCipherName(areaCipherName, slotCipher)) {
+            mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
+            mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+            keyslotItem = keyslotItem->next;
+            continue;
+        }
+
+        std::vector<uint8_t> afDecrypted(areaSize);
+        bool decOk = keyslotAreaCrypt(slotCipher, false, derivedKey.data(), derivedKeyLen,
+                                       afMaterial.data(), afDecrypted.data(), areaSize);
+        mbedtls_platform_zeroize(derivedKey.data(), derivedKey.size());
+        if (!decOk) {
+            mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+            mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
+            keyslotItem = keyslotItem->next;
+            continue;
+        }
+
+        size_t masterKeySize = areaKeySize;
+        std::vector<uint8_t> candidateKey(masterKeySize);
+        DigestSpec afSpec = resolveHashSpec(afHash);
+        bool mergeOk = (afMerge(afSpec, masterKeySize, afStripes, afDecrypted.data(), candidateKey.data()) == 0);
+        mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+        mbedtls_platform_zeroize(afDecrypted.data(), afDecrypted.size());
+        if (!mergeOk) {
+            mbedtls_platform_zeroize(candidateKey.data(), candidateKey.size());
+            keyslotItem = keyslotItem->next;
+            continue;
+        }
+
+        DigestSpec digestSpec = resolveHashSpec(matchDigest.hashName);
+        bool verified = luksVerifyMasterKey(digestSpec, candidateKey.data(), masterKeySize,
+                                             matchDigest.salt.data(), matchDigest.salt.size(),
+                                             matchDigest.iterations, matchDigest.digest.data(),
+                                             matchDigest.digest.size());
+        if (verified) {
+            targetKeyslot = keyslotItem;
+            targetIndex = std::atoi(ksIndexStr);
+            masterKey = candidateKey;
+            targetAreaEncryption = areaEncryption;
+            targetAreaOffset = areaOffset;
+            targetAreaSize = areaSize;
+            targetAreaKeySize = areaKeySize;
+            targetAfStripes = afStripes;
+            targetAfHash = afHash;
+            targetKdfType = kdfType;
+            targetKdfHash = kdfHash;
+            targetKdfIterations = iters;
+            targetKdfMemory = memory;
+            targetKdfParallelism = cpus;
+            targetSaltLen = salt.size();
+        } else {
+            mbedtls_platform_zeroize(candidateKey.data(), candidateKey.size());
+        }
+        keyslotItem = keyslotItem->next;
+    }
+
+    if (!targetKeyslot) {
+        cJSON_Delete(root);
+        return LuksChangePasswordResult::kWrongOldPassword;
+    }
+
+    // ── Rewrap: fresh salt (same length as before), SAME cost params,
+    // SAME AF stripes/area -- see this section's doc comment. ──
+    std::vector<uint8_t> newSalt(targetSaltLen > 0 ? targetSaltLen : 32);
+    bool ok = randomBytes(newSalt.data(), newSalt.size());
+
+    std::vector<uint8_t> newSlotKey(targetAreaKeySize);
+    if (ok) {
+        if (targetKdfType == "pbkdf2") {
+            DigestSpec kdfSpec = resolveHashSpec(targetKdfHash);
+            ok = kdfSpec.backend != HashBackend::kNone &&
+                 luksDeriveKdfKey(kdfSpec, newPassword, newPasswordLen, newSalt.data(), newSalt.size(),
+                                   targetKdfIterations, newSlotKey.data(), newSlotKey.size());
+        } else if (targetKdfType == "argon2id" || targetKdfType == "argon2i") {
+            ok = argon2idDeriveKey(newPassword, newPasswordLen, newSalt.data(), newSalt.size(),
+                                    targetKdfMemory, targetKdfIterations, targetKdfParallelism,
+                                    newSlotKey.data(), newSlotKey.size());
+        } else {
+            ok = false;
+        }
+    }
+
+    std::vector<uint8_t> afMaterial((size_t)targetAreaKeySize * targetAfStripes);
+    if (ok) {
+        DigestSpec afSpec = resolveHashSpec(targetAfHash);
+        ok = (afSplit(afSpec, targetAreaKeySize, targetAfStripes, masterKey.data(), afMaterial.data()) == 0);
+    }
+    mbedtls_platform_zeroize(masterKey.data(), masterKey.size());
+
+    std::vector<uint8_t> afEncrypted(afMaterial.size());
+    if (ok) {
+        CascadeId slotCipher;
+        std::string areaCipherName = targetAreaEncryption;
+        size_t dash = areaCipherName.find('-');
+        if (dash != std::string::npos) areaCipherName = areaCipherName.substr(0, dash);
+        ok = !areaCipherName.empty() && cascadeIdForCipherName(areaCipherName, slotCipher) &&
+             keyslotAreaCrypt(slotCipher, true, newSlotKey.data(), newSlotKey.size(),
+                               afMaterial.data(), afEncrypted.data(), afMaterial.size());
+    }
+    mbedtls_platform_zeroize(newSlotKey.data(), newSlotKey.size());
+    mbedtls_platform_zeroize(afMaterial.data(), afMaterial.size());
+
+    if (!ok || afEncrypted.size() != targetAreaSize) {
+        mbedtls_platform_zeroize(afEncrypted.data(), afEncrypted.size());
+        cJSON_Delete(root);
+        return LuksChangePasswordResult::kError;
+    }
+
+    if (!writer(targetAreaOffset, afEncrypted.data(), afEncrypted.size())) {
+        mbedtls_platform_zeroize(afEncrypted.data(), afEncrypted.size());
+        cJSON_Delete(root);
+        return LuksChangePasswordResult::kError;
+    }
+    mbedtls_platform_zeroize(afEncrypted.data(), afEncrypted.size());
+
+    // Update ONLY this keyslot's kdf.salt -- type/hash/iterations/time/
+    // memory/cpus, area, af, digests, segments, tokens, config all stay
+    // exactly as they were.
+    cJSON* kdf = cJSON_GetObjectItemCaseSensitive(targetKeyslot, "kdf");
+    std::string newSaltB64 = base64Encode(newSalt.data(), newSalt.size());
+    cJSON_DeleteItemFromObjectCaseSensitive(kdf, "salt");
+    cJSON_AddStringToObject(kdf, "salt", newSaltB64.c_str());
+
+    char* jsonText = cJSON_PrintUnformatted(root);
+    std::string jsonStr = jsonText ? std::string(jsonText) : std::string();
+    if (jsonText) free(jsonText);
+    cJSON_Delete(root);
+    if (jsonStr.empty() || jsonStr.size() + 1 > kLuks2JsonAreaSize) {
+        LOGI("luks2ChangeKeyslotPassword: rewritten JSON doesn't fit the reserved area");
+        return LuksChangePasswordResult::kError;
+    }
+    std::vector<uint8_t> jsonArea(kLuks2JsonAreaSize, 0);
+    std::memcpy(jsonArea.data(), jsonStr.data(), jsonStr.size());
+
+    // Rewrite both binary header copies: identical to what was read except
+    // seqid bumped and csum recomputed. Simplification: the secondary
+    // copy is derived from the PRIMARY copy's own fields (hdrOffset
+    // flipped) rather than independently read/preserved -- true for every
+    // header this app itself writes (luks2CreateHeader always mirrors
+    // them) and for any real cryptsetup volume whose two copies haven't
+    // already diverged (a header-repair scenario where they have is out
+    // of scope here, same as it is for luks2Unlock's own single-copy
+    // read above).
+    Luks2HdrDisk primaryHdr;
+    std::memcpy(&primaryHdr, hdrBuf, sizeof(Luks2HdrDisk));
+    uint64_t seqid = readBE64((const uint8_t*)&primaryHdr.seqid) + 1;
+    writeBE64((uint8_t*)&primaryHdr.seqid, seqid);
+
+    Luks2HdrDisk secondaryHdr = primaryHdr;
+    writeBE64((uint8_t*)&secondaryHdr.hdrOffset, kLuks2HdrCopySize);
+
+    auto computeChecksum = [&](Luks2HdrDisk& hdr, uint8_t out[32]) {
+        std::memset(hdr.csum, 0, sizeof(hdr.csum));
+        mbedtls_md_context_t ctx;
+        mbedtls_md_init(&ctx);
+        const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+        mbedtls_md_setup(&ctx, info, 0);
+        mbedtls_md_starts(&ctx);
+        mbedtls_md_update(&ctx, reinterpret_cast<const uint8_t*>(&hdr), sizeof(hdr));
+        mbedtls_md_update(&ctx, jsonArea.data(), jsonArea.size());
+        mbedtls_md_finish(&ctx, out);
+        mbedtls_md_free(&ctx);
+    };
+    uint8_t csum1[32], csum2[32];
+    computeChecksum(primaryHdr, csum1);
+    computeChecksum(secondaryHdr, csum2);
+    std::memcpy(primaryHdr.csum, csum1, sizeof(csum1));
+    std::memcpy(secondaryHdr.csum, csum2, sizeof(csum2));
+
+    if (!writer(0, &primaryHdr, sizeof(primaryHdr)) ||
+        !writer(kLuks2BinHdrSize, jsonArea.data(), jsonArea.size()) ||
+        !writer(kLuks2HdrCopySize, &secondaryHdr, sizeof(secondaryHdr)) ||
+        !writer(kLuks2HdrCopySize + kLuks2BinHdrSize, jsonArea.data(), jsonArea.size())) {
+        return LuksChangePasswordResult::kError;
+    }
+
+    LOGI("luks2ChangeKeyslotPassword: rewrapped keyslot %d", targetIndex);
+    return LuksChangePasswordResult::kSuccess;
+}
+
+LuksChangePasswordResult luksChangeKeyslotPassword(const LuksByteReader& reader,
+                                                    const LuksByteWriter& writer,
+                                                    const uint8_t* oldPassword, size_t oldPasswordLen,
+                                                    const uint8_t* newPassword, size_t newPasswordLen) {
+    if (!reader || !writer || oldPasswordLen == 0 || newPasswordLen == 0) {
+        return LuksChangePasswordResult::kError;
+    }
+    uint8_t verBuf[2];
+    if (!reader(6, verBuf, 2)) return LuksChangePasswordResult::kError;
+    uint16_t version = (uint16_t(verBuf[0]) << 8) | verBuf[1];
+    if (version == 1) {
+        return luks1ChangeKeyslotPassword(reader, writer, oldPassword, oldPasswordLen, newPassword, newPasswordLen);
+    } else if (version == 2) {
+        return luks2ChangeKeyslotPassword(reader, writer, oldPassword, oldPasswordLen, newPassword, newPasswordLen);
+    }
+    LOGI("luksChangeKeyslotPassword: unknown LUKS version %u", version);
+    return LuksChangePasswordResult::kError;
+}
+
+LuksChangePasswordResult luksChangeKeyslotPassword(int fd,
+                                                    const uint8_t* oldPassword, size_t oldPasswordLen,
+                                                    const uint8_t* newPassword, size_t newPasswordLen) {
+    if (fd < 0) return LuksChangePasswordResult::kError;
+    LuksByteReader reader = [fd](uint64_t offset, void* outData, size_t len) -> bool {
+        return pread(fd, outData, len, static_cast<off_t>(offset)) == static_cast<ssize_t>(len);
+    };
+    LuksByteWriter writer = [fd](uint64_t offset, const void* data, size_t len) -> bool {
+        return pwrite(fd, data, len, static_cast<off_t>(offset)) == static_cast<ssize_t>(len);
+    };
+    return luksChangeKeyslotPassword(reader, writer, oldPassword, oldPasswordLen, newPassword, newPasswordLen);
+}

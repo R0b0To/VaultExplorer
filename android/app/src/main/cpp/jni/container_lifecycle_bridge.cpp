@@ -209,3 +209,34 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_changeContainerPasswordNative(
 
     JNI_CATCH_RETURN(JNI_FALSE)
 }
+
+// Returns changeLuksContainerPassword()'s tri-state int directly (0 =
+// success, 1 = wrong old password/keyfile, 2 = any other error) rather
+// than collapsing to a jboolean like changeContainerPasswordNative above
+// — LUKS's Kotlin caller needs to tell "wrong password" apart from "I/O
+// or format error" to report AUTH_FAIL vs INVALID_VAULT, matching the
+// folder-vault (Cryptomator/gocryptfs/CryFS) change-password handlers.
+extern "C" JNIEXPORT jint JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_changeLuksContainerPasswordNative(
+        JNIEnv* env, jobject,
+        jint fd, jstring oldPassword, jstring newPassword,
+        jintArray oldKeyfileFds, jintArray newKeyfileFds) {
+    JNI_TRY
+
+    std::vector<int> oldKfFds = extractKeyfileFds(env, oldKeyfileFds);
+    std::vector<int> newKfFds = extractKeyfileFds(env, newKeyfileFds);
+
+    const char* nativeOldPass = env->GetStringUTFChars(oldPassword, nullptr);
+    const char* nativeNewPass = env->GetStringUTFChars(newPassword, nullptr);
+
+    int result = changeLuksContainerPassword(fd, nativeOldPass, nativeNewPass,
+                                             oldKfFds.empty() ? nullptr : oldKfFds.data(), static_cast<int>(oldKfFds.size()),
+                                             newKfFds.empty() ? nullptr : newKfFds.data(), static_cast<int>(newKfFds.size()));
+
+    env->ReleaseStringUTFChars(oldPassword, nativeOldPass);
+    env->ReleaseStringUTFChars(newPassword, nativeNewPass);
+
+    return result;
+
+    JNI_CATCH_RETURN(2)
+}

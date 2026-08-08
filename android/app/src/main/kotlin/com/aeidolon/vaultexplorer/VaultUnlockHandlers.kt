@@ -431,6 +431,72 @@ class VaultUnlockHandlers(
         }
     }
 
+    /**
+     * Shared plumbing for the three folder-vault "change password" handlers
+     * below: parses filePath/oldPassword/newPassword, runs [changePassword]
+     * on [ioExecutor], and maps its [com.aeidolon.vaultexplorer.engine.VaultOpenResult]
+     * onto the same AUTH_FAIL/INVALID_VAULT error-code contract the folder
+     * vaults' unlock handlers already use (see e.g. [handleUnlockCryptomatorVault]),
+     * so the Dart side's existing PlatformException handling covers this too.
+     */
+    private fun handleFolderVaultPasswordChange(
+        call: MethodCall,
+        result: MethodChannel.Result,
+        changePassword: (uri: Uri, oldPassword: CharArray, newPassword: CharArray) -> com.aeidolon.vaultexplorer.engine.VaultOpenResult<Unit>,
+    ) {
+        val uriString = call.argument<String>("filePath")
+        val oldPassword = call.argument<String>("oldPassword")
+        val newPassword = call.argument<String>("newPassword")
+        if (uriString == null || oldPassword == null || newPassword == null) {
+            result.error("INVALID_ARGS", "filePath, oldPassword and newPassword required", null)
+            return
+        }
+        ioExecutor.execute {
+            try {
+                val uri = Uri.parse(uriString)
+                val oldChars = oldPassword.toCharArray()
+                val newChars = newPassword.toCharArray()
+                val changeResult = try {
+                    changePassword(uri, oldChars, newChars)
+                } finally {
+                    oldChars.fill('\u0000')
+                    newChars.fill('\u0000')
+                }
+                activity.runOnUiThread {
+                    when (changeResult) {
+                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success -> result.success(true)
+                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.WrongPassword -> {
+                            result.error("AUTH_FAIL", "Incorrect password", null)
+                        }
+                        is com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault -> {
+                            result.error("INVALID_VAULT", changeResult.reason, null)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
+    }
+
+    fun handleChangeCryptomatorVaultPassword(call: MethodCall, result: MethodChannel.Result) {
+        handleFolderVaultPasswordChange(call, result) { uri, oldPassword, newPassword ->
+            com.aeidolon.vaultexplorer.cryptomator.CryptomatorVault.changePassword(activity, uri, oldPassword, newPassword)
+        }
+    }
+
+    fun handleChangeGocryptfsVaultPassword(call: MethodCall, result: MethodChannel.Result) {
+        handleFolderVaultPasswordChange(call, result) { uri, oldPassword, newPassword ->
+            com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.changePassword(activity, uri, oldPassword, newPassword)
+        }
+    }
+
+    fun handleChangeCryfsVaultPassword(call: MethodCall, result: MethodChannel.Result) {
+        handleFolderVaultPasswordChange(call, result) { uri, oldPassword, newPassword ->
+            com.aeidolon.vaultexplorer.cryfs.CryfsVault.changePassword(activity, uri, oldPassword, newPassword)
+        }
+    }
+
     fun handleIsGocryptfsVault(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("uri")
         if (uriString == null) {
@@ -523,6 +589,46 @@ class VaultUnlockHandlers(
                     oldKfFds, newKfFds
                 )
                 activity.runOnUiThread { result.success(success) }
+            } catch (e: Exception) {
+                activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
+            }
+        }
+    }
+
+    /** No PIM: LUKS has no PIM concept, unlike VeraCrypt's
+     *  handleChangeContainerPassword above. Maps ContainerEngine
+     *  .changeLuksPassword's tri-state result to the same AUTH_FAIL/
+     *  INVALID_VAULT error-code contract the folder-vault change-password
+     *  handlers use (see handleFolderVaultPasswordChange). */
+    fun handleChangeLuksContainerPassword(call: MethodCall, result: MethodChannel.Result) {
+        val uri = call.argument<String>("uri")
+        val oldPassword = call.argument<String>("oldPassword") ?: ""
+        val newPassword = call.argument<String>("newPassword") ?: ""
+        val oldKeyfilePaths = call.argument<List<String>>("oldKeyfilePaths")
+        val newKeyfilePaths = call.argument<List<String>>("newKeyfilePaths")
+
+        if (uri.isNullOrEmpty() || newPassword.isEmpty()) {
+            result.error("INVALID_ARGS", "uri and newPassword required", null)
+            return
+        }
+
+        ioExecutor.execute {
+            try {
+                val docUri = Uri.parse(uri)
+                val pfd = activity.contentResolver.openFileDescriptor(docUri, "rw")
+                    ?: throw Exception("Could not open file descriptor")
+                val oldKfFds = nativeOps.openKeyfileFds(oldKeyfilePaths)
+                val newKfFds = nativeOps.openKeyfileFds(newKeyfilePaths)
+                val outcome = ContainerEngine.changeLuksPassword(
+                    pfd.detachFd(), oldPassword, newPassword, oldKfFds, newKfFds
+                )
+                activity.runOnUiThread {
+                    when (outcome) {
+                        0 -> result.success(true)
+                        1 -> result.error("AUTH_FAIL", "Incorrect password", null)
+                        else -> result.error("INVALID_VAULT", "Could not change the LUKS container's password", null)
+                    }
+                }
             } catch (e: Exception) {
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             }

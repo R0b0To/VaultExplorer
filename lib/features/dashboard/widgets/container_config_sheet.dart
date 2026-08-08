@@ -701,35 +701,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                               color: cs.onSurfaceVariant),
                           onTap: () async {
                             final fmt = widget.existingRecord?.containerFormat;
-                            if (fmt == 'luks1' || fmt == 'luks2') {
-                              showAppSnackBar(
-                                context,
-                                message:
-                                    context.l10n.luksPasswordChangeNotSupportedMessage,
-                                tone: AppBannerTone.warning,
-                              );
-                            } else if (fmt == 'cryptomator') {
-                              showAppSnackBar(
-                                context,
-                                message:
-                                    context.l10n.cryptomatorPasswordChangeNotSupportedMessage,
-                                tone: AppBannerTone.warning,
-                              );
-                            } else if (fmt == 'gocryptfs') {
-                              showAppSnackBar(
-                                context,
-                                message:
-                                    context.l10n.gocryptfsPasswordChangeNotSupportedMessage,
-                                tone: AppBannerTone.warning,
-                              );
-                            } else if (fmt == 'cryfs') {
-                              showAppSnackBar(
-                                context,
-                                message:
-                                    context.l10n.cryfsPasswordChangeNotSupportedMessage,
-                                tone: AppBannerTone.warning,
-                              );
-                            } else if (fmt == 'bitlocker') {
+                            if (fmt == 'bitlocker') {
                               showAppSnackBar(
                                 context,
                                 message:
@@ -746,6 +718,7 @@ class _ContainerConfigScreenState extends State<ContainerConfigScreen> with Keyf
                                           widget.existingRecord!.cipherId,
                                       initialHashId:
                                           widget.existingRecord!.hashId,
+                                      containerFormat: fmt ?? 'veracrypt',
                                     ),
                                   ),
                                 );

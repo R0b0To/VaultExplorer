@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer.syncbridge
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import com.aeidolon.vaultexplorer.BuildConfig
 import java.security.MessageDigest
 
 /**
@@ -36,7 +37,22 @@ object CallerVerifier {
         // shipping — see the class doc comment above. Left empty here so
         // an unconfigured build fails closed (denies every caller) rather
         // than silently trusting nothing-in-particular.
-        emptySet()
+        val releaseDigests = emptySet<String>()
+
+        // Debug builds additionally trust whatever's currently sitting in
+        // this machine's default debug keystore (~/.android/debug.keystore).
+        // VaultExplorer and vaultsync-bridge share that keystore by default
+        // when both are debug-built on the same dev machine, so this lets
+        // local end-to-end testing work without ever hardcoding a real
+        // distribution channel's digest here. BuildConfig.DEBUG compiles to
+        // `false` in release, and LOCAL_DEBUG_CALLER_DIGEST is only ever
+        // populated by the `debug` buildType (see app/build.gradle.kts) —
+        // so this can't leak into or weaken a release build.
+        if (BuildConfig.DEBUG && BuildConfig.LOCAL_DEBUG_CALLER_DIGEST.isNotBlank()) {
+            releaseDigests + BuildConfig.LOCAL_DEBUG_CALLER_DIGEST
+        } else {
+            releaseDigests
+        }
     }
 
     fun check(context: Context, callingUid: Int): Boolean {

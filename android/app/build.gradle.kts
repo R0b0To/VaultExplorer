@@ -9,7 +9,10 @@ if (keystorePropertiesFile.exists()) {
 plugins {
     id("com.android.application")
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.devtools.ksp") // Room's annotation processor, for SyncLedgerDb (docs/architecture.md §8)
 }
+
+val syncApiVersion: String = gradle.extra["syncApiVersion"] as String
 
 tasks.whenTaskAdded {
     if (name.contains("ArtProfile")) {
@@ -40,6 +43,12 @@ android {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
         }
+    }
+
+    buildFeatures {
+        // VaultSyncBridgeService's public (syncapi) and internal
+        // (ILedgerWriter) AIDL surfaces — docs/architecture.md §8.
+        aidl = true
     }
 
     compileOptions {
@@ -139,6 +148,13 @@ flutter {
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation("junit:junit:4.13.2")
+
+    // docs/architecture.md §8 — VaultSync Bridge boundary.
+    implementation("com.aeidolon.vaultsync:syncapi:$syncApiVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("androidx.room:room-runtime:2.7.1")
+    implementation("androidx.room:room-ktx:2.7.1")
+    ksp("androidx.room:room-compiler:2.7.1")
 }
 
 androidComponents {

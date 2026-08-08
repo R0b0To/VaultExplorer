@@ -133,6 +133,18 @@ new code must not violate. Each is traceable to specific enforcement code.
     disguise" would itself be a fingerprint that partially defeats the
     purpose of having one.
 
+11. **`ContainerEngine` never gains an `android.content.Context` parameter
+    for the sync bridge's sake, and its write hooks never block on, or
+    change behavior based on, whether anything is listening (ADR-029).**
+    `LedgerWriterClient.notifyChangeIfActive` is the only thing a write
+    hook calls, it is `object`-scoped (no `Context` threaded through
+    `ContainerEngine`'s own API), and its first real check is always the
+    cheapest possible one (`SyncBridgeActiveMarker.isActive`, a single
+    `File.exists()`) before anything resembling IPC. §8 covers the full
+    design; this rule exists so a future contributor adding a fifth format
+    or a new write path doesn't reach for `Context` here to "make it
+    easier."
+
 ---
 
 ## 3. Thread model
@@ -248,7 +260,7 @@ written at the call sites.
 > **Numbering convention:** ADR numbers 001, 006–009, 013, and 015–018 are
 > unrecoverable gaps from a prior version of this document. They are
 > preserved as gaps intentionally so that existing in-code citations remain
-> stable. The next unused number is **029**.
+> stable. The next unused number is **031**.
 
 | ADR | Title | Status | Primary evidence |
 |---|---|---|---|
@@ -270,6 +282,8 @@ written at the call sites.
 | **026** | The in-vault PDF viewer renders through `pdfrx` (native PDFium via FFI: `PdfViewer.custom` streams decrypted bytes straight from `vaultExplorerApi.readFileChunk`, no plaintext temp file, no WebView/JS bridge), superseding the original pdf.js `PlatformView`/WebView pipeline this ADR originally described. That original pipeline's other half — the Mask Mode decoy reader sharing it via a `localUri` param — no longer applies at all: the decoy identity is now `DecoyWaterTrackerScreen` only, with no PDF entry point; `pickLocalPdfFile()` (`disguise_mode_api.dart`) and `PdfViewerBase`'s `localUri`/`PdfSearchConfig.decoy` parameters are unreferenced leftovers from it | Superseded | `pdf_viewer_base.dart`, `pdf_viewer_screen.dart`, `disguise_mode_api.dart` |
 | **027** | The decoy reader's "Open PDF File" picker reuses the existing SAF `ACTION_OPEN_DOCUMENT` + `PendingActivityResult` pattern instead of adding a third-party `file_picker` dependency — **superseded** along with ADR-026: nothing in the current UI calls `pickLocalPdfFile()` anymore | Superseded | `DisguiseModeHandlers.kt`, `VaultPickerHandlers.kt`, `disguise_mode_api.dart` |
 | **028** | The hidden vault-unlock trigger (3 s hold on app-bar title) uses a raw touch-down timer (`HoldTrigger`), `Navigator.push`s (not `pushReplacement`) onto `LockGateScreen`, and never modifies OS-level alias state | Accepted | `lib/core/utils/hold_trigger.dart`, `lib/features/decoy/widgets/hidden_vault_trigger.dart` |
+| **029** | VaultSync Bridge's `:syncbridge` process, `VaultSyncBridgeService`, and `SyncLedgerDb` are all lazily created — nothing eager-inits them, and `ContainerEngine`'s write hooks reach them only through `LedgerWriterClient`, whose first action is always a single `File.exists()` check (`SyncBridgeActiveMarker`). Zero steady-state cost when the plugin is never installed or no vault is registered for sync (§8) | Accepted | `VaultSyncBridgeService.kt`, `LedgerWriterClient.kt`, `SyncBridgeActiveMarker.kt`, `ContainerEngine.kt`, §2 rule 11, §8 |
+| **030** | `vaultsync-syncapi` is vendored as a git submodule at the repo root (`vaultsync-syncapi/`), not resolved via an "if the sibling directory happens to exist" `includeBuild` or a package registry — a missing submodule fails the Gradle build immediately with an actionable message. Keeps the build fully reproducible from source with no registry trust required, which matters for F-Droid's build pipeline the same way it does on the `vaultsync-bridge` side (that repo's ADR-S-015) | Accepted | `android/settings.gradle.kts`, `.gitmodules`, `vaultsync-syncapi/README.md` "Consuming this module" |
 
 ---
 
@@ -401,6 +415,12 @@ Via the same channel's method-call handler in reverse — see
 - **`VaultBackend`** — the interface every pure-Kotlin directory-vault
   session implements, so `ContainerEngine` can dispatch to any of the three
   without a per-format branch at most call sites.
+- **`VaultSyncBridgeService`** — the public AIDL host for the optional
+  VaultSync Bridge companion app (§8), running in the `:syncbridge`
+  process. Not reachable from Dart or `MainActivity` at all; the only
+  thing this app's own code calls into it through is
+  `LedgerWriterClient`/`ILedgerWriter` (§8.1), and even that is a
+  best-effort, fire-and-forget notification.
 - **`ContainerFileSystem`** — the locking chokepoint in front of
   `ContainerEngine` for Tier-2 calls (§3.2); both `MainActivity` and
   `ContainerDocumentsProvider` (SAF) call through here, not `ContainerEngine`
@@ -488,13 +508,120 @@ has no asynchronous native-side progress to report.
 
 ---
 
-## 8. Cross-references
+## 8. VaultSync Bridge boundary
+
+VaultSync Bridge (separate repo, `vaultsync-bridge`) is an optional
+companion app that adds cloud sync. This app has no dependency on it in
+either direction that matters at runtime: **if VaultSync Bridge is never
+installed, nothing here changes shape, starts a process, opens a database,
+or costs a cycle** (ADR-029). This section documents the boundary as seen
+from *this* repo; the full design — including everything on the plugin's
+own side (adapters, credentials, OAuth, the sync engine's state machine)
+— lives in that repo's own `docs/architecture.md`, which this section is
+kept consistent with. Grep both repos for `ADR-029` and `ADR-S-` to find
+every call site on either side.
+
+### 8.1 The boundary, in one picture
+
+```
+┌──────────────────────────── this app/repo ─────────────────────────────┐
+│                                                                         │
+│  Flutter UI ── MethodChannel ── MainActivity (main process)            │
+│                                   │  ContainerEngine (§3.3)             │
+│                                   │  write hooks: finishWrite,          │
+│                                   │  writeBackFile, deleteFile,         │
+│                                   │  renameFile (§2 rule 11)            │
+│                                   ▼                                     │
+│                          LedgerWriterClient                            │
+│                          (SyncBridgeActiveMarker.isActive() first —    │
+│                           near-zero cost when nothing is registered)   │
+│                                   │ ILedgerWriter (internal AIDL,       │
+│                                   │  same app, oneway)                  │
+│                                   ▼                                     │
+│                    ":syncbridge" process (same APK, isolated,          │
+│                     lazily created — ADR-029)                          │
+│                    VaultSyncBridgeService  (public AIDL host)          │
+│                    SyncLedgerDb (Room) — metadata only,                │
+│                      never ciphertext content                          │
+│                    CallerVerifier — pinned signing-digest allowlist,   │
+│                      re-checked on every public AIDL call              │
+└───────────────────────────────┬─────────────────────────────────────────┘
+                                 │ AIDL / Binder (com.aeidolon.vaultexplorer.
+                                 │ syncapi, from the vaultsync-syncapi repo)
+                                 │ — local IPC only, ciphertext
+                                 │ ParcelFileDescriptors + change-metadata,
+                                 │ nothing else
+                                 ▼
+                    VaultSync Bridge (separate app/repo — see its own
+                    docs/architecture.md for everything past this line)
+```
+
+### 8.2 Ownership rules specific to this boundary
+
+These extend, and are numbered independently of, §2's list (which
+predates this boundary and is about the offline core only).
+
+1. **`VaultSyncBridgeService` never accepts a `relativePath` without
+   resolving it through `PathValidator.resolve` first.** No AIDL method
+   implementation touches a `File` built from a raw client string —
+   `openBlockForRead`, `openBlockForWrite`, `finalizeBlockWrite`, and
+   `deleteBlock` all go through this one function, which rejects absolute
+   paths, `.`/`..` segments, and any canonical path that would resolve
+   outside the vault's root.
+2. **A staged write is never promoted to the live path except by
+   `File.renameTo` on the same filesystem, and never without a size check
+   first.** `openBlockForWrite` always targets `.vaultsync-staging/<uuid>`
+   under the vault root, never the live relative path; `finalizeBlockWrite`
+   verifies the staged file's actual length against the caller-declared
+   `expectedSizeBytes` before renaming, and deletes the staged file instead
+   of promoting it on a mismatch.
+3. **Every public AIDL call re-verifies the caller; binding once does not
+   grant standing trust.** `requireCallerOrThrow()` runs at the top of
+   every `IVaultSyncService.Stub` method, calling `CallerVerifier.check`
+   again rather than caching the result of the check done in `onBind`.
+4. **Every `ParcelFileDescriptor` handed out is tracked per calling uid,
+   capped, and reaped.** `VaultSyncBridgeService` never lets a single
+   caller hold more than 8 concurrently-open fds (the oldest is closed to
+   make room for a 9th) and closes anything idle past 60 seconds — a
+   resource-exhaustion guard against a buggy or malicious client, matching
+   this document's own emphasis (§2 rule 8) on not conflating "the call
+   succeeded" with "the bookkeeping around it is now safe to forget."
+5. **The dirty ledger is written from inside `VaultSyncBridgeService`'s own
+   process, by the same code path that then fires the push callback —
+   never as two separately-timed steps.** `ILedgerWriter.recordChange`
+   does the Room insert and the `IVaultSyncCallback.onVaultChanged` call in
+   the same coroutine, so a plugin can never observe a cursor advance
+   without the corresponding ledger row already being queryable.
+
+### 8.3 What crosses the boundary, and what structurally cannot
+
+Everything left of the AIDL line in §8.1 has the only copy of every
+cryptographic key and the only code capable of decrypting anything.
+Everything right of it — including `VaultSyncBridgeService` itself, even
+though it lives inside this app's APK — has no such capability: the public
+AIDL contract (`IVaultSyncService`/`IVaultSyncCallback`, in the
+`vaultsync-syncapi` repo) simply has no method whose request or response
+type could carry a plaintext byte, a password, or a key. This is enforced
+by interface shape, the same way §2's ownership rules are enforced by code
+structure rather than by policy — see that repo's ADR-S-001 for the
+client-side half of this claim.
+
+### 8.4 Cross-reference for `vaultsync-bridge`
+
+`vaultsync-bridge/docs/architecture.md`'s own header references "this
+repo's own `docs/architecture.md` §8 for the boundary as seen from that
+side" — this is that §8. If this section is ever renumbered, update that
+cross-reference in the same change.
+
+---
+
+## 9. Cross-references
 
 This document's §4 numbering matches the numbering used throughout the
 codebase. Grep for `ADR-0` or `Finding F-` to locate every call site that
 cites a specific entry. When adding a new architectural decision, assign the
-next unused number (currently **029**) rather than reusing any gap, and cite
-it consistently: `// See docs/architecture.md ADR-029.`
+next unused number (currently **031**) rather than reusing any gap, and cite
+it consistently: `// See docs/architecture.md ADR-030.`
 
 ---
 

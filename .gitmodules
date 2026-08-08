@@ -1,0 +1,3 @@
+[submodule "vaultsync-syncapi"]
+	path = vaultsync-syncapi
+	url = https://github.com/R0b0To/vaultsync-syncapi.git

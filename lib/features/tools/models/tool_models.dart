@@ -2,17 +2,27 @@
 /// Splitter/Joiner, Single-File Encrypt/Decrypt, Storage Analyzer,
 /// Container Check & Repair).
 ///
-/// These are UI-facing choices only — the actual chunked-split,
-/// AEAD-container, and repair *engines* they describe don't exist on the
-/// native side yet (see [ContainerToolService]'s doc comment). Kept in
-/// their own file so the sheets/screens and the eventual service
-/// implementation agree on the same vocabulary from day one.
+/// These are UI-facing choices only. Container Splitter/Joiner's engine
+/// exists now (`SplitJoinHandlers` on the native side, via
+/// [ContainerToolService]'s [NativeContainerToolService]) — the
+/// AEAD-container and repair engines described elsewhere in this file
+/// still don't. Kept in their own file so the sheets/screens and the
+/// service implementation agree on the same vocabulary from day one.
 library;
 
 /// Preset chunk sizes offered by the Container Splitter, plus a custom
 /// option. Values are informational (MB) for the concrete presets;
 /// [custom] defers to whatever the user types into the size field.
+///
+/// [cloud8mb] is the default: splitting for cloud sync (rather than for a
+/// legacy filesystem's single-file size cap) means a change deep inside a
+/// large container should only have to re-upload the handful of chunks it
+/// actually touched, so small chunks matter more here than they do for
+/// the two legacy size-cap presets below, which exist for FAT32/generic
+/// "my provider rejects big files" cases and stay large on purpose.
 enum ChunkSizePreset {
+  cloud8mb(8),
+  cloud32mb(32),
   cloud100mb(100),
   fat32_2gb(2000),
   fourGb(4000),

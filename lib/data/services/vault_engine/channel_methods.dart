@@ -80,6 +80,18 @@ abstract final class ChannelMethods {
   static const getMediaFileSize = 'getMediaFileSize';
   static const readMediaFileChunk = 'readMediaFileChunk';
 
+  // ── Tools tab: Container Splitter/Joiner ────────────────────────────────
+  // Operates on an unmounted container file picked via pickContainer --
+  // never a volId -- so it lives outside the mounted-container lock/error
+  // contract every other file-I/O method above goes through. opId is the
+  // caller's FileOperation.id, same convention as importFile/importFolder,
+  // but tracked in its own native-side cancellation set (SplitJoinCancellation)
+  // separate from ImportCancellation.
+  static const splitContainer = 'splitContainer';
+  static const joinContainer = 'joinContainer';
+  static const cancelSplitJoin = 'cancelSplitJoin';
+  static const unlockSplitContainer = 'unlockSplitContainer';
+
   // ── Directory operations ─────────────────────────────────────────────────
   static const listDirectory = 'listDirectory';
   static const createDirectory = 'createDirectory';

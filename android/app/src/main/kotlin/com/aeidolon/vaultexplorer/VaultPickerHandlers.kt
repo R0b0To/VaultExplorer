@@ -182,8 +182,15 @@ class VaultPickerHandlers(
     }
 
     // Folder-picker counterpart used when the user chooses a custom
-    // extraction destination from the decoy screen instead of the default
-    // Download/Extracted location. Same raw-path-only contract as above.
+    // extraction destination from the decoy screen (and, for Container
+    // Splitter/Joiner, the Tools tab's destination-folder pickers). Also
+    // returns "treeUri" alongside the best-effort raw "path" guess:
+    // [UriToPath.getRawPath] returns a path even when this process can't
+    // actually write there under scoped storage (unlike [UriToPath.getRawFile],
+    // it doesn't gate on `MANAGE_EXTERNAL_STORAGE`), so callers that write
+    // into this folder -- [SplitJoinHandlers] in particular -- need the
+    // tree URI too, to fall back to a [androidx.documentfile.provider.DocumentFile]
+    // write when the raw path turns out not to be writable.
     private val pickExtractFolderLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -191,11 +198,17 @@ class VaultPickerHandlers(
         val data = activityResult.data
         if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
             val uri = data.data!!
+            try {
+                activity.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            } catch (_: SecurityException) {}
             ioExecutor.execute {
                 val path = UriToPath.getRawPath(activity, uri)
                 val name = UriNameResolver.resolve(activity.contentResolver, uri)
                 activity.runOnUiThread {
-                    res.success(mapOf("path" to path, "displayName" to name))
+                    res.success(mapOf("path" to path, "displayName" to name, "treeUri" to uri.toString()))
                 }
             }
         } else {

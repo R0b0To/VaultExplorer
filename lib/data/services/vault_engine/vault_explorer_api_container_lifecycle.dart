@@ -253,8 +253,14 @@ mixin _ContainerLifecycleOps {
   /// Opens a SAF folder picker (`ACTION_OPEN_DOCUMENT_TREE`) so the user
   /// can choose where an archive gets extracted to, instead of the
   /// default Download/Extracted location. Same raw-path contract as
-  /// [pickArchiveFile].
-  Future<({String? path, String displayName})?> pickExtractFolder() async {
+  /// [pickArchiveFile], plus [treeUri]: the raw `path` is only a
+  /// best-effort guess (native returns one even without "All files
+  /// access" granted), so callers that *write* into this folder --
+  /// [_SplitJoinOps.splitContainer]/[_SplitJoinOps.joinContainer] in
+  /// particular -- pass [treeUri] along too, letting the native side fall
+  /// back to a SAF write when the raw path isn't actually writable. See
+  /// `SplitJoinHandlers.kt`'s `resolveDestFolder` doc comment.
+  Future<({String? path, String displayName, String? treeUri})?> pickExtractFolder() async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.pickExtractFolder,
     );
@@ -262,6 +268,7 @@ mixin _ContainerLifecycleOps {
     return (
       path: raw['path'] as String?,
       displayName: raw['displayName'] as String,
+      treeUri: raw['treeUri'] as String?,
     );
   }
 
@@ -631,6 +638,89 @@ mixin _ContainerLifecycleOps {
       matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
       matchedHashId: raw['matchedHashId'] as int? ?? 255,
       containerFormat: raw['containerFormat'] as String? ?? 'veracrypt',
+    );
+  }
+
+  /// Mounts a split container directly from its first on-disk part
+  /// (`<name>.001`/`<name>.part1`), without ever joining the sequence back
+  /// into a single file first -- see `SplitContainerMountHandlers` (Kotlin)
+  /// for how the parts get exposed as one seekable file under the hood.
+  /// Args otherwise mirror [unlockContainer] (password/pim/hidden-volume/
+  /// keyfiles all work the same way); [firstPartUri] replaces [filePath] as
+  /// the source identifier since there's no single backing file. [partCount]
+  /// in the result is purely informational (how many `.NNN`/`.partN` files
+  /// were found and mounted), for UI that wants to show it.
+  Future<
+    ({
+      int volId,
+      List<String> files,
+      int matchedCipherId,
+      int matchedHashId,
+      String containerFormat,
+      int partCount,
+    })?
+  >
+  unlockSplitContainer(
+    String firstPartUri,
+    String password,
+    int pim, {
+    String? displayName,
+    bool documentProvider = false,
+    List<String> autoMountFolders = const [],
+    int? cipherId,
+    int? hashId,
+    Uint8List? preservedKey,
+    bool cacheDerivedKey = false,
+    List<String>? keyfilePaths,
+    bool readOnly = false,
+    bool protectHiddenVolume = false,
+    String? hiddenVolumePassword,
+    int hiddenVolumePim = 0,
+    int? hiddenVolumeCipherId,
+    int? hiddenVolumeHashId,
+    List<String>? hiddenVolumeKeyfilePaths,
+  }) async {
+    final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+      ChannelMethods.unlockSplitContainer,
+      {
+        'firstPartUri': firstPartUri,
+        'password': password,
+        'pim': pim,
+        'displayName': displayName,
+        'documentProvider': documentProvider,
+        'autoMountFolders': autoMountFolders,
+        'cipherId': cipherId ?? 255,
+        'hashId': hashId ?? 255,
+        if (preservedKey != null) 'preservedKey': base64Encode(preservedKey),
+        'cacheDerivedKey': cacheDerivedKey,
+        if (keyfilePaths != null && keyfilePaths.isNotEmpty)
+          'keyfilePaths': keyfilePaths,
+        'readOnly': readOnly,
+        'protectHiddenVolume': protectHiddenVolume,
+        if (protectHiddenVolume) ...{
+          'hiddenVolumePassword': hiddenVolumePassword ?? '',
+          'hiddenVolumePim': hiddenVolumePim,
+          'hiddenVolumeCipherId': hiddenVolumeCipherId ?? 255,
+          'hiddenVolumeHashId': hiddenVolumeHashId ?? 255,
+          if (hiddenVolumeKeyfilePaths != null &&
+              hiddenVolumeKeyfilePaths.isNotEmpty)
+            'hiddenVolumeKeyfilePaths': hiddenVolumeKeyfilePaths,
+        },
+      },
+    );
+
+    if (raw == null) return null;
+
+    final volId = raw['volId'] as int;
+    final files = (raw['files'] as List<Object?>).cast<String>();
+
+    return (
+      volId: volId,
+      files: files,
+      matchedCipherId: raw['matchedCipherId'] as int? ?? 255,
+      matchedHashId: raw['matchedHashId'] as int? ?? 255,
+      containerFormat: raw['containerFormat'] as String? ?? 'veracrypt',
+      partCount: raw['partCount'] as int? ?? 1,
     );
   }
 

@@ -94,6 +94,12 @@ private object ChannelMethods {
     const val SET_KEEP_SCREEN_ON = "setKeepScreenOn"
     const val LAUNCH_URL = "launchUrl"
     const val GET_APP_VERSION = "getAppVersion"
+
+    // ── Tools tab: Container Splitter/Joiner ─────────────────────────
+    const val SPLIT_CONTAINER = "splitContainer"
+    const val JOIN_CONTAINER = "joinContainer"
+    const val CANCEL_SPLIT_JOIN = "cancelSplitJoin"
+    const val UNLOCK_SPLIT_CONTAINER = "unlockSplitContainer"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -123,6 +129,8 @@ class MainActivity : FlutterFragmentActivity() {
     private val vaultUnlockHandlers = VaultUnlockHandlers(this, ioExecutor, nativeOps, derivedKeyHandlers)
     private val thumbnailHandlers = ThumbnailHandlers(this, imageThumbnailExecutor, videoThumbnailExecutor, nativeOps)
     private val importExportHandlers = ImportExportHandlers(this, pendingResult, ioExecutor, nativeOps)
+    private val splitJoinHandlers = SplitJoinHandlers(this, ioExecutor)
+    private val splitContainerMountHandlers = SplitContainerMountHandlers(this, ioExecutor, nativeOps)
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
@@ -157,6 +165,7 @@ class MainActivity : FlutterFragmentActivity() {
         screenOffReceiver?.let { unregisterReceiver(it) }
         vaultCameraPlugin?.disposeAll()
         vaultCameraPlugin = null
+        splitContainerMountHandlers.onActivityDestroyed()
         super.onDestroy()
     }
 
@@ -210,6 +219,7 @@ class MainActivity : FlutterFragmentActivity() {
         UnlockProgressBridge.channel = channel
         ImportProgressBridge.channel = channel
         HiddenVolumeProtectionBridge.channel = channel
+        SplitJoinProgressBridge.channel = channel
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
         ExternalOpenBridge.channel = disguiseChannel
@@ -378,6 +388,10 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.EXPORT_FILES_FOLDER -> importExportHandlers.handleExportFilesFolder(call, result)
                 ChannelMethods.IMPORT_FOLDER -> importExportHandlers.handleImportFolder(call, result)
                 ChannelMethods.EXPORT_FILE -> importExportHandlers.handleExportFile(call, result)
+                ChannelMethods.SPLIT_CONTAINER -> splitJoinHandlers.handleSplitContainer(call, result)
+                ChannelMethods.JOIN_CONTAINER -> splitJoinHandlers.handleJoinContainer(call, result)
+                ChannelMethods.CANCEL_SPLIT_JOIN -> splitJoinHandlers.handleCancelSplitJoin(call, result)
+                ChannelMethods.UNLOCK_SPLIT_CONTAINER -> splitContainerMountHandlers.handleUnlockSplitContainer(call, result)
                 ChannelMethods.WRITE_FILE_CHUNK -> fileOperationHandlers.handleWriteFileChunk(call, result)
                 ChannelMethods.MOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleMountContainerFolder(call, result)
                 ChannelMethods.UNMOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleUnmountContainerFolder(call, result)

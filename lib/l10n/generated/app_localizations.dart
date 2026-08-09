@@ -2390,6 +2390,18 @@ abstract class AppLocalizations {
   /// **'Unlock a file container you already have'**
   String get mountExistingContainerSubtitle;
 
+  /// Add-vault option title
+  ///
+  /// In en, this message translates to:
+  /// **'Mount split container'**
+  String get mountSplitContainerTitle;
+
+  /// Add-vault option subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock a split container directly, without joining it first'**
+  String get mountSplitContainerSubtitle;
+
   /// Title for the USB drive mount sheet
   ///
   /// In en, this message translates to:
@@ -6541,6 +6553,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Custom size (MB)'**
   String get splitChunkSizeCustomLabel;
+
+  /// Chunk size preset label: 8 MB, sized so an edit deep inside a large container only re-uploads a handful of chunks on incremental cloud sync
+  ///
+  /// In en, this message translates to:
+  /// **'8 MB (Cloud)'**
+  String get splitChunkSizeCloud8mb;
+
+  /// Chunk size preset label: 32 MB, a coarser cloud-sync-friendly chunk size than the 8 MB preset
+  ///
+  /// In en, this message translates to:
+  /// **'32 MB (Cloud)'**
+  String get splitChunkSizeCloud32mb;
 
   /// Chunk size preset label: 100 MB, sized for cloud-storage upload limits
   ///

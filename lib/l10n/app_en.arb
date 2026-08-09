@@ -1930,6 +1930,14 @@
   "@mountExistingContainerSubtitle": {
     "description": "Add-vault option subtitle"
   },
+  "mountSplitContainerTitle": "Mount split container",
+  "@mountSplitContainerTitle": {
+    "description": "Add-vault option title"
+  },
+  "mountSplitContainerSubtitle": "Unlock a split container directly, without joining it first",
+  "@mountSplitContainerSubtitle": {
+    "description": "Add-vault option subtitle"
+  },
   "mountUsbDriveTitle": "Mount USB drive",
   "@mountUsbDriveTitle": {
     "description": "Add-vault option title"
@@ -5024,6 +5032,14 @@
   "splitChunkSizeCustomLabel": "Custom size (MB)",
   "@splitChunkSizeCustomLabel": {
     "description": "Text field label for a custom chunk size in megabytes"
+  },
+  "splitChunkSizeCloud8mb": "8 MB (Cloud)",
+  "@splitChunkSizeCloud8mb": {
+    "description": "Chunk size preset label: 8 MB, sized so an edit deep inside a large container only re-uploads a handful of chunks on incremental cloud sync"
+  },
+  "splitChunkSizeCloud32mb": "32 MB (Cloud)",
+  "@splitChunkSizeCloud32mb": {
+    "description": "Chunk size preset label: 32 MB, a coarser cloud-sync-friendly chunk size than the 8 MB preset"
   },
   "splitChunkSizeCloud": "100 MB (Cloud)",
   "@splitChunkSizeCloud": {

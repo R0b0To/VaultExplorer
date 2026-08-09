@@ -41,7 +41,8 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
   String? _sourceName;
   String? _destPath;
   String? _destName;
-  ChunkSizePreset _preset = ChunkSizePreset.fat32_2gb;
+  String? _destTreeUri;
+  ChunkSizePreset _preset = ChunkSizePreset.cloud8mb;
   final _customSizeCtrl = TextEditingController();
 
   // Join fields
@@ -49,6 +50,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
   String? _firstPartName;
   String? _joinDestPath;
   String? _joinDestName;
+  String? _joinDestTreeUri;
   final _outputNameCtrl = TextEditingController();
 
   @override
@@ -74,6 +76,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     setState(() {
       _destPath = picked.path;
       _destName = picked.displayName;
+      _destTreeUri = picked.treeUri;
       _error = null;
     });
   }
@@ -98,6 +101,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     setState(() {
       _joinDestPath = picked.path;
       _joinDestName = picked.displayName;
+      _joinDestTreeUri = picked.treeUri;
       _error = null;
     });
   }
@@ -145,6 +149,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
       await ContainerToolService.instance.splitContainer(
         sourceUri: source,
         destinationPath: dest,
+        destinationTreeUri: _destTreeUri,
         chunkSizeBytes: chunkBytes,
         onProgress: (done, total) {
           if (!mounted) return;
@@ -207,6 +212,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
       await ContainerToolService.instance.joinContainer(
         firstPartUri: firstPart,
         destinationPath: '$destFolder/$outputName',
+        destinationTreeUri: _joinDestTreeUri,
         onProgress: (done, total) {
           if (!mounted) return;
           setState(() {
@@ -383,6 +389,8 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
         spacing: 8,
         runSpacing: 8,
         children: [
+          _presetChip(ChunkSizePreset.cloud8mb, context.l10n.splitChunkSizeCloud8mb),
+          _presetChip(ChunkSizePreset.cloud32mb, context.l10n.splitChunkSizeCloud32mb),
           _presetChip(ChunkSizePreset.cloud100mb, context.l10n.splitChunkSizeCloud),
           _presetChip(ChunkSizePreset.fat32_2gb, context.l10n.splitChunkSizeFat32),
           _presetChip(ChunkSizePreset.fourGb, context.l10n.splitChunkSizeFourGb),

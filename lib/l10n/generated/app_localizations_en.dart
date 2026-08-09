@@ -1423,6 +1423,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Unlock a file container you already have';
 
   @override
+  String get mountSplitContainerTitle => 'Mount split container';
+
+  @override
+  String get mountSplitContainerSubtitle =>
+      'Unlock a split container directly, without joining it first';
+
+  @override
   String get mountUsbDriveTitle => 'Mount USB Drive';
 
   @override
@@ -3877,6 +3884,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get splitChunkSizeCustomLabel => 'Custom size (MB)';
+
+  @override
+  String get splitChunkSizeCloud8mb => '8 MB (Cloud)';
+
+  @override
+  String get splitChunkSizeCloud32mb => '32 MB (Cloud)';
 
   @override
   String get splitChunkSizeCloud => '100 MB (Cloud)';

@@ -16,6 +16,7 @@ import 'package:vaultexplorer/core/services/cache_coordinator.dart';
 part 'vault_explorer_api_crypto.dart';
 part 'vault_explorer_api_container_lifecycle.dart';
 part 'vault_explorer_api_file_io.dart';
+part 'vault_explorer_api_split_join.dart';
 
 typedef KeyfileRef = ({String uri, String displayName});
 typedef UnlockProgress = ({
@@ -39,6 +40,8 @@ typedef ImportProgress = ({
   int totalBytes,
 });
 
+typedef SplitJoinProgress = ({int opId, int bytesDone, int bytesTotal});
+
 void _logSwallowed(String method, Object error, {bool expected = false}) {
   debugPrint(
     '${expected ? '[VaultExplorerApi:expected]' : '[VaultExplorerApi]'} '
@@ -49,7 +52,7 @@ void _logSwallowed(String method, Object error, {bool expected = false}) {
 const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
 
 class VaultExplorerApi
-    with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
+    with _CryptoOps, _ContainerLifecycleOps, _FileIoOps, _SplitJoinOps {
   const VaultExplorerApi();
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;
@@ -157,6 +160,20 @@ class VaultExplorerApi
     _importProgressRegistry.remove(listener);
   }
 
+  static final ListenerRegistry<SplitJoinProgress> _splitJoinProgressRegistry =
+      ListenerRegistry<SplitJoinProgress>();
+  static void addSplitJoinProgressListener(
+    void Function(SplitJoinProgress progress) listener,
+  ) {
+    _splitJoinProgressRegistry.add(listener);
+  }
+
+  static void removeSplitJoinProgressListener(
+    void Function(SplitJoinProgress progress) listener,
+  ) {
+    _splitJoinProgressRegistry.remove(listener);
+  }
+
   static void initMethodCallHandler() {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onAppSelected') {
@@ -217,6 +234,18 @@ class VaultExplorerApi
             totalBytes: (args['totalBytes'] as num?)?.toInt() ?? 0,
           );
           _importProgressRegistry.notify(progress);
+        }
+      } else if (call.method == 'onSplitJoinProgress') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final opId = args['opId'] as int?;
+        final bytesDone = (args['bytesDone'] as num?)?.toInt();
+        final bytesTotal = (args['bytesTotal'] as num?)?.toInt();
+        if (opId != null && bytesDone != null && bytesTotal != null) {
+          _splitJoinProgressRegistry.notify((
+            opId: opId,
+            bytesDone: bytesDone,
+            bytesTotal: bytesTotal,
+          ));
         }
       } else if (call.method == 'onCameraPermissionResult') {
         final granted = call.arguments['granted'] as bool? ?? false;

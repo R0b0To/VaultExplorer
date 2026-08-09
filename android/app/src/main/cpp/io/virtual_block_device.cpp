@@ -41,6 +41,8 @@
 #include "block_io.h"
 #include "filesystems/stream_handles.h"
 #include "virtual_block_device.h"
+#include <cstdarg>
+#include <cstdio>
 #include <android/log.h>
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
@@ -57,10 +59,12 @@ extern "C" {
 #include <et/com_err.h>
 }
 
-static int android_ntfs_log_handler(const char *function, const char *,
-                                    int, const char *level,
-                                    const char *str, void *) {
-    LOGI("NTFS-3G [%s] %s: %s", level ? level : "INFO", function ? function : "", str ? str : "");
+static int android_ntfs_log_handler(const char *function, const char * /*file*/,
+                                    int /*line*/, u32 level, void * /*data*/,
+                                    const char *format, va_list args) {
+    char buf[512];
+    vsnprintf(buf, sizeof(buf), format ? format : "", args);
+    LOGI("NTFS-3G [lvl %u] %s: %s", (unsigned int)level, function ? function : "", buf);
     return 0;
 }
 

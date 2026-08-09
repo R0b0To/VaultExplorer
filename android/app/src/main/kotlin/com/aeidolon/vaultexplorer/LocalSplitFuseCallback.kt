@@ -54,6 +54,39 @@ object SafSplitResolver {
 
         val parts = mutableListOf<SplitPartInfo>()
 
+        // Strategy 0: use a persisted tree-level grant covering this
+        // file's parent folder, if one exists (obtained via the
+        // ACTION_OPEN_DOCUMENT_TREE follow-up prompt in
+        // VaultPickerHandlers.pickContainerLauncher the first time a
+        // cloud-hosted split part is picked -- see SafFolderGrants).
+        // DocumentFile.listFiles() goes through the same child-query
+        // machinery as Strategy 1 below, but this time backed by real
+        // tree permission, so it works against providers (Round-Sync/
+        // rclone, Drive, pCloud, ...) that correctly enforce per-document
+        // SAF scoping and silently reject Strategy 1/2's permission-less
+        // guesses -- which is why local containers always worked (no SAF
+        // ACL involved at all, see the rawFile branch above) while cloud
+        // ones didn't.
+        try {
+            val treeUri = SafFolderGrants.findCoveringTreeUri(context, firstUri)
+            if (treeUri != null) {
+                val treeRoot = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri)
+                val siblings = treeRoot?.listFiles()
+                if (siblings != null) {
+                    val byName = siblings.associateBy { (it.name ?: "").lowercase() }
+                    val startN = if (byName.containsKey(formatName(0).lowercase())) 0 else 1
+                    var n = startN
+                    val found = mutableListOf<SplitPartInfo>()
+                    while (true) {
+                        val doc = byName[formatName(n).lowercase()] ?: break
+                        found.add(SplitPartInfo(doc.uri, doc.length(), null))
+                        n++
+                    }
+                    if (found.size > 1) return found
+                }
+            }
+        } catch (_: Exception) {}
+
         // Strategy 1: Query SAF parent directory for sibling document URIs
         try {
             val docId = if (DocumentsContract.isTreeUri(firstUri)) {
@@ -167,6 +200,21 @@ class SplitFuseCallback(
     private val openPfds = arrayOfNulls<ParcelFileDescriptor>(parts.size)
     private val openForWrite = BooleanArray(parts.size)
 
+    // Fallback forward-only streams for SAF parts whose fd doesn't support
+    // real random access (see readFromPart). Mirrors the ReadHandle
+    // approach in engine/ChunkedFileEngine.kt, which folder-vault formats
+    // (Cryptomator/gocryptfs/cryfs) already rely on for the same cloud
+    // providers -- pread/lseek are tried first as a fast path, and only
+    // degrade to this when the transport genuinely can't seek.
+    private val partStreams = arrayOfNulls<java.io.InputStream>(parts.size)
+    private val partStreamPos = LongArray(parts.size)
+    // Once pread fails/times out for a part, stop retrying it on every
+    // subsequent read -- some providers don't fail fast on an
+    // out-of-range/out-of-order request, they hang until a network
+    // timeout, which would otherwise make every single read pay that
+    // cost before falling back to the stream that actually works.
+    private val partPreadUnsupported = BooleanArray(parts.size)
+
     override fun onGetSize(): Long = totalSizeBytes
 
     @Synchronized
@@ -230,22 +278,79 @@ class SplitFuseCallback(
                 readInPart += n
             }
         } else {
-            val pfd = openSafPfd(index, forWrite = false)
-            val fd = pfd.fileDescriptor
-            try {
-                android.system.Os.lseek(fd, offsetInPart, android.system.OsConstants.SEEK_SET)
-            } catch (e: Exception) {
-                if (offsetInPart != 0L) {
-                    fail("seek failed on part $index: ${e.message}")
+            // Fast path: real random access (works for providers that
+            // hand back a genuinely seekable fd, e.g. locally-cached
+            // Drive documents). Skipped entirely once we've already
+            // learned this part's fd can't do it.
+            if (!partPreadUnsupported[index]) {
+                val pfd = openSafPfd(index, forWrite = false)
+                val fd = pfd.fileDescriptor
+                var readInPart = 0
+                var preadFailed = false
+                while (readInPart < len) {
+                    val n = try {
+                        android.system.Os.pread(
+                            fd, data, outOffset + readInPart, len - readInPart,
+                            offsetInPart + readInPart
+                        )
+                    } catch (e: Exception) {
+                        preadFailed = true
+                        break
+                    }
+                    if (n <= 0) { preadFailed = true; break }
+                    readInPart += n
                 }
-            }
-            var readInPart = 0
-            while (readInPart < len) {
-                val n = android.system.Os.read(fd, data, outOffset + readInPart, len - readInPart)
-                if (n <= 0) fail("part $index ended unexpectedly (read=$n)")
-                readInPart += n
+                if (readInPart == len) return
+                if (preadFailed) partPreadUnsupported[index] = true
+
+                // Slow path: the fd doesn't support real random access (a
+                // forward-only network stream, e.g. Round-Sync/rclone or a
+                // streamed cloud document) -- pread either threw or
+                // returned less than requested. Fall back to a persistent
+                // forward-only stream, skipping ahead or reopening-from-
+                // zero exactly like ChunkedFileEngine.readRange does for
+                // folder vaults on the same providers.
+                readFromPartStream(
+                    index, offsetInPart + readInPart, data,
+                    outOffset + readInPart, len - readInPart
+                )
+            } else {
+                readFromPartStream(index, offsetInPart, data, outOffset, len)
             }
         }
+    }
+
+    private fun readFromPartStream(index: Int, offsetInPart: Long, data: ByteArray, outOffset: Int, len: Int) {
+        var stream = partStreams[index]
+        var pos = partStreamPos[index]
+
+        if (stream == null || pos > offsetInPart) {
+            try { stream?.close() } catch (_: Exception) {}
+            stream = context.contentResolver.openInputStream(parts[index].uri)
+                ?: fail("could not open part $index as a stream")
+            pos = 0L
+            partStreams[index] = stream
+        }
+
+        var toSkip = offsetInPart - pos
+        if (toSkip > 0) {
+            val skipBuf = ByteArray(minOf(toSkip, 256L * 1024).toInt())
+            while (toSkip > 0) {
+                val n = stream.read(skipBuf, 0, minOf(toSkip, skipBuf.size.toLong()).toInt())
+                if (n <= 0) fail("part $index ended unexpectedly while seeking to $offsetInPart")
+                toSkip -= n
+                pos += n
+            }
+        }
+
+        var readInPart = 0
+        while (readInPart < len) {
+            val n = stream.read(data, outOffset + readInPart, len - readInPart)
+            if (n <= 0) fail("part $index ended unexpectedly (stream read=$n)")
+            readInPart += n
+            pos += n
+        }
+        partStreamPos[index] = pos
     }
 
     private fun writeToPart(index: Int, offsetInPart: Long, data: ByteArray, inOffset: Int, len: Int) {
@@ -257,16 +362,16 @@ class SplitFuseCallback(
         } else {
             val pfd = openSafPfd(index, forWrite = true)
             val fd = pfd.fileDescriptor
-            try {
-                android.system.Os.lseek(fd, offsetInPart, android.system.OsConstants.SEEK_SET)
-            } catch (e: Exception) {
-                if (offsetInPart != 0L) {
-                    fail("seek failed on part $index for write: ${e.message}")
-                }
-            }
             var writtenInPart = 0
             while (writtenInPart < len) {
-                val n = android.system.Os.write(fd, data, inOffset + writtenInPart, len - writtenInPart)
+                val n = try {
+                    android.system.Os.pwrite(
+                        fd, data, inOffset + writtenInPart, len - writtenInPart,
+                        offsetInPart + writtenInPart
+                    )
+                } catch (e: Exception) {
+                    fail("pwrite failed on part $index at $offsetInPart: ${e.message}")
+                }
                 if (n <= 0) fail("write failed on part $index (written=$n)")
                 writtenInPart += n
             }
@@ -347,9 +452,15 @@ class SplitFuseCallback(
         for (pfd in openPfds) {
             try { pfd?.close() } catch (_: Exception) {}
         }
+        for (stream in partStreams) {
+            try { stream?.close() } catch (_: Exception) {}
+        }
         openRafs.fill(null)
         openPfds.fill(null)
         openForWrite.fill(false)
+        partStreams.fill(null)
+        partStreamPos.fill(0L)
+        partPreadUnsupported.fill(false)
         onReleased()
     }
 

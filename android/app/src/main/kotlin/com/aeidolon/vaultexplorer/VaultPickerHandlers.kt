@@ -3,6 +3,7 @@ package com.aeidolon.vaultexplorer
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.activity.result.contract.ActivityResultContracts
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
@@ -34,6 +35,19 @@ class VaultPickerHandlers(
         return null
     }
 
+    // Holds the container pick's Flutter result while a follow-up
+    // ACTION_OPEN_DOCUMENT_TREE prompt is on screen -- see
+    // pickContainerLauncher below. Deliberately bypasses [pendingResult]
+    // for this second hop (rather than stash/take again) since this is an
+    // internal implementation detail of finishing one pick, not a new
+    // Flutter-visible picker operation.
+    private data class SplitContainerPickCompletion(
+        val res: MethodChannel.Result,
+        val uri: Uri,
+        val name: String,
+    )
+    private var pendingSplitContainerCompletion: SplitContainerPickCompletion? = null
+
     private val pickContainerLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { activityResult ->
@@ -49,15 +63,85 @@ class VaultPickerHandlers(
                     )
                 } catch (_: SecurityException) {}
                 val name = UriNameResolver.resolve(activity.contentResolver, uri)
-                activity.runOnUiThread {
-                    res.success(mapOf(
-                        "uri" to uri.toString(),
-                        "displayName" to name
-                    ))
+
+                // A single ACTION_OPEN_DOCUMENT pick only grants access to
+                // this one document -- never its siblings. That's fine for
+                // a plain container, but a split part (".001"/".part1"/...)
+                // needs SafSplitResolver to enumerate its siblings later,
+                // which requires tree-level access to the parent folder.
+                // Local files get that for free via UriToPath.getRawFile
+                // (raw filesystem access, no SAF ACL involved); genuine
+                // cloud documents don't, so prompt for the folder once --
+                // SafFolderGrants persists it so this never happens twice
+                // for the same folder.
+                val looksLikeSplitPart = com.aeidolon.vaultexplorer.saf.SafSplitResolver.isSplitFileName(name)
+                val isRawLocalFile = UriToPath.getRawFile(activity, uri) != null
+                val alreadyCovered = com.aeidolon.vaultexplorer.saf.SafFolderGrants.hasCoveringTreeGrant(activity, uri)
+
+                if (looksLikeSplitPart && !isRawLocalFile && !alreadyCovered) {
+                    pendingSplitContainerCompletion = SplitContainerPickCompletion(res, uri, name)
+                    activity.runOnUiThread {
+                        val treeIntent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                            // Best-effort hint to open at the file's own
+                            // location; providers are free to ignore this.
+                            try { putExtra(DocumentsContract.EXTRA_INITIAL_URI, uri) } catch (_: Exception) {}
+                        }
+                        pickParentFolderForSplitLauncher.launch(treeIntent)
+                    }
+                } else {
+                    activity.runOnUiThread {
+                        res.success(mapOf(
+                            "uri" to uri.toString(),
+                            "displayName" to name
+                        ))
+                    }
                 }
             }
         } else {
             res.success(null)
+        }
+    }
+
+    // Follow-up folder picker triggered from pickContainerLauncher above
+    // when the picked file looks like a cloud-hosted split part. Grants
+    // (and persists) tree-level access to its parent folder so
+    // SafSplitResolver can actually enumerate ".002", ".003", etc. later,
+    // then completes the *original* container pick's Flutter result --
+    // this picker is invisible to the Dart side, which only ever sees one
+    // pickContainer call complete.
+    private val pickParentFolderForSplitLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val completion = pendingSplitContainerCompletion
+        pendingSplitContainerCompletion = null
+        if (completion == null) return@registerForActivityResult
+        val data = activityResult.data
+        if (activityResult.resultCode == Activity.RESULT_OK && data?.data != null) {
+            val treeUri = data.data!!
+            ioExecutor.execute {
+                try {
+                    activity.contentResolver.takePersistableUriPermission(
+                        treeUri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    )
+                } catch (_: SecurityException) {}
+                activity.runOnUiThread {
+                    completion.res.success(mapOf(
+                        "uri" to completion.uri.toString(),
+                        "displayName" to completion.name
+                    ))
+                }
+            }
+        } else {
+            // User declined folder access. Don't block the pick over it --
+            // fall through with just the single file, same as before this
+            // patch. SafSplitResolver will simply fail to find siblings
+            // and the container mounts (or fails) as a single file, same
+            // as today's behavior, rather than the picker itself failing.
+            completion.res.success(mapOf(
+                "uri" to completion.uri.toString(),
+                "displayName" to completion.name
+            ))
         }
     }
 

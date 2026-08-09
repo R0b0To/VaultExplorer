@@ -18,11 +18,12 @@ class DocumentProviderFolder {
   final String path;
   final bool autoMount;
   const DocumentProviderFolder({required this.path, this.autoMount = false});
-  String get name => path.contains('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
+  String get name =>
+      path.contains('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
   DocumentProviderFolder copyWith({bool? autoMount}) => DocumentProviderFolder(
-        path: path,
-        autoMount: autoMount ?? this.autoMount,
-      );
+    path: path,
+    autoMount: autoMount ?? this.autoMount,
+  );
   Map<String, dynamic> toJson() => {'path': path, 'autoMount': autoMount};
   factory DocumentProviderFolder.fromJson(Map<String, dynamic> j) =>
       DocumentProviderFolder(
@@ -32,7 +33,9 @@ class DocumentProviderFolder {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is DocumentProviderFolder && other.path == path && other.autoMount == autoMount;
+      other is DocumentProviderFolder &&
+          other.path == path &&
+          other.autoMount == autoMount;
   @override
   int get hashCode => Object.hash(path, autoMount);
 }
@@ -42,45 +45,47 @@ enum ContainerUnlockMethod {
   rememberPassword,
   biometrics,
   pattern;
+
   String get label => switch (this) {
-        ContainerUnlockMethod.password => 'Manual Password',
-        ContainerUnlockMethod.rememberPassword => 'Remember Password',
-        ContainerUnlockMethod.biometrics => 'Biometric Unlock',
-        ContainerUnlockMethod.pattern => 'Pattern Unlock',
-      };
+    ContainerUnlockMethod.password => 'Manual Password',
+    ContainerUnlockMethod.rememberPassword => 'Remember Password',
+    ContainerUnlockMethod.biometrics => 'Biometric Unlock',
+    ContainerUnlockMethod.pattern => 'Pattern Unlock',
+  };
   String get subtitle => switch (this) {
-        ContainerUnlockMethod.password => 'Type the password every time',
-        ContainerUnlockMethod.rememberPassword =>
-          'Stored securely in Android Keystore',
-        ContainerUnlockMethod.biometrics => 'Use fingerprint or face to unlock',
-        ContainerUnlockMethod.pattern => 'Draw a pattern to unlock',
-      };
+    ContainerUnlockMethod.password => 'Type the password every time',
+    ContainerUnlockMethod.rememberPassword =>
+      'Stored securely in Android Keystore',
+    ContainerUnlockMethod.biometrics => 'Use fingerprint or face to unlock',
+    ContainerUnlockMethod.pattern => 'Draw a pattern to unlock',
+  };
   String getLocalizedLabel(AppLocalizations l10n) => switch (this) {
-        ContainerUnlockMethod.password => l10n.unlockMethodManualPassword,
-        ContainerUnlockMethod.rememberPassword => l10n.unlockMethodRememberPassword,
-        ContainerUnlockMethod.biometrics => l10n.unlockMethodBiometrics,
-        ContainerUnlockMethod.pattern => l10n.unlockMethodPattern,
-      };
+    ContainerUnlockMethod.password => l10n.unlockMethodManualPassword,
+    ContainerUnlockMethod.rememberPassword => l10n.unlockMethodRememberPassword,
+    ContainerUnlockMethod.biometrics => l10n.unlockMethodBiometrics,
+    ContainerUnlockMethod.pattern => l10n.unlockMethodPattern,
+  };
   String getLocalizedSubtitle(AppLocalizations l10n) => switch (this) {
-        ContainerUnlockMethod.password => l10n.unlockMethodSubtitlePassword,
-        ContainerUnlockMethod.rememberPassword => l10n.unlockMethodSubtitleRememberPassword,
-        ContainerUnlockMethod.biometrics => l10n.unlockMethodSubtitleBiometrics,
-        ContainerUnlockMethod.pattern => l10n.unlockMethodSubtitlePattern,
-      };
+    ContainerUnlockMethod.password => l10n.unlockMethodSubtitlePassword,
+    ContainerUnlockMethod.rememberPassword =>
+      l10n.unlockMethodSubtitleRememberPassword,
+    ContainerUnlockMethod.biometrics => l10n.unlockMethodSubtitleBiometrics,
+    ContainerUnlockMethod.pattern => l10n.unlockMethodSubtitlePattern,
+  };
   IconData get icon => switch (this) {
-        ContainerUnlockMethod.password => Icons.key_rounded,
-        ContainerUnlockMethod.rememberPassword => Icons.lock_open_rounded,
-        ContainerUnlockMethod.biometrics => Icons.fingerprint,
-        ContainerUnlockMethod.pattern => Icons.pattern,
-      };
+    ContainerUnlockMethod.password => Icons.key_rounded,
+    ContainerUnlockMethod.rememberPassword => Icons.lock_open_rounded,
+    ContainerUnlockMethod.biometrics => Icons.fingerprint,
+    ContainerUnlockMethod.pattern => Icons.pattern,
+  };
   String toJson() => name;
   static ContainerUnlockMethod fromJson(String? value) => switch (value) {
-        'password' => ContainerUnlockMethod.password,
-        'rememberPassword' => ContainerUnlockMethod.rememberPassword,
-        'biometrics' => ContainerUnlockMethod.biometrics,
-        'pattern' => ContainerUnlockMethod.pattern,
-        _ => ContainerUnlockMethod.password,
-      };
+    'password' => ContainerUnlockMethod.password,
+    'rememberPassword' => ContainerUnlockMethod.rememberPassword,
+    'biometrics' => ContainerUnlockMethod.biometrics,
+    'pattern' => ContainerUnlockMethod.pattern,
+    _ => ContainerUnlockMethod.password,
+  };
 }
 
 class ContainerRepository {
@@ -88,7 +93,7 @@ class ContainerRepository {
   static final ContainerRepository instance = ContainerRepository._();
   static const _secure = AppSecureStorage.instance;
   Map<String, ContainerRecord>? _cache;
-  
+
   static Future<File> get _dataFile async {
     final dir = await getApplicationDocumentsDirectory();
     return File('${dir.path}/containers_v2.json');
@@ -124,13 +129,19 @@ class ContainerRepository {
 
     // Encrypt and store Favourite & Pinned paths securely in the Keystore
     if (record.favouritePaths.isNotEmpty) {
-      await _secure.write(key: _favouriteKey(record.uri), value: jsonEncode(record.favouritePaths));
+      await _secure.write(
+        key: _favouriteKey(record.uri),
+        value: jsonEncode(record.favouritePaths),
+      );
     } else {
       await _secure.delete(key: _favouriteKey(record.uri));
     }
 
     if (record.pinnedPaths.isNotEmpty) {
-      await _secure.write(key: _pinnedKey(record.uri), value: jsonEncode(record.pinnedPaths));
+      await _secure.write(
+        key: _pinnedKey(record.uri),
+        value: jsonEncode(record.pinnedPaths),
+      );
     } else {
       await _secure.delete(key: _pinnedKey(record.uri));
     }
@@ -141,14 +152,19 @@ class ContainerRepository {
     if (record.documentProviderFolders.isNotEmpty) {
       await _secure.write(
         key: _docFoldersKey(record.uri),
-        value: jsonEncode(record.documentProviderFolders.map((f) => f.toJson()).toList()),
+        value: jsonEncode(
+          record.documentProviderFolders.map((f) => f.toJson()).toList(),
+        ),
       );
     } else {
       await _secure.delete(key: _docFoldersKey(record.uri));
     }
 
     if (record.keyfiles.isNotEmpty) {
-      await _secure.write(key: _keyfilesKey(record.uri), value: jsonEncode(record.keyfiles));
+      await _secure.write(
+        key: _keyfilesKey(record.uri),
+        value: jsonEncode(record.keyfiles),
+      );
     } else {
       await _secure.delete(key: _keyfilesKey(record.uri));
     }
@@ -211,7 +227,11 @@ class ContainerRepository {
     await _persist();
   }
 
-  Future<void> setFolderAutoMount(String uri, String path, bool autoMount) async {
+  Future<void> setFolderAutoMount(
+    String uri,
+    String path,
+    bool autoMount,
+  ) async {
     await _ensureLoaded();
     final existing = _cache![uri];
     if (existing == null) return;
@@ -237,9 +257,11 @@ class ContainerRepository {
     }
   }
 
-  Future<String?> getPassword(String uri) => _secure.read(key: _keystoreKey(uri));
-  Future<String?> getPatternHash(String uri) => _secure.read(key: _patternHashKey(uri));
-  
+  Future<String?> getPassword(String uri) =>
+      _secure.read(key: _keystoreKey(uri));
+  Future<String?> getPatternHash(String uri) =>
+      _secure.read(key: _patternHashKey(uri));
+
   void invalidate() => _cache = null;
 
   static String _keystoreKey(String uri) {
@@ -288,12 +310,14 @@ class ContainerRepository {
       final file = await _dataFile;
       if (!await file.exists()) return;
       final list = jsonDecode(await file.readAsString()) as List<dynamic>;
-      
+
       // Fetch all secure encrypted preferences simultaneously to avoid N async calls
-      final secureData = await _secure.readAll(); 
+      final secureData = await _secure.readAll();
 
       for (final item in list) {
-        final rawRecord = ContainerRecord.fromJson(item as Map<String, dynamic>);
+        final rawRecord = ContainerRecord.fromJson(
+          item as Map<String, dynamic>,
+        );
 
         // Read the encrypted paths back from Keystore
         final favJson = secureData[_favouriteKey(rawRecord.uri)];
@@ -301,17 +325,25 @@ class ContainerRepository {
         final docFoldersJson = secureData[_docFoldersKey(rawRecord.uri)];
         final keyfilesJson = secureData[_keyfilesKey(rawRecord.uri)];
 
-        final favPaths = favJson != null ? List<String>.from(jsonDecode(favJson)) : <String>[];
-        final pinPaths = pinJson != null ? List<String>.from(jsonDecode(pinJson)) : <String>[];
+        final favPaths = favJson != null
+            ? List<String>.from(jsonDecode(favJson))
+            : <String>[];
+        final pinPaths = pinJson != null
+            ? List<String>.from(jsonDecode(pinJson))
+            : <String>[];
         final docFolders = docFoldersJson != null
             ? (jsonDecode(docFoldersJson) as List<dynamic>)
-                .map((e) => DocumentProviderFolder.fromJson(Map<String, dynamic>.from(e as Map)))
-                .toList()
+                  .map(
+                    (e) => DocumentProviderFolder.fromJson(
+                      Map<String, dynamic>.from(e as Map),
+                    ),
+                  )
+                  .toList()
             : <DocumentProviderFolder>[];
         final keyfiles = keyfilesJson != null
             ? (jsonDecode(keyfilesJson) as List<dynamic>)
-                .map((e) => Map<String, String>.from(e as Map))
-                .toList()
+                  .map((e) => Map<String, String>.from(e as Map))
+                  .toList()
             : <Map<String, String>>[];
 
         final secureRecord = rawRecord.copyWith(
@@ -385,6 +417,8 @@ class ContainerRecord {
   });
 
   bool get isUsbSource => uri.startsWith('usb:');
+  bool get isCloudSource =>
+      uri.startsWith('cloud://') || uri.startsWith('cloudfolder://');
 
   ContainerRecord copyWith({
     String? label,
@@ -413,7 +447,8 @@ class ContainerRecord {
       unlockMethod: unlockMethod ?? this.unlockMethod,
       autoCloseMins: autoCloseMins ?? this.autoCloseMins,
       documentProvider: documentProvider ?? this.documentProvider,
-      documentProviderFolders: documentProviderFolders ?? this.documentProviderFolders,
+      documentProviderFolders:
+          documentProviderFolders ?? this.documentProviderFolders,
       thumbnailCacheMode: thumbnailCacheMode == _keep
           ? this.thumbnailCacheMode
           : thumbnailCacheMode as ThumbnailCacheMode?,
@@ -434,27 +469,27 @@ class ContainerRecord {
   }
 
   Map<String, dynamic> toJson() => {
-        'uri': uri,
-        'label': label,
-        'rememberPassword': rememberPassword,
-        'unlockMethod': unlockMethod.toJson(),
-        'autoCloseMins': autoCloseMins,
-        'documentProvider': documentProvider,
-        if (thumbnailCacheMode != null)
-          'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
-        if (thumbnailQuality != null)
-          'thumbnailQuality': thumbnailQuality!.toJson(),
-        'cacheDerivedKey': cacheDerivedKey,
-        'readOnly': readOnly,
-        'cipherId': cipherId,
-        'hashId': hashId,
-        'containerFormat': containerFormat,
+    'uri': uri,
+    'label': label,
+    'rememberPassword': rememberPassword,
+    'unlockMethod': unlockMethod.toJson(),
+    'autoCloseMins': autoCloseMins,
+    'documentProvider': documentProvider,
+    if (thumbnailCacheMode != null)
+      'thumbnailCacheMode': thumbnailCacheMode!.toJson(),
+    if (thumbnailQuality != null)
+      'thumbnailQuality': thumbnailQuality!.toJson(),
+    'cacheDerivedKey': cacheDerivedKey,
+    'readOnly': readOnly,
+    'cipherId': cipherId,
+    'hashId': hashId,
+    'containerFormat': containerFormat,
 
-        // EXCLUDED FOR SECURITY: `favouritePaths`, `pinnedPaths`,
-        // `documentProviderFolders` and `keyfiles` all name paths on disk
-        // (inside the vault, or to external keyfiles) and are Keystore-
-        // encrypted instead of being serialized into this clear-text file.
-      };
+    // EXCLUDED FOR SECURITY: `favouritePaths`, `pinnedPaths`,
+    // `documentProviderFolders` and `keyfiles` all name paths on disk
+    // (inside the vault, or to external keyfiles) and are Keystore-
+    // encrypted instead of being serialized into this clear-text file.
+  };
 
   factory ContainerRecord.fromJson(Map<String, dynamic> j) {
     final method = ContainerUnlockMethod.fromJson(j['unlockMethod'] as String?);

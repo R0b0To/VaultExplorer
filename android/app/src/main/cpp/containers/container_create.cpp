@@ -640,6 +640,15 @@ bool createContainerWithHidden(int fd,
         return false;
     }
 
+    // createContainer() (above) truncates the outer file to a 4096-aligned
+    // size, which can be up to 4095 bytes smaller than the raw sizeBytes
+    // this function was called with -- use that same truncated size here so
+    // hiddenDataStartAbsolute below is computed against the container's
+    // actual on-disk end, not a value that could point a few bytes past it
+    // (which would matter to enableHiddenVolumeProtection's later
+    // reconstruction of this same boundary from the outer header alone).
+    const int64_t truncatedSizeBytes = (sizeBytes / 4096) * 4096;
+
     LOGI("createContainerWithHidden: outer volume created successfully, proceeding with hidden volume");
 
     bool success = false;
@@ -670,7 +679,7 @@ bool createContainerWithHidden(int fd,
     unsigned char hiddenCombinedMasterKey[192] = {0};
 
     do {
-        const uint64_t VOLUME_SIZE = static_cast<uint64_t>(sizeBytes);
+        const uint64_t VOLUME_SIZE = static_cast<uint64_t>(truncatedSizeBytes);
         uint64_t hiddenDataSize = static_cast<uint64_t>(hiddenSizeBytes);
         hiddenDataSize = (hiddenDataSize / 512) * 512;
         

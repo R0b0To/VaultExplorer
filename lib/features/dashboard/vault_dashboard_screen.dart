@@ -19,7 +19,6 @@ import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
 import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
-import 'package:vaultexplorer/features/unlock/split_container_unlock_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/dashboard_empty_state.dart';
@@ -525,35 +524,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
   }
 
-  Future<void> _showSplitContainerUnlockSheet() async {
-    if (_actionInFlight) return;
-    setState(() => _actionInFlight = true);
-    MountedContainer? newlyMountedContainer;
-    try {
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        SlideRightRoute(
-          page: SplitContainerUnlockSheet(
-            onMounted: (container, {record}) {
-              _onContainerMounted(container, record: record);
-              newlyMountedContainer = container;
-            },
-            documentProvider: _appSettings.defaultDocumentProvider,
-            mountedUris: _mounted.map((c) => c.uri).toList(),
-          ),
-        ),
-      );
-      await _loadAll();
-      if (newlyMountedContainer != null &&
-          _appSettings.autoOpenOnUnlock &&
-          mounted) {
-        _openBrowser(newlyMountedContainer!);
-      }
-    } finally {
-      if (mounted) setState(() => _actionInFlight = false);
-    }
-  }
+  
 
   void _showUsbCreateSheet() {
     if (_actionInFlight) return;
@@ -625,16 +596,6 @@ class _VaultDashboardState extends State<VaultDashboard>
               onTap: () {
                 Navigator.pop(sheetContext);
                 _showUnlockSheet();
-              },
-            ),
-            SheetOptionTile(
-              icon: Icons.call_split_rounded,
-              iconColor: cs.primary,
-              title: context.l10n.mountSplitContainerTitle,
-              subtitle: context.l10n.mountSplitContainerSubtitle,
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showSplitContainerUnlockSheet();
               },
             ),
             if (hasUsb) ...[

@@ -1,28 +1,23 @@
 package com.aeidolon.vaultexplorer
 
 import android.net.Uri
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.storage.StorageManager
 import android.provider.DocumentsContract
 import android.util.Base64
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import com.aeidolon.vaultexplorer.saf.UriToPath
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.util.concurrent.ExecutorService
 import kotlin.concurrent.withLock
 
-/**
- * Parsed, validated arguments shared by [VaultUnlockHandlers.handleUnlockContainer]
- * and [UsbContainerHandlers.handleUnlockUsbContainer] (TD-17) -- password,
- * pim, display/mount options, cipher/hash hints, preserved-key, and keyfile
- * data. Deliberately does NOT include how the underlying container is
- * located or opened (a content:// [Uri] vs. a raw USB block device):
- * that part differs enough between the two handlers -- different native
- * engine calls, different pre-checks, different cleanup on failure -- that
- * folding it into this same abstraction would trade real, testable
- * behavior for a smaller diff.
- */
+
 data class UnlockArgs(
     val password: String,
     val pim: Int,
@@ -138,11 +133,21 @@ class VaultUnlockHandlers(
     private val nativeOps: NativeOpSupport,
     private val derivedKeyHandlers: DerivedKeyHandlers,
 ) {
+    private val fuseThread = HandlerThread("split-container-fuse").apply { start() }
+    private val fuseHandler = Handler(fuseThread.looper)
+
+    private fun displayNameForSplit(firstPart: File): String =
+        Regex("""^(.*)\.(\d+|part\d+)$""", RegexOption.IGNORE_CASE)
+            .find(firstPart.name)?.groupValues?.get(1) ?: firstPart.name
+
+    fun onActivityDestroyed() {
+        fuseThread.quitSafely()
+    }
+
     fun handleUnlockContainer(call: MethodCall, result: MethodChannel.Result) {
         val uriStringOrNull = call.argument<String>("filePath")
         val args = parseUnlockArgs(call, result, uriStringOrNull, "filePath") ?: return
-        val uriString = uriStringOrNull!! // parseUnlockArgs already validated this is non-null
-
+        val uriString = uriStringOrNull!!
         val targetVolId = ContainerSessionRegistry.getVolumeIdByUri(uriString)
             ?: ContainerSessionRegistry.getFreeVolumeId()
         if (targetVolId == null) {
@@ -150,13 +155,30 @@ class VaultUnlockHandlers(
             return
         }
         activity.methodChannel?.invokeMethod("onUnlockStarted", mapOf("volId" to targetVolId))
-
         ioExecutor.execute {
             var pfd: ParcelFileDescriptor? = null
+            var proxyPfd: ParcelFileDescriptor? = null
             try {
                 val uri = Uri.parse(uriString)
-                pfd = activity.contentResolver.openFileDescriptor(uri, "rw")
-                    ?: throw Exception("Could not open file descriptor")
+                val rawFile = UriToPath.getRawFile(activity, uri)
+                val parts = if (rawFile != null) SplitPartResolver.resolvePartSequence(rawFile) else emptyList()
+
+                if (parts.size > 1) {
+                    Log.i("VaultExplorer_C++", "Auto-detected split container across ${parts.size} parts for $uriString")
+                    val fuseCallback = LocalSplitFuseCallback(
+                        parts = parts,
+                        onReleased = { ContainerSessionRegistry.removeSession(targetVolId) },
+                    )
+                    val storageManager = activity.getSystemService(StorageManager::class.java)
+                    proxyPfd = storageManager.openProxyFileDescriptor(
+                        ParcelFileDescriptor.MODE_READ_WRITE, fuseCallback, fuseHandler
+                    )
+                    pfd = proxyPfd
+                } else {
+                    pfd = activity.contentResolver.openFileDescriptor(uri, if (args.readOnly) "r" else "rw")
+                        ?: activity.contentResolver.openFileDescriptor(uri, "r")
+                        ?: throw Exception("Could not open file descriptor")
+                }
 
                 val keyfileFds = nativeOps.openKeyfileFds(args.keyfilePaths)
                 val hiddenKeyfileFds =
@@ -185,11 +207,19 @@ class VaultUnlockHandlers(
 
                 activity.runOnUiThread {
                     if (files != null) {
+                        val computedDisplayName = if (!args.displayName.isNullOrEmpty()) {
+                            args.displayName
+                        } else if (parts.size > 1) {
+                            displayNameForSplit(parts.first())
+                        } else {
+                            null
+                        }
+
                         ContainerSessionRegistry.activeSessions[targetVolId] = ContainerSession(
                             uri = uriString,
                             volId = targetVolId,
                             cachedFilesList = files.toList(),
-                            displayName = args.displayName,
+                            displayName = computedDisplayName,
                             documentProvider = args.docProvider,
                             readOnly = args.readOnly,
                         )
@@ -202,13 +232,17 @@ class VaultUnlockHandlers(
                                     "com.aeidolon.vaultexplorer.documents"), null)
                         }
                         val fmt = ContainerEngine.format(targetVolId).wireName
-                        result.success(mapOf(
+                        val resultMap = mutableMapOf<String, Any>(
                             "volId" to targetVolId,
                             "files" to files.toList(),
                             "matchedCipherId" to ContainerEngine.matchedCipherId(targetVolId),
                             "matchedHashId" to ContainerEngine.matchedHashId(targetVolId),
-                            "containerFormat" to fmt
-                        ))
+                            "containerFormat" to fmt,
+                        )
+                        if (parts.size > 1) {
+                            resultMap["partCount"] = parts.size
+                        }
+                        result.success(resultMap)
                         if (args.cacheDerivedKey && args.preservedKey == null) {
                             val derived = ContainerEngine.lastDerivedKeyMaterial(targetVolId)
                             if (derived != null) {
@@ -216,14 +250,16 @@ class VaultUnlockHandlers(
                             }
                         }
                     } else {
+                        if (proxyPfd != null) runCatching { proxyPfd.close() }
                         result.error("AUTH_FAIL",
                             if (args.protectHiddenVolume)
                                 "Incorrect password/keyfiles, or the hidden volume password/keyfiles did not match"
                             else
-                            "Incorrect password/keyfiles or invalid container", null)
+                                "Incorrect password/keyfiles or invalid container", null)
                     }
                 }
             } catch (e: Exception) {
+                if (proxyPfd != null) runCatching { proxyPfd.close() }
                 try { pfd?.close() } catch (_: Exception) {}
                 activity.runOnUiThread { nativeOps.dispatchNativeError(e, result) }
             }

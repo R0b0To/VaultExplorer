@@ -130,7 +130,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val thumbnailHandlers = ThumbnailHandlers(this, imageThumbnailExecutor, videoThumbnailExecutor, nativeOps)
     private val importExportHandlers = ImportExportHandlers(this, pendingResult, ioExecutor, nativeOps)
     private val splitJoinHandlers = SplitJoinHandlers(this, ioExecutor)
-    private val splitContainerMountHandlers = SplitContainerMountHandlers(this, ioExecutor, nativeOps)
+    private val splitContainerMountHandlers = SplitContainerMountHandlers(this, ioExecutor, nativeOps, vaultUnlockHandlers)
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
@@ -165,6 +165,7 @@ class MainActivity : FlutterFragmentActivity() {
         screenOffReceiver?.let { unregisterReceiver(it) }
         vaultCameraPlugin?.disposeAll()
         vaultCameraPlugin = null
+        vaultUnlockHandlers.onActivityDestroyed()
         splitContainerMountHandlers.onActivityDestroyed()
         super.onDestroy()
     }
@@ -327,6 +328,7 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.CREATE_USB_CONTAINER -> usbHandlers.handleCreateUsbContainer(call, result)
                 ChannelMethods.GET_USB_DEVICE_CAPACITY -> usbHandlers.handleGetUsbDeviceCapacity(call, result)
                 ChannelMethods.UNLOCK_CONTAINER -> vaultUnlockHandlers.handleUnlockContainer(call, result)
+                ChannelMethods.UNLOCK_SPLIT_CONTAINER -> vaultUnlockHandlers.handleUnlockContainer(call, result)
                 ChannelMethods.UNLOCK_CRYPTOMATOR_VAULT -> vaultUnlockHandlers.handleUnlockCryptomatorVault(call, result)
                 ChannelMethods.UNLOCK_GOCRYPTFS_VAULT -> vaultUnlockHandlers.handleUnlockGocryptfsVault(call, result)
                 ChannelMethods.UNLOCK_CRYFS_VAULT -> vaultUnlockHandlers.handleUnlockCryfsVault(call, result)

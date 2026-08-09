@@ -8,6 +8,7 @@ import android.provider.DocumentsContract
 import android.system.ErrnoException
 import android.system.OsConstants
 import android.util.Log
+import com.aeidolon.vaultexplorer.saf.SafFolderGrants
 import com.aeidolon.vaultexplorer.saf.UriToPath
 import java.io.File
 import java.io.FileInputStream
@@ -29,15 +30,19 @@ object SafSplitResolver {
 
     fun resolveParts(context: Context, firstUri: Uri, displayName: String): List<SplitPartInfo> {
         val rawFile = UriToPath.getRawFile(context, firstUri)
+        Log.i("VaultExplorer_C++", "SafSplitResolver: rawFile=${rawFile?.absolutePath ?: "null"} for $firstUri")
         if (rawFile != null) {
             val localParts = SplitPartResolver.resolvePartSequence(rawFile)
+            Log.i("VaultExplorer_C++", "SafSplitResolver: local resolvePartSequence found ${localParts.size} part(s)")
             if (localParts.size > 1) {
                 return localParts.map { SplitPartInfo(Uri.fromFile(it), it.length(), it) }
             }
         }
 
         val fileName = if (displayName.isNotEmpty()) displayName else firstUri.lastPathSegment ?: ""
-        val match = partSuffixRegex.find(fileName) ?: return emptyList()
+        val match = partSuffixRegex.find(fileName)
+        Log.i("VaultExplorer_C++", "SafSplitResolver: fileName='$fileName' matchesSplitPattern=${match != null}")
+        if (match == null) return emptyList()
 
         val base = match.groupValues[1]
         val suffix = match.groupValues[2]
@@ -59,33 +64,101 @@ object SafSplitResolver {
         // ACTION_OPEN_DOCUMENT_TREE follow-up prompt in
         // VaultPickerHandlers.pickContainerLauncher the first time a
         // cloud-hosted split part is picked -- see SafFolderGrants).
-        // DocumentFile.listFiles() goes through the same child-query
-        // machinery as Strategy 1 below, but this time backed by real
-        // tree permission, so it works against providers (Round-Sync/
-        // rclone, Drive, pCloud, ...) that correctly enforce per-document
-        // SAF scoping and silently reject Strategy 1/2's permission-less
-        // guesses -- which is why local containers always worked (no SAF
-        // ACL involved at all, see the rawFile branch above) while cloud
-        // ones didn't.
+        // Queries within that tree, backed by real tree permission, so it
+        // works against providers (Round-Sync/rclone, Drive, pCloud, ...)
+        // that correctly enforce per-document SAF scoping and silently
+        // reject Strategy 1/2's permission-less guesses -- which is why
+        // local containers always worked (no SAF ACL involved at all, see
+        // the rawFile branch above) while cloud ones didn't.
+        //
+        // Two ways to land on a tree here, tried in order:
+        //  (a) an explicit recorded mapping for this exact file (see
+        //      SafFolderGrants.recordTreeForFile) -- the picker guarantees
+        //      the user chose *this file's own* containing folder, so the
+        //      tree's own root doc ID IS the parent; no doc-ID relationship
+        //      between file and folder is needed, which is the only thing
+        //      that works for providers with fully opaque doc IDs (Drive's
+        //      doc IDs share no structure with their parent folder's).
+        //  (b) the doc-ID-prefix heuristic, for providers that happen to
+        //      use path-shaped doc IDs (Round-Sync/rclone-style mounts)
+        //      even without ever having explicitly recorded a grant for
+        //      this exact file -- here we still need to compute the real
+        //      parentDocId since the matched tree may be an ancestor
+        //      folder rather than the immediate parent.
         try {
-            val treeUri = SafFolderGrants.findCoveringTreeUri(context, firstUri)
-            if (treeUri != null) {
-                val treeRoot = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri)
-                val siblings = treeRoot?.listFiles()
-                if (siblings != null) {
-                    val byName = siblings.associateBy { (it.name ?: "").lowercase() }
-                    val startN = if (byName.containsKey(formatName(0).lowercase())) 0 else 1
-                    var n = startN
-                    val found = mutableListOf<SplitPartInfo>()
-                    while (true) {
-                        val doc = byName[formatName(n).lowercase()] ?: break
-                        found.add(SplitPartInfo(doc.uri, doc.length(), null))
-                        n++
+            val recordedTreeUri = SafFolderGrants.findRecordedTreeUri(context, firstUri)
+            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0: recordedTreeUri=${recordedTreeUri ?: "null"}")
+
+            fun queryChildrenAndMatch(treeUri: Uri, parentDocId: String): List<SplitPartInfo> {
+                val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+                val byName = mutableMapOf<String, Pair<Uri, Long>>()
+                context.contentResolver.query(
+                    childrenUri,
+                    arrayOf(
+                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                        DocumentsContract.Document.COLUMN_SIZE,
+                    ),
+                    null, null, null,
+                )?.use { cursor ->
+                    val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                    val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                    while (cursor.moveToNext()) {
+                        val cId = if (idIdx >= 0) cursor.getString(idIdx) else null ?: continue
+                        val cName = if (nameIdx >= 0) cursor.getString(nameIdx) else null ?: continue
+                        val cSize = if (sizeIdx >= 0 && !cursor.isNull(sizeIdx)) cursor.getLong(sizeIdx) else 0L
+                        byName[cName.lowercase()] = DocumentsContract.buildDocumentUriUsingTree(treeUri, cId) to cSize
                     }
+                }
+                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0: children of $parentDocId returned ${byName.size} entries: ${byName.keys}")
+                if (byName.isEmpty()) return emptyList()
+
+                val startN = if (byName.containsKey(formatName(0).lowercase())) 0 else 1
+                var n = startN
+                val found = mutableListOf<SplitPartInfo>()
+                while (true) {
+                    val (partUri, partSize) = byName[formatName(n).lowercase()] ?: break
+                    found.add(SplitPartInfo(partUri, partSize, null))
+                    n++
+                }
+                return found
+            }
+
+            if (recordedTreeUri != null) {
+                val rootDocId = DocumentsContract.getTreeDocumentId(recordedTreeUri)
+                val found = queryChildrenAndMatch(recordedTreeUri, rootDocId)
+                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0 (recorded): matched ${found.size} part(s)")
+                if (found.size > 1) return found
+            }
+
+            val prefixTreeUri = SafFolderGrants.findCoveringTreeUriByDocIdPrefix(context, firstUri)
+            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0: prefixTreeUri=${prefixTreeUri ?: "null"}")
+            if (prefixTreeUri != null && prefixTreeUri != recordedTreeUri) {
+                val docId = if (DocumentsContract.isTreeUri(firstUri)) {
+                    DocumentsContract.getTreeDocumentId(firstUri)
+                } else {
+                    DocumentsContract.getDocumentId(firstUri)
+                }
+                val parentDocId = if (docId.contains("/")) {
+                    docId.substringBeforeLast("/")
+                } else if (docId.contains(":")) {
+                    val volume = docId.substringBefore(":")
+                    val path = docId.substringAfter(":")
+                    if (path.contains("/")) "$volume:${path.substringBeforeLast("/")}" else "$volume:"
+                } else {
+                    null
+                }
+                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0 (prefix): docId=$docId parentDocId=${parentDocId ?: "null"}")
+                if (parentDocId != null) {
+                    val found = queryChildrenAndMatch(prefixTreeUri, parentDocId)
+                    Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0 (prefix): matched ${found.size} part(s)")
                     if (found.size > 1) return found
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0: threw ${e.javaClass.simpleName}: ${e.message}")
+        }
 
         // Strategy 1: Query SAF parent directory for sibling document URIs
         try {
@@ -104,6 +177,7 @@ object SafSplitResolver {
             } else {
                 null
             }
+            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: docId=$docId parentDocId=${parentDocId ?: "null"}")
 
             if (parentDocId != null) {
                 val childrenUri = DocumentsContract.buildChildDocumentsUri(firstUri.authority, parentDocId)
@@ -124,6 +198,7 @@ object SafSplitResolver {
                         mapByName[cName.lowercase()] = cId to cSize
                     }
                 }
+                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: children query returned ${mapByName.size} entries: ${mapByName.keys}")
 
                 if (mapByName.isNotEmpty()) {
                     val startN = if (mapByName.containsKey(formatName(0).lowercase())) 0 else 1
@@ -137,13 +212,17 @@ object SafSplitResolver {
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: threw ${e.javaClass.simpleName}: ${e.message}")
+        }
 
+        Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: matched ${parts.size} part(s)")
         if (parts.size > 1) return parts
 
         // Strategy 2: Probe candidate document URIs by document ID pattern
         try {
             val docId = DocumentsContract.getDocumentId(firstUri)
+            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy2: docId=$docId")
             if (docId.contains("/") || docId.contains(":")) {
                 fun buildCandidateUri(n: Int): Uri {
                     val targetName = formatName(n)
@@ -172,10 +251,14 @@ object SafSplitResolver {
                     probedParts.add(SplitPartInfo(candUri, size, null))
                     n++
                 }
+                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy2: probed ${probedParts.size} part(s)")
                 if (probedParts.size > 1) return probedParts
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.i("VaultExplorer_C++", "SafSplitResolver Strategy2: threw ${e.javaClass.simpleName}: ${e.message}")
+        }
 
+        Log.i("VaultExplorer_C++", "SafSplitResolver: all strategies exhausted, no split detected")
         return emptyList()
     }
 }

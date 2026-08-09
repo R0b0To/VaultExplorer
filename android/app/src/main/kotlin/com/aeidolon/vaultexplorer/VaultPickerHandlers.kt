@@ -74,7 +74,7 @@ class VaultPickerHandlers(
                 // cloud documents don't, so prompt for the folder once --
                 // SafFolderGrants persists it so this never happens twice
                 // for the same folder.
-                val looksLikeSplitPart = com.aeidolon.vaultexplorer.saf.SafSplitResolver.isSplitFileName(name)
+                val looksLikeSplitPart = SafSplitResolver.isSplitFileName(name)
                 val isRawLocalFile = UriToPath.getRawFile(activity, uri) != null
                 val alreadyCovered = com.aeidolon.vaultexplorer.saf.SafFolderGrants.hasCoveringTreeGrant(activity, uri)
 
@@ -124,6 +124,7 @@ class VaultPickerHandlers(
                         treeUri,
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                     )
+                    com.aeidolon.vaultexplorer.saf.SafFolderGrants.recordTreeForFile(activity, completion.uri, treeUri)
                 } catch (_: SecurityException) {}
                 activity.runOnUiThread {
                     completion.res.success(mapOf(

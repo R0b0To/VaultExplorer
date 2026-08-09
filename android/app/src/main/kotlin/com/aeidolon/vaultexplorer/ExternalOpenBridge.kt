@@ -6,8 +6,8 @@ import io.flutter.plugin.common.MethodChannel
 
 /**
  * Carries "please open this PDF" requests that arrived via the decoy
- * identity's Open-With/Share intent-filters (docs/architecture.md §8.3,
- * ADR-029) from [MainActivity.onCreate]/[MainActivity.onNewIntent] to Dart.
+ * identity's Open-With/Share intent-filters (docs/architecture.md §7.3)
+ * from [MainActivity.onCreate]/[MainActivity.onNewIntent] to Dart.
  *
  * Two delivery paths, both needed:
  *

@@ -7,7 +7,7 @@ import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 /// "hold for 3 seconds" gesture that opens the real vault's
 /// [LockGateScreen] from inside the Mask Mode decoy reader.
 ///
-/// Design notes (docs/architecture.md §8, ADR-028):
+/// Design notes (docs/architecture.md §7, ADR-028):
 ///
 /// * Timing/gating is delegated to [HoldTrigger], measured from raw
 ///   touch-down via [onTapDown]/[onTapUp]/[onTapCancel] rather than

@@ -1,8 +1,5 @@
 package com.aeidolon.vaultexplorer
 
-import com.aeidolon.vaultexplorer.syncapi.ChangeType
-import com.aeidolon.vaultexplorer.syncbridge.LedgerWriterClient
-
 /**
  * Format-neutral native engine boundary.
  *
@@ -154,15 +151,6 @@ object ContainerEngine {
     fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean {
         val ok = VaultBackendRegistry.get(volId)?.let { it.renameFile(oldPath, newPath) }
             ?: NativeEngine.renameFile(oldPath, newPath, volId)
-        // Modeled as delete+add rather than a dedicated RENAME change type
-        // (docs/architecture.md ADR-029): no cloud adapter in the sync
-        // plugin has a rename primitive of its own (§3.1 in that repo's
-        // architecture.md — upload/download/delete only), so a rename
-        // ledger entry could never mean anything more specific anyway.
-        if (ok) {
-            notifyLedger(oldPath, volId, ChangeType.DELETE)
-            notifyLedger(newPath, volId, ChangeType.ADD)
-        }
         return ok
     }
 
@@ -174,7 +162,6 @@ object ContainerEngine {
     fun deleteFile(path: String, volId: Int): Boolean {
         val ok = VaultBackendRegistry.get(volId)?.let { it.deleteFile(path) }
             ?: NativeEngine.deleteFile(path, volId)
-        if (ok) notifyLedger(path, volId, ChangeType.DELETE)
         return ok
     }
 
@@ -199,36 +186,14 @@ object ContainerEngine {
         return NativeEngine.writeFileChunk(path, offset, data, volId)
     }
 
-    /** No-op for VeraCrypt/LUKS (whose writeFileChunk is already durable per-call); required for Cryptomator and Gocryptfs to flush their write buffers. Safe to call unconditionally after any writeFileChunk() sequence completes.
-     *
-     * Also the dirty-ledger write hook (docs/architecture.md ADR-029):
-     * this is the one place every writeFileChunk() sequence, for every
-     * format, is guaranteed to funnel through exactly once, so it is the
-     * single choke point for "a file's content changed" regardless of
-     * which of the two backend families served the write. */
+    /** No-op for VeraCrypt/LUKS (whose writeFileChunk is already durable per-call); required for Cryptomator and Gocryptfs to flush their write buffers. Safe to call unconditionally after any writeFileChunk() sequence completes. */
     fun finishWrite(path: String, volId: Int): Boolean {
-        val ok = VaultBackendRegistry.get(volId)?.let { it.finishWrite(path) } ?: true
-        if (ok) notifyLedger(path, volId, ChangeType.MODIFY)
-        return ok
+        return VaultBackendRegistry.get(volId)?.let { it.finishWrite(path) } ?: true
     }
 
     fun writeBackFile(path: String, sourcePath: String, volId: Int): Boolean {
-        val ok = VaultBackendRegistry.get(volId)?.let { it.writeBackFile(path, sourcePath) }
+        return VaultBackendRegistry.get(volId)?.let { it.writeBackFile(path, sourcePath) }
             ?: NativeEngine.writeBackFile(path, sourcePath, volId)
-        if (ok) notifyLedger(path, volId, ChangeType.MODIFY)
-        return ok
-    }
-
-    /** Best-effort, fire-and-forget notification to the (usually absent)
-     *  sync plugin — see [LedgerWriterClient]'s doc comment for why this
-     *  can never affect the write it's reporting on. sizeBytes is left
-     *  unknown (-1) deliberately: computing it here would mean an extra
-     *  backend call on every single write even when nothing is listening
-     *  (the overwhelming majority of installs); the sync engine reads the
-     *  real size off the fd it opens via IVaultSyncService anyway. */
-    private fun notifyLedger(path: String, volId: Int, changeType: String) {
-        val uri = ContainerSessionRegistry.activeSessions[volId]?.uri ?: return
-        LedgerWriterClient.notifyChangeIfActive(uri, path, changeType, sizeBytes = -1L)
     }
 
     fun extractFile(path: String, destination: String, volId: Int): Boolean {

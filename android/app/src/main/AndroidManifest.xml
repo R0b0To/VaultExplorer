@@ -1,11 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <permission
-        android:name="com.aeidolon.vaultexplorer.permission.BIND_SYNC_BRIDGE"
-        android:protectionLevel="signature" />
-
-    <uses-permission android:name="com.aeidolon.vaultsync.permission.BIND_CLOUD_BRIDGE" />
-
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
@@ -90,21 +84,8 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-
-        <service
-            android:name=".syncbridge.VaultSyncBridgeService"
-            android:process=":syncbridge"
-            android:exported="true"
-            android:permission="com.aeidolon.vaultexplorer.permission.BIND_SYNC_BRIDGE" />
-
-        <provider
-            android:name=".syncbridge.SyncBridgeContextInitializer"
-            android:authorities="com.aeidolon.vaultexplorer.syncbridgeinit"
-            android:exported="false"
-            android:initOrder="100" />
     </application>
     <queries>
-        <package android:name="com.aeidolon.vaultsync" />
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

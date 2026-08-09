@@ -1,6 +1,4 @@
 import java.util.Properties
-import java.security.KeyStore
-import java.security.MessageDigest
 
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
@@ -8,37 +6,10 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
-// Local-dev-only convenience for CallerVerifier (syncbridge/CallerVerifier.kt):
-// both VaultExplorer and vaultsync-bridge, when debug-built on the same
-// machine, are signed by the same default ~/.android/debug.keystore. This
-// reads that keystore's own SHA-256 signing-certificate digest so debug
-// builds can trust it automatically — release builds never see this value
-// (see the `debug`-only buildConfigField below), so this has zero effect
-// on the fail-closed production allowlist.
-fun localDebugKeystoreSigningDigest(): String {
-    return try {
-        val debugKeystore = File(System.getProperty("user.home"), ".android/debug.keystore")
-        if (!debugKeystore.isFile) return ""
-        val keyStore = KeyStore.getInstance("JKS")
-        debugKeystore.inputStream().use { keyStore.load(it, "android".toCharArray()) }
-        val aliases = keyStore.aliases()
-        if (!aliases.hasMoreElements()) return ""
-        val cert = keyStore.getCertificate(aliases.nextElement()) ?: return ""
-        MessageDigest.getInstance("SHA-256")
-            .digest(cert.encoded)
-            .joinToString("") { "%02x".format(it) }
-    } catch (e: Exception) {
-        ""
-    }
-}
-
 plugins {
     id("com.android.application")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.devtools.ksp") // Room's annotation processor, for SyncLedgerDb (docs/architecture.md §8)
 }
-
-val syncApiVersion: String = gradle.extra["syncApiVersion"] as String
 
 tasks.whenTaskAdded {
     if (name.contains("ArtProfile")) {
@@ -69,13 +40,6 @@ android {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
         }
-    }
-
-    buildFeatures {
-        // VaultSyncBridgeService's public (syncapi) and internal
-        // (ILedgerWriter) AIDL surfaces — docs/architecture.md §8.
-        aidl = true
-        buildConfig = true
     }
 
     compileOptions {
@@ -137,14 +101,6 @@ android {
     }
 
     buildTypes {
-        debug {
-            buildConfigField(
-                "String",
-                "LOCAL_DEBUG_CALLER_DIGEST",
-                "\"${localDebugKeystoreSigningDigest()}\""
-            )
-        }
-
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -183,13 +139,6 @@ flutter {
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     testImplementation("junit:junit:4.13.2")
-
-    // docs/architecture.md §8 — VaultSync Bridge boundary.
-    implementation("com.aeidolon.vaultsync:syncapi:$syncApiVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("androidx.room:room-runtime:2.7.1")
-    implementation("androidx.room:room-ktx:2.7.1")
-    ksp("androidx.room:room-compiler:2.7.1")
 }
 
 androidComponents {

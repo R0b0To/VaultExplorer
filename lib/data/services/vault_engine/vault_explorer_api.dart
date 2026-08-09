@@ -16,7 +16,6 @@ import 'package:vaultexplorer/core/services/cache_coordinator.dart';
 part 'vault_explorer_api_crypto.dart';
 part 'vault_explorer_api_container_lifecycle.dart';
 part 'vault_explorer_api_file_io.dart';
-part 'vault_explorer_api_cloud_bridge.dart';
 
 typedef KeyfileRef = ({String uri, String displayName});
 typedef UnlockProgress = ({
@@ -28,7 +27,6 @@ typedef UnlockProgress = ({
   String containerFormat,
   int slot,
 });
-typedef CloudSessionInvalidation = ({int volId, String reason});
 String hashAlgorithmName(int hashId) => HashAlgo.nameFor(hashId);
 String cipherAlgorithmName(int cipherId) => CipherAlgo.nameFor(cipherId);
 
@@ -51,7 +49,7 @@ void _logSwallowed(String method, Object error, {bool expected = false}) {
 const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
 
 class VaultExplorerApi
-    with _CryptoOps, _ContainerLifecycleOps, _FileIoOps, _CloudBridgeOps {
+    with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
   const VaultExplorerApi();
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;
@@ -75,21 +73,6 @@ class VaultExplorerApi
     void Function(int volId) listener,
   ) {
     _usbContainerDetachedRegistry.remove(listener);
-  }
-
-  static final ListenerRegistry<CloudSessionInvalidation>
-  _cloudSessionInvalidatedRegistry =
-      ListenerRegistry<CloudSessionInvalidation>();
-  static void addCloudSessionInvalidatedListener(
-    void Function(CloudSessionInvalidation event) listener,
-  ) {
-    _cloudSessionInvalidatedRegistry.add(listener);
-  }
-
-  static void removeCloudSessionInvalidatedListener(
-    void Function(CloudSessionInvalidation event) listener,
-  ) {
-    _cloudSessionInvalidatedRegistry.remove(listener);
   }
 
   static final ListenerRegistry<int> _containerLockedRegistry =
@@ -186,15 +169,6 @@ class VaultExplorerApi
         final volId = call.arguments['volId'] as int?;
         if (volId != null) {
           _usbContainerDetachedRegistry.notify(volId);
-        }
-      } else if (call.method == 'onCloudSessionInvalidated') {
-        final args = call.arguments as Map<Object?, Object?>;
-        final volId = args['volId'] as int?;
-        if (volId != null) {
-          _cloudSessionInvalidatedRegistry.notify((
-            volId: volId,
-            reason: args['reason'] as String? ?? 'The cloud connection ended.',
-          ));
         }
       } else if (call.method == 'onHiddenVolumeProtectionTriggered') {
         final args = call.arguments as Map<Object?, Object?>;

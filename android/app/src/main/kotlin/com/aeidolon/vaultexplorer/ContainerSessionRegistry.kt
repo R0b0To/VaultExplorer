@@ -20,12 +20,6 @@ data class ContainerSession(
     val isUsbSource: Boolean = false,
     val readOnly: Boolean = false,
     val subFolderMounts: MutableMap<String, SubFolderMount> = mutableMapOf(),
-    // Set only for a remote-chunked mount (CloudMountHandlers); formatted
-    // "$accountId:$remoteVaultPath", the same key ChunkCacheManager uses
-    // on the Bridge side. `uri` for these sessions is a synthetic
-    // "cloud://accountId/remoteVaultPath" identity for display purposes —
-    // see CloudMountHandlers.handleUnlockRemoteChunkedVault.
-    val cloudVaultKey: String? = null,
 )
 
 object ContainerSessionRegistry {
@@ -48,7 +42,6 @@ object ContainerSessionRegistry {
     fun getFreeVolumeId(): Int? = (0 until MAX_VOLUMES).firstOrNull { !activeSessions.containsKey(it) }
     fun getSessionByUri(uri: String): ContainerSession? = activeSessions.values.find { it.uri == uri }
     fun getVolumeIdByUri(uri: String): Int? = activeSessions.entries.find { it.value.uri == uri }?.key
-    fun getVolumeIdByCloudVaultKey(key: String): Int? = activeSessions.entries.find { it.value.cloudVaultKey == key }?.key
     fun removeSession(volId: Int) { activeSessions.remove(volId) }
 
     /**

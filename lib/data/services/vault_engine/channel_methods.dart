@@ -129,16 +129,6 @@ abstract final class ChannelMethods {
   static const createUsbContainer = 'createUsbContainer';
   static const getUsbDeviceCapacity = 'getUsbDeviceCapacity';
 
-  // ── Cloud Storage (VaultSync Bridge plugin) ──────────────────────────────
-  // §5.1: checkCloudBridgeAvailable never throws for "not installed" --
-  // it resolves to {available: false, reason: 'not_installed'} so the
-  // Cloud Storage tab can show its fallback banner instead of an error.
-  static const checkCloudBridgeAvailable = 'checkCloudBridgeAvailable';
-  static const listCloudAccounts = 'listCloudAccounts';
-  static const discoverRemoteVaults = 'discoverRemoteVaults';
-  static const listRemoteFolders = 'listRemoteFolders';
-  static const unlockRemoteChunkedVault = 'unlockRemoteChunkedVault';
-
   // ── System Utilities ─────────────────────────────────────────────────────
   static const documentExists = 'documentExists';
   static const warmContainer = 'warmContainer';

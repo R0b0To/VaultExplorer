@@ -25,31 +25,3 @@ plugins {
 }
 
 include(":app")
-
-val syncApiDir = rootDir.resolve("../vaultsync-syncapi")
-check(syncApiDir.resolve("VERSION").isFile) {
-    "vaultsync-syncapi submodule not found at $syncApiDir.\n" +
-        "Run 'git submodule update --init --recursive' from the repo root, then re-sync."
-}
-
-run {
-    val sdkDir = java.util.Properties().apply {
-        file("local.properties").inputStream().use { load(it) }
-    }.getProperty("sdk.dir")
-    if (sdkDir != null) {
-        val syncApiProps = java.util.Properties()
-        syncApiProps.setProperty("sdk.dir", sdkDir)
-        syncApiDir.resolve("local.properties").outputStream().use {
-            syncApiProps.store(it, null)
-        }
-    }
-}
-
-includeBuild(syncApiDir) {
-    dependencySubstitution {
-        substitute(module("com.aeidolon.vaultsync:syncapi"))
-            .using(project(":syncapi"))
-    }
-}
-
-gradle.extra["syncApiVersion"] = syncApiDir.resolve("VERSION").readText().trim()

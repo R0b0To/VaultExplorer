@@ -25,7 +25,6 @@ import 'package:vaultexplorer/features/dashboard/widgets/dashboard_empty_state.d
 import 'package:vaultexplorer/features/dashboard/widgets/vault_card_row.dart';
 import 'package:vaultexplorer/features/browser/file_browser_screen.dart';
 import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
-import 'package:vaultexplorer/features/unlock/cloud_unlock_sheet.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_sheet.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
@@ -89,9 +88,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     );
     WidgetsBinding.instance.addObserver(this);
     VaultExplorerApi.addUsbContainerDetachedListener(_onUsbContainerDetached);
-    VaultExplorerApi.addCloudSessionInvalidatedListener(
-      _onCloudSessionInvalidated,
-    );
     VaultExplorerApi.addHiddenVolumeProtectionTriggeredListener(
       _onHiddenVolumeProtectionTriggered,
     );
@@ -109,9 +105,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     _lockController.dispose();
     VaultExplorerApi.removeUsbContainerDetachedListener(
       _onUsbContainerDetached,
-    );
-    VaultExplorerApi.removeCloudSessionInvalidatedListener(
-      _onCloudSessionInvalidated,
     );
     VaultExplorerApi.removeHiddenVolumeProtectionTriggeredListener(
       _onHiddenVolumeProtectionTriggered,
@@ -299,19 +292,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     showAppSnackBar(
       context,
       message: context.l10n.usbDriveDisconnectedLocked,
-      tone: AppBannerTone.warning,
-    );
-  }
-
-  void _onCloudSessionInvalidated(CloudSessionInvalidation event) {
-    if (!mounted ||
-        !_mounted.any((container) => container.volId == event.volId)) {
-      return;
-    }
-    _onContainerLocked(event.volId);
-    showAppSnackBar(
-      context,
-      message: 'Cloud vault locked: ${event.reason}',
       tone: AppBannerTone.warning,
     );
   }
@@ -527,53 +507,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
   }
 
-  Future<void> _showCloudUnlockSheet({ContainerRecord? existingRecord}) async {
-    if (_actionInFlight) return;
-    setState(() => _actionInFlight = true);
-    String? rememberedPassword;
-    if (existingRecord?.unlockMethod ==
-        ContainerUnlockMethod.rememberPassword) {
-      rememberedPassword = await ContainerRepository.instance.getPassword(
-        existingRecord!.uri,
-      );
-    }
-    MountedContainer? newlyMountedContainer;
-    try {
-      if (!mounted) return;
-      await Navigator.push(
-        context,
-        SlideRightRoute(
-          page: CloudUnlockSheet(
-            onMounted: (container, {record}) {
-              _onContainerMounted(container, record: record);
-              newlyMountedContainer = container;
-            },
-            documentProvider:
-                existingRecord?.documentProvider ??
-                _appSettings.defaultDocumentProvider,
-            autoMountFolders:
-                existingRecord?.documentProviderFolders
-                    .where((folder) => folder.autoMount)
-                    .map((folder) => folder.path)
-                    .toList() ??
-                const <String>[],
-            existingRecord: existingRecord,
-            prefillPassword: rememberedPassword,
-            mountedUris: _mounted.map((container) => container.uri).toList(),
-          ),
-        ),
-      );
-      await _loadAll();
-      if (newlyMountedContainer != null &&
-          _appSettings.autoOpenOnUnlock &&
-          mounted) {
-        _openBrowser(newlyMountedContainer!);
-      }
-    } finally {
-      if (mounted) setState(() => _actionInFlight = false);
-    }
-  }
-
   void _showUsbCreateSheet() {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
@@ -641,16 +574,6 @@ class _VaultDashboardState extends State<VaultDashboard>
               onTap: () {
                 Navigator.pop(sheetContext);
                 _showUnlockSheet();
-              },
-            ),
-            SheetOptionTile(
-              icon: Icons.cloud_outlined,
-              iconColor: cs.primary,
-              title: 'Mount cloud vault',
-              subtitle: 'Stream a chunked vault through VaultSync Bridge',
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showCloudUnlockSheet();
               },
             ),
             if (hasUsb) ...[
@@ -843,8 +766,6 @@ class _VaultDashboardState extends State<VaultDashboard>
       case LockedVaultItem(:final record):
         record.isUsbSource
             ? _showUsbUnlockSheet(existingRecord: record)
-            : record.isCloudSource
-            ? _showCloudUnlockSheet(existingRecord: record)
             : _showUnlockSheet(uri: item.uri, name: item.name);
     }
   }

@@ -417,8 +417,6 @@ class ContainerRecord {
   });
 
   bool get isUsbSource => uri.startsWith('usb:');
-  bool get isCloudSource =>
-      uri.startsWith('cloud://') || uri.startsWith('cloudfolder://');
 
   ContainerRecord copyWith({
     String? label,

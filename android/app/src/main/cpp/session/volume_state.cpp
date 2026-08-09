@@ -13,8 +13,6 @@ void VolumeState::reset() {
     isHiddenVolume = false;
     fileSize = 0;
     isUsbSource = false;
-    isCloudChunkedSource = false;
-    cloudChunkDevice.reset();
     readOnly = false;
     hiddenVolumeProtectionEnabled = false;
     hiddenProtectedStart = 0;

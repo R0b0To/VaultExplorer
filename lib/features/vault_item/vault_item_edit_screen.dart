@@ -342,8 +342,6 @@ class _FieldInput extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: obscure,
-      // Every field here is vault content, not just `secret`-typed ones —
-      // don't let the IME learn or cloud-sync any of it via predictive text.
       enableSuggestions: false,
       autocorrect: false,
       maxLines: isMultiline ? null : 1,

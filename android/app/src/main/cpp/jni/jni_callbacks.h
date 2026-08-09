@@ -15,9 +15,6 @@ extern jclass g_hiddenVolumeProtectionBridgeClass;
 extern jmethodID g_hiddenVolumeProtectionTriggeredMethod;
 extern jclass g_illegalStateExceptionClass;
 extern jclass g_unlockCancelledExceptionClass;
-extern jclass g_cloudChunkBridgeClass;
-extern jmethodID g_cloudChunkReadMethod;
-extern jmethodID g_cloudChunkWriteMethod;
 
 void reportUnlockProgress(int volId, int attempted, int total, int hashId,
                           int cipherId, int format = 0, int slot = 0);
@@ -26,7 +23,3 @@ bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount,
                     unsigned char* outBuf);
 bool usbWriteSectors(int volId, uint64_t startSector, uint32_t sectorCount,
                      const unsigned char* inBuf);
-bool cloudChunkReadRange(int volId, uint64_t chunkIndex, uint64_t offsetInChunk,
-                         unsigned char* outBuf, size_t len);
-bool cloudChunkWriteRange(int volId, uint64_t chunkIndex, uint64_t offsetInChunk,
-                          const unsigned char* inBuf, size_t len);

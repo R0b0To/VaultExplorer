@@ -14,7 +14,6 @@
 #include "container_format.h"
 #include "crypto/cascade.h"
 #include "io/decrypted_block_cache.h"
-#include "containers/chunked_block_device.h"
 
 extern "C" {
 #include "volume.h"
@@ -120,15 +119,6 @@ struct VolumeState {
     // to be doing.
     DecryptedBlockCache decryptedBlockCache;
     std::mutex decryptedBlockCacheMutex;
-
-    // Third physicalRead/physicalWrite transport, alongside the plain-fd
-    // and USB branches (io/block_io.cpp) — see chunked_block_device.h's
-    // header comment for this field's current integration status
-    // (available and wired, not yet what unlockRemoteChunked switches a
-    // volume onto). When true, fd stays -1 and isUsbSource stays false;
-    // physicalRead/Write route through cloudChunkDevice instead.
-    bool isCloudChunkedSource = false;
-    std::unique_ptr<ChunkedBlockDevice> cloudChunkDevice;
 
     VolumeState() = default;
     ~VolumeState() = default;

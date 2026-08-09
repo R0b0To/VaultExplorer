@@ -382,7 +382,6 @@ add_library(
         session/session_prepare.cpp    # VeraCrypt/LUKS session establishment (Tier-1 JNI calls)
         session/bitlocker_backend.cpp  # BitLocker session establishment + dislocker-backed I/O
         containers/container_create.cpp     # new-container header/format creation (createContainerNative)
-        containers/chunked_block_device.cpp # 4 MB fixed-size chunk virtual block device (remote cloud-chunked volumes)
         containers/vhdx_image.cpp      # VHDX (Hyper-V disk image) BAT-indexed read/write for fixed/dynamic disks
         containers/vhd_image.cpp       # legacy VHD BAT-indexed read/write for dynamic (expandable) disks
         jni/jni_runtime.cpp
@@ -516,11 +515,9 @@ if(NOT ANDROID)
     add_executable(fs_scan_test test/fs_scan_test.cpp)
     add_executable(kdf_table_test crypto/test/kdf_table_test.cpp crypto/kdf_table.cpp)
     add_executable(decrypted_block_cache_test io/test/decrypted_block_cache_test.cpp)
-    add_executable(chunked_block_device_test containers/test/chunked_block_device_test.cpp containers/chunked_block_device.cpp)
     enable_testing()
     add_test(NAME sector_batching_test COMMAND sector_batching_test)
     add_test(NAME fs_scan_test COMMAND fs_scan_test)
     add_test(NAME kdf_table_test COMMAND kdf_table_test)
     add_test(NAME decrypted_block_cache_test COMMAND decrypted_block_cache_test)
-    add_test(NAME chunked_block_device_test COMMAND chunked_block_device_test)
 endif()

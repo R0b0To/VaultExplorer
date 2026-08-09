@@ -48,3 +48,16 @@ gitattributes
 
 # Ignore local i18n WIP folder
 /vaultexplorer-i18n-wip/
+android/.gradle/9.1.0/gc.properties
+android/.gradle/9.1.0/checksums/checksums.lock
+android/.gradle/9.1.0/executionHistory/executionHistory.bin
+android/.gradle/9.1.0/executionHistory/executionHistory.lock
+android/.gradle/9.1.0/fileChanges/last-build.bin
+android/.gradle/9.1.0/fileHashes/fileHashes.bin
+android/.gradle/9.1.0/fileHashes/fileHashes.lock
+android/.gradle/9.1.0/fileHashes/resourceHashesCache.bin
+android/.gradle/buildOutputCleanup/buildOutputCleanup.lock
+android/.gradle/buildOutputCleanup/cache.properties
+android/.gradle/buildOutputCleanup/outputFiles.bin
+android/.gradle/noVersion/buildLogic.lock
+android/.gradle/vcs-1/gc.properties

@@ -112,7 +112,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   Set<String> _pinnedPaths = {};
   List<String> _favouritePaths = [];
   bool _isContainerLocked = false;
-  bool _hiddenVolumeProtectionTriggered = false;
   bool _isDeepSearch = false;
   bool _isSearchingSubfolders = false;
   List<RawEntry> _deepSearchResults = [];
@@ -141,23 +140,10 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     }
   }
 
-  void _onHiddenVolumeProtectionTriggeredEvent(int volId) {
-    if (volId != widget.container.volId || !mounted) return;
-    setState(() => _hiddenVolumeProtectionTriggered = true);
-    showAppSnackBar(
-      context,
-      message: context.l10n.hiddenVolumeProtectionTriggeredWarning,
-      tone: AppBannerTone.warning,
-    );
-  }
-
   @override
   void initState() {
     super.initState();
     VaultExplorerApi.addContainerLockedListener(_onContainerLockedEvent);
-    VaultExplorerApi.addHiddenVolumeProtectionTriggeredListener(
-      _onHiddenVolumeProtectionTriggeredEvent,
-    );
     _freeSpace = widget.container.freeSpace;
     _initSettingsAndContents();
     _loadToolbarConfig();
@@ -168,9 +154,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
   @override
   void dispose() {
     VaultExplorerApi.removeContainerLockedListener(_onContainerLockedEvent);
-    VaultExplorerApi.removeHiddenVolumeProtectionTriggeredListener(
-      _onHiddenVolumeProtectionTriggeredEvent,
-    );
     _closeArchive();
     VaultExplorerApi.removeUsbContainerDetachedListener(_onContainerDetached);
     super.dispose();
@@ -300,8 +283,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
     exitSelectionMode();
   }
 
-  bool get _isReadOnly =>
-      widget.container.readOnly || _hiddenVolumeProtectionTriggered;
+  bool get _isReadOnly => widget.container.readOnly;
 
   void _signalActivity() => widget.onUserActivity?.call();
 

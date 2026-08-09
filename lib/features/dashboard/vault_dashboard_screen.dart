@@ -92,6 +92,9 @@ class _VaultDashboardState extends State<VaultDashboard>
     VaultExplorerApi.addCloudSessionInvalidatedListener(
       _onCloudSessionInvalidated,
     );
+    VaultExplorerApi.addHiddenVolumeProtectionTriggeredListener(
+      _onHiddenVolumeProtectionTriggered,
+    );
     VaultExplorerApi.addScreenOffListener(_lockController.handleScreenOff);
     _loadAll();
   }
@@ -109,6 +112,9 @@ class _VaultDashboardState extends State<VaultDashboard>
     );
     VaultExplorerApi.removeCloudSessionInvalidatedListener(
       _onCloudSessionInvalidated,
+    );
+    VaultExplorerApi.removeHiddenVolumeProtectionTriggeredListener(
+      _onHiddenVolumeProtectionTriggered,
     );
     VaultExplorerApi.removeScreenOffListener(_lockController.handleScreenOff);
     _swipeGroup.dispose();
@@ -306,6 +312,41 @@ class _VaultDashboardState extends State<VaultDashboard>
     showAppSnackBar(
       context,
       message: 'Cloud vault locked: ${event.reason}',
+      tone: AppBannerTone.warning,
+    );
+  }
+
+  // A blocked write can leave the outer volume's on-disk filesystem
+  // structures briefly inconsistent (some but not all of a multi-step FAT
+  // operation may have already landed before the write that would have
+  // reached the hidden volume got refused) -- exactly the "looks broken/
+  // empty until you remount" behavior VeraCrypt itself exhibits here. There
+  // is no way to make the still-open FAT/NTFS session consistent again in
+  // place, so rather than leave the container open and looking corrupted,
+  // force it closed now (same teardown as pressing "lock") and prompt the
+  // user to reopen it -- a fresh mount re-reads the real on-disk state,
+  // which is exactly what resolves this on desktop VeraCrypt too.
+  Future<void> _onHiddenVolumeProtectionTriggered(int volId) async {
+    if (!mounted) return;
+    final idx = _mounted.indexWhere((c) => c.volId == volId);
+    if (idx == -1) return;
+    final container = _mounted[idx];
+    if (vaultExplorerApi.acquireLockGuard(volId)) {
+      try {
+        await vaultExplorerApi.lockContainer(container.uri);
+      } catch (_) {
+        // Already in a degraded state -- fall through to clean up the
+        // Dart-side session regardless of whether the native unmount call
+        // itself succeeded cleanly.
+      } finally {
+        vaultExplorerApi.releaseLockGuard(volId);
+      }
+    }
+    if (!mounted) return;
+    _onContainerLocked(volId);
+    showAppSnackBar(
+      context,
+      message: context.l10n.hiddenVolumeProtectionTriggeredWarning,
       tone: AppBannerTone.warning,
     );
   }

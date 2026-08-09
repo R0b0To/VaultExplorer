@@ -302,6 +302,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readOnlyContainerWarning => 'This container is mounted read-only.';
 
   @override
+  String get hiddenVolumeProtectionTriggeredWarning =>
+      'A write to this outer volume would have damaged the hidden volume, so it was blocked. This container has been switched to read-only for the rest of this session.';
+
+  @override
+  String get protectHiddenVolumeToggleTitle => 'Protect hidden volume';
+
+  @override
+  String get protectHiddenVolumeToggleSubtitle =>
+      'Prevent damage caused by writing to the outer volume';
+
+  @override
+  String get protectHiddenVolumeCredentialsRequired =>
+      'A hidden volume password or keyfile is required to protect it';
+
+  @override
   String deleteItemsTitle(num count) {
     String _temp0 = intl.Intl.pluralLogic(
       count,

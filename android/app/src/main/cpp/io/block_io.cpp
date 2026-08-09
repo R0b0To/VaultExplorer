@@ -20,6 +20,22 @@ bool physicalWrite(int volumeId, uint64_t byteOffset,
                    const unsigned char* buffer, size_t byteCount) {
     VolumeState& volume = volumes[volumeId];
     if (volume.readOnly) return false;
+
+
+    if (volume.hiddenVolumeProtectionEnabled && byteCount > 0) {
+        const uint64_t writeEnd = byteOffset + static_cast<uint64_t>(byteCount);
+        const bool overlapsHiddenArea =
+            writeEnd > volume.hiddenProtectedStart && byteOffset < volume.hiddenProtectedEnd;
+        if (overlapsHiddenArea) {
+            if (!volume.hiddenVolumeProtectionTriggered) {
+                volume.hiddenVolumeProtectionTriggered = true;
+                volume.readOnly = true;
+                notifyHiddenVolumeProtectionTriggered(volumeId);
+            }
+            return false;
+        }
+    }
+
     if (volume.isUsbSource) {
         return usbWriteSectors(volumeId, byteOffset / 512,
                                static_cast<uint32_t>(byteCount / 512), buffer);

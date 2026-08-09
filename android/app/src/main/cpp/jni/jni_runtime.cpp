@@ -12,6 +12,8 @@ jmethodID g_usbReadMethod = nullptr;
 jmethodID g_usbWriteMethod = nullptr;
 jclass    g_progressBridgeClass = nullptr;
 jmethodID g_progressReportMethod = nullptr;
+jclass    g_hiddenVolumeProtectionBridgeClass = nullptr;
+jmethodID g_hiddenVolumeProtectionTriggeredMethod = nullptr;
 jclass    g_illegalStateExceptionClass = nullptr;
 jclass    g_unlockCancelledExceptionClass = nullptr;
 
@@ -52,6 +54,21 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         return JNI_ERR;
     }
 
+    jclass hiddenProtectionLocal = env->FindClass("com/aeidolon/vaultexplorer/HiddenVolumeProtectionBridge");
+    if (!hiddenProtectionLocal) {
+        LOGI("JNI_OnLoad: HiddenVolumeProtectionBridge class not found");
+        return JNI_ERR;
+    }
+    g_hiddenVolumeProtectionBridgeClass = static_cast<jclass>(env->NewGlobalRef(hiddenProtectionLocal));
+    env->DeleteLocalRef(hiddenProtectionLocal);
+
+    g_hiddenVolumeProtectionTriggeredMethod = env->GetStaticMethodID(
+        g_hiddenVolumeProtectionBridgeClass, "reportTriggered", "(I)V");
+    if (!g_hiddenVolumeProtectionTriggeredMethod) {
+        LOGI("JNI_OnLoad: HiddenVolumeProtectionBridge.reportTriggered not found");
+        return JNI_ERR;
+    }
+
     jclass iseLocal = env->FindClass("java/lang/IllegalStateException");
     if (!iseLocal) {
         LOGI("JNI_OnLoad: IllegalStateException class not found");
@@ -78,6 +95,7 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
     if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) {
         if (g_usbBridgeClass) env->DeleteGlobalRef(g_usbBridgeClass);
         if (g_progressBridgeClass) env->DeleteGlobalRef(g_progressBridgeClass);
+        if (g_hiddenVolumeProtectionBridgeClass) env->DeleteGlobalRef(g_hiddenVolumeProtectionBridgeClass);
         if (g_illegalStateExceptionClass) env->DeleteGlobalRef(g_illegalStateExceptionClass);
         if (g_unlockCancelledExceptionClass) env->DeleteGlobalRef(g_unlockCancelledExceptionClass);
     }
@@ -86,6 +104,8 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
     g_usbWriteMethod = nullptr;
     g_progressBridgeClass = nullptr;
     g_progressReportMethod = nullptr;
+    g_hiddenVolumeProtectionBridgeClass = nullptr;
+    g_hiddenVolumeProtectionTriggeredMethod = nullptr;
     g_illegalStateExceptionClass = nullptr;
     g_unlockCancelledExceptionClass = nullptr;
     g_vm = nullptr;

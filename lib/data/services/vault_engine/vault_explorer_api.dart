@@ -85,6 +85,25 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
     _containerLockedRegistry.notify(volId);
   }
 
+  /// Fired once per session when a write to an outer volume mounted with
+  /// "protect hidden volume" would have landed inside the hidden volume's
+  /// data area. By the time this fires, native has already refused that
+  /// write and permanently switched the volume to read-only for the rest
+  /// of the session -- listeners should surface that to the user, not try
+  /// to react to it.
+  static final ListenerRegistry<int> _hiddenVolumeProtectionTriggeredRegistry =
+      ListenerRegistry<int>();
+  static void addHiddenVolumeProtectionTriggeredListener(
+    void Function(int volId) listener,
+  ) {
+    _hiddenVolumeProtectionTriggeredRegistry.add(listener);
+  }
+  static void removeHiddenVolumeProtectionTriggeredListener(
+    void Function(int volId) listener,
+  ) {
+    _hiddenVolumeProtectionTriggeredRegistry.remove(listener);
+  }
+
   static final List<void Function()> _screenOffListeners = [];
   static void addScreenOffListener(void Function() listener) {
     _screenOffListeners.add(listener);
@@ -141,6 +160,12 @@ class VaultExplorerApi with _CryptoOps, _ContainerLifecycleOps, _FileIoOps {
         final volId = call.arguments['volId'] as int?;
         if (volId != null) {
           _usbContainerDetachedRegistry.notify(volId);
+        }
+      } else if (call.method == 'onHiddenVolumeProtectionTriggered') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final volId = args['volId'] as int?;
+        if (volId != null) {
+          _hiddenVolumeProtectionTriggeredRegistry.notify(volId);
         }
       } else if (call.method == 'onScreenOff') {
         for (final listener in List.of(_screenOffListeners)) {

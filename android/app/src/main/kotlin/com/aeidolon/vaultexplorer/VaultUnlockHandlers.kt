@@ -35,6 +35,20 @@ data class UnlockArgs(
     val cacheDerivedKey: Boolean,
     val keyfilePaths: List<String>?,
     val readOnly: Boolean,
+    // "Protect hidden volume against damage caused by writing to the
+    // outer volume" (advanced unlock option). protectHiddenVolume is the
+    // user's intent; hiddenPassword/hiddenPim/hiddenCipherId/hiddenHashId/
+    // hiddenKeyfilePaths describe the hidden volume itself and are only
+    // meaningful when protectHiddenVolume is true. Kept separate from
+    // protectHiddenVolume (rather than just checking hiddenPassword !=
+    // null) so callers can distinguish "protection on, empty password" --
+    // a validation error -- from "protection off" outright.
+    val protectHiddenVolume: Boolean,
+    val hiddenPassword: String?,
+    val hiddenPim: Int,
+    val hiddenCipherId: Int,
+    val hiddenHashId: Int,
+    val hiddenKeyfilePaths: List<String>?,
 )
 
 /**
@@ -71,6 +85,12 @@ fun parseUnlockArgs(
     val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
     val keyfilePaths = call.argument<List<String>>("keyfilePaths")
     val readOnly = call.argument<Boolean>("readOnly") ?: false
+    val protectHiddenVolume = call.argument<Boolean>("protectHiddenVolume") ?: false
+    val hiddenPassword = call.argument<String>("hiddenVolumePassword")
+    val hiddenPim = call.argument<Number>("hiddenVolumePim")?.toInt() ?: 0
+    val hiddenCipherId = call.argument<Number>("hiddenVolumeCipherId")?.toInt() ?: 255
+    val hiddenHashId = call.argument<Number>("hiddenVolumeHashId")?.toInt() ?: 255
+    val hiddenKeyfilePaths = call.argument<List<String>>("hiddenVolumeKeyfilePaths")
 
     if (sourceIdentifier == null || password == null) {
         result.error("INVALID_ARGS", "$sourceIdentifierArgName and password required", null)
@@ -78,6 +98,10 @@ fun parseUnlockArgs(
     }
     if (password.isEmpty() && keyfilePaths.isNullOrEmpty() && preservedKey == null) {
         result.error("INVALID_ARGS", "password or keyfiles required", null)
+        return null
+    }
+    if (protectHiddenVolume && hiddenPassword.isNullOrEmpty() && hiddenKeyfilePaths.isNullOrEmpty()) {
+        result.error("INVALID_ARGS", "hidden volume password or keyfiles required to protect it", null)
         return null
     }
 
@@ -93,6 +117,12 @@ fun parseUnlockArgs(
         cacheDerivedKey = cacheDerivedKey,
         keyfilePaths = keyfilePaths,
         readOnly = readOnly,
+        protectHiddenVolume = protectHiddenVolume,
+        hiddenPassword = hiddenPassword,
+        hiddenPim = hiddenPim,
+        hiddenCipherId = hiddenCipherId,
+        hiddenHashId = hiddenHashId,
+        hiddenKeyfilePaths = hiddenKeyfilePaths,
     )
 }
 
@@ -129,6 +159,8 @@ class VaultUnlockHandlers(
                     ?: throw Exception("Could not open file descriptor")
 
                 val keyfileFds = nativeOps.openKeyfileFds(args.keyfilePaths)
+                val hiddenKeyfileFds =
+                    if (args.protectHiddenVolume) nativeOps.openKeyfileFds(args.hiddenKeyfilePaths) else null
                 val fd = pfd.detachFd()
 
                 if (args.preservedKey != null) {
@@ -139,9 +171,16 @@ class VaultUnlockHandlers(
                 if (keyfileFds != null && keyfileFds.isNotEmpty()) {
                     Log.i("VaultExplorer_C++", "File unlock using ${keyfileFds.size} keyfile(s)")
                 }
+                if (args.protectHiddenVolume) {
+                    Log.i("VaultExplorer_C++", "File unlock requesting hidden volume protection")
+                }
 
                 val files = ContainerSessionRegistry.locks[targetVolId].writeLock().withLock {
-                    ContainerEngine.unlockFile(fd, args.password, args.pim, targetVolId, args.cipherId, args.hashId, args.preservedKey, keyfileFds, args.readOnly)
+                    ContainerEngine.unlockFile(
+                        fd, args.password, args.pim, targetVolId, args.cipherId, args.hashId, args.preservedKey, keyfileFds, args.readOnly,
+                        if (args.protectHiddenVolume) args.hiddenPassword ?: "" else null,
+                        args.hiddenPim, args.hiddenCipherId, args.hiddenHashId, hiddenKeyfileFds,
+                    )
                 }
 
                 activity.runOnUiThread {
@@ -178,7 +217,10 @@ class VaultUnlockHandlers(
                         }
                     } else {
                         result.error("AUTH_FAIL",
-                            "Incorrect password/keyfiles or invalid container", null)
+                            if (args.protectHiddenVolume)
+                                "Incorrect password/keyfiles, or the hidden volume password/keyfiles did not match"
+                            else
+                                "Incorrect password/keyfiles or invalid container", null)
                     }
                 }
             } catch (e: Exception) {

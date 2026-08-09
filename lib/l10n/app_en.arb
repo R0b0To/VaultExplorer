@@ -477,6 +477,22 @@
   "@readOnlyContainerWarning": {
     "description": "Snackbar shown when trying to modify a read-only mounted container"
   },
+  "hiddenVolumeProtectionTriggeredWarning": "A write to this outer volume would have damaged the hidden volume, so it was blocked. This container has been switched to read-only for the rest of this session.",
+  "@hiddenVolumeProtectionTriggeredWarning": {
+    "description": "Snackbar/warning shown when hidden volume protection blocks a write and switches the outer volume to read-only for the rest of the session"
+  },
+  "protectHiddenVolumeToggleTitle": "Protect hidden volume",
+  "@protectHiddenVolumeToggleTitle": {
+    "description": "Title for the \"protect hidden volume\" toggle in the unlock advanced options"
+  },
+  "protectHiddenVolumeToggleSubtitle": "Prevent damage caused by writing to the outer volume",
+  "@protectHiddenVolumeToggleSubtitle": {
+    "description": "Subtitle explaining the \"protect hidden volume\" toggle"
+  },
+  "protectHiddenVolumeCredentialsRequired": "A hidden volume password or keyfile is required to protect it",
+  "@protectHiddenVolumeCredentialsRequired": {
+    "description": "Validation error shown when \"protect hidden volume\" is enabled but no hidden password/keyfiles were entered"
+  },
   "deleteItemsTitle": "{count, plural, =1{Delete 1 item?} other{Delete {count} items?}}",
   "@deleteItemsTitle": {
     "description": "Confirmation dialog title for deleting one or more items",

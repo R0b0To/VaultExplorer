@@ -209,6 +209,7 @@ class MainActivity : FlutterFragmentActivity() {
         methodChannel = channel
         UnlockProgressBridge.channel = channel
         ImportProgressBridge.channel = channel
+        HiddenVolumeProtectionBridge.channel = channel
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
         ExternalOpenBridge.channel = disguiseChannel

@@ -51,12 +51,13 @@ internal object NativeEngine {
     @JvmStatic
     external fun getLastDerivedKeyMaterialNative(volId: Int): ByteArray?
 
-    /** keyfileFds: see [deriveKeyMaterialNative] — same detach/ownership contract. */
    @JvmStatic
     external fun unlockAndListNative(
         fd: Int, password: String, pim: Int, volId: Int,
         cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null,
-        keyfileFds: IntArray? = null, readOnly: Boolean = false
+        keyfileFds: IntArray? = null, readOnly: Boolean = false,
+        hiddenPassword: String? = null, hiddenPim: Int = 0,
+        hiddenCipherId: Int = 255, hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null
     ): Array<String>?
 
 
@@ -188,10 +189,14 @@ internal object NativeEngine {
     @JvmStatic external fun getSpaceInfo(volId: Int): LongArray?
     /** USB unlock + list. cipherId/hashId: 255 = auto-detect.
      *  keyfileFds: see [deriveKeyMaterialNative] — same detach/ownership contract. */
+    /** See [unlockAndListNative]'s doc comment for the hidden* params --
+     *  identical "protect hidden volume" contract, just for the USB path. */
     @JvmStatic external fun unlockUsbAndListNative(
         password: String, pim: Int, volId: Int, deviceSizeBytes: Long,
         cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null,
-        partitionOffsetHint: Long = -1L, keyfileFds: IntArray? = null, readOnly: Boolean = false
+        partitionOffsetHint: Long = -1L, keyfileFds: IntArray? = null, readOnly: Boolean = false,
+        hiddenPassword: String? = null, hiddenPim: Int = 0,
+        hiddenCipherId: Int = 255, hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null
     ): Array<String>?
 
     /** Creates a new container directly on a raw (unformatted) USB block device.

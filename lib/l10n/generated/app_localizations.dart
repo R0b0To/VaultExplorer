@@ -530,6 +530,30 @@ abstract class AppLocalizations {
   /// **'This container is mounted read-only.'**
   String get readOnlyContainerWarning;
 
+  /// Snackbar/warning shown when hidden volume protection blocks a write and switches the outer volume to read-only for the rest of the session
+  ///
+  /// In en, this message translates to:
+  /// **'A write to this outer volume would have damaged the hidden volume, so it was blocked. This container has been switched to read-only for the rest of this session.'**
+  String get hiddenVolumeProtectionTriggeredWarning;
+
+  /// Title for the "protect hidden volume" toggle in the unlock advanced options
+  ///
+  /// In en, this message translates to:
+  /// **'Protect hidden volume'**
+  String get protectHiddenVolumeToggleTitle;
+
+  /// Subtitle explaining the "protect hidden volume" toggle
+  ///
+  /// In en, this message translates to:
+  /// **'Prevent damage caused by writing to the outer volume'**
+  String get protectHiddenVolumeToggleSubtitle;
+
+  /// Validation error shown when "protect hidden volume" is enabled but no hidden password/keyfiles were entered
+  ///
+  /// In en, this message translates to:
+  /// **'A hidden volume password or keyfile is required to protect it'**
+  String get protectHiddenVolumeCredentialsRequired;
+
   /// Confirmation dialog title for deleting one or more items
   ///
   /// In en, this message translates to:

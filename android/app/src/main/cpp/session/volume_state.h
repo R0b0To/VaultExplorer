@@ -55,6 +55,12 @@ struct VolumeState {
     bool fsMounted = false;
     bool isUsbSource = false;
     bool readOnly = false;
+
+
+    bool hiddenVolumeProtectionEnabled = false;
+    uint64_t hiddenProtectedStart = 0;
+    uint64_t hiddenProtectedEnd = 0;
+    bool hiddenVolumeProtectionTriggered = false;
     uint64_t partitionStartSector = 0;
     int matchedCipherId = -1;
     int matchedHashId = -1;

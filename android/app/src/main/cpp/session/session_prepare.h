@@ -40,6 +40,13 @@ bool prepareUsbSession(const unsigned char* password, size_t passwordLen, int pi
                        const int* keyfileFds = nullptr, int keyfileCount = 0,
                        bool readOnly = false);
 
+
+bool enableHiddenVolumeProtection(
+    int volId,
+    const unsigned char* hiddenPassword, size_t hiddenPasswordLen,
+    int hiddenPim, int hiddenCipherId, int hiddenHashId,
+    const int* hiddenKeyfileFds = nullptr, int hiddenKeyfileCount = 0);
+
 void clearUnlockCancellation(int volId);
 void requestUnlockCancellation(int volId);
 bool isUnlockCancelled(int volId);

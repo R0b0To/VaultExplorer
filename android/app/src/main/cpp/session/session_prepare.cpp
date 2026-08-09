@@ -30,6 +30,7 @@
 #include "crypto/xts_tweak.h"
 #include "jni_callbacks.h"
 #include "volume_state.h"
+#include "block_io.h"
 
 #undef min
 #undef max
@@ -776,25 +777,10 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
             LOGI("prepareSession(vol=%d): dynamic/differencing VHD signature matched but open failed: %s",
                  volId, probeImg.lastError());
         }
-        // Not BitLocker (or a differencing VHD we can't open): same stance
-        // as the VHDX block above -- VeraCrypt/LUKS are never
-        // dynamic-VHD-shaped in practice, so let it continue on to the
-        // generic VeraCrypt header-slot matching below, just skipping the
-        // (inapplicable) flat scan that follows.
+
     }
 
-    // Whole-disk container files -- most commonly a fixed-format VHD
-    // exported from Windows with BitLocker already turned on -- don't have
-    // the FVE signature at byte 0 of the file: byte 0 is the disk's own
-    // MBR/GPT, and the BitLocker volume lives inside one of its partitions
-    // instead, exactly like a raw USB disk (see prepareUsbSession's
-    // matching scan below). Parse that partition table and retry the
-    // signature probe at each partition's byte offset before falling
-    // through to VeraCrypt's header-slot matching.
-    //
-    // Skipped entirely for a dynamic/differencing VHD (handledAsExpandableVhd)
-    // -- see the block above for why this flat, byte-N-of-file-is-byte-N-of-
-    // disk scan would silently misread one of those.
+
     if (!handledAsExpandableVhd) {
         const uint64_t usableBytes = usableFileBytesExcludingVhdFooter(fd, fileSize);
         auto fileReadSectors = [fd, usableBytes](uint64_t startSector, uint32_t count, unsigned char* out) -> bool {
@@ -879,14 +865,7 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
             ParsedHeaderFields fields;
         };
 
-        // Sequential, standard-volume-first: deriveAndValidateHeader already fans the
-        // hash/cipher combinations for a single slot out across the shared ThreadPool.
-        // Running slot 0 (standard) and slot 1 (hidden) concurrently on separate threads
-        // made both calls submit to that same pool at once, so worker threads were handed
-        // out in whatever order the scheduler happened to pick -- the hidden-volume header
-        // could (and often did) get validated before the standard one. Trying the slots one
-        // at a time, standard first, matches VeraCrypt's own mount order and avoids splitting
-        // the pool's threads across two simultaneous derivations.
+
         for (size_t i = 0; i < 2 && !matched; i++) {
             if (!reads[i].ok) continue;
             SlotResult result;
@@ -938,6 +917,94 @@ bool prepareSession(int fd, const unsigned char* password, size_t passwordLen, i
         v.matchedHashId = (int)matchedHash;
         v.partitionStartSector = 0; 
         v.readOnly = readOnly;
+    }
+    return true;
+}
+
+bool enableHiddenVolumeProtection(
+    int volId,
+    const unsigned char* hiddenPassword, size_t hiddenPasswordLen,
+    int hiddenPim, int hiddenCipherId, int hiddenHashId,
+    const int* hiddenKeyfileFds, int hiddenKeyfileCount) {
+    if (volId < 0 || volId >= MAX_VOLUMES) {
+        closeUnusedKeyfileFds(hiddenKeyfileFds, hiddenKeyfileCount);
+        return false;
+    }
+    VolumeState& v = volumes[volId];
+
+    unsigned char mixedPassword[MAX_PASSWORD_LEN] = {0};
+    ScopeZeroize mixedPasswordGuard(mixedPassword, sizeof(mixedPassword));
+    size_t mixedPasswordLen = std::min(hiddenPasswordLen, sizeof(mixedPassword));
+    memcpy(mixedPassword, hiddenPassword, mixedPasswordLen);
+    if (hiddenKeyfileCount > 0 &&
+        !applyKeyfilesToPassword(hiddenKeyfileFds, hiddenKeyfileCount, mixedPassword, &mixedPasswordLen)) {
+        LOGI("enableHiddenVolumeProtection(vol=%d): hidden keyfile mixing failed", volId);
+        return false;
+    }
+    if (mixedPasswordLen == 0) {
+        LOGI("enableHiddenVolumeProtection(vol=%d): empty hidden password", volId);
+        return false;
+    }
+
+    uint64_t dataOffset, dataAreaLengthBytes;
+    {
+        std::lock_guard<std::mutex> lock(v.mutex);
+
+        if (!v.dataCtxInitialized || v.isHiddenVolume) {
+            LOGI("enableHiddenVolumeProtection(vol=%d): no outer session to protect", volId);
+            return false;
+        }
+        dataOffset = v.dataOffset;
+        dataAreaLengthBytes = v.dataAreaLengthBytes;
+    }
+
+    const uint64_t containerBase = dataOffset - VC_DATA_AREA_OFFSET;
+    const uint64_t hiddenHeaderOffset = containerBase + TC_HIDDEN_VOLUME_HEADER_OFFSET;
+
+    unsigned char headerSector[VC_FULL_HEADER_SIZE];
+    if (!physicalRead(volId, hiddenHeaderOffset, headerSector, VC_FULL_HEADER_SIZE)) {
+        LOGI("enableHiddenVolumeProtection(vol=%d): could not read hidden header", volId);
+        return false;
+    }
+
+    unsigned char dKey[192];
+    unsigned char decH[VC_HEADER_BODY_SIZE];
+    CascadeId matchedCipher{};
+    HashId matchedHash{};
+    ParsedHeaderFields fields;
+
+    const bool matched = deriveAndValidateHeader(
+        headerSector, mixedPassword, mixedPasswordLen, hiddenPim, hiddenCipherId, hiddenHashId,
+        dKey, decH, matchedCipher, matchedHash, fields, volId, nullptr, /*slotId=*/1);
+    mbedtls_platform_zeroize(dKey, sizeof(dKey));
+
+    if (!matched) {
+        LOGI("enableHiddenVolumeProtection(vol=%d): hidden password/keyfiles did not match", volId);
+        return false;
+    }
+    // Mirrors createContainerWithHidden's own validity check (see
+    // container_create.cpp): a hidden volume can occupy at most everything
+    // past the outer volume's reserved header area.
+    if (!fields.isHiddenVolume() || fields.hiddenVolumeSize == 0 ||
+        fields.hiddenVolumeSize >= dataAreaLengthBytes + VC_DATA_AREA_OFFSET) {
+        LOGI("enableHiddenVolumeProtection(vol=%d): decrypted header is not a valid hidden volume", volId);
+        return false;
+    }
+
+    // See container_create.cpp's createContainerWithHidden: the hidden
+    // volume's data area always occupies the last hiddenVolumeSize bytes
+    // of the outer container, and the outer container's own total size is
+    // dataOffset + dataAreaLengthBytes + VC_DATA_AREA_OFFSET (the trailing
+    // header-group-sized area reserved, but never used for data, by every
+    // outer volume this app creates).
+    const uint64_t outerContainerEnd = dataOffset + dataAreaLengthBytes + VC_DATA_AREA_OFFSET;
+
+    {
+        std::lock_guard<std::mutex> lock(v.mutex);
+        v.hiddenVolumeProtectionEnabled = true;
+        v.hiddenProtectedStart = outerContainerEnd - fields.hiddenVolumeSize;
+        v.hiddenProtectedEnd = outerContainerEnd;
+        v.hiddenVolumeProtectionTriggered = false;
     }
     return true;
 }

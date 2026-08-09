@@ -36,17 +36,23 @@ object ContainerEngine {
         fd: Int, password: String, pim: Int, volId: Int, cipherId: Int = 255,
         hashId: Int = 255, preservedKey: ByteArray? = null, keyfileFds: IntArray? = null,
         readOnly: Boolean = false,
+        hiddenPassword: String? = null, hiddenPim: Int = 0, hiddenCipherId: Int = 255,
+        hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null,
     ): Array<String>? = NativeEngine.unlockAndListNative(
-        fd, password, pim, volId, cipherId, hashId, preservedKey, keyfileFds, readOnly
+        fd, password, pim, volId, cipherId, hashId, preservedKey, keyfileFds, readOnly,
+        hiddenPassword, hiddenPim, hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
     )
 
     fun unlockUsb(
         password: String, pim: Int, volId: Int, deviceSizeBytes: Long, cipherId: Int = 255,
         hashId: Int = 255, preservedKey: ByteArray? = null, partitionOffsetHint: Long = -1L,
         keyfileFds: IntArray? = null, readOnly: Boolean = false,
+        hiddenPassword: String? = null, hiddenPim: Int = 0, hiddenCipherId: Int = 255,
+        hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null,
     ): Array<String>? = NativeEngine.unlockUsbAndListNative(
         password, pim, volId, deviceSizeBytes, cipherId, hashId, preservedKey,
-        partitionOffsetHint, keyfileFds, readOnly
+        partitionOffsetHint, keyfileFds, readOnly,
+        hiddenPassword, hiddenPim, hiddenCipherId, hiddenHashId, hiddenKeyfileFds,
     )
 
     /** containerFormat: 0 = VeraCrypt, 1 = LUKS1, 2 = LUKS2. See

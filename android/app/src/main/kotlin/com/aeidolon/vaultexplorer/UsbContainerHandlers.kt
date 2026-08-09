@@ -128,6 +128,8 @@ class UsbContainerHandlers(
                 UsbBlockBridge.register(targetVolId, msd)
 
                 val keyfileFds = nativeOps.openKeyfileFds(args.keyfilePaths)
+                val hiddenKeyfileFds =
+                    if (args.protectHiddenVolume) nativeOps.openKeyfileFds(args.hiddenKeyfilePaths) else null
 
                 if (args.preservedKey != null) {
                     Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${args.preservedKey.size})")
@@ -137,11 +139,17 @@ class UsbContainerHandlers(
                 if (keyfileFds != null && keyfileFds.isNotEmpty()) {
                     Log.i("VaultExplorer_C++", "USB unlock using ${keyfileFds.size} keyfile(s)")
                 }
+                if (args.protectHiddenVolume) {
+                    Log.i("VaultExplorer_C++", "USB unlock requesting hidden volume protection")
+                }
 
                 val files = ContainerSessionRegistry.locks[targetVolId].writeLock().withLock {
                     ContainerEngine.unlockUsb(
                         args.password, args.pim, targetVolId, sizeBytes, args.cipherId, args.hashId, args.preservedKey,
-                        keyfileFds = keyfileFds, readOnly = args.readOnly
+                        keyfileFds = keyfileFds, readOnly = args.readOnly,
+                        hiddenPassword = if (args.protectHiddenVolume) args.hiddenPassword ?: "" else null,
+                        hiddenPim = args.hiddenPim, hiddenCipherId = args.hiddenCipherId,
+                        hiddenHashId = args.hiddenHashId, hiddenKeyfileFds = hiddenKeyfileFds,
                     )
                 }
 
@@ -180,7 +188,11 @@ class UsbContainerHandlers(
                         }
                     } else {
                         UsbBlockBridge.unregister(targetVolId)
-                        result.error("AUTH_FAIL", "Incorrect password/keyfiles or invalid drive", null)
+                        result.error("AUTH_FAIL",
+                            if (args.protectHiddenVolume)
+                                "Incorrect password/keyfiles, or the hidden volume password/keyfiles did not match"
+                            else
+                                "Incorrect password/keyfiles or invalid drive", null)
                     }
                 }
             } catch (e: Exception) {

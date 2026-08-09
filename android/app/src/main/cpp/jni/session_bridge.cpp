@@ -23,9 +23,47 @@ static void throwUnlockCancelledException(JNIEnv* env) {
     if (g_unlockCancelledExceptionClass) env->ThrowNew(g_unlockCancelledExceptionClass, "CANCELLED");
 }
 
+
+static void rollBackUnprotectedSession(int volId) {
+    VolumeState& v = volumes[volId];
+    std::lock_guard<std::mutex> lock(v.mutex);
+    for (FIL* f : v.openStreams) { f_close(f); delete f; }
+    v.openStreams.clear();
+    for (NtfsStream* ns : v.openNtfsStreams) {
+        ntfs_attr_close(ns->attr);
+        ntfs_inode_close(ns->inode);
+        delete ns;
+    }
+    v.openNtfsStreams.clear();
+    v.reset();
+    unmountVolume(volId);
+}
+
+
+static bool applyHiddenVolumeProtectionOrRollBack(
+        JNIEnv* env, int volId, jstring hiddenPassword, jint hiddenPim,
+        jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
+    if (hiddenPassword == nullptr) return true;
+
+    const char* nativeHiddenPass = env->GetStringUTFChars(hiddenPassword, nullptr);
+    std::vector<int> hiddenKfFds = extractKeyfileFds(env, hiddenKeyfileFds);
+    const bool ok = enableHiddenVolumeProtection(
+        volId, reinterpret_cast<const unsigned char*>(nativeHiddenPass), strlen(nativeHiddenPass),
+        hiddenPim, hiddenCipherId, hiddenHashId,
+        hiddenKfFds.empty() ? nullptr : hiddenKfFds.data(), static_cast<int>(hiddenKfFds.size()));
+    env->ReleaseStringUTFChars(hiddenPassword, nativeHiddenPass);
+
+    if (!ok) {
+        rollBackUnprotectedSession(volId);
+        return false;
+    }
+    return true;
+}
+
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_unlockAndListNative(
-        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds, jboolean readOnly) {
+        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint volId, jint cipherId, jint hashId, jbyteArray preservedKey, jintArray keyfileFds, jboolean readOnly,
+        jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
     JNI_TRY
 
 
@@ -66,6 +104,11 @@ if (!prepareSession(fd, reinterpret_cast<const unsigned char*>(nativePass), strl
 
     if (!mountOk) {
         LOGI("FATFS/NTFS Mount failed on volume %d", volId);
+        return nullptr;
+    }
+
+    if (!applyHiddenVolumeProtectionOrRollBack(env, volId, hiddenPassword, hiddenPim,
+                                               hiddenCipherId, hiddenHashId, hiddenKeyfileFds)) {
         return nullptr;
     }
 
@@ -167,7 +210,8 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_getMatchedPartitionOffset(JNIEnv* e
 extern "C" JNIEXPORT jobjectArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
         JNIEnv* env, jobject, jstring password, jint pim, jint volId, jlong deviceSizeBytes, jint cipherId, jint hashId, jbyteArray preservedKey,
-        jlong partitionOffsetHint, jintArray keyfileFds, jboolean readOnly) {
+        jlong partitionOffsetHint, jintArray keyfileFds, jboolean readOnly,
+        jstring hiddenPassword, jint hiddenPim, jint hiddenCipherId, jint hiddenHashId, jintArray hiddenKeyfileFds) {
     JNI_TRY
 
 
@@ -212,6 +256,11 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_unlockUsbAndListNative(
     }
     if (!mountOk) {
         LOGI("FATFS/NTFS Mount failed on USB volume %d", volId);
+        return nullptr;
+    }
+
+    if (!applyHiddenVolumeProtectionOrRollBack(env, volId, hiddenPassword, hiddenPim,
+                                               hiddenCipherId, hiddenHashId, hiddenKeyfileFds)) {
         return nullptr;
     }
 

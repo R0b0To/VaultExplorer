@@ -58,6 +58,21 @@ class _UnlockSheetState extends State<UnlockSheet>
   int _hashId = 255;
   String _containerFormat = 'container';
 
+  // "Protect hidden volume against damage caused by writing to the outer
+  // volume" (advanced unlock option). Only shown/submitted for VeraCrypt
+  // containers -- gated in build() by the same `!_isLuks && !_isFolderVault
+  // && !_isBitlocker` condition already used for the outer AdvancedParamsPanel.
+  bool _protectHiddenVolume = false;
+  final _hiddenPasswordCtrl = TextEditingController();
+  final _hiddenPimCtrl = TextEditingController();
+  bool _hiddenObscure = true;
+  int _hiddenCipherId = 255;
+  int _hiddenHashId = 255;
+  late final _hiddenKeyfilesController = KeyfilePickerController(
+    notify: () { if (mounted) setState(() {}); },
+    onError: (msg) { if (mounted) setState(() => _error = msg ?? context.l10n.couldNotPickKeyfiles); },
+  );
+
   @override
   void onKeyfilePickError(String message) => setState(() => _error = message);
 
@@ -217,6 +232,8 @@ class _UnlockSheetState extends State<UnlockSheet>
     VaultExplorerApi.removeUnlockProgressListener(_onUnlockProgress);
     _passwordCtrl.dispose();
     _pimCtrl.dispose();
+    _hiddenPasswordCtrl.dispose();
+    _hiddenPimCtrl.dispose();
     super.dispose();
   }
 
@@ -482,6 +499,12 @@ class _UnlockSheetState extends State<UnlockSheet>
       setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
       return;
     }
+    if (_protectHiddenVolume &&
+        _hiddenPasswordCtrl.text.isEmpty &&
+        _hiddenKeyfilesController.keyfiles.isEmpty) {
+      setState(() => _error = context.l10n.protectHiddenVolumeCredentialsRequired);
+      return;
+    }
 
     if (_isCryfs && !_hasAllStorageAccess) {
       final grant = await showAppConfirmDialog(
@@ -648,6 +671,9 @@ class _UnlockSheetState extends State<UnlockSheet>
 
     try {
       final pim = clampPim(_pimCtrl.text.isEmpty ? 0 : int.tryParse(_pimCtrl.text) ?? 0);
+      final hiddenPim = clampPim(_hiddenPimCtrl.text.isEmpty ? 0 : int.tryParse(_hiddenPimCtrl.text) ?? 0);
+      final hiddenKeyfilePaths =
+          _hiddenKeyfilesController.keyfiles.map((k) => k.uri).toList();
       final name = _selectedName ?? context.l10n.defaultContainerName;
       final records = await ContainerRepository.instance.loadAll();
       final record = records[_selectedUri!];
@@ -679,6 +705,12 @@ class _UnlockSheetState extends State<UnlockSheet>
               cacheDerivedKey: shouldCacheDerivedKey,
               keyfilePaths: effectiveKeyfilePaths,
               readOnly: _readOnly,
+              protectHiddenVolume: _protectHiddenVolume,
+              hiddenVolumePassword: _hiddenPasswordCtrl.text,
+              hiddenVolumePim: hiddenPim,
+              hiddenVolumeCipherId: _hiddenCipherId,
+              hiddenVolumeHashId: _hiddenHashId,
+              hiddenVolumeKeyfilePaths: hiddenKeyfilePaths,
             )
           : await _unlockSwallowingStaleAuthFail(() => vaultExplorerApi.unlockContainer(
               _selectedUri!,
@@ -693,6 +725,12 @@ class _UnlockSheetState extends State<UnlockSheet>
               cacheDerivedKey: shouldCacheDerivedKey,
               keyfilePaths: effectiveKeyfilePaths,
               readOnly: _readOnly,
+              protectHiddenVolume: _protectHiddenVolume,
+              hiddenVolumePassword: _hiddenPasswordCtrl.text,
+              hiddenVolumePim: hiddenPim,
+              hiddenVolumeCipherId: _hiddenCipherId,
+              hiddenVolumeHashId: _hiddenHashId,
+              hiddenVolumeKeyfilePaths: hiddenKeyfilePaths,
             ));
       if (result == null && resolvedPreservedKey != null) {
         await vaultExplorerApi.clearDerivedKey(_selectedUri!);
@@ -714,6 +752,12 @@ class _UnlockSheetState extends State<UnlockSheet>
             cacheDerivedKey: shouldCacheDerivedKey,
             keyfilePaths: effectiveKeyfilePaths,
             readOnly: _readOnly,
+            protectHiddenVolume: _protectHiddenVolume,
+            hiddenVolumePassword: _hiddenPasswordCtrl.text,
+            hiddenVolumePim: hiddenPim,
+            hiddenVolumeCipherId: _hiddenCipherId,
+            hiddenVolumeHashId: _hiddenHashId,
+            hiddenVolumeKeyfilePaths: hiddenKeyfilePaths,
           );
         }
       }
@@ -1382,7 +1426,16 @@ class _UnlockSheetState extends State<UnlockSheet>
                                   ? null
                                   : (val) {
                                       dismissKeyboard();
-                                      setState(() => _readOnly = val);
+                                      setState(() {
+                                        _readOnly = val;
+                                        // Protection is meaningless (and its
+                                        // fields are hidden) while mounting
+                                        // read-only -- clear it so a stale
+                                        // "on" from before doesn't silently
+                                        // ride along if read-only is turned
+                                        // off again later.
+                                        if (val) _protectHiddenVolume = false;
+                                      });
                                     },
                               title: Text(
                                 context.l10n.readOnlyModeLabel,
@@ -1394,6 +1447,67 @@ class _UnlockSheetState extends State<UnlockSheet>
                               ),
                               secondary: Icon(Icons.visibility_outlined, color: cs.primary),
                             ),
+                            if (!_isLuks && !_isFolderVault && !_isBitlocker) ...[
+                              SwitchListTile(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                                value: _protectHiddenVolume && !_readOnly,
+                                onChanged: (_loading || _readOnly)
+                                    ? null
+                                    : (val) {
+                                        dismissKeyboard();
+                                        setState(() => _protectHiddenVolume = val);
+                                      },
+                                title: Text(
+                                  context.l10n.protectHiddenVolumeToggleTitle,
+                                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: Text(
+                                  _readOnly
+                                      ? context.l10n.readOnlyModeContainerSubtitle
+                                      : context.l10n.protectHiddenVolumeToggleSubtitle,
+                                  style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                                secondary: Icon(Icons.shield_outlined, color: cs.primary),
+                              ),
+                              if (_protectHiddenVolume && !_readOnly) ...[
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: TextField(
+                                    controller: _hiddenPasswordCtrl,
+                                    obscureText: _hiddenObscure,
+                                    enabled: !_loading,
+                                    autofillHints: const [AutofillHints.password],
+                                    decoration: InputDecoration(
+                                      labelText: context.l10n.hiddenPasswordLabel,
+                                      prefixIcon: Icon(Icons.key_rounded, size: 20, color: cs.primary),
+                                      suffixIcon: PasswordVisibilityToggle(
+                                        obscured: _hiddenObscure,
+                                        onToggle: () => setState(() => _hiddenObscure = !_hiddenObscure),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 1),
+                                  child: KeyfilesPicker(
+                                    keyfiles: _hiddenKeyfilesController.keyfiles,
+                                    picking: _hiddenKeyfilesController.picking,
+                                    onPick: _hiddenKeyfilesController.pick,
+                                    onRemove: _hiddenKeyfilesController.remove,
+                                    enabled: !_loading,
+                                  ),
+                                ),
+                                AdvancedParamsPanel(
+                                  pimController: _hiddenPimCtrl,
+                                  cipherId: _hiddenCipherId,
+                                  hashId: _hiddenHashId,
+                                  enabled: !_loading,
+                                  onCipherChanged: (val) => setState(() => _hiddenCipherId = val),
+                                  onHashChanged: (val) => setState(() => _hiddenHashId = val),
+                                  onExpansionChanged: (_) => dismissKeyboard(),
+                                ),
+                              ],
+                            ],
                             if (widget.initialUri == null)
                               SwitchListTile(
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),

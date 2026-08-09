@@ -571,6 +571,12 @@ mixin _ContainerLifecycleOps {
     bool cacheDerivedKey = false,
     List<String>? keyfilePaths,
     bool readOnly = false,
+    bool protectHiddenVolume = false,
+    String? hiddenVolumePassword,
+    int hiddenVolumePim = 0,
+    int? hiddenVolumeCipherId,
+    int? hiddenVolumeHashId,
+    List<String>? hiddenVolumeKeyfilePaths,
   }) async {
     final raw = await _channel
         .invokeMethod<Map<Object?, Object?>>(ChannelMethods.unlockContainer, {
@@ -587,6 +593,16 @@ mixin _ContainerLifecycleOps {
           if (keyfilePaths != null && keyfilePaths.isNotEmpty)
             'keyfilePaths': keyfilePaths,
           'readOnly': readOnly,
+          'protectHiddenVolume': protectHiddenVolume,
+          if (protectHiddenVolume) ...{
+            'hiddenVolumePassword': hiddenVolumePassword ?? '',
+            'hiddenVolumePim': hiddenVolumePim,
+            'hiddenVolumeCipherId': hiddenVolumeCipherId ?? 255,
+            'hiddenVolumeHashId': hiddenVolumeHashId ?? 255,
+            if (hiddenVolumeKeyfilePaths != null &&
+                hiddenVolumeKeyfilePaths.isNotEmpty)
+              'hiddenVolumeKeyfilePaths': hiddenVolumeKeyfilePaths,
+          },
         });
 
     if (raw == null) return null;
@@ -663,6 +679,12 @@ mixin _ContainerLifecycleOps {
     bool cacheDerivedKey = false,
     List<String>? keyfilePaths,
     bool readOnly = false,
+    bool protectHiddenVolume = false,
+    String? hiddenVolumePassword,
+    int hiddenVolumePim = 0,
+    int? hiddenVolumeCipherId,
+    int? hiddenVolumeHashId,
+    List<String>? hiddenVolumeKeyfilePaths,
   }) async {
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
       ChannelMethods.unlockUsbContainer,
@@ -680,6 +702,16 @@ mixin _ContainerLifecycleOps {
         if (keyfilePaths != null && keyfilePaths.isNotEmpty)
           'keyfilePaths': keyfilePaths,
         'readOnly': readOnly,
+        'protectHiddenVolume': protectHiddenVolume,
+        if (protectHiddenVolume) ...{
+          'hiddenVolumePassword': hiddenVolumePassword ?? '',
+          'hiddenVolumePim': hiddenVolumePim,
+          'hiddenVolumeCipherId': hiddenVolumeCipherId ?? 255,
+          'hiddenVolumeHashId': hiddenVolumeHashId ?? 255,
+          if (hiddenVolumeKeyfilePaths != null &&
+              hiddenVolumeKeyfilePaths.isNotEmpty)
+            'hiddenVolumeKeyfilePaths': hiddenVolumeKeyfilePaths,
+        },
       },
     );
 

@@ -42,6 +42,17 @@ void reportUnlockProgress(int volId, int attempted, int total, int hashId,
     if (env->ExceptionCheck()) env->ExceptionClear();
 }
 
+void notifyHiddenVolumeProtectionTriggered(int volId) {
+    if (volId < 0) return;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env) return;
+    if (!g_hiddenVolumeProtectionBridgeClass || !g_hiddenVolumeProtectionTriggeredMethod) return;
+    env->CallStaticVoidMethod(
+        g_hiddenVolumeProtectionBridgeClass, g_hiddenVolumeProtectionTriggeredMethod,
+        static_cast<jint>(volId));
+    if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
 bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount,
                     unsigned char* outBuf) {
     JNIEnv* env = g_threadJniEnv.get();

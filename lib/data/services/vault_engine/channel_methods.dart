@@ -34,14 +34,15 @@ abstract final class ChannelMethods {
 
   static const hasAllFilesAccess = 'hasAllFilesAccess';
   static const requestAllFilesAccess = 'requestAllFilesAccess';
-  
+
   // ── Cryptomator / Folder Vaults ──────────────────────────────────────────
   /// Opens ACTION_OPEN_DOCUMENT_TREE (a folder picker, not a file picker)
   /// and checks for masterkey.cryptomator, gocryptfs.conf, or cryfs.config.
   static const pickCryptomatorVault = 'pickCryptomatorVault';
   static const unlockCryptomatorVault = 'unlockCryptomatorVault';
   static const createCryptomatorVault = 'createCryptomatorVault';
-  static const changeCryptomatorVaultPassword = 'changeCryptomatorVaultPassword';
+  static const changeCryptomatorVaultPassword =
+      'changeCryptomatorVaultPassword';
   static const finishWriteIfCryptomator = 'finishWriteIfCryptomator';
 
   static const pickGocryptfsVault = 'pickGocryptfsVault';
@@ -68,7 +69,8 @@ abstract final class ChannelMethods {
   // in memory (keyed by opId) until this is called or the op is superseded.
   static const deleteImportSources = 'deleteImportSources';
   static const getFileSize = 'getFileSize';
-  static const getFolderSize = 'getFolderSize'; // recursive directory byte total
+  static const getFolderSize =
+      'getFolderSize'; // recursive directory byte total
   static const readFileChunk = 'readFileChunk';
   static const writeFileChunk = 'writeFileChunk';
   static const writeBackFile = 'writeBackFile';
@@ -94,7 +96,6 @@ abstract final class ChannelMethods {
   static const getImageThumbnailWithSize = 'getImageThumbnailWithSize';
   static const getVideoThumbnailWithSize = 'getVideoThumbnailWithSize';
   static const setPlaybackActive = 'setPlaybackActive';
-
 
   // ── Crypto ───────────────────────────────────────────────────────────────
   static const hashPassword = 'hashPassword';
@@ -127,6 +128,16 @@ abstract final class ChannelMethods {
   static const unlockUsbContainer = 'unlockUsbContainer';
   static const createUsbContainer = 'createUsbContainer';
   static const getUsbDeviceCapacity = 'getUsbDeviceCapacity';
+
+  // ── Cloud Storage (VaultSync Bridge plugin) ──────────────────────────────
+  // §5.1: checkCloudBridgeAvailable never throws for "not installed" --
+  // it resolves to {available: false, reason: 'not_installed'} so the
+  // Cloud Storage tab can show its fallback banner instead of an error.
+  static const checkCloudBridgeAvailable = 'checkCloudBridgeAvailable';
+  static const listCloudAccounts = 'listCloudAccounts';
+  static const discoverRemoteVaults = 'discoverRemoteVaults';
+  static const listRemoteFolders = 'listRemoteFolders';
+  static const unlockRemoteChunkedVault = 'unlockRemoteChunkedVault';
 
   // ── System Utilities ─────────────────────────────────────────────────────
   static const documentExists = 'documentExists';

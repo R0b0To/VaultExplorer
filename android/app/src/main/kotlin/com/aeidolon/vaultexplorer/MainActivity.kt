@@ -94,6 +94,11 @@ private object ChannelMethods {
     const val SET_KEEP_SCREEN_ON = "setKeepScreenOn"
     const val LAUNCH_URL = "launchUrl"
     const val GET_APP_VERSION = "getAppVersion"
+    const val CHECK_CLOUD_BRIDGE_AVAILABLE = "checkCloudBridgeAvailable"
+    const val LIST_CLOUD_ACCOUNTS = "listCloudAccounts"
+    const val DISCOVER_REMOTE_VAULTS = "discoverRemoteVaults"
+    const val LIST_REMOTE_FOLDERS = "listRemoteFolders"
+    const val UNLOCK_REMOTE_CHUNKED_VAULT = "unlockRemoteChunkedVault"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -128,9 +133,15 @@ class MainActivity : FlutterFragmentActivity() {
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
     private val disguiseModeHandlers = DisguiseModeHandlers(this)
     private val secureStorageHandlers = SecureStorageHandlers(this)
+    // CloudMountHandlers obtains applicationContext while constructing its
+    // AIDL client. An Activity property initializer runs before attach(),
+    // when ContextWrapper's base context is still null, so initialize it
+    // after super.onCreate instead.
+    private lateinit var cloudMountHandlers: com.aeidolon.vaultexplorer.cloudbridge.CloudMountHandlers
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
+        cloudMountHandlers = com.aeidolon.vaultexplorer.cloudbridge.CloudMountHandlers(this, ioExecutor, nativeOps)
         disguiseModeHandlers.updateActivityIdentity()
         // Wipes any vx_vid_*.mp4 left behind in cacheDir by a previous
         // process death mid-recording (crash, force-stop, OOM kill) --
@@ -157,6 +168,7 @@ class MainActivity : FlutterFragmentActivity() {
         screenOffReceiver?.let { unregisterReceiver(it) }
         vaultCameraPlugin?.disposeAll()
         vaultCameraPlugin = null
+        if (::cloudMountHandlers.isInitialized) cloudMountHandlers.onActivityDestroyed()
         super.onDestroy()
     }
 
@@ -374,6 +386,11 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.SET_KEEP_SCREEN_ON -> systemHandlers.handleSetKeepScreenOn(call, result)
                 ChannelMethods.LAUNCH_URL -> systemHandlers.handleLaunchUrl(call, result)
                 ChannelMethods.GET_APP_VERSION -> systemHandlers.handleGetAppVersion(call, result)
+                ChannelMethods.CHECK_CLOUD_BRIDGE_AVAILABLE -> cloudMountHandlers.handleCheckCloudBridgeAvailable(call, result)
+                ChannelMethods.LIST_CLOUD_ACCOUNTS -> cloudMountHandlers.handleListCloudAccounts(call, result)
+                ChannelMethods.DISCOVER_REMOTE_VAULTS -> cloudMountHandlers.handleDiscoverRemoteVaults(call, result)
+                ChannelMethods.LIST_REMOTE_FOLDERS -> cloudMountHandlers.handleListRemoteFolders(call, result)
+                ChannelMethods.UNLOCK_REMOTE_CHUNKED_VAULT -> cloudMountHandlers.handleUnlockRemoteChunkedVault(call, result)
                 ChannelMethods.IMPORT_FILE -> importExportHandlers.handleImportFile(call, result)
                 ChannelMethods.EXPORT_FILES_FOLDER -> importExportHandlers.handleExportFilesFolder(call, result)
                 ChannelMethods.IMPORT_FOLDER -> importExportHandlers.handleImportFolder(call, result)

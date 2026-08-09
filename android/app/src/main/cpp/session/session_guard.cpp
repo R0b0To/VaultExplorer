@@ -13,7 +13,7 @@ bool requireActiveSession(int volumeId, const char* operation) {
     if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
     VolumeState& volume = volumes[volumeId];
     std::lock_guard<std::mutex> lock(volume.mutex);
-    if (!volume.dataCtxInitialized || (volume.fd < 0 && !volume.isUsbSource)) {
+    if (!volume.dataCtxInitialized || (volume.fd < 0 && !volume.isUsbSource && !volume.isCloudChunkedSource)) {
         LOGI("%s: volume %d has no active session (not unlocked)", operation, volumeId);
         return false;
     }

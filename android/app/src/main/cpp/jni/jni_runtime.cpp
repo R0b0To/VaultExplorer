@@ -16,6 +16,9 @@ jclass    g_hiddenVolumeProtectionBridgeClass = nullptr;
 jmethodID g_hiddenVolumeProtectionTriggeredMethod = nullptr;
 jclass    g_illegalStateExceptionClass = nullptr;
 jclass    g_unlockCancelledExceptionClass = nullptr;
+jclass    g_cloudChunkBridgeClass = nullptr;
+jmethodID g_cloudChunkReadMethod = nullptr;
+jmethodID g_cloudChunkWriteMethod = nullptr;
 
 extern "C" int av_jni_set_java_vm(void *vm, void *log_ctx);
 
@@ -85,6 +88,25 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     g_unlockCancelledExceptionClass = static_cast<jclass>(env->NewGlobalRef(uceLocal));
     env->DeleteLocalRef(uceLocal);
 
+    // CloudChunkBridge lives in VaultExplorer's own APK (not the
+    // VaultSync Bridge plugin's), same as UsbBlockBridge above — its
+    // absence would be a packaging bug, not a "plugin not installed"
+    // condition, so this fails JNI_OnLoad exactly like the USB lookup
+    // does rather than degrading gracefully.
+    jclass cloudChunkLocal = env->FindClass("com/aeidolon/vaultexplorer/CloudChunkBridge");
+    if (!cloudChunkLocal) {
+        LOGI("JNI_OnLoad: CloudChunkBridge class not found");
+        return JNI_ERR;
+    }
+    g_cloudChunkBridgeClass = static_cast<jclass>(env->NewGlobalRef(cloudChunkLocal));
+    env->DeleteLocalRef(cloudChunkLocal);
+    g_cloudChunkReadMethod = env->GetStaticMethodID(g_cloudChunkBridgeClass, "readChunk", "(IJ)[B");
+    g_cloudChunkWriteMethod = env->GetStaticMethodID(g_cloudChunkBridgeClass, "writeChunkRange", "(IJI[B)Z");
+    if (!g_cloudChunkReadMethod || !g_cloudChunkWriteMethod) {
+        LOGI("JNI_OnLoad: CloudChunkBridge methods not found");
+        return JNI_ERR;
+    }
+
     ThreadPool::getInstance();
 
     return JNI_VERSION_1_6;
@@ -98,6 +120,7 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
         if (g_hiddenVolumeProtectionBridgeClass) env->DeleteGlobalRef(g_hiddenVolumeProtectionBridgeClass);
         if (g_illegalStateExceptionClass) env->DeleteGlobalRef(g_illegalStateExceptionClass);
         if (g_unlockCancelledExceptionClass) env->DeleteGlobalRef(g_unlockCancelledExceptionClass);
+        if (g_cloudChunkBridgeClass) env->DeleteGlobalRef(g_cloudChunkBridgeClass);
     }
     g_usbBridgeClass = nullptr;
     g_usbReadMethod = nullptr;
@@ -108,5 +131,8 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
     g_hiddenVolumeProtectionTriggeredMethod = nullptr;
     g_illegalStateExceptionClass = nullptr;
     g_unlockCancelledExceptionClass = nullptr;
+    g_cloudChunkBridgeClass = nullptr;
+    g_cloudChunkReadMethod = nullptr;
+    g_cloudChunkWriteMethod = nullptr;
     g_vm = nullptr;
 }

@@ -220,7 +220,7 @@ class VaultUnlockHandlers(
                             if (args.protectHiddenVolume)
                                 "Incorrect password/keyfiles, or the hidden volume password/keyfiles did not match"
                             else
-                                "Incorrect password/keyfiles or invalid container", null)
+                            "Incorrect password/keyfiles or invalid container", null)
                     }
                 }
             } catch (e: Exception) {
@@ -738,6 +738,17 @@ class VaultUnlockHandlers(
                     }
                     if (session?.isUsbSource == true) {
                         UsbBlockBridge.unregister(volId)
+                    }
+                    if (session?.cloudVaultKey != null) {
+                        // No-op today (CloudFuseCallback.onRelease already
+                        // handled Bridge-side cache invalidation when
+                        // NativeEngine.lockNative above closed the AppFuse
+                        // fd) — kept symmetric with the isUsbSource branch
+                        // above so CloudChunkBridge's registration table
+                        // never accumulates stale volId entries if/when a
+                        // volume is switched onto the direct-dispatch path
+                        // documented in chunked_block_device.h.
+                        com.aeidolon.vaultexplorer.CloudChunkBridge.unregister(volId)
                     }
                     ContainerSessionRegistry.removeSession(volId)
                     activity.runOnUiThread {

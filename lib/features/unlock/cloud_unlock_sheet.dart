@@ -45,10 +45,9 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
 
   List<CloudAccount> _accounts = const [];
   List<RemoteVault> _vaults = const [];
-  List<RemoteFolder> _folders = const [];
   CloudAccount? _selectedAccount;
   RemoteVault? _selectedVault;
-  String _remoteDirectory = '/';
+  String? _directFolderUri;
   bool _loadingBridge = true;
   bool _loadingVaults = false;
   bool _unlocking = false;
@@ -113,6 +112,7 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
             _vaults = const [];
             _selectedAccount = null;
             _selectedVault = null;
+            _directFolderUri = null;
           });
         }
         return;
@@ -136,8 +136,8 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
         _accounts = accounts;
         _selectedAccount = selected;
         _vaults = const [];
-        _folders = const [];
         _selectedVault = null;
+        _directFolderUri = null;
       });
       if (selected != null) {
         await _loadVaults(
@@ -169,31 +169,20 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
   Future<void> _loadVaults(
     CloudAccount account, {
     String? preferredRemotePath,
-    String remoteDirectory = '/',
   }) async {
     setState(() {
       _selectedAccount = account;
       _selectedVault = null;
       _vaults = const [];
-      _folders = const [];
       _loadingVaults = true;
-      _remoteDirectory = remoteDirectory;
+      _directFolderUri = null;
       _error = null;
     });
 
     try {
-      final results = await Future.wait([
-        vaultExplorerApi.discoverRemoteVaults(
-          account.accountId,
-          remoteDirectory: remoteDirectory,
-        ),
-        vaultExplorerApi.listRemoteFolders(
-          account.accountId,
-          remoteDirectory: remoteDirectory,
-        ),
-      ]);
-      final vaults = results[0] as List<RemoteVault>;
-      final folders = results[1] as List<RemoteFolder>;
+      final vaults = await vaultExplorerApi.discoverRemoteVaults(
+        account.accountId,
+      );
       if (!mounted || _selectedAccount?.accountId != account.accountId) return;
 
       RemoteVault? selected;
@@ -205,7 +194,6 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
       }
       setState(() {
         _vaults = vaults;
-        _folders = folders;
         _selectedVault = selected;
         if (preferredRemotePath != null && selected == null) {
           _error =
@@ -230,6 +218,10 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
   }
 
   bool _isAlreadyMounted(RemoteVault vault) {
+    final directFolderUri = _directFolderUri;
+    if (directFolderUri != null && identical(vault, _selectedVault)) {
+      return widget.mountedUris.contains(directFolderUri);
+    }
     return widget.mountedUris.any((uri) {
       final target = _CloudTarget.tryParse(uri);
       return target?.accountId == vault.accountId &&
@@ -237,9 +229,15 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
     });
   }
 
-  String _mountUri(RemoteVault vault) => _isFolderFormat(vault.format)
-      ? 'cloudfolder://${vault.accountId}/${vault.format}/${Uri.encodeComponent(vault.remotePath)}'
-      : 'cloud://${vault.accountId}/${Uri.encodeComponent(vault.remotePath)}';
+  String _mountUri(RemoteVault vault) {
+    final directFolderUri = _directFolderUri;
+    if (directFolderUri != null && identical(vault, _selectedVault)) {
+      return directFolderUri;
+    }
+    return _isFolderFormat(vault.format)
+        ? 'cloudfolder://${vault.accountId}/${vault.format}/${Uri.encodeComponent(vault.remotePath)}'
+        : 'cloud://${vault.accountId}/${Uri.encodeComponent(vault.remotePath)}';
+  }
 
   static bool _isFolderFormat(String format) => switch (format) {
     'cryptomator' || 'gocryptfs' || 'cryfs' => true,
@@ -273,7 +271,9 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
       );
     }
 
-    final folderUri = vault.folderUri;
+    final folderUri = _directFolderUri != null && identical(vault, _selectedVault)
+        ? _directFolderUri
+        : vault.folderUri;
     if (folderUri == null || folderUri.isEmpty) {
       throw PlatformException(
         code: 'FOLDER_UNAVAILABLE',
@@ -422,62 +422,37 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
     }
   }
 
-  Future<void> _useFolderAsVault(RemoteFolder folder) async {
-    final format = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Use ${folder.displayName} as a vault'),
-        content: const Text(
-          'Choose the encrypted folder format. The password check will verify the choice before mounting.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'cryfs'),
-            child: const Text('CryFS'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, 'gocryptfs'),
-            child: const Text('gocryptfs'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, 'cryptomator'),
-            child: const Text('Cryptomator'),
-          ),
-        ],
-      ),
-    );
-    if (format == null || !mounted) return;
+  Future<void> _selectExistingFolderVault() async {
+    // This is deliberately VaultExplorer's normal ACTION_OPEN_DOCUMENT_TREE
+    // route. Choosing the Google Drive provider here gives the engines its
+    // optimised direct provider instead of proxying thousands of ciphertext
+    // files through VaultSync Bridge.
+    final picked = await vaultExplorerApi.pickCryptomatorVault();
+    if (picked == null || !mounted) return;
+    final format = picked.format;
+    if (format == null) {
+      setState(
+        () => _error =
+            'No Cryptomator, gocryptfs, or CryFS marker was found in the selected folder.',
+      );
+      return;
+    }
+    final account = _selectedAccount;
+    if (account == null) return;
     final vault = RemoteVault(
-      accountId: folder.accountId,
-      remotePath: folder.remotePath,
-      displayName: folder.displayName,
+      accountId: account.accountId,
+      remotePath: picked.uri,
+      displayName: picked.displayName,
       format: format,
       totalSizeBytes: 0,
       chunkSizeNumBytes: 0,
-      folderUri: folder.folderUri,
+      folderUri: picked.uri,
     );
     setState(() {
-      _vaults = [
-        ..._vaults.where(
-          (item) =>
-              item.remotePath != vault.remotePath ||
-              item.format != vault.format,
-        ),
-        vault,
-      ];
       _selectedVault = vault;
+      _directFolderUri = picked.uri;
       _error = null;
     });
-  }
-
-  String _parentDirectory(String path) {
-    final normalized = path.replaceAll(RegExp(r'^/+|/+$'), '');
-    if (normalized.isEmpty || !normalized.contains('/')) return '/';
-    return normalized.substring(0, normalized.lastIndexOf('/'));
   }
 
   @override
@@ -652,49 +627,21 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
           ),
           const SizedBox(height: 24),
           Text(
-            'Cloud folders',
+            'Existing folder vault',
             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 4),
+          Text(
+            'Select the folder with Android\'s Drive provider for fast file-by-file access.',
+            style: textTheme.bodySmall?.copyWith(
+              color: colors.onSurfaceVariant,
+            ),
+          ),
           const SizedBox(height: 8),
-          SectionCard(
-            children: [
-              if (_remoteDirectory != '/')
-                ListTile(
-                  leading: const Icon(Icons.drive_folder_upload_outlined),
-                  title: const Text('Up one folder'),
-                  onTap: _loadingVaults || _selectedAccount == null
-                      ? null
-                      : () => _loadVaults(
-                          _selectedAccount!,
-                          remoteDirectory: _parentDirectory(_remoteDirectory),
-                        ),
-                ),
-              if (_folders.isEmpty)
-                const ListTile(
-                  leading: Icon(Icons.folder_off_outlined),
-                  title: Text('No subfolders found here'),
-                )
-              else
-                for (final folder in _folders)
-                  ListTile(
-                    leading: const Icon(Icons.folder_outlined),
-                    title: Text(folder.displayName),
-                    subtitle: Text(folder.remotePath),
-                    onTap: _loadingVaults
-                        ? null
-                        : () => _loadVaults(
-                            _selectedAccount!,
-                            remoteDirectory: folder.remotePath,
-                          ),
-                    trailing: IconButton(
-                      tooltip: 'Use this folder as a vault',
-                      onPressed: _unlocking
-                          ? null
-                          : () => _useFolderAsVault(folder),
-                      icon: const Icon(Icons.lock_outline_rounded),
-                    ),
-                  ),
-            ],
+          OutlinedButton.icon(
+            onPressed: _isBusy ? null : _selectExistingFolderVault,
+            icon: const Icon(Icons.folder_open_outlined),
+            label: const Text('Select existing folder'),
           ),
           const SizedBox(height: 24),
           Text(
@@ -716,6 +663,7 @@ class _CloudUnlockSheetState extends State<CloudUnlockSheet> {
                 if (_unlocking) return;
                 setState(() {
                   _selectedVault = value;
+                  _directFolderUri = null;
                   _error = null;
                 });
               },

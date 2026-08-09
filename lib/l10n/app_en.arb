@@ -2522,6 +2522,10 @@
   "@gocryptfsCipherLabel": {
     "description": "Label above the AES-256-GCM/XChaCha20-Poly1305 cipher picker shown when creating a new gocryptfs vault"
   },
+  "cryfsCipherLabel": "Content Cipher",
+  "@cryfsCipherLabel": {
+    "description": "Label above the XChaCha20-Poly1305/AES-256-GCM cipher picker shown when creating a new CryFS vault"
+  },
   "destinationFolderLabel": "Destination Folder",
   "@destinationFolderLabel": {
     "description": "Label shown once a folder vault destination has been picked"

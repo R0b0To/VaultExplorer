@@ -1881,6 +1881,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gocryptfsCipherLabel => 'Content Cipher';
 
   @override
+  String get cryfsCipherLabel => 'Content Cipher';
+
+  @override
   String get destinationFolderLabel => 'Destination Folder';
 
   @override

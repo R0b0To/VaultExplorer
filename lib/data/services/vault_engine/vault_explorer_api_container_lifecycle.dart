@@ -514,11 +514,18 @@ mixin _ContainerLifecycleOps {
     );
   }
 
-  Future<bool> createCryfsVault(String folderUri, String password) async {
+  /// [cipher]: 'xchacha20-poly1305' (default for CryFS 1.0.x/0.11.x) or
+  /// 'aes-256-gcm' (CryFS 0.10.x default, still supported). Unrecognized
+  /// values fall back to 'xchacha20-poly1305' on the native side.
+  Future<bool> createCryfsVault(
+    String folderUri,
+    String password, {
+    String cipher = 'xchacha20-poly1305',
+  }) async {
     try {
       final success = await _channel.invokeMethod<bool>(
         ChannelMethods.createCryfsVault,
-        {'filePath': folderUri, 'password': password},
+        {'filePath': folderUri, 'password': password, 'cipher': cipher},
       );
       return success ?? false;
     } catch (e) {

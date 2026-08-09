@@ -52,6 +52,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
   bool _isFolderVault = false;
   String _folderVaultFormat = 'cryptomator';
   String _gocryptfsCipher = 'aes-256-gcm';
+  String _cryfsCipher = 'xchacha20-poly1305';
   String? _folderVaultUri;
   String? _folderVaultDisplayName;
   bool _pickingFolderVault = false;
@@ -184,7 +185,11 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                   password,
                   cipher: _gocryptfsCipher,
                 )
-              : await vaultExplorerApi.createCryfsVault(_folderVaultUri!, password);
+              : await vaultExplorerApi.createCryfsVault(
+                  _folderVaultUri!,
+                  password,
+                  cipher: _cryfsCipher,
+                );
       if (success) {
         if (mounted) {
           Navigator.pop(context);
@@ -817,6 +822,32 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
                       ],
                       onChanged: (val) =>
                           setState(() => _gocryptfsCipher = val),
+                    ),
+                  ],
+                ),
+              ),
+            if (_folderVaultFormat == 'cryfs')
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    OptionPickerTile<String>(
+                      label: context.l10n.cryfsCipherLabel,
+                      value: _cryfsCipher,
+                      prefixIcon: Icons.enhanced_encryption_rounded,
+                      options: const [
+                        SelectOption(
+                          value: 'xchacha20-poly1305',
+                          label: 'XChaCha20-Poly1305',
+                        ),
+                        SelectOption(
+                          value: 'aes-256-gcm',
+                          label: 'AES-256-GCM',
+                        ),
+                      ],
+                      onChanged: (val) =>
+                          setState(() => _cryfsCipher = val),
                     ),
                   ],
                 ),

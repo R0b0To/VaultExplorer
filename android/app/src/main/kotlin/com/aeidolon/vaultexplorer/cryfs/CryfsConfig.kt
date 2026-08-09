@@ -41,9 +41,21 @@ object CryfsConfigFile {
     private const val SCRYPT_SALT_LEN = 32
 
     private const val DEFAULT_BLOCKSIZE = 32 * 1024
-    private const val DEFAULT_BLOCK_CIPHER = "aes-256-gcm"
+    // CryFS 1.0.0/0.11.x default to XChaCha20-Poly1305 for new filesystems (still readable by
+    // old clients only if they were configured to use it too; AES-256-GCM remains supported).
+    // Not private: exposed as the default for CryfsVault.create()'s cipher parameter.
+    const val DEFAULT_BLOCK_CIPHER = "xchacha20-poly1305"
 
+    // On-disk storage format version. This has NOT changed since CryFS 0.10 -- filesystems
+    // created by CryFS 0.10.x, 0.11.x and 1.0.x all share this same storage format and are
+    // mutually readable without migration, so this must stay "0.10" even though the software
+    // release version below has moved on.
     const val FORMAT_VERSION = "0.10"
+
+    // The actual CryFS software release version this app identifies itself as, written into
+    // the "createdWithVersion" / "lastOpenedWithVersion" config fields. Distinct from
+    // FORMAT_VERSION above.
+    const val SOFTWARE_VERSION = "1.0.3"
 
     private fun passwordToUtf8Bytes(password: CharArray): ByteArray {
         val encoded = Charsets.UTF_8.encode(java.nio.CharBuffer.wrap(password))
@@ -338,20 +350,20 @@ object CryfsConfigFile {
         }
     }
 
-    fun newVaultConfig(random: SecureRandom): CryfsConfig {
+    fun newVaultConfig(random: SecureRandom, cipher: String = DEFAULT_BLOCK_CIPHER): CryfsConfig {
         val key = ByteArray(32).also { random.nextBytes(it) }
         val filesystemId = ByteArray(16).also { random.nextBytes(it) }
         val rootBlobId = CryfsBlockId.random(random)
         return CryfsConfig(
-            blockCipherName = DEFAULT_BLOCK_CIPHER,
+            blockCipherName = cipher,
             encryptionKey = key,
             blocksizeBytes = DEFAULT_BLOCKSIZE,
             rootBlobId = rootBlobId,
             filesystemId = filesystemId,
             exclusiveClientId = null, // Multi-client mode enabled by default
             formatVersion = FORMAT_VERSION,
-            createdWithVersion = FORMAT_VERSION,
-            lastOpenedWithVersion = FORMAT_VERSION,
+            createdWithVersion = SOFTWARE_VERSION,
+            lastOpenedWithVersion = SOFTWARE_VERSION,
         )
     }
 

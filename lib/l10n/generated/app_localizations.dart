@@ -3086,6 +3086,12 @@ abstract class AppLocalizations {
   /// **'Content Cipher'**
   String get gocryptfsCipherLabel;
 
+  /// Label above the XChaCha20-Poly1305/AES-256-GCM cipher picker shown when creating a new CryFS vault
+  ///
+  /// In en, this message translates to:
+  /// **'Content Cipher'**
+  String get cryfsCipherLabel;
+
   /// Label shown once a folder vault destination has been picked
   ///
   /// In en, this message translates to:

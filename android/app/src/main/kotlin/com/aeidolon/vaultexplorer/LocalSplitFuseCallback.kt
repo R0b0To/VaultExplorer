@@ -263,6 +263,19 @@ object SafSplitResolver {
     }
 }
 
+// Thrown internally by openSafPfd when a provider rejects combined "rw"
+// random-access mode for an actual write attempt (as opposed to lacking
+// permission, being offline, etc). Distinguishing this from other
+// failures lets writeToPart fall back to local rw staging instead of
+// just failing the write outright -- see mirrorPartLocally.
+private class SafRwUnsupportedException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
+private fun looksLikeRwModeUnsupported(e: Throwable): Boolean {
+    if (e is UnsupportedOperationException) return true
+    val msg = e.message?.lowercase() ?: return false
+    return msg.contains("unsupported mode") || (msg.contains("mode") && msg.contains("rw"))
+}
+
 class SplitFuseCallback(
     private val context: Context,
     private val parts: List<SplitPartInfo>,
@@ -297,6 +310,17 @@ class SplitFuseCallback(
     // timeout, which would otherwise make every single read pay that
     // cost before falling back to the stream that actually works.
     private val partPreadUnsupported = BooleanArray(parts.size)
+
+    // Local staging mirrors for SAF parts whose provider won't hand back
+    // a genuine random-access "rw" fd (rclone/Round-Sync-style and other
+    // network-backed DocumentsProviders that only implement "r"/"w").
+    // Populated lazily, per-part, only once a real write hits that part
+    // and openSafPfd's "rw" open throws SafRwUnsupportedException -- see
+    // writeToPart and mirrorPartLocally. Flushed back to the remote
+    // document on fsync/release.
+    private val mirrorFiles = arrayOfNulls<File>(parts.size)
+    private val mirrorDirty = BooleanArray(parts.size)
+    private var mirrorDir: File? = null
 
     override fun onGetSize(): Long = totalSizeBytes
 
@@ -349,10 +373,17 @@ class SplitFuseCallback(
         return requested
     }
 
+    // The real backing file for reads/writes to this part: either the
+    // part's own local File (true on-device containers), or a local rw
+    // mirror we staged after the provider rejected "rw" (see
+    // mirrorPartLocally). Null means we're still going through SAF pfds
+    // directly.
+    private fun localFileFor(index: Int): File? = parts[index].file ?: mirrorFiles[index]
+
     private fun readFromPart(index: Int, offsetInPart: Long, data: ByteArray, outOffset: Int, len: Int) {
-        val part = parts[index]
-        if (part.file != null) {
-            val raf = openLocalRaf(index, forWrite = false)
+        val localFile = localFileFor(index)
+        if (localFile != null) {
+            val raf = openLocalRaf(index, forWrite = false, file = localFile)
             raf.seek(offsetInPart)
             var readInPart = 0
             while (readInPart < len) {
@@ -437,31 +468,52 @@ class SplitFuseCallback(
     }
 
     private fun writeToPart(index: Int, offsetInPart: Long, data: ByteArray, inOffset: Int, len: Int) {
-        val part = parts[index]
-        if (part.file != null) {
-            val raf = openLocalRaf(index, forWrite = true)
+        val localFile = localFileFor(index)
+        if (localFile != null) {
+            val raf = openLocalRaf(index, forWrite = true, file = localFile)
             raf.seek(offsetInPart)
             raf.write(data, inOffset, len)
-        } else {
+            // Only meaningful when localFile is a staged mirror
+            // (mirrorFiles[index] != null); flushDirtyMirrors ignores
+            // this flag for genuinely-local parts since it keys off
+            // mirrorFiles, so it's harmless to always set it here.
+            mirrorDirty[index] = true
+            return
+        }
+
+        try {
             val pfd = openSafPfd(index, forWrite = true)
             val fd = pfd.fileDescriptor
             var writtenInPart = 0
             while (writtenInPart < len) {
-                val n = try {
-                    android.system.Os.pwrite(
-                        fd, data, inOffset + writtenInPart, len - writtenInPart,
-                        offsetInPart + writtenInPart
-                    )
-                } catch (e: Exception) {
-                    fail("pwrite failed on part $index at $offsetInPart: ${e.message}")
-                }
+                val n = android.system.Os.pwrite(
+                    fd, data, inOffset + writtenInPart, len - writtenInPart,
+                    offsetInPart + writtenInPart
+                )
                 if (n <= 0) fail("write failed on part $index (written=$n)")
                 writtenInPart += n
             }
+        } catch (e: SafRwUnsupportedException) {
+            // Provider genuinely can't give us a random-access rw fd for
+            // this document (e.g. "Unsupported mode: rw" from
+            // rclone/Round-Sync-style or other cloud-backed providers).
+            // Stage the whole part locally once and redo this write
+            // against the mirror -- see mirrorPartLocally.
+            Log.i(
+                "VaultExplorer_C++",
+                "SplitFuseCallback: part $index rejects random-access rw (${e.message}), staging local mirror"
+            )
+            mirrorPartLocally(index)
+            // Re-enter writeToPart now that localFileFor(index) resolves
+            // to the freshly staged mirror -- reuses the same write +
+            // dirty-flag path as a genuinely local part.
+            writeToPart(index, offsetInPart, data, inOffset, len)
+        } catch (e: Exception) {
+            fail("pwrite failed on part $index at $offsetInPart: ${e.message}")
         }
     }
 
-    private fun openLocalRaf(index: Int, forWrite: Boolean): RandomAccessFile {
+    private fun openLocalRaf(index: Int, forWrite: Boolean, file: File): RandomAccessFile {
         val existing = openRafs[index]
         if (existing != null) {
             if (!forWrite || openForWrite[index]) return existing
@@ -472,15 +524,15 @@ class SplitFuseCallback(
         val mode = if (forWrite || !readOnly) "rw" else "r"
         var openedForWrite = false
         val raf = try {
-            val f = RandomAccessFile(parts[index].file!!, mode)
+            val f = RandomAccessFile(file, mode)
             openedForWrite = (mode == "rw")
             f
         } catch (e: Exception) {
             if (mode == "rw" && !forWrite) {
                 openedForWrite = false
-                RandomAccessFile(parts[index].file!!, "r")
+                RandomAccessFile(file, "r")
             } else {
-                fail("could not open part ${parts[index].file!!.name}: ${e.message}")
+                fail("could not open part ${file.name}: ${e.message}")
             }
         }
         openRafs[index] = raf
@@ -508,6 +560,12 @@ class SplitFuseCallback(
                 openedForWrite = false
                 context.contentResolver.openFileDescriptor(parts[index].uri, "r")
                     ?: fail("could not open part $index for read")
+            } else if (mode == "rw" && forWrite && looksLikeRwModeUnsupported(e)) {
+                // A genuine write attempt, but this provider doesn't
+                // implement combined rw at all -- let writeToPart catch
+                // this and fall back to local mirror staging instead of
+                // failing the write outright.
+                throw SafRwUnsupportedException("part $index: ${e.message}", e)
             } else {
                 fail("could not open part $index: ${e.message}")
             }
@@ -515,6 +573,80 @@ class SplitFuseCallback(
         openPfds[index] = pfd
         openForWrite[index] = openedForWrite
         return pfd
+    }
+
+    private fun mirrorDirFor(): File {
+        var dir = mirrorDir
+        if (dir == null) {
+            dir = File(context.cacheDir, "split_rw_mirror_${System.identityHashCode(this)}").apply { mkdirs() }
+            mirrorDir = dir
+        }
+        return dir
+    }
+
+    // Downloads part [index] in full into a local cache file so it can be
+    // opened as a real RandomAccessFile (genuine seek + in-place write)
+    // for the rest of this mount. Idempotent -- returns the existing
+    // mirror if one was already staged. Intended to be small/cheap for
+    // split parts sized in the few-MB range; for very large parts this
+    // is a real download-before-first-write cost, same trade-off any
+    // "no true rw on this provider" fallback has to make.
+    private fun mirrorPartLocally(index: Int): File {
+        mirrorFiles[index]?.let { return it }
+        val dir = mirrorDirFor()
+        val local = File(dir, "part_$index")
+        Log.i(
+            "VaultExplorer_C++",
+            "SplitFuseCallback: staging local rw mirror for part $index (${parts[index].sizeBytes} bytes)"
+        )
+        context.contentResolver.openInputStream(parts[index].uri)?.use { input ->
+            FileOutputStream(local).use { output ->
+                input.copyTo(output, bufferSize = 256 * 1024)
+            }
+        } ?: fail("could not open part $index to stage local mirror")
+
+        // The mirror is now authoritative for this part -- drop any
+        // cached SAF pfd/stream so nothing keeps reading stale bytes
+        // from the remote document underneath it.
+        openPfds[index]?.let { try { it.close() } catch (_: Exception) {} }
+        openPfds[index] = null
+        partStreams[index]?.let { try { it.close() } catch (_: Exception) {} }
+        partStreams[index] = null
+
+        mirrorFiles[index] = local
+        return local
+    }
+
+    private fun flushDirtyMirrors() {
+        for (i in parts.indices) {
+            val mirror = mirrorFiles[i] ?: continue
+            if (!mirrorDirty[i]) continue
+            try {
+                uploadMirror(i, mirror)
+                mirrorDirty[i] = false
+            } catch (e: Exception) {
+                // Leave it marked dirty so the next fsync/release retries
+                // rather than silently losing the pending write.
+                Log.e("SplitFuseCallback", "failed to flush mirror for part $i: ${e.message}")
+            }
+        }
+    }
+
+    private fun uploadMirror(index: Int, mirror: File) {
+        // Make sure every buffered write against the mirror is actually
+        // on disk before we stream it back up.
+        openRafs[index]?.let { try { it.fd.sync() } catch (_: Exception) {} }
+        val out = context.contentResolver.openOutputStream(parts[index].uri, "wt")
+            ?: throw java.io.IOException("openOutputStream returned null for part $index")
+        out.use { stream ->
+            FileInputStream(mirror).use { input ->
+                input.copyTo(stream, bufferSize = 256 * 1024)
+            }
+        }
+        Log.i(
+            "VaultExplorer_C++",
+            "SplitFuseCallback: flushed local mirror for part $index (${mirror.length()} bytes) back to ${parts[index].uri}"
+        )
     }
 
     @Synchronized
@@ -525,10 +657,16 @@ class SplitFuseCallback(
         for (pfd in openPfds) {
             try { pfd?.fileDescriptor?.sync() } catch (_: Exception) {}
         }
+        // Local rw mirrors only ever touch the on-device cache file above
+        // -- they still need an explicit upload to actually reach the
+        // remote document, unlike a genuine SAF rw fd whose sync() does
+        // that for us.
+        flushDirtyMirrors()
     }
 
     @Synchronized
     override fun onRelease() {
+        flushDirtyMirrors()
         for (raf in openRafs) {
             try { raf?.close() } catch (_: Exception) {}
         }
@@ -544,6 +682,10 @@ class SplitFuseCallback(
         partStreams.fill(null)
         partStreamPos.fill(0L)
         partPreadUnsupported.fill(false)
+        mirrorDir?.let { dir -> try { dir.deleteRecursively() } catch (_: Exception) {} }
+        mirrorFiles.fill(null)
+        mirrorDirty.fill(false)
+        mirrorDir = null
         onReleased()
     }
 

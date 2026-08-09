@@ -42,16 +42,16 @@ class SingleFileCryptoHandlers(
             var destPfd: ParcelFileDescriptor? = null
             var createdDestFile: File? = null
             var createdDestDoc: DocumentFile? = null
-
             try {
                 val srcUri = Uri.parse(sourceUriStr)
                 val srcRawFile = UriToPath.getRawFile(activity, srcUri)
                 val srcName = UriNameResolver.resolve(activity.contentResolver, srcUri)
-
                 srcPfd = activity.contentResolver.openFileDescriptor(srcUri, "r")
                     ?: throw Exception("Could not open source file")
 
-                val outName = if (srcName.endsWith(".vxenc", ignoreCase = true)) {
+                val outName = if (cipherIndex == 2) {
+                    if (srcName.endsWith(".aes", ignoreCase = true)) srcName else "$srcName.aes"
+                } else if (srcName.endsWith(".vxenc", ignoreCase = true)) {
                     srcName
                 } else {
                     "$srcName.vxenc"
@@ -144,17 +144,17 @@ class SingleFileCryptoHandlers(
             var destPfd: ParcelFileDescriptor? = null
             var createdDestFile: File? = null
             var createdDestDoc: DocumentFile? = null
-
             try {
                 val srcUri = Uri.parse(sourceUriStr)
                 val srcRawFile = UriToPath.getRawFile(activity, srcUri)
                 val srcName = UriNameResolver.resolve(activity.contentResolver, srcUri)
-
                 srcPfd = activity.contentResolver.openFileDescriptor(srcUri, "r")
                     ?: throw Exception("Could not open encrypted source file")
 
                 var outName = if (srcName.endsWith(".vxenc", ignoreCase = true)) {
                     srcName.substring(0, srcName.length - 6)
+                } else if (srcName.endsWith(".aes", ignoreCase = true)) {
+                    srcName.substring(0, srcName.length - 4)
                 } else if (srcName.endsWith(".enc", ignoreCase = true)) {
                     srcName.substring(0, srcName.length - 4)
                 } else {

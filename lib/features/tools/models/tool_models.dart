@@ -17,6 +17,7 @@ enum CryptoDirection { encrypt, decrypt }
 enum StandaloneCipher {
   xChaCha20Poly1305,
   aes256Gcm,
+  aesCrypt,
   aes256Xts,
   serpent,
   twofish,
@@ -36,6 +37,7 @@ enum StandaloneCipher {
   String get label => switch (this) {
         StandaloneCipher.xChaCha20Poly1305 => 'XChaCha20-Poly1305 (AEAD)',
         StandaloneCipher.aes256Gcm => 'AES-256-GCM (AEAD)',
+        StandaloneCipher.aesCrypt => 'AES Crypt (.aes)',
         StandaloneCipher.aes256Xts => 'AES-256',
         StandaloneCipher.serpent => 'Serpent',
         StandaloneCipher.twofish => 'Twofish',

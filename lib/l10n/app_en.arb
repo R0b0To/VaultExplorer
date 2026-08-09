@@ -4936,7 +4936,317 @@
   "bookmarkBarSectionHeader": "Bookmark Bar & Favourites",
   "noBookmarksYet": "No favourite items bookmarked yet",
   "reorderBookmarksTitle": "Rearrange Bookmarks",
-  "reorderBookmarksDesc": "Drag items to reorder them in the bookmark bar"
+  "reorderBookmarksDesc": "Drag items to reorder them in the bookmark bar",
+
+  "navBarVaultsLabel": "Vaults",
+  "@navBarVaultsLabel": {
+    "description": "Bottom navigation bar label for the Vaults dashboard tab"
+  },
+  "navBarToolsLabel": "Tools",
+  "@navBarToolsLabel": {
+    "description": "Bottom navigation bar label for the Tools tab"
+  },
+
+  "toolsScreenTitle": "Tools",
+  "@toolsScreenTitle": {
+    "description": "AppBar title for the Tools tab"
+  },
+  "toolsSectionContainerUtilities": "Container Utilities",
+  "@toolsSectionContainerUtilities": {
+    "description": "Section header on the Tools tab, above Split/Repair"
+  },
+  "toolsSectionFileCryptography": "File Cryptography",
+  "@toolsSectionFileCryptography": {
+    "description": "Section header on the Tools tab, above Single-File Encrypt/Decrypt"
+  },
+  "toolsSectionStorageDiagnostics": "Storage & Diagnostics",
+  "@toolsSectionStorageDiagnostics": {
+    "description": "Section header on the Tools tab, above Storage Analyzer"
+  },
+  "toolContainerSplitterTitle": "Split & Join",
+  "@toolContainerSplitterTitle": {
+    "description": "Tool card title for the Container Splitter/Joiner"
+  },
+  "toolContainerSplitterSubtitle": "Split a container into chunks, or rejoin them",
+  "@toolContainerSplitterSubtitle": {
+    "description": "Tool card subtitle for the Container Splitter/Joiner"
+  },
+  "toolContainerRepairTitle": "Check & Repair",
+  "@toolContainerRepairTitle": {
+    "description": "Tool card title for Container Check & Repair"
+  },
+  "toolContainerRepairSubtitle": "Diagnose header or filesystem issues",
+  "@toolContainerRepairSubtitle": {
+    "description": "Tool card subtitle for Container Check & Repair"
+  },
+  "toolSingleFileCryptoTitle": "Encrypt / Decrypt File",
+  "@toolSingleFileCryptoTitle": {
+    "description": "Tool card title for Single-File Encrypt/Decrypt"
+  },
+  "toolSingleFileCryptoSubtitle": "Protect a single file without a full container",
+  "@toolSingleFileCryptoSubtitle": {
+    "description": "Tool card subtitle for Single-File Encrypt/Decrypt"
+  },
+  "toolStorageAnalyzerTitle": "Storage Analyzer",
+  "@toolStorageAnalyzerTitle": {
+    "description": "Tool card title for the Storage Analyzer"
+  },
+  "toolStorageAnalyzerSubtitle": "See what's taking up space in a mounted vault",
+  "@toolStorageAnalyzerSubtitle": {
+    "description": "Tool card subtitle for the Storage Analyzer"
+  },
+
+  "toolNotImplementedYetMessage": "This tool isn't wired up to the native engine yet — check back in a future update.",
+  "@toolNotImplementedYetMessage": {
+    "description": "Shown when a Tools-tab action calls into a ContainerToolService method that still throws UnimplementedError"
+  },
+
+  "splitJoinModeSplit": "Split",
+  "@splitJoinModeSplit": {
+    "description": "Segmented button option: split mode"
+  },
+  "splitJoinModeJoin": "Join",
+  "@splitJoinModeJoin": {
+    "description": "Segmented button option: join mode"
+  },
+  "splitSourceFileLabel": "Source File",
+  "@splitSourceFileLabel": {
+    "description": "Label for the container file being split"
+  },
+  "splitDestinationFolderLabel": "Destination Folder",
+  "@splitDestinationFolderLabel": {
+    "description": "Label for where split chunks are written"
+  },
+  "splitChunkSizeLabel": "Chunk Size",
+  "@splitChunkSizeLabel": {
+    "description": "Label for the chunk-size preset selector"
+  },
+  "splitChunkSizeCustomLabel": "Custom size (MB)",
+  "@splitChunkSizeCustomLabel": {
+    "description": "Text field label for a custom chunk size in megabytes"
+  },
+  "splitChunkSizeCloud": "100 MB (Cloud)",
+  "@splitChunkSizeCloud": {
+    "description": "Chunk size preset label: 100 MB, sized for cloud-storage upload limits"
+  },
+  "splitChunkSizeFat32": "2 GB (FAT32)",
+  "@splitChunkSizeFat32": {
+    "description": "Chunk size preset label: 2 GB, sized for the FAT32 4 GB single-file limit"
+  },
+  "splitChunkSizeFourGb": "4 GB",
+  "@splitChunkSizeFourGb": {
+    "description": "Chunk size preset label: 4 GB"
+  },
+  "splitChunkSizeCustom": "Custom",
+  "@splitChunkSizeCustom": {
+    "description": "Chunk size preset label: user-entered custom size"
+  },
+  "splitContainerButton": "Split Container",
+  "@splitContainerButton": {
+    "description": "Primary action button label for the Split flow"
+  },
+  "joinFirstPartLabel": "First Part",
+  "@joinFirstPartLabel": {
+    "description": "Label for the first chunk file (e.g. .001) when joining"
+  },
+  "joinOutputFileNameLabel": "Output File Name",
+  "@joinOutputFileNameLabel": {
+    "description": "Text field label for the joined output file's name"
+  },
+  "joinContainerButton": "Join Files",
+  "@joinContainerButton": {
+    "description": "Primary action button label for the Join flow"
+  },
+  "chooseFileButton": "Choose File",
+  "@chooseFileButton": {
+    "description": "Generic button label to open a file picker"
+  },
+  "chooseFolderButton": "Choose Folder",
+  "@chooseFolderButton": {
+    "description": "Generic button label to open a folder picker"
+  },
+  "noFileSelectedLabel": "No file selected",
+  "@noFileSelectedLabel": {
+    "description": "Placeholder shown before a file has been picked"
+  },
+  "noFolderSelectedLabel": "No folder selected",
+  "@noFolderSelectedLabel": {
+    "description": "Placeholder shown before a destination folder has been picked"
+  },
+  "splitJoinOperationProgress": "{done} / {total}",
+  "@splitJoinOperationProgress": {
+    "description": "Byte progress readout for split/join/encrypt/decrypt operations",
+    "placeholders": {
+      "done": {"type": "String"},
+      "total": {"type": "String"}
+    }
+  },
+  "splitContainerSuccessMessage": "Container split successfully",
+  "@splitContainerSuccessMessage": {
+    "description": "Snackbar shown after a successful split"
+  },
+  "joinContainerSuccessMessage": "Files joined successfully",
+  "@joinContainerSuccessMessage": {
+    "description": "Snackbar shown after a successful join"
+  },
+
+  "cryptoDirectionEncrypt": "Encrypt",
+  "@cryptoDirectionEncrypt": {
+    "description": "Segmented button option: encrypt mode"
+  },
+  "cryptoDirectionDecrypt": "Decrypt",
+  "@cryptoDirectionDecrypt": {
+    "description": "Segmented button option: decrypt mode"
+  },
+  "singleFileCryptoInputFileLabel": "Input File",
+  "@singleFileCryptoInputFileLabel": {
+    "description": "Label for the file being encrypted/decrypted"
+  },
+  "singleFileCryptoCipherLabel": "Cipher",
+  "@singleFileCryptoCipherLabel": {
+    "description": "Label for the standalone AEAD cipher selector"
+  },
+  "singleFileCryptoDeleteOriginalLabel": "Delete original file after encryption",
+  "@singleFileCryptoDeleteOriginalLabel": {
+    "description": "Switch label to delete the plaintext source after encrypting"
+  },
+  "singleFileCryptoEncryptButton": "Encrypt File",
+  "@singleFileCryptoEncryptButton": {
+    "description": "Primary action button label when encrypting"
+  },
+  "singleFileCryptoDecryptButton": "Decrypt File",
+  "@singleFileCryptoDecryptButton": {
+    "description": "Primary action button label when decrypting"
+  },
+  "singleFileCryptoSuccessMessage": "Done",
+  "@singleFileCryptoSuccessMessage": {
+    "description": "Snackbar shown after a successful encrypt/decrypt"
+  },
+
+  "repairTargetStepTitle": "Choose a Target",
+  "@repairTargetStepTitle": {
+    "description": "Step title: pick an unmounted file or mounted volume to repair"
+  },
+  "repairTargetUnmountedFileOption": "Unmounted File",
+  "@repairTargetUnmountedFileOption": {
+    "description": "Repair wizard option: pick a container file that isn't currently mounted"
+  },
+  "repairTargetUnmountedFileSubtitle": "Restore a backup header on a container you haven't opened",
+  "@repairTargetUnmountedFileSubtitle": {
+    "description": "Subtitle for the unmounted-file repair target option"
+  },
+  "repairTargetMountedVolumeSubtitle": "Run a filesystem check on an already-open vault",
+  "@repairTargetMountedVolumeSubtitle": {
+    "description": "Subtitle shown above the list of currently mounted volumes in the repair wizard"
+  },
+  "repairNoMountedVolumes": "No vaults are currently mounted",
+  "@repairNoMountedVolumes": {
+    "description": "Empty state when no mounted volume is available to repair"
+  },
+  "repairScanButton": "Run Diagnostic Scan",
+  "@repairScanButton": {
+    "description": "Button label to start the repair wizard's diagnostic step"
+  },
+  "repairChangeTargetButton": "Change Target",
+  "@repairChangeTargetButton": {
+    "description": "Button to go back and pick a different repair target"
+  },
+  "repairDiagnosisHealthy": "No issues found",
+  "@repairDiagnosisHealthy": {
+    "description": "Repair diagnosis result: everything looks fine"
+  },
+  "repairDiagnosisHeaderCorrupted": "Header Corrupted",
+  "@repairDiagnosisHeaderCorrupted": {
+    "description": "Repair diagnosis result: container header signature/backup mismatch"
+  },
+  "repairDiagnosisFilesystemDirty": "Filesystem Dirty / Unclean Unmount",
+  "@repairDiagnosisFilesystemDirty": {
+    "description": "Repair diagnosis result: filesystem wasn't cleanly unmounted"
+  },
+  "repairRestoreBackupHeaderButton": "Restore Backup Header",
+  "@repairRestoreBackupHeaderButton": {
+    "description": "Action button for a header-corrupted diagnosis"
+  },
+  "repairRunFilesystemCheckButton": "Run Filesystem Check & Fix",
+  "@repairRunFilesystemCheckButton": {
+    "description": "Action button for a filesystem-dirty diagnosis"
+  },
+  "repairActionSucceededMessage": "Repair completed successfully",
+  "@repairActionSucceededMessage": {
+    "description": "Shown after a repair action reports success"
+  },
+  "repairActionFailedMessage": "Repair action did not succeed",
+  "@repairActionFailedMessage": {
+    "description": "Shown after a repair action reports failure"
+  },
+
+  "storageAnalyzerTargetLabel": "Volume",
+  "@storageAnalyzerTargetLabel": {
+    "description": "Label for the mounted-volume picker in Storage Analyzer"
+  },
+  "storageAnalyzerNoTargetsTitle": "Nothing to Analyze",
+  "@storageAnalyzerNoTargetsTitle": {
+    "description": "Empty state title when no volumes are mounted"
+  },
+  "storageAnalyzerNoTargetsMessage": "Mount a vault first, then come back here to see its storage breakdown.",
+  "@storageAnalyzerNoTargetsMessage": {
+    "description": "Empty state message when no volumes are mounted"
+  },
+  "storageAnalyzerUsedOfTotal": "{used} of {total} used",
+  "@storageAnalyzerUsedOfTotal": {
+    "description": "Capacity gauge caption",
+    "placeholders": {
+      "used": {"type": "String"},
+      "total": {"type": "String"}
+    }
+  },
+  "storageAnalyzerHeaviestFilesHeader": "Heaviest Files",
+  "@storageAnalyzerHeaviestFilesHeader": {
+    "description": "Section header for the largest-files list"
+  },
+  "storageAnalyzerBreakdownHeader": "By File Type",
+  "@storageAnalyzerBreakdownHeader": {
+    "description": "Section header for the file-type breakdown bar"
+  },
+  "storageAnalyzerScanningMessage": "Scanning volume…",
+  "@storageAnalyzerScanningMessage": {
+    "description": "Shown while the recursive directory walk is in progress"
+  },
+  "storageAnalyzerScanTruncatedNotice": "Scan stopped early after {count} files — results may be incomplete.",
+  "@storageAnalyzerScanTruncatedNotice": {
+    "description": "Notice shown when the directory walk hit its entry cap",
+    "placeholders": {
+      "count": {"type": "String"}
+    }
+  },
+  "storageAnalyzerNoFilesFound": "No files found",
+  "@storageAnalyzerNoFilesFound": {
+    "description": "Shown when a mounted volume's directory walk found no files"
+  },
+  "storageCategoryImages": "Images",
+  "@storageCategoryImages": {
+    "description": "Storage Analyzer file-type category"
+  },
+  "storageCategoryVideos": "Videos",
+  "@storageCategoryVideos": {
+    "description": "Storage Analyzer file-type category"
+  },
+  "storageCategoryAudio": "Audio",
+  "@storageCategoryAudio": {
+    "description": "Storage Analyzer file-type category"
+  },
+  "storageCategoryDocuments": "Documents",
+  "@storageCategoryDocuments": {
+    "description": "Storage Analyzer file-type category"
+  },
+  "storageCategoryArchives": "Archives",
+  "@storageCategoryArchives": {
+    "description": "Storage Analyzer file-type category"
+  },
+  "storageCategoryOther": "Other",
+  "@storageCategoryOther": {
+    "description": "Storage Analyzer file-type category: everything not otherwise classified"
+  }
 }
 
 

@@ -6415,6 +6415,444 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Drag items to reorder them in the bookmark bar'**
   String get reorderBookmarksDesc;
+
+  /// Bottom navigation bar label for the Vaults dashboard tab
+  ///
+  /// In en, this message translates to:
+  /// **'Vaults'**
+  String get navBarVaultsLabel;
+
+  /// Bottom navigation bar label for the Tools tab
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get navBarToolsLabel;
+
+  /// AppBar title for the Tools tab
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get toolsScreenTitle;
+
+  /// Section header on the Tools tab, above Split/Repair
+  ///
+  /// In en, this message translates to:
+  /// **'Container Utilities'**
+  String get toolsSectionContainerUtilities;
+
+  /// Section header on the Tools tab, above Single-File Encrypt/Decrypt
+  ///
+  /// In en, this message translates to:
+  /// **'File Cryptography'**
+  String get toolsSectionFileCryptography;
+
+  /// Section header on the Tools tab, above Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'Storage & Diagnostics'**
+  String get toolsSectionStorageDiagnostics;
+
+  /// Tool card title for the Container Splitter/Joiner
+  ///
+  /// In en, this message translates to:
+  /// **'Split & Join'**
+  String get toolContainerSplitterTitle;
+
+  /// Tool card subtitle for the Container Splitter/Joiner
+  ///
+  /// In en, this message translates to:
+  /// **'Split a container into chunks, or rejoin them'**
+  String get toolContainerSplitterSubtitle;
+
+  /// Tool card title for Container Check & Repair
+  ///
+  /// In en, this message translates to:
+  /// **'Check & Repair'**
+  String get toolContainerRepairTitle;
+
+  /// Tool card subtitle for Container Check & Repair
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnose header or filesystem issues'**
+  String get toolContainerRepairSubtitle;
+
+  /// Tool card title for Single-File Encrypt/Decrypt
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypt / Decrypt File'**
+  String get toolSingleFileCryptoTitle;
+
+  /// Tool card subtitle for Single-File Encrypt/Decrypt
+  ///
+  /// In en, this message translates to:
+  /// **'Protect a single file without a full container'**
+  String get toolSingleFileCryptoSubtitle;
+
+  /// Tool card title for the Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Analyzer'**
+  String get toolStorageAnalyzerTitle;
+
+  /// Tool card subtitle for the Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'See what\'s taking up space in a mounted vault'**
+  String get toolStorageAnalyzerSubtitle;
+
+  /// Shown when a Tools-tab action calls into a ContainerToolService method that still throws UnimplementedError
+  ///
+  /// In en, this message translates to:
+  /// **'This tool isn\'t wired up to the native engine yet — check back in a future update.'**
+  String get toolNotImplementedYetMessage;
+
+  /// Segmented button option: split mode
+  ///
+  /// In en, this message translates to:
+  /// **'Split'**
+  String get splitJoinModeSplit;
+
+  /// Segmented button option: join mode
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get splitJoinModeJoin;
+
+  /// Label for the container file being split
+  ///
+  /// In en, this message translates to:
+  /// **'Source File'**
+  String get splitSourceFileLabel;
+
+  /// Label for where split chunks are written
+  ///
+  /// In en, this message translates to:
+  /// **'Destination Folder'**
+  String get splitDestinationFolderLabel;
+
+  /// Label for the chunk-size preset selector
+  ///
+  /// In en, this message translates to:
+  /// **'Chunk Size'**
+  String get splitChunkSizeLabel;
+
+  /// Text field label for a custom chunk size in megabytes
+  ///
+  /// In en, this message translates to:
+  /// **'Custom size (MB)'**
+  String get splitChunkSizeCustomLabel;
+
+  /// Chunk size preset label: 100 MB, sized for cloud-storage upload limits
+  ///
+  /// In en, this message translates to:
+  /// **'100 MB (Cloud)'**
+  String get splitChunkSizeCloud;
+
+  /// Chunk size preset label: 2 GB, sized for the FAT32 4 GB single-file limit
+  ///
+  /// In en, this message translates to:
+  /// **'2 GB (FAT32)'**
+  String get splitChunkSizeFat32;
+
+  /// Chunk size preset label: 4 GB
+  ///
+  /// In en, this message translates to:
+  /// **'4 GB'**
+  String get splitChunkSizeFourGb;
+
+  /// Chunk size preset label: user-entered custom size
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get splitChunkSizeCustom;
+
+  /// Primary action button label for the Split flow
+  ///
+  /// In en, this message translates to:
+  /// **'Split Container'**
+  String get splitContainerButton;
+
+  /// Label for the first chunk file (e.g. .001) when joining
+  ///
+  /// In en, this message translates to:
+  /// **'First Part'**
+  String get joinFirstPartLabel;
+
+  /// Text field label for the joined output file's name
+  ///
+  /// In en, this message translates to:
+  /// **'Output File Name'**
+  String get joinOutputFileNameLabel;
+
+  /// Primary action button label for the Join flow
+  ///
+  /// In en, this message translates to:
+  /// **'Join Files'**
+  String get joinContainerButton;
+
+  /// Generic button label to open a file picker
+  ///
+  /// In en, this message translates to:
+  /// **'Choose File'**
+  String get chooseFileButton;
+
+  /// Generic button label to open a folder picker
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Folder'**
+  String get chooseFolderButton;
+
+  /// Placeholder shown before a file has been picked
+  ///
+  /// In en, this message translates to:
+  /// **'No file selected'**
+  String get noFileSelectedLabel;
+
+  /// Placeholder shown before a destination folder has been picked
+  ///
+  /// In en, this message translates to:
+  /// **'No folder selected'**
+  String get noFolderSelectedLabel;
+
+  /// Byte progress readout for split/join/encrypt/decrypt operations
+  ///
+  /// In en, this message translates to:
+  /// **'{done} / {total}'**
+  String splitJoinOperationProgress(String done, String total);
+
+  /// Snackbar shown after a successful split
+  ///
+  /// In en, this message translates to:
+  /// **'Container split successfully'**
+  String get splitContainerSuccessMessage;
+
+  /// Snackbar shown after a successful join
+  ///
+  /// In en, this message translates to:
+  /// **'Files joined successfully'**
+  String get joinContainerSuccessMessage;
+
+  /// Segmented button option: encrypt mode
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypt'**
+  String get cryptoDirectionEncrypt;
+
+  /// Segmented button option: decrypt mode
+  ///
+  /// In en, this message translates to:
+  /// **'Decrypt'**
+  String get cryptoDirectionDecrypt;
+
+  /// Label for the file being encrypted/decrypted
+  ///
+  /// In en, this message translates to:
+  /// **'Input File'**
+  String get singleFileCryptoInputFileLabel;
+
+  /// Label for the standalone AEAD cipher selector
+  ///
+  /// In en, this message translates to:
+  /// **'Cipher'**
+  String get singleFileCryptoCipherLabel;
+
+  /// Switch label to delete the plaintext source after encrypting
+  ///
+  /// In en, this message translates to:
+  /// **'Delete original file after encryption'**
+  String get singleFileCryptoDeleteOriginalLabel;
+
+  /// Primary action button label when encrypting
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypt File'**
+  String get singleFileCryptoEncryptButton;
+
+  /// Primary action button label when decrypting
+  ///
+  /// In en, this message translates to:
+  /// **'Decrypt File'**
+  String get singleFileCryptoDecryptButton;
+
+  /// Snackbar shown after a successful encrypt/decrypt
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get singleFileCryptoSuccessMessage;
+
+  /// Step title: pick an unmounted file or mounted volume to repair
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a Target'**
+  String get repairTargetStepTitle;
+
+  /// Repair wizard option: pick a container file that isn't currently mounted
+  ///
+  /// In en, this message translates to:
+  /// **'Unmounted File'**
+  String get repairTargetUnmountedFileOption;
+
+  /// Subtitle for the unmounted-file repair target option
+  ///
+  /// In en, this message translates to:
+  /// **'Restore a backup header on a container you haven\'t opened'**
+  String get repairTargetUnmountedFileSubtitle;
+
+  /// Subtitle shown above the list of currently mounted volumes in the repair wizard
+  ///
+  /// In en, this message translates to:
+  /// **'Run a filesystem check on an already-open vault'**
+  String get repairTargetMountedVolumeSubtitle;
+
+  /// Empty state when no mounted volume is available to repair
+  ///
+  /// In en, this message translates to:
+  /// **'No vaults are currently mounted'**
+  String get repairNoMountedVolumes;
+
+  /// Button label to start the repair wizard's diagnostic step
+  ///
+  /// In en, this message translates to:
+  /// **'Run Diagnostic Scan'**
+  String get repairScanButton;
+
+  /// Button to go back and pick a different repair target
+  ///
+  /// In en, this message translates to:
+  /// **'Change Target'**
+  String get repairChangeTargetButton;
+
+  /// Repair diagnosis result: everything looks fine
+  ///
+  /// In en, this message translates to:
+  /// **'No issues found'**
+  String get repairDiagnosisHealthy;
+
+  /// Repair diagnosis result: container header signature/backup mismatch
+  ///
+  /// In en, this message translates to:
+  /// **'Header Corrupted'**
+  String get repairDiagnosisHeaderCorrupted;
+
+  /// Repair diagnosis result: filesystem wasn't cleanly unmounted
+  ///
+  /// In en, this message translates to:
+  /// **'Filesystem Dirty / Unclean Unmount'**
+  String get repairDiagnosisFilesystemDirty;
+
+  /// Action button for a header-corrupted diagnosis
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Backup Header'**
+  String get repairRestoreBackupHeaderButton;
+
+  /// Action button for a filesystem-dirty diagnosis
+  ///
+  /// In en, this message translates to:
+  /// **'Run Filesystem Check & Fix'**
+  String get repairRunFilesystemCheckButton;
+
+  /// Shown after a repair action reports success
+  ///
+  /// In en, this message translates to:
+  /// **'Repair completed successfully'**
+  String get repairActionSucceededMessage;
+
+  /// Shown after a repair action reports failure
+  ///
+  /// In en, this message translates to:
+  /// **'Repair action did not succeed'**
+  String get repairActionFailedMessage;
+
+  /// Label for the mounted-volume picker in Storage Analyzer
+  ///
+  /// In en, this message translates to:
+  /// **'Volume'**
+  String get storageAnalyzerTargetLabel;
+
+  /// Empty state title when no volumes are mounted
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to Analyze'**
+  String get storageAnalyzerNoTargetsTitle;
+
+  /// Empty state message when no volumes are mounted
+  ///
+  /// In en, this message translates to:
+  /// **'Mount a vault first, then come back here to see its storage breakdown.'**
+  String get storageAnalyzerNoTargetsMessage;
+
+  /// Capacity gauge caption
+  ///
+  /// In en, this message translates to:
+  /// **'{used} of {total} used'**
+  String storageAnalyzerUsedOfTotal(String used, String total);
+
+  /// Section header for the largest-files list
+  ///
+  /// In en, this message translates to:
+  /// **'Heaviest Files'**
+  String get storageAnalyzerHeaviestFilesHeader;
+
+  /// Section header for the file-type breakdown bar
+  ///
+  /// In en, this message translates to:
+  /// **'By File Type'**
+  String get storageAnalyzerBreakdownHeader;
+
+  /// Shown while the recursive directory walk is in progress
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning volume…'**
+  String get storageAnalyzerScanningMessage;
+
+  /// Notice shown when the directory walk hit its entry cap
+  ///
+  /// In en, this message translates to:
+  /// **'Scan stopped early after {count} files — results may be incomplete.'**
+  String storageAnalyzerScanTruncatedNotice(String count);
+
+  /// Shown when a mounted volume's directory walk found no files
+  ///
+  /// In en, this message translates to:
+  /// **'No files found'**
+  String get storageAnalyzerNoFilesFound;
+
+  /// Storage Analyzer file-type category
+  ///
+  /// In en, this message translates to:
+  /// **'Images'**
+  String get storageCategoryImages;
+
+  /// Storage Analyzer file-type category
+  ///
+  /// In en, this message translates to:
+  /// **'Videos'**
+  String get storageCategoryVideos;
+
+  /// Storage Analyzer file-type category
+  ///
+  /// In en, this message translates to:
+  /// **'Audio'**
+  String get storageCategoryAudio;
+
+  /// Storage Analyzer file-type category
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get storageCategoryDocuments;
+
+  /// Storage Analyzer file-type category
+  ///
+  /// In en, this message translates to:
+  /// **'Archives'**
+  String get storageCategoryArchives;
+
+  /// Storage Analyzer file-type category: everything not otherwise classified
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get storageCategoryOther;
 }
 
 class _AppLocalizationsDelegate

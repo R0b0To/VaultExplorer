@@ -5,10 +5,11 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
-import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
+import 'package:vaultexplorer/app/main_shell.dart';
 
 /// Shown at app start when a master password is configured.
-/// Replaced by VaultDashboard on successful authentication.
+/// Replaced by [MainShell] (Vaults + Tools tabs) on successful
+/// authentication.
 class LockGateScreen extends StatefulWidget {
   const LockGateScreen({super.key});
 
@@ -264,7 +265,7 @@ class _LockGateScreenState extends State<LockGateScreen> {
 
   void _goToDashboard() {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const VaultDashboard()),
+      MaterialPageRoute(builder: (_) => const MainShell()),
     );
   }
 

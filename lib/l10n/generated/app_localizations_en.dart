@@ -3809,4 +3809,239 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reorderBookmarksDesc =>
       'Drag items to reorder them in the bookmark bar';
+
+  @override
+  String get navBarVaultsLabel => 'Vaults';
+
+  @override
+  String get navBarToolsLabel => 'Tools';
+
+  @override
+  String get toolsScreenTitle => 'Tools';
+
+  @override
+  String get toolsSectionContainerUtilities => 'Container Utilities';
+
+  @override
+  String get toolsSectionFileCryptography => 'File Cryptography';
+
+  @override
+  String get toolsSectionStorageDiagnostics => 'Storage & Diagnostics';
+
+  @override
+  String get toolContainerSplitterTitle => 'Split & Join';
+
+  @override
+  String get toolContainerSplitterSubtitle =>
+      'Split a container into chunks, or rejoin them';
+
+  @override
+  String get toolContainerRepairTitle => 'Check & Repair';
+
+  @override
+  String get toolContainerRepairSubtitle =>
+      'Diagnose header or filesystem issues';
+
+  @override
+  String get toolSingleFileCryptoTitle => 'Encrypt / Decrypt File';
+
+  @override
+  String get toolSingleFileCryptoSubtitle =>
+      'Protect a single file without a full container';
+
+  @override
+  String get toolStorageAnalyzerTitle => 'Storage Analyzer';
+
+  @override
+  String get toolStorageAnalyzerSubtitle =>
+      'See what\'s taking up space in a mounted vault';
+
+  @override
+  String get toolNotImplementedYetMessage =>
+      'This tool isn\'t wired up to the native engine yet — check back in a future update.';
+
+  @override
+  String get splitJoinModeSplit => 'Split';
+
+  @override
+  String get splitJoinModeJoin => 'Join';
+
+  @override
+  String get splitSourceFileLabel => 'Source File';
+
+  @override
+  String get splitDestinationFolderLabel => 'Destination Folder';
+
+  @override
+  String get splitChunkSizeLabel => 'Chunk Size';
+
+  @override
+  String get splitChunkSizeCustomLabel => 'Custom size (MB)';
+
+  @override
+  String get splitChunkSizeCloud => '100 MB (Cloud)';
+
+  @override
+  String get splitChunkSizeFat32 => '2 GB (FAT32)';
+
+  @override
+  String get splitChunkSizeFourGb => '4 GB';
+
+  @override
+  String get splitChunkSizeCustom => 'Custom';
+
+  @override
+  String get splitContainerButton => 'Split Container';
+
+  @override
+  String get joinFirstPartLabel => 'First Part';
+
+  @override
+  String get joinOutputFileNameLabel => 'Output File Name';
+
+  @override
+  String get joinContainerButton => 'Join Files';
+
+  @override
+  String get chooseFileButton => 'Choose File';
+
+  @override
+  String get chooseFolderButton => 'Choose Folder';
+
+  @override
+  String get noFileSelectedLabel => 'No file selected';
+
+  @override
+  String get noFolderSelectedLabel => 'No folder selected';
+
+  @override
+  String splitJoinOperationProgress(String done, String total) {
+    return '$done / $total';
+  }
+
+  @override
+  String get splitContainerSuccessMessage => 'Container split successfully';
+
+  @override
+  String get joinContainerSuccessMessage => 'Files joined successfully';
+
+  @override
+  String get cryptoDirectionEncrypt => 'Encrypt';
+
+  @override
+  String get cryptoDirectionDecrypt => 'Decrypt';
+
+  @override
+  String get singleFileCryptoInputFileLabel => 'Input File';
+
+  @override
+  String get singleFileCryptoCipherLabel => 'Cipher';
+
+  @override
+  String get singleFileCryptoDeleteOriginalLabel =>
+      'Delete original file after encryption';
+
+  @override
+  String get singleFileCryptoEncryptButton => 'Encrypt File';
+
+  @override
+  String get singleFileCryptoDecryptButton => 'Decrypt File';
+
+  @override
+  String get singleFileCryptoSuccessMessage => 'Done';
+
+  @override
+  String get repairTargetStepTitle => 'Choose a Target';
+
+  @override
+  String get repairTargetUnmountedFileOption => 'Unmounted File';
+
+  @override
+  String get repairTargetUnmountedFileSubtitle =>
+      'Restore a backup header on a container you haven\'t opened';
+
+  @override
+  String get repairTargetMountedVolumeSubtitle =>
+      'Run a filesystem check on an already-open vault';
+
+  @override
+  String get repairNoMountedVolumes => 'No vaults are currently mounted';
+
+  @override
+  String get repairScanButton => 'Run Diagnostic Scan';
+
+  @override
+  String get repairChangeTargetButton => 'Change Target';
+
+  @override
+  String get repairDiagnosisHealthy => 'No issues found';
+
+  @override
+  String get repairDiagnosisHeaderCorrupted => 'Header Corrupted';
+
+  @override
+  String get repairDiagnosisFilesystemDirty =>
+      'Filesystem Dirty / Unclean Unmount';
+
+  @override
+  String get repairRestoreBackupHeaderButton => 'Restore Backup Header';
+
+  @override
+  String get repairRunFilesystemCheckButton => 'Run Filesystem Check & Fix';
+
+  @override
+  String get repairActionSucceededMessage => 'Repair completed successfully';
+
+  @override
+  String get repairActionFailedMessage => 'Repair action did not succeed';
+
+  @override
+  String get storageAnalyzerTargetLabel => 'Volume';
+
+  @override
+  String get storageAnalyzerNoTargetsTitle => 'Nothing to Analyze';
+
+  @override
+  String get storageAnalyzerNoTargetsMessage =>
+      'Mount a vault first, then come back here to see its storage breakdown.';
+
+  @override
+  String storageAnalyzerUsedOfTotal(String used, String total) {
+    return '$used of $total used';
+  }
+
+  @override
+  String get storageAnalyzerHeaviestFilesHeader => 'Heaviest Files';
+
+  @override
+  String get storageAnalyzerBreakdownHeader => 'By File Type';
+
+  @override
+  String get storageAnalyzerScanningMessage => 'Scanning volume…';
+
+  @override
+  String storageAnalyzerScanTruncatedNotice(String count) {
+    return 'Scan stopped early after $count files — results may be incomplete.';
+  }
+
+  @override
+  String get storageAnalyzerNoFilesFound => 'No files found';
+
+  @override
+  String get storageCategoryImages => 'Images';
+
+  @override
+  String get storageCategoryVideos => 'Videos';
+
+  @override
+  String get storageCategoryAudio => 'Audio';
+
+  @override
+  String get storageCategoryDocuments => 'Documents';
+
+  @override
+  String get storageCategoryArchives => 'Archives';
+
+  @override
+  String get storageCategoryOther => 'Other';
 }

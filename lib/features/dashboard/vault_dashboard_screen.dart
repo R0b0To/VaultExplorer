@@ -53,14 +53,30 @@ class SlideRightRoute<T> extends PageRouteBuilder<T> {
       );
 }
 
+/// Lets [MainShell] trigger the "Add a vault" menu from its own centered
+/// bottom-bar button without needing to reference the private
+/// [State] class that implements it -- see [VaultDashboard]'s `GlobalKey`
+/// in `main_shell.dart`.
+abstract class VaultDashboardActions {
+  void showAddVaultMenu();
+}
+
 class VaultDashboard extends StatefulWidget {
-  const VaultDashboard({super.key});
+  /// Optional sink for the currently-mounted volume list, kept live as
+  /// [_mounted] changes. [MainShell] passes this so the Tools tab (Storage
+  /// Analyzer's target picker, Repair's "choose mounted volume" option) can
+  /// see what's mounted without duplicating this screen's own mount
+  /// tracking. `null` when [VaultDashboard] is used standalone.
+  final ValueNotifier<List<MountedContainer>>? mountedNotifier;
+
+  const VaultDashboard({super.key, this.mountedNotifier});
   @override
   State<VaultDashboard> createState() => _VaultDashboardState();
 }
 
 class _VaultDashboardState extends State<VaultDashboard>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver
+    implements VaultDashboardActions {
   final List<MountedContainer> _mounted = [];
   Map<String, ContainerRecord> _records = {};
   final List<String> _recordsOrder = [];
@@ -250,6 +266,7 @@ class _VaultDashboardState extends State<VaultDashboard>
     unawaited(
       SecureScreenPolicy.apply(preference: _appSettings.blockScreenshots),
     );
+    widget.mountedNotifier?.value = List.unmodifiable(_mounted);
   }
 
   void _onUserActivityForContainer(int volId) {
@@ -528,6 +545,9 @@ class _VaultDashboardState extends State<VaultDashboard>
       if (mounted) setState(() => _actionInFlight = false);
     });
   }
+
+  @override
+  void showAddVaultMenu() => _showAddOptionsSheet();
 
   Future<void> _showAddOptionsSheet() async {
     if (_actionInFlight) return;
@@ -975,11 +995,6 @@ class _VaultDashboardState extends State<VaultDashboard>
             ),
             const SizedBox(width: 4),
           ],
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _actionInFlight ? null : _showAddOptionsSheet,
-          icon: const Icon(Icons.add_rounded),
-          label: Text(context.l10n.addVaultFabLabel),
         ),
         body: Stack(
           children: [

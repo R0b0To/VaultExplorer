@@ -1,57 +1,32 @@
 package com.aeidolon.vaultexplorer
 
-/**
- * Raw JNI shim over the C++ native library. Binds 1:1 to the fixed
- * `Java_com_aeidolon_vaultexplorer_NativeEngine_` export names in the
- * cpp/jni bridge files (crypto_bridge.cpp, filesystem_bridge.cpp,
- * session_bridge.cpp, container_lifecycle_bridge.cpp) — keeping that ABI
- * constraint isolated here lets the public Kotlin API evolve independently.
- *
- * App code must use [ContainerEngine], never this object directly.
- * NativeEngine has two kinds of consumers:
- *
- *   1. VeraCrypt/LUKS/BitLocker session + file-operation calls, tiered as:
- *      - Session-establishment: take a real fd + password + pim because
- *        they are creating the crypto session from scratch.
- *      - Stateless: take volId only; the C++ side asserts an active
- *        session exists via requireActiveSession() and throws
- *        IllegalStateException("NOT_UNLOCKED: ...") if it doesn't.
- *
- *   2. Shared native crypto primitives used by the pure-Kotlin format
- *      backends that have no session of their own here — scrypt (Cryptomator),
- *      SIV-mode and EME (Cryptomator/gocryptfs filename/content crypto), and
- *      the CryFS AES-GCM block cipher. See CryptomatorVault, Scrypt, SivMode,
- *      GocryptfsEme, CryfsBlockCipher.
- */
 internal object NativeEngine {
     init {
         System.loadLibrary("vaultexplorer")
     }
 
-    // ── Config ───────────────────────────────────────────────────────────
+    @JvmStatic
+    external fun encryptSingleFileNative(
+        srcFd: Int, destFd: Int, cipherIndex: Int,
+        password: String, keyfileFds: IntArray?, opId: Int
+    ): Boolean
+
+    @JvmStatic
+    external fun decryptSingleFileNative(
+        srcFd: Int, destFd: Int,
+        password: String, keyfileFds: IntArray?, opId: Int
+    ): Boolean
 
     @JvmStatic
     external fun getMaxVolumesNative(): Int
-
-    // ── Tier 1: session establishment ──────────────────────────────────────
-
-    /** Opens fd, runs PBKDF2, mounts the FAT layer, returns root listing.
-     *  cipherId/hashId: 255 = auto-detect (try all combinations).
-     *  keyfileFds: raw fds (already ParcelFileDescriptor.detachFd()'d on the
-     *  Kotlin side) for any keyfiles to mix into the password before
-     *  derivation. The native side takes ownership and closes every fd in
-     *  this array, whether derivation succeeds or fails — callers must not
-     *  touch or close them again afterward. Pass null/empty for no keyfiles. */
     @JvmStatic
     external fun deriveKeyMaterialNative(
         fd: Int, password: String, pim: Int,
         cipherId: Int = 255, hashId: Int = 255, keyfileFds: IntArray? = null
     ): ByteArray?
-
     @JvmStatic
     external fun getLastDerivedKeyMaterialNative(volId: Int): ByteArray?
-
-   @JvmStatic
+    @JvmStatic
     external fun unlockAndListNative(
         fd: Int, password: String, pim: Int, volId: Int,
         cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null,
@@ -59,45 +34,15 @@ internal object NativeEngine {
         hiddenPassword: String? = null, hiddenPim: Int = 0,
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null
     ): Array<String>?
-
-
-
     @JvmStatic external fun getAvifInfoNative(avifBytes: ByteArray): IntArray?
     @JvmStatic external fun decodeAvifFrameNative(avifBytes: ByteArray, frameIndex: Int): Map<String, Any>?
     @JvmStatic external fun decodeAvifNative(avifBytes: ByteArray): Map<String, Any>?
-
-
-    /** Writes a new container to fd and formats it.
-     *
-     *  containerFormat: 0 = VeraCrypt, 1 = LUKS1, 2 = LUKS2 (matches
-     *  ContainerFormat's native ordinal, see container_format.h).
-     *
-     *  cipherId/hashId: for VeraCrypt (containerFormat==0), 255 = auto
-     *  (defaults to AES + SHA-512). For LUKS (containerFormat==1 or 2),
-     *  both must be concrete — creation always knows exactly which
-     *  algorithm it's using — restricted to AES(0)/Serpent(1)/Twofish(2)
-     *  for cipherId (LUKS1 additionally requires AES specifically) and
-     *  SHA-512(0)/SHA-256(1)/Argon2id(5) for hashId (Argon2id only valid
-     *  for LUKS2).
-     *
-     *  keyfileFds: see [deriveKeyMaterialNative] for the fd ownership
-     *  contract. For VeraCrypt, keyfiles mix additively into the typed
-     *  password (including allowing an empty password when keyfiles alone
-     *  are supplied). For LUKS, a keyfile REPLACES the typed password
-     *  entirely — matching real `cryptsetup --key-file` — and only the
-     *  first keyfile is used. */
     @JvmStatic
     external fun createContainerNative(
         fd: Int, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
         containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
         keyfileFds: IntArray? = null
     ): Boolean
-
-    /** Creates a VeraCrypt container with an embedded hidden volume.
-     *  The outer volume is created first, then the hidden volume's header
-     *  is written at offset 65536 and the hidden data area at the end of
-     *  the container is zero-encrypted with its own independent master key.
-     *  keyfileFds / hiddenKeyfileFds: same detach/ownership contract. */
     @JvmStatic
     external fun createContainerWithHiddenNative(
         fd: Int, outerPassword: String, hiddenPassword: String,
@@ -108,12 +53,6 @@ internal object NativeEngine {
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255,
         outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null
     ): Boolean
-
-    /** Re-encrypts a VeraCrypt container's header with a new password.
-     *  Decrypts the header with [oldPassword]/[oldPim], re-derives the
-     *  header key from [newPassword]/[newPim] with a fresh random salt,
-     *  then writes the re-encrypted header (primary + backup).
-     *  Always takes ownership of [fd]. */
     @JvmStatic
     external fun changeContainerPasswordNative(
         fd: Int, oldPassword: String, newPassword: String,
@@ -121,57 +60,31 @@ internal object NativeEngine {
         cipherId: Int = 255, hashId: Int = 255,
         oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null
     ): Boolean
-
-    /** Returns changeLuksContainerPassword()'s tri-state result directly
-     *  (0 = success, 1 = wrong old password/keyfile, 2 = any other
-     *  error) — see container_create.h's doc comment. No PIM/cipherId/
-     *  hashId params: LUKS has no PIM, and its cipher/hash live in the
-     *  container's own header/JSON metadata rather than being passed in. */
     @JvmStatic
     external fun changeLuksContainerPasswordNative(
         fd: Int, oldPassword: String, newPassword: String,
         oldKeyfileFds: IntArray? = null, newKeyfileFds: IntArray? = null
     ): Int
-
-    /** PBKDF2-SHA512 via mbedTLS; no volId, no session required. */
     @JvmStatic
     external fun hashPasswordNative(
         password: String, salt: ByteArray, iterations: Int
     ): ByteArray?
-
-    /** PBKDF2-SHA256 via mbedTLS; no volId, no session required. */
     @JvmStatic
     external fun hashPasswordSha256Native(
         password: String, salt: ByteArray, iterations: Int, outputLen: Int
     ): ByteArray?
-
-    /** AES-GCM encryption via mbedTLS. */
     @JvmStatic
     external fun aesGcmEncryptNative(
         key: ByteArray, iv: ByteArray, plaintext: ByteArray
     ): ByteArray?
-
-    /** AES-GCM decryption via mbedTLS. */
     @JvmStatic
     external fun aesGcmDecryptNative(
         key: ByteArray, iv: ByteArray, ciphertextAndTag: ByteArray
     ): ByteArray?
-
-    // ── Session teardown ───────────────────────────────────────────────────
-
     @JvmStatic
     external fun lockNative(volId: Int)
-
-    /** Best-effort: asks an in-flight unlockAndListNative/unlockUsbAndListNative
-     *  call for [volId] to abort at its next hash/cipher combination boundary
-     *  (not instant — bounded by roughly one PBKDF2 round). Safe to call even
-     *  if nothing is currently unlocking for [volId]. See UnlockCancelledException. */
     @JvmStatic
     external fun requestCancelUnlockNative(volId: Int)
-
-    // ── Tier 2: stateless file operations (volId-only) ─────────────────────
-
-    // ── Matched cipher/hash lookup (perf: skip auto-detect next unlock) ────
     @JvmStatic external fun getMatchedCipherId(volId: Int): Int
     @JvmStatic external fun getMatchedHashId(volId: Int): Int
     @JvmStatic external fun getContainerFormat(volId: Int): Int
@@ -187,10 +100,6 @@ internal object NativeEngine {
     @JvmStatic external fun renameFile(oldPath: String, newPath: String, volId: Int): Boolean
     @JvmStatic external fun setLastModifiedTime(path: String, epochSeconds: Long, volId: Int): Boolean
     @JvmStatic external fun getSpaceInfo(volId: Int): LongArray?
-    /** USB unlock + list. cipherId/hashId: 255 = auto-detect.
-     *  keyfileFds: see [deriveKeyMaterialNative] — same detach/ownership contract. */
-    /** See [unlockAndListNative]'s doc comment for the hidden* params --
-     *  identical "protect hidden volume" contract, just for the USB path. */
     @JvmStatic external fun unlockUsbAndListNative(
         password: String, pim: Int, volId: Int, deviceSizeBytes: Long,
         cipherId: Int = 255, hashId: Int = 255, preservedKey: ByteArray? = null,
@@ -198,58 +107,37 @@ internal object NativeEngine {
         hiddenPassword: String? = null, hiddenPim: Int = 0,
         hiddenCipherId: Int = 255, hiddenHashId: Int = 255, hiddenKeyfileFds: IntArray? = null
     ): Array<String>?
-
-    /** Creates a new container directly on a raw (unformatted) USB block device.
- *  [volId] must already have a UsbMassStorageDevice registered in
- *  UsbBlockBridge (MainActivity does this before calling). Writes an MBR
- *  partition table via writeMbrPartitionTable() then formats the container
- *  starting at that partition. See createContainerNative for the
- *  cipherId/hashId/keyfileFds semantics — identical here. */
-@JvmStatic
-external fun createUsbContainerNative(
-    volId: Int, partitionScheme: String, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
-    containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
-    keyfileFds: IntArray? = null, quickFormat: Boolean = false
-): Boolean
-
-@JvmStatic
+    @JvmStatic
+    external fun createUsbContainerNative(
+        volId: Int, partitionScheme: String, password: String, pim: Int, sizeBytes: Long, fileSystem: String,
+        containerFormat: Int = 0, cipherId: Int = 255, hashId: Int = 255,
+        keyfileFds: IntArray? = null, quickFormat: Boolean = false
+    ): Boolean
+    @JvmStatic
     external fun scryptNative(
         passphrase: ByteArray, salt: ByteArray, N: Int, r: Int, p: Int, dkLen: Int
     ): ByteArray?
-
-
-@JvmStatic
+    @JvmStatic
     external fun gocryptfsEmeNative(
         key: ByteArray, tweak: ByteArray, data: ByteArray, encrypt: Boolean
     ): ByteArray?
-
     @JvmStatic
     external fun sivEncryptNative(
         encKey: ByteArray, macKey: ByteArray, plaintext: ByteArray, adList: Array<ByteArray>?
     ): ByteArray?
-
     @JvmStatic
     external fun sivDecryptNative(
         encKey: ByteArray, macKey: ByteArray, ciphertext: ByteArray, adList: Array<ByteArray>?
     ): ByteArray?
-
-    /** XChaCha20-Poly1305 seal/open (crypto/xchacha20poly1305.h). Used by
-     *  GocryptfsContentCryptor for XChaCha20Poly1305-flagged vaults, since
-     *  javax.crypto has no XChaCha20 support; the AES-GCM path stays pure
-     *  Kotlin. key must be 32 bytes, nonce 24 bytes; aad may be null.
-     *  Open returns null on auth failure (bad key/corrupted data) same as
-     *  aesGcmDecryptNative. */
     @JvmStatic
     external fun xchacha20Poly1305SealNative(
         key: ByteArray, nonce: ByteArray, aad: ByteArray?, plaintext: ByteArray
     ): ByteArray?
-
     @JvmStatic
     external fun xchacha20Poly1305OpenNative(
         key: ByteArray, nonce: ByteArray, aad: ByteArray?, ciphertextAndTag: ByteArray
     ): ByteArray?
-
-@JvmStatic
+    @JvmStatic
     external fun createUsbContainerWithHiddenNative(
         volId: Int, partitionScheme: String,
         outerPassword: String, hiddenPassword: String,
@@ -261,25 +149,13 @@ external fun createUsbContainerNative(
         outerKeyfileFds: IntArray? = null, hiddenKeyfileFds: IntArray? = null,
         quickFormat: Boolean = false
     ): Boolean
-
-    // ── Tier 2: stream lifecycle ───────────────────────────────────────────
-    // Used exclusively by ContainerProxyCallback. Passes a raw C++ FIL*
-    // as a Long — kept separate from the one-shot stateless methods above
-    // because the pointer lifetime is tied to the ProxyFileDescriptor callback.
-
     @JvmStatic external fun openStream(targetFileName: String, volId: Int): Long
     @JvmStatic external fun readStream(streamPtr: Long, offset: Long, outBuffer: ByteArray, length: Int, volId: Int): Int
     @JvmStatic external fun closeStream(streamPtr: Long, volId: Int)
     @JvmStatic external fun getCascadeFingerprint(cascadeId: Int): Int
     @JvmStatic external fun getCascadeIdCount(): Int
     @JvmStatic external fun getHashIdCount(): Int
-
-    // ── CryFS block cipher (see cpp/crypto/cryfs_block_cipher.h) ───────────
-    // Kotlin-side wrapper: cryfs/CryfsBlockCipher.kt. Only the AES-GCM/CFB
-    // cipher family is implemented natively; cryfsCipherIdNative returns -1
-    // for any other cipher name found in a vault's cryfs.config.
     @JvmStatic external fun cryfsCipherIdNative(cipherName: String): Int
     @JvmStatic external fun cryfsEncryptBlockNative(cipherId: Int, key: ByteArray, plaintext: ByteArray): ByteArray?
     @JvmStatic external fun cryfsDecryptBlockNative(cipherId: Int, key: ByteArray, ciphertext: ByteArray): ByteArray?
-
 }

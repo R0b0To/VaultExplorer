@@ -1,17 +1,6 @@
-/// Single source of truth for every MethodChannel method name.
-///
-/// Both [VaultExplorerApi] call-sites and [MainActivity]'s `when` block must
-/// use these constants. The Kotlin side mirrors them in the local
-/// [ChannelMethods] object inside [MainActivity].
 abstract final class ChannelMethods {
-  // ── Container lifecycle ──────────────────────────────────────────────────
   static const pickContainer = 'pickContainer';
   static const pickKeyfiles = 'pickKeyfiles';
-
-  // Used by the decoy Archive Explorer screen: pick any .zip via SAF
-  // (not just ones sitting in Downloads) and pick a custom extraction
-  // destination. Both resolve to a raw filesystem path rather than a
-  // content:// URI -- see VaultPickerHandlers.kt for why.
   static const pickArchiveFile = 'pickArchiveFile';
   static const pickExtractFolder = 'pickExtractFolder';
   static const createContainer = 'createContainer';
@@ -21,95 +10,62 @@ abstract final class ChannelMethods {
   static const cancelUnlock = 'cancelUnlock';
   static const changeContainerPassword = 'changeContainerPassword';
   static const changeLuksContainerPassword = 'changeLuksContainerPassword';
-
   static const getAvifInfo = 'getAvifInfo';
   static const decodeAvifFrame = 'decodeAvifFrame';
   static const decodeAvif = 'decodeAvif';
-
-  // Exposes/unmounts a single folder inside an unlocked container as its
-  // own SAF root, independent of the container-wide documentProvider flag.
   static const mountContainerFolder = 'mountContainerFolder';
   static const unmountContainerFolder = 'unmountContainerFolder';
   static const getMountedContainerFolders = 'getMountedContainerFolders';
-
   static const hasAllFilesAccess = 'hasAllFilesAccess';
   static const requestAllFilesAccess = 'requestAllFilesAccess';
-
-  // ── Cryptomator / Folder Vaults ──────────────────────────────────────────
-  /// Opens ACTION_OPEN_DOCUMENT_TREE (a folder picker, not a file picker)
-  /// and checks for masterkey.cryptomator, gocryptfs.conf, or cryfs.config.
   static const pickCryptomatorVault = 'pickCryptomatorVault';
   static const unlockCryptomatorVault = 'unlockCryptomatorVault';
   static const createCryptomatorVault = 'createCryptomatorVault';
   static const changeCryptomatorVaultPassword =
       'changeCryptomatorVaultPassword';
   static const finishWriteIfCryptomator = 'finishWriteIfCryptomator';
-
   static const pickGocryptfsVault = 'pickGocryptfsVault';
   static const unlockGocryptfsVault = 'unlockGocryptfsVault';
   static const createGocryptfsVault = 'createGocryptfsVault';
   static const changeGocryptfsVaultPassword = 'changeGocryptfsVaultPassword';
   static const isGocryptfsVault = 'isGocryptfsVault';
-
   static const pickCryfsVault = 'pickCryfsVault';
   static const unlockCryfsVault = 'unlockCryfsVault';
   static const createCryfsVault = 'createCryfsVault';
   static const changeCryfsVaultPassword = 'changeCryfsVaultPassword';
   static const isCryfsVault = 'isCryfsVault';
-
-  // ── File I/O ─────────────────────────────────────────────────────────────
   static const decryptFile = 'decryptFile';
   static const exportFileToStorage = 'exportFileToStorage';
   static const exportFilesToFolder = 'exportFilesToFolder';
   static const importFile = 'importFile';
   static const importFolder = 'importFolder';
   static const cancelImport = 'cancelImport';
-  // Deletes the source files/folder from device storage that were picked
-  // during the import identified by opId. Native keeps the picked URIs
-  // in memory (keyed by opId) until this is called or the op is superseded.
   static const deleteImportSources = 'deleteImportSources';
   static const getFileSize = 'getFileSize';
-  static const getFolderSize =
-      'getFolderSize'; // recursive directory byte total
+  static const getFolderSize = 'getFolderSize';
   static const readFileChunk = 'readFileChunk';
   static const writeFileChunk = 'writeFileChunk';
   static const writeBackFile = 'writeBackFile';
   static const getSpaceInfo = 'getSpaceInfo';
-
-  // Routed to fullResExecutor on native side for Media Viewer image reads
   static const getMediaFileSize = 'getMediaFileSize';
   static const readMediaFileChunk = 'readMediaFileChunk';
-
-  // ── Tools tab: Container Splitter/Joiner ────────────────────────────────
-  // Operates on an unmounted container file picked via pickContainer --
-  // never a volId -- so it lives outside the mounted-container lock/error
-  // contract every other file-I/O method above goes through. opId is the
-  // caller's FileOperation.id, same convention as importFile/importFolder,
-  // but tracked in its own native-side cancellation set (SplitJoinCancellation)
-  // separate from ImportCancellation.
   static const splitContainer = 'splitContainer';
   static const joinContainer = 'joinContainer';
   static const cancelSplitJoin = 'cancelSplitJoin';
   static const unlockSplitContainer = 'unlockSplitContainer';
-
-  // ── Directory operations ─────────────────────────────────────────────────
+  static const encryptSingleFile = 'encryptSingleFile';
+  static const decryptSingleFile = 'decryptSingleFile';
   static const listDirectory = 'listDirectory';
   static const createDirectory = 'createDirectory';
   static const renameFile = 'renameFile';
   static const deleteFile = 'deleteFile';
   static const setLastModifiedTime = 'setLastModifiedTime';
-
-  // ── Media & Thumbnails ───────────────────────────────────────────────────
   static const openWithApp = 'openWithApp';
   static const getVideoThumbnail = 'getVideoThumbnail';
   static const getImageThumbnail = 'getImageThumbnail';
-  // Same output as getImageThumbnail / getVideoThumbnail, plus the source
-  // frame's pre-downscale width/height — see ThumbnailWithSize.
   static const getImageThumbnailWithSize = 'getImageThumbnailWithSize';
   static const getVideoThumbnailWithSize = 'getVideoThumbnailWithSize';
   static const setPlaybackActive = 'setPlaybackActive';
-
-  // ── Crypto ───────────────────────────────────────────────────────────────
   static const hashPassword = 'hashPassword';
   static const hashPasswordSha256 = 'hashPasswordSha256';
   static const deriveDerivedKey = 'deriveDerivedKey';
@@ -118,36 +74,24 @@ abstract final class ChannelMethods {
   static const clearDerivedKey = 'clearDerivedKey';
   static const aesGcmEncrypt = 'aesGcmEncrypt';
   static const aesGcmDecrypt = 'aesGcmDecrypt';
-
-  // ── Secure Storage ───────────────────────────────────────────────────────
   static const readSecure = 'readSecure';
   static const writeSecure = 'writeSecure';
   static const deleteSecure = 'deleteSecure';
   static const deleteAllSecure = 'deleteAllSecure';
   static const readAllSecure = 'readAllSecure';
   static const containsKeySecure = 'containsKeySecure';
-
-  // ── Security & Privacy ───────────────────────────────────────────────────
   static const setSecureScreen = 'setSecureScreen';
   static const setSensitiveClipboardText = 'setSensitiveClipboardText';
   static const setKeepScreenOn = 'setKeepScreenOn';
   static const launchUrl = 'launchUrl';
   static const getAppVersion = 'getAppVersion';
-
-  // ── USB Drive Support ────────────────────────────────────────────────────
   static const listUsbDevices = 'listUsbDevices';
   static const requestUsbPermission = 'requestUsbPermission';
   static const unlockUsbContainer = 'unlockUsbContainer';
   static const createUsbContainer = 'createUsbContainer';
   static const getUsbDeviceCapacity = 'getUsbDeviceCapacity';
-
-  // ── System Utilities ─────────────────────────────────────────────────────
   static const documentExists = 'documentExists';
   static const warmContainer = 'warmContainer';
-
-  // VaultExplorerApi.initMethodCallHandler and CacheCoordinator.
   static const onTrimMemory = 'onTrimMemory';
-
-  // ── Device capability profiling ────────────────────────────────
   static const getDeviceCapabilityProfile = 'getDeviceCapabilityProfile';
 }

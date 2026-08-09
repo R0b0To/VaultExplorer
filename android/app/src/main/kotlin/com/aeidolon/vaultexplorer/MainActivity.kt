@@ -94,12 +94,12 @@ private object ChannelMethods {
     const val SET_KEEP_SCREEN_ON = "setKeepScreenOn"
     const val LAUNCH_URL = "launchUrl"
     const val GET_APP_VERSION = "getAppVersion"
-
-    // ── Tools tab: Container Splitter/Joiner ─────────────────────────
     const val SPLIT_CONTAINER = "splitContainer"
     const val JOIN_CONTAINER = "joinContainer"
     const val CANCEL_SPLIT_JOIN = "cancelSplitJoin"
     const val UNLOCK_SPLIT_CONTAINER = "unlockSplitContainer"
+    const val ENCRYPT_SINGLE_FILE = "encryptSingleFile"
+    const val DECRYPT_SINGLE_FILE = "decryptSingleFile"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -130,6 +130,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val thumbnailHandlers = ThumbnailHandlers(this, imageThumbnailExecutor, videoThumbnailExecutor, nativeOps)
     private val importExportHandlers = ImportExportHandlers(this, pendingResult, ioExecutor, nativeOps)
     private val splitJoinHandlers = SplitJoinHandlers(this, ioExecutor)
+    private val singleFileCryptoHandlers = SingleFileCryptoHandlers(this, ioExecutor, nativeOps)
     private val splitContainerMountHandlers = SplitContainerMountHandlers(this, ioExecutor, nativeOps, vaultUnlockHandlers)
     private val fileOperationHandlers = FileOperationHandlers(nativeOps, fullResExecutor)
     private val systemHandlers = SystemPermissionHandlers(this)
@@ -140,13 +141,6 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
         disguiseModeHandlers.updateActivityIdentity()
-        // Wipes any vx_vid_*.mp4 left behind in cacheDir by a previous
-        // process death mid-recording (crash, force-stop, OOM kill) --
-        // the normal cleanup path only runs when a recording finishes or
-        // fails cleanly. Runs on ioExecutor since it may need to overwrite
-        // a large leftover file; happens before configureFlutterEngine()
-        // sets up VaultCameraPlugin, so there's no risk of racing a
-        // legitimate new recording's temp file.
         ioExecutor.execute {
             com.aeidolon.vaultexplorer.camera.VaultVideoRecorder.sweepOrphanedTempFiles(cacheDir)
         }
@@ -182,7 +176,6 @@ class MainActivity : FlutterFragmentActivity() {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) systemHandlers.sanitizeClipboard()
     }
-    
 
     private fun resizeExecutorPools() {
         val sizes = DeviceCapabilityProfiler.executorSizesFor(DeviceCapabilityProfiler.tierFor(this))
@@ -215,6 +208,7 @@ class MainActivity : FlutterFragmentActivity() {
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
+
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel
         UnlockProgressBridge.channel = channel
@@ -394,6 +388,8 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.JOIN_CONTAINER -> splitJoinHandlers.handleJoinContainer(call, result)
                 ChannelMethods.CANCEL_SPLIT_JOIN -> splitJoinHandlers.handleCancelSplitJoin(call, result)
                 ChannelMethods.UNLOCK_SPLIT_CONTAINER -> splitContainerMountHandlers.handleUnlockSplitContainer(call, result)
+                ChannelMethods.ENCRYPT_SINGLE_FILE -> singleFileCryptoHandlers.handleEncryptSingleFile(call, result)
+                ChannelMethods.DECRYPT_SINGLE_FILE -> singleFileCryptoHandlers.handleDecryptSingleFile(call, result)
                 ChannelMethods.WRITE_FILE_CHUNK -> fileOperationHandlers.handleWriteFileChunk(call, result)
                 ChannelMethods.MOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleMountContainerFolder(call, result)
                 ChannelMethods.UNMOUNT_CONTAINER_FOLDER -> folderDocumentProviderHandlers.handleUnmountContainerFolder(call, result)

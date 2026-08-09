@@ -404,7 +404,8 @@ add_library(
         crypto/kdf_table.cpp       # per-hash iteration-count table + hash dispatch + PIM clamping
         crypto/luks_header.cpp     # LUKS header parsing & key recovery
         crypto/scrypt.cpp
-        crypto/cryfs_block_cipher.cpp  
+        crypto/cryfs_block_cipher.cpp
+        crypto/single_file_crypto.cpp # Single file encryption & decryption engine
         crypto/xchacha20poly1305.cpp  # shared XChaCha20-Poly1305 AEAD (CryFS block cipher + gocryptfs content crypto)
         crypto/eme.cpp             # EME filename encryption
         crypto/siv.cpp             # SIV filename encryption

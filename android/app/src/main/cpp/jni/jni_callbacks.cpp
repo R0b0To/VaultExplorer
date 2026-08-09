@@ -1,17 +1,14 @@
 #include "jni_callbacks.h"
 
 namespace {
-
-
 struct ThreadJniEnv {
     JNIEnv* env = nullptr;
     bool weAttached = false;
-
     JNIEnv* get() {
         if (env) return env;
         if (!g_vm) return nullptr;
         if (g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) == JNI_OK) {
-            return env; // already attached (e.g. this is the original JNI entry thread)
+            return env;
         }
         if (g_vm->AttachCurrentThread(&env, nullptr) == JNI_OK) {
             weAttached = true;
@@ -20,15 +17,12 @@ struct ThreadJniEnv {
         env = nullptr;
         return nullptr;
     }
-
     ~ThreadJniEnv() {
         if (weAttached && g_vm) g_vm->DetachCurrentThread();
     }
 };
-
 thread_local ThreadJniEnv g_threadJniEnv;
-
-} // namespace
+}
 
 void reportUnlockProgress(int volId, int attempted, int total, int hashId,
                           int cipherId, int format, int slot) {
@@ -40,6 +34,26 @@ void reportUnlockProgress(int volId, int attempted, int total, int hashId,
         static_cast<jint>(volId), static_cast<jint>(attempted), static_cast<jint>(total),
         static_cast<jint>(hashId), static_cast<jint>(cipherId), static_cast<jint>(format), static_cast<jint>(slot));
     if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
+void reportSplitJoinProgress(int opId, uint64_t bytesDone, uint64_t bytesTotal) {
+    if (opId <= 0) return;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_splitJoinProgressBridgeClass || !g_splitJoinProgressReportMethod) return;
+    env->CallStaticVoidMethod(
+        g_splitJoinProgressBridgeClass, g_splitJoinProgressReportMethod,
+        static_cast<jint>(opId), static_cast<jlong>(bytesDone), static_cast<jlong>(bytesTotal));
+    if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
+bool isSplitJoinCancelled(int opId) {
+    if (opId <= 0) return false;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_splitJoinCancellationClass || !g_splitJoinIsCancelledMethod) return false;
+    jboolean cancelled = env->CallStaticBooleanMethod(
+        g_splitJoinCancellationClass, g_splitJoinIsCancelledMethod, static_cast<jint>(opId));
+    if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
+    return cancelled == JNI_TRUE;
 }
 
 void notifyHiddenVolumeProtectionTriggered(int volId) {
@@ -62,7 +76,6 @@ bool usbReadSectors(int volId, uint64_t startSector, uint32_t sectorCount,
         static_cast<jint>(volId), static_cast<jlong>(startSector), static_cast<jint>(sectorCount)));
     if (env->ExceptionCheck()) { env->ExceptionClear(); return false; }
     if (!result) return false;
-
     const jsize len = env->GetArrayLength(result);
     const size_t expected = static_cast<size_t>(sectorCount) * 512;
     if (static_cast<size_t>(len) != expected) { env->DeleteLocalRef(result); return false; }

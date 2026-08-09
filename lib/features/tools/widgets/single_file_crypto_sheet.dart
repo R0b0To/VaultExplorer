@@ -9,14 +9,6 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
 
-/// File Cryptography → Single-File Encrypt/Decrypt.
-///
-/// Wraps one local file in a standalone AEAD container (or unwraps one
-/// previously produced by this same tool) without needing a full
-/// FAT/NTFS-backed volume -- see the design note's "File Cryptography
-/// (Standalone)" section. Calls through [ContainerToolService], whose
-/// [ContainerToolService.encryptFile]/[ContainerToolService.decryptFile]
-/// are not implemented natively yet.
 class SingleFileCryptoSheet extends StatefulWidget {
   const SingleFileCryptoSheet({super.key});
 
@@ -28,13 +20,14 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     with KeyfilePickerMixin {
   CryptoDirection _direction = CryptoDirection.encrypt;
   StandaloneCipher _cipher = StandaloneCipher.xChaCha20Poly1305;
-
   String? _sourceUri;
   String? _sourceName;
+  String? _destPath;
+  String? _destName;
+  String? _destTreeUri;
   final _passwordCtrl = TextEditingController();
   bool _obscure = true;
   bool _deleteOriginal = false;
-
   bool _busy = false;
   String? _error;
   int? _progressDone;
@@ -50,15 +43,22 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
   }
 
   Future<void> _pickSource() async {
-    // Generic ACTION_OPEN_DOCUMENT picker -- same one the Splitter's
-    // "source file" field uses. Not restricted to container-shaped files,
-    // which is fine here since it's already unfiltered ("*/*") on the
-    // native side.
     final picked = await vaultExplorerApi.pickContainer();
     if (picked == null || !mounted) return;
     setState(() {
       _sourceUri = picked.uri;
       _sourceName = picked.displayName;
+      _error = null;
+    });
+  }
+
+  Future<void> _pickDestinationFolder() async {
+    final picked = await vaultExplorerApi.pickExtractFolder();
+    if (picked == null || !mounted) return;
+    setState(() {
+      _destPath = picked.path;
+      _destName = picked.displayName;
+      _destTreeUri = picked.treeUri;
       _error = null;
     });
   }
@@ -69,8 +69,8 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
       setState(() => _error = context.l10n.noFileSelectedLabel);
       return;
     }
-    if (_passwordCtrl.text.isEmpty) {
-      setState(() => _error = context.l10n.passwordFieldLabel);
+    if (_passwordCtrl.text.isEmpty && keyfiles.isEmpty) {
+      setState(() => _error = context.l10n.passwordOrKeyfilesRequired);
       return;
     }
 
@@ -98,6 +98,8 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
           passphrase: _passwordCtrl.text,
           keyfilePaths: keyfilePaths,
           deleteOriginalAfter: _deleteOriginal,
+          destinationPath: _destPath,
+          destinationTreeUri: _destTreeUri,
           onProgress: onProgress,
         );
       } else {
@@ -105,6 +107,8 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
           sourceUri: source,
           passphrase: _passwordCtrl.text,
           keyfilePaths: keyfilePaths,
+          destinationPath: _destPath,
+          destinationTreeUri: _destTreeUri,
           onProgress: onProgress,
         );
       }
@@ -126,7 +130,9 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
       if (mounted) {
         setState(() {
           _busy = false;
-          _error = e.message ?? '$e';
+          _error = e.code == 'AUTH_FAIL'
+              ? context.l10n.incorrectPasswordError
+              : (e.message ?? '$e');
         });
       }
     } catch (e) {
@@ -215,6 +221,42 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                 ],
               ),
             ),
+            const SizedBox(height: AppSpacing.sm),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.folder_outlined, size: AppIconSize.small, color: cs.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.l10n.splitDestinationFolderLabel,
+                          style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                        Text(
+                          _destName ?? context.l10n.noFolderSelectedLabel,
+                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: _busy ? null : _pickDestinationFolder,
+                    child: Text(context.l10n.chooseFolderButton),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _passwordCtrl,
@@ -251,25 +293,14 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const SizedBox(height: AppSpacing.sm),
-                          Text(
-                            context.l10n.singleFileCryptoCipherLabel,
-                            style: textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: StandaloneCipher.values
-                                .map(
-                                  (c) => ChoiceChip(
-                                    label: Text(c.label),
-                                    selected: _cipher == c,
-                                    onSelected: _busy
-                                        ? null
-                                        : (_) => setState(() => _cipher = c),
-                                  ),
-                                )
+                          OptionPickerTile<StandaloneCipher>(
+                            label: context.l10n.singleFileCryptoCipherLabel,
+                            value: _cipher,
+                            prefixIcon: Icons.security_rounded,
+                            options: StandaloneCipher.values
+                                .map((c) => SelectOption(value: c, label: c.label))
                                 .toList(),
+                            onChanged: _busy ? (_) {} : (val) => setState(() => _cipher = val),
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           SwitchListTile(

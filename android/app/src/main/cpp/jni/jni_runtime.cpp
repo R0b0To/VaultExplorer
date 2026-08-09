@@ -1,11 +1,8 @@
 #include "jni_callbacks.h"
 #include "crypto/thread_pool.h"
 #include <android/log.h>
-
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
-// Process-lifetime JNI cache.  Filesystem and crypto code only consume these
-// handles; registration, lookup and global-reference ownership remain here.
 JavaVM*   g_vm = nullptr;
 jclass    g_usbBridgeClass = nullptr;
 jmethodID g_usbReadMethod = nullptr;
@@ -16,6 +13,10 @@ jclass    g_hiddenVolumeProtectionBridgeClass = nullptr;
 jmethodID g_hiddenVolumeProtectionTriggeredMethod = nullptr;
 jclass    g_illegalStateExceptionClass = nullptr;
 jclass    g_unlockCancelledExceptionClass = nullptr;
+jclass    g_splitJoinProgressBridgeClass = nullptr;
+jmethodID g_splitJoinProgressReportMethod = nullptr;
+jclass    g_splitJoinCancellationClass = nullptr;
+jmethodID g_splitJoinIsCancelledMethod = nullptr;
 
 extern "C" int av_jni_set_java_vm(void *vm, void *log_ctx);
 
@@ -45,8 +46,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     }
     g_progressBridgeClass = static_cast<jclass>(env->NewGlobalRef(progressLocal));
     env->DeleteLocalRef(progressLocal);
-    
-    // Updated signature to take 7 integers (including slotId)
     g_progressReportMethod = env->GetStaticMethodID(
         g_progressBridgeClass, "reportProgress", "(IIIIIII)V");
     if (!g_progressReportMethod) {
@@ -61,7 +60,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     }
     g_hiddenVolumeProtectionBridgeClass = static_cast<jclass>(env->NewGlobalRef(hiddenProtectionLocal));
     env->DeleteLocalRef(hiddenProtectionLocal);
-
     g_hiddenVolumeProtectionTriggeredMethod = env->GetStaticMethodID(
         g_hiddenVolumeProtectionBridgeClass, "reportTriggered", "(I)V");
     if (!g_hiddenVolumeProtectionTriggeredMethod) {
@@ -85,8 +83,25 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
     g_unlockCancelledExceptionClass = static_cast<jclass>(env->NewGlobalRef(uceLocal));
     env->DeleteLocalRef(uceLocal);
 
-    ThreadPool::getInstance();
+    jclass sjProgressLocal = env->FindClass("com/aeidolon/vaultexplorer/SplitJoinProgressBridge");
+    if (sjProgressLocal) {
+        g_splitJoinProgressBridgeClass = static_cast<jclass>(env->NewGlobalRef(sjProgressLocal));
+        env->DeleteLocalRef(sjProgressLocal);
+        g_splitJoinProgressReportMethod = env->GetStaticMethodID(
+            g_splitJoinProgressBridgeClass, "reportProgress", "(IJJ)V");
+        if (env->ExceptionCheck()) env->ExceptionClear();
+    }
 
+    jclass sjCancelLocal = env->FindClass("com/aeidolon/vaultexplorer/SplitJoinCancellation");
+    if (sjCancelLocal) {
+        g_splitJoinCancellationClass = static_cast<jclass>(env->NewGlobalRef(sjCancelLocal));
+        env->DeleteLocalRef(sjCancelLocal);
+        g_splitJoinIsCancelledMethod = env->GetStaticMethodID(
+            g_splitJoinCancellationClass, "isCancelled", "(I)Z");
+        if (env->ExceptionCheck()) env->ExceptionClear();
+    }
+
+    ThreadPool::getInstance();
     return JNI_VERSION_1_6;
 }
 
@@ -98,6 +113,8 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
         if (g_hiddenVolumeProtectionBridgeClass) env->DeleteGlobalRef(g_hiddenVolumeProtectionBridgeClass);
         if (g_illegalStateExceptionClass) env->DeleteGlobalRef(g_illegalStateExceptionClass);
         if (g_unlockCancelledExceptionClass) env->DeleteGlobalRef(g_unlockCancelledExceptionClass);
+        if (g_splitJoinProgressBridgeClass) env->DeleteGlobalRef(g_splitJoinProgressBridgeClass);
+        if (g_splitJoinCancellationClass) env->DeleteGlobalRef(g_splitJoinCancellationClass);
     }
     g_usbBridgeClass = nullptr;
     g_usbReadMethod = nullptr;
@@ -108,5 +125,9 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
     g_hiddenVolumeProtectionTriggeredMethod = nullptr;
     g_illegalStateExceptionClass = nullptr;
     g_unlockCancelledExceptionClass = nullptr;
+    g_splitJoinProgressBridgeClass = nullptr;
+    g_splitJoinProgressReportMethod = nullptr;
+    g_splitJoinCancellationClass = nullptr;
+    g_splitJoinIsCancelledMethod = nullptr;
     g_vm = nullptr;
 }

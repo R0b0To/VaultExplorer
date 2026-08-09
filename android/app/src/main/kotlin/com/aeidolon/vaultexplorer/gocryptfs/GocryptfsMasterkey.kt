@@ -35,9 +35,11 @@ object GocryptfsMasterkey {
             keyLengthBytes = config.scryptKeyLen,
         )
         try {
-            // HKDF is always required by SUPPORTED_FLAGS, so this branch is
-            // unconditional here (kept explicit for readability / future
-            // legacy-flag support).
+            // HKDF is always required (GocryptfsConfig.BASE_REQUIRED_FLAGS),
+            // so this branch is unconditional here (kept explicit for
+            // readability). Masterkey wrapping is always AES-256-GCM
+            // regardless of the vault's content cipher -- XChaCha20Poly1305
+            // only replaces the per-chunk file content AEAD, not this.
             val gcmKey = Hkdf.deriveSha256(scryptHash, "AES-GCM file content encryption", 32)
             return try {
                 decryptBlock(gcmKey, config.encryptedKey)

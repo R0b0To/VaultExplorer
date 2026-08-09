@@ -51,6 +51,7 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
 
   bool _isFolderVault = false;
   String _folderVaultFormat = 'cryptomator';
+  String _gocryptfsCipher = 'aes-256-gcm';
   String? _folderVaultUri;
   String? _folderVaultDisplayName;
   bool _pickingFolderVault = false;
@@ -178,7 +179,11 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
       final success = _folderVaultFormat == 'cryptomator'
           ? await vaultExplorerApi.createCryptomatorVault(_folderVaultUri!, password)
           : _folderVaultFormat == 'gocryptfs'
-              ? await vaultExplorerApi.createGocryptfsVault(_folderVaultUri!, password)
+              ? await vaultExplorerApi.createGocryptfsVault(
+                  _folderVaultUri!,
+                  password,
+                  cipher: _gocryptfsCipher,
+                )
               : await vaultExplorerApi.createCryfsVault(_folderVaultUri!, password);
       if (success) {
         if (mounted) {
@@ -790,6 +795,32 @@ class _CreateContainerSheetState extends State<CreateContainerSheet> with Keyfil
               padding: const EdgeInsets.all(16),
               child: _buildFolderVaultPickerCard(cs, textTheme),
             ),
+            if (_folderVaultFormat == 'gocryptfs')
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    OptionPickerTile<String>(
+                      label: context.l10n.gocryptfsCipherLabel,
+                      value: _gocryptfsCipher,
+                      prefixIcon: Icons.enhanced_encryption_rounded,
+                      options: const [
+                        SelectOption(
+                          value: 'aes-256-gcm',
+                          label: 'AES-256-GCM',
+                        ),
+                        SelectOption(
+                          value: 'xchacha20-poly1305',
+                          label: 'XChaCha20-Poly1305',
+                        ),
+                      ],
+                      onChanged: (val) =>
+                          setState(() => _gocryptfsCipher = val),
+                    ),
+                  ],
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(

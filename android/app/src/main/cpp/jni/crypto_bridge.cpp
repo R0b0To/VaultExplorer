@@ -33,6 +33,7 @@
 #include "crypto/eme.h"
 #include "crypto/siv.h"
 #include "crypto/cryfs_block_cipher.h"
+#include "crypto/xchacha20poly1305.h"
 
 #undef min
 #undef max
@@ -650,6 +651,107 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_aesGcmDecryptNative(
 
     jbyteArray result = env->NewByteArray(static_cast<jsize>(out.size()));
     if (ptLen > 0) {
+        env->SetByteArrayRegion(result, 0, static_cast<jsize>(out.size()), reinterpret_cast<const jbyte*>(out.data()));
+    }
+    mbedtls_platform_zeroize(out.data(), out.size());
+    return result;
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
+// XChaCha20-Poly1305 for gocryptfs content encryption (GocryptfsContentCryptor's
+// XChaCha20Poly1305 path — the AES-GCM path stays on javax.crypto, which has no
+// XChaCha20 support). Wire format matches gocryptfs: 24-byte nonce prefix chosen
+// by the caller, plaintext-length ciphertext, then a 16-byte tag -- same
+// (nonce, ciphertext, tag) layout the pure-Kotlin GocryptfsContentCryptor already
+// uses for AES-GCM chunks, just with a 24- instead of 16-byte nonce. AAD (when
+// present) is gocryptfs's concatAD(): big-endian blockNo(8) || fileID(16).
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_xchacha20Poly1305SealNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jbyteArray nonce, jbyteArray aad, jbyteArray plaintext) {
+    JNI_TRY
+
+    if (!key || !nonce || !plaintext) return nullptr;
+    if (env->GetArrayLength(key) != 32 || env->GetArrayLength(nonce) != 24) return nullptr;
+
+    jsize ptLen = env->GetArrayLength(plaintext);
+    jsize aadLen = aad ? env->GetArrayLength(aad) : 0;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* nonceData = env->GetByteArrayElements(nonce, nullptr);
+    jbyte* aadData = aad ? env->GetByteArrayElements(aad, nullptr) : nullptr;
+    jbyte* ptData = env->GetByteArrayElements(plaintext, nullptr);
+
+    std::vector<uint8_t> out(static_cast<size_t>(ptLen) + 16);
+    bool ok = xchacha20Poly1305Seal(
+        reinterpret_cast<const uint8_t*>(keyData),
+        reinterpret_cast<const uint8_t*>(nonceData),
+        aadData ? reinterpret_cast<const uint8_t*>(aadData) : nullptr, static_cast<size_t>(aadLen),
+        reinterpret_cast<const uint8_t*>(ptData), static_cast<size_t>(ptLen),
+        out.data());
+
+    env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+    env->ReleaseByteArrayElements(nonce, nonceData, JNI_ABORT);
+    if (aadData) env->ReleaseByteArrayElements(aad, aadData, JNI_ABORT);
+    env->ReleaseByteArrayElements(plaintext, ptData, JNI_ABORT);
+
+    if (!ok) {
+        mbedtls_platform_zeroize(out.data(), out.size());
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(out.size()));
+    env->SetByteArrayRegion(result, 0, static_cast<jsize>(out.size()), reinterpret_cast<const jbyte*>(out.data()));
+    mbedtls_platform_zeroize(out.data(), out.size());
+    return result;
+
+    JNI_CATCH_RETURN(nullptr)
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_aeidolon_vaultexplorer_NativeEngine_xchacha20Poly1305OpenNative(
+        JNIEnv* env, jobject,
+        jbyteArray key, jbyteArray nonce, jbyteArray aad, jbyteArray ciphertextAndTag) {
+    JNI_TRY
+
+    if (!key || !nonce || !ciphertextAndTag) return nullptr;
+    if (env->GetArrayLength(key) != 32 || env->GetArrayLength(nonce) != 24) return nullptr;
+
+    constexpr size_t tagLen = 16;
+    jsize ctLen = env->GetArrayLength(ciphertextAndTag);
+    if (ctLen < static_cast<jsize>(tagLen)) return nullptr;
+    jsize aadLen = aad ? env->GetArrayLength(aad) : 0;
+
+    jbyte* keyData = env->GetByteArrayElements(key, nullptr);
+    jbyte* nonceData = env->GetByteArrayElements(nonce, nullptr);
+    jbyte* aadData = aad ? env->GetByteArrayElements(aad, nullptr) : nullptr;
+    jbyte* ctData = env->GetByteArrayElements(ciphertextAndTag, nullptr);
+
+    const size_t bodyLen = static_cast<size_t>(ctLen) - tagLen;
+    const unsigned char* tagPtr = reinterpret_cast<const unsigned char*>(ctData) + bodyLen;
+
+    std::vector<uint8_t> out(bodyLen);
+    bool ok = xchacha20Poly1305Open(
+        reinterpret_cast<const uint8_t*>(keyData),
+        reinterpret_cast<const uint8_t*>(nonceData),
+        aadData ? reinterpret_cast<const uint8_t*>(aadData) : nullptr, static_cast<size_t>(aadLen),
+        reinterpret_cast<const uint8_t*>(ctData), bodyLen,
+        reinterpret_cast<const uint8_t*>(tagPtr),
+        out.data());
+
+    env->ReleaseByteArrayElements(key, keyData, JNI_ABORT);
+    env->ReleaseByteArrayElements(nonce, nonceData, JNI_ABORT);
+    if (aadData) env->ReleaseByteArrayElements(aad, aadData, JNI_ABORT);
+    env->ReleaseByteArrayElements(ciphertextAndTag, ctData, JNI_ABORT);
+
+    if (!ok) {
+        mbedtls_platform_zeroize(out.data(), out.size());
+        return nullptr;
+    }
+
+    jbyteArray result = env->NewByteArray(static_cast<jsize>(out.size()));
+    if (bodyLen > 0) {
         env->SetByteArrayRegion(result, 0, static_cast<jsize>(out.size()), reinterpret_cast<const jbyte*>(out.data()));
     }
     mbedtls_platform_zeroize(out.data(), out.size());

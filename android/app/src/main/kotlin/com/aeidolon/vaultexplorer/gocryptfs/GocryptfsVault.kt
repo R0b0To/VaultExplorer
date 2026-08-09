@@ -47,8 +47,8 @@ object GocryptfsVault {
         val contentKey = Hkdf.deriveSha256(masterkey, "AES-GCM file content encryption", 32)
         masterkey.fill(0)
         val nameCryptor = GocryptfsFileNameCryptor(nameKey, config.longNameMax)
-        val contentCryptor = GocryptfsContentCryptor(contentKey)
-        val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor)
+        val contentCryptor = GocryptfsContentCryptor(contentKey, config.cipher)
+        val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor, hasDirIV = config.hasDirIV)
         val session = GocryptfsSession(
             context = context,
             vaultRootUri = vaultRootUri,
@@ -60,7 +60,12 @@ object GocryptfsVault {
         return com.aeidolon.vaultexplorer.engine.VaultOpenResult.Success(session, root.name ?: "Vault")
     }
 
-    fun create(context: Context, vaultRootUri: Uri, password: CharArray): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> {
+    fun create(
+        context: Context,
+        vaultRootUri: Uri,
+        password: CharArray,
+        cipher: GocryptfsCipher = GocryptfsCipher.AES_256_GCM,
+    ): com.aeidolon.vaultexplorer.engine.VaultOpenResult<GocryptfsSession> {
         val root = DocumentFile.fromTreeUri(context, vaultRootUri)
             ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Cannot access the selected folder.")
         val saf = SafDocumentOps(context)
@@ -87,6 +92,7 @@ object GocryptfsVault {
                 scryptR = DEFAULT_SCRYPT_R,
                 scryptP = DEFAULT_SCRYPT_P,
                 longNameMax = 0,
+                featureFlags = featureFlagsFor(cipher),
             )
             val configDoc = root.createFile("application/octet-stream", CONFIG_FILE_NAME)
                 ?: return com.aeidolon.vaultexplorer.engine.VaultOpenResult.InvalidVault("Could not create gocryptfs.conf")
@@ -101,8 +107,8 @@ object GocryptfsVault {
             val nameKey = Hkdf.deriveSha256(masterkey, "EME filename encryption", 32)
             val contentKey = Hkdf.deriveSha256(masterkey, "AES-GCM file content encryption", 32)
             val nameCryptor = GocryptfsFileNameCryptor(nameKey, 0)
-            val contentCryptor = GocryptfsContentCryptor(contentKey)
-            val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor)
+            val contentCryptor = GocryptfsContentCryptor(contentKey, cipher)
+            val tree = GocryptfsVaultTree(context, vaultRootUri, nameCryptor, hasDirIV = true)
             val session = GocryptfsSession(
                 context = context,
                 vaultRootUri = vaultRootUri,
@@ -126,6 +132,7 @@ object GocryptfsVault {
         scryptR: Int,
         scryptP: Int,
         longNameMax: Int,
+        featureFlags: List<String>,
     ): String {
         val scryptObject = JSONObject().apply {
             put("Salt", Base64.encodeToString(scryptSalt, Base64.NO_WRAP))
@@ -139,13 +146,21 @@ object GocryptfsVault {
             put("EncryptedKey", Base64.encodeToString(encryptedKey, Base64.NO_WRAP))
             put("ScryptObject", scryptObject)
             put("Version", CONFIG_VERSION)
-            put(
-                "FeatureFlags",
-                JSONArray(listOf("GCMIV128", "DirIV", "EMENames", "LongNames", "Raw64", "HKDF")),
-            )
+            put("FeatureFlags", JSONArray(featureFlags))
             if (longNameMax > 0) put("LongNameMax", longNameMax)
         }
         return json.toString(2)
+    }
+
+    /** New vaults this app creates always get DirIV + the modern name-encoding
+     *  flags; only the content cipher (GCMIV128 vs XChaCha20Poly1305) varies
+     *  with the [cipher] the user picked at creation time. */
+    private fun featureFlagsFor(cipher: GocryptfsCipher): List<String> {
+        val base = listOf("DirIV", "EMENames", "LongNames", "Raw64", "HKDF")
+        return when (cipher) {
+            GocryptfsCipher.AES_256_GCM -> listOf("GCMIV128") + base
+            GocryptfsCipher.XCHACHA20_POLY1305 -> listOf("XChaCha20Poly1305") + base
+        }
     }
 
     /**
@@ -200,6 +215,11 @@ object GocryptfsVault {
                 scryptR = config.scryptR,
                 scryptP = config.scryptP,
                 longNameMax = config.longNameMax,
+                // Preserve the vault's existing flags exactly, including a
+                // legacy vault's missing DirIV/GCMIV128 -- changePassword
+                // only rewraps the masterkey, it never migrates the vault's
+                // on-disk format.
+                featureFlags = config.featureFlags.toList(),
             )
             context.contentResolver.openOutputStream(configDoc.uri, "wt")?.use {
                 it.write(newConfigJson.toByteArray(Charsets.UTF_8))

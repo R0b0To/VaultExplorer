@@ -405,6 +405,7 @@ add_library(
         crypto/luks_header.cpp     # LUKS header parsing & key recovery
         crypto/scrypt.cpp
         crypto/cryfs_block_cipher.cpp  
+        crypto/xchacha20poly1305.cpp  # shared XChaCha20-Poly1305 AEAD (CryFS block cipher + gocryptfs content crypto)
         crypto/eme.cpp             # EME filename encryption
         crypto/siv.cpp             # SIV filename encryption
         ${fatfs_SOURCE_DIR}/src/ff.c

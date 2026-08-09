@@ -173,6 +173,15 @@ class VaultCreationHandlers(
     fun handleCreateGocryptfsVault(call: MethodCall, result: MethodChannel.Result) {
         val uriString = call.argument<String>("filePath")
         val password = call.argument<String>("password") ?: ""
+        // 'aes-256-gcm' (default) or 'xchacha20-poly1305'; anything else
+        // (including omitted/older Dart callers) falls back to GCM so this
+        // stays backward compatible with pre-cipher-choice callers.
+        val cipherArg = call.argument<String>("cipher")
+        val cipher = if (cipherArg == "xchacha20-poly1305") {
+            com.aeidolon.vaultexplorer.gocryptfs.GocryptfsCipher.XCHACHA20_POLY1305
+        } else {
+            com.aeidolon.vaultexplorer.gocryptfs.GocryptfsCipher.AES_256_GCM
+        }
         if (uriString == null || password.isEmpty()) {
             result.error("INVALID_ARGS", "filePath and password required", null)
             return
@@ -182,7 +191,7 @@ class VaultCreationHandlers(
                 val uri = Uri.parse(uriString)
                 val passwordChars = password.toCharArray()
                 val createResult = try {
-                    com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.create(activity, uri, passwordChars)
+                    com.aeidolon.vaultexplorer.gocryptfs.GocryptfsVault.create(activity, uri, passwordChars, cipher)
                 } finally {
                     passwordChars.fill('\u0000')
                 }

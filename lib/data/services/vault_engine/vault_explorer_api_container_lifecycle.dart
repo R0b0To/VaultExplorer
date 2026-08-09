@@ -415,11 +415,19 @@ mixin _ContainerLifecycleOps {
     );
   }
 
-  Future<bool> createGocryptfsVault(String folderUri, String password) async {
+  /// [cipher]: 'aes-256-gcm' (default, GCMIV128) or 'xchacha20-poly1305'
+  /// (gocryptfs v2.2+, XChaCha20Poly1305) -- selects the FeatureFlags this
+  /// new vault's gocryptfs.conf is written with. Unrecognized values fall
+  /// back to 'aes-256-gcm' on the native side.
+  Future<bool> createGocryptfsVault(
+    String folderUri,
+    String password, {
+    String cipher = 'aes-256-gcm',
+  }) async {
     try {
       final success = await _channel.invokeMethod<bool>(
         ChannelMethods.createGocryptfsVault,
-        {'filePath': folderUri, 'password': password},
+        {'filePath': folderUri, 'password': password, 'cipher': cipher},
       );
       return success ?? false;
     } catch (e) {

@@ -233,6 +233,22 @@ external fun createUsbContainerNative(
         encKey: ByteArray, macKey: ByteArray, ciphertext: ByteArray, adList: Array<ByteArray>?
     ): ByteArray?
 
+    /** XChaCha20-Poly1305 seal/open (crypto/xchacha20poly1305.h). Used by
+     *  GocryptfsContentCryptor for XChaCha20Poly1305-flagged vaults, since
+     *  javax.crypto has no XChaCha20 support; the AES-GCM path stays pure
+     *  Kotlin. key must be 32 bytes, nonce 24 bytes; aad may be null.
+     *  Open returns null on auth failure (bad key/corrupted data) same as
+     *  aesGcmDecryptNative. */
+    @JvmStatic
+    external fun xchacha20Poly1305SealNative(
+        key: ByteArray, nonce: ByteArray, aad: ByteArray?, plaintext: ByteArray
+    ): ByteArray?
+
+    @JvmStatic
+    external fun xchacha20Poly1305OpenNative(
+        key: ByteArray, nonce: ByteArray, aad: ByteArray?, ciphertextAndTag: ByteArray
+    ): ByteArray?
+
 @JvmStatic
     external fun createUsbContainerWithHiddenNative(
         volId: Int, partitionScheme: String,

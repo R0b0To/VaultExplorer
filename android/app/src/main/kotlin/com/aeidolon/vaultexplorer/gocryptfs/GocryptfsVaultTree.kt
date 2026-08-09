@@ -29,10 +29,19 @@ class GocryptfsVaultTree(
     private val context: Context,
     private val vaultRootUri: Uri,
     private val nameCryptor: GocryptfsFileNameCryptor,
+    /** false => vault was created without the DirIV flag ("deterministic
+     *  names" mode, gocryptfs v2.2+): every directory's name-encryption
+     *  tweak is a fixed all-zero 16-byte IV, no gocryptfs.diriv file is
+     *  read, written, or expected to exist. */
+    private val hasDirIV: Boolean = true,
 ) {
     private val folderCache = HashMap<String, DocumentFile>()
     private val dirivCache = HashMap<String, ByteArray>()
     private val safOps = SafDocumentOps(context)
+
+    companion object {
+        private val ZERO_DIRIV = ByteArray(16)
+    }
 
     private val vaultRoot: DocumentFile by lazy {
         DocumentFile.fromTreeUri(context, vaultRootUri) ?: throw VaultIOException("Cannot open vault root")
@@ -109,8 +118,12 @@ class GocryptfsVaultTree(
         return current
     }
 
-/** Creates (or returns, if it already exists) the per-directory tweak file. */
+/** Returns the per-directory name-encryption tweak: the contents of
+ *  gocryptfs.diriv (created fresh if missing) when the vault has the
+ *  DirIV flag, or a fixed all-zero 16-byte IV with no file I/O when it
+ *  doesn't ("deterministic names" mode, gocryptfs v2.2+). */
 fun dirivFor(virtualDirPath: String, physicalFolder: DocumentFile = physicalFolderFor(virtualDirPath)): ByteArray {
+    if (!hasDirIV) return ZERO_DIRIV
     dirivCache[virtualDirPath]?.let { return it }
     val existing = findChild(physicalFolder, GocryptfsFileNameCryptor.DIRIV_FILENAME)
     val bytes = if (existing != null) {

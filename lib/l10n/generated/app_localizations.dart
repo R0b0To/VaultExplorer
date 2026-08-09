@@ -3080,6 +3080,12 @@ abstract class AppLocalizations {
   /// **'Vault Format'**
   String get vaultFormatLabel;
 
+  /// Label above the AES-256-GCM/XChaCha20-Poly1305 cipher picker shown when creating a new gocryptfs vault
+  ///
+  /// In en, this message translates to:
+  /// **'Content Cipher'**
+  String get gocryptfsCipherLabel;
+
   /// Label shown once a folder vault destination has been picked
   ///
   /// In en, this message translates to:

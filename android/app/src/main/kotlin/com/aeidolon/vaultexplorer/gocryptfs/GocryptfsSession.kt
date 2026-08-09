@@ -34,7 +34,7 @@ class GocryptfsSession(
     private val chunkCryptor = object : VaultChunkCryptor<GocryptfsFileHeader> {
         override val headerSize: Int get() = GocryptfsContentCryptor.HEADER_LEN
         override val cleartextChunkSize: Int get() = GocryptfsContentCryptor.CLEARTEXT_CHUNK_SIZE
-        override val ciphertextChunkSize: Int get() = GocryptfsContentCryptor.CIPHERTEXT_CHUNK_SIZE
+        override val ciphertextChunkSize: Int get() = contentCryptor.ciphertextChunkSize
 
         override fun createHeader(): GocryptfsFileHeader = contentCryptor.createHeader()
         override fun encodeHeader(header: GocryptfsFileHeader): ByteArray = contentCryptor.encodeHeader(header)

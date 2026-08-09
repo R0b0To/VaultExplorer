@@ -1878,6 +1878,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get vaultFormatLabel => 'Vault Format';
 
   @override
+  String get gocryptfsCipherLabel => 'Content Cipher';
+
+  @override
   String get destinationFolderLabel => 'Destination Folder';
 
   @override

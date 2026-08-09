@@ -7,6 +7,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Base64
 
@@ -123,5 +124,105 @@ class GocryptfsMasterkeyTest {
         assertEquals(testScryptN, parsed.scryptN)
         assertArrayEquals(salt, parsed.scryptSalt)
         assertArrayEquals(masterkey, GocryptfsMasterkey.unlock(parsed, password))
+    }
+
+    @Test
+    fun `legacy vault without DirIV or GCMIV128 is accepted (deterministic names, AES-GCM)`() {
+        // Pre-v2.2 gocryptfs vaults created with -deterministic-names never
+        // wrote DirIV; GCMIV128 was always implicit before named feature
+        // flags existed at all in some very old configs. Both are optional
+        // on the read path -- only the base name-encoding/HKDF flags and
+        // exactly one of GCMIV128/XChaCha20Poly1305 are required.
+        val masterkey = freshMasterkey()
+        val password = "hunter2".toCharArray()
+        val salt = ByteArray(16).also { random.nextBytes(it) }
+        val encryptedKey = GocryptfsMasterkey.wrap(masterkey, password, salt, testScryptN, testScryptR, testScryptKeyLen, random)
+        val json = JSONObject().apply {
+            put("EncryptedKey", Base64.getEncoder().encodeToString(encryptedKey))
+            put("ScryptObject", JSONObject().apply {
+                put("Salt", Base64.getEncoder().encodeToString(salt))
+                put("N", testScryptN); put("R", testScryptR); put("P", 1); put("KeyLen", testScryptKeyLen)
+            })
+            put("Version", 2)
+            // No DirIV, no XChaCha20Poly1305 -- still valid since GCMIV128 is present.
+            put("FeatureFlags", JSONArray(listOf("GCMIV128", "EMENames", "LongNames", "Raw64", "HKDF")))
+        }
+
+        val parsed = GocryptfsConfig.parse(json.toString().toByteArray(Charsets.UTF_8))
+        assertFalse(parsed.hasDirIV)
+        assertEquals(GocryptfsCipher.AES_256_GCM, parsed.cipher)
+        assertArrayEquals(masterkey, GocryptfsMasterkey.unlock(parsed, password))
+    }
+
+    @Test
+    fun `vault with XChaCha20Poly1305 and DirIV is accepted`() {
+        val masterkey = freshMasterkey()
+        val password = "hunter2".toCharArray()
+        val salt = ByteArray(16).also { random.nextBytes(it) }
+        val encryptedKey = GocryptfsMasterkey.wrap(masterkey, password, salt, testScryptN, testScryptR, testScryptKeyLen, random)
+        val json = JSONObject().apply {
+            put("EncryptedKey", Base64.getEncoder().encodeToString(encryptedKey))
+            put("ScryptObject", JSONObject().apply {
+                put("Salt", Base64.getEncoder().encodeToString(salt))
+                put("N", testScryptN); put("R", testScryptR); put("P", 1); put("KeyLen", testScryptKeyLen)
+            })
+            put("Version", 2)
+            put("FeatureFlags", JSONArray(listOf("XChaCha20Poly1305", "DirIV", "EMENames", "LongNames", "Raw64", "HKDF")))
+        }
+
+        val parsed = GocryptfsConfig.parse(json.toString().toByteArray(Charsets.UTF_8))
+        assertTrue(parsed.hasDirIV)
+        assertEquals(GocryptfsCipher.XCHACHA20_POLY1305, parsed.cipher)
+    }
+
+    @Test
+    fun `GCMIV128 and XChaCha20Poly1305 together are rejected as mutually exclusive`() {
+        val json = JSONObject().apply {
+            put("EncryptedKey", Base64.getEncoder().encodeToString(ByteArray(48)))
+            put("ScryptObject", JSONObject().apply {
+                put("Salt", Base64.getEncoder().encodeToString(ByteArray(16)))
+                put("N", testScryptN); put("R", testScryptR); put("P", 1); put("KeyLen", testScryptKeyLen)
+            })
+            put("Version", 2)
+            put("FeatureFlags", JSONArray(listOf("GCMIV128", "XChaCha20Poly1305", "EMENames", "LongNames", "Raw64", "HKDF")))
+        }
+
+        assertThrows(GocryptfsConfigException::class.java) {
+            GocryptfsConfig.parse(json.toString().toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    @Test
+    fun `neither GCMIV128 nor XChaCha20Poly1305 is rejected`() {
+        val json = JSONObject().apply {
+            put("EncryptedKey", Base64.getEncoder().encodeToString(ByteArray(48)))
+            put("ScryptObject", JSONObject().apply {
+                put("Salt", Base64.getEncoder().encodeToString(ByteArray(16)))
+                put("N", testScryptN); put("R", testScryptR); put("P", 1); put("KeyLen", testScryptKeyLen)
+            })
+            put("Version", 2)
+            put("FeatureFlags", JSONArray(listOf("EMENames", "LongNames", "Raw64", "HKDF")))
+        }
+
+        assertThrows(GocryptfsConfigException::class.java) {
+            GocryptfsConfig.parse(json.toString().toByteArray(Charsets.UTF_8))
+        }
+    }
+
+    @Test
+    fun `PlaintextNames vault is still rejected`() {
+        val json = JSONObject().apply {
+            put("EncryptedKey", Base64.getEncoder().encodeToString(ByteArray(48)))
+            put("ScryptObject", JSONObject().apply {
+                put("Salt", Base64.getEncoder().encodeToString(ByteArray(16)))
+                put("N", testScryptN); put("R", testScryptR); put("P", 1); put("KeyLen", testScryptKeyLen)
+            })
+            put("Version", 2)
+            put("FeatureFlags", JSONArray(listOf("PlaintextNames", "GCMIV128", "HKDF")))
+        }
+
+        assertThrows(GocryptfsConfigException::class.java) {
+            GocryptfsConfig.parse(json.toString().toByteArray(Charsets.UTF_8))
+        }
     }
 }

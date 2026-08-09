@@ -6554,28 +6554,28 @@ abstract class AppLocalizations {
   /// **'Custom size (MB)'**
   String get splitChunkSizeCustomLabel;
 
-  /// Chunk size preset label: 8 MB, sized so an edit deep inside a large container only re-uploads a handful of chunks on incremental cloud sync
+  /// Chunk size preset label: 8 MB
   ///
   /// In en, this message translates to:
-  /// **'8 MB (Cloud)'**
+  /// **'8 MB'**
   String get splitChunkSizeCloud8mb;
 
-  /// Chunk size preset label: 32 MB, a coarser cloud-sync-friendly chunk size than the 8 MB preset
+  /// Chunk size preset label: 32 MB
   ///
   /// In en, this message translates to:
-  /// **'32 MB (Cloud)'**
+  /// **'32 MB'**
   String get splitChunkSizeCloud32mb;
 
-  /// Chunk size preset label: 100 MB, sized for cloud-storage upload limits
+  /// Chunk size preset label: 100 MB
   ///
   /// In en, this message translates to:
-  /// **'100 MB (Cloud)'**
+  /// **'100 MB'**
   String get splitChunkSizeCloud;
 
-  /// Chunk size preset label: 2 GB, sized for the FAT32 4 GB single-file limit
+  /// Chunk size preset label: 2 GB
   ///
   /// In en, this message translates to:
-  /// **'2 GB (FAT32)'**
+  /// **'2 GB'**
   String get splitChunkSizeFat32;
 
   /// Chunk size preset label: 4 GB

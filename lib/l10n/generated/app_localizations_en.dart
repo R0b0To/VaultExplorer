@@ -3886,16 +3886,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get splitChunkSizeCustomLabel => 'Custom size (MB)';
 
   @override
-  String get splitChunkSizeCloud8mb => '8 MB (Cloud)';
+  String get splitChunkSizeCloud8mb => '8 MB';
 
   @override
-  String get splitChunkSizeCloud32mb => '32 MB (Cloud)';
+  String get splitChunkSizeCloud32mb => '32 MB';
 
   @override
-  String get splitChunkSizeCloud => '100 MB (Cloud)';
+  String get splitChunkSizeCloud => '100 MB';
 
   @override
-  String get splitChunkSizeFat32 => '2 GB (FAT32)';
+  String get splitChunkSizeFat32 => '2 GB';
 
   @override
   String get splitChunkSizeFourGb => '4 GB';

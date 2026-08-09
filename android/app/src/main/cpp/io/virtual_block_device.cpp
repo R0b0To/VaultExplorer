@@ -41,6 +41,8 @@
 #include "block_io.h"
 #include "filesystems/stream_handles.h"
 #include "virtual_block_device.h"
+#include <android/log.h>
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 extern "C" {
 #include "device.h"
@@ -49,10 +51,23 @@ extern "C" {
 #include "dir.h"
 #include "attrib.h"
 #include "layout.h"
+#include "logging.h"
 #include <ext2fs/ext2fs.h>
 #include <ext2fs/ext2_io.h>
 #include <et/com_err.h>
 }
+
+static int android_ntfs_log_handler(const char *function, const char *,
+                                    int, const char *level,
+                                    const char *str, void *) {
+    LOGI("NTFS-3G [%s] %s: %s", level ? level : "INFO", function ? function : "", str ? str : "");
+    return 0;
+}
+
+static bool _ntfsLoggingInitialized = []() {
+    ntfs_log_set_handler(android_ntfs_log_handler);
+    return true;
+}();
 
 // Undefine conflicting macros defined by NTFS-3G support.h
 #undef min
@@ -105,14 +120,17 @@ bool ensureMounted(int volId) {
             return false;
         }
 
-        const unsigned long mountFlags = v.readOnly ? NTFS_MNT_RDONLY : 0;
+const unsigned long mountFlags = v.readOnly ? NTFS_MNT_RDONLY : 0;
         v.ntfsVol = ntfs_device_mount(dev, mountFlags);
         if (!v.ntfsVol && !v.readOnly) {
             v.ntfsVol = ntfs_device_mount(dev, NTFS_MNT_RECOVER);
         }
-
+        if (!v.ntfsVol && !v.readOnly) {
+            v.ntfsVol = ntfs_device_mount(dev, NTFS_MNT_RECOVER | NTFS_MNT_IGNORE_HIBERFILE);
+        }
         if (!v.ntfsVol) {
-            LOGI("ensureMounted: ntfs_device_mount failed");
+            LOGI("ensureMounted: ntfs_device_mount failed on volume %d, errno=%d (%s)",
+                 volId, errno, strerror(errno));
             ntfs_device_free(dev);
             delete privVolId;
             return false;

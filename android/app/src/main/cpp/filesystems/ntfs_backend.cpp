@@ -1,6 +1,7 @@
 #include "ntfs_backend.h"
-
 #include "dir_entry_wire.h"
+#include <android/log.h>
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
 #include <algorithm>
 #include <atomic>
@@ -50,15 +51,8 @@ int ntfsStat(ntfs_device* device, struct stat* statBuffer) {
         errno = ENODEV;
         return -1;
     }
-    if (!device->d_private) {
-        std::memset(statBuffer, 0, sizeof(*statBuffer));
-        statBuffer->st_size = volumes[volumeId].dataAreaLengthBytes;
-        statBuffer->st_mode = S_IFBLK | 0660;
-        return 0;
-    }
-    if (volumes[volumeId].fd >= 0) return fstat(volumes[volumeId].fd, statBuffer);
     std::memset(statBuffer, 0, sizeof(*statBuffer));
-    statBuffer->st_size = volumes[volumeId].fileSize;
+    statBuffer->st_size = static_cast<off_t>(volumes[volumeId].dataAreaLengthBytes);
     statBuffer->st_mode = S_IFBLK | 0660;
     return 0;
 }
@@ -120,11 +114,13 @@ s64 ntfsPread(ntfs_device* device, void* buffer, s64 count, s64 offset) {
     const int volumeId = ntfsVolumeId(device);
     if (volumeId < 0 || volumeId >= kMaxVolumes) return -1;
     VolumeState& volume = volumes[volumeId];
-
     const uint64_t startByte = static_cast<uint64_t>(offset);
-    const uint64_t byteCount = static_cast<uint64_t>(count);
-    if (startByte > volume.dataAreaLengthBytes || byteCount > volume.dataAreaLengthBytes - startByte)
-        return -1;
+    if (startByte >= volume.dataAreaLengthBytes) return 0;
+    uint64_t byteCount = static_cast<uint64_t>(count);
+    if (byteCount > volume.dataAreaLengthBytes - startByte) {
+        byteCount = volume.dataAreaLengthBytes - startByte;
+    }
+    std::memset(buffer, 0, static_cast<size_t>(count));
 
     // BitLocker: bitlockerRead's logicalOffset uses the exact same
     // dataAreaLengthBytes-relative convention as startByte here, so this is
@@ -147,7 +143,11 @@ s64 ntfsPread(ntfs_device* device, void* buffer, s64 count, s64 offset) {
     unsigned char* encrypted = tlsEncrypted.get(transferBytes);
     if (!encrypted) return -1;
     
-    if (!physicalRead(volumeId, physicalStartSector * 512, encrypted, transferBytes)) return -1;
+    if (!physicalRead(volumeId, physicalStartSector * 512, encrypted, transferBytes)) {
+        LOGI("ntfsPread: physicalRead failed for volume %d at offset %llu (count=%zu)",
+             volumeId, (unsigned long long)(physicalStartSector * 512), transferBytes);
+        return -1;
+    }
 
     unsigned char* plaintext = tlsPlaintext.get(transferBytes);
     if (!plaintext) return -1;
@@ -166,11 +166,12 @@ s64 ntfsPwrite(ntfs_device* device, const void* buffer, s64 count, s64 offset) {
     const int volumeId = ntfsVolumeId(device);
     if (volumeId < 0 || volumeId >= kMaxVolumes) return -1;
     VolumeState& volume = volumes[volumeId];
-
     const uint64_t startByte = static_cast<uint64_t>(offset);
-    const uint64_t byteCount = static_cast<uint64_t>(count);
-    if (startByte > volume.dataAreaLengthBytes || byteCount > volume.dataAreaLengthBytes - startByte)
-        return -1;
+    if (startByte >= volume.dataAreaLengthBytes) return -1;
+    uint64_t byteCount = static_cast<uint64_t>(count);
+    if (byteCount > volume.dataAreaLengthBytes - startByte) {
+        byteCount = volume.dataAreaLengthBytes - startByte;
+    }
 
     // See the matching comment in ntfsPread.
     if (volume.containerFormat == ContainerFormat::kBitLocker) {
@@ -194,7 +195,11 @@ s64 ntfsPwrite(ntfs_device* device, const void* buffer, s64 count, s64 offset) {
         unsigned char* encrypted = tlsEncrypted.get(transferBytes);
         if (!encrypted) return -1;
         
-        if (!physicalRead(volumeId, physicalStartSector * 512, encrypted, transferBytes)) return -1;
+        if (!physicalRead(volumeId, physicalStartSector * 512, encrypted, transferBytes)) {
+        LOGI("ntfsPread: physicalRead failed for volume %d at offset %llu (count=%zu)",
+             volumeId, (unsigned long long)(physicalStartSector * 512), transferBytes);
+        return -1;
+    }
         for (uint32_t i = 0; i < sectorCount; ++i) {
             const uint64_t tweak = physicalStartSector + i - volume.partitionStartSector;
             cascadeDecryptSector(volume.cascade, tweak, encrypted + i * 512, sectors + i * 512);

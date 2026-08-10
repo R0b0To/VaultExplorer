@@ -44,6 +44,13 @@ class AdvancedParamsPanel extends StatelessWidget {
   /// panel while the password field still has focus.
   final ValueChanged<bool>? onExpansionChanged;
 
+  /// Long-press on the panel header — resets cipher/hash back to
+  /// auto-detect (255) and clears the PIM field. Lets the person recover
+  /// from a saved-but-wrong PIM/cipher/hash combo (e.g. after a VeraCrypt
+  /// container was re-encrypted) without hunting down each field by hand.
+  /// Optional and unused by callers that don't have anything to reset.
+  final VoidCallback? onLongPress;
+
   const AdvancedParamsPanel({
     super.key,
     this.pimController,
@@ -58,6 +65,7 @@ class AdvancedParamsPanel extends StatelessWidget {
     this.cipherItems,
     this.hashItems,
     this.onExpansionChanged,
+    this.onLongPress,
   });
 
   List<SelectOption<int>> _convertToSelectOptions(
@@ -100,10 +108,14 @@ class AdvancedParamsPanel extends StatelessWidget {
         backgroundColor: Colors.transparent,
         collapsedBackgroundColor: Colors.transparent,
         leading: Icon(Icons.tune_rounded, color: cs.primary),
-        title: Text(
-          context.l10n.advancedParametersTitle,
-          style: textTheme.bodyMedium
-              ?.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface),
+        title: GestureDetector(
+          onLongPress: onLongPress,
+          behavior: HitTestBehavior.opaque,
+          child: Text(
+            context.l10n.advancedParametersTitle,
+            style: textTheme.bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface),
+          ),
         ),
         subtitle: subtitle != null
             ? Text(subtitle!,

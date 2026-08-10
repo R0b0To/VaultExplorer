@@ -1418,6 +1418,11 @@ class _UnlockSheetState extends State<UnlockSheet>
                                 onCipherChanged: (val) => setState(() => _cipherId = val),
                                 onHashChanged: (val) => setState(() => _hashId = val),
                                 onExpansionChanged: (_) => dismissKeyboard(),
+                                onLongPress: () => setState(() {
+                                  _cipherId = 255;
+                                  _hashId = 255;
+                                  _pimCtrl.clear();
+                                }),
                               ),
                             SwitchListTile(
                               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1505,6 +1510,11 @@ class _UnlockSheetState extends State<UnlockSheet>
                                   onCipherChanged: (val) => setState(() => _hiddenCipherId = val),
                                   onHashChanged: (val) => setState(() => _hiddenHashId = val),
                                   onExpansionChanged: (_) => dismissKeyboard(),
+                                  onLongPress: () => setState(() {
+                                    _hiddenCipherId = 255;
+                                    _hiddenHashId = 255;
+                                    _hiddenPimCtrl.clear();
+                                  }),
                                 ),
                               ],
                             ],

@@ -20,8 +20,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     with KeyfilePickerMixin {
   CryptoDirection _direction = CryptoDirection.encrypt;
   StandaloneCipher _cipher = StandaloneCipher.xChaCha20Poly1305;
-  String? _sourceUri;
-  String? _sourceName;
+  final List<KeyfileRef> _sources = [];
   String? _destPath;
   String? _destName;
   String? _destTreeUri;
@@ -30,6 +29,10 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
   bool _deleteOriginal = false;
   bool _busy = false;
   String? _error;
+  // Which file (1-based, within _sources) the current run is on, plus
+  // that file's own byte progress -- shown as "File {current} of {total}"
+  // above the existing per-file LinearProgressIndicator.
+  int _currentIndex = 0;
   int? _progressDone;
   int? _progressTotal;
 
@@ -42,14 +45,24 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     super.dispose();
   }
 
-  Future<void> _pickSource() async {
-    final picked = await vaultExplorerApi.pickContainer();
-    if (picked == null || !mounted) return;
+  Future<void> _addSources() async {
+    final picked = await vaultExplorerApi.pickCryptoFiles();
+    if (picked.isEmpty || !mounted) return;
     setState(() {
-      _sourceUri = picked.uri;
-      _sourceName = picked.displayName;
+      final existingUris = _sources.map((f) => f.uri).toSet();
+      for (final file in picked) {
+        if (existingUris.add(file.uri)) _sources.add(file);
+      }
       _error = null;
     });
+  }
+
+  void _removeSource(KeyfileRef file) {
+    setState(() => _sources.remove(file));
+  }
+
+  void _clearSources() {
+    setState(() => _sources.clear());
   }
 
   Future<void> _pickDestinationFolder() async {
@@ -64,8 +77,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
   }
 
   Future<void> _run() async {
-    final source = _sourceUri;
-    if (source == null) {
+    if (_sources.isEmpty) {
       setState(() => _error = context.l10n.noFileSelectedLabel);
       return;
     }
@@ -77,6 +89,7 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
     setState(() {
       _busy = true;
       _error = null;
+      _currentIndex = 0;
       _progressDone = 0;
       _progressTotal = null;
     });
@@ -90,58 +103,100 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
       });
     }
 
-    try {
-      if (_direction == CryptoDirection.encrypt) {
-        await ContainerToolService.instance.encryptFile(
-          sourceUri: source,
-          cipher: _cipher,
-          passphrase: _passwordCtrl.text,
-          keyfilePaths: keyfilePaths,
-          deleteOriginalAfter: _deleteOriginal,
-          destinationPath: _destPath,
-          destinationTreeUri: _destTreeUri,
-          onProgress: onProgress,
-        );
-      } else {
-        await ContainerToolService.instance.decryptFile(
-          sourceUri: source,
-          passphrase: _passwordCtrl.text,
-          keyfilePaths: keyfilePaths,
-          destinationPath: _destPath,
-          destinationTreeUri: _destTreeUri,
-          onProgress: onProgress,
-        );
-      }
+    // No native batch API exists (encryptSingleFile/decryptSingleFile take
+    // one URI per call) -- run the queue sequentially here instead,
+    // reusing the same per-file progress callback for each one. A wrong
+    // password/keyfile combo applies to every remaining file too, so that
+    // one case aborts the whole run rather than grinding through it;
+    // any other per-file failure is recorded and the batch continues.
+    final failedNames = <String>[];
+    var succeeded = 0;
+
+    for (var i = 0; i < _sources.length; i++) {
+      final source = _sources[i];
       if (!mounted) return;
+      setState(() {
+        _currentIndex = i + 1;
+        _progressDone = 0;
+        _progressTotal = null;
+      });
+
+      try {
+        if (_direction == CryptoDirection.encrypt) {
+          await ContainerToolService.instance.encryptFile(
+            sourceUri: source.uri,
+            cipher: _cipher,
+            passphrase: _passwordCtrl.text,
+            keyfilePaths: keyfilePaths,
+            deleteOriginalAfter: _deleteOriginal,
+            destinationPath: _destPath,
+            destinationTreeUri: _destTreeUri,
+            onProgress: onProgress,
+          );
+        } else {
+          await ContainerToolService.instance.decryptFile(
+            sourceUri: source.uri,
+            passphrase: _passwordCtrl.text,
+            keyfilePaths: keyfilePaths,
+            destinationPath: _destPath,
+            destinationTreeUri: _destTreeUri,
+            onProgress: onProgress,
+          );
+        }
+        succeeded++;
+      } on UnimplementedError {
+        if (mounted) {
+          setState(() {
+            _busy = false;
+            _error = context.l10n.toolNotImplementedYetMessage;
+          });
+        }
+        return;
+      } on PlatformException catch (e) {
+        if (e.code == 'AUTH_FAIL') {
+          if (mounted) {
+            setState(() {
+              _busy = false;
+              _error = context.l10n.incorrectPasswordError;
+            });
+          }
+          return;
+        }
+        failedNames.add(source.displayName);
+      } catch (_) {
+        failedNames.add(source.displayName);
+      }
+    }
+
+    if (!mounted) return;
+
+    if (failedNames.isEmpty) {
       Navigator.of(context).pop();
       showAppSnackBar(
         context,
-        message: context.l10n.singleFileCryptoSuccessMessage,
+        message: context.l10n.singleFileCryptoSuccessMessage(succeeded),
         tone: AppBannerTone.success,
       );
-    } on UnimplementedError {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = context.l10n.toolNotImplementedYetMessage;
-        });
-      }
-    } on PlatformException catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = e.code == 'AUTH_FAIL'
-              ? context.l10n.incorrectPasswordError
-              : (e.message ?? '$e');
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _error = '$e';
-        });
-      }
+    } else if (succeeded > 0) {
+      Navigator.of(context).pop();
+      showAppSnackBar(
+        context,
+        message: context.l10n.singleFileCryptoPartialFailureMessage(
+          succeeded,
+          _sources.length,
+          failedNames.length,
+        ),
+        tone: AppBannerTone.warning,
+      );
+    } else {
+      setState(() {
+        _busy = false;
+        _error = context.l10n.singleFileCryptoPartialFailureMessage(
+          succeeded,
+          _sources.length,
+          failedNames.length,
+        );
+      });
     }
   }
 
@@ -192,32 +247,71 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                 color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(AppRadius.md),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.description_outlined, size: AppIconSize.small, color: cs.primary),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.singleFileCryptoInputFileLabel,
-                          style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  Row(
+                    children: [
+                      Icon(Icons.description_outlined, size: AppIconSize.small, color: cs.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.l10n.singleFileCryptoInputFileLabel,
+                              style: textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            Text(
+                              context.l10n.singleFileCryptoFilesQueuedCount(_sources.length),
+                              style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        Text(
-                          _sourceName ?? context.l10n.noFileSelectedLabel,
-                          style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: _busy ? null : _addSources,
+                        child: Text(context.l10n.singleFileCryptoAddFilesButton),
+                      ),
+                    ],
+                  ),
+                  if (_sources.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.25)),
+                    for (final file in _sources)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                file.displayName,
+                                style: textTheme.bodySmall,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 18),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              visualDensity: VisualDensity.compact,
+                              onPressed: _busy ? null : () => _removeSource(file),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _busy ? null : _clearSources,
+                        child: Text(context.l10n.singleFileCryptoClearFilesButton),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: _busy ? null : _pickSource,
-                    child: Text(context.l10n.chooseFileButton),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -319,6 +413,13 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                     : const SizedBox.shrink(key: ValueKey('decrypt-extra-fields')),
               ),
             ),
+            if (_busy && _sources.length > 1) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                context.l10n.singleFileCryptoBatchProgressLabel(_currentIndex, _sources.length),
+                style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ],
             if (_progressTotal != null) ...[
               const SizedBox(height: AppSpacing.sm),
               LinearProgressIndicator(
@@ -357,8 +458,8 @@ class _SingleFileCryptoSheetState extends State<SingleFileCryptoSheet>
                     )
                   : Text(
                       isEncrypt
-                          ? context.l10n.singleFileCryptoEncryptButton
-                          : context.l10n.singleFileCryptoDecryptButton,
+                          ? context.l10n.singleFileCryptoEncryptButton(_sources.length)
+                          : context.l10n.singleFileCryptoDecryptButton(_sources.length),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
             ),

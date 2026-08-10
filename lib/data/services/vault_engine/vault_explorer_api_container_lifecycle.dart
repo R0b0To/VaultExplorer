@@ -286,6 +286,26 @@ mixin _ContainerLifecycleOps {
         .toList();
   }
 
+  /// Multi-select `ACTION_OPEN_DOCUMENT` picker for the standalone
+  /// encrypt/decrypt file tool's batch mode -- same native shape as
+  /// [pickKeyfiles] (list of uri/displayName pairs), just a separate
+  /// channel method so the two pickers' intents can diverge later (e.g.
+  /// filtering decrypt's picker to a specific extension) without one
+  /// affecting the other.
+  Future<List<KeyfileRef>> pickCryptoFiles() async {
+    final raw = await _channel.invokeMethod<List<Object?>>(
+      ChannelMethods.pickCryptoFiles,
+    );
+    if (raw == null) return [];
+    return raw
+        .cast<Map<Object?, Object?>>()
+        .map((m) => (
+              uri: m['uri'] as String,
+              displayName: m['displayName'] as String,
+            ))
+        .toList();
+  }
+
   Future<({String uri, String displayName, bool looksLikeVault, String? format})?> pickCryptomatorVault() async {
     try {
       final res = await _channel.invokeMapMethod<String, dynamic>(ChannelMethods.pickCryptomatorVault);

@@ -1,6 +1,7 @@
 abstract final class ChannelMethods {
   static const pickContainer = 'pickContainer';
   static const pickKeyfiles = 'pickKeyfiles';
+  static const pickCryptoFiles = 'pickCryptoFiles';
   static const pickArchiveFile = 'pickArchiveFile';
   static const pickExtractFolder = 'pickExtractFolder';
   static const createContainer = 'createContainer';

@@ -4987,11 +4987,11 @@
   "@toolContainerRepairSubtitle": {
     "description": "Tool card subtitle for Container Check & Repair"
   },
-  "toolSingleFileCryptoTitle": "Encrypt / Decrypt File",
+  "toolSingleFileCryptoTitle": "Encrypt / Decrypt Files",
   "@toolSingleFileCryptoTitle": {
     "description": "Tool card title for Single-File Encrypt/Decrypt"
   },
-  "toolSingleFileCryptoSubtitle": "Protect a single file without a full container",
+  "toolSingleFileCryptoSubtitle": "Protect one or more files without a full container",
   "@toolSingleFileCryptoSubtitle": {
     "description": "Tool card subtitle for Single-File Encrypt/Decrypt"
   },
@@ -5114,29 +5114,70 @@
   "@cryptoDirectionDecrypt": {
     "description": "Segmented button option: decrypt mode"
   },
-  "singleFileCryptoInputFileLabel": "Input File",
+  "singleFileCryptoInputFileLabel": "Input Files",
   "@singleFileCryptoInputFileLabel": {
-    "description": "Label for the file being encrypted/decrypted"
+    "description": "Label for the file(s) being encrypted/decrypted"
   },
   "singleFileCryptoCipherLabel": "Cipher",
   "@singleFileCryptoCipherLabel": {
     "description": "Label for the standalone AEAD cipher selector"
   },
-  "singleFileCryptoDeleteOriginalLabel": "Delete original file after encryption",
+  "singleFileCryptoDeleteOriginalLabel": "Delete original files after encryption",
   "@singleFileCryptoDeleteOriginalLabel": {
-    "description": "Switch label to delete the plaintext source after encrypting"
+    "description": "Switch label to delete the plaintext source(s) after encrypting"
   },
-  "singleFileCryptoEncryptButton": "Encrypt File",
+  "singleFileCryptoEncryptButton": "{count, plural, =1{Encrypt File} other{Encrypt {count} Files}}",
   "@singleFileCryptoEncryptButton": {
-    "description": "Primary action button label when encrypting"
+    "description": "Primary action button label when encrypting, given how many files are queued",
+    "placeholders": {
+      "count": {}
+    }
   },
-  "singleFileCryptoDecryptButton": "Decrypt File",
+  "singleFileCryptoDecryptButton": "{count, plural, =1{Decrypt File} other{Decrypt {count} Files}}",
   "@singleFileCryptoDecryptButton": {
-    "description": "Primary action button label when decrypting"
+    "description": "Primary action button label when decrypting, given how many files are queued",
+    "placeholders": {
+      "count": {}
+    }
   },
-  "singleFileCryptoSuccessMessage": "Done",
+  "singleFileCryptoSuccessMessage": "{count, plural, =1{Done} other{Done — {count} files processed}}",
   "@singleFileCryptoSuccessMessage": {
-    "description": "Snackbar shown after a successful encrypt/decrypt"
+    "description": "Snackbar shown after a fully successful encrypt/decrypt run",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "singleFileCryptoPartialFailureMessage": "{succeeded} of {total} files processed — {failed} failed",
+  "@singleFileCryptoPartialFailureMessage": {
+    "description": "Snackbar shown when a batch encrypt/decrypt run finishes with some files failing",
+    "placeholders": {
+      "succeeded": {},
+      "total": {},
+      "failed": {}
+    }
+  },
+  "singleFileCryptoAddFilesButton": "Add Files",
+  "@singleFileCryptoAddFilesButton": {
+    "description": "Button to open the multi-select file picker, adding to the current batch"
+  },
+  "singleFileCryptoClearFilesButton": "Clear",
+  "@singleFileCryptoClearFilesButton": {
+    "description": "Button to clear every file currently queued for encrypt/decrypt"
+  },
+  "singleFileCryptoFilesQueuedCount": "{count, plural, =0{No files selected} =1{1 file selected} other{{count} files selected}}",
+  "@singleFileCryptoFilesQueuedCount": {
+    "description": "Count readout under the input-files picker row",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "singleFileCryptoBatchProgressLabel": "File {current} of {total}",
+  "@singleFileCryptoBatchProgressLabel": {
+    "description": "Progress readout while a batch encrypt/decrypt run is in flight",
+    "placeholders": {
+      "current": {},
+      "total": {}
+    }
   },
 
   "repairTargetStepTitle": "Choose a Target",

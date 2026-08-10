@@ -6491,13 +6491,13 @@ abstract class AppLocalizations {
   /// Tool card title for Single-File Encrypt/Decrypt
   ///
   /// In en, this message translates to:
-  /// **'Encrypt / Decrypt File'**
+  /// **'Encrypt / Decrypt Files'**
   String get toolSingleFileCryptoTitle;
 
   /// Tool card subtitle for Single-File Encrypt/Decrypt
   ///
   /// In en, this message translates to:
-  /// **'Protect a single file without a full container'**
+  /// **'Protect one or more files without a full container'**
   String get toolSingleFileCryptoSubtitle;
 
   /// Tool card title for the Storage Analyzer
@@ -6668,10 +6668,10 @@ abstract class AppLocalizations {
   /// **'Decrypt'**
   String get cryptoDirectionDecrypt;
 
-  /// Label for the file being encrypted/decrypted
+  /// Label for the file(s) being encrypted/decrypted
   ///
   /// In en, this message translates to:
-  /// **'Input File'**
+  /// **'Input Files'**
   String get singleFileCryptoInputFileLabel;
 
   /// Label for the standalone AEAD cipher selector
@@ -6680,29 +6680,63 @@ abstract class AppLocalizations {
   /// **'Cipher'**
   String get singleFileCryptoCipherLabel;
 
-  /// Switch label to delete the plaintext source after encrypting
+  /// Switch label to delete the plaintext source(s) after encrypting
   ///
   /// In en, this message translates to:
-  /// **'Delete original file after encryption'**
+  /// **'Delete original files after encryption'**
   String get singleFileCryptoDeleteOriginalLabel;
 
-  /// Primary action button label when encrypting
+  /// Primary action button label when encrypting, given how many files are queued
   ///
   /// In en, this message translates to:
-  /// **'Encrypt File'**
-  String get singleFileCryptoEncryptButton;
+  /// **'{count, plural, =1{Encrypt File} other{Encrypt {count} Files}}'**
+  String singleFileCryptoEncryptButton(num count);
 
-  /// Primary action button label when decrypting
+  /// Primary action button label when decrypting, given how many files are queued
   ///
   /// In en, this message translates to:
-  /// **'Decrypt File'**
-  String get singleFileCryptoDecryptButton;
+  /// **'{count, plural, =1{Decrypt File} other{Decrypt {count} Files}}'**
+  String singleFileCryptoDecryptButton(num count);
 
-  /// Snackbar shown after a successful encrypt/decrypt
+  /// Snackbar shown after a fully successful encrypt/decrypt run
   ///
   /// In en, this message translates to:
-  /// **'Done'**
-  String get singleFileCryptoSuccessMessage;
+  /// **'{count, plural, =1{Done} other{Done — {count} files processed}}'**
+  String singleFileCryptoSuccessMessage(num count);
+
+  /// Snackbar shown when a batch encrypt/decrypt run finishes with some files failing
+  ///
+  /// In en, this message translates to:
+  /// **'{succeeded} of {total} files processed — {failed} failed'**
+  String singleFileCryptoPartialFailureMessage(
+    Object succeeded,
+    Object total,
+    Object failed,
+  );
+
+  /// Button to open the multi-select file picker, adding to the current batch
+  ///
+  /// In en, this message translates to:
+  /// **'Add Files'**
+  String get singleFileCryptoAddFilesButton;
+
+  /// Button to clear every file currently queued for encrypt/decrypt
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get singleFileCryptoClearFilesButton;
+
+  /// Count readout under the input-files picker row
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No files selected} =1{1 file selected} other{{count} files selected}}'**
+  String singleFileCryptoFilesQueuedCount(num count);
+
+  /// Progress readout while a batch encrypt/decrypt run is in flight
+  ///
+  /// In en, this message translates to:
+  /// **'File {current} of {total}'**
+  String singleFileCryptoBatchProgressLabel(Object current, Object total);
 
   /// Step title: pick an unmounted file or mounted volume to repair
   ///

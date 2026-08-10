@@ -3850,11 +3850,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Diagnose header or filesystem issues';
 
   @override
-  String get toolSingleFileCryptoTitle => 'Encrypt / Decrypt File';
+  String get toolSingleFileCryptoTitle => 'Encrypt / Decrypt Files';
 
   @override
   String get toolSingleFileCryptoSubtitle =>
-      'Protect a single file without a full container';
+      'Protect one or more files without a full container';
 
   @override
   String get toolStorageAnalyzerTitle => 'Storage Analyzer';
@@ -3945,23 +3945,79 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cryptoDirectionDecrypt => 'Decrypt';
 
   @override
-  String get singleFileCryptoInputFileLabel => 'Input File';
+  String get singleFileCryptoInputFileLabel => 'Input Files';
 
   @override
   String get singleFileCryptoCipherLabel => 'Cipher';
 
   @override
   String get singleFileCryptoDeleteOriginalLabel =>
-      'Delete original file after encryption';
+      'Delete original files after encryption';
 
   @override
-  String get singleFileCryptoEncryptButton => 'Encrypt File';
+  String singleFileCryptoEncryptButton(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Encrypt $count Files',
+      one: 'Encrypt File',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get singleFileCryptoDecryptButton => 'Decrypt File';
+  String singleFileCryptoDecryptButton(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Decrypt $count Files',
+      one: 'Decrypt File',
+    );
+    return '$_temp0';
+  }
 
   @override
-  String get singleFileCryptoSuccessMessage => 'Done';
+  String singleFileCryptoSuccessMessage(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Done — $count files processed',
+      one: 'Done',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String singleFileCryptoPartialFailureMessage(
+    Object succeeded,
+    Object total,
+    Object failed,
+  ) {
+    return '$succeeded of $total files processed — $failed failed';
+  }
+
+  @override
+  String get singleFileCryptoAddFilesButton => 'Add Files';
+
+  @override
+  String get singleFileCryptoClearFilesButton => 'Clear';
+
+  @override
+  String singleFileCryptoFilesQueuedCount(num count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count files selected',
+      one: '1 file selected',
+      zero: 'No files selected',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String singleFileCryptoBatchProgressLabel(Object current, Object total) {
+    return 'File $current of $total';
+  }
 
   @override
   String get repairTargetStepTitle => 'Choose a Target';

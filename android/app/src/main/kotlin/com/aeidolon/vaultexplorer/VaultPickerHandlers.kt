@@ -330,6 +330,40 @@ class VaultPickerHandlers(
         res.success(picked)
     }
 
+    // Multi-select source-file picker for the encrypt/decrypt file tool's
+    // batch mode. Same shape as pickKeyfilesLauncher (clipData fan-out,
+    // best-effort persistable-permission grant, uri/displayName map per
+    // item) but kept as its own launcher/handler pair -- see
+    // pickCryptoFiles's doc comment in vault_explorer_api_container_lifecycle.dart.
+    private val pickCryptoFilesLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { activityResult ->
+        val res = pendingResult.take() ?: return@registerForActivityResult
+        val data = activityResult.data
+        if (activityResult.resultCode != Activity.RESULT_OK || data == null) {
+            res.success(null)
+            return@registerForActivityResult
+        }
+        val uris = mutableListOf<Uri>()
+        data.clipData?.let { clip ->
+            for (i in 0 until clip.itemCount) uris.add(clip.getItemAt(i).uri)
+        }
+        if (uris.isEmpty()) data.data?.let { uris.add(it) }
+
+        val picked = uris.mapNotNull { uri ->
+            try {
+                activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: SecurityException) {}
+            try {
+                mapOf(
+                    "uri" to uri.toString(),
+                    "displayName" to UriNameResolver.resolve(activity.contentResolver, uri)
+                )
+            } catch (_: Exception) { null }
+        }
+        res.success(picked)
+    }
+
     fun handlePickContainer(call: MethodCall, result: MethodChannel.Result) {
         pendingResult.stash(result)
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
@@ -381,5 +415,15 @@ class VaultPickerHandlers(
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
         }
         pickKeyfilesLauncher.launch(intent)
+    }
+
+    fun handlePickCryptoFiles(call: MethodCall, result: MethodChannel.Result) {
+        pendingResult.stash(result)
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        pickCryptoFilesLauncher.launch(intent)
     }
 }

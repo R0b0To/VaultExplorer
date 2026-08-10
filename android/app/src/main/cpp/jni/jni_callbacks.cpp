@@ -56,6 +56,18 @@ bool isSplitJoinCancelled(int opId) {
     return cancelled == JNI_TRUE;
 }
 
+void reportRepairLog(int opId, const char* message) {
+    if (opId <= 0 || !message) return;
+    JNIEnv* env = g_threadJniEnv.get();
+    if (!env || !g_repairLogBridgeClass || !g_repairLogReportMethod) return;
+    jstring jMessage = env->NewStringUTF(message);
+    if (!jMessage) return;
+    env->CallStaticVoidMethod(g_repairLogBridgeClass, g_repairLogReportMethod,
+                              static_cast<jint>(opId), jMessage);
+    env->DeleteLocalRef(jMessage);
+    if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
 void notifyHiddenVolumeProtectionTriggered(int volId) {
     if (volId < 0) return;
     JNIEnv* env = g_threadJniEnv.get();

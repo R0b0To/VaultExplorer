@@ -100,6 +100,12 @@ private object ChannelMethods {
     const val UNLOCK_SPLIT_CONTAINER = "unlockSplitContainer"
     const val ENCRYPT_SINGLE_FILE = "encryptSingleFile"
     const val DECRYPT_SINGLE_FILE = "decryptSingleFile"
+
+    // Check & Repair tool.
+    const val DIAGNOSE_UNMOUNTED_CONTAINER_FILE = "diagnoseUnmountedContainerFile"
+    const val DIAGNOSE_MOUNTED_VOLUME_FILESYSTEM = "diagnoseMountedVolumeFilesystem"
+    const val RESTORE_BACKUP_HEADER_UNMOUNTED = "restoreBackupHeaderUnmounted"
+    const val RUN_MOUNTED_VOLUME_FILESYSTEM_CHECK = "runMountedVolumeFilesystemCheck"
 }
 
 class MainActivity : FlutterFragmentActivity() {
@@ -137,6 +143,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val folderDocumentProviderHandlers = FolderDocumentProviderHandlers(this)
     private val disguiseModeHandlers = DisguiseModeHandlers(this)
     private val secureStorageHandlers = SecureStorageHandlers(this)
+    private val repairHandlers = RepairHandlers(this, ioExecutor)
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -215,6 +222,7 @@ class MainActivity : FlutterFragmentActivity() {
         ImportProgressBridge.channel = channel
         HiddenVolumeProtectionBridge.channel = channel
         SplitJoinProgressBridge.channel = channel
+        RepairLogBridge.channel = channel
 
         val disguiseChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, DISGUISE_CHANNEL)
         ExternalOpenBridge.channel = disguiseChannel
@@ -398,6 +406,10 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.GET_AVIF_INFO -> derivedKeyHandlers.handleGetAvifInfo(call, result)
                 ChannelMethods.DECODE_AVIF_FRAME -> derivedKeyHandlers.handleDecodeAvifFrame(call, result)
                 ChannelMethods.DECODE_AVIF -> derivedKeyHandlers.handleDecodeAvif(call, result)
+                ChannelMethods.DIAGNOSE_UNMOUNTED_CONTAINER_FILE -> repairHandlers.handleDiagnoseUnmountedContainerFile(call, result)
+                ChannelMethods.DIAGNOSE_MOUNTED_VOLUME_FILESYSTEM -> repairHandlers.handleDiagnoseMountedVolumeFilesystem(call, result)
+                ChannelMethods.RESTORE_BACKUP_HEADER_UNMOUNTED -> repairHandlers.handleRestoreBackupHeaderUnmounted(call, result)
+                ChannelMethods.RUN_MOUNTED_VOLUME_FILESYSTEM_CHECK -> repairHandlers.handleRunMountedVolumeFilesystemCheck(call, result)
                 else -> result.notImplemented()
             }
         }

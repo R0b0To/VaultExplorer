@@ -41,7 +41,18 @@ abstract class ContainerToolService {
   });
 
   Future<RepairDiagnosis> diagnoseTarget(RepairTarget target);
-  Future<bool> restoreBackupHeader(RepairTarget target);
+
+  /// [password] is only consulted for a VeraCrypt/TrueCrypt
+  /// [UnmountedFileTarget] -- pass it null on the first call and catch
+  /// [RepairPasswordRequiredException] to know whether one is actually
+  /// needed; other formats (currently just LUKS2) never throw it. Throws
+  /// [RepairIncorrectPasswordException] if [password] was supplied but
+  /// didn't verify, and [RepairUnsupportedFormatException] for formats
+  /// with no restore path implemented (LUKS1, BitLocker) or for a
+  /// [MountedVolumeTarget] (restoring a header only makes sense for an
+  /// unmounted file -- a volume with a bad header couldn't have mounted in
+  /// the first place).
+  Future<bool> restoreBackupHeader(RepairTarget target, {String? password});
   Future<bool> runFilesystemCheck(MountedVolumeTarget target);
 }
 
@@ -94,7 +105,7 @@ class DefaultContainerToolService implements ContainerToolService {
       throw UnimplementedError('diagnoseTarget is not implemented yet.');
 
   @override
-  Future<bool> restoreBackupHeader(RepairTarget target) =>
+  Future<bool> restoreBackupHeader(RepairTarget target, {String? password}) =>
       throw UnimplementedError('restoreBackupHeader is not implemented yet.');
 
   @override
@@ -207,5 +218,39 @@ class NativeContainerToolService extends DefaultContainerToolService {
         opId: opId,
       );
     });
+  }
+
+  RepairDiagnosis _diagnosisFromCode(int code) {
+    if (code >= 0 && code < RepairDiagnosis.values.length) {
+      return RepairDiagnosis.values[code];
+    }
+    return RepairDiagnosis.headerCorrupted;
+  }
+
+  @override
+  Future<RepairDiagnosis> diagnoseTarget(RepairTarget target) async {
+    final result = switch (target) {
+      UnmountedFileTarget(:final uri) =>
+        await vaultExplorerApi.diagnoseUnmountedContainerFile(uri),
+      MountedVolumeTarget(:final volId) =>
+        await vaultExplorerApi.diagnoseMountedVolumeFilesystem(volId),
+    };
+    return _diagnosisFromCode(result.diagnosisCode);
+  }
+
+  @override
+  Future<bool> restoreBackupHeader(RepairTarget target, {String? password}) {
+    if (target is! UnmountedFileTarget) {
+      throw const RepairUnsupportedFormatException();
+    }
+    return vaultExplorerApi.restoreBackupHeaderUnmounted(
+      uri: target.uri,
+      password: password,
+    );
+  }
+
+  @override
+  Future<bool> runFilesystemCheck(MountedVolumeTarget target) {
+    return vaultExplorerApi.runMountedVolumeFilesystemCheck(target.volId);
   }
 }

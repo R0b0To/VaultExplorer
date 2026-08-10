@@ -758,3 +758,29 @@ void ntfsCloseStream(int volumeId, void* handle) {
     ntfs_inode_close(ns->inode);
     delete ns;
 }
+
+bool ntfsIsDirty(int volumeId) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    auto& v = volumes[volumeId];
+    if (!v.ntfsVol) return false;
+    // vol->flags mirrors the $Volume attribute's VOLUME_INFORMATION.flags
+    // as read at mount time -- VOLUME_IS_DIRTY (layout.h) is the same bit
+    // Windows sets on an unclean shutdown and that ntfsfix clears.
+    return (v.ntfsVol->flags & VOLUME_IS_DIRTY) != 0;
+}
+
+bool ntfsClearDirtyFlag(int volumeId) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    auto& v = volumes[volumeId];
+    if (!v.ntfsVol || v.readOnly) return false;
+    const le16 newFlags = static_cast<le16>(v.ntfsVol->flags & ~VOLUME_IS_DIRTY);
+    // ntfs_volume_write_flags both updates vol->flags in memory and writes
+    // the VOLUME_INFORMATION attribute back to $Volume on disk -- the same
+    // call real ntfsfix.c makes once it's satisfied the volume is
+    // consistent.
+    if (ntfs_volume_write_flags(v.ntfsVol, newFlags) != 0) {
+        LOGI("ntfsClearDirtyFlag: ntfs_volume_write_flags failed on volume %d (errno=%d)", volumeId, errno);
+        return false;
+    }
+    return true;
+}

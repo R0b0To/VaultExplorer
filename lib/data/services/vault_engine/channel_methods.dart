@@ -94,4 +94,10 @@ abstract final class ChannelMethods {
   static const warmContainer = 'warmContainer';
   static const onTrimMemory = 'onTrimMemory';
   static const getDeviceCapabilityProfile = 'getDeviceCapabilityProfile';
+
+  // Check & Repair tool.
+  static const diagnoseUnmountedContainerFile = 'diagnoseUnmountedContainerFile';
+  static const diagnoseMountedVolumeFilesystem = 'diagnoseMountedVolumeFilesystem';
+  static const restoreBackupHeaderUnmounted = 'restoreBackupHeaderUnmounted';
+  static const runMountedVolumeFilesystemCheck = 'runMountedVolumeFilesystemCheck';
 }

@@ -365,6 +365,49 @@ bool mountExtVolume(int volumeId) {
     return true;
 }
 
+bool extIsDirty(int volumeId) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    VolumeState& volume = volumes[volumeId];
+    if (!volume.extFs || !volume.extFs->super) return false;
+    ext2_super_block* sb = volume.extFs->super;
+
+    // Same three signals a real e2fsck's opening pass checks before
+    // deciding a full check is needed: the superblock wasn't marked clean
+    // (s_state missing EXT2_VALID_FS), it's explicitly flagged with
+    // detected errors (EXT2_ERROR_FS), or there's an outstanding journal
+    // replay (EXT3_FEATURE_INCOMPAT_RECOVER) from an unclean shutdown.
+    const bool notMarkedValid = (sb->s_state & EXT2_VALID_FS) == 0;
+    const bool hasErrorFlag = (sb->s_state & EXT2_ERROR_FS) != 0;
+    const bool needsJournalRecovery = EXT2_HAS_INCOMPAT_FEATURE(sb, EXT3_FEATURE_INCOMPAT_RECOVER);
+    return notMarkedValid || hasErrorFlag || needsJournalRecovery;
+}
+
+bool extClearDirtyState(int volumeId) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    VolumeState& volume = volumes[volumeId];
+    if (!volume.extFs || !volume.extFs->super || volume.readOnly) return false;
+    ext2_super_block* sb = volume.extFs->super;
+
+    sb->s_state |= EXT2_VALID_FS;
+    sb->s_state &= ~EXT2_ERROR_FS;
+    // The journal-recovery flag itself is left alone -- clearing it here
+    // without actually replaying the journal would be lying about the
+    // volume's state, not repairing it. A dirty diagnosis caused solely by
+    // an outstanding journal replay resolves itself the next time this
+    // volume is unlocked (the kernel-equivalent replay this app's mount
+    // path performs), so surfacing the error/valid bits as fixed is still
+    // an accurate, useful repair on its own.
+    sb->s_lastcheck = static_cast<uint32_t>(time(nullptr));
+    ext2fs_mark_super_dirty(volume.extFs);
+    const errcode_t flushError = ext2fs_flush(volume.extFs);
+    if (flushError != 0) {
+        EXT_LOGI("extClearDirtyState: ext2fs_flush failed on volume %d: %s (err=%lu)", volumeId,
+                 error_message(flushError), static_cast<unsigned long>(flushError));
+        return false;
+    }
+    return true;
+}
+
 // ----------------------------------------------------------------====
 // EXT2/3/4 rename support. ext2fs_link()/ext2fs_unlink() don't update a
 // moved directory's own ".." entry, so extRenameFile below repoints it

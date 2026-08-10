@@ -33,3 +33,11 @@ void ntfsGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeBy
 void* ntfsOpenStream(int volumeId, const std::string& path);
 int32_t ntfsReadStream(int volumeId, void* handle, uint64_t offset, uint8_t* dest, size_t length);
 void ntfsCloseStream(int volumeId, void* handle);
+
+// Check & Repair tool (see containers/container_repair.cpp). Reads/clears
+// the on-disk $Volume dirty flag (VOLUME_IS_DIRTY, in the VOLUME_INFORMATION
+// attribute) -- the same flag Windows sets on an unclean unmount and that
+// real `ntfsfix` clears once it's satisfied the volume is consistent.
+// [volumeId]'s ntfs_volume must already be mounted (VolumeState::ntfsVol).
+bool ntfsIsDirty(int volumeId);
+bool ntfsClearDirtyFlag(int volumeId);

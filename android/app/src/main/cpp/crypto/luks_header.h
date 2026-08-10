@@ -153,6 +153,38 @@ LuksChangePasswordResult luksChangeKeyslotPassword(int fd,
                                                     const uint8_t* oldPassword, size_t oldPasswordLen,
                                                     const uint8_t* newPassword, size_t newPasswordLen);
 
+// ── Header integrity / backup-header restore (Check & Repair tool) ─────────
+//
+// LUKS2 keeps two on-disk copies of its binary header + JSON metadata (see
+// Luks2HdrDisk in luks_header.cpp): the primary copy at byte 0, and a
+// secondary copy at byte kLuks2HdrCopySize (16384). Each copy carries a
+// SHA-256 checksum over itself (with its own csum field zeroed) plus its
+// JSON area, so -- unlike VeraCrypt's encrypted header -- corruption is
+// detectable without a password: just recompute and compare.
+//
+// LUKS1 has no equivalent on-disk backup copy (real cryptsetup relies on an
+// out-of-band `luksHeaderBackup` file for that), so isLuksContainer() alone
+// isn't enough to know whether backup-restore is even possible -- callers
+// must check the version byte at header offset 6 themselves before calling
+// these.
+
+// Recomputes both copies' checksums over their on-disk bytes and reports
+// which ones currently verify. Doesn't touch the effectively-plaintext
+// header at all -- purely a read-only integrity check, safe to call on any
+// LUKS2 container without a password.
+bool luks2CheckHeaderIntegrity(const LuksByteReader& reader,
+                                bool& outPrimaryValid, bool& outSecondaryValid);
+
+// Overwrites the primary header copy (binary header + JSON metadata) with
+// the secondary copy's content, fixing up the copied binary header's
+// `hdrOffset` field to 0 (it reads 16384 in the secondary copy) and
+// recomputing its checksum over the corrected bytes before writing --  a
+// byte-for-byte raw copy would leave the "primary" copy's own header
+// mis-declaring its offset. Requires the secondary copy to currently
+// verify; fails (returns false) without writing anything if it doesn't, or
+// if the primary already verifies (nothing to repair).
+bool luks2RestoreHeaderFromBackup(const LuksByteReader& reader, const LuksByteWriter& writer);
+
 // ── Container creation ──────────────────────────────────────────────────
 
 // Parameters describing how to format a brand-new LUKS1 or LUKS2 container.

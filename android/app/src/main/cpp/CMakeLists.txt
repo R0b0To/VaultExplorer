@@ -399,6 +399,8 @@ add_library(
         session/session_guard.cpp
         containers/container_header.cpp
         containers/container_utils.cpp
+        containers/container_repair.cpp   # Check & Repair tool: header diagnosis/backup-header restore, mounted-fs dirty check/repair
+        jni/repair_bridge.cpp             # JNI surface for the Check & Repair tool (see container_repair.cpp)
         crypto/cipher_shim.cpp     # adapter
         crypto/cascade.cpp         # cipher-agnostic XTS + cascade chaining
         crypto/kdf_table.cpp       # per-hash iteration-count table + hash dispatch + PIM clamping

@@ -12,11 +12,13 @@ import 'package:vaultexplorer/core/utils/listener_registry.dart';
 import 'package:vaultexplorer/data/services/vault_engine/channel_methods.dart';
 import 'package:vaultexplorer/data/models/crypto_algorithms.dart';
 import 'package:vaultexplorer/core/services/cache_coordinator.dart';
+import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 
 part 'vault_explorer_api_crypto.dart';
 part 'vault_explorer_api_container_lifecycle.dart';
 part 'vault_explorer_api_file_io.dart';
 part 'vault_explorer_api_split_join.dart';
+part 'vault_explorer_api_repair.dart';
 
 typedef KeyfileRef = ({String uri, String displayName});
 typedef UnlockProgress = ({
@@ -52,7 +54,7 @@ void _logSwallowed(String method, Object error, {bool expected = false}) {
 const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
 
 class VaultExplorerApi
-    with _CryptoOps, _ContainerLifecycleOps, _FileIoOps, _SplitJoinOps {
+    with _CryptoOps, _ContainerLifecycleOps, _FileIoOps, _SplitJoinOps, _RepairOps {
   const VaultExplorerApi();
 
   static void Function(String ext, String pkg)? onAppSelectedCallback;

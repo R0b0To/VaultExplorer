@@ -12,10 +12,8 @@ import 'package:vaultexplorer/features/tools/services/container_tool_service.dar
 ///
 /// A three-step diagnostic wizard: pick a target (an unmounted container
 /// file, or one of [mountedContainers]'s already-open volumes) → run the
-/// scan → act on whatever it finds. Mirrors the design note's "step-by-step
-/// diagnostic wizard" flow. All three steps call through
-/// [ContainerToolService], which doesn't have a native implementation
-/// behind it yet.
+/// scan → act on whatever it finds. See container_repair.cpp for what the
+/// scan/restore/check steps actually do for each container format.
 class ContainerRepairSheet extends StatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
 
@@ -98,18 +96,29 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   Future<void> _restoreBackupHeader() async {
     final target = _target;
     if (target == null) return;
+    await _runRestoreBackupHeader(target, password: null);
+  }
+
+  Future<void> _runRestoreBackupHeader(RepairTarget target, {String? password}) async {
     setState(() {
       _actionRunning = true;
       _error = null;
     });
     try {
-      final ok = await ContainerToolService.instance.restoreBackupHeader(target);
+      final ok = await ContainerToolService.instance.restoreBackupHeader(target, password: password);
       if (mounted) {
         setState(() {
           _actionRunning = false;
           _actionSucceeded = ok;
         });
       }
+    } on RepairPasswordRequiredException {
+      if (!mounted) return;
+      setState(() => _actionRunning = false);
+      final entered = await _promptForPassword();
+      if (!mounted) return;
+      if (entered == null || entered.isEmpty) return;
+      await _runRestoreBackupHeader(target, password: entered);
     } on UnimplementedError {
       if (mounted) {
         setState(() {
@@ -125,6 +134,47 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
         });
       }
     }
+  }
+
+  Future<String?> _promptForPassword() {
+    final controller = TextEditingController();
+    bool obscure = true;
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            final materialL10n = MaterialLocalizations.of(dialogContext);
+            return AlertDialog(
+              title: Text(context.l10n.passwordFieldLabel),
+              content: TextField(
+                controller: controller,
+                obscureText: obscure,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: context.l10n.passwordFieldLabel,
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                    onPressed: () => setDialogState(() => obscure = !obscure),
+                  ),
+                ),
+                onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(materialL10n.cancelButtonLabel),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+                  child: Text(materialL10n.okButtonLabel),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _runFilesystemCheck() async {

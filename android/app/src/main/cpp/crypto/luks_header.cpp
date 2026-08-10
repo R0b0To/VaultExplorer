@@ -2000,3 +2000,102 @@ LuksChangePasswordResult luksChangeKeyslotPassword(int fd,
     };
     return luksChangeKeyslotPassword(reader, writer, oldPassword, oldPasswordLen, newPassword, newPasswordLen);
 }
+
+// ── Header integrity / backup-header restore ────────────────────────────
+
+// Recomputes a header copy's own checksum exactly like luks2ChangeKeyslotPassword's
+// computeChecksum lambda does: SHA-256 over the 4096-byte binary header
+// (with its own csum field zeroed for the computation) followed by its
+// kLuks2JsonAreaSize-byte JSON area, matching real LUKS2's on-disk
+// checksum coverage.
+static void luks2ComputeCopyChecksum(Luks2HdrDisk& hdr, const std::vector<uint8_t>& jsonArea, uint8_t out[32]) {
+    std::memset(hdr.csum, 0, sizeof(hdr.csum));
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    const mbedtls_md_info_t* info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    mbedtls_md_setup(&ctx, info, 0);
+    mbedtls_md_starts(&ctx);
+    mbedtls_md_update(&ctx, reinterpret_cast<const uint8_t*>(&hdr), sizeof(hdr));
+    mbedtls_md_update(&ctx, jsonArea.data(), jsonArea.size());
+    mbedtls_md_finish(&ctx, out);
+    mbedtls_md_free(&ctx);
+}
+
+// Reads one header copy (binary header + JSON area) at [copyOffset] and
+// reports whether its stored checksum matches a freshly-recomputed one.
+// Also hands back the raw bytes read, so restore can reuse them without a
+// second read.
+static bool luks2ReadAndVerifyCopy(const LuksByteReader& reader, uint64_t copyOffset,
+                                    Luks2HdrDisk& outHdr, std::vector<uint8_t>& outJsonArea,
+                                    bool& outValid) {
+    outValid = false;
+    if (!reader(copyOffset, &outHdr, sizeof(Luks2HdrDisk))) return false;
+    if (std::memcmp(outHdr.magic, LUKS_MAGIC, 6) != 0) return false; // not a LUKS2 header at all
+    outJsonArea.assign(kLuks2JsonAreaSize, 0);
+    if (!reader(copyOffset + kLuks2BinHdrSize, outJsonArea.data(), outJsonArea.size())) return false;
+
+    uint8_t storedCsum[32];
+    std::memcpy(storedCsum, outHdr.csum, sizeof(storedCsum));
+
+    Luks2HdrDisk scratch = outHdr;
+    uint8_t computed[32];
+    luks2ComputeCopyChecksum(scratch, outJsonArea, computed);
+
+    outValid = std::memcmp(storedCsum, computed, sizeof(computed)) == 0;
+    return true;
+}
+
+bool luks2CheckHeaderIntegrity(const LuksByteReader& reader, bool& outPrimaryValid, bool& outSecondaryValid) {
+    outPrimaryValid = false;
+    outSecondaryValid = false;
+    if (!reader) return false;
+
+    Luks2HdrDisk primaryHdr, secondaryHdr;
+    std::vector<uint8_t> primaryJson, secondaryJson;
+    bool primaryReadOk = luks2ReadAndVerifyCopy(reader, 0, primaryHdr, primaryJson, outPrimaryValid);
+    bool secondaryReadOk = luks2ReadAndVerifyCopy(reader, kLuks2HdrCopySize, secondaryHdr, secondaryJson, outSecondaryValid);
+
+    // A copy that can't even be read (I/O error, truncated file) is neither
+    // "valid" nor a reader failure for the *other* copy -- report what we
+    // could determine rather than failing the whole call.
+    return primaryReadOk || secondaryReadOk;
+}
+
+bool luks2RestoreHeaderFromBackup(const LuksByteReader& reader, const LuksByteWriter& writer) {
+    if (!reader || !writer) return false;
+
+    Luks2HdrDisk primaryHdr, secondaryHdr;
+    std::vector<uint8_t> primaryJson, secondaryJson;
+    bool primaryValid = false, secondaryValid = false;
+    bool primaryReadOk = luks2ReadAndVerifyCopy(reader, 0, primaryHdr, primaryJson, primaryValid);
+    bool secondaryReadOk = luks2ReadAndVerifyCopy(reader, kLuks2HdrCopySize, secondaryHdr, secondaryJson, secondaryValid);
+
+    if (!secondaryReadOk || !secondaryValid) {
+        LOGI("luks2RestoreHeaderFromBackup: backup (secondary) header copy does not verify -- refusing to restore");
+        return false;
+    }
+    if (primaryReadOk && primaryValid) {
+        LOGI("luks2RestoreHeaderFromBackup: primary header already verifies -- nothing to repair");
+        return false;
+    }
+
+    // Mirror the secondary copy's fields into a new primary copy, fixing up
+    // hdrOffset (0 for the primary slot, unlike the secondary's 16384) and
+    // recomputing the checksum over the corrected bytes -- see this
+    // function's doc comment in luks_header.h for why a raw byte copy alone
+    // isn't correct here.
+    Luks2HdrDisk restoredPrimary = secondaryHdr;
+    writeBE64(reinterpret_cast<uint8_t*>(&restoredPrimary.hdrOffset), 0);
+    uint8_t newCsum[32];
+    luks2ComputeCopyChecksum(restoredPrimary, secondaryJson, newCsum);
+    std::memcpy(restoredPrimary.csum, newCsum, sizeof(newCsum));
+
+    if (!writer(0, &restoredPrimary, sizeof(restoredPrimary)) ||
+        !writer(kLuks2BinHdrSize, secondaryJson.data(), secondaryJson.size())) {
+        LOGI("luks2RestoreHeaderFromBackup: write failed");
+        return false;
+    }
+
+    LOGI("luks2RestoreHeaderFromBackup: primary header copy restored from backup");
+    return true;
+}

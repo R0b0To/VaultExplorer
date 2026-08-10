@@ -61,3 +61,4 @@ android/.gradle/buildOutputCleanup/cache.properties
 android/.gradle/buildOutputCleanup/outputFiles.bin
 android/.gradle/noVersion/buildLogic.lock
 android/.gradle/vcs-1/gc.properties
+android/.gradle/file-system.probe

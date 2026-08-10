@@ -35,6 +35,14 @@ bool mountExtVolume(int volumeId);
 bool formatExtVolume(int volumeId, const char* variant);
 bool ensureExtBitmapsLoaded(int volumeId);
 
+// Check & Repair tool (see containers/container_repair.cpp). Reports/clears
+// the superblock's own "was this unmounted cleanly / were errors detected"
+// state (EXT2_VALID_FS / EXT2_ERROR_FS in s_state) -- the same signal a
+// real e2fsck's quick pass consults before deciding whether a full check is
+// even needed. [volumeId]'s ext2_filsys must already be mounted (VolumeState::extFs).
+bool extIsDirty(int volumeId);
+bool extClearDirtyState(int volumeId);
+
 // The rest of these back filesystems/fs_ops.h's fsXxx functions for ext --
 // see that header for the exact contract each one implements. Several are
 // thin wrappers around the helpers above (extOpenFile, extResolvePath,

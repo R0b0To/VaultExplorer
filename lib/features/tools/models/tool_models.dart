@@ -78,6 +78,32 @@ enum RepairDiagnosis {
   filesystemDirty,
 }
 
+/// Thrown by [ContainerToolService.restoreBackupHeader] when the target's
+/// backup-header copy can only be trusted once its password has decrypted
+/// and verified it (VeraCrypt/TrueCrypt) -- unlike LUKS2, whose header
+/// checksum is unencrypted and needs no password at all. Callers should
+/// prompt for a password and retry with it.
+class RepairPasswordRequiredException implements Exception {
+  const RepairPasswordRequiredException();
+}
+
+/// Thrown when a password was supplied but didn't decrypt any backup
+/// header slot.
+class RepairIncorrectPasswordException implements Exception {
+  const RepairIncorrectPasswordException();
+  @override
+  String toString() => 'Incorrect password.';
+}
+
+/// Thrown when the target's format has no backup-header restore path
+/// implemented at all (e.g. LUKS1, which has no on-disk backup copy to
+/// restore from -- see luks_header.h's header-integrity doc comment).
+class RepairUnsupportedFormatException implements Exception {
+  const RepairUnsupportedFormatException();
+  @override
+  String toString() => 'This container format doesn\'t support backup-header restore yet.';
+}
+
 class StorageEntry {
   final String path;
   final String name;

@@ -39,11 +39,6 @@
 
 static constexpr int MAX_VOLUMES = FF_VOLUMES;
 
-struct PartitionCandidate {
-    uint64_t startSector;
-    uint64_t sectorCount;
-};
-
 // Parses an MBR (and, if present, GPT) partition table from any
 // sector-addressable block source via the readSectors callback. Shared by
 // prepareUsbSession (backed by usbReadSectors) and prepareSession's
@@ -51,12 +46,14 @@ struct PartitionCandidate {
 // so a "container file" can also be a whole-disk image -- e.g. a
 // fixed-format VHD exported from Windows with BitLocker already enabled --
 // with the encrypted volume living inside a partition rather than starting
-// at byte 0 of the file, the same way a raw USB disk already works.
+// at byte 0 of the file, the same way a raw USB disk already works. Also
+// reused by container_repair.cpp's format-detection scan (not just the
+// unlock path) -- see session_prepare.h.
 //
 // Always appends a trailing {0, 0} sentinel so callers that also want to
 // try "the whole device/file as one unpartitioned volume" (VeraCrypt/raw
 // LUKS/raw BitLocker containers) can loop over the result uniformly.
-static std::vector<PartitionCandidate> scanPartitionTable(
+std::vector<PartitionCandidate> scanPartitionTable(
     const std::function<bool(uint64_t startSector, uint32_t count, unsigned char* out)>& readSectors) {
     std::vector<PartitionCandidate> partitions;
 
@@ -146,7 +143,9 @@ static std::vector<PartitionCandidate> scanPartitionTable(
 // images) use a completely different on-disk layout and are not handled by
 // this scan -- see the probeVhdDiskKind()/VhdImage block in prepareSession,
 // which intercepts those before this function is ever called.
-static uint64_t usableFileBytesExcludingVhdFooter(int fd, uint64_t fileSize) {
+// Reused by container_repair.cpp's format-detection scan too -- see
+// session_prepare.h.
+uint64_t usableFileBytesExcludingVhdFooter(int fd, uint64_t fileSize) {
     if (fileSize < 512) return fileSize;
     unsigned char footer[512];
     if (pread(fd, footer, sizeof(footer), static_cast<off_t>(fileSize - 512)) != 512) return fileSize;

@@ -17,6 +17,8 @@ jclass    g_splitJoinProgressBridgeClass = nullptr;
 jmethodID g_splitJoinProgressReportMethod = nullptr;
 jclass    g_splitJoinCancellationClass = nullptr;
 jmethodID g_splitJoinIsCancelledMethod = nullptr;
+jclass    g_repairLogBridgeClass = nullptr;
+jmethodID g_repairLogReportMethod = nullptr;
 
 extern "C" int av_jni_set_java_vm(void *vm, void *log_ctx);
 
@@ -101,6 +103,15 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
         if (env->ExceptionCheck()) env->ExceptionClear();
     }
 
+    jclass repairLogLocal = env->FindClass("com/aeidolon/vaultexplorer/RepairLogBridge");
+    if (repairLogLocal) {
+        g_repairLogBridgeClass = static_cast<jclass>(env->NewGlobalRef(repairLogLocal));
+        env->DeleteLocalRef(repairLogLocal);
+        g_repairLogReportMethod = env->GetStaticMethodID(
+            g_repairLogBridgeClass, "reportLog", "(ILjava/lang/String;)V");
+        if (env->ExceptionCheck()) env->ExceptionClear();
+    }
+
     ThreadPool::getInstance();
     return JNI_VERSION_1_6;
 }
@@ -115,6 +126,7 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
         if (g_unlockCancelledExceptionClass) env->DeleteGlobalRef(g_unlockCancelledExceptionClass);
         if (g_splitJoinProgressBridgeClass) env->DeleteGlobalRef(g_splitJoinProgressBridgeClass);
         if (g_splitJoinCancellationClass) env->DeleteGlobalRef(g_splitJoinCancellationClass);
+        if (g_repairLogBridgeClass) env->DeleteGlobalRef(g_repairLogBridgeClass);
     }
     g_usbBridgeClass = nullptr;
     g_usbReadMethod = nullptr;
@@ -129,5 +141,7 @@ extern "C" void JNI_OnUnload(JavaVM* vm, void*) {
     g_splitJoinProgressReportMethod = nullptr;
     g_splitJoinCancellationClass = nullptr;
     g_splitJoinIsCancelledMethod = nullptr;
+    g_repairLogBridgeClass = nullptr;
+    g_repairLogReportMethod = nullptr;
     g_vm = nullptr;
 }

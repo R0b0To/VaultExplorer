@@ -14,22 +14,8 @@ class _CategoryAcc {
   int count = 0;
 }
 
-/// Storage & Diagnostics → Storage Analyzer.
-///
-/// Unlike the rest of the Tools tab, this one is fully wired up already --
-/// see [ContainerToolService]'s doc comment: it reads real data through
-/// [VaultExplorerApi.getSpaceInfo] (capacity gauge) and a recursive
-/// [VaultExplorerApi.listDirectory] walk (heaviest files / file-type
-/// breakdown), the same calls the file browser itself uses, rather than
-/// through a not-yet-implemented service method.
-///
-/// The walk in [_walkMountedVolume] is capped at [_maxEntries] files and
-/// [_maxDepth] levels so a huge vault can't hang the UI thread indefinitely
-/// -- callers see a "results may be incomplete" notice rather than a
-/// screen that never finishes loading.
 class StorageAnalyzerScreen extends StatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
-
   const StorageAnalyzerScreen({super.key, required this.mountedContainers});
 
   @override
@@ -54,7 +40,7 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
   void initState() {
     super.initState();
     final list = widget.mountedContainers.value;
-    if (list.length == 1) {
+    if (list.isNotEmpty) {
       _selected = list.first;
       _load();
     }
@@ -70,11 +56,13 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
   void _onMountedChanged() {
     final list = widget.mountedContainers.value;
     final selected = _selected;
-    if (selected != null && !list.any((c) => c.volId == selected.volId)) {
+    if (list.isEmpty) {
       setState(() {
         _selected = null;
         _resetResults();
       });
+    } else if (selected == null || !list.any((c) => c.volId == selected.volId)) {
+      _selectTarget(list.first);
     }
   }
 
@@ -101,6 +89,7 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
     const audio = {'mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma'};
     const documents = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'odt', 'csv'};
     const archives = {'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'};
+
     if (images.contains(ext)) return 'images';
     if (videos.contains(ext)) return 'videos';
     if (audio.contains(ext)) return 'audio';
@@ -120,15 +109,14 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
 
     var total = target.totalSpace;
     var free = target.freeSpace;
+
     try {
       final space = await vaultExplorerApi.getSpaceInfo(target);
       if (space != null && space.length > 1) {
         if (space[0] >= 0) total = space[0];
         if (space[1] >= 0) free = space[1];
       }
-    } catch (_) {
-      // Fall back to the [MountedContainer]'s own last-known figures.
-    }
+    } catch (_) {}
 
     final entries = <StorageEntry>[];
     final categoryTotals = <String, _CategoryAcc>{};
@@ -224,7 +212,7 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
               OptionPickerTile<int>(
                 label: context.l10n.storageAnalyzerTargetLabel,
                 value: _selected?.volId ?? mountedList.first.volId,
-                subtitle: _selected?.displayName,
+                subtitle: _selected?.displayName ?? mountedList.first.displayName,
                 prefixIcon: Icons.lock_open_rounded,
                 options: mountedList
                     .map((c) => SelectOption(value: c.volId, label: c.displayName))
@@ -240,7 +228,7 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
                   padding: EdgeInsets.symmetric(vertical: 48),
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (_selected != null && _totalBytes != null) ...[
+              else if (_selected != null) ...[
                 _buildCapacityGauge(context),
                 if (_truncated) ...[
                   const SizedBox(height: AppSpacing.md),
@@ -264,45 +252,85 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
   Widget _buildCapacityGauge(BuildContext context) {
     final cs = context.colors;
     final textTheme = context.typography;
-    final total = _totalBytes!;
-    final free = _freeBytes ?? 0;
-    final used = (total - free).clamp(0, total == 0 ? 1 : total);
-    final fraction = total > 0 ? used / total : 0.0;
 
+    final total = _totalBytes ?? -1;
+    final free = _freeBytes ?? -1;
+    final scannedBytes = _breakdown.fold<int>(0, (sum, b) => sum + b.sizeBytes);
+
+    if (total > 0 && free >= 0) {
+      final used = (total - free).clamp(0, total);
+      final fraction = (used / total).clamp(0.0, 1.0);
+      return Center(
+        child: Column(
+          children: [
+            SizedBox(
+              width: 160,
+              height: 160,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 160,
+                    height: 160,
+                    child: CircularProgressIndicator(
+                      value: fraction,
+                      strokeWidth: 14,
+                      backgroundColor: cs.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation(cs.primary),
+                    ),
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${(fraction * 100).round()}%',
+                        style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              context.l10n.storageAnalyzerUsedOfTotal(formatBytes(used), formatBytes(total)),
+              style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Fallback for Folder Vaults or containers with unknown/unbounded capacity
     return Center(
       child: Column(
         children: [
-          SizedBox(
-            width: 160,
-            height: 160,
-            child: Stack(
-              alignment: Alignment.center,
+          Container(
+            width: 140,
+            height: 140,
+            decoration: BoxDecoration(
+              color: cs.primaryContainer.withValues(alpha: 0.3),
+              shape: BoxShape.circle,
+              border: Border.all(color: cs.primary.withValues(alpha: 0.5), width: 3),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(
-                  width: 160,
-                  height: 160,
-                  child: CircularProgressIndicator(
-                    value: fraction,
-                    strokeWidth: 14,
-                    backgroundColor: cs.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation(cs.primary),
+                Icon(Icons.folder_shared_rounded, size: 36, color: cs.primary),
+                const SizedBox(height: 6),
+                Text(
+                  formatBytes(scannedBytes),
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.primary,
                   ),
-                ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${(fraction * 100).round()}%',
-                      style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
                 ),
               ],
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            context.l10n.storageAnalyzerUsedOfTotal(formatBytes(used), formatBytes(total)),
+            'Total Vault Content Size: ${formatBytes(scannedBytes)}',
             style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
@@ -313,7 +341,6 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
   Widget _buildBreakdownSection(BuildContext context) {
     final textTheme = context.typography;
     final cs = context.colors;
-
     if (_breakdown.isEmpty) {
       return Text(
         context.l10n.storageAnalyzerNoFilesFound,
@@ -322,7 +349,6 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
     }
 
     final totalBytes = _breakdown.fold<int>(0, (sum, b) => sum + b.sizeBytes);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -373,11 +399,9 @@ class _StorageAnalyzerScreenState extends State<StorageAnalyzerScreen> {
   Widget _buildHeaviestFilesSection(BuildContext context) {
     final textTheme = context.typography;
     final cs = context.colors;
-
     if (_heaviest.isEmpty) {
       return const SizedBox.shrink();
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

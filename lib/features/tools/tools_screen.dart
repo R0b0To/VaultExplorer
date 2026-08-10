@@ -87,7 +87,9 @@ class ToolsScreen extends StatelessWidget {
                 iconColor: cs.secondary,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const SingleFileCryptoSheet(),
+                    builder: (_) => SingleFileCryptoSheet(
+                      mountedContainers: mountedContainers,
+                    ),
                   ),
                 ),
               ),
@@ -105,7 +107,9 @@ class ToolsScreen extends StatelessWidget {
                   iconColor: cs.primary,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => DuplicateFinderScreen(mountedContainers: mountedContainers),
+                      builder: (_) => DuplicateFinderScreen(
+                        mountedContainers: mountedContainers,
+                      ),
                     ),
                   ),
                 ),
@@ -116,7 +120,9 @@ class ToolsScreen extends StatelessWidget {
                   iconColor: cs.tertiary,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => StorageAnalyzerScreen(mountedContainers: mountedContainers),
+                      builder: (_) => StorageAnalyzerScreen(
+                        mountedContainers: mountedContainers,
+                      ),
                     ),
                   ),
                 ),

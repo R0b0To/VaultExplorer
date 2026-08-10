@@ -389,6 +389,7 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
         spacing: 8,
         runSpacing: 8,
         children: [
+          _presetChip(ChunkSizePreset.fourMb, context.l10n.splitChunkSizeFourMb),
           _presetChip(ChunkSizePreset.cloud8mb, context.l10n.splitChunkSizeCloud8mb),
           _presetChip(ChunkSizePreset.cloud32mb, context.l10n.splitChunkSizeCloud32mb),
           _presetChip(ChunkSizePreset.cloud100mb, context.l10n.splitChunkSizeCloud),
@@ -446,6 +447,12 @@ class _ContainerSplitterSheetState extends State<ContainerSplitterSheet> {
     return ChoiceChip(
       label: Text(label),
       selected: selected,
+      // The default checkmark is inserted/removed from the chip's layout
+      // on selection, changing each chip's width and shifting every chip
+      // after it within the Wrap. Selection is already communicated via
+      // the chip's background/label color change, so drop the checkmark
+      // rather than reserve space for it.
+      showCheckmark: false,
       onSelected: _busy ? null : (_) => setState(() => _preset = preset),
     );
   }

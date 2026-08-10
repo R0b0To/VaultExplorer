@@ -3886,6 +3886,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get splitChunkSizeCustomLabel => 'Custom size (MB)';
 
   @override
+  String get splitChunkSizeFourMb => '4 MB';
+
+  @override
   String get splitChunkSizeCloud8mb => '8 MB';
 
   @override

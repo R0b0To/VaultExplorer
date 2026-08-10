@@ -6554,6 +6554,12 @@ abstract class AppLocalizations {
   /// **'Custom size (MB)'**
   String get splitChunkSizeCustomLabel;
 
+  /// Chunk size preset label: 4 MB
+  ///
+  /// In en, this message translates to:
+  /// **'4 MB'**
+  String get splitChunkSizeFourMb;
+
   /// Chunk size preset label: 8 MB
   ///
   /// In en, this message translates to:

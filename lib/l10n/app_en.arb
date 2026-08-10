@@ -5033,6 +5033,10 @@
   "@splitChunkSizeCustomLabel": {
     "description": "Text field label for a custom chunk size in megabytes"
   },
+  "splitChunkSizeFourMb": "4 MB",
+  "@splitChunkSizeFourMb": {
+    "description": "Chunk size preset label: 4 MB"
+  },
   "splitChunkSizeCloud8mb": "8 MB",
   "@splitChunkSizeCloud8mb": {
     "description": "Chunk size preset label: 8 MB"

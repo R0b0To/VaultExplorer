@@ -4,39 +4,6 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/dashboard/vault_dashboard_screen.dart';
 import 'package:vaultexplorer/features/tools/tools_screen.dart';
 
-/// Top-level two-tab shell: [VaultDashboard] ("Vaults") and [ToolsScreen]
-/// ("Tools"), switched by a bottom bar that also holds a centered "Add
-/// vault" button -- see the Tools-page design note's "Primary Navigation
-/// Structure" section for why a bottom bar (not top tabs) replaced the
-/// earlier idea (top tabs would have competed visually with
-/// [VaultDashboard]'s own app bar title/search/Mask Mode trigger,
-/// ADR-028).
-///
-/// The "Add vault" action used to be a [FloatingActionButton.extended] on
-/// [VaultDashboard]'s own [Scaffold], reachable only from the Vaults tab.
-/// It now lives here instead, as a plain button in the middle of the
-/// bottom bar's row -- no floating/docked FAB, no notch, just a third
-/// item alongside the two tabs -- so it's one tap away regardless of
-/// which tab is showing. [_dashboardKey] reaches into [VaultDashboard]'s
-/// state to trigger the same "Mount / USB / Create" menu that FAB used
-/// to open -- see [VaultDashboardActions].
-///
-/// [_mountedNotifier] is the single live list of mounted volumes both tabs
-/// see: [VaultDashboard] writes to it (via its `mountedNotifier` param)
-/// every time its own `_mounted` list changes, and [ToolsScreen] reads it
-/// (via `mountedContainers`) for the Storage Analyzer's target picker and
-/// the Repair wizard's "choose a mounted volume" step. Neither tab tracks
-/// mounted-volume state independently.
-///
-/// Not reachable from Mask Mode / Disguise Mode: `_DisguiseModeGate`
-/// (`lib/app/vault_explorer_app.dart`) routes decoy mode straight to
-/// `DecoyArchiveExplorerScreen` instead of `LockGateScreen` → [MainShell],
-/// so the Tools tab structurally never appears there -- no extra
-/// hide-when-disguised logic needed on this end.
-///
-/// An [IndexedStack] (not a route switch) keeps both tabs alive across
-/// switches, so browsing state in the Vaults tab and any in-flight
-/// Tools-tab sheet survive a tab change instead of rebuilding from scratch.
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -48,11 +15,6 @@ class _MainShellState extends State<MainShell> {
   int _index = 0;
   final ValueNotifier<List<MountedContainer>> _mountedNotifier =
       ValueNotifier(const []);
-
-  /// Typed as the public [VaultDashboardActions] interface (not the
-  /// private `_VaultDashboardState`) so this file can call
-  /// [VaultDashboardActions.showAddVaultMenu] without needing to name a
-  /// class it isn't allowed to see.
   final GlobalKey<State<VaultDashboard>> _dashboardKey =
       GlobalKey<State<VaultDashboard>>();
 
@@ -62,15 +24,19 @@ class _MainShellState extends State<MainShell> {
     super.dispose();
   }
 
- void _onAddVaultTap() {
-    (_dashboardKey.currentState as VaultDashboardActions?)?.showAddVaultMenu();
+  void _onAddVaultTap() {
+    // Switch to Vaults tab if currently viewing Tools, then open the add menu
+    if (_index != 0) {
+      setState(() => _index = 0);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      (_dashboardKey.currentState as VaultDashboardActions?)?.showAddVaultMenu();
+    });
   }
-
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       body: IndexedStack(
         index: _index,
@@ -84,7 +50,7 @@ class _MainShellState extends State<MainShell> {
         child: SafeArea(
           top: false,
           child: SizedBox(
-            height: 64,
+            height: 68,
             child: Row(
               children: [
                 _MainBottomBarItem(
@@ -94,11 +60,9 @@ class _MainShellState extends State<MainShell> {
                   selected: _index == 0,
                   onTap: () => setState(() => _index = 0),
                 ),
-                _MainBottomBarItem(
+                _MainCenterActionButton(
                   icon: Icons.add_rounded,
-                  selectedIcon: Icons.add_rounded,
                   label: context.l10n.addVaultFabLabel,
-                  selected: false,
                   onTap: _onAddVaultTap,
                 ),
                 _MainBottomBarItem(
@@ -117,11 +81,6 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-/// One tab in [MainShell]'s bottom bar -- a stand-in for
-/// [NavigationDestination] (which needs a full destinations list, leaving
-/// no room for the "Add vault" button in between), styled to match: a
-/// pill-shaped selected indicator behind the icon, primary-tinted icon
-/// and label when selected, muted otherwise.
 class _MainBottomBarItem extends StatelessWidget {
   final IconData icon;
   final IconData selectedIcon;
@@ -141,14 +100,14 @@ class _MainBottomBarItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final color = selected ? cs.onSecondaryContainer : cs.onSurfaceVariant;
-
     return Expanded(
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6), // Reduced from 10 to 6
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
@@ -166,6 +125,64 @@ class _MainBottomBarItem extends StatelessWidget {
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: color,
                       fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MainCenterActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _MainCenterActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: cs.shadow.withValues(alpha: 0.12),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  icon,
+                  color: cs.onPrimaryContainer,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.bold,
                     ),
               ),
             ],

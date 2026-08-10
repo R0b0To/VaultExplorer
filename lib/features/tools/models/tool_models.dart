@@ -1,6 +1,7 @@
 library;
 
 enum ChunkSizePreset {
+  fourMb(4),
   cloud8mb(8),
   cloud32mb(32),
   cloud100mb(100),

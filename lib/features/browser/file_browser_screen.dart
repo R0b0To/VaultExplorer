@@ -2073,13 +2073,6 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
                           _statusMessage!,
                           key: ValueKey(_statusMessage),
                           tone: _statusIsError ? AppBannerTone.error : AppBannerTone.info,
-                          trailing: IconButton(
-                            icon: const Icon(Icons.close_rounded, size: AppIconSize.small),
-                            onPressed: _clearStatus,
-                            visualDensity: VisualDensity.compact,
-                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            padding: EdgeInsets.zero,
-                          ),
                         ),
                       ),
                     ),

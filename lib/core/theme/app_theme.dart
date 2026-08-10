@@ -1,47 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DESIGN TOKENS
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// Single source of truth for spacing / radius / icon-size / motion values.
-// New UI should always reference these instead of literal numbers so the
-// whole app can be re-tuned from one place.
-
 abstract final class AppRadius {
-  static const sm = 8.0; // chips, small controls
-  static const md = 12.0; // cards, tiles, standard containers, dialogs' children
-  static const lg = 20.0; // icon badges, prominent hero containers
-  static const xl = 24.0; // hero cards (dashboard container cards, etc.)
-  static const sheet = 28.0; // bottom sheets, dialogs (MD3 large)
-  static const full = 100.0; // pill shapes (buttons, progress bars, badges)
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 20.0;
+  static const xl = 24.0;
+  static const sheet = 28.0;
+  static const full = 100.0;
 }
 
 abstract final class AppIconSize {
-  static const inline = 14.0; // stat rows, meta text icons
-  static const small = 18.0; // input prefix icons, dense list icons
-  static const standard = 20.0; // toggle rows, section leading icons
-  static const action = 24.0; // AppBar / default IconButton
-  static const feature = 40.0; // empty-state / error-state illustrations
-  static const hero = 56.0; // large empty states
+  static const inline = 14.0;
+  static const small = 18.0;
+  static const standard = 20.0;
+  static const action = 24.0;
+  static const feature = 40.0;
+  static const hero = 56.0;
 }
 
 abstract final class AppSpacing {
-  // Step scale — prefer these over ad hoc SizedBox literals in new code.
   static const xs = 4.0;
   static const sm = 8.0;
   static const md = 16.0;
   static const lg = 24.0;
   static const xl = 32.0;
-
   static const pagePadding = EdgeInsets.fromLTRB(16, 12, 16, 32);
   static const sheetPadding = EdgeInsets.fromLTRB(24, 8, 24, 24);
   static const floatingStackClearance = 112.0;
 }
 
-/// Material 3 motion tokens (durations follow the M3 "easing & duration"
-/// spec — short for micro-interactions, medium for local transitions).
 abstract final class AppMotion {
   static const short1 = Duration(milliseconds: 100);
   static const short2 = Duration(milliseconds: 150);
@@ -49,24 +37,9 @@ abstract final class AppMotion {
   static const medium2 = Duration(milliseconds: 300);
   static const long1 = Duration(milliseconds: 400);
   static const long2 = Duration(milliseconds: 500);
-
-  /// M3 "emphasized" easing — use for hero-ish, attention-worthy motion.
   static const emphasized = Curves.easeInOutCubicEmphasized;
-
-  /// M3 "standard" easing — use for everyday enter/exit transitions.
   static const standard = Curves.easeOutCubic;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SEMANTIC COLORS (ThemeExtension)
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// ColorScheme has no "success" / "warning" roles. Screens previously reached
-// for raw Colors.green/Colors.amber for things like "saved" / "unsaved"
-// status (see text_editor_screen.dart). This extension gives them a themed,
-// dark/light-aware home instead, participating in ThemeData like any other
-// role: `Theme.of(context).extension<AppSemanticColors>()!` (or the
-// `context.semanticColors` shortcut below).
 
 @immutable
 class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
@@ -158,8 +131,6 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   }
 }
 
-/// Convenience accessors so call sites can write `context.colors.primary`
-/// instead of `Theme.of(context).colorScheme.primary`.
 extension AppThemeX on BuildContext {
   ColorScheme get colors => Theme.of(this).colorScheme;
   TextTheme get typography => Theme.of(this).textTheme;
@@ -167,107 +138,75 @@ extension AppThemeX on BuildContext {
       Theme.of(this).extension<AppSemanticColors>() ?? AppSemanticColors.dark;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// COLOR SCHEMES
-// ─────────────────────────────────────────────────────────────────────────────
+const Color _seedColor = Color(0xFF0B57D0);
 
-const Color _seedColor = Color(0xFF0B57D0); // Google Blue
-
-/// Hand-tuned MD3 dark palette (kept from the original app design — this is
-/// the "vault" look-and-feel) expressed as a *complete* ColorScheme rather
-/// than letting `ColorScheme.dark()` synthesize the surface-container and
-/// tertiary roles. Being explicit here means every role has a deliberate,
-/// contrast-checked value instead of an algorithmic guess.
 ColorScheme _darkColorScheme() => const ColorScheme(
       brightness: Brightness.dark,
-
       primary: Color(0xFFA8C7FA),
       onPrimary: Color(0xFF062E6F),
       primaryContainer: Color(0xFF0842A0),
       onPrimaryContainer: Color(0xFFD3E3FD),
-
       secondary: Color(0xFFBEC6DC),
       onSecondary: Color(0xFF283141),
       secondaryContainer: Color(0xFF3C4858),
       onSecondaryContainer: Color(0xFFDAE2F9),
-
       tertiary: Color(0xFFCFBCFF),
       onTertiary: Color(0xFF34275B),
       tertiaryContainer: Color(0xFF4B3D74),
       onTertiaryContainer: Color(0xFFEADDFF),
-
       error: Color(0xFFFFB4AB),
       onError: Color(0xFF690005),
       errorContainer: Color(0xFF93000A),
       onErrorContainer: Color(0xFFFFDAD6),
-
       surface: Color(0xFF111318),
       onSurface: Color(0xFFE2E2E9),
       onSurfaceVariant: Color(0xFFC2C7CF),
-
       surfaceContainerLowest: Color(0xFF0C0E13),
       surfaceContainerLow: Color(0xFF191C20),
       surfaceContainer: Color(0xFF1D2024),
       surfaceContainerHigh: Color(0xFF272A2F),
       surfaceContainerHighest: Color(0xFF32353A),
-
       outline: Color(0xFF8C9199),
       outlineVariant: Color(0xFF42474E),
-
       inverseSurface: Color(0xFFE2E2E9),
       onInverseSurface: Color(0xFF2E3135),
       inversePrimary: Color(0xFF3A5D92),
-
       shadow: Color(0xFF000000),
       scrim: Color(0xFF000000),
       surfaceTint: Color(0xFFA8C7FA),
     );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// THEME BUILDERS
-// ─────────────────────────────────────────────────────────────────────────────
-
 ThemeData buildDarkTheme() => _buildTheme(_darkColorScheme(), Brightness.dark);
-
 ThemeData buildLightTheme() => _buildTheme(
       ColorScheme.fromSeed(seedColor: _seedColor, brightness: Brightness.light),
       Brightness.light,
     );
 
-/// Retained for any older call sites — prefer [buildDarkTheme] explicitly.
 @Deprecated('Use buildDarkTheme() (or buildLightTheme()) instead.')
 ThemeData buildTheme() => buildDarkTheme();
 
 ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
   final isDark = brightness == Brightness.dark;
-
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
     colorScheme: cs,
     scaffoldBackgroundColor: cs.surface,
     visualDensity: VisualDensity.adaptivePlatformDensity,
-
-    // Android's "wet ink" ripple (Android 12+) instead of the classic
-    // circular splash — a small but noticeable native-feel upgrade.
     splashFactory: InkSparkle.splashFactory,
-
-    // Predictive back on Android 14+/16, standard slide on iOS.
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
         TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
       },
     ),
-
     extensions: [isDark ? AppSemanticColors.dark : AppSemanticColors.light],
-
     appBarTheme: AppBarTheme(
       backgroundColor: cs.surface,
       foregroundColor: cs.onSurface,
       elevation: 0,
       scrolledUnderElevation: 3,
       surfaceTintColor: cs.surfaceTint,
-      centerTitle: false, // Native Android left-aligns titles
+      centerTitle: false,
       titleTextStyle: TextStyle(
         fontSize: 22,
         fontWeight: FontWeight.w400,
@@ -289,7 +228,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
               systemNavigationBarIconBrightness: Brightness.dark,
             ),
     ),
-
     cardTheme: CardThemeData(
       color: cs.surfaceContainerLow,
       elevation: 0,
@@ -300,7 +238,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       ),
       margin: EdgeInsets.zero,
     ),
-
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: cs.surfaceContainerHigh,
@@ -331,13 +268,11 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       prefixIconColor: cs.onSurfaceVariant,
       suffixIconColor: cs.onSurfaceVariant,
     ),
-
     dividerTheme: DividerThemeData(
       color: cs.outlineVariant,
       thickness: 1,
       space: 1,
     ),
-
     listTileTheme: ListTileThemeData(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       iconColor: cs.onSurfaceVariant,
@@ -346,7 +281,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         borderRadius: BorderRadius.circular(AppRadius.md),
       ),
     ),
-
     checkboxTheme: CheckboxThemeData(
       fillColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) return cs.primary;
@@ -356,7 +290,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       side: BorderSide(color: cs.onSurfaceVariant, width: 2),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
     ),
-
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) return cs.onPrimary;
@@ -371,22 +304,18 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         return cs.outline;
       }),
     ),
-
     radioTheme: RadioThemeData(
       fillColor: WidgetStateProperty.resolveWith((states) {
         if (states.contains(WidgetState.selected)) return cs.primary;
         return cs.outline;
       }),
     ),
-
     sliderTheme: SliderThemeData(
       activeTrackColor: cs.primary,
       inactiveTrackColor: cs.surfaceContainerHighest,
       thumbColor: cs.primary,
       overlayColor: cs.primary.withValues(alpha: 0.12),
     ),
-
-    // Buttons — pill-shaped, 48dp minimum touch target across the board.
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: cs.primary,
@@ -402,7 +331,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         minimumSize: const Size(double.infinity, 48),
       ),
     ),
-
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: cs.surfaceContainerHigh,
@@ -413,7 +341,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         minimumSize: const Size(0, 48),
       ),
     ),
-
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         foregroundColor: cs.primary,
@@ -423,7 +350,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         minimumSize: const Size(0, 48),
       ),
     ),
-
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: cs.primary,
@@ -436,11 +362,9 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         minimumSize: const Size(0, 48),
       ),
     ),
-
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(foregroundColor: cs.onSurfaceVariant),
     ),
-
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: cs.primaryContainer,
       foregroundColor: cs.onPrimaryContainer,
@@ -453,7 +377,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
     ),
-
     chipTheme: ChipThemeData(
       backgroundColor: cs.surfaceContainerHigh,
       selectedColor: cs.secondaryContainer,
@@ -464,7 +387,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.full)),
       padding: const EdgeInsets.symmetric(horizontal: 8),
     ),
-
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: SegmentedButton.styleFrom(
         backgroundColor: cs.surfaceContainerHigh,
@@ -474,7 +396,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         side: BorderSide(color: cs.outlineVariant),
       ),
     ),
-
     navigationBarTheme: NavigationBarThemeData(
       height: 80,
       elevation: 0,
@@ -500,7 +421,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         );
       }),
     ),
-
     popupMenuTheme: PopupMenuThemeData(
       color: cs.surfaceContainer,
       elevation: 3,
@@ -511,7 +431,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       ),
       textStyle: TextStyle(color: cs.onSurface, fontSize: 14),
     ),
-
     menuTheme: MenuThemeData(
       style: MenuStyle(
         backgroundColor: WidgetStateProperty.all(cs.surfaceContainer),
@@ -524,7 +443,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
         ),
       ),
     ),
-
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: cs.surfaceContainerLow,
       modalBackgroundColor: cs.surfaceContainerLow,
@@ -532,21 +450,20 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
       ),
-      showDragHandle: true, // Native Android drag pill
+      showDragHandle: true,
       dragHandleColor: cs.onSurfaceVariant.withValues(alpha: 0.4),
       elevation: 1,
       modalElevation: 1,
     ),
-
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: cs.inverseSurface,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       contentTextStyle: TextStyle(color: cs.onInverseSurface, fontSize: 14),
       actionTextColor: cs.inversePrimary,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.full)),
       behavior: SnackBarBehavior.floating,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     ),
-
     dialogTheme: DialogThemeData(
       backgroundColor: cs.surfaceContainerHigh,
       surfaceTintColor: Colors.transparent,
@@ -562,7 +479,6 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       ),
       contentTextStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
     ),
-
     tooltipTheme: TooltipThemeData(
       decoration: BoxDecoration(
         color: cs.inverseSurface,
@@ -570,13 +486,11 @@ ThemeData _buildTheme(ColorScheme cs, Brightness brightness) {
       ),
       textStyle: TextStyle(color: cs.onInverseSurface, fontSize: 12),
     ),
-
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: cs.primary,
       linearTrackColor: cs.surfaceContainerHighest,
       circularTrackColor: cs.surfaceContainerHighest,
     ),
-
     textTheme: TextTheme(
       headlineSmall: TextStyle(
         color: cs.onSurface,

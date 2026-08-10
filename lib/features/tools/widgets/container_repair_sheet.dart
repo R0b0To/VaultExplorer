@@ -8,15 +8,8 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 import 'package:vaultexplorer/features/tools/services/container_tool_service.dart';
 
-/// Container Utilities → Check & Repair.
-///
-/// A three-step diagnostic wizard: pick a target (an unmounted container
-/// file, or one of [mountedContainers]'s already-open volumes) → run the
-/// scan → act on whatever it finds. See container_repair.cpp for what the
-/// scan/restore/check steps actually do for each container format.
 class ContainerRepairSheet extends StatefulWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
-
   const ContainerRepairSheet({super.key, required this.mountedContainers});
 
   @override
@@ -42,7 +35,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   void _appendLogLine(String message) {
     if (!mounted) return;
     setState(() => _logLines.add(message));
-    // Autoscroll to the newest line once the frame with it has laid out.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_logScrollController.hasClients) return;
       _logScrollController.animateTo(
@@ -76,9 +68,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     _diagnosis = null;
     _actionSucceeded = null;
     _error = null;
-    // Otherwise a log from the previous target's scan/repair run would
-    // still be sitting there the next time this step is shown, above
-    // wherever the new target's own run appends its first line.
     _logLines.clear();
   }
 
@@ -90,14 +79,15 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   Future<void> _runDiagnosis() async {
     final target = _target;
     if (target == null) return;
-
     setState(() {
       _diagnosing = true;
-      _error = null;
-      _logLines.clear();
+      _resetDiagnosis();
     });
     try {
-      final result = await ContainerToolService.instance.diagnoseTarget(target, onLogLine: _appendLogLine);
+      final result = await ContainerToolService.instance.diagnoseTarget(
+        target,
+        onLogLine: _appendLogLine,
+      );
       if (!mounted) return;
       setState(() {
         _diagnosing = false;
@@ -252,39 +242,16 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: AppSpacing.pagePadding,
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeInOutCubic,
-          alignment: Alignment.topCenter,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            transitionBuilder: (child, animation) =>
-                FadeTransition(opacity: animation, child: child),
-            // Default layoutBuilder stacks the outgoing child under the
-            // incoming one and sizes to whichever is taller for the whole
-            // crossfade -- with AnimatedSize wrapping this, that meant an
-            // instant jump to that combined height the moment a switch
-            // started, then a second, separate animated correction down
-            // to the real size once the fade finished. Keeping only the
-            // current child here means AnimatedSize has one true target
-            // height throughout, so target<->diagnosis switches (and
-            // everything that changes height within the diagnosis step --
-            // log panel, result banners) settle in a single smooth resize
-            // instead of several visible jumps.
-            layoutBuilder: (currentChild, previousChildren) =>
-                currentChild ?? const SizedBox.shrink(),
-            child: KeyedSubtree(
-              key: ValueKey(_target == null),
-              child: _target == null
-                  ? _buildTargetStep(context)
-                  : _buildDiagnosisStep(context),
-            ),
-          ),
-        ),
+      body: SafeArea(
+        child: _target == null
+            ? SingleChildScrollView(
+                padding: AppSpacing.pagePadding,
+                child: _buildTargetStep(context),
+              )
+            : Padding(
+                padding: AppSpacing.pagePadding,
+                child: _buildDiagnosisStep(context),
+              ),
       ),
     );
   }
@@ -292,7 +259,6 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   Widget _buildTargetStep(BuildContext context) {
     final textTheme = context.typography;
     final cs = context.colors;
-
     return ValueListenableBuilder<List<MountedContainer>>(
       valueListenable: widget.mountedContainers,
       builder: (context, mounted, _) {
@@ -340,16 +306,41 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     );
   }
 
+  String _diagnosisLabel(BuildContext context, RepairDiagnosis diagnosis) =>
+      switch (diagnosis) {
+        RepairDiagnosis.healthy => context.l10n.repairDiagnosisHealthy,
+        RepairDiagnosis.headerCorrupted =>
+          context.l10n.repairDiagnosisHeaderCorrupted,
+        RepairDiagnosis.filesystemDirty =>
+          context.l10n.repairDiagnosisFilesystemDirty,
+      };
+
+  AppBannerTone _diagnosisTone(RepairDiagnosis diagnosis) =>
+      switch (diagnosis) {
+        RepairDiagnosis.healthy => AppBannerTone.success,
+        RepairDiagnosis.headerCorrupted => AppBannerTone.warning,
+        RepairDiagnosis.filesystemDirty => AppBannerTone.warning,
+      };
+
+  IconData _diagnosisIcon(RepairDiagnosis diagnosis) =>
+      switch (diagnosis) {
+        RepairDiagnosis.healthy => Icons.check_circle_outline_rounded,
+        RepairDiagnosis.headerCorrupted => Icons.warning_amber_rounded,
+        RepairDiagnosis.filesystemDirty => Icons.warning_amber_rounded,
+      };
+
   Widget _buildDiagnosisStep(BuildContext context) {
     final textTheme = context.typography;
     final cs = context.colors;
     final target = _target!;
-    final targetName =
-        target is UnmountedFileTarget ? target.displayName : (target as MountedVolumeTarget).displayName;
+    final targetName = target is UnmountedFileTarget
+        ? target.displayName
+        : (target as MountedVolumeTarget).displayName;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Target summary card
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -359,7 +350,9 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           child: Row(
             children: [
               Icon(
-                target is UnmountedFileTarget ? Icons.insert_drive_file_outlined : Icons.lock_open_rounded,
+                target is UnmountedFileTarget
+                    ? Icons.insert_drive_file_outlined
+                    : Icons.lock_open_rounded,
                 size: AppIconSize.small,
                 color: cs.primary,
               ),
@@ -367,135 +360,155 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
               Expanded(
                 child: Text(
                   targetName,
-                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               TextButton(
-                onPressed: (_diagnosing || _actionRunning) ? null : _changeTarget,
+                onPressed:
+                    (_diagnosing || _actionRunning) ? null : _changeTarget,
                 child: Text(context.l10n.repairChangeTargetButton),
               ),
             ],
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        if (_logLines.isNotEmpty) ...[
-          _buildLogPanel(context),
+
+        // Log panel expanding to fill available screen height
+        Expanded(
+          child: _buildLogPanel(context),
+        ),
+        const SizedBox(height: AppSpacing.md),
+
+        // Diagnosis banner (only shown before repair action succeeds)
+        if (_diagnosis != null && _actionSucceeded != true) ...[
+          InlineBanner(
+            _diagnosisLabel(context, _diagnosis!),
+            tone: _diagnosisTone(_diagnosis!),
+            icon: _diagnosisIcon(_diagnosis!),
+          ),
           const SizedBox(height: AppSpacing.md),
         ],
-        if (_diagnosis == null) ...[
-          if (_error != null) ...[
-            InlineErrorBanner(_error!),
-            const SizedBox(height: AppSpacing.md),
-          ],
-          FilledButton(
-            onPressed: _diagnosing ? null : _runDiagnosis,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              shape: const StadiumBorder(),
-            ),
-            child: _diagnosing
-                ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation(cs.onPrimary),
-                    ),
-                  )
-                : Text(
-                    context.l10n.repairScanButton,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+
+        // Action Succeeded / Failed result banner
+        if (_actionSucceeded != null) ...[
+          InlineBanner(
+            _actionSucceeded!
+                ? context.l10n.repairActionSucceededMessage
+                : context.l10n.repairActionFailedMessage,
+            tone: _actionSucceeded!
+                ? AppBannerTone.success
+                : AppBannerTone.error,
           ),
-        ] else
-          ..._buildDiagnosisResult(context, target),
+          const SizedBox(height: AppSpacing.md),
+        ],
+
+        // Error banner
+        if (_error != null) ...[
+          InlineErrorBanner(_error!),
+          const SizedBox(height: AppSpacing.md),
+        ],
+
+        // Action Button
+        _buildActionButton(context, target),
       ],
     );
   }
 
-  List<Widget> _buildDiagnosisResult(BuildContext context, RepairTarget target) {
-    final diagnosis = _diagnosis!;
-    final (tone, icon, label) = switch (diagnosis) {
-      RepairDiagnosis.healthy => (
-          AppBannerTone.success,
-          Icons.check_circle_outline_rounded,
-          context.l10n.repairDiagnosisHealthy,
-        ),
-      RepairDiagnosis.headerCorrupted => (
-          AppBannerTone.warning,
-          Icons.warning_amber_rounded,
-          context.l10n.repairDiagnosisHeaderCorrupted,
-        ),
-      RepairDiagnosis.filesystemDirty => (
-          AppBannerTone.warning,
-          Icons.warning_amber_rounded,
-          context.l10n.repairDiagnosisFilesystemDirty,
-        ),
-    };
+  Widget _buildActionButton(BuildContext context, RepairTarget target) {
+    final cs = context.colors;
 
-    return [
-      InlineBanner(label, tone: tone, icon: icon),
-      const SizedBox(height: AppSpacing.md),
-      if (_actionSucceeded != null) ...[
-        InlineBanner(
-          _actionSucceeded!
-              ? context.l10n.repairActionSucceededMessage
-              : context.l10n.repairActionFailedMessage,
-          tone: _actionSucceeded! ? AppBannerTone.success : AppBannerTone.error,
+    // Show fix button if diagnosis found corruption AND action has NOT succeeded yet
+    if (_diagnosis == RepairDiagnosis.headerCorrupted && _actionSucceeded != true) {
+      return FilledButton(
+        onPressed: _actionRunning ? null : _restoreBackupHeader,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: const StadiumBorder(),
         ),
-        const SizedBox(height: AppSpacing.md),
-      ],
-      if (_error != null) ...[
-        InlineErrorBanner(_error!),
-        const SizedBox(height: AppSpacing.md),
-      ],
-      if (diagnosis == RepairDiagnosis.headerCorrupted)
-        FilledButton(
-          onPressed: _actionRunning ? null : _restoreBackupHeader,
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), shape: const StadiumBorder()),
-          child: _actionButtonChild(context.l10n.repairRestoreBackupHeaderButton),
-        )
-      else if (diagnosis == RepairDiagnosis.filesystemDirty && target is MountedVolumeTarget)
-        FilledButton(
-          onPressed: _actionRunning ? null : _runFilesystemCheck,
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), shape: const StadiumBorder()),
-          child: _actionButtonChild(context.l10n.repairRunFilesystemCheckButton),
+        child: _actionButtonChild(context.l10n.repairRestoreBackupHeaderButton),
+      );
+    }
+
+    if (_diagnosis == RepairDiagnosis.filesystemDirty &&
+        target is MountedVolumeTarget &&
+        _actionSucceeded != true) {
+      return FilledButton(
+        onPressed: _actionRunning ? null : _runFilesystemCheck,
+        style: FilledButton.styleFrom(
+          minimumSize: const Size.fromHeight(52),
+          shape: const StadiumBorder(),
         ),
-    ];
+        child: _actionButtonChild(context.l10n.repairRunFilesystemCheckButton),
+      );
+    }
+
+    // Otherwise (no diagnosis yet, healthy, or after successful repair): show Diagnostic Scan button
+    return FilledButton(
+      onPressed: (_diagnosing || _actionRunning) ? null : _runDiagnosis,
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(52),
+        shape: const StadiumBorder(),
+      ),
+      child: _diagnosing
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation(cs.onPrimary),
+              ),
+            )
+          : Text(
+              context.l10n.repairScanButton,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+    );
   }
 
   Widget _buildLogPanel(BuildContext context) {
     final cs = context.colors;
     return Container(
-      height: 160,
       width: double.infinity,
+      height: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: cs.outlineVariant),
       ),
-      child: Scrollbar(
-        controller: _logScrollController,
-        child: ListView.builder(
-          controller: _logScrollController,
-          itemCount: _logLines.length,
-          itemBuilder: (context, index) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 1),
-            child: Text(
-              _logLines[index],
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                color: cs.onSurfaceVariant,
-                height: 1.3,
+      child: _logLines.isEmpty
+          ? Center(
+              child: Text(
+                'Log output will appear here...',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                ),
+              ),
+            )
+          : Scrollbar(
+              controller: _logScrollController,
+              child: ListView.builder(
+                controller: _logScrollController,
+                itemCount: _logLines.length,
+                itemBuilder: (context, index) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 1),
+                  child: Text(
+                    _logLines[index],
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 

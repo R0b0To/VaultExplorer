@@ -5,19 +5,10 @@ import 'package:vaultexplorer/features/browser/widgets/file_operations_sheet.dar
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_pill.dart';
-
 import '../../utils/format_utils.dart';
 
-/// Live file-operation progress indicator.
-///
-/// Auto-dismisses [_kLingerDuration] after a clean (no-error) completion.
-/// The linger timer is paused while [FileOperationsSheet] is open (tracked
-/// via [FileOperationsSheet.isOpenNotifier]) so the pill's underlying history
-/// doesn't get cleared out from under the person while they're actively
-/// looking at it — it resumes counting down once they close the sheet.
 class OperationActivityPill extends StatefulWidget {
   const OperationActivityPill({super.key});
-
   @override
   State<OperationActivityPill> createState() => _OperationActivityPillState();
 }
@@ -47,10 +38,8 @@ class _OperationActivityPillState extends State<OperationActivityPill> {
   void _maybeScheduleAutoHide() {
     final svc = FileOperationService.instance;
     _hideTimer?.cancel();
-
     if (svc.operations.isEmpty || svc.activeCount > 0) return;
-    if (FileOperationsSheet.isOpenNotifier.value) return; // paused while viewing
-
+    if (FileOperationsSheet.isOpenNotifier.value) return;
     final hasErrors = svc.operations.any(
       (op) =>
           op.status == FileOperationStatus.failed ||
@@ -58,7 +47,6 @@ class _OperationActivityPillState extends State<OperationActivityPill> {
           op.status == FileOperationStatus.completedWithErrors,
     );
     if (hasErrors) return;
-
     _hideTimer = Timer(_kLingerDuration, () {
       FileOperationService.instance.clearFinished();
     });
@@ -72,16 +60,14 @@ class _OperationActivityPillState extends State<OperationActivityPill> {
         final svc = FileOperationService.instance;
         final ops = svc.operations;
         if (ops.isEmpty) return const SizedBox.shrink();
-
         final active = svc.activeOperations;
         final hasActive = active.isNotEmpty;
         final primary = hasActive ? active.last : ops.last;
-
         return ListenableBuilder(
           listenable: primary,
           builder: (context, _) => _OperationPillContent(
             primary: primary,
-            totalOps: ops.length,
+            activeCount: active.length,
             hasActive: hasActive,
           ),
         );
@@ -92,12 +78,12 @@ class _OperationActivityPillState extends State<OperationActivityPill> {
 
 class _OperationPillContent extends StatelessWidget {
   final FileOperation primary;
-  final int totalOps;
+  final int activeCount;
   final bool hasActive;
 
   const _OperationPillContent({
     required this.primary,
-    required this.totalOps,
+    required this.activeCount,
     required this.hasActive,
   });
 
@@ -121,31 +107,41 @@ class _OperationPillContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
     final isError =
         primary.status == FileOperationStatus.failed ||
         primary.status == FileOperationStatus.diskFull ||
         primary.status == FileOperationStatus.completedWithErrors;
-
     final color = isError ? cs.errorContainer : cs.secondaryContainer;
     final onColor = isError ? cs.onErrorContainer : cs.onSecondaryContainer;
 
-    final multiOp = totalOps > 1;
-    final label = multiOp
-        ? context.l10n.multiOpLabel(totalOps)
-        : (hasActive
-              ? (primary.currentActivity.isNotEmpty ? primary.currentActivity : primary.shortSummary)
-              : primary.completionSummary);
-    final sublabel = multiOp
-        ? context.l10n.multiOpSublabel(hasActive ? primary.shortSummary : context.l10n.completed)
-        : (hasActive ? _progressText(context, primary) : '');
+    final String label;
+    final String sublabel;
+
+    if (hasActive) {
+      label = primary.currentActivity.isNotEmpty
+          ? primary.currentActivity
+          : primary.shortSummary;
+
+      final progress = _progressText(context, primary);
+      if (activeCount > 1) {
+        sublabel = progress.isNotEmpty
+            ? '$progress · +${activeCount - 1} more'
+            : '+${activeCount - 1} more';
+      } else {
+        sublabel = progress;
+      }
+    } else {
+      label = primary.completionSummary;
+      sublabel = '';
+    }
 
     return FloatingPill(
       color: color,
       onTap: () => FileOperationsSheet.show(context),
-      child: SizedBox(
-        width: 290,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 360),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             if (hasActive)
               SizedBox(
@@ -168,8 +164,8 @@ class _OperationPillContent extends StatelessWidget {
                 size: AppIconSize.standard,
                 color: onColor,
               ),
-            const SizedBox(width: 12),
-            Expanded(
+            const SizedBox(width: 10),
+            Flexible(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,

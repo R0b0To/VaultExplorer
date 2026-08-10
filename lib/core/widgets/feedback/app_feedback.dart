@@ -3,9 +3,6 @@ import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/feedback/inline_banner.dart' show AppBannerTone;
 
-/// Centralized SnackBar presenter so every screen shows the same shape,
-/// duration, and icon language instead of hand-building `SnackBar(...)`
-/// inline. Uses [AppSemanticColors] for success/warning tones.
 void showAppSnackBar(
   BuildContext context, {
   required String message,
@@ -15,7 +12,6 @@ void showAppSnackBar(
 }) {
   final cs = context.colors;
   final semantic = context.semanticColors;
-
   final (Color bg, Color fg, IconData defaultIcon) = switch (tone) {
     AppBannerTone.info => (cs.inverseSurface, cs.onInverseSurface, Icons.info_outline_rounded),
     AppBannerTone.success => (semantic.success, semantic.onSuccess, Icons.check_circle_rounded),
@@ -27,17 +23,62 @@ void showAppSnackBar(
     ..clearSnackBars()
     ..showSnackBar(
       SnackBar(
-        backgroundColor: bg,
-        content: Row(
-          children: [
-            Icon(icon ?? defaultIcon, color: fg, size: AppIconSize.standard),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(message, style: TextStyle(color: fg)),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        behavior: SnackBarBehavior.floating,
+        padding: EdgeInsets.zero,
+        margin: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
+        duration: const Duration(seconds: 3),
+        content: Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(AppRadius.full),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon ?? defaultIcon, color: fg, size: AppIconSize.standard),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    message,
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (action != null) ...[
+                  const SizedBox(width: 8),
+                  TextButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      action.onPressed();
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: action.textColor ?? cs.inversePrimary,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(action.label),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
-        action: action,
       ),
     );
 }

@@ -22,6 +22,9 @@
 #include "jni/jni_callbacks.h"
 
 #include "diskio.h" // FatFs: BYTE/LBA_t/UINT/DRESULT + disk_read/disk_write, see fat32/exFAT check below
+#include "ff.h" // FatFs public API: f_opendir/f_readdir/f_unlink, for the directory-tree deep scan below
+#include "filesystems/filesystem_paths.h" // drivePaths[] -- the volume is already f_mount'd by the time this runs
+#include "containers/container_utils.h" // fatToUnixTimestamp
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
 
@@ -238,47 +241,63 @@ RepairDiagnosisCode diagnoseVeraCrypt(int fd, uint64_t fileSize, int opId) {
 
 namespace {
 
-RepairDiagnosisCode diagnoseUnmountedContainerFileImpl(int fd, ContainerFormat& outFormat, bool& outFormatKnown) {
+RepairDiagnosisCode diagnoseUnmountedContainerFileImpl(int fd, ContainerFormat& outFormat, bool& outFormatKnown,
+                                                         int opId) {
     outFormatKnown = false;
     if (fd < 0) return RepairDiagnosisCode::kHeaderCorrupted;
 
     struct stat st{};
-    if (fstat(fd, &st) != 0 || st.st_size <= 0) return RepairDiagnosisCode::kHeaderCorrupted;
+    if (fstat(fd, &st) != 0 || st.st_size <= 0) {
+        rlog(opId, "Could not stat the file, or it's empty -- flagging as corrupted.");
+        return RepairDiagnosisCode::kHeaderCorrupted;
+    }
     const uint64_t fileSize = static_cast<uint64_t>(st.st_size);
 
     uint8_t magicProbe[6];
-    if (!preadFully(fd, 0, magicProbe, sizeof(magicProbe))) return RepairDiagnosisCode::kHeaderCorrupted;
+    if (!preadFully(fd, 0, magicProbe, sizeof(magicProbe))) {
+        rlog(opId, "Could not read the first few bytes of the file -- flagging as corrupted.");
+        return RepairDiagnosisCode::kHeaderCorrupted;
+    }
 
     if (isLuksContainer(magicProbe, sizeof(magicProbe))) {
         uint8_t versionBuf[2];
-        if (!preadFully(fd, 6, versionBuf, sizeof(versionBuf))) return RepairDiagnosisCode::kHeaderCorrupted;
+        if (!preadFully(fd, 6, versionBuf, sizeof(versionBuf))) {
+            rlog(opId, "LUKS magic found, but the version field couldn't be read -- flagging as corrupted.");
+            return RepairDiagnosisCode::kHeaderCorrupted;
+        }
         const uint16_t version = (uint16_t(versionBuf[0]) << 8) | versionBuf[1];
 
         if (version == 1) {
             outFormat = ContainerFormat::kLuks1;
             outFormatKnown = true;
-            return diagnoseLuks1(fd, fileSize);
+            return diagnoseLuks1(fd, fileSize, opId);
         }
         if (version == 2) {
             outFormat = ContainerFormat::kLuks2;
             outFormatKnown = true;
+            rlog(opId, "LUKS2 container detected -- checking primary and secondary header checksums...");
             LuksByteReader reader = [fd](uint64_t offset, void* outData, size_t len) -> bool {
                 return preadFully(fd, offset, outData, len);
             };
             bool primaryValid = false, secondaryValid = false;
             if (!luks2CheckHeaderIntegrity(reader, primaryValid, secondaryValid)) {
+                rlog(opId, "Could not read the LUKS2 headers -- flagging as corrupted.");
                 return RepairDiagnosisCode::kHeaderCorrupted;
             }
+            rlog(opId, primaryValid ? "Primary header checksum is valid." : "Primary header checksum is invalid.");
+            rlog(opId, secondaryValid ? "Secondary (backup) header checksum is valid."
+                                       : "Secondary (backup) header checksum is invalid.");
             return primaryValid ? RepairDiagnosisCode::kHealthy : RepairDiagnosisCode::kHeaderCorrupted;
         }
         // Recognized as LUKS but an unknown version -- still "known", just
         // not one we can say anything more specific about.
+        rlog(opId, "LUKS magic found, but the version number isn't one this tool recognizes.");
         outFormatKnown = true;
         outFormat = ContainerFormat::kLuks2;
         return RepairDiagnosisCode::kHeaderCorrupted;
     }
 
-    if (detectBitlockerAnywhereInFile(fd, fileSize)) {
+    if (detectBitlockerAnywhereInFile(fd, fileSize, opId)) {
         // BitLocker's FVE metadata format isn't one this tool can verify or
         // repair (no backup-header concept analogous to VeraCrypt/LUKS2 is
         // wired up here) -- report healthy rather than a corruption we
@@ -294,7 +313,7 @@ RepairDiagnosisCode diagnoseUnmountedContainerFileImpl(int fd, ContainerFormat& 
     // BitLocker is treated as a VeraCrypt-family candidate.
     outFormat = ContainerFormat::kVeraCrypt;
     outFormatKnown = true;
-    return diagnoseVeraCrypt(fd, fileSize);
+    return diagnoseVeraCrypt(fd, fileSize, opId);
 }
 
 } // namespace
@@ -307,8 +326,9 @@ bool repairFormatNeedsPasswordForRestore(ContainerFormat format) {
 // returning, on every path -- matching this codebase's convention for
 // native functions fed a Kotlin `detachFd()`'d SAF descriptor (see e.g.
 // changeContainerPassword in container_create.cpp).
-RepairDiagnosisCode diagnoseUnmountedContainerFile(int fd, ContainerFormat& outFormat, bool& outFormatKnown) {
-    RepairDiagnosisCode code = diagnoseUnmountedContainerFileImpl(fd, outFormat, outFormatKnown);
+RepairDiagnosisCode diagnoseUnmountedContainerFile(int fd, ContainerFormat& outFormat, bool& outFormatKnown,
+                                                    int logOpId) {
+    RepairDiagnosisCode code = diagnoseUnmountedContainerFileImpl(fd, outFormat, outFormatKnown, logOpId);
     if (fd >= 0) close(fd);
     return code;
 }
@@ -317,25 +337,31 @@ RepairDiagnosisCode diagnoseUnmountedContainerFile(int fd, ContainerFormat& outF
 
 namespace {
 
-bool restoreLuks2BackupHeaderUnmountedImpl(int fd) {
+bool restoreLuks2BackupHeaderUnmountedImpl(int fd, int opId) {
     if (fd < 0) return false;
+    rlog(opId, "Reading the secondary (backup) header...");
     LuksByteReader reader = [fd](uint64_t offset, void* outData, size_t len) -> bool {
         return preadFully(fd, offset, outData, len);
     };
     LuksByteWriter writer = [fd](uint64_t offset, const void* data, size_t len) -> bool {
         return pwriteFully(fd, offset, data, len);
     };
-    return luks2RestoreHeaderFromBackup(reader, writer);
+    rlog(opId, "Verifying the backup header's checksum before trusting it...");
+    const bool restored = luks2RestoreHeaderFromBackup(reader, writer);
+    rlog(opId, restored ? "Backup header verified -- primary header overwritten from it."
+                         : "Backup header did not verify either -- nothing safe to restore from.");
+    return restored;
 }
 
 VeraCryptRestoreResult restoreVeraCryptBackupHeaderUnmountedImpl(
-    int fd, const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId) {
+    int fd, const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId, int opId) {
     if (fd < 0 || !password || passwordLen == 0) return VeraCryptRestoreResult::kIoError;
 
     struct stat st{};
     if (fstat(fd, &st) != 0 || st.st_size <= 0) return VeraCryptRestoreResult::kIoError;
     const uint64_t fileSize = static_cast<uint64_t>(st.st_size);
     if (fileSize < TC_VOLUME_HEADER_GROUP_SIZE + VC_FULL_HEADER_SIZE) {
+        rlog(opId, "File is too small to hold a backup header group -- nothing to restore from.");
         return VeraCryptRestoreResult::kIoError;
     }
 
@@ -351,6 +377,7 @@ VeraCryptRestoreResult restoreVeraCryptBackupHeaderUnmountedImpl(
         {TC_HIDDEN_VOLUME_HEADER_OFFSET, backupGroupOffset + TC_HIDDEN_VOLUME_HEADER_OFFSET},
     };
 
+    rlog(opId, "Checking whether the primary header already decrypts fine (nothing to fix if so)...");
     bool anyPrimaryAlreadyHealthy = false;
     for (const Slot& slot : slots) {
         uint8_t primarySector[VC_FULL_HEADER_SIZE];
@@ -368,11 +395,18 @@ VeraCryptRestoreResult restoreVeraCryptBackupHeaderUnmountedImpl(
             }
         }
     }
-    if (anyPrimaryAlreadyHealthy) return VeraCryptRestoreResult::kAlreadyHealthy;
+    if (anyPrimaryAlreadyHealthy) {
+        rlog(opId, "Primary header already decrypts fine -- nothing to restore.");
+        return VeraCryptRestoreResult::kAlreadyHealthy;
+    }
 
+    rlog(opId, "Primary header doesn't verify -- trying the backup header slot(s)...");
     for (const Slot& slot : slots) {
         uint8_t backupSector[VC_FULL_HEADER_SIZE];
-        if (!preadFully(fd, slot.backupOffset, backupSector, sizeof(backupSector))) continue;
+        if (!preadFully(fd, slot.backupOffset, backupSector, sizeof(backupSector))) {
+            rlog(opId, "Could not read a backup header slot -- skipping it.");
+            continue;
+        }
 
         unsigned char keyMaterial[192];
         unsigned char decryptedHeader[VC_HEADER_BODY_SIZE];
@@ -384,37 +418,44 @@ VeraCryptRestoreResult restoreVeraCryptBackupHeaderUnmountedImpl(
                                                         fields);
         mbedtls_platform_zeroize(keyMaterial, sizeof(keyMaterial));
         mbedtls_platform_zeroize(decryptedHeader, sizeof(decryptedHeader));
-        if (!verified) continue;
+        if (!verified) {
+            rlog(opId, "Backup header slot didn't decrypt/verify under this password -- trying the next slot.");
+            continue;
+        }
 
+        rlog(opId, "Backup header decrypted and CRC-validated -- it's genuine. Overwriting the primary header...");
         // The backup decrypted and CRC-validated under this password --
         // it's genuine. Overwrite the primary with its raw (still
         // encrypted) bytes, exactly as real VeraCrypt's header restore
         // does; nothing derived from the plaintext is ever written.
         if (!pwriteFully(fd, slot.primaryOffset, backupSector, sizeof(backupSector))) {
             mbedtls_platform_zeroize(backupSector, sizeof(backupSector));
+            rlog(opId, "Writing the restored primary header failed (I/O error).");
             return VeraCryptRestoreResult::kIoError;
         }
         mbedtls_platform_zeroize(backupSector, sizeof(backupSector));
         LOGI("restoreVeraCryptBackupHeaderUnmounted: primary header restored from backup at slot offset %llu",
              static_cast<unsigned long long>(slot.primaryOffset));
+        rlog(opId, "Primary header restored from the verified backup.");
         return VeraCryptRestoreResult::kSuccess;
     }
 
+    rlog(opId, "No backup header slot verified under this password.");
     return VeraCryptRestoreResult::kPasswordIncorrect;
 }
 
 } // namespace
 
-bool restoreLuks2BackupHeaderUnmounted(int fd) {
-    bool ok = restoreLuks2BackupHeaderUnmountedImpl(fd);
+bool restoreLuks2BackupHeaderUnmounted(int fd, int logOpId) {
+    bool ok = restoreLuks2BackupHeaderUnmountedImpl(fd, logOpId);
     if (fd >= 0) close(fd);
     return ok;
 }
 
 VeraCryptRestoreResult restoreVeraCryptBackupHeaderUnmounted(
-    int fd, const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId) {
+    int fd, const uint8_t* password, size_t passwordLen, int pim, int cipherId, int hashId, int logOpId) {
     VeraCryptRestoreResult result =
-        restoreVeraCryptBackupHeaderUnmountedImpl(fd, password, passwordLen, pim, cipherId, hashId);
+        restoreVeraCryptBackupHeaderUnmountedImpl(fd, password, passwordLen, pim, cipherId, hashId, logOpId);
     if (fd >= 0) close(fd);
     return result;
 }
@@ -532,38 +573,224 @@ bool fatClearDirty(int volId) {
     }
 }
 
+// ── FAT/exFAT directory-tree deep scan (a lightweight chkdsk-equivalent)
+//    ─────────────────────────────────────────────────────────────────────
+//
+// fatIsDirty/fatClearDirty above only reflect whether the volume was
+// cleanly unmounted -- that flag says nothing about whether the directory
+// tree itself is intact. A torn write or a corrupted cluster can leave
+// individual directory *entries* damaged (garbage date/size fields,
+// unparseable name bytes) while the dirty bit stays clear the whole time,
+// so the check above alone won't catch it -- this is what a real-world
+// corrupted container actually looks like when browsed (entries showing
+// as "?", implausible future dates, file sizes bigger than the volume
+// itself). This walks the whole tree via FatFs's own directory API
+// (drivePaths[volId] is already f_mount'd by the time diagnose/repair
+// runs here -- see virtual_block_device.cpp) and flags any entry that
+// couldn't plausibly be genuine, mirroring what Windows chkdsk does to a
+// real corrupted FAT volume: prune entries that don't hold together
+// rather than trying to interpret them.
+struct FatCorruptEntry {
+    std::string path;
+    bool isDir;
+};
+
+// A name FatFs couldn't decode into valid Unicode surfaces, after its own
+// OEM/UTF-8 conversion, as '?'. A genuine file can of course contain a
+// literal '?' in its name, but a name that's *entirely* replacement
+// characters is a strong corruption signal rather than a plausible real
+// filename someone chose.
+bool fatNameIsAllReplacementChars(const char* fname) {
+    if (!fname || !fname[0]) return false;
+    for (const char* p = fname; *p; ++p) {
+        if (*p != '?') return false;
+    }
+    return true;
+}
+
+bool fatEntryLooksCorrupted(const FILINFO& fno, uint64_t volumeCapacityBytes, uint64_t nowUnix) {
+    if (fatNameIsAllReplacementChars(fno.fname)) return true;
+
+    if (!(fno.fattrib & AM_DIR) && volumeCapacityBytes > 0 &&
+        static_cast<uint64_t>(fno.fsize) > volumeCapacityBytes) {
+        return true;
+    }
+
+    // A little slack for clock skew between the device and whatever last
+    // wrote the container; more than a year out isn't clock skew, it's a
+    // mangled date field (FAT/exFAT dates can encode years up to 2107 --
+    // easily hit by a few flipped bits in a corrupted entry).
+    constexpr uint64_t kOneYearSeconds = 366ULL * 24 * 3600;
+    const uint64_t entryUnix = fatToUnixTimestamp(fno.fdate, fno.ftime);
+    if (entryUnix > nowUnix + kOneYearSeconds) return true;
+
+    return false;
+}
+
+uint64_t fatVolumeCapacityBytes(int volId) {
+    FATFS* fs = nullptr;
+    DWORD freeClusters = 0;
+    if (f_getfree(drivePaths[volId], &freeClusters, &fs) != FR_OK || !fs) return 0;
+    return static_cast<uint64_t>(fs->n_fatent - 2) * fs->csize * 512ULL;
+}
+
+// Recurses into [pathSuffix] (relative to the volume root, "" for the
+// root itself), appending every corrupted entry found to [outCorrupt].
+// Does not recurse into a directory that is itself flagged corrupted --
+// its contents are just as untrustworthy and get removed wholesale along
+// with it.
+void fatScanForCorruptEntries(int volId, const std::string& pathSuffix, uint64_t volumeCapacityBytes,
+                               uint64_t nowUnix, std::vector<FatCorruptEntry>& outCorrupt, int opId) {
+    std::string fullPath = drivePaths[volId];
+    if (!pathSuffix.empty()) fullPath += "/" + pathSuffix;
+
+    DIR dir;
+    FILINFO fno;
+    if (f_opendir(&dir, fullPath.c_str()) != FR_OK) return;
+    while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
+        const std::string childSuffix = pathSuffix.empty() ? std::string(fno.fname) : pathSuffix + "/" + fno.fname;
+        const bool isDir = (fno.fattrib & AM_DIR) != 0;
+
+        if (fatEntryLooksCorrupted(fno, volumeCapacityBytes, nowUnix)) {
+            char msg[320];
+            std::snprintf(msg, sizeof(msg), "Found a corrupted %s entry: %s",
+                          isDir ? "directory" : "file", childSuffix.c_str());
+            rlog(opId, msg);
+            outCorrupt.push_back({childSuffix, isDir});
+            continue; // don't trust anything inside a corrupted directory either
+        }
+
+        if (isDir) {
+            fatScanForCorruptEntries(volId, childSuffix, volumeCapacityBytes, nowUnix, outCorrupt, opId);
+        }
+    }
+    f_closedir(&dir);
+}
+
+FRESULT fatRemoveRecursiveForRepair(const char* path) {
+    DIR dir;
+    FILINFO fno;
+    FRESULT fr = f_opendir(&dir, path);
+    if (fr == FR_OK) {
+        while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0]) {
+            std::string childPath = std::string(path) + "/" + fno.fname;
+            if (fno.fattrib & AM_DIR) {
+                fatRemoveRecursiveForRepair(childPath.c_str());
+            } else {
+                f_unlink(childPath.c_str());
+            }
+        }
+        f_closedir(&dir);
+    }
+    return f_unlink(path);
+}
+
+// True if any corrupted entry was found (whether or not [opId]'s caller
+// goes on to actually remove them) -- used by diagnoseMountedVolumeFilesystem
+// to fold "the tree has garbage in it" into the same kFilesystemDirty
+// diagnosis the dirty-bit check reports, since the wizard's repair action
+// (runMountedVolumeFilesystemCheck) handles both.
+bool fatHasCorruptEntries(int volId, int opId) {
+    const uint64_t capacity = fatVolumeCapacityBytes(volId);
+    const uint64_t nowUnix = static_cast<uint64_t>(time(nullptr));
+    std::vector<FatCorruptEntry> found;
+    fatScanForCorruptEntries(volId, "", capacity, nowUnix, found, opId);
+    return !found.empty();
+}
+
+// Removes every corrupted entry found by the same scan, deepest-first
+// (the scan itself already avoids recursing into a corrupted directory,
+// so ordering here just needs to not choke on a parent disappearing out
+// from under a still-pending child -- which can't happen since corrupted
+// directories are never recursed into to begin with).
+bool fatRemoveCorruptEntries(int volId, int opId) {
+    const uint64_t capacity = fatVolumeCapacityBytes(volId);
+    const uint64_t nowUnix = static_cast<uint64_t>(time(nullptr));
+    std::vector<FatCorruptEntry> found;
+    fatScanForCorruptEntries(volId, "", capacity, nowUnix, found, opId);
+
+    if (found.empty()) {
+        rlog(opId, "No corrupted directory entries found.");
+        return true;
+    }
+
+    char summary[96];
+    std::snprintf(summary, sizeof(summary), "Removing %zu corrupted entr%s...", found.size(),
+                  found.size() == 1 ? "y" : "ies");
+    rlog(opId, summary);
+
+    bool allRemoved = true;
+    for (const auto& entry : found) {
+        const std::string fullPath = std::string(drivePaths[volId]) + "/" + entry.path;
+        const FRESULT fr = entry.isDir ? fatRemoveRecursiveForRepair(fullPath.c_str()) : f_unlink(fullPath.c_str());
+        char msg[320];
+        std::snprintf(msg, sizeof(msg), "%s: %s", fr == FR_OK ? "Removed" : "Failed to remove", entry.path.c_str());
+        rlog(opId, msg);
+        if (fr != FR_OK) allRemoved = false;
+    }
+    return allRemoved;
+}
+
 } // namespace
 
-RepairDiagnosisCode diagnoseMountedVolumeFilesystem(int volId) {
+RepairDiagnosisCode diagnoseMountedVolumeFilesystem(int volId, int logOpId) {
     if (volId < 0 || volId >= FF_VOLUMES) return RepairDiagnosisCode::kHealthy;
     VolumeState& v = volumes[volId];
 
     switch (v.fsType) {
-        case VolumeState::FS_EXT:
-            return extIsDirty(volId) ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
-        case VolumeState::FS_NTFS:
-            return ntfsIsDirty(volId) ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
-        case VolumeState::FS_FATFS: {
-            bool dirty = false;
-            if (!fatIsDirty(volId, dirty)) return RepairDiagnosisCode::kHealthy; // unrecognized/FAT12: nothing to flag
+        case VolumeState::FS_EXT: {
+            rlog(logOpId, "ext filesystem -- checking the superblock's clean-unmount state...");
+            const bool dirty = extIsDirty(volId);
+            rlog(logOpId, dirty ? "Superblock reports the filesystem was not unmounted cleanly."
+                                 : "Superblock reports a clean unmount.");
             return dirty ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
+        }
+        case VolumeState::FS_NTFS: {
+            rlog(logOpId, "NTFS filesystem -- checking the $Volume dirty flag...");
+            const bool dirty = ntfsIsDirty(volId);
+            rlog(logOpId, dirty ? "$Volume dirty flag is set." : "$Volume dirty flag is clear.");
+            return dirty ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
+        }
+        case VolumeState::FS_FATFS: {
+            rlog(logOpId, "FAT/exFAT filesystem -- checking the clean-shutdown bit...");
+            bool dirty = false;
+            const bool recognized = fatIsDirty(volId, dirty);
+            if (recognized) {
+                rlog(logOpId, dirty ? "Clean-shutdown bit is not set." : "Clean-shutdown bit is set.");
+            } else {
+                rlog(logOpId, "Boot sector isn't a recognized FAT16/FAT32/exFAT layout -- skipping that check.");
+            }
+            rlog(logOpId, "Scanning the directory tree for corrupted entries (garbage names, impossible "
+                          "dates/sizes)...");
+            const bool hasCorruptEntries = fatHasCorruptEntries(volId, logOpId);
+            if (!hasCorruptEntries) rlog(logOpId, "No corrupted directory entries found.");
+            if (!recognized) return hasCorruptEntries ? RepairDiagnosisCode::kFilesystemDirty
+                                                        : RepairDiagnosisCode::kHealthy; // unrecognized/FAT12 dirty-bit: nothing to flag there
+            return (dirty || hasCorruptEntries) ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
         }
         default:
             return RepairDiagnosisCode::kHealthy;
     }
 }
 
-bool runMountedVolumeFilesystemCheck(int volId) {
+bool runMountedVolumeFilesystemCheck(int volId, int logOpId) {
     if (volId < 0 || volId >= FF_VOLUMES) return false;
     VolumeState& v = volumes[volId];
 
     switch (v.fsType) {
         case VolumeState::FS_EXT:
+            rlog(logOpId, "Clearing the ext superblock's dirty/error state...");
             return extClearDirtyState(volId);
         case VolumeState::FS_NTFS:
+            rlog(logOpId, "Clearing the NTFS $Volume dirty flag...");
             return ntfsClearDirtyFlag(volId);
-        case VolumeState::FS_FATFS:
-            return fatClearDirty(volId);
+        case VolumeState::FS_FATFS: {
+            rlog(logOpId, "Setting the FAT/exFAT clean-shutdown bit...");
+            const bool clearedFlag = fatClearDirty(volId);
+            rlog(logOpId, "Scanning the directory tree for corrupted entries to remove...");
+            const bool removedCorrupt = fatRemoveCorruptEntries(volId, logOpId);
+            return clearedFlag && removedCorrupt;
+        }
         default:
             return false;
     }

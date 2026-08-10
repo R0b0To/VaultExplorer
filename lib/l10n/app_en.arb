@@ -4508,7 +4508,7 @@
   "@aboutDirectoryVaultsTitle": {
     "description": "List tile title on the about screen for the directory vault formats entry"
   },
-  "aboutDirectoryVaultsSubtitle": "Cryptomator (v7/v8 SIV_GCM), gocryptfs (v2 EME), CryFS (0.10 Merkle)",
+  "aboutDirectoryVaultsSubtitle": "Cryptomator (v7/v8 SIV_GCM & SIV_CTRMAC), gocryptfs (v2 AES-GCM & XChaCha20), CryFS (v0.10+ XChaCha20 & AES)",
   "@aboutDirectoryVaultsSubtitle": {
     "description": "List tile subtitle on the about screen describing directory vault format support"
   },

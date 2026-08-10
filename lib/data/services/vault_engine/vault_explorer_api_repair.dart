@@ -9,10 +9,14 @@ part of 'vault_explorer_api.dart';
 typedef RepairDiagnosisResult = ({int diagnosisCode, String? format});
 
 mixin _RepairOps {
-  Future<RepairDiagnosisResult> diagnoseUnmountedContainerFile(String uri) async {
+  /// [opId], here and on every other call below, identifies this call to
+  /// the wizard's live log panel -- see [VaultExplorerApi.addRepairLogListener]
+  /// and RepairLogBridge.kt/reportRepairLog on the native side. Pass a
+  /// non-positive value (the default) to skip live logging entirely.
+  Future<RepairDiagnosisResult> diagnoseUnmountedContainerFile(String uri, {int opId = -1}) async {
     final raw = await _channel.invokeMapMethod<String, Object?>(
       ChannelMethods.diagnoseUnmountedContainerFile,
-      {'uri': uri},
+      {'uri': uri, 'opId': opId},
     );
     return (
       diagnosisCode: raw?['diagnosisCode'] as int? ?? 1,
@@ -20,10 +24,10 @@ mixin _RepairOps {
     );
   }
 
-  Future<RepairDiagnosisResult> diagnoseMountedVolumeFilesystem(int volId) async {
+  Future<RepairDiagnosisResult> diagnoseMountedVolumeFilesystem(int volId, {int opId = -1}) async {
     final raw = await _channel.invokeMapMethod<String, Object?>(
       ChannelMethods.diagnoseMountedVolumeFilesystem,
-      {'volId': volId},
+      {'volId': volId, 'opId': opId},
     );
     return (
       diagnosisCode: raw?['diagnosisCode'] as int? ?? 0,
@@ -42,6 +46,7 @@ mixin _RepairOps {
     int pim = 0,
     int cipherId = 255,
     int hashId = 255,
+    int opId = -1,
   }) async {
     try {
       final success = await _channel.invokeMethod<bool>(
@@ -52,6 +57,7 @@ mixin _RepairOps {
           'pim': pim,
           'cipherId': cipherId,
           'hashId': hashId,
+          'opId': opId,
         },
       );
       return success ?? false;
@@ -69,10 +75,10 @@ mixin _RepairOps {
     }
   }
 
-  Future<bool> runMountedVolumeFilesystemCheck(int volId) async {
+  Future<bool> runMountedVolumeFilesystemCheck(int volId, {int opId = -1}) async {
     final success = await _channel.invokeMethod<bool>(
       ChannelMethods.runMountedVolumeFilesystemCheck,
-      {'volId': volId},
+      {'volId': volId, 'opId': opId},
     );
     return success ?? false;
   }

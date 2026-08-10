@@ -158,4 +158,20 @@ internal object NativeEngine {
     @JvmStatic external fun cryfsCipherIdNative(cipherName: String): Int
     @JvmStatic external fun cryfsEncryptBlockNative(cipherId: Int, key: ByteArray, plaintext: ByteArray): ByteArray?
     @JvmStatic external fun cryfsDecryptBlockNative(cipherId: Int, key: ByteArray, ciphertext: ByteArray): ByteArray?
+
+    // Check & Repair tool -- see containers/container_repair.cpp. [opId] <= 0
+    // means "no live log panel listening" (matches reportRepairLog's own
+    // no-op-below-zero convention on the native side).
+    @JvmStatic
+    external fun nativeDiagnoseContainerFile(fd: Int, opId: Int = -1): IntArray?
+    @JvmStatic
+    external fun nativeRestoreLuks2BackupHeaderFile(fd: Int, opId: Int = -1): Boolean
+    @JvmStatic
+    external fun nativeRestoreVeraCryptBackupHeaderFile(
+        fd: Int, password: String, pim: Int, cipherId: Int, hashId: Int, opId: Int = -1
+    ): Int
+    @JvmStatic
+    external fun nativeDiagnoseMountedVolumeFilesystem(volId: Int, opId: Int = -1): Int
+    @JvmStatic
+    external fun nativeRunMountedVolumeFilesystemCheck(volId: Int, opId: Int = -1): Boolean
 }

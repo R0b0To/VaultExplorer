@@ -15,12 +15,12 @@
 // than inventing a parcelable result type for two ints.
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_nativeDiagnoseContainerFile(
-        JNIEnv* env, jobject, jint fd) {
+        JNIEnv* env, jobject, jint fd, jint opId) {
     JNI_TRY
 
     ContainerFormat format = ContainerFormat::kVeraCrypt;
     bool formatKnown = false;
-    RepairDiagnosisCode code = diagnoseUnmountedContainerFile(fd, format, formatKnown);
+    RepairDiagnosisCode code = diagnoseUnmountedContainerFile(fd, format, formatKnown, opId);
 
     jint packed[2] = {
         static_cast<jint>(code),
@@ -37,10 +37,10 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_nativeDiagnoseContainerFile(
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_nativeRestoreLuks2BackupHeaderFile(
-        JNIEnv* env, jobject, jint fd) {
+        JNIEnv* env, jobject, jint fd, jint opId) {
     JNI_TRY
 
-    return restoreLuks2BackupHeaderUnmounted(fd) ? JNI_TRUE : JNI_FALSE;
+    return restoreLuks2BackupHeaderUnmounted(fd, opId) ? JNI_TRUE : JNI_FALSE;
 
     JNI_CATCH_RETURN(JNI_FALSE)
 }
@@ -52,14 +52,14 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_nativeRestoreLuks2BackupHeaderFile(
 // them all into one generic failure.
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_nativeRestoreVeraCryptBackupHeaderFile(
-        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint cipherId, jint hashId) {
+        JNIEnv* env, jobject, jint fd, jstring password, jint pim, jint cipherId, jint hashId, jint opId) {
     JNI_TRY
 
     const char* nativePass = env->GetStringUTFChars(password, nullptr);
     const size_t passLen = std::strlen(nativePass);
 
     VeraCryptRestoreResult result = restoreVeraCryptBackupHeaderUnmounted(
-            fd, reinterpret_cast<const uint8_t*>(nativePass), passLen, pim, cipherId, hashId);
+            fd, reinterpret_cast<const uint8_t*>(nativePass), passLen, pim, cipherId, hashId, opId);
 
     env->ReleaseStringUTFChars(password, nativePass);
     return static_cast<jint>(result);
@@ -69,20 +69,20 @@ Java_com_aeidolon_vaultexplorer_NativeEngine_nativeRestoreVeraCryptBackupHeaderF
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_nativeDiagnoseMountedVolumeFilesystem(
-        JNIEnv* env, jobject, jint volId) {
+        JNIEnv* env, jobject, jint volId, jint opId) {
     JNI_TRY
 
-    return static_cast<jint>(diagnoseMountedVolumeFilesystem(volId));
+    return static_cast<jint>(diagnoseMountedVolumeFilesystem(volId, opId));
 
     JNI_CATCH_RETURN(static_cast<jint>(RepairDiagnosisCode::kHealthy))
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_aeidolon_vaultexplorer_NativeEngine_nativeRunMountedVolumeFilesystemCheck(
-        JNIEnv* env, jobject, jint volId) {
+        JNIEnv* env, jobject, jint volId, jint opId) {
     JNI_TRY
 
-    return runMountedVolumeFilesystemCheck(volId) ? JNI_TRUE : JNI_FALSE;
+    return runMountedVolumeFilesystemCheck(volId, opId) ? JNI_TRUE : JNI_FALSE;
 
     JNI_CATCH_RETURN(JNI_FALSE)
 }

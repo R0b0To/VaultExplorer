@@ -44,6 +44,11 @@ typedef ImportProgress = ({
 
 typedef SplitJoinProgress = ({int opId, int bytesDone, int bytesTotal});
 
+/// One live log line from the Check & Repair tool's native diagnose/
+/// restore/check calls -- see reportRepairLog in jni_callbacks.h and
+/// container_repair.cpp for where these originate.
+typedef RepairLogLine = ({int opId, String message});
+
 void _logSwallowed(String method, Object error, {bool expected = false}) {
   debugPrint(
     '${expected ? '[VaultExplorerApi:expected]' : '[VaultExplorerApi]'} '
@@ -176,6 +181,20 @@ class VaultExplorerApi
     _splitJoinProgressRegistry.remove(listener);
   }
 
+  static final ListenerRegistry<RepairLogLine> _repairLogRegistry =
+      ListenerRegistry<RepairLogLine>();
+  static void addRepairLogListener(
+    void Function(RepairLogLine line) listener,
+  ) {
+    _repairLogRegistry.add(listener);
+  }
+
+  static void removeRepairLogListener(
+    void Function(RepairLogLine line) listener,
+  ) {
+    _repairLogRegistry.remove(listener);
+  }
+
   static void initMethodCallHandler() {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onAppSelected') {
@@ -248,6 +267,13 @@ class VaultExplorerApi
             bytesDone: bytesDone,
             bytesTotal: bytesTotal,
           ));
+        }
+      } else if (call.method == 'onRepairLog') {
+        final args = call.arguments as Map<Object?, Object?>;
+        final opId = args['opId'] as int?;
+        final message = args['message'] as String?;
+        if (opId != null && message != null) {
+          _repairLogRegistry.notify((opId: opId, message: message));
         }
       } else if (call.method == 'onCameraPermissionResult') {
         final granted = call.arguments['granted'] as bool? ?? false;

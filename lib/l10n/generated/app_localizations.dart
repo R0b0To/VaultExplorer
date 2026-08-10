@@ -5801,7 +5801,7 @@ abstract class AppLocalizations {
   /// List tile subtitle on the about screen describing directory vault format support
   ///
   /// In en, this message translates to:
-  /// **'Cryptomator (v7/v8 SIV_GCM), gocryptfs (v2 EME), CryFS (0.10 Merkle)'**
+  /// **'Cryptomator (v7/v8 SIV_GCM & SIV_CTRMAC), gocryptfs (v2 AES-GCM & XChaCha20), CryFS (v0.10+ XChaCha20 & AES)'**
   String get aboutDirectoryVaultsSubtitle;
 
   /// List tile title on the about screen for the VHD/VHDX format entry

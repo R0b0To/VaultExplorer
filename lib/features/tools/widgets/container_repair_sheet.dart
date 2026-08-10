@@ -30,6 +30,28 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   bool _actionRunning = false;
   bool? _actionSucceeded;
   String? _error;
+  final List<String> _logLines = [];
+  final ScrollController _logScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _logScrollController.dispose();
+    super.dispose();
+  }
+
+  void _appendLogLine(String message) {
+    if (!mounted) return;
+    setState(() => _logLines.add(message));
+    // Autoscroll to the newest line once the frame with it has laid out.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_logScrollController.hasClients) return;
+      _logScrollController.animateTo(
+        _logScrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOut,
+      );
+    });
+  }
 
   Future<void> _pickUnmountedFile() async {
     final picked = await vaultExplorerApi.pickContainer();
@@ -68,9 +90,10 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     setState(() {
       _diagnosing = true;
       _error = null;
+      _logLines.clear();
     });
     try {
-      final result = await ContainerToolService.instance.diagnoseTarget(target);
+      final result = await ContainerToolService.instance.diagnoseTarget(target, onLogLine: _appendLogLine);
       if (!mounted) return;
       setState(() {
         _diagnosing = false;
@@ -96,6 +119,7 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
   Future<void> _restoreBackupHeader() async {
     final target = _target;
     if (target == null) return;
+    setState(() => _logLines.clear());
     await _runRestoreBackupHeader(target, password: null);
   }
 
@@ -105,7 +129,11 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
       _error = null;
     });
     try {
-      final ok = await ContainerToolService.instance.restoreBackupHeader(target, password: password);
+      final ok = await ContainerToolService.instance.restoreBackupHeader(
+        target,
+        password: password,
+        onLogLine: _appendLogLine,
+      );
       if (mounted) {
         setState(() {
           _actionRunning = false;
@@ -183,9 +211,10 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     setState(() {
       _actionRunning = true;
       _error = null;
+      _logLines.clear();
     });
     try {
-      final ok = await ContainerToolService.instance.runFilesystemCheck(target);
+      final ok = await ContainerToolService.instance.runFilesystemCheck(target, onLogLine: _appendLogLine);
       if (mounted) {
         setState(() {
           _actionRunning = false;
@@ -334,6 +363,10 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           ),
         ),
         const SizedBox(height: AppSpacing.md),
+        if (_logLines.isNotEmpty) ...[
+          _buildLogPanel(context),
+          const SizedBox(height: AppSpacing.md),
+        ],
         if (_diagnosis == null) ...[
           if (_error != null) ...[
             InlineErrorBanner(_error!),
@@ -414,6 +447,39 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           child: _actionButtonChild(context.l10n.repairRunFilesystemCheckButton),
         ),
     ];
+  }
+
+  Widget _buildLogPanel(BuildContext context) {
+    final cs = context.colors;
+    return Container(
+      height: 160,
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Scrollbar(
+        controller: _logScrollController,
+        child: ListView.builder(
+          controller: _logScrollController,
+          itemCount: _logLines.length,
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 1),
+            child: Text(
+              _logLines[index],
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                color: cs.onSurfaceVariant,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _actionButtonChild(String label) {

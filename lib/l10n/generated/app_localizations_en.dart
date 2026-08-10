@@ -3417,7 +3417,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutDirectoryVaultsSubtitle =>
-      'Cryptomator (v7/v8 SIV_GCM), gocryptfs (v2 EME), CryFS (0.10 Merkle)';
+      'Cryptomator (v7/v8 SIV_GCM & SIV_CTRMAC), gocryptfs (v2 AES-GCM & XChaCha20), CryFS (v0.10+ XChaCha20 & AES)';
 
   @override
   String get aboutVhdTitle => 'Virtual Hard Disks (VHD / VHDX)';

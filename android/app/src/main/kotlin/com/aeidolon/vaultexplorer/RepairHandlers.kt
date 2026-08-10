@@ -26,6 +26,7 @@ class RepairHandlers(
 ) {
     fun handleDiagnoseUnmountedContainerFile(call: MethodCall, result: MethodChannel.Result) {
         val uri = call.argument<String>("uri")
+        val opId = call.argument<Number>("opId")?.toInt() ?: -1
         if (uri.isNullOrEmpty()) {
             result.error("INVALID_ARGS", "uri required", null)
             return
@@ -35,7 +36,7 @@ class RepairHandlers(
             try {
                 val pfd = activity.contentResolver.openFileDescriptor(Uri.parse(uri), "r")
                     ?: throw Exception("Could not open file descriptor")
-                val packed = NativeEngine.nativeDiagnoseContainerFile(pfd.detachFd())
+                val packed = NativeEngine.nativeDiagnoseContainerFile(pfd.detachFd(), opId)
                 activity.runOnUiThread {
                     if (packed == null || packed.size != 2) {
                         result.error("IO_ERROR", "Could not read the container file", null)
@@ -52,6 +53,7 @@ class RepairHandlers(
 
     fun handleDiagnoseMountedVolumeFilesystem(call: MethodCall, result: MethodChannel.Result) {
         val volId = call.argument<Number>("volId")?.toInt()
+        val opId = call.argument<Number>("opId")?.toInt() ?: -1
         if (volId == null) {
             result.error("INVALID_ARGS", "volId required", null)
             return
@@ -59,7 +61,7 @@ class RepairHandlers(
 
         ioExecutor.execute {
             try {
-                val code = NativeEngine.nativeDiagnoseMountedVolumeFilesystem(volId)
+                val code = NativeEngine.nativeDiagnoseMountedVolumeFilesystem(volId, opId)
                 activity.runOnUiThread { result.success(mapOf("diagnosisCode" to code, "format" to null)) }
             } catch (e: Exception) {
                 activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }
@@ -82,6 +84,7 @@ class RepairHandlers(
         val pim = call.argument<Number>("pim")?.toInt() ?: 0
         val cipherId = call.argument<Number>("cipherId")?.toInt() ?: 255
         val hashId = call.argument<Number>("hashId")?.toInt() ?: 255
+        val opId = call.argument<Number>("opId")?.toInt() ?: -1
         if (uri.isNullOrEmpty()) {
             result.error("INVALID_ARGS", "uri required", null)
             return
@@ -92,14 +95,14 @@ class RepairHandlers(
                 val docUri = Uri.parse(uri)
                 val probeFd = activity.contentResolver.openFileDescriptor(docUri, "r")
                     ?: throw Exception("Could not open file descriptor")
-                val packed = NativeEngine.nativeDiagnoseContainerFile(probeFd.detachFd())
+                val packed = NativeEngine.nativeDiagnoseContainerFile(probeFd.detachFd(), opId)
                 val formatOrdinal = if (packed != null && packed.size == 2) packed[1] else -1
 
                 when (formatOrdinal) {
                     2 -> { // LUKS2 -- checksum-verified, no password needed.
                         val pfd = activity.contentResolver.openFileDescriptor(docUri, "rw")
                             ?: throw Exception("Could not open file descriptor")
-                        val ok = NativeEngine.nativeRestoreLuks2BackupHeaderFile(pfd.detachFd())
+                        val ok = NativeEngine.nativeRestoreLuks2BackupHeaderFile(pfd.detachFd(), opId)
                         activity.runOnUiThread {
                             if (ok) result.success(true)
                             else result.error("NOTHING_TO_REPAIR", "The backup header copy doesn't verify either", null)
@@ -115,7 +118,7 @@ class RepairHandlers(
                         val pfd = activity.contentResolver.openFileDescriptor(docUri, "rw")
                             ?: throw Exception("Could not open file descriptor")
                         val outcome = NativeEngine.nativeRestoreVeraCryptBackupHeaderFile(
-                            pfd.detachFd(), password, pim, cipherId, hashId
+                            pfd.detachFd(), password, pim, cipherId, hashId, opId
                         )
                         activity.runOnUiThread {
                             when (outcome) {
@@ -139,6 +142,7 @@ class RepairHandlers(
 
     fun handleRunMountedVolumeFilesystemCheck(call: MethodCall, result: MethodChannel.Result) {
         val volId = call.argument<Number>("volId")?.toInt()
+        val opId = call.argument<Number>("opId")?.toInt() ?: -1
         if (volId == null) {
             result.error("INVALID_ARGS", "volId required", null)
             return
@@ -146,7 +150,7 @@ class RepairHandlers(
 
         ioExecutor.execute {
             try {
-                val ok = NativeEngine.nativeRunMountedVolumeFilesystemCheck(volId)
+                val ok = NativeEngine.nativeRunMountedVolumeFilesystemCheck(volId, opId)
                 activity.runOnUiThread { result.success(ok) }
             } catch (e: Exception) {
                 activity.runOnUiThread { result.error("IO_ERROR", e.message, null) }

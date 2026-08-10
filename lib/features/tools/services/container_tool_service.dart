@@ -40,7 +40,7 @@ abstract class ContainerToolService {
     void Function(int bytesDone, int bytesTotal)? onProgress,
   });
 
-  Future<RepairDiagnosis> diagnoseTarget(RepairTarget target);
+  Future<RepairDiagnosis> diagnoseTarget(RepairTarget target, {void Function(String message)? onLogLine});
 
   /// [password] is only consulted for a VeraCrypt/TrueCrypt
   /// [UnmountedFileTarget] -- pass it null on the first call and catch
@@ -52,8 +52,8 @@ abstract class ContainerToolService {
   /// [MountedVolumeTarget] (restoring a header only makes sense for an
   /// unmounted file -- a volume with a bad header couldn't have mounted in
   /// the first place).
-  Future<bool> restoreBackupHeader(RepairTarget target, {String? password});
-  Future<bool> runFilesystemCheck(MountedVolumeTarget target);
+  Future<bool> restoreBackupHeader(RepairTarget target, {String? password, void Function(String message)? onLogLine});
+  Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine});
 }
 
 class DefaultContainerToolService implements ContainerToolService {
@@ -101,15 +101,15 @@ class DefaultContainerToolService implements ContainerToolService {
       throw UnimplementedError('decryptFile is not implemented yet.');
 
   @override
-  Future<RepairDiagnosis> diagnoseTarget(RepairTarget target) =>
+  Future<RepairDiagnosis> diagnoseTarget(RepairTarget target, {void Function(String message)? onLogLine}) =>
       throw UnimplementedError('diagnoseTarget is not implemented yet.');
 
   @override
-  Future<bool> restoreBackupHeader(RepairTarget target, {String? password}) =>
+  Future<bool> restoreBackupHeader(RepairTarget target, {String? password, void Function(String message)? onLogLine}) =>
       throw UnimplementedError('restoreBackupHeader is not implemented yet.');
 
   @override
-  Future<bool> runFilesystemCheck(MountedVolumeTarget target) =>
+  Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine}) =>
       throw UnimplementedError('runFilesystemCheck is not implemented yet.');
 }
 
@@ -131,6 +131,26 @@ class NativeContainerToolService extends DefaultContainerToolService {
       return await body();
     } finally {
       VaultExplorerApi.removeSplitJoinProgressListener(listener);
+    }
+  }
+
+  /// Mirrors [_withProgressListener] for the Check & Repair tool's live log
+  /// panel -- see RepairLogBridge.kt/reportRepairLog in container_repair.cpp
+  /// for where these lines originate.
+  Future<T> _withLogListener<T>(
+    void Function(String message)? onLogLine,
+    int opId,
+    Future<T> Function() body,
+  ) async {
+    if (onLogLine == null) return body();
+    void listener(RepairLogLine line) {
+      if (line.opId == opId) onLogLine(line.message);
+    }
+    VaultExplorerApi.addRepairLogListener(listener);
+    try {
+      return await body();
+    } finally {
+      VaultExplorerApi.removeRepairLogListener(listener);
     }
   }
 
@@ -228,29 +248,39 @@ class NativeContainerToolService extends DefaultContainerToolService {
   }
 
   @override
-  Future<RepairDiagnosis> diagnoseTarget(RepairTarget target) async {
-    final result = switch (target) {
-      UnmountedFileTarget(:final uri) =>
-        await vaultExplorerApi.diagnoseUnmountedContainerFile(uri),
-      MountedVolumeTarget(:final volId) =>
-        await vaultExplorerApi.diagnoseMountedVolumeFilesystem(volId),
-    };
-    return _diagnosisFromCode(result.diagnosisCode);
+  Future<RepairDiagnosis> diagnoseTarget(RepairTarget target, {void Function(String message)? onLogLine}) {
+    final opId = _nextOpId();
+    return _withLogListener(onLogLine, opId, () async {
+      final result = switch (target) {
+        UnmountedFileTarget(:final uri) =>
+          await vaultExplorerApi.diagnoseUnmountedContainerFile(uri, opId: opId),
+        MountedVolumeTarget(:final volId) =>
+          await vaultExplorerApi.diagnoseMountedVolumeFilesystem(volId, opId: opId),
+      };
+      return _diagnosisFromCode(result.diagnosisCode);
+    });
   }
 
   @override
-  Future<bool> restoreBackupHeader(RepairTarget target, {String? password}) {
+  Future<bool> restoreBackupHeader(RepairTarget target, {String? password, void Function(String message)? onLogLine}) {
     if (target is! UnmountedFileTarget) {
       throw const RepairUnsupportedFormatException();
     }
-    return vaultExplorerApi.restoreBackupHeaderUnmounted(
-      uri: target.uri,
-      password: password,
-    );
+    final opId = _nextOpId();
+    return _withLogListener(onLogLine, opId, () {
+      return vaultExplorerApi.restoreBackupHeaderUnmounted(
+        uri: target.uri,
+        password: password,
+        opId: opId,
+      );
+    });
   }
 
   @override
-  Future<bool> runFilesystemCheck(MountedVolumeTarget target) {
-    return vaultExplorerApi.runMountedVolumeFilesystemCheck(target.volId);
+  Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine}) {
+    final opId = _nextOpId();
+    return _withLogListener(onLogLine, opId, () {
+      return vaultExplorerApi.runMountedVolumeFilesystemCheck(target.volId, opId: opId);
+    });
   }
 }

@@ -411,6 +411,287 @@ bool extClearDirtyState(int volumeId) {
 
 namespace {
 
+struct ExtBlockBitmapRebuild {
+    ext2_filsys fs;
+    ext2fs_block_bitmap map;
+    bool valid = true;
+};
+
+int extMarkRebuiltBlock(ext2_filsys fs, blk64_t* block, e2_blkcnt_t,
+                         blk64_t, int, void* data) {
+    auto* rebuild = static_cast<ExtBlockBitmapRebuild*>(data);
+    if (*block == 0) return 0; // Sparse hole.
+    if (*block < fs->super->s_first_data_block || *block >= ext2fs_blocks_count(fs->super)) {
+        rebuild->valid = false;
+        return 0;
+    }
+    ext2fs_mark_block_bitmap2(rebuild->map, *block);
+    return 0;
+}
+
+// Builds the allocation map from immutable filesystem metadata plus every
+// inode that the inode bitmap says exists. This is the safe direction for a
+// damaged free-space map: only blocks that are provably referenced are marked
+// used; all the spurious "used" bits that make an empty volume look full are
+// dropped. It intentionally does not attempt to repair a damaged inode map.
+bool extBuildAllocatedBlockBitmap(ext2_filsys fs, ext2fs_block_bitmap* outMap) {
+    ext2fs_block_bitmap rebuilt = nullptr;
+    if (ext2fs_allocate_block_bitmap(fs, "VaultExplorer rebuilt block map", &rebuilt) != 0) return false;
+    ext2fs_clear_block_bitmap(rebuilt);
+
+    const blk64_t totalBlocks = ext2fs_blocks_count(fs->super);
+    for (dgrp_t group = 0; group < fs->group_desc_count; ++group) {
+        ext2fs_reserve_super_and_bgd(fs, group, rebuilt);
+        ext2fs_mark_block_bitmap2(rebuilt, ext2fs_block_bitmap_loc(fs, group));
+        ext2fs_mark_block_bitmap2(rebuilt, ext2fs_inode_bitmap_loc(fs, group));
+        const blk64_t inodeTable = ext2fs_inode_table_loc(fs, group);
+        for (unsigned int index = 0; index < fs->inode_blocks_per_group; ++index) {
+            if (inodeTable + index < totalBlocks) ext2fs_mark_block_bitmap2(rebuilt, inodeTable + index);
+        }
+    }
+
+    ExtBlockBitmapRebuild context{fs, rebuilt};
+    for (ext2_ino_t ino = 1; ino <= fs->super->s_inodes_count; ++ino) {
+        if (!ext2fs_test_inode_bitmap2(fs->inode_map, ino)) continue;
+        struct ext2_inode inode{};
+        if (ext2fs_read_inode(fs, ino, &inode) != 0) {
+            context.valid = false;
+            break;
+        }
+        const blk64_t aclBlock = ext2fs_file_acl_block(fs, &inode);
+        if (aclBlock) {
+            if (aclBlock < fs->super->s_first_data_block || aclBlock >= totalBlocks) {
+                context.valid = false;
+                break;
+            }
+            ext2fs_mark_block_bitmap2(rebuilt, aclBlock);
+        }
+        const errcode_t iterateError = ext2fs_block_iterate3(fs, ino, BLOCK_FLAG_READ_ONLY, nullptr,
+                                                              extMarkRebuiltBlock, &context);
+        // Inline-data inodes legitimately have no separate data blocks.
+        if (iterateError != 0 && iterateError != EXT2_ET_INLINE_DATA_CANT_ITERATE) {
+            context.valid = false;
+            break;
+        }
+    }
+    if (!context.valid) {
+        ext2fs_free_block_bitmap(rebuilt);
+        return false;
+    }
+    *outMap = rebuilt;
+    return true;
+}
+
+bool extReconcileFreeBlockCounts(int volumeId, bool apply) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    VolumeState& volume = volumes[volumeId];
+    if (!volume.extFs || !volume.extFs->super || (apply && volume.readOnly) ||
+        !ensureExtBitmapsLoaded(volumeId) || !volume.extFs->block_map) {
+        return false;
+    }
+
+    ext2_filsys fs = volume.extFs;
+    ext2fs_block_bitmap rebuilt = nullptr;
+    if (!extBuildAllocatedBlockBitmap(fs, &rebuilt)) return false;
+
+    const bool bitmapDiffers = ext2fs_compare_block_bitmap(fs->block_map, rebuilt) != 0;
+    blk64_t totalFree = 0;
+    bool differs = false;
+    std::vector<uint32_t> freeCounts(fs->group_desc_count);
+    for (dgrp_t group = 0; group < fs->group_desc_count; ++group) {
+        const blk64_t first = ext2fs_group_first_block2(fs, group);
+        const int count = ext2fs_group_blocks_count(fs, group);
+        uint32_t freeInGroup = 0;
+        for (int index = 0; index < count; ++index) {
+            if (!ext2fs_test_block_bitmap2(rebuilt, first + static_cast<blk64_t>(index))) {
+                ++freeInGroup;
+            }
+        }
+        totalFree += freeInGroup;
+        freeCounts[group] = freeInGroup;
+        if (ext2fs_bg_free_blocks_count(fs, group) != freeInGroup) {
+            differs = true;
+        }
+    }
+    if (ext2fs_free_blocks_count(fs->super) != totalFree) {
+        differs = true;
+    }
+    differs = differs || bitmapDiffers;
+    if (!apply) {
+        ext2fs_free_block_bitmap(rebuilt);
+        return differs;
+    }
+    if (!differs) {
+        ext2fs_free_block_bitmap(rebuilt);
+        return true;
+    }
+    ext2fs_block_bitmap oldMap = fs->block_map;
+    fs->block_map = rebuilt;
+    ext2fs_mark_bb_dirty(fs);
+    if (ext2fs_write_block_bitmap(fs) != 0) {
+        fs->block_map = oldMap;
+        ext2fs_free_block_bitmap(rebuilt);
+        return false;
+    }
+    ext2fs_free_block_bitmap(oldMap);
+    for (dgrp_t group = 0; group < fs->group_desc_count; ++group) {
+        ext2fs_bg_free_blocks_count_set(fs, group, freeCounts[group]);
+        ext2fs_group_desc_csum_set(fs, group);
+    }
+    ext2fs_free_blocks_count_set(fs->super, totalFree);
+    ext2fs_mark_super_dirty(fs);
+    return ext2fs_flush(fs) == 0;
+}
+
+} // namespace
+
+bool extFreeSpaceAccountingNeedsRepair(int volumeId) {
+    return extReconcileFreeBlockCounts(volumeId, false);
+}
+
+bool extRepairFreeSpaceAccounting(int volumeId) {
+    return extReconcileFreeBlockCounts(volumeId, true);
+}
+
+// ext2fs_unlink() only removes the directory entry -- it never touches the
+// block/inode bitmaps or the superblock's free counters. This callback frees
+// a single data block; it's used both by the normal delete path
+// (extReleaseInodeIfUnlinked) and by the orphaned-inode repair pass below.
+// Defined here (outside any anonymous namespace) so both sites can reach it.
+int extReleaseBlockCallback(ext2_filsys fs, blk64_t* blocknr, e2_blkcnt_t,
+                             blk64_t, int, void*) {
+    ext2fs_block_alloc_stats2(fs, *blocknr, -1);
+    return 0;
+}
+
+// ── Orphaned inode reclamation ──────────────────────────────────────────
+//
+// An orphaned inode is one that the inode bitmap marks as allocated but
+// that no directory entry anywhere in the tree references. The old delete
+// path produced these by calling ext2fs_unlink() (removing the directory
+// entry) without freeing the inode or its data blocks. The result: files
+// are invisible, but their blocks stay "in use" and the volume appears
+// full even though it's empty.
+//
+// The algorithm:
+//   1. Walk the entire directory tree from the root, collecting every
+//      inode number that any directory entry (including "." and "..")
+//      points to.
+//   2. Walk the inode bitmap: any inode that is marked allocated but does
+//      not appear in the collected set (and is not a reserved inode below
+//      s_first_ino) is orphaned.
+//   3. For each orphan: free its data blocks via ext2fs_block_iterate3,
+//      then free the inode itself via ext2fs_inode_alloc_stats2.
+
+namespace {
+
+struct ExtRefCollectContext {
+    ext2_filsys fs;
+    std::unordered_set<ext2_ino_t>* referenced;
+};
+
+int extRefCollectCallback(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, char*, void* data) {
+    if (!entry->inode) return 0;
+    auto* context = static_cast<ExtRefCollectContext*>(data);
+    context->referenced->insert(entry->inode);
+
+    // Recurse into child directories (but skip "." and ".." to avoid loops).
+    const unsigned int nameLen = ext2fs_dirent_name_len(entry);
+    const bool isDot = nameLen == 1 && entry->name[0] == '.';
+    const bool isDotDot = nameLen == 2 && entry->name[0] == '.' && entry->name[1] == '.';
+    if (!isDot && !isDotDot) {
+        struct ext2_inode inode{};
+        if (ext2fs_read_inode(context->fs, entry->inode, &inode) == 0 &&
+            LINUX_S_ISDIR(inode.i_mode)) {
+            ext2fs_dir_iterate2(context->fs, entry->inode, 0, nullptr,
+                                extRefCollectCallback, data);
+        }
+    }
+    return 0;
+}
+
+// Builds the complete set of inode numbers reachable from the directory
+// tree. The root inode itself is always included.
+bool extCollectReferencedInodes(ext2_filsys fs, std::unordered_set<ext2_ino_t>& outReferenced) {
+    outReferenced.clear();
+    outReferenced.insert(EXT2_ROOT_INO);
+    ExtRefCollectContext context{fs, &outReferenced};
+    const errcode_t err = ext2fs_dir_iterate2(fs, EXT2_ROOT_INO, 0, nullptr,
+                                               extRefCollectCallback, &context);
+    return err == 0;
+}
+
+bool extScanOrphanedInodes(int volumeId, bool reclaim) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    VolumeState& volume = volumes[volumeId];
+    if (!volume.extFs || !volume.extFs->super || (reclaim && volume.readOnly) ||
+        !ensureExtBitmapsLoaded(volumeId)) {
+        return false;
+    }
+
+    ext2_filsys fs = volume.extFs;
+
+    // 1. Collect every inode referenced by a directory entry.
+    std::unordered_set<ext2_ino_t> referenced;
+    if (!extCollectReferencedInodes(fs, referenced)) return false;
+
+    // 2. Walk the inode bitmap looking for allocated-but-unreferenced inodes.
+    //    Skip reserved inodes (< s_first_ino) -- they're special (journal,
+    //    resize, lost+found placeholder, etc.) and should never be reclaimed.
+    const ext2_ino_t firstUserIno = fs->super->s_first_ino;
+    bool foundOrphan = false;
+
+    for (ext2_ino_t ino = firstUserIno; ino <= fs->super->s_inodes_count; ++ino) {
+        if (!ext2fs_test_inode_bitmap2(fs->inode_map, ino)) continue;
+        if (referenced.count(ino)) continue;
+
+        // This inode is allocated but unreachable from the directory tree.
+        foundOrphan = true;
+        if (!reclaim) return true; // Detection mode: one orphan is enough.
+
+        struct ext2_inode inode{};
+        if (ext2fs_read_inode(fs, ino, &inode) != 0) continue;
+        const bool isDir = LINUX_S_ISDIR(inode.i_mode);
+
+        EXT_LOGI("extReclaimOrphanedInodes: freeing orphaned inode %u (dir=%d, links=%u, blocks=%u)",
+                 ino, isDir ? 1 : 0, inode.i_links_count, inode.i_blocks);
+
+        // Set deletion time and zero the link count.
+        inode.i_links_count = 0;
+        inode.i_dtime = static_cast<__u32>(time(nullptr));
+        ext2fs_write_inode(fs, ino, &inode);
+
+        // Free data blocks.
+        if (ext2fs_inode_has_valid_blocks2(fs, &inode)) {
+            ext2fs_block_iterate3(fs, ino, BLOCK_FLAG_READ_ONLY, nullptr,
+                                   extReleaseBlockCallback, nullptr);
+        }
+
+        // Free the inode itself from the inode bitmap and update counters.
+        ext2fs_inode_alloc_stats2(fs, ino, -1, isDir ? 1 : 0);
+    }
+
+    if (!reclaim) return foundOrphan;
+    if (!foundOrphan) return true; // Nothing to do, success.
+
+    ext2fs_mark_ib_dirty(fs);
+    ext2fs_mark_bb_dirty(fs);
+    ext2fs_mark_super_dirty(fs);
+    return ext2fs_flush(fs) == 0;
+}
+
+} // namespace
+
+bool extHasOrphanedInodes(int volumeId) {
+    return extScanOrphanedInodes(volumeId, false);
+}
+
+bool extReclaimOrphanedInodes(int volumeId) {
+    return extScanOrphanedInodes(volumeId, true);
+}
+
+namespace {
+
 // This is deliberately narrower than e2fsck: libext2fs safely exposes each
 // usable directory record to this callback, so we can remove records whose
 // inode reference or basic metadata is demonstrably impossible. A malformed
@@ -615,23 +896,6 @@ bool extExtractFile(int volumeId, const std::string& targetPath, const std::stri
 
 namespace {
 
-// ext2fs_unlink() only removes the directory entry -- it never touches the
-// block/inode bitmaps or the superblock's free counters, which is what
-// getSpaceInfo() reads for FS_EXT. If we stop at unlink() (and a manual
-// i_links_count--), the inode's data blocks stay marked "in use" forever:
-// free space never grows back after a delete, or after a move that
-// overwrites an existing destination file. Writes look fine only because
-// block *allocation* does update the bitmaps correctly -- deletion just
-// never released anything to begin with.
-//
-// This mirrors what e2fsprogs's own debugfs "rm" (kill_file_by_inode) does:
-// walk the inode's blocks and free each one, then free the inode itself.
-int extReleaseBlockCallback(ext2_filsys fs, blk64_t* blocknr, e2_blkcnt_t,
-                             blk64_t, int, void*) {
-    ext2fs_block_alloc_stats2(fs, *blocknr, -1);
-    return 0;
-}
-
 // Drops one link to `ino`. If that was the last link, reclaims its data
 // blocks and frees the inode so free-space counters reflect the deletion.
 // Safe to call after ext2fs_unlink() has already removed the directory
@@ -789,7 +1053,25 @@ bool extSetLastModifiedTime(int volumeId, const std::string& path, uint64_t epoc
 void extGetSpaceInfo(int volumeId, uint64_t& outTotalBytes, uint64_t& outFreeBytes) {
     auto& v = volumes[volumeId];
     outTotalBytes = static_cast<uint64_t>(ext2fs_blocks_count(v.extFs->super)) * v.extFs->blocksize;
-    outFreeBytes = static_cast<uint64_t>(ext2fs_free_blocks_count(v.extFs->super)) * v.extFs->blocksize;
+    // If only the redundant counters are corrupt, show the bitmap's actual
+    // availability immediately. Check & Repair persists the reconciled
+    // counters; this avoids presenting a healthy empty vault as "full" until
+    // the user happens to run repair.
+    if (ensureExtBitmapsLoaded(volumeId) && v.extFs->block_map) {
+        blk64_t freeBlocks = 0;
+        for (dgrp_t group = 0; group < v.extFs->group_desc_count; ++group) {
+            const blk64_t first = ext2fs_group_first_block2(v.extFs, group);
+            const int count = ext2fs_group_blocks_count(v.extFs, group);
+            for (int index = 0; index < count; ++index) {
+                if (!ext2fs_test_block_bitmap2(v.extFs->block_map, first + static_cast<blk64_t>(index))) {
+                    ++freeBlocks;
+                }
+            }
+        }
+        outFreeBytes = freeBlocks * v.extFs->blocksize;
+    } else {
+        outFreeBytes = static_cast<uint64_t>(ext2fs_free_blocks_count(v.extFs->super)) * v.extFs->blocksize;
+    }
 }
 
 void* extOpenStream(int volumeId, const std::string& path) {

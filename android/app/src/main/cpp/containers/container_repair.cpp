@@ -982,8 +982,20 @@ RepairDiagnosisCode diagnoseMountedVolumeFilesystem(int volId, int logOpId) {
             rlog(logOpId, "Scanning the directory tree for entries with invalid inodes or impossible metadata...");
             const bool hasCorruptEntries = extHasCorruptDirectoryEntries(volId);
             if (!hasCorruptEntries) rlog(logOpId, "No corrupted directory entries found.");
-            return (dirty || hasCorruptEntries) ? RepairDiagnosisCode::kFilesystemDirty
-                                                : RepairDiagnosisCode::kHealthy;
+            rlog(logOpId, "Comparing ext free-block counters with the allocation bitmap...");
+            const bool badFreeSpaceAccounting = extFreeSpaceAccountingNeedsRepair(volId);
+            if (badFreeSpaceAccounting) {
+                rlog(logOpId, "Free-block counters disagree with the allocation bitmap; the volume may appear full incorrectly.");
+            }
+            rlog(logOpId, "Scanning for orphaned inodes (allocated but unreachable from any directory)...");
+            const bool hasOrphanedInodes = extHasOrphanedInodes(volId);
+            if (hasOrphanedInodes) {
+                rlog(logOpId, "Found inodes that are allocated but not referenced by any directory entry; their blocks are wasting space.");
+            } else {
+                rlog(logOpId, "No orphaned inodes found.");
+            }
+            return (dirty || hasCorruptEntries || badFreeSpaceAccounting || hasOrphanedInodes)
+                ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
         }
         case VolumeState::FS_NTFS: {
             rlog(logOpId, "NTFS filesystem -- checking the $Volume dirty flag...");
@@ -1027,7 +1039,14 @@ bool runMountedVolumeFilesystemCheck(int volId, int logOpId) {
             const bool clearedFlag = extClearDirtyState(volId);
             rlog(logOpId, "Removing corrupted ext directory entries...");
             const bool removedCorrupt = extRemoveCorruptDirectoryEntries(volId);
-            return clearedFlag && removedCorrupt;
+            rlog(logOpId, "Reclaiming orphaned inodes (allocated but unreachable from any directory)...");
+            const bool reclaimedOrphans = extReclaimOrphanedInodes(volId);
+            if (reclaimedOrphans) {
+                rlog(logOpId, "Orphaned inodes reclaimed successfully.");
+            }
+            rlog(logOpId, "Rebuilding ext free-block counters from the allocation bitmap...");
+            const bool repairedFreeSpaceAccounting = extRepairFreeSpaceAccounting(volId);
+            return clearedFlag && removedCorrupt && reclaimedOrphans && repairedFreeSpaceAccounting;
         }
         case VolumeState::FS_NTFS: {
             rlog(logOpId, "Clearing the NTFS $Volume dirty flag...");

@@ -47,6 +47,20 @@ bool extClearDirtyState(int volumeId);
 // volume; it never guesses at inode/block ownership.
 bool extHasCorruptDirectoryEntries(int volumeId);
 bool extRemoveCorruptDirectoryEntries(int volumeId);
+// Validates/repairs the redundant free-block counters from the mounted block
+// bitmap. This fixes volumes that appear full solely because their counters
+// were damaged while the allocation bitmap is still intact.
+bool extFreeSpaceAccountingNeedsRepair(int volumeId);
+bool extRepairFreeSpaceAccounting(int volumeId);
+// Detects/reclaims inodes that are marked allocated in the inode bitmap but
+// are not referenced by any directory entry -- the specific corruption left
+// behind by the old delete path that only called ext2fs_unlink() without
+// freeing the inode's blocks or the inode itself. Reclamation frees the
+// orphan's data blocks and the inode, so a subsequent free-space-accounting
+// rebuild picks up the freed space. Must run *before*
+// extRepairFreeSpaceAccounting to get correct counters.
+bool extHasOrphanedInodes(int volumeId);
+bool extReclaimOrphanedInodes(int volumeId);
 
 // The rest of these back filesystems/fs_ops.h's fsXxx functions for ext --
 // see that header for the exact contract each one implements. Several are

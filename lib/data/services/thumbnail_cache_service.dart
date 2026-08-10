@@ -81,16 +81,7 @@ class ThumbnailCacheService {
 
   // ── Filename / key encoding ────────────────────────────────────────────────
   static String _encodeKey(String value) {
-    const int fnvPrime = 1099511628211;
-    const int offsetBasis = -2875151525287752661;
-    const int mask64 = 0xFFFFFFFFFFFFFFFF;
-    int hash = offsetBasis;
-    final bytes = utf8.encode(value);
-    for (final byte in bytes) {
-      hash = (hash ^ byte) & mask64;
-      hash = (hash * fnvPrime) & mask64;
-    }
-    return BigInt.from(hash).toUnsigned(64).toRadixString(16).padLeft(16, '0');
+    return md5.convert(utf8.encode(value)).toString();
   }
 
   // ── Quality-qualified path key ─────────────────────────────────────────────
@@ -439,40 +430,22 @@ static Future<void> put({
         unawaited(enforceDiskBudget());
       }
     } else {
-      final cachePath =
-          '$inContainerDir/${_encodeKey(_qualifiedPath(filePath, quality))}';
-      
-      // Unique temp path for the vault to prevent write conflicts
-      final uniqueId = DateTime.now().microsecondsSinceEpoch;
-      final tmpPath = '$cachePath.$uniqueId.tmp';
-      
+      final keyHex = _encodeKey(_qualifiedPath(filePath, quality));
+      final cachePath = '$inContainerDir/$keyHex';
       final uriStr = container.uri.toString();
 
       if (!_ensuredThumbDirs.containsKey(uriStr)) {
         _ensuredThumbDirs[uriStr] = vaultExplorerApi.createDirectory(container, inContainerDir);
       }
       await _ensuredThumbDirs[uriStr];
-      
-      final ok = await vaultExplorerApi.writeFileChunk(container, tmpPath, 0, payload);
-      // finishWriteIfCryptomator() is a documented no-op for every format
-      // except Cryptomator (which needs it to flush the buffered final
-      // chunk) — skip the round trip for gocryptfs/VeraCrypt/LUKS, which is
-      // the common case, instead of paying for a call that just no-ops.
-      if (container.containerFormat == 'cryptomator') {
-        await vaultExplorerApi.finishWriteIfCryptomator(container, tmpPath);
+
+      final ok = await vaultExplorerApi.writeFileChunk(container, cachePath, 0, payload);
+      if (ok && container.containerFormat == 'cryptomator') {
+        await vaultExplorerApi.finishWriteIfCryptomator(container, cachePath);
       }
 
-      if (ok) {
-        // You may still need to delete the target file here depending on whether 
-        // vaultExplorerApi.renameFile supports overwriting existing files.
-        await vaultExplorerApi.deleteFile(container, cachePath);
-        await vaultExplorerApi.renameFile(container, tmpPath, cachePath);
-        if (++_inContainerPutWriteCount % 25 == 0) {
-          unawaited(enforceInContainerDiskBudget(container));
-        }
-      } else {
-        await vaultExplorerApi.deleteFile(container, tmpPath);
-
+      if (ok && ++_inContainerPutWriteCount % 25 == 0) {
+        unawaited(enforceInContainerDiskBudget(container));
       }
     }
   } catch (e, stackTrace) {

@@ -1,5 +1,3 @@
-// File: lib/features/dashboard/vault_dashboard_screen.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,7 +15,6 @@ import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/core/widgets/activity/floating_activity_stack.dart';
-import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/unlock/unlock_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/container_config_sheet.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/create_container_sheet.dart';
@@ -28,7 +25,6 @@ import 'package:vaultexplorer/features/unlock/usb_unlock_sheet.dart';
 import 'package:vaultexplorer/features/lock/lock_gate_screen.dart';
 import 'package:vaultexplorer/features/dashboard/widgets/usb_create_container_sheet.dart';
 import 'package:vaultexplorer/data/models/container_sort_mode.dart';
-
 import '../../data/models/file_operation.dart';
 import '../../data/services/media_aspect_ratio_cache.dart';
 
@@ -53,30 +49,16 @@ class SlideRightRoute<T> extends PageRouteBuilder<T> {
       );
 }
 
-/// Lets [MainShell] trigger the "Add a vault" menu from its own centered
-/// bottom-bar button without needing to reference the private
-/// [State] class that implements it -- see [VaultDashboard]'s `GlobalKey`
-/// in `main_shell.dart`.
-abstract class VaultDashboardActions {
-  void showAddVaultMenu();
-}
-
 class VaultDashboard extends StatefulWidget {
-  /// Optional sink for the currently-mounted volume list, kept live as
-  /// [_mounted] changes. [MainShell] passes this so the Tools tab (Storage
-  /// Analyzer's target picker, Repair's "choose mounted volume" option) can
-  /// see what's mounted without duplicating this screen's own mount
-  /// tracking. `null` when [VaultDashboard] is used standalone.
   final ValueNotifier<List<MountedContainer>>? mountedNotifier;
-
   const VaultDashboard({super.key, this.mountedNotifier});
+
   @override
-  State<VaultDashboard> createState() => _VaultDashboardState();
+  State<VaultDashboard> createState() => VaultDashboardState();
 }
 
-class _VaultDashboardState extends State<VaultDashboard>
-    with WidgetsBindingObserver
-    implements VaultDashboardActions {
+class VaultDashboardState extends State<VaultDashboard>
+    with WidgetsBindingObserver {
   final List<MountedContainer> _mounted = [];
   Map<String, ContainerRecord> _records = {};
   final List<String> _recordsOrder = [];
@@ -93,6 +75,10 @@ class _VaultDashboardState extends State<VaultDashboard>
   Timer? _undoTimer;
   final Set<String> _animatingOutUris = {};
   final Set<String> _animatingInUris = {};
+
+  void reloadDashboard() {
+    _loadAll();
+  }
 
   @override
   void initState() {
@@ -165,7 +151,6 @@ class _VaultDashboardState extends State<VaultDashboard>
         await vaultExplorerApi.lockContainer(c.uri);
         _onContainerLocked(c.volId);
       } catch (e) {
-
       } finally {
         vaultExplorerApi.releaseLockGuard(c.volId);
       }
@@ -233,7 +218,6 @@ class _VaultDashboardState extends State<VaultDashboard>
           if (!mounted) return;
           _onContainerLocked(container.volId);
         } catch (e) {
-
         } finally {
           vaultExplorerApi.releaseLockGuard(container.volId);
         }
@@ -241,26 +225,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     );
   }
 
-  /// FLAG_SECURE isn't only about blocking manual screenshots — it also
-  /// tells Android not to cache a real bitmap of this window for the
-  /// "resume" transition (the task-snapshot placeholder shown instantly
-  /// when a task returns to the foreground, including right after
-  /// dismissing the keyguard). That snapshot mechanism, not any timing
-  /// race in our own auto-lock code, is what actually caused the reported
-  /// bug: a container auto-locks on screen-off, but Android had already
-  /// cached its last-visible screen as this window's snapshot *before*
-  /// the lock could apply, and replayed that cached bitmap the instant the
-  /// device was unlocked — regardless of how fast our own lock logic ran.
-  /// With FLAG_SECURE set, Android skips that snapshot and shows a plain
-  /// placeholder instead, so there's nothing sensitive left to flash.
-  ///
-  /// So: force it on for as long as *any* container is unlocked, regardless
-  /// of the person's own "block screenshots" preference — there's decrypted
-  /// content on screen; hiding it from the OS's own snapshot cache isn't
-  /// optional the way manual screenshot-blocking is. Once nothing is
-  /// mounted, fall back to whatever they actually chose in Settings.
-  /// Idempotent and cheap enough to just call after every mount/unmount
-  /// rather than tracking 0↔1 transitions by hand.
   void _syncSecureScreen() {
     SecureScreenPolicy.anyContainerMounted = _mounted.isNotEmpty;
     unawaited(
@@ -313,16 +277,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     );
   }
 
-  // A blocked write can leave the outer volume's on-disk filesystem
-  // structures briefly inconsistent (some but not all of a multi-step FAT
-  // operation may have already landed before the write that would have
-  // reached the hidden volume got refused) -- exactly the "looks broken/
-  // empty until you remount" behavior VeraCrypt itself exhibits here. There
-  // is no way to make the still-open FAT/NTFS session consistent again in
-  // place, so rather than leave the container open and looking corrupted,
-  // force it closed now (same teardown as pressing "lock") and prompt the
-  // user to reopen it -- a fresh mount re-reads the real on-disk state,
-  // which is exactly what resolves this on desktop VeraCrypt too.
   Future<void> _onHiddenVolumeProtectionTriggered(int volId) async {
     if (!mounted) return;
     final idx = _mounted.indexWhere((c) => c.volId == volId);
@@ -332,9 +286,6 @@ class _VaultDashboardState extends State<VaultDashboard>
       try {
         await vaultExplorerApi.lockContainer(container.uri);
       } catch (_) {
-        // Already in a degraded state -- fall through to clean up the
-        // Dart-side session regardless of whether the native unmount call
-        // itself succeeded cleanly.
       } finally {
         vaultExplorerApi.releaseLockGuard(volId);
       }
@@ -524,8 +475,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     }
   }
 
-  
-
   void _showUsbCreateSheet() {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
@@ -548,9 +497,6 @@ class _VaultDashboardState extends State<VaultDashboard>
     });
   }
 
-  @override
-  void showAddVaultMenu() => _showAddOptionsSheet();
-
   Future<void> _showAddOptionsSheet() async {
     if (_actionInFlight) return;
     setState(() => _actionInFlight = true);
@@ -559,7 +505,6 @@ class _VaultDashboardState extends State<VaultDashboard>
       final devices = await vaultExplorerApi.listUsbDevices();
       hasUsb = devices.isNotEmpty;
     } catch (e) {
-
     }
     if (!mounted) return;
     setState(() => _actionInFlight = false);
@@ -982,20 +927,9 @@ class _VaultDashboardState extends State<VaultDashboard>
             context.l10n.appNameVaultExplorer,
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
-          actions: [
-            const AppBarClipboardButton(),
-            IconButton(
-              icon: const Icon(Icons.settings_rounded),
-              tooltip: context.l10n.settingsTooltip,
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AppSettingsScreen()),
-                );
-                if (mounted) _loadAll();
-              },
-            ),
-            const SizedBox(width: 4),
+          actions: const [
+            AppBarClipboardButton(),
+            SizedBox(width: 4),
           ],
         ),
         body: Stack(
@@ -1008,6 +942,11 @@ class _VaultDashboardState extends State<VaultDashboard>
               child: Center(child: FloatingActivityStack()),
             ),
           ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _showAddOptionsSheet,
+          icon: const Icon(Icons.add_rounded),
+          label: Text(context.l10n.addVaultFabLabel),
         ),
         bottomNavigationBar: AnimatedContainer(
           duration: const Duration(milliseconds: 300),

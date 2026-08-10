@@ -9,6 +9,7 @@ import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
 import 'package:vaultexplorer/data/services/app_settings_service.dart';
 import 'package:vaultexplorer/data/services/password_hasher.dart';
 import 'package:vaultexplorer/data/services/secure_screen_policy.dart';
+import 'package:vaultexplorer/data/services/settings_backup_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import '../../app/vault_explorer_app.dart';
@@ -36,6 +37,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
 
   bool _biometricAvailable = false;
   final _localAuth = LocalAuthentication();
+  bool _backupBusy = false;
 
   @override
   void initState() {
@@ -115,6 +117,106 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
         _disguiseMode = disguiseMode;
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _exportSettings() async {
+    if (_backupBusy) return;
+    setState(() => _backupBusy = true);
+    try {
+      final ok = await SettingsBackupService.exportToFile();
+      if (!mounted) return;
+      // A false result also covers the user cancelling the "save as"
+      // picker, which isn't an error -- stay quiet in that case.
+      if (ok) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.exportSettingsSuccessMessage,
+          tone: AppBannerTone.success,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.exportSettingsErrorMessage,
+          tone: AppBannerTone.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _importSettings() async {
+    if (_backupBusy) return;
+    setState(() => _backupBusy = true);
+    ImportedSettingsBundle? bundle;
+    try {
+      bundle = await SettingsBackupService.pickAndParseFile();
+    } on InvalidSettingsBackupException {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.importSettingsInvalidFileMessage,
+          tone: AppBannerTone.error,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.importSettingsInvalidFileMessage,
+          tone: AppBannerTone.error,
+        );
+      }
+    }
+    if (!mounted) {
+      return;
+    }
+    if (bundle == null) {
+      // User cancelled the picker, or parsing failed and was already
+      // reported above -- either way there's nothing left to confirm.
+      setState(() => _backupBusy = false);
+      return;
+    }
+
+    final confirmed = await showAppConfirmDialog(
+      context,
+      title: context.l10n.importSettingsConfirmTitle,
+      message: context.l10n.importSettingsConfirmMessage,
+      confirmLabel: context.l10n.importSettingsTitle,
+      isDestructive: true,
+    );
+    if (!mounted) return;
+    if (!confirmed) {
+      setState(() => _backupBusy = false);
+      return;
+    }
+
+    try {
+      await SettingsBackupService.applyImportedBundle(bundle);
+      if (!mounted) return;
+      setState(() => _settings = bundle!.appSettings);
+      appThemeModeNotifier.value = bundle.appSettings.themeMode;
+      appLocaleNotifier.value = bundle.appSettings.languageCode != null
+          ? Locale(bundle.appSettings.languageCode!)
+          : null;
+      showAppSnackBar(
+        context,
+        message: context.l10n.importSettingsSuccessMessage,
+        tone: AppBannerTone.success,
+      );
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.importSettingsInvalidFileMessage,
+          tone: AppBannerTone.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
     }
   }
 
@@ -819,6 +921,51 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                                 }),
                               ],
                             ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SectionHeader(context.l10n.sectionBackupRestore),
+                      SectionCard(
+                        children: [
+                          ListTile(
+                            title: Text(
+                              context.l10n.exportSettingsTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.exportSettingsSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            enabled: !_backupBusy,
+                            onTap: _exportSettings,
+                          ),
+                          ListTile(
+                            title: Text(
+                              context.l10n.importSettingsTitle,
+                              style: textTheme.bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              context.l10n.importSettingsSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            trailing: _backupBusy
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      valueColor:
+                                          AlwaysStoppedAnimation(cs.primary),
+                                    ),
+                                  )
+                                : null,
+                            enabled: !_backupBusy,
+                            onTap: _importSettings,
                           ),
                         ],
                       ),

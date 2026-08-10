@@ -47,6 +47,27 @@ Future<bool> openWithApp(
     return result ?? false;
   }
 
+  /// Lets the user pick a destination via the system document picker and
+  /// writes [contents] to it as UTF-8 text. Unlike [exportFileToStorage],
+  /// this isn't scoped to a mounted container -- it's the plain
+  /// app-settings export/import round trip (Settings -> Export/Import).
+  /// Returns false if the user cancelled or the write failed.
+  Future<bool> exportAppSettingsFile(String contents, String fileName) async {
+    final result = await _channel.invokeMethod<bool>(
+      ChannelMethods.exportAppSettingsFile,
+      {'contents': contents, 'fileName': fileName},
+    );
+    return result ?? false;
+  }
+
+  /// Opens the system document picker and returns the picked file's text
+  /// content, or null if the user cancelled.
+  Future<String?> importAppSettingsFile() async {
+    return _channel.invokeMethod<String>(
+      ChannelMethods.importAppSettingsFile,
+    );
+  }
+
   Future<int> getFileSize(MountedContainer container, String fileName) async {
     final result = await _channel.invokeMethod<int>(
       ChannelMethods.getFileSize,

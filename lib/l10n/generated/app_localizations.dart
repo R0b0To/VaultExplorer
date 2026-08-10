@@ -1730,6 +1730,72 @@ abstract class AppLocalizations {
   /// **'Remove association'**
   String get removeAssociationTooltip;
 
+  /// Settings section header for export/import of app settings
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get sectionBackupRestore;
+
+  /// Settings row title for exporting app settings to a file
+  ///
+  /// In en, this message translates to:
+  /// **'Export settings'**
+  String get exportSettingsTitle;
+
+  /// Settings row subtitle for exporting app settings to a file
+  ///
+  /// In en, this message translates to:
+  /// **'Save app settings and file manager layout to a file'**
+  String get exportSettingsSubtitle;
+
+  /// Settings row title for importing app settings from a file
+  ///
+  /// In en, this message translates to:
+  /// **'Import settings'**
+  String get importSettingsTitle;
+
+  /// Settings row subtitle for importing app settings from a file
+  ///
+  /// In en, this message translates to:
+  /// **'Restore app settings and file manager layout from a file'**
+  String get importSettingsSubtitle;
+
+  /// Confirmation dialog title before overwriting settings with an imported file
+  ///
+  /// In en, this message translates to:
+  /// **'Import settings?'**
+  String get importSettingsConfirmTitle;
+
+  /// Confirmation dialog message before overwriting settings with an imported file
+  ///
+  /// In en, this message translates to:
+  /// **'This replaces your current app settings and file manager layout. This can\'t be undone.'**
+  String get importSettingsConfirmMessage;
+
+  /// Snackbar shown after successfully exporting settings
+  ///
+  /// In en, this message translates to:
+  /// **'Settings exported'**
+  String get exportSettingsSuccessMessage;
+
+  /// Snackbar shown after successfully importing settings
+  ///
+  /// In en, this message translates to:
+  /// **'Settings imported'**
+  String get importSettingsSuccessMessage;
+
+  /// Snackbar shown when exporting settings fails
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t export settings'**
+  String get exportSettingsErrorMessage;
+
+  /// Snackbar shown when the picked import file isn't a recognizable settings bundle
+  ///
+  /// In en, this message translates to:
+  /// **'That file isn\'t a valid settings export'**
+  String get importSettingsInvalidFileMessage;
+
   /// Settings row title linking to the About screen
   ///
   /// In en, this message translates to:

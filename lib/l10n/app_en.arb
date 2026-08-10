@@ -1376,6 +1376,50 @@
   "@removeAssociationTooltip": {
     "description": "Tooltip for the button that deletes a remembered file association"
   },
+  "sectionBackupRestore": "Backup",
+  "@sectionBackupRestore": {
+    "description": "Settings section header for export/import of app settings"
+  },
+  "exportSettingsTitle": "Export settings",
+  "@exportSettingsTitle": {
+    "description": "Settings row title for exporting app settings to a file"
+  },
+  "exportSettingsSubtitle": "Save app settings and file manager layout to a file",
+  "@exportSettingsSubtitle": {
+    "description": "Settings row subtitle for exporting app settings to a file"
+  },
+  "importSettingsTitle": "Import settings",
+  "@importSettingsTitle": {
+    "description": "Settings row title for importing app settings from a file"
+  },
+  "importSettingsSubtitle": "Restore app settings and file manager layout from a file",
+  "@importSettingsSubtitle": {
+    "description": "Settings row subtitle for importing app settings from a file"
+  },
+  "importSettingsConfirmTitle": "Import settings?",
+  "@importSettingsConfirmTitle": {
+    "description": "Confirmation dialog title before overwriting settings with an imported file"
+  },
+  "importSettingsConfirmMessage": "This replaces your current app settings and file manager layout. This can't be undone.",
+  "@importSettingsConfirmMessage": {
+    "description": "Confirmation dialog message before overwriting settings with an imported file"
+  },
+  "exportSettingsSuccessMessage": "Settings exported",
+  "@exportSettingsSuccessMessage": {
+    "description": "Snackbar shown after successfully exporting settings"
+  },
+  "importSettingsSuccessMessage": "Settings imported",
+  "@importSettingsSuccessMessage": {
+    "description": "Snackbar shown after successfully importing settings"
+  },
+  "exportSettingsErrorMessage": "Couldn't export settings",
+  "@exportSettingsErrorMessage": {
+    "description": "Snackbar shown when exporting settings fails"
+  },
+  "importSettingsInvalidFileMessage": "That file isn't a valid settings export",
+  "@importSettingsInvalidFileMessage": {
+    "description": "Snackbar shown when the picked import file isn't a recognizable settings bundle"
+  },
   "aboutAppTitle": "About VaultExplorer",
   "@aboutAppTitle": {
     "description": "Settings row title linking to the About screen"

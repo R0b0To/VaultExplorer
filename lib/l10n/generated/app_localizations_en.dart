@@ -1014,6 +1014,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeAssociationTooltip => 'Remove association';
 
   @override
+  String get sectionBackupRestore => 'Backup';
+
+  @override
+  String get exportSettingsTitle => 'Export settings';
+
+  @override
+  String get exportSettingsSubtitle =>
+      'Save app settings and file manager layout to a file';
+
+  @override
+  String get importSettingsTitle => 'Import settings';
+
+  @override
+  String get importSettingsSubtitle =>
+      'Restore app settings and file manager layout from a file';
+
+  @override
+  String get importSettingsConfirmTitle => 'Import settings?';
+
+  @override
+  String get importSettingsConfirmMessage =>
+      'This replaces your current app settings and file manager layout. This can\'t be undone.';
+
+  @override
+  String get exportSettingsSuccessMessage => 'Settings exported';
+
+  @override
+  String get importSettingsSuccessMessage => 'Settings imported';
+
+  @override
+  String get exportSettingsErrorMessage => 'Couldn\'t export settings';
+
+  @override
+  String get importSettingsInvalidFileMessage =>
+      'That file isn\'t a valid settings export';
+
+  @override
   String get aboutAppTitle => 'About VaultExplorer';
 
   @override

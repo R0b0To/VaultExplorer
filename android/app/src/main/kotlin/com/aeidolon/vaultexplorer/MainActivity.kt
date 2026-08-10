@@ -31,6 +31,8 @@ private object ChannelMethods {
     const val EXPORT_FILES_FOLDER       = "exportFilesToFolder"
     const val IMPORT_FILE               = "importFile"
     const val IMPORT_FOLDER             = "importFolder"
+    const val EXPORT_APP_SETTINGS_FILE  = "exportAppSettingsFile"
+    const val IMPORT_APP_SETTINGS_FILE  = "importAppSettingsFile"
     const val CANCEL_IMPORT             = "cancelImport"
     const val DELETE_IMPORT_SOURCES     = "deleteImportSources"
     const val GET_FILE_SIZE             = "getFileSize"
@@ -136,6 +138,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val vaultUnlockHandlers = VaultUnlockHandlers(this, ioExecutor, nativeOps, derivedKeyHandlers)
     private val thumbnailHandlers = ThumbnailHandlers(this, imageThumbnailExecutor, videoThumbnailExecutor, nativeOps)
     private val importExportHandlers = ImportExportHandlers(this, pendingResult, ioExecutor, nativeOps)
+    private val appSettingsFileHandlers = AppSettingsFileHandlers(this, pendingResult, ioExecutor)
     private val splitJoinHandlers = SplitJoinHandlers(this, ioExecutor)
     private val singleFileCryptoHandlers = SingleFileCryptoHandlers(this, ioExecutor, nativeOps)
     private val splitContainerMountHandlers = SplitContainerMountHandlers(this, ioExecutor, nativeOps, vaultUnlockHandlers)
@@ -394,6 +397,8 @@ class MainActivity : FlutterFragmentActivity() {
                 ChannelMethods.EXPORT_FILES_FOLDER -> importExportHandlers.handleExportFilesFolder(call, result)
                 ChannelMethods.IMPORT_FOLDER -> importExportHandlers.handleImportFolder(call, result)
                 ChannelMethods.EXPORT_FILE -> importExportHandlers.handleExportFile(call, result)
+                ChannelMethods.EXPORT_APP_SETTINGS_FILE -> appSettingsFileHandlers.handleExportAppSettingsFile(call, result)
+                ChannelMethods.IMPORT_APP_SETTINGS_FILE -> appSettingsFileHandlers.handleImportAppSettingsFile(call, result)
                 ChannelMethods.SPLIT_CONTAINER -> splitJoinHandlers.handleSplitContainer(call, result)
                 ChannelMethods.JOIN_CONTAINER -> splitJoinHandlers.handleJoinContainer(call, result)
                 ChannelMethods.CANCEL_SPLIT_JOIN -> splitJoinHandlers.handleCancelSplitJoin(call, result)

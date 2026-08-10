@@ -41,3 +41,7 @@ void ntfsCloseStream(int volumeId, void* handle);
 // [volumeId]'s ntfs_volume must already be mounted (VolumeState::ntfsVol).
 bool ntfsIsDirty(int volumeId);
 bool ntfsClearDirtyFlag(int volumeId);
+// Conservative Check & Repair directory pass. It removes only corrupt $I30
+// index entries, leaving an uncertain target MFT record allocated.
+bool ntfsHasCorruptDirectoryEntries(int volumeId);
+bool ntfsRemoveCorruptDirectoryEntries(int volumeId);

@@ -11,6 +11,7 @@
 #include <fstream>
 #include <memory>
 #include <strings.h>
+#include <unordered_set>
 #include <unistd.h>
 
 #include "diskio.h"
@@ -406,6 +407,105 @@ bool extClearDirtyState(int volumeId) {
         return false;
     }
     return true;
+}
+
+namespace {
+
+// This is deliberately narrower than e2fsck: libext2fs safely exposes each
+// usable directory record to this callback, so we can remove records whose
+// inode reference or basic metadata is demonstrably impossible. A malformed
+// directory block that the iterator itself cannot parse still needs a full
+// e2fsck-style structural repair and is reported as a scan failure instead of
+// being rewritten speculatively.
+struct ExtRepairScan {
+    ext2_filsys fs;
+    uint64_t capacityBytes;
+    uint64_t nowUnix;
+    bool remove = false;
+    bool found = false;
+    bool complete = true;
+    std::unordered_set<ext2_ino_t> visited;
+};
+
+struct ExtRepairDirectory {
+    ExtRepairScan* scan;
+    std::vector<ext2_ino_t> childDirectories;
+};
+
+bool extRepairEntryLooksCorrupt(ExtRepairScan* scan, ext2_ino_t ino, struct ext2_inode& inode) {
+    if (ino == 0 || ext2fs_read_inode(scan->fs, ino, &inode) != 0) return true;
+    const uint64_t size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
+    if (!LINUX_S_ISDIR(inode.i_mode) && size > scan->capacityBytes) return true;
+    constexpr uint64_t kOneYearSeconds = 366ULL * 24 * 3600;
+    return inode.i_mtime > scan->nowUnix + kOneYearSeconds;
+}
+
+int extRepairDirectoryEntry(ext2_ino_t, int, struct ext2_dir_entry* entry, int, int, char*, void* data) {
+    auto* context = static_cast<ExtRepairDirectory*>(data);
+    if (!entry->inode) return 0;
+
+    const unsigned int nameLength = ext2fs_dirent_name_len(entry);
+    const bool isDot = nameLength == 1 && entry->name[0] == '.';
+    const bool isDotDot = nameLength == 2 && entry->name[0] == '.' && entry->name[1] == '.';
+    if (isDot || isDotDot) return 0;
+
+    struct ext2_inode inode{};
+    if (extRepairEntryLooksCorrupt(context->scan, entry->inode, inode)) {
+        context->scan->found = true;
+        if (context->scan->remove) {
+            // Clearing the inode is the ext directory-entry equivalent of a
+            // delete marker. Do not free the inode/blocks: its metadata is
+            // exactly what failed validation, so reclaiming it is unsafe.
+            entry->inode = 0;
+            return DIRENT_CHANGED;
+        }
+        return 0;
+    }
+
+    if (LINUX_S_ISDIR(inode.i_mode)) context->childDirectories.push_back(entry->inode);
+    return 0;
+}
+
+void extScanRepairDirectory(ExtRepairScan& scan, ext2_ino_t directory) {
+    if (!scan.visited.insert(directory).second) return;
+    ExtRepairDirectory context{&scan, {}};
+    const errcode_t error = ext2fs_dir_iterate2(scan.fs, directory, 0, nullptr,
+                                                  extRepairDirectoryEntry, &context);
+    if (error != 0) {
+        scan.found = true;
+        scan.complete = false;
+        return;
+    }
+    for (const ext2_ino_t child : context.childDirectories) extScanRepairDirectory(scan, child);
+}
+
+bool extScanCorruptDirectoryEntries(int volumeId, bool remove) {
+    if (volumeId < 0 || volumeId >= FF_VOLUMES) return false;
+    VolumeState& volume = volumes[volumeId];
+    if (!volume.extFs || !volume.extFs->super || (remove && volume.readOnly)) return false;
+
+    ExtRepairScan scan{
+        volume.extFs,
+        ext2fs_blocks_count(volume.extFs->super) * static_cast<uint64_t>(volume.extFs->blocksize),
+        static_cast<uint64_t>(time(nullptr)),
+        remove,
+    };
+    extScanRepairDirectory(scan, EXT2_ROOT_INO);
+    if (!remove) return scan.found;
+    if (!scan.complete) return false;
+    if (!scan.found) return true;
+    ext2fs_mark_super_dirty(volume.extFs);
+    return ext2fs_flush(volume.extFs) == 0;
+}
+
+} // namespace
+
+bool extHasCorruptDirectoryEntries(int volumeId) {
+    return extScanCorruptDirectoryEntries(volumeId, false);
+}
+
+bool extRemoveCorruptDirectoryEntries(int volumeId) {
+    return extScanCorruptDirectoryEntries(volumeId, true);
 }
 
 // ----------------------------------------------------------------====

@@ -11,6 +11,7 @@
 #include <fstream>
 #include <memory>
 #include <sys/stat.h>
+#include <unordered_set>
 #include <unistd.h>
 
 extern "C" {
@@ -18,6 +19,7 @@ extern "C" {
 #include "inode.h"
 #include "dir.h"
 #include "attrib.h"
+#include "index.h"
 #include "layout.h"
 }
 
@@ -352,6 +354,140 @@ int ntfsFilldir(void* dirent, const ntfschar* name, const int nameLength,
     return 0;
 }
 
+// NTFS's directory is the $I30 B-tree. ntfs_readdir has already validated
+// enough of an entry to hand us the raw UTF-16 name; if that name cannot be
+// converted, its MFT target cannot be opened, or its basic metadata is
+// impossible, we can safely remove exactly that index entry through NTFS-3G's
+// index API. The target MFT record is intentionally retained: when an entry
+// is corrupt, deleting an uncertain record/cluster chain is riskier than
+// leaving it unreferenced for a later full ntfsck-style recovery.
+struct NtfsRepairEntry {
+    std::string parentPath;
+    std::vector<ntfschar> name;
+    int nameType;
+};
+
+struct NtfsRepairScan {
+    ntfs_volume* volume;
+    uint64_t capacityBytes;
+    uint64_t nowUnix;
+    bool found = false;
+    bool complete = true;
+    std::unordered_set<uint64_t> visited;
+    std::vector<NtfsRepairEntry> corrupt;
+};
+
+struct NtfsRepairDirectory {
+    NtfsRepairScan* scan;
+    std::string path;
+    std::vector<std::pair<std::string, uint64_t>> childDirectories;
+};
+
+bool ntfsRepairIsInternalName(const std::string& name) {
+    return name == "System Volume Information" || name == "$MFT" || name == "$MFTMirr" ||
+           name == "$LogFile" || name == "$Volume" || name == "$AttrDef" || name == "$Bitmap" ||
+           name == "$Boot" || name == "$BadClus" || name == "$Secure" || name == "$UpCase" ||
+           name == "$Extend" || name == "$RECYCLE.BIN";
+}
+
+int ntfsRepairDirectoryEntry(void* data, const ntfschar* name, const int nameLength,
+                             const int nameType, const s64, const MFT_REF reference, const unsigned) {
+    auto* context = static_cast<NtfsRepairDirectory*>(data);
+    if (nameType == FILE_NAME_DOS || nameLength <= 0 || nameLength > 255) return 0;
+
+    char* utf8Name = nullptr;
+    const int utf8Length = ntfs_ucstombs(name, nameLength, &utf8Name, 0);
+    const bool nameInvalid = utf8Length < 0 || !utf8Name;
+    std::string nameString;
+    if (!nameInvalid) {
+        nameString.assign(utf8Name, utf8Length);
+        free(utf8Name);
+        if (nameString == "." || nameString == ".." || ntfsRepairIsInternalName(nameString)) return 0;
+    } else if (utf8Name) {
+        free(utf8Name);
+    }
+
+    ntfs_inode* inode = nameInvalid ? nullptr : ntfs_inode_open(context->scan->volume, reference);
+    bool corrupt = nameInvalid || !inode;
+    bool isDirectory = false;
+    if (inode) {
+        isDirectory = (inode->mrec->flags & MFT_RECORD_IS_DIRECTORY) != 0;
+        const uint64_t ntfsTime = inode->last_data_change_time;
+        constexpr uint64_t kNtfsEpochOffset = 116444736000000000ULL;
+        constexpr uint64_t kOneYearSeconds = 366ULL * 24 * 3600;
+        const bool futureTimestamp = ntfsTime > kNtfsEpochOffset &&
+            (ntfsTime - kNtfsEpochOffset) / 10000000ULL > context->scan->nowUnix + kOneYearSeconds;
+        corrupt = (!isDirectory && (inode->data_size < 0 ||
+                    static_cast<uint64_t>(inode->data_size) > context->scan->capacityBytes)) || futureTimestamp;
+        ntfs_inode_close(inode);
+    }
+
+    if (corrupt) {
+        context->scan->found = true;
+        context->scan->corrupt.push_back({context->path,
+                                          std::vector<ntfschar>(name, name + nameLength), nameType});
+        return 0;
+    }
+    if (isDirectory) {
+        const std::string childPath = context->path.empty() ? nameString : context->path + "/" + nameString;
+        context->childDirectories.push_back({childPath, static_cast<uint64_t>(reference)});
+    }
+    return 0;
+}
+
+void ntfsScanRepairDirectory(NtfsRepairScan& scan, const std::string& path, uint64_t directoryReference) {
+    if (!scan.visited.insert(directoryReference).second) return;
+    ntfs_inode* directory = path.empty()
+        ? ntfs_inode_open(scan.volume, FILE_root)
+        : ntfs_pathname_to_inode(scan.volume, nullptr, ("/" + path).c_str());
+    if (!directory) {
+        scan.found = true;
+        scan.complete = false;
+        return;
+    }
+    s64 position = 0;
+    NtfsRepairDirectory context{&scan, path, {}};
+    if (ntfs_readdir(directory, &position, &context, ntfsRepairDirectoryEntry) != 0) {
+        scan.found = true;
+        scan.complete = false;
+    }
+    ntfs_inode_close(directory);
+    for (const auto& child : context.childDirectories) ntfsScanRepairDirectory(scan, child.first, child.second);
+}
+
+bool ntfsRemoveRepairIndexEntry(NtfsRepairScan& scan, const NtfsRepairEntry& entry) {
+    ntfs_inode* directory = entry.parentPath.empty()
+        ? ntfs_inode_open(scan.volume, FILE_root)
+        : ntfs_pathname_to_inode(scan.volume, nullptr, ("/" + entry.parentPath).c_str());
+    if (!directory) return false;
+
+    const size_t keyLength = offsetof(FILE_NAME_ATTR, file_name) + entry.name.size() * sizeof(ntfschar);
+    std::vector<uint8_t> keyBuffer(keyLength, 0);
+    auto* key = reinterpret_cast<FILE_NAME_ATTR*>(keyBuffer.data());
+    key->file_name_length = static_cast<uint8_t>(entry.name.size());
+    key->file_name_type = static_cast<FILE_NAME_TYPE_FLAGS>(entry.nameType);
+    std::memcpy(key->file_name, entry.name.data(), entry.name.size() * sizeof(ntfschar));
+    const bool removed = ntfs_index_remove(directory, nullptr, key, static_cast<int>(keyLength)) == 0 &&
+                         ntfs_inode_sync(directory) == 0;
+    ntfs_inode_close(directory);
+    return removed;
+}
+
+bool ntfsScanCorruptDirectoryEntries(int volumeId, bool remove) {
+    if (volumeId < 0 || volumeId >= kMaxVolumes) return false;
+    VolumeState& volume = volumes[volumeId];
+    if (!volume.ntfsVol || (remove && volume.readOnly)) return false;
+
+    NtfsRepairScan scan{volume.ntfsVol, volume.dataAreaLengthBytes, static_cast<uint64_t>(time(nullptr))};
+    ntfsScanRepairDirectory(scan, "", static_cast<uint64_t>(FILE_root));
+    if (!remove) return scan.found;
+    if (!scan.complete) return false;
+    for (const auto& entry : scan.corrupt) {
+        if (!ntfsRemoveRepairIndexEntry(scan, entry)) return false;
+    }
+    return ntfs_device_sync(volume.ntfsVol->dev) == 0;
+}
+
 } // namespace
 
 extern "C" ntfs_device_operations vExplorer_ntfs_ops = {
@@ -366,6 +502,14 @@ extern "C" ntfs_device_operations vExplorer_ntfs_ops = {
     ntfsStat,
     ntfsIoctl
 };
+
+bool ntfsHasCorruptDirectoryEntries(int volumeId) {
+    return ntfsScanCorruptDirectoryEntries(volumeId, false);
+}
+
+bool ntfsRemoveCorruptDirectoryEntries(int volumeId) {
+    return ntfsScanCorruptDirectoryEntries(volumeId, true);
+}
 
 uint64_t recursiveNtfsFolderSize(int volumeId, const std::string& path) {
     ntfs_volume* volume = volumes[volumeId].ntfsVol;

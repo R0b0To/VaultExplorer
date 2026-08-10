@@ -488,6 +488,9 @@ uint16_t leU16(const uint8_t* p) { return uint16_t(p[0]) | (uint16_t(p[1]) << 8)
 uint32_t leU32(const uint8_t* p) {
     return uint32_t(p[0]) | (uint32_t(p[1]) << 8) | (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24);
 }
+uint64_t leU64(const uint8_t* p) {
+    return uint64_t(leU32(p)) | (uint64_t(leU32(p + 4)) << 32);
+}
 
 enum class FatKind { kFat16, kFat32, kExFat, kUnsupported };
 
@@ -592,7 +595,14 @@ bool fatClearDirty(int volId) {
 // rather than trying to interpret them.
 struct FatCorruptEntry {
     std::string path;
+    // The directory which contains this entry. Kept separately because an
+    // undecodable child name cannot reliably be used to open the entry again.
+    std::string parentPath;
     bool isDir;
+    BYTE attr;
+    FSIZE_t size;
+    WORD date;
+    WORD time;
 };
 
 // A name FatFs couldn't decode into valid Unicode surfaces, after its own
@@ -656,7 +666,7 @@ void fatScanForCorruptEntries(int volId, const std::string& pathSuffix, uint64_t
             std::snprintf(msg, sizeof(msg), "Found a corrupted %s entry: %s",
                           isDir ? "directory" : "file", childSuffix.c_str());
             rlog(opId, msg);
-            outCorrupt.push_back({childSuffix, isDir});
+            outCorrupt.push_back({childSuffix, pathSuffix, isDir, fno.fattrib, fno.fsize, fno.fdate, fno.ftime});
             continue; // don't trust anything inside a corrupted directory either
         }
 
@@ -683,6 +693,222 @@ FRESULT fatRemoveRecursiveForRepair(const char* path) {
         f_closedir(&dir);
     }
     return f_unlink(path);
+}
+
+// FatFs quite reasonably refuses to look up an invalid UTF-8/OEM name such
+// as "???". That is precisely the sort of directory entry this repair pass
+// finds, though, so a pathname-based f_unlink can never remove it. FAT16/32
+// directory entries are fixed-size records; when the normal unlink fails,
+// locate the one record with the metadata FatFs just reported and mark its
+// first byte DDEM (0xE5). This is how FAT deletion is represented on disk.
+//
+// We deliberately do not free the entry's cluster chain in this fallback.
+// The name/entry is already corrupt, so its start cluster cannot safely be
+// trusted. Hiding the unreadable entry is safe; reclaiming an uncertain chain
+// could destroy a different file if the cluster fields were damaged too.
+struct FatRawDirectorySlot {
+    LBA_t sector;
+    uint16_t offset;
+};
+
+bool fatRawEntryMatches(const uint8_t* raw, const FatCorruptEntry& entry) {
+    constexpr uint8_t kDeleted = 0xE5;
+    constexpr uint8_t kLongFileName = 0x0F;
+    // FAT's public attributes occupy bits 0..5. FatFs masks the raw value
+    // with this same mask before exposing FILINFO::fattrib.
+    constexpr uint8_t kAttributeMask = 0x3F;
+    if (raw[0] == 0 || raw[0] == kDeleted || raw[11] == kLongFileName) return false;
+    return (raw[11] & kAttributeMask) == entry.attr &&
+           leU16(raw + 22) == entry.time &&
+           leU16(raw + 24) == entry.date &&
+           leU32(raw + 28) == static_cast<uint32_t>(entry.size);
+}
+
+// Returns a slot only if it is unique. This extra constraint prevents a
+// damaged name from causing us to remove a different entry that happens to
+// share the same timestamps and size.
+bool fatFindRawFatDirectorySlot(int volId, const FatCorruptEntry& entry, FatRawDirectorySlot& outSlot) {
+    std::string parent = drivePaths[volId];
+    if (!entry.parentPath.empty()) parent += "/" + entry.parentPath;
+
+    DIR dir;
+    if (f_opendir(&dir, parent.c_str()) != FR_OK) return false;
+    FATFS* fs = dir.obj.fs;
+    if (!fs) {
+        f_closedir(&dir);
+        return false;
+    }
+    const DWORD firstCluster = entry.parentPath.empty() ? static_cast<DWORD>(fs->dirbase) : dir.obj.sclust;
+    f_closedir(&dir);
+
+    if ((fs->fs_type != FS_FAT16 && fs->fs_type != FS_FAT32) || fs->csize == 0) return false;
+
+    constexpr uint32_t kEndOfChain = 0x0FFFFFF8;
+    constexpr uint32_t kBadCluster = 0x0FFFFFF7;
+    constexpr uint8_t kDeleted = 0xE5;
+    FatRawDirectorySlot candidate{};
+    size_t matchCount = 0;
+    // FAT16's root directory is a fixed sector range rather than a cluster
+    // chain. Subdirectories, and every FAT32 directory, use cluster chains.
+    if (fs->fs_type == FS_FAT16 && entry.parentPath.empty()) {
+        const DWORD rootSectors = (static_cast<DWORD>(fs->n_rootdir) * 32 + 511) / 512;
+        for (DWORD index = 0; index < rootSectors; ++index) {
+            uint8_t sector[512];
+            const LBA_t sectorNumber = fs->dirbase + index;
+            if (disk_read(static_cast<BYTE>(volId), sector, sectorNumber, 1) != RES_OK) return false;
+            for (uint16_t offset = 0; offset < sizeof(sector); offset += 32) {
+                if (sector[offset] == 0) return matchCount == 1 && (outSlot = candidate, true);
+                if (fatRawEntryMatches(sector + offset, entry)) {
+                    candidate = {sectorNumber, offset};
+                    if (++matchCount > 1) return false;
+                }
+            }
+        }
+        if (matchCount != 1) return false;
+        outSlot = candidate;
+        return true;
+    }
+
+    if (firstCluster < 2) return false;
+    DWORD cluster = firstCluster;
+
+    // A directory chain should never contain more clusters than the volume
+    // has FAT entries. The bound also prevents a corrupt cyclic chain from
+    // making repair loop forever.
+    for (DWORD hops = 0; hops < fs->n_fatent && cluster >= 2 && cluster < fs->n_fatent; ++hops) {
+        const LBA_t clusterSector = fs->database + static_cast<LBA_t>(cluster - 2) * fs->csize;
+        for (WORD sectorInCluster = 0; sectorInCluster < fs->csize; ++sectorInCluster) {
+            uint8_t sector[512];
+            const LBA_t sectorNumber = clusterSector + sectorInCluster;
+            if (disk_read(static_cast<BYTE>(volId), sector, sectorNumber, 1) != RES_OK) return false;
+
+            for (uint16_t offset = 0; offset < sizeof(sector); offset += 32) {
+                if (sector[offset] == 0) return matchCount == 1 && (outSlot = candidate, true);
+                if (fatRawEntryMatches(sector + offset, entry)) {
+                    candidate = {sectorNumber, offset};
+                    if (++matchCount > 1) return false;
+                }
+            }
+        }
+
+        const uint32_t fatEntrySize = fs->fs_type == FS_FAT32 ? 4 : 2;
+        const uint64_t fatByteOffset = static_cast<uint64_t>(cluster) * fatEntrySize;
+        const LBA_t fatSector = fs->fatbase + fatByteOffset / 512;
+        const uint16_t fatOffset = static_cast<uint16_t>(fatByteOffset % 512);
+        uint8_t sector[512];
+        if (fatOffset > sizeof(sector) - fatEntrySize ||
+            disk_read(static_cast<BYTE>(volId), sector, fatSector, 1) != RES_OK) {
+            return false;
+        }
+        const DWORD next = fs->fs_type == FS_FAT32
+            ? leU32(sector + fatOffset) & 0x0FFFFFFF
+            : leU16(sector + fatOffset);
+        const DWORD endOfChain = fs->fs_type == FS_FAT32 ? kEndOfChain : 0xFFF8;
+        const DWORD badCluster = fs->fs_type == FS_FAT32 ? kBadCluster : 0xFFF7;
+        if (next >= endOfChain) break;
+        if (next < 2 || next == badCluster || next >= fs->n_fatent) return false;
+        cluster = next;
+    }
+
+    if (matchCount != 1) return false;
+    outSlot = candidate;
+    return true;
+}
+
+bool fatRawDeleteCorruptFatEntry(int volId, const FatCorruptEntry& entry) {
+    FatRawDirectorySlot slot{};
+    if (!fatFindRawFatDirectorySlot(volId, entry, slot)) return false;
+
+    uint8_t sector[512];
+    if (disk_read(static_cast<BYTE>(volId), sector, slot.sector, 1) != RES_OK) return false;
+    sector[slot.offset] = 0xE5;
+    if (disk_write(static_cast<BYTE>(volId), sector, slot.sector, 1) != RES_OK) return false;
+
+    // Keep FatFs's shared sector window coherent with the direct write. A
+    // stale window could otherwise be flushed later and resurrect the entry.
+    FATFS* fs = &volumes[volId].fatfs;
+    if (fs->winsect == slot.sector) fs->win[slot.offset] = 0xE5;
+    return true;
+}
+
+// exFAT uses variable-size entry sets rather than the single FAT 8.3 entry.
+// The active primary file entry is 0x85 and its following stream extension
+// carries the file size. Clearing the primary entry's in-use bit (0x80)
+// removes the whole set from directory enumeration; as with the FAT fallback,
+// we leave its uncertain allocation alone.
+bool fatFindRawExFatDirectorySlot(int volId, const FatCorruptEntry& entry, FatRawDirectorySlot& outSlot) {
+    std::string parent = drivePaths[volId];
+    if (!entry.parentPath.empty()) parent += "/" + entry.parentPath;
+    DIR dir;
+    if (f_opendir(&dir, parent.c_str()) != FR_OK) return false;
+    FATFS* fs = dir.obj.fs;
+    if (!fs) {
+        f_closedir(&dir);
+        return false;
+    }
+    const DWORD firstCluster = entry.parentPath.empty() ? static_cast<DWORD>(fs->dirbase) : dir.obj.sclust;
+    f_closedir(&dir);
+    if (fs->fs_type != FS_EXFAT || firstCluster < 2 || fs->csize == 0) return false;
+
+    constexpr uint32_t kEndOfChain = 0x0FFFFFF8;
+    constexpr uint32_t kBadCluster = 0x0FFFFFF7;
+    FatRawDirectorySlot candidate{};
+    size_t matchCount = 0;
+    DWORD cluster = firstCluster;
+    for (DWORD hops = 0; hops < fs->n_fatent && cluster >= 2 && cluster < fs->n_fatent; ++hops) {
+        const LBA_t clusterSector = fs->database + static_cast<LBA_t>(cluster - 2) * fs->csize;
+        for (WORD sectorInCluster = 0; sectorInCluster < fs->csize; ++sectorInCluster) {
+            uint8_t sector[512];
+            const LBA_t sectorNumber = clusterSector + sectorInCluster;
+            if (disk_read(static_cast<BYTE>(volId), sector, sectorNumber, 1) != RES_OK) return false;
+            for (uint16_t offset = 0; offset < sizeof(sector); offset += 32) {
+                if (sector[offset] == 0) return matchCount == 1 && (outSlot = candidate, true);
+                // Only match complete primary+stream pairs in this sector.
+                // A pair split at a sector boundary is left to normal FatFs
+                // unlink rather than risking an ambiguous direct edit.
+                if (sector[offset] != 0x85 || offset > sizeof(sector) - 64 || sector[offset + 32] != 0xC0) continue;
+                const uint8_t* primary = sector + offset;
+                const uint8_t* stream = primary + 32;
+                const uint64_t size = entry.isDir ? 0 : leU64(stream + 24);
+                if ((leU16(primary + 4) & 0x3F) != entry.attr ||
+                    leU16(primary + 12) != entry.time || leU16(primary + 14) != entry.date ||
+                    size != entry.size) {
+                    continue;
+                }
+                candidate = {sectorNumber, offset};
+                if (++matchCount > 1) return false;
+            }
+        }
+        const uint64_t fatByteOffset = static_cast<uint64_t>(cluster) * 4;
+        const LBA_t fatSector = fs->fatbase + fatByteOffset / 512;
+        const uint16_t fatOffset = static_cast<uint16_t>(fatByteOffset % 512);
+        uint8_t sector[512];
+        if (fatOffset > sizeof(sector) - 4 ||
+            disk_read(static_cast<BYTE>(volId), sector, fatSector, 1) != RES_OK) return false;
+        const DWORD next = leU32(sector + fatOffset) & 0x0FFFFFFF;
+        if (next >= kEndOfChain) break;
+        if (next < 2 || next == kBadCluster || next >= fs->n_fatent) return false;
+        cluster = next;
+    }
+    if (matchCount != 1) return false;
+    outSlot = candidate;
+    return true;
+}
+
+bool fatRawDeleteCorruptExFatEntry(int volId, const FatCorruptEntry& entry) {
+    FatRawDirectorySlot slot{};
+    if (!fatFindRawExFatDirectorySlot(volId, entry, slot)) return false;
+    uint8_t sector[512];
+    if (disk_read(static_cast<BYTE>(volId), sector, slot.sector, 1) != RES_OK) return false;
+    sector[slot.offset] &= 0x7F; // Mark the primary 0x85 entry inactive.
+    if (disk_write(static_cast<BYTE>(volId), sector, slot.sector, 1) != RES_OK) return false;
+    FATFS* fs = &volumes[volId].fatfs;
+    if (fs->winsect == slot.sector) fs->win[slot.offset] &= 0x7F;
+    return true;
+}
+
+bool fatRawDeleteCorruptEntry(int volId, const FatCorruptEntry& entry) {
+    return fatRawDeleteCorruptFatEntry(volId, entry) || fatRawDeleteCorruptExFatEntry(volId, entry);
 }
 
 // True if any corrupted entry was found (whether or not [opId]'s caller
@@ -722,11 +948,21 @@ bool fatRemoveCorruptEntries(int volId, int opId) {
     bool allRemoved = true;
     for (const auto& entry : found) {
         const std::string fullPath = std::string(drivePaths[volId]) + "/" + entry.path;
-        const FRESULT fr = entry.isDir ? fatRemoveRecursiveForRepair(fullPath.c_str()) : f_unlink(fullPath.c_str());
+        FRESULT fr = entry.isDir ? fatRemoveRecursiveForRepair(fullPath.c_str()) : f_unlink(fullPath.c_str());
+        bool rawDeleted = false;
+        if (fr != FR_OK) {
+            char fallback[320];
+            std::snprintf(fallback, sizeof(fallback),
+                          "FatFs could not unlink %s (error %d); trying raw FAT directory-slot removal...",
+                          entry.path.c_str(), static_cast<int>(fr));
+            rlog(opId, fallback);
+            rawDeleted = fatRawDeleteCorruptEntry(volId, entry);
+        }
         char msg[320];
-        std::snprintf(msg, sizeof(msg), "%s: %s", fr == FR_OK ? "Removed" : "Failed to remove", entry.path.c_str());
+        std::snprintf(msg, sizeof(msg), "%s: %s",
+                      (fr == FR_OK || rawDeleted) ? "Removed" : "Failed to remove", entry.path.c_str());
         rlog(opId, msg);
-        if (fr != FR_OK) allRemoved = false;
+        if (fr != FR_OK && !rawDeleted) allRemoved = false;
     }
     return allRemoved;
 }
@@ -743,13 +979,21 @@ RepairDiagnosisCode diagnoseMountedVolumeFilesystem(int volId, int logOpId) {
             const bool dirty = extIsDirty(volId);
             rlog(logOpId, dirty ? "Superblock reports the filesystem was not unmounted cleanly."
                                  : "Superblock reports a clean unmount.");
-            return dirty ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
+            rlog(logOpId, "Scanning the directory tree for entries with invalid inodes or impossible metadata...");
+            const bool hasCorruptEntries = extHasCorruptDirectoryEntries(volId);
+            if (!hasCorruptEntries) rlog(logOpId, "No corrupted directory entries found.");
+            return (dirty || hasCorruptEntries) ? RepairDiagnosisCode::kFilesystemDirty
+                                                : RepairDiagnosisCode::kHealthy;
         }
         case VolumeState::FS_NTFS: {
             rlog(logOpId, "NTFS filesystem -- checking the $Volume dirty flag...");
             const bool dirty = ntfsIsDirty(volId);
             rlog(logOpId, dirty ? "$Volume dirty flag is set." : "$Volume dirty flag is clear.");
-            return dirty ? RepairDiagnosisCode::kFilesystemDirty : RepairDiagnosisCode::kHealthy;
+            rlog(logOpId, "Scanning the $I30 directory indexes for unreadable entries or impossible metadata...");
+            const bool hasCorruptEntries = ntfsHasCorruptDirectoryEntries(volId);
+            if (!hasCorruptEntries) rlog(logOpId, "No corrupted directory entries found.");
+            return (dirty || hasCorruptEntries) ? RepairDiagnosisCode::kFilesystemDirty
+                                                : RepairDiagnosisCode::kHealthy;
         }
         case VolumeState::FS_FATFS: {
             rlog(logOpId, "FAT/exFAT filesystem -- checking the clean-shutdown bit...");
@@ -778,12 +1022,20 @@ bool runMountedVolumeFilesystemCheck(int volId, int logOpId) {
     VolumeState& v = volumes[volId];
 
     switch (v.fsType) {
-        case VolumeState::FS_EXT:
+        case VolumeState::FS_EXT: {
             rlog(logOpId, "Clearing the ext superblock's dirty/error state...");
-            return extClearDirtyState(volId);
-        case VolumeState::FS_NTFS:
+            const bool clearedFlag = extClearDirtyState(volId);
+            rlog(logOpId, "Removing corrupted ext directory entries...");
+            const bool removedCorrupt = extRemoveCorruptDirectoryEntries(volId);
+            return clearedFlag && removedCorrupt;
+        }
+        case VolumeState::FS_NTFS: {
             rlog(logOpId, "Clearing the NTFS $Volume dirty flag...");
-            return ntfsClearDirtyFlag(volId);
+            const bool clearedFlag = ntfsClearDirtyFlag(volId);
+            rlog(logOpId, "Removing corrupted NTFS directory-index entries...");
+            const bool removedCorrupt = ntfsRemoveCorruptDirectoryEntries(volId);
+            return clearedFlag && removedCorrupt;
+        }
         case VolumeState::FS_FATFS: {
             rlog(logOpId, "Setting the FAT/exFAT clean-shutdown bit...");
             const bool clearedFlag = fatClearDirty(volId);

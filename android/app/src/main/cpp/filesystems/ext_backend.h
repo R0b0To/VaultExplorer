@@ -42,6 +42,11 @@ bool ensureExtBitmapsLoaded(int volumeId);
 // even needed. [volumeId]'s ext2_filsys must already be mounted (VolumeState::extFs).
 bool extIsDirty(int volumeId);
 bool extClearDirtyState(int volumeId);
+// A conservative directory-entry pass for Check & Repair. It removes only
+// entries whose inode cannot be read or whose metadata is impossible for this
+// volume; it never guesses at inode/block ownership.
+bool extHasCorruptDirectoryEntries(int volumeId);
+bool extRemoveCorruptDirectoryEntries(int volumeId);
 
 // The rest of these back filesystems/fs_ops.h's fsXxx functions for ext --
 // see that header for the exact contract each one implements. Several are

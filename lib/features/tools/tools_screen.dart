@@ -7,11 +7,13 @@ import 'package:vaultexplorer/core/widgets/layout/section_card.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_repair_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_splitter_sheet.dart';
+import 'package:vaultexplorer/features/tools/widgets/duplicate_finder_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
+import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
 
 class ToolsScreen extends StatelessWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
-  static const bool _showStorageDiagnostics = false;
+  static const bool _showStorageDiagnostics = true;
 
   const ToolsScreen({super.key, required this.mountedContainers});
 
@@ -83,11 +85,26 @@ class ToolsScreen extends StatelessWidget {
             SectionCard(
               children: [
                 _ToolRow(
+                  icon: Icons.difference_rounded,
+                  title: context.l10n.toolDuplicateFinderTitle,
+                  subtitle: context.l10n.toolDuplicateFinderSubtitle,
+                  iconColor: cs.primary,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => DuplicateFinderScreen(mountedContainers: mountedContainers),
+                    ),
+                  ),
+                ),
+                _ToolRow(
                   icon: Icons.pie_chart_rounded,
                   title: context.l10n.toolStorageAnalyzerTitle,
                   subtitle: context.l10n.toolStorageAnalyzerSubtitle,
-                  onTap: () {
-                  },
+                  iconColor: cs.tertiary,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => StorageAnalyzerScreen(mountedContainers: mountedContainers),
+                    ),
+                  ),
                 ),
               ],
             ),

@@ -5047,6 +5047,86 @@
   "@toolStorageAnalyzerSubtitle": {
     "description": "Tool card subtitle for the Storage Analyzer"
   },
+  "toolDuplicateFinderTitle": "Duplicate File Finder",
+  "@toolDuplicateFinderTitle": {
+    "description": "Tool card title for Duplicate File Finder"
+  },
+  "toolDuplicateFinderSubtitle": "Find & remove byte-identical duplicate files to reclaim space",
+  "@toolDuplicateFinderSubtitle": {
+    "description": "Tool card subtitle for Duplicate File Finder"
+  },
+  "duplicateFinderTargetLabel": "Target Vault",
+  "@duplicateFinderTargetLabel": {
+    "description": "Label for target vault selector in Duplicate File Finder"
+  },
+  "duplicateFinderTargetAllVaults": "All Open Vaults",
+  "@duplicateFinderTargetAllVaults": {
+    "description": "Option for scanning all open vaults in Duplicate File Finder"
+  },
+  "duplicateFinderStartScan": "Start Scan",
+  "@duplicateFinderStartScan": {
+    "description": "Button label to start duplicate scan"
+  },
+  "duplicateFinderCancelScan": "Cancel Scan",
+  "@duplicateFinderCancelScan": {
+    "description": "Button label to cancel duplicate scan"
+  },
+  "duplicateFinderRescan": "Rescan",
+  "@duplicateFinderRescan": {
+    "description": "Button label to rescan for duplicates"
+  },
+  "duplicateFinderScanningStage1": "Stage 1: Indexing & size grouping...",
+  "@duplicateFinderScanningStage1": {
+    "description": "Stage 1 scanning status"
+  },
+  "duplicateFinderScanningStage2": "Stage 2: Checking partial file headers...",
+  "@duplicateFinderScanningStage2": {
+    "description": "Stage 2 scanning status"
+  },
+  "duplicateFinderScanningStage3": "Stage 3: Verifying full byte hashes...",
+  "@duplicateFinderScanningStage3": {
+    "description": "Stage 3 scanning status"
+  },
+  "duplicateFinderScanComplete": "Scan Complete",
+  "@duplicateFinderScanComplete": {
+    "description": "Scan complete status"
+  },
+  "duplicateFinderNoDuplicatesTitle": "No Duplicate Files Found",
+  "@duplicateFinderNoDuplicatesTitle": {
+    "description": "Title when no duplicate files are found"
+  },
+  "duplicateFinderNoDuplicatesMessage": "All files in the scanned vault(s) contain unique byte contents.",
+  "@duplicateFinderNoDuplicatesMessage": {
+    "description": "Message when no duplicate files are found"
+  },
+  "duplicateFinderSelectRedundant": "Select Redundant",
+  "@duplicateFinderSelectRedundant": {
+    "description": "Action to select redundant copies"
+  },
+  "duplicateFinderSelectAll": "Select All",
+  "@duplicateFinderSelectAll": {
+    "description": "Action to select all files"
+  },
+  "duplicateFinderDeselectAll": "Deselect All",
+  "@duplicateFinderDeselectAll": {
+    "description": "Action to deselect all files"
+  },
+  "duplicateFinderOriginalLabel": "Original",
+  "@duplicateFinderOriginalLabel": {
+    "description": "Badge for original/keep copy"
+  },
+  "duplicateFinderDuplicateLabel": "Duplicate",
+  "@duplicateFinderDuplicateLabel": {
+    "description": "Badge for redundant duplicate copy"
+  },
+  "duplicateFinderConfirmDeleteTitle": "Delete Duplicate Files?",
+  "@duplicateFinderConfirmDeleteTitle": {
+    "description": "Dialog title for deleting duplicates"
+  },
+  "duplicateFinderSearchHint": "Search duplicates by filename or path...",
+  "@duplicateFinderSearchHint": {
+    "description": "Search field hint text in Duplicate Finder"
+  },
 
   "toolNotImplementedYetMessage": "This tool isn't wired up to the native engine yet — check back in a future update.",
   "@toolNotImplementedYetMessage": {

@@ -6578,6 +6578,126 @@ abstract class AppLocalizations {
   /// **'See what\'s taking up space in a mounted vault'**
   String get toolStorageAnalyzerSubtitle;
 
+  /// Tool card title for Duplicate File Finder
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate File Finder'**
+  String get toolDuplicateFinderTitle;
+
+  /// Tool card subtitle for Duplicate File Finder
+  ///
+  /// In en, this message translates to:
+  /// **'Find & remove byte-identical duplicate files to reclaim space'**
+  String get toolDuplicateFinderSubtitle;
+
+  /// Label for target vault selector in Duplicate File Finder
+  ///
+  /// In en, this message translates to:
+  /// **'Target Vault'**
+  String get duplicateFinderTargetLabel;
+
+  /// Option for scanning all open vaults in Duplicate File Finder
+  ///
+  /// In en, this message translates to:
+  /// **'All Open Vaults'**
+  String get duplicateFinderTargetAllVaults;
+
+  /// Button label to start duplicate scan
+  ///
+  /// In en, this message translates to:
+  /// **'Start Scan'**
+  String get duplicateFinderStartScan;
+
+  /// Button label to cancel duplicate scan
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Scan'**
+  String get duplicateFinderCancelScan;
+
+  /// Button label to rescan for duplicates
+  ///
+  /// In en, this message translates to:
+  /// **'Rescan'**
+  String get duplicateFinderRescan;
+
+  /// Stage 1 scanning status
+  ///
+  /// In en, this message translates to:
+  /// **'Stage 1: Indexing & size grouping...'**
+  String get duplicateFinderScanningStage1;
+
+  /// Stage 2 scanning status
+  ///
+  /// In en, this message translates to:
+  /// **'Stage 2: Checking partial file headers...'**
+  String get duplicateFinderScanningStage2;
+
+  /// Stage 3 scanning status
+  ///
+  /// In en, this message translates to:
+  /// **'Stage 3: Verifying full byte hashes...'**
+  String get duplicateFinderScanningStage3;
+
+  /// Scan complete status
+  ///
+  /// In en, this message translates to:
+  /// **'Scan Complete'**
+  String get duplicateFinderScanComplete;
+
+  /// Title when no duplicate files are found
+  ///
+  /// In en, this message translates to:
+  /// **'No Duplicate Files Found'**
+  String get duplicateFinderNoDuplicatesTitle;
+
+  /// Message when no duplicate files are found
+  ///
+  /// In en, this message translates to:
+  /// **'All files in the scanned vault(s) contain unique byte contents.'**
+  String get duplicateFinderNoDuplicatesMessage;
+
+  /// Action to select redundant copies
+  ///
+  /// In en, this message translates to:
+  /// **'Select Redundant'**
+  String get duplicateFinderSelectRedundant;
+
+  /// Action to select all files
+  ///
+  /// In en, this message translates to:
+  /// **'Select All'**
+  String get duplicateFinderSelectAll;
+
+  /// Action to deselect all files
+  ///
+  /// In en, this message translates to:
+  /// **'Deselect All'**
+  String get duplicateFinderDeselectAll;
+
+  /// Badge for original/keep copy
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get duplicateFinderOriginalLabel;
+
+  /// Badge for redundant duplicate copy
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get duplicateFinderDuplicateLabel;
+
+  /// Dialog title for deleting duplicates
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Duplicate Files?'**
+  String get duplicateFinderConfirmDeleteTitle;
+
+  /// Search field hint text in Duplicate Finder
+  ///
+  /// In en, this message translates to:
+  /// **'Search duplicates by filename or path...'**
+  String get duplicateFinderSearchHint;
+
   /// Shown when a Tools-tab action calls into a ContainerToolService method that still throws UnimplementedError
   ///
   /// In en, this message translates to:

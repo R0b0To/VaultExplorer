@@ -3901,6 +3901,72 @@ class AppLocalizationsEn extends AppLocalizations {
       'See what\'s taking up space in a mounted vault';
 
   @override
+  String get toolDuplicateFinderTitle => 'Duplicate File Finder';
+
+  @override
+  String get toolDuplicateFinderSubtitle =>
+      'Find & remove byte-identical duplicate files to reclaim space';
+
+  @override
+  String get duplicateFinderTargetLabel => 'Target Vault';
+
+  @override
+  String get duplicateFinderTargetAllVaults => 'All Open Vaults';
+
+  @override
+  String get duplicateFinderStartScan => 'Start Scan';
+
+  @override
+  String get duplicateFinderCancelScan => 'Cancel Scan';
+
+  @override
+  String get duplicateFinderRescan => 'Rescan';
+
+  @override
+  String get duplicateFinderScanningStage1 =>
+      'Stage 1: Indexing & size grouping...';
+
+  @override
+  String get duplicateFinderScanningStage2 =>
+      'Stage 2: Checking partial file headers...';
+
+  @override
+  String get duplicateFinderScanningStage3 =>
+      'Stage 3: Verifying full byte hashes...';
+
+  @override
+  String get duplicateFinderScanComplete => 'Scan Complete';
+
+  @override
+  String get duplicateFinderNoDuplicatesTitle => 'No Duplicate Files Found';
+
+  @override
+  String get duplicateFinderNoDuplicatesMessage =>
+      'All files in the scanned vault(s) contain unique byte contents.';
+
+  @override
+  String get duplicateFinderSelectRedundant => 'Select Redundant';
+
+  @override
+  String get duplicateFinderSelectAll => 'Select All';
+
+  @override
+  String get duplicateFinderDeselectAll => 'Deselect All';
+
+  @override
+  String get duplicateFinderOriginalLabel => 'Original';
+
+  @override
+  String get duplicateFinderDuplicateLabel => 'Duplicate';
+
+  @override
+  String get duplicateFinderConfirmDeleteTitle => 'Delete Duplicate Files?';
+
+  @override
+  String get duplicateFinderSearchHint =>
+      'Search duplicates by filename or path...';
+
+  @override
   String get toolNotImplementedYetMessage =>
       'This tool isn\'t wired up to the native engine yet — check back in a future update.';
 

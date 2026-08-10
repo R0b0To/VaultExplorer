@@ -7103,6 +7103,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Other'**
   String get storageCategoryOther;
+
+  /// Title for Keyfile & Passphrase Generator tool
+  ///
+  /// In en, this message translates to:
+  /// **'Keyfile & Passphrase Generator'**
+  String get keyfilePassphraseGeneratorTitle;
+
+  /// Subtitle for Keyfile & Passphrase Generator tool
+  ///
+  /// In en, this message translates to:
+  /// **'Generate Diceware passphrases, custom passwords, and high-entropy keyfiles'**
+  String get keyfilePassphraseGeneratorSubtitle;
+
+  /// Tab title for Passphrase Generator
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase'**
+  String get tabPassphrase;
+
+  /// Tab title for Keyfile Generator
+  ///
+  /// In en, this message translates to:
+  /// **'Keyfile'**
+  String get tabKeyfile;
+
+  /// Generator mode for Diceware word-based passphrases
+  ///
+  /// In en, this message translates to:
+  /// **'Diceware Passphrase'**
+  String get modeDiceware;
+
+  /// Generator mode for custom character passwords
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Password'**
+  String get modeCustomPassword;
+
+  /// Keyfile format option for binary random bytes
+  ///
+  /// In en, this message translates to:
+  /// **'Binary Keyfile (.key)'**
+  String get keyfileTypeBinary;
+
+  /// Keyfile format option for high-entropy PNG image noise
+  ///
+  /// In en, this message translates to:
+  /// **'Noise Image Keyfile (.png)'**
+  String get keyfileTypeImage;
+
+  /// Snackbar message when passphrase is copied
+  ///
+  /// In en, this message translates to:
+  /// **'Passphrase copied to sensitive clipboard'**
+  String get copyPassphraseSuccess;
+
+  /// Snackbar message when keyfile fingerprint is copied
+  ///
+  /// In en, this message translates to:
+  /// **'SHA-256 fingerprint copied to clipboard'**
+  String get copyFingerprintSuccess;
+
+  /// Button to save keyfile into a mounted vault
+  ///
+  /// In en, this message translates to:
+  /// **'Save to Mounted Vault'**
+  String get saveKeyfileToVault;
+
+  /// Button to export keyfile to external device storage
+  ///
+  /// In en, this message translates to:
+  /// **'Export to Device Storage'**
+  String get exportKeyfileToStorage;
 }
 
 class _AppLocalizationsDelegate

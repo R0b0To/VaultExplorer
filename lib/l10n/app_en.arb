@@ -5431,6 +5431,54 @@
   "storageCategoryOther": "Other",
   "@storageCategoryOther": {
     "description": "Storage Analyzer file-type category: everything not otherwise classified"
+  },
+  "keyfilePassphraseGeneratorTitle": "Keyfile & Passphrase Generator",
+  "@keyfilePassphraseGeneratorTitle": {
+    "description": "Title for Keyfile & Passphrase Generator tool"
+  },
+  "keyfilePassphraseGeneratorSubtitle": "Generate Diceware passphrases, custom passwords, and high-entropy keyfiles",
+  "@keyfilePassphraseGeneratorSubtitle": {
+    "description": "Subtitle for Keyfile & Passphrase Generator tool"
+  },
+  "tabPassphrase": "Passphrase",
+  "@tabPassphrase": {
+    "description": "Tab title for Passphrase Generator"
+  },
+  "tabKeyfile": "Keyfile",
+  "@tabKeyfile": {
+    "description": "Tab title for Keyfile Generator"
+  },
+  "modeDiceware": "Diceware Passphrase",
+  "@modeDiceware": {
+    "description": "Generator mode for Diceware word-based passphrases"
+  },
+  "modeCustomPassword": "Custom Password",
+  "@modeCustomPassword": {
+    "description": "Generator mode for custom character passwords"
+  },
+  "keyfileTypeBinary": "Binary Keyfile (.key)",
+  "@keyfileTypeBinary": {
+    "description": "Keyfile format option for binary random bytes"
+  },
+  "keyfileTypeImage": "Noise Image Keyfile (.png)",
+  "@keyfileTypeImage": {
+    "description": "Keyfile format option for high-entropy PNG image noise"
+  },
+  "copyPassphraseSuccess": "Passphrase copied to sensitive clipboard",
+  "@copyPassphraseSuccess": {
+    "description": "Snackbar message when passphrase is copied"
+  },
+  "copyFingerprintSuccess": "SHA-256 fingerprint copied to clipboard",
+  "@copyFingerprintSuccess": {
+    "description": "Snackbar message when keyfile fingerprint is copied"
+  },
+  "saveKeyfileToVault": "Save to Mounted Vault",
+  "@saveKeyfileToVault": {
+    "description": "Button to save keyfile into a mounted vault"
+  },
+  "exportKeyfileToStorage": "Export to Device Storage",
+  "@exportKeyfileToStorage": {
+    "description": "Button to export keyfile to external device storage"
   }
 }
 

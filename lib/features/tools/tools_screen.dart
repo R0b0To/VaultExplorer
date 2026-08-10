@@ -8,6 +8,7 @@ import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_repair_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_splitter_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/duplicate_finder_screen.dart';
+import 'package:vaultexplorer/features/tools/widgets/keyfile_passphrase_generator_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
 
@@ -66,6 +67,19 @@ class ToolsScreen extends StatelessWidget {
           SectionHeader(context.l10n.toolsSectionFileCryptography),
           SectionCard(
             children: [
+              _ToolRow(
+                icon: Icons.key_rounded,
+                title: context.l10n.keyfilePassphraseGeneratorTitle,
+                subtitle: context.l10n.keyfilePassphraseGeneratorSubtitle,
+                iconColor: cs.primary,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => KeyfilePassphraseGeneratorScreen(
+                      mountedContainers: mountedContainers,
+                    ),
+                  ),
+                ),
+              ),
               _ToolRow(
                 icon: Icons.enhanced_encryption_rounded,
                 title: context.l10n.toolSingleFileCryptoTitle,

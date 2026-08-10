@@ -4219,4 +4219,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageCategoryOther => 'Other';
+
+  @override
+  String get keyfilePassphraseGeneratorTitle =>
+      'Keyfile & Passphrase Generator';
+
+  @override
+  String get keyfilePassphraseGeneratorSubtitle =>
+      'Generate Diceware passphrases, custom passwords, and high-entropy keyfiles';
+
+  @override
+  String get tabPassphrase => 'Passphrase';
+
+  @override
+  String get tabKeyfile => 'Keyfile';
+
+  @override
+  String get modeDiceware => 'Diceware Passphrase';
+
+  @override
+  String get modeCustomPassword => 'Custom Password';
+
+  @override
+  String get keyfileTypeBinary => 'Binary Keyfile (.key)';
+
+  @override
+  String get keyfileTypeImage => 'Noise Image Keyfile (.png)';
+
+  @override
+  String get copyPassphraseSuccess =>
+      'Passphrase copied to sensitive clipboard';
+
+  @override
+  String get copyFingerprintSuccess =>
+      'SHA-256 fingerprint copied to clipboard';
+
+  @override
+  String get saveKeyfileToVault => 'Save to Mounted Vault';
+
+  @override
+  String get exportKeyfileToStorage => 'Export to Device Storage';
 }

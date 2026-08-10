@@ -9,28 +9,39 @@ import 'package:vaultexplorer/features/settings/app_settings_screen.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_repair_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/container_splitter_sheet.dart';
 import 'package:vaultexplorer/features/tools/widgets/single_file_crypto_sheet.dart';
-import 'package:vaultexplorer/features/tools/widgets/storage_analyzer_screen.dart';
-import 'package:vaultexplorer/features/tools/widgets/tool_card.dart';
 
 /// The "Tools" tab: utility workflows for standalone file/container
 /// operations, grouped by category, as laid out in the Tools-page design
 /// (Container Utilities / File Cryptography / Storage & Diagnostics).
 ///
+/// Rows use the same [SectionHeader]/[SectionCard] grouped-list look as
+/// App Settings, File Manager Settings, and About, rather than a bespoke
+/// card grid, so the Tools tab reads as the same app as the rest of the
+/// settings-style screens.
+///
 /// Lives alongside [VaultDashboard] as the second [MainShell] tab. Doesn't
 /// track its own mounted-volume state — [mountedContainers] is fed down
 /// from [MainShell], which is in turn fed by [VaultDashboard.mountedNotifier],
-/// so Storage Analyzer's target picker and Repair's "choose mounted
-/// volume" option see the same live list the Vaults tab shows.
+/// so Repair's "choose mounted volume" option sees the same live list the
+/// Vaults tab shows.
 class ToolsScreen extends StatelessWidget {
   final ValueListenable<List<MountedContainer>> mountedContainers;
+
+  // Storage Analyzer is temporarily hidden from the Tools tab -- flip
+  // this back on to restore its section once it's ready again. Left as
+  // a single switch rather than deleting the section below so re-enabling
+  // it is a one-line change.
+  static const bool _showStorageDiagnostics = false;
 
   const ToolsScreen({super.key, required this.mountedContainers});
 
   @override
   Widget build(BuildContext context) {
+    final cs = context.colors;
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: context.colors.surfaceContainerHigh,
+        backgroundColor: cs.surfaceContainerHigh,
         title: Text(
           context.l10n.toolsScreenTitle,
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -54,9 +65,9 @@ class ToolsScreen extends StatelessWidget {
         padding: AppSpacing.pagePadding,
         children: [
           SectionHeader(context.l10n.toolsSectionContainerUtilities),
-          _ToolGrid(
-            cards: [
-              ToolCard(
+          SectionCard(
+            children: [
+              _ToolRow(
                 icon: Icons.content_cut_rounded,
                 title: context.l10n.toolContainerSplitterTitle,
                 subtitle: context.l10n.toolContainerSplitterSubtitle,
@@ -66,11 +77,11 @@ class ToolsScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              ToolCard(
+              _ToolRow(
                 icon: Icons.build_rounded,
                 title: context.l10n.toolContainerRepairTitle,
                 subtitle: context.l10n.toolContainerRepairSubtitle,
-                iconColor: context.colors.tertiary,
+                iconColor: cs.tertiary,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) =>
@@ -82,13 +93,13 @@ class ToolsScreen extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
           SectionHeader(context.l10n.toolsSectionFileCryptography),
-          _ToolGrid(
-            cards: [
-              ToolCard(
+          SectionCard(
+            children: [
+              _ToolRow(
                 icon: Icons.enhanced_encryption_rounded,
                 title: context.l10n.toolSingleFileCryptoTitle,
                 subtitle: context.l10n.toolSingleFileCryptoSubtitle,
-                iconColor: context.colors.secondary,
+                iconColor: cs.secondary,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => const SingleFileCryptoSheet(),
@@ -97,48 +108,76 @@ class ToolsScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          SectionHeader(context.l10n.toolsSectionStorageDiagnostics),
-          _ToolGrid(
-            cards: [
-              ToolCard(
-                icon: Icons.pie_chart_rounded,
-                title: context.l10n.toolStorageAnalyzerTitle,
-                subtitle: context.l10n.toolStorageAnalyzerSubtitle,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => StorageAnalyzerScreen(
-                      mountedContainers: mountedContainers,
-                    ),
-                  ),
+          if (_showStorageDiagnostics) ...[
+            const SizedBox(height: AppSpacing.lg),
+            SectionHeader(context.l10n.toolsSectionStorageDiagnostics),
+            SectionCard(
+              children: [
+                _ToolRow(
+                  icon: Icons.pie_chart_rounded,
+                  title: context.l10n.toolStorageAnalyzerTitle,
+                  subtitle: context.l10n.toolStorageAnalyzerSubtitle,
+                  onTap: () {
+                    // Intentionally unreachable while
+                    // _showStorageDiagnostics is false -- see its doc
+                    // comment. Left wired up so bringing this section back
+                    // only needs that switch flipped, not new code.
+                  },
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-/// Fixed two-column grid for a section's [ToolCard]s. A single leftover
-/// card in an odd-count section spans the row rather than leaving an
-/// awkward empty cell.
-class _ToolGrid extends StatelessWidget {
-  final List<Widget> cards;
-  const _ToolGrid({required this.cards});
+/// One tappable tool entry, styled to match the rest of the app's
+/// grouped-list rows (tinted icon chip, title, subtitle, chevron) -- see
+/// e.g. `file_manager_toolbar_settings_screen.dart`'s reorder rows for the
+/// same leading-icon treatment.
+class _ToolRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Color? iconColor;
+
+  const _ToolRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.iconColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (cards.length == 1) return cards.first;
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: AppSpacing.sm,
-      crossAxisSpacing: AppSpacing.sm,
-      childAspectRatio: 1.25,
-      children: cards,
+    final cs = context.colors;
+    final textTheme = context.typography;
+    final accent = iconColor ?? cs.primary;
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        child: Icon(icon, size: AppIconSize.small, color: accent),
+      ),
+      title: Text(
+        title,
+        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+      ),
+      trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+      onTap: onTap,
     );
   }
 }

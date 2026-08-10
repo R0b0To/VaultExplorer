@@ -76,6 +76,10 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
     _diagnosis = null;
     _actionSucceeded = null;
     _error = null;
+    // Otherwise a log from the previous target's scan/repair run would
+    // still be sitting there the next time this step is shown, above
+    // wherever the new target's own run appends its first line.
+    _logLines.clear();
   }
 
   void _changeTarget() => setState(() {
@@ -260,6 +264,19 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
             switchOutCurve: Curves.easeIn,
             transitionBuilder: (child, animation) =>
                 FadeTransition(opacity: animation, child: child),
+            // Default layoutBuilder stacks the outgoing child under the
+            // incoming one and sizes to whichever is taller for the whole
+            // crossfade -- with AnimatedSize wrapping this, that meant an
+            // instant jump to that combined height the moment a switch
+            // started, then a second, separate animated correction down
+            // to the real size once the fade finished. Keeping only the
+            // current child here means AnimatedSize has one true target
+            // height throughout, so target<->diagnosis switches (and
+            // everything that changes height within the diagnosis step --
+            // log panel, result banners) settle in a single smooth resize
+            // instead of several visible jumps.
+            layoutBuilder: (currentChild, previousChildren) =>
+                currentChild ?? const SizedBox.shrink(),
             child: KeyedSubtree(
               key: ValueKey(_target == null),
               child: _target == null

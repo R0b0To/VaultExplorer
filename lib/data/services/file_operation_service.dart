@@ -454,7 +454,7 @@ if (freeBytes != null && requiredBytes > (freeBytes * 0.95).floor()) {
         );
       } catch (e) {
         if (e is! _DiskFullException && e is! _CancelledException) {
-          debugPrint('FileOperationService unhandled: $e');
+
         }
       }
       final diskFull = op.itemStatuses.any(

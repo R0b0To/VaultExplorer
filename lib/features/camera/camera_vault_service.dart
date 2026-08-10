@@ -49,7 +49,6 @@ class CameraVaultService {
           .map((e) => RawEntry.parse(e).name)
           .toSet();
     } catch (e) {
-      debugPrint('CameraVaultService: failed to list target directory, assuming empty.');
       return {};
     }
   }

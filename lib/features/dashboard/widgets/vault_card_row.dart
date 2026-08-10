@@ -169,18 +169,18 @@ class _VaultCardRowState extends State<VaultCardRow>
   }
 
   Future<void> _triggerPeekNudge() async {
-    debugPrint('[VaultCardRow] Nudge checks passed. Starting delayed trigger...');
+
     if (!mounted || _isDragging || _openSide != _OpenSide.none) return;
     await Future.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
-    debugPrint('[VaultCardRow] Executing nudge slide actions...');
+
     await _animatePeekTo(-90.0, const Duration(milliseconds: 500));
     await Future.delayed(const Duration(milliseconds: 650));
     await _animatePeekTo(90.0, const Duration(milliseconds: 500));
     await Future.delayed(const Duration(milliseconds: 650));
     await _animatePeekTo(0.0, const Duration(milliseconds: 500));
     if (mounted) {
-      debugPrint('[VaultCardRow] Nudge complete, calling onNudgeComplete callback.');
+
       widget.onNudgeComplete?.call();
     }
   }

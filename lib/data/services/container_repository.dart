@@ -9,9 +9,7 @@ import 'package:vaultexplorer/data/services/app_secure_storage.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 
-void _logSwallowed(String method, Object error) {
-  debugPrint('[ContainerRepository] $method failed: $error');
-}
+void _logSwallowed(String method, Object error) {}
 
 @immutable
 class DocumentProviderFolder {

@@ -49,12 +49,7 @@ typedef SplitJoinProgress = ({int opId, int bytesDone, int bytesTotal});
 /// container_repair.cpp for where these originate.
 typedef RepairLogLine = ({int opId, String message});
 
-void _logSwallowed(String method, Object error, {bool expected = false}) {
-  debugPrint(
-    '${expected ? '[VaultExplorerApi:expected]' : '[VaultExplorerApi]'} '
-    '$method failed: $error',
-  );
-}
+void _logSwallowed(String method, Object error, {bool expected = false}) {}
 
 const _channel = MethodChannel('com.aeidolon.vaultexplorer/engine');
 

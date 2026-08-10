@@ -18,9 +18,7 @@ typedef PickedLocalPdf = ({String uri, String displayName});
 
 const _channel = MethodChannel('com.aeidolon.vaultexplorer/disguise_channel');
 
-void _logSwallowed(String method, Object error) {
-  debugPrint('[DisguiseModeApi] $method failed: $error');
-}
+void _logSwallowed(String method, Object error) {}
 
 class DisguiseModeApi {
   const DisguiseModeApi();

@@ -86,7 +86,7 @@ class _TextEditorScreenState extends State<TextEditorScreen> {
       try {
         await _tempFile!.delete();
       } catch (e) {
-        debugPrint('Error deleting temp file: $e');
+
       }
     }
   }

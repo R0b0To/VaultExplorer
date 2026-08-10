@@ -327,7 +327,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         );
       }
     } catch (e) {
-      debugPrint('Failed to resolve settings: $e');
+
     }
     await _loadDirectoryContents(_currentDirPath);
   }
@@ -584,7 +584,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         );
       }
     } catch (e) {
-      debugPrint('Deep search error: $e');
+
     }
   }
 
@@ -1293,7 +1293,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
         }
       }
     } catch (e) {
-      debugPrint('Error scanning subfolder for media: $e');
+
     }
     return foundFiles;
   }
@@ -1783,7 +1783,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       final updatedSettings = settings.copyWith(defaultLayoutMode: mode);
       await AppSettingsService.saveSettings(updatedSettings);
     } catch (e) {
-      debugPrint('Failed to save layout mode: $e');
+
     }
   }
 
@@ -1797,7 +1797,7 @@ class _FileBrowserScreenState extends State<FileBrowserScreen>
       );
       await AppSettingsService.saveSettings(updatedSettings);
     } catch (e) {
-      debugPrint('Failed to save sort settings: $e');
+
     }
   }
 

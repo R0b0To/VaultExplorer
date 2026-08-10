@@ -20,7 +20,7 @@ class VaultItemsService {
       final json = jsonDecode(utf8.decode(bytes));
       return VaultItem.fromJson(json);
     } catch (e) {
-      debugPrint('VaultItemsService.loadItem error: $e');
+
       return null;
     }
   }
@@ -42,7 +42,7 @@ await vaultExplorerApi.deleteFile(container, path);
 final renamed = await vaultExplorerApi.renameFile(container, tmpPath, path);
 return renamed;
     } catch (e) {
-      debugPrint('VaultItemsService.saveItem error: $e');
+
       return false;
     }
   }

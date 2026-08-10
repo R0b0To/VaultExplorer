@@ -200,7 +200,7 @@ class PlaylistController extends ChangeNotifier {
         }
       }
     } catch (e) {
-      debugPrint('Error scanning current folder: $e');
+
     }
     foundFiles.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     return foundFiles;
@@ -253,7 +253,7 @@ class PlaylistController extends ChangeNotifier {
         }
       }
     } catch (e) {
-      debugPrint('Error walking subdirectories: $e');
+
     }
 
     return foundFiles;

@@ -348,7 +348,7 @@ static Uint8List? getFromMemory(
         return (bytes, width, height);
       }
     } catch (e) {
-      debugPrint('ThumbnailCacheService.get: $e');
+
       return null;
     }
   }
@@ -472,13 +472,11 @@ static Future<void> put({
         }
       } else {
         await vaultExplorerApi.deleteFile(container, tmpPath);
-        debugPrint(
-          'ThumbnailCacheService.put: inContainer write failed',
-        );
+
       }
     }
   } catch (e, stackTrace) {
-    debugPrint('ThumbnailCacheService.put: $e\n$stackTrace');
+
   }
 }
   // ── Cache management ───────────────────────────────────────────────────────
@@ -580,7 +578,7 @@ static Future<void> put({
         } catch (_) {}
       }
     } catch (e) {
-      debugPrint('ThumbnailCacheService.enforceDiskBudget: $e');
+
     }
   }
 
@@ -625,7 +623,7 @@ static Future<void> put({
         if (deleted) runningBytes -= entry.sizeBytes;
       }
     } catch (e) {
-      debugPrint('ThumbnailCacheService.enforceInContainerDiskBudget: $e');
+
     }
   }
 

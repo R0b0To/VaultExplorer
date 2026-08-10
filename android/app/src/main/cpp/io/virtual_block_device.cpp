@@ -59,12 +59,9 @@ extern "C" {
 #include <et/com_err.h>
 }
 
-static int android_ntfs_log_handler(const char *function, const char * /*file*/,
-                                    int /*line*/, u32 level, void * /*data*/,
-                                    const char *format, va_list args) {
-    char buf[512];
-    vsnprintf(buf, sizeof(buf), format ? format : "", args);
-    LOGI("NTFS-3G [lvl %u] %s: %s", (unsigned int)level, function ? function : "", buf);
+static int android_ntfs_log_handler(const char * /*function*/, const char * /*file*/,
+                                    int /*line*/, u32 /*level*/, void * /*data*/,
+                                    const char * /*format*/, va_list /*args*/) {
     return 0;
 }
 

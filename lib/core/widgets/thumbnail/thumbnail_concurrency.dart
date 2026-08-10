@@ -8,7 +8,7 @@ export 'package:vaultexplorer/core/widgets/thumbnail/priority_task_queue.dart';
 
 void unawaited(Future<void> future) {
   future.catchError((Object e) {
-    debugPrint('unawaited error (non-fatal): $e');
+    // error silently swallowed
   });
 }
 

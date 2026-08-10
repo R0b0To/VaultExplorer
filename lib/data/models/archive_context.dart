@@ -147,7 +147,7 @@ class ArchiveContext {
 
       final outPath = p.join(tempDir.path, name);
       if (!p.isWithin(tempDir.path, outPath)) {
-        debugPrint('Skipped archive entry escaping extraction dir: $name');
+
         continue;
       }
 

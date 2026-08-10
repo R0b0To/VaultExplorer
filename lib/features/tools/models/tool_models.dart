@@ -73,40 +73,6 @@ class MountedVolumeTarget extends RepairTarget {
   const MountedVolumeTarget({required this.volId, required this.displayName});
 }
 
-/// Filesystem choices for the Format Volume tool -- reformats an
-/// already-mounted volume's inner filesystem in place (see
-/// container_reformat.cpp). Distinct from [FilesystemType]
-/// (core/filesystem/filesystem_type.dart), which models name-validation
-/// rules for the file browser rather than wire-level format selection.
-enum TargetFilesystem {
-  fat,
-  exFat,
-  ntfs,
-  ext2,
-  ext3,
-  ext4;
-
-  /// Wire string sent to the native format dispatch -- the same lowercase
-  /// names create_container_sheet.dart's filesystem dropdown sends via
-  /// createContainer's fileSystem argument.
-  String get wireName => switch (this) {
-        TargetFilesystem.fat => 'fat',
-        TargetFilesystem.exFat => 'exfat',
-        TargetFilesystem.ntfs => 'ntfs',
-        TargetFilesystem.ext2 => 'ext2',
-        TargetFilesystem.ext3 => 'ext3',
-        TargetFilesystem.ext4 => 'ext4',
-      };
-
-  String get label => switch (this) {
-        TargetFilesystem.fat => 'FAT32',
-        TargetFilesystem.exFat => 'exFAT',
-        TargetFilesystem.ntfs => 'NTFS',
-        TargetFilesystem.ext2 => 'ext2',
-        TargetFilesystem.ext3 => 'ext3',
-        TargetFilesystem.ext4 => 'ext4',
-      };
-}
 
 enum RepairDiagnosis {
   healthy,

@@ -18,7 +18,7 @@ void configurePlatformIntegrations() {
   PlatformDispatcher.instance.onError = (error, stack) {
     final errStr = error.toString();
     if (errStr.contains('Cannot add event after closing')) {
-      debugPrint('Suppressed stream-after-close error: $errStr');
+
       return true;
     }
     return false;

@@ -165,7 +165,7 @@ class _VaultDashboardState extends State<VaultDashboard>
         await vaultExplorerApi.lockContainer(c.uri);
         _onContainerLocked(c.volId);
       } catch (e) {
-        debugPrint('Auto-lock failed for volId=${c.volId}: $e');
+
       } finally {
         vaultExplorerApi.releaseLockGuard(c.volId);
       }
@@ -233,7 +233,7 @@ class _VaultDashboardState extends State<VaultDashboard>
           if (!mounted) return;
           _onContainerLocked(container.volId);
         } catch (e) {
-          debugPrint('Auto-close lock failed for volId=${container.volId}: $e');
+
         } finally {
           vaultExplorerApi.releaseLockGuard(container.volId);
         }
@@ -559,7 +559,7 @@ class _VaultDashboardState extends State<VaultDashboard>
       final devices = await vaultExplorerApi.listUsbDevices();
       hasUsb = devices.isNotEmpty;
     } catch (e) {
-      debugPrint('Failed to check USB devices: $e');
+
     }
     if (!mounted) return;
     setState(() => _actionInFlight = false);

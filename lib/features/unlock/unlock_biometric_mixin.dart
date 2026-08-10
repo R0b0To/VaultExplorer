@@ -115,10 +115,6 @@ mixin UnlockBiometricMixin<T extends StatefulWidget> on State<T> {
             ? await vaultExplorerApi.loadDerivedKey(deriveId)
             : null;
 
-        debugPrint(
-          '${source.debugLogTag}: biometric cached-key present='
-          '${cachedKey != null && cachedKey.isNotEmpty} for ${source.containerUri}',
-        );
 
         if (cachedKey != null && cachedKey.isNotEmpty) {
           await performUnlock(
@@ -216,10 +212,6 @@ if (storedPatternHash == null) {
           ? await vaultExplorerApi.loadDerivedKey(deriveId)
           : null;
 
-      debugPrint(
-        '${source.debugLogTag}: pattern cached-key present='
-        '${cachedKey != null && cachedKey.isNotEmpty} for ${source.containerUri}',
-      );
 
       if (cachedKey != null && cachedKey.isNotEmpty) {
         await performUnlock(preservedKey: cachedKey, shouldCacheDerivedKeyOverride: shouldCacheGoingForward);

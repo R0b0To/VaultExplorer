@@ -523,7 +523,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       await future;
       if (mounted) setState(() {});
     } catch (e) {
-      debugPrint('Failed to prefetch thumbnail: $e');
+
     } finally {
       if (ThumbnailConcurrency.inFlightThumbnails[key] == future) {
         ThumbnailConcurrency.inFlightThumbnails.remove(key);
@@ -638,7 +638,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         priority: TaskPriority.adjacent,
       );
     } catch (e) {
-      debugPrint('Failed to prefetch full-resolution image: $e');
+
     } finally {
       _prefetchingFullRes.remove(fileName);
     }
@@ -804,7 +804,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         fileToDelete,
       );
     } catch (e) {
-      debugPrint('Deletion error operation failed: $e');
+
     }
     if (success && mounted) {
       _mediaKeys.remove(fileToDelete);

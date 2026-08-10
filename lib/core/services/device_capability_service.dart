@@ -21,7 +21,7 @@ class DeviceCapabilityService {
     try {
       final profile = await vaultExplorerApi.getDeviceCapabilityProfile();
       final tier = profile.tier;
-      debugPrint('[DeviceCapabilityService] Profile loaded: $profile');
+
 
       switch (tier.toUpperCase()) {
         case 'LOW':
@@ -56,7 +56,7 @@ class DeviceCapabilityService {
           break;
       }
     } catch (e) {
-      debugPrint('[DeviceCapabilityService] Failed to load capability profile: $e');
+
     }
   }
 }

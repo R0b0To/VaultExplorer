@@ -75,7 +75,7 @@ fun parseUnlockArgs(
     val preservedKeyBase64 = call.argument<String>("preservedKey")
     val preservedKey = preservedKeyBase64?.let { Base64.decode(it, Base64.NO_WRAP) }
     if (preservedKey != null) {
-        Log.i("VaultExplorer_C++", "Unlock request is using preserved key (${preservedKey.size} bytes)")
+        Log.i("VaultExplorer_C++", "Unlock request is using preserved key")
     }
     val cacheDerivedKey = call.argument<Boolean>("cacheDerivedKey") ?: false
     val keyfilePaths = call.argument<List<String>>("keyfilePaths")
@@ -165,7 +165,7 @@ class VaultUnlockHandlers(
                 val parts = SafSplitResolver.resolveParts(activity, uri, displayName)
 
                 if (parts.size > 1) {
-                    Log.i("VaultExplorer_C++", "Auto-detected split container across ${parts.size} parts for $uriString")
+                    Log.i("VaultExplorer_C++", "Auto-detected split container across ${parts.size} parts")
                     val fuseCallback = SplitFuseCallback(
                         context = activity,
                         parts = parts,
@@ -195,7 +195,7 @@ class VaultUnlockHandlers(
                 val fd = pfd.detachFd()
 
                 if (args.preservedKey != null) {
-                    Log.i("VaultExplorer_C++", "File unlock using preserved derived key (len=${args.preservedKey.size})")
+                    Log.i("VaultExplorer_C++", "File unlock using preserved derived key")
                 } else if (args.cacheDerivedKey) {
                     Log.i("VaultExplorer_C++", "File unlock will derive and cache a fresh key")
                 }
@@ -451,7 +451,7 @@ class VaultUnlockHandlers(
             try {
                 val uri = Uri.parse(uriString)
                 if (preservedKey != null) {
-                    Log.i("VaultExplorer_C++", "CryFS unlock using preserved combined key (len=${preservedKey.size})")
+                    Log.i("VaultExplorer_C++", "CryFS unlock using preserved combined key")
                 } else if (cacheDerivedKey) {
                     Log.i("VaultExplorer_C++", "CryFS unlock will derive and cache a fresh combined key")
                 }

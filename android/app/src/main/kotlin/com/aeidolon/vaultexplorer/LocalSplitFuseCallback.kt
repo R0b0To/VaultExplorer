@@ -30,7 +30,7 @@ object SafSplitResolver {
 
     fun resolveParts(context: Context, firstUri: Uri, displayName: String): List<SplitPartInfo> {
         val rawFile = UriToPath.getRawFile(context, firstUri)
-        Log.i("VaultExplorer_C++", "SafSplitResolver: rawFile=${rawFile?.absolutePath ?: "null"} for $firstUri")
+        Log.i("VaultExplorer_C++", "SafSplitResolver: resolving parts")
         if (rawFile != null) {
             val localParts = SplitPartResolver.resolvePartSequence(rawFile)
             Log.i("VaultExplorer_C++", "SafSplitResolver: local resolvePartSequence found ${localParts.size} part(s)")
@@ -111,7 +111,7 @@ object SafSplitResolver {
                         byName[cName.lowercase()] = DocumentsContract.buildDocumentUriUsingTree(treeUri, cId) to cSize
                     }
                 }
-                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0: children of $parentDocId returned ${byName.size} entries: ${byName.keys}")
+                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy0: children returned ${byName.size} entries")
                 if (byName.isEmpty()) return emptyList()
 
                 val startN = if (byName.containsKey(formatName(0).lowercase())) 0 else 1
@@ -198,7 +198,7 @@ object SafSplitResolver {
                         mapByName[cName.lowercase()] = cId to cSize
                     }
                 }
-                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: children query returned ${mapByName.size} entries: ${mapByName.keys}")
+                Log.i("VaultExplorer_C++", "SafSplitResolver Strategy1: children query returned ${mapByName.size} entries")
 
                 if (mapByName.isNotEmpty()) {
                     val startN = if (mapByName.containsKey(formatName(0).lowercase())) 0 else 1
@@ -645,7 +645,7 @@ class SplitFuseCallback(
         }
         Log.i(
             "VaultExplorer_C++",
-            "SplitFuseCallback: flushed local mirror for part $index (${mirror.length()} bytes) back to ${parts[index].uri}"
+            "SplitFuseCallback: flushed local mirror for part $index (${mirror.length()} bytes)"
         )
     }
 

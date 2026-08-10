@@ -373,7 +373,7 @@ class _UsbUnlockSheetState extends State<UsbUnlockSheet>
           (shouldPreloadCachedKey
               ? await vaultExplorerApi.loadDerivedKey(device.deviceName)
               : null);
-      debugPrint('usb unlock: method=$_unlockMethod shouldCacheDerivedKey=$shouldCacheDerivedKey preservedKeyLen=${resolvedPreservedKey?.length ?? 0}');
+
       var result = resolvedPreservedKey == null
           ? await vaultExplorerApi.unlockUsbContainer(
               device.deviceName,

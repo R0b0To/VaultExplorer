@@ -132,7 +132,7 @@ class UsbContainerHandlers(
                     if (args.protectHiddenVolume) nativeOps.openKeyfileFds(args.hiddenKeyfilePaths) else null
 
                 if (args.preservedKey != null) {
-                    Log.i("VaultExplorer_C++", "USB unlock using preserved derived key (len=${args.preservedKey.size})")
+                    Log.i("VaultExplorer_C++", "USB unlock using preserved derived key")
                 } else if (args.cacheDerivedKey) {
                     Log.i("VaultExplorer_C++", "USB unlock will derive and cache a fresh key")
                 }
@@ -228,7 +228,7 @@ class UsbContainerHandlers(
 
                 val deviceCapacityBytes = msd.sectorCount * msd.sectorSize
                 val partitionStartBytes = 2048L * 512L
-                Log.i("VaultExplorer_C++", "createUsbContainer: device=$deviceName capacity=$deviceCapacityBytes requested=$sizeBytes")
+                Log.i("VaultExplorer_C++", "createUsbContainer: starting container creation")
                 if (sizeBytes <= 0 || sizeBytes > deviceCapacityBytes - partitionStartBytes) {
                     Log.w("VaultExplorer_C++", "createUsbContainer: requested size exceeds usable capacity")
                     msd.close()

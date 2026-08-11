@@ -480,7 +480,7 @@ Future<void> _activateCurrentMedia() async {
     }
   }
 
-  Future<void> _prefetchThumbnail(String fileName) async {
+ Future<void> _prefetchThumbnail(String fileName) async {
     final isImg = MediaViewerConstants.isImage(fileName);
     final isVid = MediaViewerConstants.isVideo(fileName);
     if (!isImg && !isVid) return;
@@ -514,10 +514,6 @@ Future<void> _activateCurrentMedia() async {
       }
     }
 
-    if (isVid && PlaybackThrottleController.isPlaybackActive.value) {
-      return;
-    }
-
     final key = '${widget.container.volId}:'
         '${widget.container.mountedAt.millisecondsSinceEpoch}:$fileName';
     final existing = ThumbnailConcurrency.inFlightThumbnails[key];
@@ -539,6 +535,7 @@ Future<void> _activateCurrentMedia() async {
       await future;
       if (mounted) setState(() {});
     } catch (e) {
+      // Ignore prefetch errors
     } finally {
       if (ThumbnailConcurrency.inFlightThumbnails[key] == future) {
         ThumbnailConcurrency.inFlightThumbnails.remove(key);

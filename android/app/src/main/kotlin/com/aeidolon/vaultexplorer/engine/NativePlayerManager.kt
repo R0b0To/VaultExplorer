@@ -197,13 +197,21 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         colorInfoString = "SDR"
         lastDiagnosticsEmitTimeMs = 0L
 
-        // Release old surface & texture entry to ensure fresh GPU texture per video
+        // 1. ALWAYS disconnect ExoPlayer from surface FIRST before destroying the surface
+        var exoPlayer = player
+        if (exoPlayer != null) {
+            exoPlayer.stop()
+            exoPlayer.clearVideoSurface()
+            exoPlayer.clearMediaItems()
+        }
+
+        // 2. NOW safely release the old surface and textureEntry
         surface?.release()
         surface = null
         textureEntry?.release()
         textureEntry = null
 
-        // Create a FRESH SurfaceTextureEntry for this new video stream
+        // 3. Create a FRESH SurfaceTextureEntry for this new video
         val registry = textureRegistry ?: throw IllegalStateException("TextureRegistry not set")
         val entry = registry.createSurfaceTexture()
         textureEntry = entry
@@ -212,7 +220,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         val newSurface = Surface(st)
         surface = newSurface
 
-        var exoPlayer = player
+        // 4. Create or reuse ExoPlayer instance
         if (exoPlayer == null) {
             val tier = DeviceCapabilityProfiler.tierFor(context)
             val loadControl = buildLoadControl(tier)
@@ -230,11 +238,9 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             exoPlayer.addListener(this)
             exoPlayer.addAnalyticsListener(analyticsListener)
             player = exoPlayer
-        } else {
-            exoPlayer.stop()
-            exoPlayer.clearMediaItems()
         }
 
+        // 5. Connect newSurface to ExoPlayer and prepare
         exoPlayer.setVideoSurface(newSurface)
 
         val dataSourceFactory = VaultMedia3DataSourceFactory(volId, filePath)
@@ -409,7 +415,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     }
 
     override fun onVideoSizeChanged(videoSize: VideoSize) {
-        // Do NOT call setDefaultBufferSize to avoid EGL buffer queue reallocations
         emitEvent("videoSize", mapOf(
             "width" to videoSize.width,
             "height" to videoSize.height,

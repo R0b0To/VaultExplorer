@@ -199,6 +199,7 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
       if (!mounted) return;
       setState(() => _settings = bundle!.appSettings);
       appThemeModeNotifier.value = bundle.appSettings.themeMode;
+      appUseDynamicColorNotifier.value = bundle.appSettings.useDynamicColor;
       appLocaleNotifier.value = bundle.appSettings.languageCode != null
           ? Locale(bundle.appSettings.languageCode!)
           : null;
@@ -674,6 +675,24 @@ class _AppSettingsScreenState extends State<AppSettingsScreen>
                             onChanged: (v) {
                               setState(() => _settings.themeMode = v);
                               appThemeModeNotifier.value = v;
+                              _persist();
+                            },
+                          ),
+                          SwitchListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            title: Text(context.l10n.useMaterialYouTitle,
+                                style: textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                            subtitle: Text(
+                              context.l10n.useMaterialYouSubtitle,
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            value: _settings.useDynamicColor,
+                            onChanged: (v) {
+                              setState(() => _settings.useDynamicColor = v);
+                              appUseDynamicColorNotifier.value = v;
                               _persist();
                             },
                           ),

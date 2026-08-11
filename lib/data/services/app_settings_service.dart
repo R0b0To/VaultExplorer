@@ -29,6 +29,7 @@ class AppSettings {
   ContainerSortMode containerSortMode;
   bool swapCardActions;
   ThemeMode themeMode;
+  bool useDynamicColor;
   BrowserLayoutMode defaultLayoutMode;
   ThumbnailCacheMode defaultThumbnailCacheMode;
   ThumbnailQuality defaultThumbnailQuality;
@@ -58,6 +59,7 @@ class AppSettings {
     this.containerSortMode = ContainerSortMode.manual,
     this.swapCardActions = false,
     this.themeMode = ThemeMode.system,
+    this.useDynamicColor = false,
     this.autoOpenOnUnlock = false,
     this.defaultFileSortBy = SortBy.name,
     this.defaultFileSortAscending = true,
@@ -109,6 +111,7 @@ class AppSettings {
     ContainerSortMode? containerSortMode,
     bool? swapCardActions,
     ThemeMode? themeMode,
+    bool? useDynamicColor,
     BrowserLayoutMode? defaultLayoutMode,
     ThumbnailCacheMode? defaultThumbnailCacheMode,
     ThumbnailQuality? defaultThumbnailQuality,
@@ -137,6 +140,7 @@ class AppSettings {
       containerSortMode: containerSortMode ?? this.containerSortMode,
       swapCardActions: swapCardActions ?? this.swapCardActions,
       themeMode: themeMode ?? this.themeMode,
+      useDynamicColor: useDynamicColor ?? this.useDynamicColor,
       defaultThumbnailCacheMode: defaultThumbnailCacheMode ?? this.defaultThumbnailCacheMode,
       defaultThumbnailQuality: defaultThumbnailQuality ?? this.defaultThumbnailQuality,
       extensionPreferences: extensionPreferences ?? this.extensionPreferences,
@@ -172,6 +176,7 @@ class AppSettings {
     'containerSortMode': containerSortMode.toJson(),
     'swapCardActions': swapCardActions,
     'themeMode': themeMode.index,
+    'useDynamicColor': useDynamicColor,
     'extensionPreferences': extensionPreferences,
     'autoOpenOnUnlock': autoOpenOnUnlock,
     'defaultFileSortBy': defaultFileSortBy.toJson(),
@@ -197,6 +202,7 @@ class AppSettings {
     containerSortMode: ContainerSortMode.fromJson(j['containerSortMode'] as String?),
     swapCardActions: j['swapCardActions'] as bool? ?? false,
     themeMode: j['themeMode'] != null ? ThemeMode.values[j['themeMode'] as int] : ThemeMode.system,
+    useDynamicColor: j['useDynamicColor'] as bool? ?? false,
     lockContainersOnScreenLock: j['lockContainersOnScreenLock'] as bool? ?? true,
     autoLockMins: j['autoLockMins'] as int? ?? 0,
     defaultLayoutMode:

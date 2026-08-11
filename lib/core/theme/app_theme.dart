@@ -176,9 +176,19 @@ ColorScheme _darkColorScheme() => const ColorScheme(
       surfaceTint: Color(0xFFA8C7FA),
     );
 
-ThemeData buildDarkTheme() => _buildTheme(_darkColorScheme(), Brightness.dark);
-ThemeData buildLightTheme() => _buildTheme(
-      ColorScheme.fromSeed(seedColor: _seedColor, brightness: Brightness.light),
+/// [dynamicScheme] is the device's Material You palette (from
+/// `DynamicColorBuilder`'s `darkDynamic`), used in place of the hardcoded
+/// scheme when the user has enabled the "Use Material You" setting.
+ThemeData buildDarkTheme({ColorScheme? dynamicScheme}) =>
+    _buildTheme(dynamicScheme ?? _darkColorScheme(), Brightness.dark);
+
+/// [dynamicScheme] is the device's Material You palette (from
+/// `DynamicColorBuilder`'s `lightDynamic`), used in place of the hardcoded
+/// seed-generated scheme when the user has enabled the "Use Material You"
+/// setting.
+ThemeData buildLightTheme({ColorScheme? dynamicScheme}) => _buildTheme(
+      dynamicScheme ??
+          ColorScheme.fromSeed(seedColor: _seedColor, brightness: Brightness.light),
       Brightness.light,
     );
 

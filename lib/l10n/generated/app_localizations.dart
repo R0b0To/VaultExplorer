@@ -1568,6 +1568,18 @@ abstract class AppLocalizations {
   /// **'Dark Theme'**
   String get darkTheme;
 
+  /// Settings toggle title
+  ///
+  /// In en, this message translates to:
+  /// **'Use Material You'**
+  String get useMaterialYouTitle;
+
+  /// Settings toggle subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Match app colors to your wallpaper (Android 12+)'**
+  String get useMaterialYouSubtitle;
+
   /// Settings picker label
   ///
   /// In en, this message translates to:

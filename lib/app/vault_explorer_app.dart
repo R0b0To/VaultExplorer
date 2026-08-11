@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
@@ -11,6 +12,8 @@ import 'package:vaultexplorer/l10n/generated/app_localizations.dart';
 String appVersion = '0.0.0';
 final ValueNotifier<ThemeMode> appThemeModeNotifier = ValueNotifier(ThemeMode.system);
 
+final ValueNotifier<bool> appUseDynamicColorNotifier = ValueNotifier(false);
+
 /// `null` = follow the system locale. Otherwise one of
 /// [AppLocalizations.supportedLocales], set from `AppSettings.languageCode`
 /// at startup (`runDeferredStartupWork`) and live-updated from the language
@@ -22,21 +25,36 @@ class VaultExplorerApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: appThemeModeNotifier,
-      builder: (context, themeMode, child) {
-        return ValueListenableBuilder<Locale?>(
-          valueListenable: appLocaleNotifier,
-          builder: (context, locale, child) {
-            return MaterialApp(
-              debugShowCheckedModeBanner: false,
-              theme: buildLightTheme(),
-              darkTheme: buildDarkTheme(),
-              themeMode: themeMode,
-              locale: locale,
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: const _DisguiseModeGate(),
+    return DynamicColorBuilder(
+      builder: (lightDynamic, darkDynamic) {
+        return ValueListenableBuilder<ThemeMode>(
+          valueListenable: appThemeModeNotifier,
+          builder: (context, themeMode, child) {
+            return ValueListenableBuilder<Locale?>(
+              valueListenable: appLocaleNotifier,
+              builder: (context, locale, child) {
+                return ValueListenableBuilder<bool>(
+                  valueListenable: appUseDynamicColorNotifier,
+                  builder: (context, useDynamicColor, child) {
+                    final useDynamic =
+                        useDynamicColor && lightDynamic != null && darkDynamic != null;
+                    return MaterialApp(
+                      debugShowCheckedModeBanner: false,
+                      theme: buildLightTheme(
+                        dynamicScheme: useDynamic ? lightDynamic : null,
+                      ),
+                      darkTheme: buildDarkTheme(
+                        dynamicScheme: useDynamic ? darkDynamic : null,
+                      ),
+                      themeMode: themeMode,
+                      locale: locale,
+                      localizationsDelegates: AppLocalizations.localizationsDelegates,
+                      supportedLocales: AppLocalizations.supportedLocales,
+                      home: const _DisguiseModeGate(),
+                    );
+                  },
+                );
+              },
             );
           },
         );

@@ -1268,6 +1268,14 @@
   "@darkTheme": {
     "description": "Theme option"
   },
+  "useMaterialYouTitle": "Use Material You",
+  "@useMaterialYouTitle": {
+    "description": "Settings toggle title"
+  },
+  "useMaterialYouSubtitle": "Match app colors to your wallpaper (Android 12+)",
+  "@useMaterialYouSubtitle": {
+    "description": "Settings toggle subtitle"
+  },
   "sortContainersByLabel": "Sort Containers By",
   "@sortContainersByLabel": {
     "description": "Settings picker label"

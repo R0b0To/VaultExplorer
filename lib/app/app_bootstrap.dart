@@ -31,6 +31,7 @@ Future<void> runDeferredStartupWork() async {
   try {
     final settings = await AppSettingsService.loadSettings();
     appThemeModeNotifier.value = settings.themeMode;
+    appUseDynamicColorNotifier.value = settings.useDynamicColor;
     if (settings.languageCode != null) {
       appLocaleNotifier.value = Locale(settings.languageCode!);
     }

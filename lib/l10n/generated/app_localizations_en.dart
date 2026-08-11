@@ -922,6 +922,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get darkTheme => 'Dark Theme';
 
   @override
+  String get useMaterialYouTitle => 'Use Material You';
+
+  @override
+  String get useMaterialYouSubtitle =>
+      'Match app colors to your wallpaper (Android 12+)';
+
+  @override
   String get sortContainersByLabel => 'Sort Containers By';
 
   @override

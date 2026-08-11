@@ -573,7 +573,7 @@
       }
     }
   },
-  "couldntRenameMultiWithReason": "{count, plural, =1{Couldn't rename 1 item: {reason}} other{Couldn't rename # items: {reason}}}",
+  "couldntRenameMultiWithReason": "{count, plural, =1{Couldn't rename 1 item: {reason}} other{Couldn't rename {count} items: {reason}}}",
   "@couldntRenameMultiWithReason": {
     "description": "Error shown when one or more items fail to rename in a batch, with a specific reason",
     "placeholders": {
@@ -585,7 +585,7 @@
       }
     }
   },
-  "couldntRenameMultiNoReason": "{count, plural, =1{Couldn't rename 1 item} other{Couldn't rename # items}}",
+  "couldntRenameMultiNoReason": "{count, plural, =1{Couldn't rename 1 item} other{Couldn't rename {count} items}}",
   "@couldntRenameMultiNoReason": {
     "description": "Error shown when one or more items fail to rename in a batch, without a specific reason",
     "placeholders": {
@@ -1179,7 +1179,7 @@
   "@immediately": {
     "description": "Auto-lock timeout option meaning zero delay"
   },
-  "nMinutes": "{count, plural, =1{1 minute} other{# minutes}}",
+  "nMinutes": "{count, plural, =1{1 minute} other{{count} minutes}}",
   "@nMinutes": {
     "description": "Duration in minutes, used for auto-lock timeout options",
     "placeholders": {
@@ -2091,7 +2091,7 @@
       }
     }
   },
-  "pinnedCount": "{count, plural, =1{Pinned 1 item} other{Pinned # items}}",
+  "pinnedCount": "{count, plural, =1{Pinned 1 item} other{Pinned {count} items}}",
   "@pinnedCount": {
     "description": "Status message after pinning items",
     "placeholders": {
@@ -2100,7 +2100,7 @@
       }
     }
   },
-  "unpinnedCount": "{count, plural, =1{Unpinned 1 item} other{Unpinned # items}}",
+  "unpinnedCount": "{count, plural, =1{Unpinned 1 item} other{Unpinned {count} items}}",
   "@unpinnedCount": {
     "description": "Status message after unpinning items",
     "placeholders": {

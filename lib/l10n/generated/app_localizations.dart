@@ -647,13 +647,13 @@ abstract class AppLocalizations {
   /// Error shown when one or more items fail to rename in a batch, with a specific reason
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Couldn\'t rename 1 item: {reason}} other{Couldn\'t rename # items: {reason}}}'**
+  /// **'{count, plural, =1{Couldn\'t rename 1 item: {reason}} other{Couldn\'t rename {count} items: {reason}}}'**
   String couldntRenameMultiWithReason(num count, String reason);
 
   /// Error shown when one or more items fail to rename in a batch, without a specific reason
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Couldn\'t rename 1 item} other{Couldn\'t rename # items}}'**
+  /// **'{count, plural, =1{Couldn\'t rename 1 item} other{Couldn\'t rename {count} items}}'**
   String couldntRenameMultiNoReason(num count);
 
   /// Validation error when the hidden volume size field is empty or non-positive
@@ -1445,7 +1445,7 @@ abstract class AppLocalizations {
   /// Duration in minutes, used for auto-lock timeout options
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{1 minute} other{# minutes}}'**
+  /// **'{count, plural, =1{1 minute} other{{count} minutes}}'**
   String nMinutes(num count);
 
   /// Settings toggle title
@@ -2597,13 +2597,13 @@ abstract class AppLocalizations {
   /// Status message after pinning items
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Pinned 1 item} other{Pinned # items}}'**
+  /// **'{count, plural, =1{Pinned 1 item} other{Pinned {count} items}}'**
   String pinnedCount(num count);
 
   /// Status message after unpinning items
   ///
   /// In en, this message translates to:
-  /// **'{count, plural, =1{Unpinned 1 item} other{Unpinned # items}}'**
+  /// **'{count, plural, =1{Unpinned 1 item} other{Unpinned {count} items}}'**
   String unpinnedCount(num count);
 
   /// Warning shown when browsing a read-only container with in-container thumbnail caching selected

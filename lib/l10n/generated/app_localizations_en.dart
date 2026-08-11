@@ -388,7 +388,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Couldn\'t rename # items: $reason',
+      other: 'Couldn\'t rename $count items: $reason',
       one: 'Couldn\'t rename 1 item: $reason',
     );
     return '$_temp0';
@@ -399,7 +399,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Couldn\'t rename # items',
+      other: 'Couldn\'t rename $count items',
       one: 'Couldn\'t rename 1 item',
     );
     return '$_temp0';
@@ -847,7 +847,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: '# minutes',
+      other: '$count minutes',
       one: '1 minute',
     );
     return '$_temp0';
@@ -1547,7 +1547,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Pinned # items',
+      other: 'Pinned $count items',
       one: 'Pinned 1 item',
     );
     return '$_temp0';
@@ -1558,7 +1558,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'Unpinned # items',
+      other: 'Unpinned $count items',
       one: 'Unpinned 1 item',
     );
     return '$_temp0';

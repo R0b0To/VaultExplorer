@@ -11,19 +11,8 @@ import com.aeidolon.vaultexplorer.ContainerFileSystem
  * filesystem layer via [ContainerFileSystem], bypassing SAF/ContentProvider
  * IPC entirely.
  *
- * Uses the streaming API ([ContainerFileSystem.openStream] /
- * [ContainerFileSystem.readStream] / [ContainerFileSystem.closeStream]) for
- * reads. This matches the hot-path optimization already present in the C++
- * layer: [fsReadStream] skips [ensureMounted()] on every call because a
- * stream handle can only exist if the volume was already mounted
- * successfully. Thread safety is provided by [ContainerFileSystem]'s
- * per-volume [ReentrantReadWriteLock].
- *
- * ExoPlayer's [ProgressiveMediaSource] calls [open], then pumps [read] until
- * EOF or a seek triggers [close] + re-[open] at a new position. The C++
- * stream's [fsReadStream] already accepts an explicit offset per call, so we
- * don't need to close/reopen the stream for seeks within the same open —
- * we simply update [readPosition].
+ * Thread-safe with internal 256KB buffering to minimize JNI cross-boundary
+ * overhead during high-bitrate 4K video playback.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class VaultMedia3DataSource(
@@ -37,6 +26,13 @@ class VaultMedia3DataSource(
     private var bytesRemaining: Long = 0L
     private var opened: Boolean = false
 
+    // 256KB internal buffer to reduce JNI boundary crossing overhead for 4K video reads
+    private val bufferSize = 256 * 1024
+    private val internalBuffer = ByteArray(bufferSize)
+    private var bufferOffset: Long = -1L
+    private var bufferLength: Int = 0
+
+    @Synchronized
     override fun open(dataSpec: DataSpec): Long {
         transferInitializing(dataSpec)
 
@@ -56,44 +52,80 @@ class VaultMedia3DataSource(
         }
         if (bytesRemaining < 0) bytesRemaining = 0
 
+        bufferOffset = -1L
+        bufferLength = 0
         opened = true
         transferStarted(dataSpec)
         return bytesRemaining
     }
 
+    @Synchronized
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
         if (length == 0) return 0
         if (bytesRemaining <= 0) return C.RESULT_END_OF_INPUT
+        val ptr = streamPtr
+        if (ptr == 0L || !opened) return C.RESULT_END_OF_INPUT
 
-        val toRead = minOf(length.toLong(), bytesRemaining).toInt()
+        val maxToRead = minOf(length.toLong(), bytesRemaining).toInt()
+        var bytesCopied = 0
 
-        // Read directly into ExoPlayer's buffer at the specified offset.
-        // ContainerFileSystem.readStream wraps the call with withReadLock.
-        val bytesRead = ContainerFileSystem.readStream(
-            volId, streamPtr, readPosition, buffer, toRead, offset
-        )
-        if (bytesRead <= 0) return C.RESULT_END_OF_INPUT
+        while (bytesCopied < maxToRead) {
+            val currentPos = readPosition + bytesCopied
+            // Serve directly from internal buffer if currentPos is buffered
+            if (bufferOffset != -1L && currentPos >= bufferOffset && currentPos < bufferOffset + bufferLength) {
+                val bufPos = (currentPos - bufferOffset).toInt()
+                val availableInBuf = bufferLength - bufPos
+                val chunkToCopy = minOf(maxToRead - bytesCopied, availableInBuf)
+                System.arraycopy(internalBuffer, bufPos, buffer, offset + bytesCopied, chunkToCopy)
+                bytesCopied += chunkToCopy
+            } else {
+                // Buffer miss: If request is larger than bufferSize, do direct native read
+                if (maxToRead - bytesCopied >= bufferSize) {
+                    val readFromNative = ContainerFileSystem.readStream(
+                        volId, ptr, currentPos, buffer, maxToRead - bytesCopied, offset + bytesCopied
+                    )
+                    if (readFromNative <= 0) break
+                    bytesCopied += readFromNative
+                } else {
+                    // Refill internal buffer with up to 256KB block
+                    val fetchSize = minOf(bufferSize.toLong(), fileSize - currentPos).toInt()
+                    if (fetchSize <= 0) break
+                    val readFromNative = ContainerFileSystem.readStream(
+                        volId, ptr, currentPos, internalBuffer, fetchSize, 0
+                    )
+                    if (readFromNative <= 0) break
+                    bufferOffset = currentPos
+                    bufferLength = readFromNative
+                }
+            }
+        }
 
-        readPosition += bytesRead
-        bytesRemaining -= bytesRead
-        bytesTransferred(bytesRead)
-        return bytesRead
+        if (bytesCopied <= 0) return C.RESULT_END_OF_INPUT
+
+        readPosition += bytesCopied
+        bytesRemaining -= bytesCopied
+        bytesTransferred(bytesCopied)
+        return bytesCopied
     }
 
+    @Synchronized
     override fun getUri(): Uri? {
         return if (opened) Uri.parse("vault://$volId/$filePath") else null
     }
 
+    @Synchronized
     override fun close() {
-        if (streamPtr != 0L) {
+        val ptr = streamPtr
+        if (ptr != 0L) {
             try {
-                ContainerFileSystem.closeStream(volId, streamPtr)
+                ContainerFileSystem.closeStream(volId, ptr)
             } catch (_: Exception) {
-                // Best-effort close; stream may already be invalid if the
-                // container was locked while playback was active.
+                // Best-effort close
             }
             streamPtr = 0L
         }
+        bufferOffset = -1L
+        bufferLength = 0
         if (opened) {
             opened = false
             transferEnded()

@@ -5,7 +5,9 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -13,7 +15,6 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
-import androidx.media3.common.Format
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -32,12 +33,6 @@ import io.flutter.plugin.common.MethodChannel
 /**
  * Manages the lifecycle of a single ExoPlayer instance that reads decrypted
  * media directly from [VaultMedia3DataSource].
- *
- * Coordinates with [ThumbnailHandlers] via [setPlaybackActiveMethod] to
- * arbitrate hardware codec access between video playback and thumbnail
- * extraction.
- *
- * All public methods must be called on the main (UI) thread.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class NativePlayerManager(private val context: Context) : Player.Listener {
@@ -45,6 +40,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     companion object {
         private const val TAG = "NativePlayerManager"
         private const val POSITION_UPDATE_INTERVAL_MS = 200L
+        private const val DIAGNOSTICS_EMIT_INTERVAL_MS = 1000L
     }
 
     private var player: ExoPlayer? = null
@@ -53,16 +49,8 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var attachedPlayerView: PlayerView? = null
     private var pendingPrepare: Boolean = false
 
-    /** Method channel for sending one-shot replies (e.g., track list responses). */
     var methodChannel: MethodChannel? = null
-
-    /** Event channel sink for streaming player state to Flutter. */
     var eventSink: EventChannel.EventSink? = null
-
-    /**
-     * Callback that notifies [ThumbnailHandlers] to pause/resume background
-     * thumbnail extraction. Wired in [MainActivity.configureFlutterEngine].
-     */
     var setPlaybackActiveCallback: ((Boolean) -> Unit)? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -85,8 +73,17 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var droppedVideoFrames: Int = 0
     private var videoDecoderInitTimeMs: Long = 0
     private var colorInfoString: String = "SDR"
+    private var lastDiagnosticsEmitTimeMs: Long = 0L
 
     private val analyticsListener = object : AnalyticsListener {
+        override fun onRenderedFirstFrame(
+            eventTime: AnalyticsListener.EventTime,
+            output: Any,
+            renderTimeMs: Long
+        ) {
+            emitEvent("renderedFirstFrame", emptyMap())
+        }
+
         override fun onVideoDecoderInitialized(
             eventTime: AnalyticsListener.EventTime,
             decoderName: String,
@@ -95,7 +92,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             videoDecoderName = decoderName
             videoDecoderInitTimeMs = initializationDurationMs
             isVideoHw = !isSoftwareDecoder(decoderName)
-            emitDiagnosticsUpdate()
+            emitDiagnosticsUpdateThrottled()
         }
 
         override fun onAudioDecoderInitialized(
@@ -105,12 +102,12 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         ) {
             audioDecoderName = decoderName
             isAudioHw = !isSoftwareDecoder(decoderName)
-            emitDiagnosticsUpdate()
+            emitDiagnosticsUpdateThrottled()
         }
 
         override fun onVideoInputFormatChanged(
             eventTime: AnalyticsListener.EventTime,
-            format: androidx.media3.common.Format,
+            format: Format,
             decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?
         ) {
             videoFrameRate = if (format.frameRate > 0) format.frameRate else videoFrameRate
@@ -118,18 +115,19 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             colorInfoString = when {
                 format.colorInfo?.colorTransfer == C.COLOR_TRANSFER_ST2084 -> "HDR10"
                 format.colorInfo?.colorTransfer == C.COLOR_TRANSFER_HLG -> "HLG"
-                else -> "SDR"
+                format.colorInfo?.colorSpace == C.COLOR_SPACE_BT2020 -> "Rec.2020 (HDR/WCG)"
+                else -> "SDR (BT.709)"
             }
-            emitDiagnosticsUpdate()
+            emitDiagnosticsUpdateThrottled()
         }
 
         override fun onAudioInputFormatChanged(
             eventTime: AnalyticsListener.EventTime,
-            format: androidx.media3.common.Format,
+            format: Format,
             decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?
         ) {
             audioMimeType = format.sampleMimeType ?: ""
-            emitDiagnosticsUpdate()
+            emitDiagnosticsUpdateThrottled()
         }
 
         override fun onDroppedVideoFrames(
@@ -138,7 +136,8 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             elapsedMs: Long
         ) {
             droppedVideoFrames += droppedFrames
-            emitDiagnosticsUpdate()
+            // Throttle events during frame drops to prevent Platform Channel event storms
+            emitDiagnosticsUpdateThrottled()
         }
     }
 
@@ -169,6 +168,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         )
     }
 
+    private fun emitDiagnosticsUpdateThrottled() {
+        val now = System.currentTimeMillis()
+        if (now - lastDiagnosticsEmitTimeMs >= DIAGNOSTICS_EMIT_INTERVAL_MS) {
+            lastDiagnosticsEmitTimeMs = now
+            emitDiagnosticsUpdate()
+        }
+    }
+
     private fun emitDiagnosticsUpdate() {
         emitEvent("diagnosticsUpdate", getDiagnosticsMap())
     }
@@ -190,6 +197,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         droppedVideoFrames = 0
         videoDecoderInitTimeMs = 0
         colorInfoString = "SDR"
+        lastDiagnosticsEmitTimeMs = 0L
 
         val tier = DeviceCapabilityProfiler.tierFor(context)
         val loadControl = buildLoadControl(tier)
@@ -197,6 +205,13 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
         val exoPlayer = ExoPlayer.Builder(context, renderersFactory)
             .setLoadControl(loadControl)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                /* handleAudioFocus= */ true
+            )
             .build()
         exoPlayer.addListener(this)
         exoPlayer.addAnalyticsListener(analyticsListener)
@@ -209,19 +224,12 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
         player = exoPlayer
 
-        // If a PlayerView is already attached (unlikely on first init, but
-        // possible on re-init), wire it up and prepare immediately.
-        // Otherwise, defer prepare() until attachPlayerView() is called so
-        // the codec's SurfaceView exists before first frame decode.
         val existingView = attachedPlayerView
         if (existingView != null) {
             existingView.player = exoPlayer
             exoPlayer.prepare()
             pendingPrepare = false
         } else {
-            // Start without a video surface — audio will still play once
-            // prepared, and video frames will queue until the surface
-            // arrives.
             exoPlayer.clearVideoSurface()
             exoPlayer.prepare()
             pendingPrepare = true
@@ -232,12 +240,22 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     private fun buildLoadControl(tier: DeviceCapabilityProfiler.Tier): DefaultLoadControl {
         val (minBufferMs, maxBufferMs, bufferForPlaybackMs, bufferForPlaybackAfterRebufferMs) = when (tier) {
-            DeviceCapabilityProfiler.Tier.LOW    -> Quadruple(5_000, 15_000, 1_500, 3_000)
-            DeviceCapabilityProfiler.Tier.MEDIUM -> Quadruple(10_000, 30_000, 2_000, 4_000)
-            DeviceCapabilityProfiler.Tier.HIGH   -> Quadruple(15_000, 50_000, 2_500, 5_000)
+            DeviceCapabilityProfiler.Tier.LOW    -> Quadruple(8_000, 20_000, 2_000, 4_000)
+            DeviceCapabilityProfiler.Tier.MEDIUM -> Quadruple(12_000, 30_000, 2_500, 5_000)
+            DeviceCapabilityProfiler.Tier.HIGH   -> Quadruple(15_000, 40_000, 3_000, 6_000)
+        }
+        // Cap max buffer bytes (32MB - 64MB) to prevent 4K high-bitrate streams from consuming
+        // hundreds of MBs in heap memory and causing heavy GC thrashing.
+        val maxBufferBytes = when (tier) {
+            DeviceCapabilityProfiler.Tier.LOW    -> 32 * 1024 * 1024
+            DeviceCapabilityProfiler.Tier.MEDIUM -> 48 * 1024 * 1024
+            DeviceCapabilityProfiler.Tier.HIGH   -> 64 * 1024 * 1024
         }
         return DefaultLoadControl.Builder()
             .setBufferDurationsMs(minBufferMs, maxBufferMs, bufferForPlaybackMs, bufferForPlaybackAfterRebufferMs)
+            .setTargetBufferBytes(maxBufferBytes)
+            .setPrioritizeTimeOverSizeThresholds(false)
+            .setBackBuffer(0, /* retainBackBufferFromKeyframe= */ false)
             .build()
     }
 
@@ -245,7 +263,14 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     // ── Transport controls ──────────────────────────────────────────────────
 
-    fun play() { player?.play() }
+    fun play() {
+        val p = player ?: return
+        if (p.playbackState == Player.STATE_ENDED || (p.duration > 0 && p.currentPosition >= p.duration)) {
+            p.seekTo(0L)
+        }
+        p.play()
+    }
+
     fun pause() { player?.pause() }
 
     fun seekTo(positionMs: Long) {
@@ -336,29 +361,16 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 
     // ── PlayerView attach/detach ────────────────────────────────────────────
 
-    /**
-     * Called by [NativePlayerPlatformView] when the Flutter PlatformView is
-     * created. Wires the ExoPlayer to the [PlayerView]'s SurfaceView so
-     * decoded video frames render to the correct surface.
-     */
     fun attachPlayerView(view: PlayerView) {
         attachedPlayerView = view
         val p = player ?: return
         view.player = p
         if (pendingPrepare) {
-            // The player was already prepared (audio may be playing),
-            // but it had no video surface. Now that the PlayerView is
-            // available, set the surface. ExoPlayer will automatically
-            // route new decoded frames to it.
             pendingPrepare = false
             Log.d(TAG, "PlayerView attached — video surface connected")
         }
     }
 
-    /**
-     * Called by [NativePlayerPlatformView] when the Flutter PlatformView is
-     * disposed.
-     */
     fun detachPlayerView(view: PlayerView) {
         if (attachedPlayerView === view) {
             view.player = null
@@ -371,8 +383,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     fun release() {
         mainHandler.removeCallbacks(positionUpdateRunnable)
         attachedPlayerView?.player = null
-        // Don't null attachedPlayerView here — the PlatformView may still
-        // exist and will call detachPlayerView on dispose.
+        attachedPlayerView = null
         player?.let { p ->
             p.removeListener(this)
             p.release()
@@ -383,10 +394,13 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         currentFilePath = ""
     }
 
-    /** For [NativePlayerViewFactory] — returns the active [ExoPlayer] or null. */
     fun getPlayer(): ExoPlayer? = player
 
     // ── Player.Listener callbacks ───────────────────────────────────────────
+
+    override fun onRenderedFirstFrame() {
+        emitEvent("renderedFirstFrame", emptyMap())
+    }
 
     override fun onPlaybackStateChanged(playbackState: Int) {
         val state = when (playbackState) {
@@ -398,8 +412,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         }
         emitEvent("playbackState", mapOf("state" to state))
 
-        // When the player reaches STATE_READY for the first time, emit
-        // the initial track list so Flutter can populate the track pickers.
         if (playbackState == Player.STATE_READY) {
             emitTracksChanged()
         }
@@ -411,8 +423,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             mainHandler.post(positionUpdateRunnable)
         } else {
             mainHandler.removeCallbacks(positionUpdateRunnable)
-            // Emit one final position update so Flutter has the exact
-            // pause position.
             player?.let { emitPositionUpdate(it) }
         }
     }
@@ -463,16 +473,8 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
 }
 
 /**
- * Custom [MediaCodecVideoRenderer] that caps operating rate requests sent to
- * vendor hardware decoders (e.g. Qualcomm CCodec `c2.qti.vp9.decoder`).
- *
- * When playback speed is increased (e.g. 2x–4x), standard ExoPlayer calculates
- * operatingRate = speed * frameRate (which for 4K@30fps becomes 90–120fps / 96000 mFPS).
- * Vendor hardware decoders fail operating-rate queries for high values and enter
- * continuous flush loops (`Discard frames from previous generation. flushed work; ignored`).
- *
- * Returning [CODEC_OPERATING_RATE_UNSET] (-1.0f) forces MediaCodec to operate at its
- * standard optimal clock while ExoPlayer handles speed scaling smoothly without flushing.
+ * Custom [MediaCodecVideoRenderer] that computes operating rate requests
+ * for hardware decoders during high-speed playback.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private class HighSpeedMediaCodecVideoRenderer(
@@ -498,10 +500,12 @@ private class HighSpeedMediaCodecVideoRenderer(
         streamFormats: Array<out Format>
     ): Float {
         val defaultRate = super.getCodecOperatingRateV23(targetPlaybackSpeed, format, streamFormats)
-        if (defaultRate > 60.0f || (format.height >= 2160 && targetPlaybackSpeed > 1.0f)) {
-            return CODEC_OPERATING_RATE_UNSET
+        if (defaultRate != CODEC_OPERATING_RATE_UNSET) {
+            // defaultRate already accounts for targetPlaybackSpeed
+            return defaultRate.coerceAtMost(120f)
         }
-        return defaultRate
+        val streamFps = if (format.frameRate > 0f) format.frameRate else 30f
+        return (streamFps * targetPlaybackSpeed).coerceAtMost(120f)
     }
 }
 
@@ -512,7 +516,9 @@ private class HighPerformanceRenderersFactory(
 
     init {
         setEnableDecoderFallback(true)
-        setExtensionRendererMode(EXTENSION_RENDERER_MODE_PREFER)
+        // Prefer hardware MediaCodec decoders over CPU software extension decoders
+        setExtensionRendererMode(EXTENSION_RENDERER_MODE_ON)
+        forceEnableMediaCodecAsynchronousQueueing()
     }
 
     override fun buildVideoRenderers(

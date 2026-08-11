@@ -542,7 +542,7 @@ addDocumentRow(
 
         init {
             try {
-                ContainerFileSystem.withLock(volId) {
+                ContainerFileSystem.withReadLock(volId) {
                     fileSizeCached = ContainerFileSystem.getFileSize(volId, fatPath)
                     if (fileSizeCached < 0) fileSizeCached = 0L
                     if (!isWrite) {
@@ -558,7 +558,7 @@ addDocumentRow(
         private fun flushWriteCache() {
             if (writeCache != null && writeCacheLength > 0) {
                 val chunk = if (writeCacheLength == writeCacheCapacity) writeCache else writeCache.copyOf(writeCacheLength)
-                ContainerFileSystem.withLock(volId) {
+                ContainerFileSystem.withWriteLock(volId) {
                     ContainerFileSystem.writeFileChunk(volId, fatPath, writeCacheOffset, chunk)
                 }
                 
@@ -589,7 +589,7 @@ addDocumentRow(
 
                 if (readSize <= readCacheCapacity) {
                     val fetchSize = minOf(readCacheCapacity.toLong(), fileSizeCached - offset).toInt()
-                    val actualRead = ContainerFileSystem.withLock(volId) {
+                    val actualRead = ContainerFileSystem.withReadLock(volId) {
                         ContainerFileSystem.readStream(volId, streamPtr, offset, readCache, fetchSize)
                     }
                     if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
@@ -605,7 +605,7 @@ addDocumentRow(
                 }
             }
 
-            val actualRead = ContainerFileSystem.withLock(volId) {
+            val actualRead = ContainerFileSystem.withReadLock(volId) {
                 ContainerFileSystem.readStream(volId, streamPtr, offset, data, readSize)
             }
             if (actualRead < 0) throw ErrnoException("onRead", OsConstants.EIO)
@@ -621,7 +621,7 @@ addDocumentRow(
 
             if (size >= writeCacheCapacity) {
                 val chunkData = if (data.size == size) data else data.copyOf(size)
-                val success = ContainerFileSystem.withLock(volId) {
+                val success = ContainerFileSystem.withWriteLock(volId) {
                     ContainerFileSystem.writeFileChunk(volId, fatPath, offset, chunkData)
                 }
                 if (!success) throw ErrnoException("onWrite", OsConstants.EIO)
@@ -645,11 +645,11 @@ addDocumentRow(
 override fun onRelease() {
     flushWriteCache()
     if (isWrite) {
-        ContainerFileSystem.withLock(volId) {
+        ContainerFileSystem.withWriteLock(volId) {
             ContainerEngine.finishWrite(fatPath, volId)
         }
     }
-    ContainerFileSystem.withLock(volId) {
+    ContainerFileSystem.withReadLock(volId) {
         if (streamPtr != 0L) { ContainerFileSystem.closeStream(volId, streamPtr); streamPtr = 0L }
     }
     if (isWrite && hasChanges) {

@@ -136,7 +136,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     );
     _loadConfig();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _activateCurrentMedia();
+      unawaited(_activateCurrentMedia());
       _startSlideshowTimerIfNeeded();
       await PlaybackThrottleController.initGate;
       if (mounted) _prefetchSurroundingItems();
@@ -144,16 +144,18 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   int _activateToken = 0;
-  void _activateCurrentMedia() {
+  Future<void> _activateCurrentMedia() async {
     if (_playlistController.isEmpty) return;
     final file = _playlistController.currentFile;
     final token = ++_activateToken;
     final isVid = MediaViewerConstants.isVideo(file);
     final isAud = MediaViewerConstants.isAudio(file);
-    unawaited(PlaybackThrottleController.setActive(isVid));
-    if (!mounted || token != _activateToken) return;
     if (isVid || isAud) {
       PlaybackThrottleController.setInitializing();
+    }
+    await PlaybackThrottleController.setActive(isVid);
+    if (!mounted || token != _activateToken) return;
+    if (isVid || isAud) {
       unawaited(_playbackManager.activate(
         fileName: file,
         contentUriString: _contentUriFor(file),
@@ -339,7 +341,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               .then((_) {
             if (mounted) {
               _isProgrammaticScrolling = false;
-              _activateCurrentMedia();
+              unawaited(_activateCurrentMedia());
               _onScrollEnd();
             }
           });
@@ -347,7 +349,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           _isProgrammaticScrolling = true;
           _listScrollController.jumpTo(target);
           _isProgrammaticScrolling = false;
-          _activateCurrentMedia();
+          unawaited(_activateCurrentMedia());
           _onScrollEnd();
         }
       }
@@ -656,7 +658,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _startHideTimer();
     _isProgrammaticScrolling = true;
     _playlistController.updateIndex(index);
-    _activateCurrentMedia();
+    unawaited(_activateCurrentMedia());
     _prefetchDebounceTimer?.cancel();
     _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
       if (mounted) _prefetchSurroundingItems();
@@ -759,7 +761,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   void _onScrollEnd() {
     _isSwiping = false;
     if (_playbackManager.currentFileNotifier.value != _playlistController.currentFile) {
-      _activateCurrentMedia();
+      unawaited(_activateCurrentMedia());
     } else if (_autoPlay) {
       _playbackManager.activeController?.play();
     }
@@ -1163,7 +1165,17 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 oldController.dispose();
                 if (mounted) {
-                  _activateCurrentMedia();
+                  unawaited(_activateCurrentMedia());
+                  _onScrollEnd();
+                }
+              });
+            } else {
+              final oldPageController = _pageController;
+              _pageController = PageController(initialPage: _playlistController.currentIndex);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                oldPageController.dispose();
+                if (mounted) {
+                  unawaited(_activateCurrentMedia());
                   _onScrollEnd();
                 }
               });
@@ -1228,7 +1240,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               onPageChanged: (index) {
                 if (_playlistController.currentIndex != index) {
                   _playlistController.updateIndex(index);
-                  _activateCurrentMedia();
+                  unawaited(_activateCurrentMedia());
                 }
                 _prefetchDebounceTimer?.cancel();
                 _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
@@ -1262,7 +1274,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                             final newIndex = _getIndexForOffset(offset, _viewportWidth, _viewportHeight);
                             if (_playlistController.currentIndex != newIndex) {
                               _playlistController.updateIndex(newIndex);
-                              _activateCurrentMedia();
+                              unawaited(_activateCurrentMedia());
                             }
                           }
                         } else if (notification is ScrollEndNotification) {

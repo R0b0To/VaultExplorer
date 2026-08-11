@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/core/services/playback_throttle_controller.dart';
+import 'package:vaultexplorer/core/utils/retry.dart';
 import 'package:video_player/video_player.dart';
 
 
@@ -72,43 +73,46 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     if (_inner != null || _disposed) return;
     PlaybackThrottleController.setInitializing();
 
-    var controller = VideoPlayerController.contentUri(Uri.parse(contentUriString));
-    _inner = controller;
-    controller.addListener(_onTick);
-
+    VideoPlayerController controller;
     try {
-      await controller.initialize();
-      PlaybackThrottleController.setInitialized();
+      // A hardware decoder held by another app (or briefly by one of our
+      // own thumbnail extractions racing this init — see
+      // PlaybackThrottleController.setActive) is often released within a
+      // second or two, not 400ms, so give it real attempts with backoff
+      // instead of a single quick retry. Note: video_player_android's
+      // ExoPlayer instance is built entirely inside the plugin, with no
+      // public option to force a software decoder — retrying with backoff
+      // is the actual available mitigation for transient contention, not
+      // a substitute for a genuine software fallback.
+      controller = await retryWithBackoff<VideoPlayerController>(
+        (attempt) async {
+          if (_disposed) throw StateError('disposed');
+          final c = VideoPlayerController.contentUri(Uri.parse(contentUriString));
+          _inner = c;
+          c.addListener(_onTick);
+          try {
+            await c.initialize();
+          } catch (e) {
+            c.removeListener(_onTick);
+            await c.dispose();
+            _inner = null;
+            rethrow;
+          }
+          return c;
+        },
+        maxAttempts: 3,
+        initialDelay: const Duration(milliseconds: 500),
+        maxDelay: const Duration(seconds: 2),
+        retryIf: (_) => !_disposed,
+      );
     } catch (e) {
-      controller.removeListener(_onTick);
-      await controller.dispose();
-      if (_disposed) {
-        PlaybackThrottleController.setInitialized();
-        return;
-      }
-
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (_disposed) {
-        PlaybackThrottleController.setInitialized();
-        return;
-      }
-
-      controller = VideoPlayerController.contentUri(Uri.parse(contentUriString));
-      _inner = controller;
-      controller.addListener(_onTick);
-      try {
-        await controller.initialize();
-      } catch (_) {
-        PlaybackThrottleController.setInitialized();
-        value = const NativeVideoValue(
-          hasError: true,
-          errorDescription: 'Video decoder unavailable — hardware codec contention',
-        );
-        return;
-      }
       PlaybackThrottleController.setInitialized();
+      if (_disposed) return;
+      value = NativeVideoValue(hasError: true, errorDescription: _describeInitError(e));
+      return;
     }
 
+    PlaybackThrottleController.setInitialized();
     if (_disposed) return;
     if (_currentSpeed != 1.0) {
       try {
@@ -118,6 +122,22 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
     if (autoPlay && !_disposed) await play();
   }
 
+  /// Only reports "hardware codec contention" when the failure actually
+  /// looks decoder/codec related (mirrors ThumbnailHandlers
+  /// .isCodecResourceError on the native side). Anything else — e.g. a
+  /// genuine ExoPlaybackException source/IO error — is surfaced as-is so
+  /// it isn't hidden behind a misleading diagnosis.
+  String _describeInitError(Object error) {
+    final msg = error.toString().toLowerCase();
+    final looksLikeDecoderContention = msg.contains('codec') ||
+        msg.contains('decoder') ||
+        msg.contains('no_memory') ||
+        msg.contains('insufficientresources') ||
+        msg.contains('0x80001000');
+    return looksLikeDecoderContention
+        ? 'Video decoder unavailable — hardware codec contention'
+        : error.toString();
+  }
 
   void _onTick() {
     if (_disposed) return;

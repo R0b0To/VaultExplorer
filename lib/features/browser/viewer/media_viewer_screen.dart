@@ -1,5 +1,3 @@
-// File: features/browser/viewer/media_viewer_screen.dart
-
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -70,15 +68,18 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       ValueNotifier<ScrollPhysics>(const BouncingScrollPhysics());
   final ValueNotifier<VideoPlaybackProgress> _videoProgressNotifier =
       ValueNotifier<VideoPlaybackProgress>(const VideoPlaybackProgress());
+
   bool _showUI = false;
   bool _isContainerLocked = false;
   int _activeMenuCount = 0;
   bool _isCarouselVisible = false;
   bool _enableCarousel = true;
   late bool _wasEmpty;
+
   Timer? _slideshowTimer;
   Timer? _hideTimer;
   Timer? _prefetchDebounceTimer;
+
   final bool _autoPlay = true;
   bool _autoAdvance = false;
   bool _isAutoAdvancing = false;
@@ -95,6 +96,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   bool _isMuted = false;
   bool _isSwiping = false;
   bool _isProgrammaticScrolling = false;
+
   final Set<String> _prefetchingFullRes = {};
   final Map<String, int> _rotations = {};
   final Map<String, GlobalKey> _mediaKeys = {};
@@ -115,6 +117,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     ThumbnailConcurrency.videoLimiter.cancelAll();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     VaultExplorerApi.addUsbContainerDetachedListener(_onContainerDetached);
+
     _playlistController = PlaylistController(
       container: widget.container,
       initialMediaFiles: widget.mediaFiles,
@@ -127,6 +130,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _pageController = PageController(initialPage: widget.initialIndex);
     _listScrollController = ScrollController();
     _continuousTransformationController = TransformationController();
+
     _playlistController.addListener(_onPlaylistUpdate);
     _playbackManager.activeControllerNotifier.addListener(
       _onActiveVideoControllerChanged,
@@ -134,7 +138,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _playbackManager.currentFileNotifier.addListener(
       _onCurrentMediaFileChanged,
     );
+
     _loadConfig();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       unawaited(_activateCurrentMedia());
       _startSlideshowTimerIfNeeded();
@@ -144,7 +150,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   }
 
   int _activateToken = 0;
-  Future<void> _activateCurrentMedia() async {
+Future<void> _activateCurrentMedia() async {
     if (_playlistController.isEmpty) return;
     final file = _playlistController.currentFile;
     final token = ++_activateToken;
@@ -181,6 +187,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _transitionEffect = config.playlistTransitionEffect;
         _scrollMode = appSettings.playlistScrollMode;
       });
+
       if (config.autoStartPlaylistMode && !_playlistController.isPlaylistMode) {
         final targetFile = _playlistController.currentFile;
         await _playlistController.enablePlaylist('Current Folder Only');
@@ -251,13 +258,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   EdgeInsets _getContinuousListPadding(double viewportWidth, double viewportHeight) {
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty || viewportHeight <= 0) return EdgeInsets.zero;
-
     final h0 = _getItemHeight(0, viewportWidth, viewportHeight);
     final topPadding = math.max(0.0, (viewportHeight - h0) / 2.0);
-
     final hLast = _getItemHeight(playlist.length - 1, viewportWidth, viewportHeight);
     final bottomPadding = math.max(0.0, (viewportHeight - hLast) / 2.0);
-
     return EdgeInsets.only(top: topPadding, bottom: bottomPadding);
   }
 
@@ -268,12 +272,10 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     if (targetIndex >= playlist.length) targetIndex = playlist.length - 1;
 
     final padding = _getContinuousListPadding(viewportWidth, viewportHeight);
-
     double sumPrevHeights = 0.0;
     for (int i = 0; i < targetIndex; i++) {
       sumPrevHeights += _getItemHeight(i, viewportWidth, viewportHeight);
     }
-
     final currentItemHeight = _getItemHeight(targetIndex, viewportWidth, viewportHeight);
     double idealOffset;
     if (currentItemHeight >= viewportHeight) {
@@ -281,13 +283,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     } else {
       idealOffset = padding.top + sumPrevHeights - (viewportHeight - currentItemHeight) / 2.0;
     }
-
     double totalContentHeight = padding.top + sumPrevHeights + currentItemHeight + padding.bottom;
     for (int i = targetIndex + 1; i < playlist.length; i++) {
       totalContentHeight += _getItemHeight(i, viewportWidth, viewportHeight);
     }
     final maxScrollExtent = math.max(0.0, totalContentHeight - viewportHeight);
-
     return idealOffset.clamp(0.0, maxScrollExtent);
   }
 
@@ -298,7 +298,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
     final currentIdx = _playlistController.currentIndex.clamp(0, playlist.length - 1);
     final padding = _getContinuousListPadding(viewportWidth, viewportHeight);
-
     double sumPrev = 0.0;
     final targetOffsets = <double>[];
     for (int i = 0; i < playlist.length; i++) {
@@ -312,7 +311,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
 
     int bestIdx = currentIdx;
     double minDiff = (offset - targetOffsets[currentIdx]).abs();
-
     for (int i = 0; i < playlist.length; i++) {
       final diff = (offset - targetOffsets[i]).abs();
       if (diff < minDiff - 10.0) {
@@ -320,7 +318,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         bestIdx = i;
       }
     }
-
     return bestIdx;
   }
 
@@ -377,6 +374,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _updatePlaybackMode(VideoPlaybackMode.playOnce);
       }
     }
+
     final oldController = _pageController;
     _pageController =
         PageController(initialPage: _playlistController.currentIndex);
@@ -402,12 +400,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         _lastListenedController!.removeListener(_onControllerTickUpdate);
       } catch (_) {}
     }
+
     final controller = _playbackManager.activeController;
     _lastListenedController = controller;
+
     if (controller == null) {
       _updateWakelock(false);
       return;
     }
+
     controller.addListener(_onControllerTickUpdate);
     _updateWakelock(controller.value.isPlaying);
   }
@@ -419,11 +420,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
   void _onControllerTickUpdate() {
     final controller = _playbackManager.activeController;
     if (controller == null || controller.value.hasError) return;
+
     _updateWakelock(controller.value.isPlaying);
+
     final isInitialized = controller.value.isInitialized;
     final position = controller.value.position;
     final duration = controller.value.duration;
+
     if (!isInitialized || duration <= Duration.zero) return;
+
     if (_videoPlaybackMode == VideoPlaybackMode.loop) {
       if (position >= duration || (!controller.value.isPlaying && position >= duration - const Duration(milliseconds: 200))) {
         controller.seekTo(Duration.zero);
@@ -431,7 +436,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         return;
       }
     }
+
     if (_isAutoAdvancing) return;
+
     if (_videoPlaybackMode == VideoPlaybackMode.playAndAdvance && position >= duration) {
       _isAutoAdvancing = true;
       try {
@@ -460,6 +467,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final index = _playlistController.currentIndex;
     final playlist = _playlistController.playlist;
     if (playlist.isEmpty) return;
+
     for (final delta in [1, -1, 2, -2]) {
       final i = index + delta;
       if (i >= 0 && i < playlist.length) {
@@ -476,6 +484,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final isImg = MediaViewerConstants.isImage(fileName);
     final isVid = MediaViewerConstants.isVideo(fileName);
     if (!isImg && !isVid) return;
+
     if (ThumbnailCacheService.getFromMemory(
           widget.container,
           fileName,
@@ -484,6 +493,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         null) {
       return;
     }
+
     final mode = widget.thumbnailCacheMode;
     if (mode != ThumbnailCacheMode.disabled) {
       final cached = await ThumbnailCacheService.get(
@@ -503,9 +513,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         return;
       }
     }
+
     if (isVid && PlaybackThrottleController.isPlaybackActive.value) {
       return;
     }
+
     final key = '${widget.container.volId}:'
         '${widget.container.mountedAt.millisecondsSinceEpoch}:$fileName';
     final existing = ThumbnailConcurrency.inFlightThumbnails[key];
@@ -516,6 +528,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       if (mounted) setState(() {});
       return;
     }
+
     final limiter = isVid
         ? ThumbnailConcurrency.videoLimiter
         : ThumbnailConcurrency.imageLimiter;
@@ -526,7 +539,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       await future;
       if (mounted) setState(() {});
     } catch (e) {
-
     } finally {
       if (ThumbnailConcurrency.inFlightThumbnails[key] == future) {
         ThumbnailConcurrency.inFlightThumbnails.remove(key);
@@ -566,6 +578,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
+
     final data = await vaultExplorerApi.getImageThumbnail(
       widget.container,
       fileName,
@@ -600,6 +613,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       );
       if (cached != null && cached.isNotEmpty) return cached;
     }
+
     final data = await vaultExplorerApi.getVideoThumbnail(
       widget.container,
       fileName,
@@ -626,6 +640,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     if (!MediaViewerConstants.isImage(fileName)) return;
     if (FullResImageCache.contains(widget.container, fileName)) return;
     if (_prefetchingFullRes.contains(fileName)) return;
+
     _prefetchingFullRes.add(fileName);
     final completer = Completer<void>();
     try {
@@ -641,7 +656,6 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         priority: TaskPriority.adjacent,
       );
     } catch (e) {
-
     } finally {
       _prefetchingFullRes.remove(fileName);
     }
@@ -658,12 +672,15 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     _cancelSlideshowTimer();
     _startHideTimer();
     _isProgrammaticScrolling = true;
+
     _playlistController.updateIndex(index);
     unawaited(_activateCurrentMedia());
+
     _prefetchDebounceTimer?.cancel();
     _prefetchDebounceTimer = Timer(const Duration(milliseconds: 150), () {
       if (mounted) _prefetchSurroundingItems();
     });
+
     if (_scrollMode.isContinuous) {
       if (_listScrollController.hasClients &&
           _listScrollController.positions.length == 1 &&
@@ -692,6 +709,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         }
       }
     }
+
     if (mounted && _transitionToken == token) {
       _isProgrammaticScrolling = false;
       _isSwiping = false;
@@ -798,7 +816,9 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
       ),
     );
     _menuClosed();
+
     if (confirm != true) return;
+
     final fileToDelete = _playlistController.currentFile;
     bool success = false;
     try {
@@ -807,8 +827,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         fileToDelete,
       );
     } catch (e) {
-
     }
+
     if (success && mounted) {
       _mediaKeys.remove(fileToDelete);
       _rotations.remove(fileToDelete);
@@ -1047,6 +1067,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     }
     final isImg = MediaViewerConstants.isImage(fileName);
     final isAudio = MediaViewerConstants.isAudio(fileName);
+
     final itemWidget = Container(
       color: Colors.black,
       child: isImg
@@ -1077,6 +1098,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               contentUriString: contentUriString,
               playbackManager: _playbackManager,
               posterBytes: prefetchedBytes,
+              thumbnailCacheMode: widget.thumbnailCacheMode,
               showUI: _showUI,
               enableZoom: !_scrollMode.isContinuous,
               onToggleUI: _setUIVisibility,
@@ -1103,9 +1125,11 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               onError: () => _handleMediaError(fileName),
             ),
     );
+
     if (_scrollMode.isContinuous) {
       return itemWidget;
     }
+
     return PlaylistTransitionTransformer(
       pageController: _pageController,
       index: index,
@@ -1135,6 +1159,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
         ),
       );
     }
+
     final isCurrentAnImage =
         MediaViewerConstants.isImage(_playlistController.currentFile);
     bool isPlayingState = false;
@@ -1145,6 +1170,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           _playbackManager.activeController?.value.isPlaying ?? false;
     }
     _updateWakelock(isPlayingState);
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: LayoutBuilder(
@@ -1195,6 +1221,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
             '${_scrollMode}_'
             '${_viewportWidth}_$_viewportHeight',
           );
+
           Widget mainScrollView;
           if (_scrollMode.isContinuous) {
             Widget listWidget = ListView.builder(
@@ -1213,6 +1240,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
                 );
               },
             );
+
             mainScrollView = InteractiveViewer(
               transformationController: _continuousTransformationController,
               minScale: 1.0,
@@ -1255,6 +1283,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
               },
             );
           }
+
           return Stack(
             children: [
               ValueListenableBuilder<ScrollPhysics>(

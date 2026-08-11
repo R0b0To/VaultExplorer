@@ -1,5 +1,5 @@
-// File: lib/features/browser/viewer/native_video_controller.dart
 import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 import 'package:vaultexplorer/features/browser/viewer/native_media3_player_view.dart';
@@ -10,6 +10,7 @@ class NativeVideoValue {
   final bool isPlaying;
   final bool isBuffering;
   final bool hasError;
+  final bool hasRenderedFirstFrame;
   final String errorDescription;
   final Duration position;
   final Duration duration;
@@ -20,6 +21,7 @@ class NativeVideoValue {
     this.isPlaying = false,
     this.isBuffering = false,
     this.hasError = false,
+    this.hasRenderedFirstFrame = false,
     this.errorDescription = '',
     this.position = Duration.zero,
     this.duration = Duration.zero,
@@ -37,6 +39,7 @@ class NativeVideoValue {
     bool? isPlaying,
     bool? isBuffering,
     bool? hasError,
+    bool? hasRenderedFirstFrame,
     String? errorDescription,
     Duration? position,
     Duration? duration,
@@ -47,6 +50,7 @@ class NativeVideoValue {
       isPlaying: isPlaying ?? this.isPlaying,
       isBuffering: isBuffering ?? this.isBuffering,
       hasError: hasError ?? this.hasError,
+      hasRenderedFirstFrame: hasRenderedFirstFrame ?? this.hasRenderedFirstFrame,
       errorDescription: errorDescription ?? this.errorDescription,
       position: position ?? this.position,
       duration: duration ?? this.duration,
@@ -109,21 +113,19 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
   }
 
   NativeMedia3Controller get media3Controller => _media3;
-
   ValueNotifier<List<AudioTrackInfo>> get audioTracksNotifier => _media3.audioTracksNotifier;
   ValueNotifier<List<SubtitleTrackInfo>> get subtitleTracksNotifier => _media3.subtitleTracksNotifier;
   ValueNotifier<MediaDiagnosticsInfo> get diagnosticsNotifier => _media3.diagnosticsNotifier;
   List<AudioTrackInfo> get audioTracks => _media3.audioTracks;
   List<SubtitleTrackInfo> get subtitleTracks => _media3.subtitleTracks;
   MediaDiagnosticsInfo get diagnostics => _media3.diagnostics;
-
   Future<MediaDiagnosticsInfo> fetchDiagnostics() => _media3.fetchDiagnostics();
 
   void _onMedia3StateChanged() {
     value = _media3.value;
   }
 
-  Future<void> initialize() async {
+Future<void> initialize() async {
     await _media3.initialize();
   }
 
@@ -173,7 +175,6 @@ class NativeVideoController extends ValueNotifier<NativeVideoValue> {
   }
 }
 
-/// Renders the native Media3 PlayerView for [controller].
 class NativeVideoPlayerView extends StatelessWidget {
   final NativeVideoController controller;
   const NativeVideoPlayerView({super.key, required this.controller});

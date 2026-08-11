@@ -1,5 +1,3 @@
-// File: lib/features/browser/viewer/native_media3_controller.dart
-
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -143,9 +141,9 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   final String filePath;
   final bool autoPlay;
   double _currentSpeed;
-
   StreamSubscription<dynamic>? _eventSubscription;
   bool _disposed = false;
+  int? textureId;
 
   final ValueNotifier<List<AudioTrackInfo>> audioTracksNotifier =
       ValueNotifier<List<AudioTrackInfo>>([]);
@@ -169,15 +167,18 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   Future<void> initialize() async {
     if (_disposed) return;
     PlaybackThrottleController.setInitializing();
-
+    value = value.copyWith(isInitialized: false, hasRenderedFirstFrame: false);
     try {
       await retryWithBackoff<void>(
         (attempt) async {
           if (_disposed) throw StateError('disposed');
-          await _cmdChannel.invokeMethod('initialize', {
+          final result = await _cmdChannel.invokeMethod('initialize', {
             'volId': volId,
             'filePath': filePath,
           });
+          if (result is Map && result.containsKey('textureId')) {
+            textureId = (result['textureId'] as num?)?.toInt();
+          }
         },
         maxAttempts: 3,
         initialDelay: const Duration(milliseconds: 500),
@@ -205,10 +206,8 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
             );
           },
         );
-
     PlaybackThrottleController.setInitialized();
     if (_disposed) return;
-
     if (_currentSpeed != 1.0) {
       try {
         await setPlaybackSpeed(_currentSpeed);
@@ -219,12 +218,16 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
     }
   }
 
+
   void _handleNativeEvent(dynamic rawEvent) {
     if (_disposed || rawEvent is! Map) return;
     final eventMap = Map<String, dynamic>.from(rawEvent);
     final type = eventMap['event'] as String?;
 
     switch (type) {
+      case 'renderedFirstFrame':
+        value = value.copyWith(hasRenderedFirstFrame: true);
+        break;
       case 'playbackState':
         final state = eventMap['state'] as String?;
         final isBuffering = state == 'buffering';
@@ -234,35 +237,31 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
           isBuffering: isBuffering,
         );
         break;
-
       case 'playingChanged':
         final isPlaying = eventMap['isPlaying'] as bool? ?? false;
         value = value.copyWith(isPlaying: isPlaying);
         break;
-
       case 'positionUpdate':
         final posMs = (eventMap['positionMs'] as num?)?.toInt() ?? 0;
         final durMs = (eventMap['durationMs'] as num?)?.toInt() ?? 0;
         value = value.copyWith(
           position: Duration(milliseconds: posMs),
           duration: Duration(milliseconds: durMs),
+          // Force fallback true if it has progressed time but missed the event somehow
+          hasRenderedFirstFrame: value.hasRenderedFirstFrame || posMs > 0,
         );
         break;
-
       case 'videoSize':
         final w = (eventMap['width'] as num?)?.toDouble() ?? 0.0;
         final h = (eventMap['height'] as num?)?.toDouble() ?? 0.0;
         value = value.copyWith(size: Size(w, h));
         break;
-
       case 'tracksChanged':
         _updateTracksFromMap(eventMap);
         break;
-
       case 'diagnosticsUpdate':
         diagnosticsNotifier.value = MediaDiagnosticsInfo.fromMap(eventMap);
         break;
-
       case 'error':
         final msg = eventMap['message'] as String? ?? 'Playback error';
         value = value.copyWith(
@@ -387,7 +386,7 @@ class NativeMedia3Controller extends ValueNotifier<NativeVideoValue> {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    value = const NativeVideoValue(isInitialized: false);
+    value = const NativeVideoValue(isInitialized: false, hasRenderedFirstFrame: false);
     await _eventSubscription?.cancel();
     _eventSubscription = null;
     audioTracksNotifier.dispose();

@@ -214,17 +214,16 @@ class MainActivity : FlutterFragmentActivity() {
         methodChannel?.invokeMethod("onTrimMemory", mapOf("level" to level))
     }
 
-    override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
+   override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         resizeExecutorPools()
+        
+        nativePlayerManager.setTextureRegistry(flutterEngine.renderer)
+
         vaultCameraPlugin = com.aeidolon.vaultexplorer.camera.VaultCameraPlugin(this, flutterEngine.dartExecutor.binaryMessenger, flutterEngine.renderer)
         flutterEngine.platformViewsController.registry.registerViewFactory(
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
-        )
-        flutterEngine.platformViewsController.registry.registerViewFactory(
-            "com.aeidolon.vaultexplorer/native_player_view",
-            com.aeidolon.vaultexplorer.engine.NativePlayerViewFactory(nativePlayerManager),
         )
 
         val playerChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.aeidolon.vaultexplorer/player")
@@ -234,8 +233,8 @@ class MainActivity : FlutterFragmentActivity() {
                 "initialize" -> {
                     val volId = call.argument<Int>("volId") ?: -1
                     val filePath = call.argument<String>("filePath") ?: ""
-                    nativePlayerManager.initialize(volId, filePath)
-                    result.success(null)
+                    val textureId = nativePlayerManager.initialize(volId, filePath)
+                    result.success(mapOf("textureId" to textureId))
                 }
                 "play" -> {
                     nativePlayerManager.play()

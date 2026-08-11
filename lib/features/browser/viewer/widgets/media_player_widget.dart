@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
+import 'package:vaultexplorer/data/models/thumbnail_cache_mode.dart';
+import 'package:vaultexplorer/data/models/thumbnail_quality.dart';
 import 'package:vaultexplorer/data/services/media_aspect_ratio_cache.dart';
 import 'package:vaultexplorer/data/services/thumbnail_cache_service.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -66,7 +68,9 @@ class MediaPlayerWidget extends StatefulWidget {
   final VoidCallback? onError;
   final VideoPlaybackManager playbackManager;
   final Uint8List? posterBytes;
+  final ThumbnailCacheMode thumbnailCacheMode;
   final bool enableZoom;
+
   const MediaPlayerWidget({
     super.key,
     required this.container,
@@ -83,11 +87,13 @@ class MediaPlayerWidget extends StatefulWidget {
     required this.onSubtitlesAvailableChanged,
     required this.progressNotifier,
     required this.playbackManager,
-    this.onSizeKnown,
     this.posterBytes,
+    this.thumbnailCacheMode = ThumbnailCacheMode.appCache,
+    this.onSizeKnown,
     this.onError,
     this.enableZoom = true,
   });
+
   @override
   State<MediaPlayerWidget> createState() => _MediaPlayerWidgetState();
 }
@@ -128,12 +134,30 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     _knownAspectRatio =
         MediaAspectRatioCache.get(widget.container, widget.fileName);
     _syncBoundController();
+    _ensurePosterLoaded();
+  }
+
+  Future<void> _ensurePosterLoaded() async {
+    if (_localPosterBytes != null) return;
+    try {
+      final bytes = await ThumbnailCacheService.get(
+        container: widget.container,
+        filePath: widget.fileName,
+        mode: widget.thumbnailCacheMode,
+        quality: ThumbnailQuality.defaultQuality,
+      );
+      if (bytes != null && bytes.isNotEmpty && mounted) {
+        setState(() {
+          _localPosterBytes = bytes;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
   void didUpdateWidget(covariant MediaPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.fileName != widget.fileName) {
+    if (oldWidget.fileName != widget.fileName || oldWidget.posterBytes != widget.posterBytes) {
       _localPosterBytes = widget.posterBytes ??
           ThumbnailCacheService.getFromMemory(
             widget.container,
@@ -141,6 +165,7 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
           );
       _knownAspectRatio =
           MediaAspectRatioCache.get(widget.container, widget.fileName);
+      _ensurePosterLoaded();
     }
     if (_boundController != null && oldWidget.playbackSpeed != widget.playbackSpeed) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -403,13 +428,19 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
   }
 
   Widget _buildPoster(ColorScheme cs, {required bool isLoading}) {
-    final poster = _localPosterBytes ?? widget.posterBytes;
+    final poster = _localPosterBytes ??
+        widget.posterBytes ??
+        ThumbnailCacheService.getFromMemory(
+          widget.container,
+          widget.fileName,
+        );
     final posterCacheWidth =
         (MediaQuery.of(context).size.width * MediaQuery.of(context).devicePixelRatio)
             .round()
             .clamp(1, 1 << 20);
     final isRotated = widget.rotationQuarterTurns % 2 != 0;
-    final knownRatio = _knownAspectRatio;
+    final knownRatio = _knownAspectRatio ??
+        MediaAspectRatioCache.get(widget.container, widget.fileName);
     final effectiveKnownRatio = (knownRatio != null && isRotated)
         ? 1.0 / knownRatio
         : knownRatio;
@@ -451,11 +482,12 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Container(color: Colors.black),
         if (posterContent != null)
           posterContent
         else if (widget.isAudio)
-          Center(child: _buildAudioCenterVisual(cs, isPlaying: false)),
+          Center(child: _buildAudioCenterVisual(cs, isPlaying: false))
+        else
+          const SizedBox.expand(),
       ],
     );
   }
@@ -514,13 +546,22 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
           alignment: Alignment.center,
           children: [
             _buildPoster(cs, isLoading: _isActive),
-            // Mount the native PlayerView early so its SurfaceView
-            // exists before ExoPlayer's first decoded frame. The view
-            // internally handles sizing/visibility.
             if (!widget.isAudio && controller != null && _isActive)
-              RotatedBox(
-                quarterTurns: widget.rotationQuarterTurns,
-                child: NativeVideoPlayerView(controller: controller),
+              ValueListenableBuilder<NativeVideoValue>(
+                valueListenable: controller,
+                builder: (context, val, _) {
+                  final showVideo = val.isInitialized &&
+                      val.hasRenderedFirstFrame &&
+                      !controller.isDisposed;
+                  return AnimatedOpacity(
+                    opacity: showVideo ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: RotatedBox(
+                      quarterTurns: widget.rotationQuarterTurns,
+                      child: NativeVideoPlayerView(controller: controller),
+                    ),
+                  );
+                },
               ),
             if (widget.isAudio && controller != null && isVideoReady)
               _buildAudioCenterVisual(cs, isPlaying: controller.value.isPlaying)
@@ -754,7 +795,6 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   final List<double> _heights = [0.2, 0.5, 0.8, 0.4, 0.9, 0.3, 0.7, 0.5, 0.2];
-
   @override
   void initState() {
     super.initState();
@@ -764,7 +804,6 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
     );
     if (widget.isPlaying) _controller.repeat(reverse: true);
   }
-
   @override
   void didUpdateWidget(covariant _AudioVisualizer oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -774,13 +813,11 @@ class _AudioVisualizerState extends State<_AudioVisualizer>
       _controller.stop();
     }
   }
-
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

@@ -11,7 +11,6 @@ class VideoPlaybackManager {
   NativeVideoController? get activeController => activeControllerNotifier.value;
   final Map<String, bool> _subtitlesAvailableMap = {};
   bool isSubtitleAvailable(String fileName) => _subtitlesAvailableMap[fileName] ?? false;
-
   int _activationToken = 0;
   Future<void>? _currentActivationFuture;
 
@@ -23,7 +22,7 @@ class VideoPlaybackManager {
     return _controllers[fileName];
   }
 
-  Future<void> activate({
+ Future<void> activate({
     required String fileName,
     int? volId,
     String? filePath,
@@ -55,17 +54,15 @@ class VideoPlaybackManager {
           return;
         }
       }
+
       final previousFile = currentFileNotifier.value;
       if (previousFile != null && previousFile != fileName) {
-        final prevCtrl = _controllers.remove(previousFile);
-        if (prevCtrl != null) {
-          prevCtrl.pause();
-          await prevCtrl.dispose();
-        }
+        _controllers.remove(previousFile);
       }
-      if (token != _activationToken) return;
-      NativeVideoController controller;
 
+      if (token != _activationToken) return;
+
+      NativeVideoController controller;
       NativeVideoController createController() {
         if (volId != null && filePath != null) {
           return NativeVideoController(
@@ -92,7 +89,9 @@ class VideoPlaybackManager {
           controller = createController();
           _controllers[fileName] = controller;
           unawaited(controller.initialize().then((_) {
-            controller.setLooping(looping);
+            if (token == _activationToken && !controller.isDisposed) {
+              controller.setLooping(looping);
+            }
           }));
         } else {
           await controller.setPlaybackSpeed(playbackSpeed);
@@ -103,9 +102,12 @@ class VideoPlaybackManager {
         controller = createController();
         _controllers[fileName] = controller;
         unawaited(controller.initialize().then((_) {
-          controller.setLooping(looping);
+          if (token == _activationToken && !controller.isDisposed) {
+            controller.setLooping(looping);
+          }
         }));
       }
+
       activeControllerNotifier.value = controller;
       currentFileNotifier.value = fileName;
       _cleanupOldControllers(keepFiles: {fileName});
@@ -117,8 +119,7 @@ class VideoPlaybackManager {
   void _cleanupOldControllers({required Set<String> keepFiles}) {
     final keysToRemove = _controllers.keys.where((k) => !keepFiles.contains(k)).toList();
     for (final key in keysToRemove) {
-      final ctrl = _controllers.remove(key);
-      ctrl?.dispose();
+      _controllers.remove(key);
     }
   }
 

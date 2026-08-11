@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Surface
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Format
@@ -20,34 +21,31 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.Renderer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
-import androidx.media3.exoplayer.mediacodec.MediaCodecAdapter
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.video.MediaCodecVideoRenderer
 import androidx.media3.exoplayer.video.VideoRendererEventListener
-import androidx.media3.ui.PlayerView
 import com.aeidolon.vaultexplorer.DeviceCapabilityProfiler
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.view.TextureRegistry
 
-/**
- * Manages the lifecycle of a single ExoPlayer instance that reads decrypted
- * media directly from [VaultMedia3DataSource].
- */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class NativePlayerManager(private val context: Context) : Player.Listener {
-
     companion object {
         private const val TAG = "NativePlayerManager"
         private const val POSITION_UPDATE_INTERVAL_MS = 200L
         private const val DIAGNOSTICS_EMIT_INTERVAL_MS = 1000L
     }
 
+    private var textureRegistry: TextureRegistry? = null
+    private var textureEntry: TextureRegistry.SurfaceTextureEntry? = null
+    private var surface: Surface? = null
+    private var textureId: Long = -1L
+
     private var player: ExoPlayer? = null
     private var currentVolId: Int = -1
     private var currentFilePath: String = ""
-    private var attachedPlayerView: PlayerView? = null
-    private var pendingPrepare: Boolean = false
 
     var methodChannel: MethodChannel? = null
     var eventSink: EventChannel.EventSink? = null
@@ -74,6 +72,10 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     private var videoDecoderInitTimeMs: Long = 0
     private var colorInfoString: String = "SDR"
     private var lastDiagnosticsEmitTimeMs: Long = 0L
+
+    fun setTextureRegistry(registry: TextureRegistry) {
+        this.textureRegistry = registry
+    }
 
     private val analyticsListener = object : AnalyticsListener {
         override fun onRenderedFirstFrame(
@@ -136,7 +138,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             elapsedMs: Long
         ) {
             droppedVideoFrames += droppedFrames
-            // Throttle events during frame drops to prevent Platform Channel event storms
             emitDiagnosticsUpdateThrottled()
         }
     }
@@ -165,6 +166,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             "bufferedMs" to (p?.bufferedPosition ?: 0L),
             "volId" to currentVolId,
             "filePath" to currentFilePath,
+            "textureId" to textureId,
         )
     }
 
@@ -180,11 +182,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         emitEvent("diagnosticsUpdate", getDiagnosticsMap())
     }
 
-    // ── Initialization ─────────────────────────────────────────────────────
-
-    fun initialize(volId: Int, filePath: String) {
-        release() // ensure no stale player
-
+    fun initialize(volId: Int, filePath: String): Long {
         currentVolId = volId
         currentFilePath = filePath
         videoDecoderName = "Initializing..."
@@ -199,43 +197,54 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         colorInfoString = "SDR"
         lastDiagnosticsEmitTimeMs = 0L
 
-        val tier = DeviceCapabilityProfiler.tierFor(context)
-        val loadControl = buildLoadControl(tier)
-        val renderersFactory = HighPerformanceRenderersFactory(context)
+        // Release old surface & texture entry to ensure fresh GPU texture per video
+        surface?.release()
+        surface = null
+        textureEntry?.release()
+        textureEntry = null
 
-        val exoPlayer = ExoPlayer.Builder(context, renderersFactory)
-            .setLoadControl(loadControl)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-                    .setUsage(C.USAGE_MEDIA)
-                    .build(),
-                /* handleAudioFocus= */ true
-            )
-            .build()
-        exoPlayer.addListener(this)
-        exoPlayer.addAnalyticsListener(analyticsListener)
+        // Create a FRESH SurfaceTextureEntry for this new video stream
+        val registry = textureRegistry ?: throw IllegalStateException("TextureRegistry not set")
+        val entry = registry.createSurfaceTexture()
+        textureEntry = entry
+        textureId = entry.id()
+        val st = entry.surfaceTexture()
+        val newSurface = Surface(st)
+        surface = newSurface
+
+        var exoPlayer = player
+        if (exoPlayer == null) {
+            val tier = DeviceCapabilityProfiler.tierFor(context)
+            val loadControl = buildLoadControl(tier)
+            val renderersFactory = HighPerformanceRenderersFactory(context)
+            exoPlayer = ExoPlayer.Builder(context, renderersFactory)
+                .setLoadControl(loadControl)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                        .setUsage(C.USAGE_MEDIA)
+                        .build(),
+                    true
+                )
+                .build()
+            exoPlayer.addListener(this)
+            exoPlayer.addAnalyticsListener(analyticsListener)
+            player = exoPlayer
+        } else {
+            exoPlayer.stop()
+            exoPlayer.clearMediaItems()
+        }
+
+        exoPlayer.setVideoSurface(newSurface)
 
         val dataSourceFactory = VaultMedia3DataSourceFactory(volId, filePath)
         val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
             .createMediaSource(MediaItem.fromUri(Uri.parse("vault://$volId/$filePath")))
-
         exoPlayer.setMediaSource(mediaSource)
+        exoPlayer.prepare()
 
-        player = exoPlayer
-
-        val existingView = attachedPlayerView
-        if (existingView != null) {
-            existingView.player = exoPlayer
-            exoPlayer.prepare()
-            pendingPrepare = false
-        } else {
-            exoPlayer.clearVideoSurface()
-            exoPlayer.prepare()
-            pendingPrepare = true
-        }
-
-        Log.d(TAG, "Player initialized for volId=$volId, path=$filePath, tier=$tier, viewAttached=${existingView != null}")
+        Log.d(TAG, "Player initialized for volId=$volId, path=$filePath, fresh textureId=$textureId")
+        return textureId
     }
 
     private fun buildLoadControl(tier: DeviceCapabilityProfiler.Tier): DefaultLoadControl {
@@ -244,8 +253,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             DeviceCapabilityProfiler.Tier.MEDIUM -> Quadruple(12_000, 30_000, 2_500, 5_000)
             DeviceCapabilityProfiler.Tier.HIGH   -> Quadruple(15_000, 40_000, 3_000, 6_000)
         }
-        // Cap max buffer bytes (32MB - 64MB) to prevent 4K high-bitrate streams from consuming
-        // hundreds of MBs in heap memory and causing heavy GC thrashing.
         val maxBufferBytes = when (tier) {
             DeviceCapabilityProfiler.Tier.LOW    -> 32 * 1024 * 1024
             DeviceCapabilityProfiler.Tier.MEDIUM -> 48 * 1024 * 1024
@@ -255,13 +262,11 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             .setBufferDurationsMs(minBufferMs, maxBufferMs, bufferForPlaybackMs, bufferForPlaybackAfterRebufferMs)
             .setTargetBufferBytes(maxBufferBytes)
             .setPrioritizeTimeOverSizeThresholds(false)
-            .setBackBuffer(0, /* retainBackBufferFromKeyframe= */ false)
+            .setBackBuffer(0,  false)
             .build()
     }
 
     private data class Quadruple(val a: Int, val b: Int, val c: Int, val d: Int)
-
-    // ── Transport controls ──────────────────────────────────────────────────
 
     fun play() {
         val p = player ?: return
@@ -288,8 +293,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     fun setLooping(loop: Boolean) {
         player?.repeatMode = if (loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
     }
-
-    // ── Track selection ─────────────────────────────────────────────────────
 
     fun getAudioTracks(): List<Map<String, Any?>> {
         val p = player ?: return emptyList()
@@ -351,7 +354,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
         val group = tracks.groups[groupIndex]
         if (group.type != trackType) return
         if (trackIndex < 0 || trackIndex >= group.length) return
-
         val override = TrackSelectionOverride(group.mediaTrackGroup, listOf(trackIndex))
         p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
             .setTrackTypeDisabled(trackType, false)
@@ -359,44 +361,24 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             .build()
     }
 
-    // ── PlayerView attach/detach ────────────────────────────────────────────
-
-    fun attachPlayerView(view: PlayerView) {
-        attachedPlayerView = view
-        val p = player ?: return
-        view.player = p
-        if (pendingPrepare) {
-            pendingPrepare = false
-            Log.d(TAG, "PlayerView attached — video surface connected")
-        }
-    }
-
-    fun detachPlayerView(view: PlayerView) {
-        if (attachedPlayerView === view) {
-            view.player = null
-            attachedPlayerView = null
-        }
-    }
-
-    // ── Release ─────────────────────────────────────────────────────────────
-
     fun release() {
         mainHandler.removeCallbacks(positionUpdateRunnable)
-        attachedPlayerView?.player = null
-        attachedPlayerView = null
         player?.let { p ->
+            p.clearVideoSurface()
             p.removeListener(this)
             p.release()
         }
         player = null
-        pendingPrepare = false
+        surface?.release()
+        surface = null
+        textureEntry?.release()
+        textureEntry = null
+        textureId = -1L
         currentVolId = -1
         currentFilePath = ""
     }
 
     fun getPlayer(): ExoPlayer? = player
-
-    // ── Player.Listener callbacks ───────────────────────────────────────────
 
     override fun onRenderedFirstFrame() {
         emitEvent("renderedFirstFrame", emptyMap())
@@ -411,7 +393,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             else -> "unknown"
         }
         emitEvent("playbackState", mapOf("state" to state))
-
         if (playbackState == Player.STATE_READY) {
             emitTracksChanged()
         }
@@ -428,6 +409,7 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     }
 
     override fun onVideoSizeChanged(videoSize: VideoSize) {
+        // Do NOT call setDefaultBufferSize to avoid EGL buffer queue reallocations
         emitEvent("videoSize", mapOf(
             "width" to videoSize.width,
             "height" to videoSize.height,
@@ -445,8 +427,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
             "message" to (error.message ?: "Unknown playback error"),
         ))
     }
-
-    // ── Event emission helpers ───────────────────────────────────────────────
 
     private fun emitPositionUpdate(player: ExoPlayer) {
         emitEvent("positionUpdate", mapOf(
@@ -472,10 +452,6 @@ class NativePlayerManager(private val context: Context) : Player.Listener {
     }
 }
 
-/**
- * Custom [MediaCodecVideoRenderer] that computes operating rate requests
- * for hardware decoders during high-speed playback.
- */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private class HighSpeedMediaCodecVideoRenderer(
     context: Context,
@@ -501,7 +477,6 @@ private class HighSpeedMediaCodecVideoRenderer(
     ): Float {
         val defaultRate = super.getCodecOperatingRateV23(targetPlaybackSpeed, format, streamFormats)
         if (defaultRate != CODEC_OPERATING_RATE_UNSET) {
-            // defaultRate already accounts for targetPlaybackSpeed
             return defaultRate.coerceAtMost(120f)
         }
         val streamFps = if (format.frameRate > 0f) format.frameRate else 30f
@@ -513,10 +488,8 @@ private class HighSpeedMediaCodecVideoRenderer(
 private class HighPerformanceRenderersFactory(
     context: Context
 ) : DefaultRenderersFactory(context) {
-
     init {
         setEnableDecoderFallback(true)
-        // Prefer hardware MediaCodec decoders over CPU software extension decoders
         setExtensionRendererMode(EXTENSION_RENDERER_MODE_ON)
         forceEnableMediaCodecAsynchronousQueueing()
     }

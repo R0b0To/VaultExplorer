@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/features/browser/viewer/media_viewer_constants.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
+import 'package:vaultexplorer/features/browser/viewer/native_video_controller.dart';
+import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 
 class AdvancedSettingsSheet extends StatefulWidget {
   final bool isPlaylistMode;
@@ -18,6 +20,7 @@ class AdvancedSettingsSheet extends StatefulWidget {
   final ValueChanged<int> onSlideshowDelayChanged;
   final ValueChanged<double> onPlaybackSpeedChanged;
   final ValueChanged<bool> onSubtitlesEnabledChanged;
+  final NativeVideoController? videoController;
 
   const AdvancedSettingsSheet({
     super.key,
@@ -35,6 +38,7 @@ class AdvancedSettingsSheet extends StatefulWidget {
     required this.onSlideshowDelayChanged,
     required this.onPlaybackSpeedChanged,
     required this.onSubtitlesEnabledChanged,
+    this.videoController,
   });
 
   @override
@@ -157,6 +161,14 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
                 _buildHeader(cs, context.l10n.playbackSpeedLabel, () => setState(() => _sheetPage = 'main')),
                 const SizedBox(height: 8),
                 _buildPlaybackSpeedSubmenu(cs),
+              ] else if (_sheetPage == 'audioTracks') ...[
+                _buildHeader(cs, 'Audio Track', () => setState(() => _sheetPage = 'main')),
+                const SizedBox(height: 8),
+                _buildAudioTrackSubmenu(cs),
+              ] else if (_sheetPage == 'subtitleTracks') ...[
+                _buildHeader(cs, context.l10n.subtitlesLabel, () => setState(() => _sheetPage = 'main')),
+                const SizedBox(height: 8),
+                _buildSubtitleTrackSubmenu(cs),
               ],
             ],
           ),
@@ -243,7 +255,91 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
               setState(() => _sheetPage = 'playbackSpeed');
             },
           ),
-          if (widget.hasSubtitles) ...[
+          if (widget.videoController != null) ...[
+            ValueListenableBuilder<List<AudioTrackInfo>>(
+              valueListenable: widget.videoController!.audioTracksNotifier,
+              builder: (context, audioTracks, _) {
+                if (audioTracks.length <= 1) return const SizedBox.shrink();
+                final selected = audioTracks.firstWhere(
+                  (t) => t.isSelected,
+                  orElse: () => audioTracks.first,
+                );
+                final selectedLabel = selected.label.isNotEmpty
+                    ? selected.label
+                    : (selected.language.isNotEmpty ? selected.language : 'Track 1');
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Divider(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.audiotrack_rounded),
+                      title: const Text('Audio Track'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            selectedLabel,
+                            style: TextStyle(color: cs.primary, fontSize: 13),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right_rounded, size: 20),
+                        ],
+                      ),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() => _sheetPage = 'audioTracks');
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+            ValueListenableBuilder<List<SubtitleTrackInfo>>(
+              valueListenable: widget.videoController!.subtitleTracksNotifier,
+              builder: (context, subTracks, _) {
+                final hasSubTracks = subTracks.isNotEmpty;
+                if (!hasSubTracks && !widget.hasSubtitles) return const SizedBox.shrink();
+
+                final selectedSub = subTracks.firstWhere(
+                  (t) => t.isSelected,
+                  orElse: () => const SubtitleTrackInfo(
+                    groupIndex: -1, trackIndex: -1, isSelected: false, language: '', label: 'Off', mimeType: '', id: ''
+                  ),
+                );
+                final label = selectedSub.isSelected
+                    ? (selectedSub.label.isNotEmpty ? selectedSub.label : selectedSub.language)
+                    : 'Off';
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Divider(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.subtitles_rounded),
+                      title: Text(context.l10n.subtitlesLabel),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            label,
+                            style: TextStyle(color: cs.primary, fontSize: 13),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right_rounded, size: 20),
+                        ],
+                      ),
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        setState(() => _sheetPage = 'subtitleTracks');
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+          ] else if (widget.hasSubtitles) ...[
             const Divider(),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -354,6 +450,108 @@ class _AdvancedSettingsSheetState extends State<AdvancedSettingsSheet> {
           },
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildAudioTrackSubmenu(ColorScheme cs) {
+    final tracks = widget.videoController?.audioTracks ?? [];
+    if (tracks.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Text('No audio tracks available'),
+      );
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: tracks.map((track) {
+        final label = track.label.isNotEmpty
+            ? track.label
+            : (track.language.isNotEmpty ? track.language : 'Track ${track.trackIndex + 1}');
+        final isSelected = track.isSelected;
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? cs.primary : null,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          subtitle: track.mimeType.isNotEmpty
+              ? Text('${track.mimeType} ${track.channelCount != null ? '(${track.channelCount} ch)' : ''}')
+              : null,
+          trailing: isSelected
+              ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
+              : null,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            widget.videoController?.selectAudioTrack(track.groupIndex, track.trackIndex);
+            setState(() => _sheetPage = 'main');
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSubtitleTrackSubmenu(ColorScheme cs) {
+    final tracks = widget.videoController?.subtitleTracks ?? [];
+    final hasActiveSelection = tracks.any((t) => t.isSelected);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            'Off',
+            style: TextStyle(
+              color: !hasActiveSelection ? cs.primary : null,
+              fontWeight: !hasActiveSelection ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          trailing: !hasActiveSelection
+              ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
+              : null,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            widget.videoController?.disableSubtitleTrack();
+            setState(() {
+              _currentSubtitlesEnabled = false;
+              _sheetPage = 'main';
+            });
+            widget.onSubtitlesEnabledChanged(false);
+          },
+        ),
+        ...tracks.map((track) {
+          final label = track.label.isNotEmpty
+              ? track.label
+              : (track.language.isNotEmpty ? track.language : 'Subtitle ${track.trackIndex + 1}');
+          final isSelected = track.isSelected;
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? cs.primary : null,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            subtitle: track.mimeType.isNotEmpty ? Text(track.mimeType) : null,
+            trailing: isSelected
+                ? Icon(Icons.check_rounded, color: cs.primary, size: 18)
+                : null,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              widget.videoController?.selectSubtitleTrack(track.groupIndex, track.trackIndex);
+              setState(() {
+                _currentSubtitlesEnabled = true;
+                _sheetPage = 'main';
+              });
+              widget.onSubtitlesEnabledChanged(true);
+            },
+          );
+        }),
+      ],
     );
   }
 }

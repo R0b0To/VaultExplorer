@@ -1,5 +1,7 @@
 library;
 
+import 'package:vaultexplorer/data/models/mounted_container.dart';
+
 enum ChunkSizePreset {
   fourMb(4),
   cloud8mb(8),
@@ -126,4 +128,80 @@ class StorageCategoryBreakdown {
     required this.sizeBytes,
     required this.fileCount,
   });
+}
+
+/// Why a [runBatchFileCrypto] run stopped before processing every source
+/// file. `null` on [BatchCryptoBatchResult.abortReason] means the batch
+/// ran to completion (individual per-file failures still land in
+/// [BatchCryptoBatchResult.failedNames] rather than aborting the batch).
+enum BatchCryptoAbortReason { notImplemented, authFailure }
+
+/// Outcome of a [ContainerToolService.runBatchFileCrypto] run.
+class BatchCryptoBatchResult {
+  final BatchCryptoAbortReason? abortReason;
+  final int succeeded;
+  final int totalFiles;
+  final List<String> failedNames;
+
+  const BatchCryptoBatchResult({
+    this.abortReason,
+    required this.succeeded,
+    required this.totalFiles,
+    required this.failedNames,
+  });
+
+  bool get aborted => abortReason != null;
+}
+/// external device storage or from a currently-mounted vault.
+class CryptoSourceItem {
+  final String displayName;
+  final String? externalUri;
+  final MountedContainer? container;
+  final String? relativePath;
+  final bool isFromVault;
+
+  const CryptoSourceItem.external({
+    required this.displayName,
+    required this.externalUri,
+  })  : container = null,
+        relativePath = null,
+        isFromVault = false;
+
+  const CryptoSourceItem.vault({
+    required this.displayName,
+    required this.container,
+    required this.relativePath,
+  })  : externalUri = null,
+        isFromVault = true;
+
+  String get id => isFromVault
+      ? 'vault:${container!.volId}:$relativePath'
+      : 'ext:$externalUri';
+}
+
+/// Where the Single File Crypto tool should write its output: either
+/// external device storage or a folder inside a currently-mounted vault.
+class CryptoDestination {
+  final String displayName;
+  final String? externalPath;
+  final String? externalTreeUri;
+  final MountedContainer? container;
+  final String? relativePath;
+  final bool isVault;
+
+  const CryptoDestination.external({
+    required this.displayName,
+    required this.externalPath,
+    this.externalTreeUri,
+  })  : container = null,
+        relativePath = null,
+        isVault = false;
+
+  const CryptoDestination.vault({
+    required this.displayName,
+    required this.container,
+    required this.relativePath,
+  })  : externalPath = null,
+        externalTreeUri = null,
+        isVault = true;
 }

@@ -203,23 +203,29 @@ class DuplicateFinderService {
         fullHashGroups.putIfAbsent(groupKey, () => []).add(item);
       }
 
-      // Build intermediate results
-      final currentVerified = _buildDuplicateGroups(fullHashGroups);
-      final totalWaste = currentVerified.fold<int>(0, (sum, g) => sum + g.totalWasteBytes);
-      final dupFileCount = currentVerified.fold<int>(0, (sum, g) => sum + g.files.length);
+      // Rebuilding + re-sorting the full duplicate-group list is O(n) per
+      // call, so doing it on every single hashed candidate makes this loop
+      // O(n^2) for large duplicate sets. Throttle it the same way Stage 2
+      // throttles its progress emission — the UI still updates smoothly,
+      // just not on every single file.
+      if (stage3Processed % 5 == 0 || stage3Processed == totalStage3Candidates) {
+        final currentVerified = _buildDuplicateGroups(fullHashGroups);
+        final totalWaste = currentVerified.fold<int>(0, (sum, g) => sum + g.totalWasteBytes);
+        final dupFileCount = currentVerified.fold<int>(0, (sum, g) => sum + g.files.length);
 
-      yield DuplicateScanProgress(
-        stage: DuplicateScanStage.fullHashing,
-        totalFilesScanned: totalFilesScanned,
-        candidateGroupCount: partialCandidateGroups.length,
-        totalCandidatesToHash: totalStage3Candidates,
-        processedCandidates: stage3Processed,
-        duplicateGroupCount: currentVerified.length,
-        duplicateFileCount: dupFileCount,
-        potentialSavedBytes: totalWaste,
-        currentFileName: item.name,
-        currentVaultName: item.container.displayName,
-      ).toResult(currentVerified);
+        yield DuplicateScanProgress(
+          stage: DuplicateScanStage.fullHashing,
+          totalFilesScanned: totalFilesScanned,
+          candidateGroupCount: partialCandidateGroups.length,
+          totalCandidatesToHash: totalStage3Candidates,
+          processedCandidates: stage3Processed,
+          duplicateGroupCount: currentVerified.length,
+          duplicateFileCount: dupFileCount,
+          potentialSavedBytes: totalWaste,
+          currentFileName: item.name,
+          currentVaultName: item.container.displayName,
+        ).toResult(currentVerified);
+      }
     }
 
     final finalVerified = _buildDuplicateGroups(fullHashGroups);

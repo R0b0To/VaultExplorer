@@ -19,3 +19,7 @@
     public static int v(...);
     public static int d(...);
 }
+
+# Media3 / ExoPlayer — native player pipeline
+-keep class androidx.media3.** { *; }
+-dontwarn androidx.media3.**

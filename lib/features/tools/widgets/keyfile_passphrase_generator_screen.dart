@@ -175,7 +175,9 @@ class _KeyfilePassphraseGeneratorScreenState
       if (mounted) {
         showAppSnackBar(
           context,
-          message: 'Keyfile exported to ${folder.displayName}/$_keyfileSuggestedName',
+          message: context.l10n.keyfileExportSuccessMessage(
+            '${folder.displayName}/$_keyfileSuggestedName',
+          ),
           tone: AppBannerTone.success,
         );
       }
@@ -183,7 +185,7 @@ class _KeyfilePassphraseGeneratorScreenState
       if (mounted) {
         showAppSnackBar(
           context,
-          message: 'Export failed: $e',
+          message: context.l10n.keyfileExportFailedMessage(e),
           tone: AppBannerTone.error,
         );
       }
@@ -199,7 +201,7 @@ class _KeyfilePassphraseGeneratorScreenState
     if (_openVaults.isEmpty) {
       showAppSnackBar(
         context,
-        message: 'No open vaults available. Please mount a vault first.',
+        message: context.l10n.keyfileNoOpenVaultsMessage,
         tone: AppBannerTone.warning,
       );
       return;
@@ -215,7 +217,7 @@ class _KeyfilePassphraseGeneratorScreenState
               Padding(
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: Text(
-                  'Select Destination Vault',
+                  ctx.l10n.keyfileSelectDestinationVaultTitle,
                   style: ctx.typography.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -226,7 +228,7 @@ class _KeyfilePassphraseGeneratorScreenState
                 (vault) => ListTile(
                   leading: const Icon(Icons.lock_open_rounded),
                   title: Text(vault.displayName),
-                  subtitle: Text('Volume ID: ${vault.volId}'),
+                  subtitle: Text(ctx.l10n.keyfileVolumeIdLabel(vault.volId)),
                   onTap: () => Navigator.pop(ctx, vault),
                 ),
               ),
@@ -251,13 +253,16 @@ class _KeyfilePassphraseGeneratorScreenState
       if (ok && mounted) {
         showAppSnackBar(
           context,
-          message: 'Keyfile saved to ${selectedVault.displayName}: $vaultPath',
+          message: context.l10n.keyfileSavedToVaultMessage(
+            selectedVault.displayName,
+            vaultPath,
+          ),
           tone: AppBannerTone.success,
         );
       } else if (mounted) {
         showAppSnackBar(
           context,
-          message: 'Failed to write keyfile to vault',
+          message: context.l10n.keyfileWriteFailedMessage,
           tone: AppBannerTone.error,
         );
       }
@@ -265,7 +270,7 @@ class _KeyfilePassphraseGeneratorScreenState
       if (mounted) {
         showAppSnackBar(
           context,
-          message: 'Error saving to vault: $e',
+          message: context.l10n.keyfileSaveErrorMessage(e),
           tone: AppBannerTone.error,
         );
       }
@@ -382,7 +387,7 @@ class _KeyfilePassphraseGeneratorScreenState
                 Row(
                   children: [
                     Text(
-                      'Generated Secret',
+                      context.l10n.passphraseGeneratedSecretLabel,
                       style: textTheme.labelMedium?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
@@ -390,12 +395,12 @@ class _KeyfilePassphraseGeneratorScreenState
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.copy_rounded),
-                      tooltip: 'Copy to Clipboard',
+                      tooltip: context.l10n.copyToClipboardTooltip,
                       onPressed: _copyPassphrase,
                     ),
                     IconButton(
                       icon: const Icon(Icons.refresh_rounded),
-                      tooltip: 'Generate New',
+                      tooltip: context.l10n.generateNewTooltip,
                       onPressed: _regeneratePassphrase,
                     ),
                   ],
@@ -451,7 +456,7 @@ class _KeyfilePassphraseGeneratorScreenState
                         ),
                         const SizedBox(width: AppSpacing.xs),
                         Text(
-                          'Strength: ${strength.label}',
+                          context.l10n.passphraseStrengthLabel(strength.label),
                           style: textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: _colorForStrength(strength.scoreFraction),
@@ -460,7 +465,9 @@ class _KeyfilePassphraseGeneratorScreenState
                       ],
                     ),
                     Text(
-                      '${_passphraseEntropyBits.toStringAsFixed(1)} bits entropy',
+                      context.l10n.passphraseEntropyBitsLabel(
+                        _passphraseEntropyBits.toStringAsFixed(1),
+                      ),
                       style: textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
@@ -480,7 +487,7 @@ class _KeyfilePassphraseGeneratorScreenState
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Estimated crack time: ${strength.crackTimeStr}',
+                  context.l10n.passphraseCrackTimeLabel(strength.crackTimeStr),
                   style: textTheme.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant.withValues(alpha: 0.8),
                   ),
@@ -518,7 +525,7 @@ class _KeyfilePassphraseGeneratorScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'EFF Diceware Options',
+              context.l10n.dicewareOptionsTitle,
               style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -527,10 +534,14 @@ class _KeyfilePassphraseGeneratorScreenState
             Row(
               children: [
                 Expanded(
-                  child: Text('Word Count: $_dicewareWordCount words'),
+                  child: Text(
+                    context.l10n.dicewareWordCountLabel(_dicewareWordCount),
+                  ),
                 ),
                 Text(
-                  '${(_dicewareWordCount * 12.9).toStringAsFixed(0)} bits',
+                  context.l10n.dicewareWordCountBitsLabel(
+                    (_dicewareWordCount * 12.9).toStringAsFixed(0),
+                  ),
                   style: textTheme.labelSmall?.copyWith(color: cs.secondary),
                 ),
               ],
@@ -540,7 +551,7 @@ class _KeyfilePassphraseGeneratorScreenState
               min: 3,
               max: 12,
               divisions: 9,
-              label: '$_dicewareWordCount words',
+              label: context.l10n.dicewareWordCountSliderLabel(_dicewareWordCount),
               onChanged: (val) {
                 setState(() {
                   _dicewareWordCount = val.toInt();
@@ -555,16 +566,16 @@ class _KeyfilePassphraseGeneratorScreenState
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Word Separator'),
+                Text(context.l10n.dicewareWordSeparatorLabel),
                 DropdownButton<String>(
                   value: _dicewareSeparator,
                   underline: const SizedBox(),
-                  items: const [
-                    DropdownMenuItem(value: '-', child: Text('Hyphen ( - )')),
-                    DropdownMenuItem(value: ' ', child: Text('Space (   )')),
-                    DropdownMenuItem(value: '_', child: Text('Underscore ( _ )')),
-                    DropdownMenuItem(value: '.', child: Text('Dot ( . )')),
-                    DropdownMenuItem(value: '/', child: Text('Slash ( / )')),
+                  items: [
+                    DropdownMenuItem(value: '-', child: Text(context.l10n.dicewareSeparatorHyphen)),
+                    DropdownMenuItem(value: ' ', child: Text(context.l10n.dicewareSeparatorSpace)),
+                    DropdownMenuItem(value: '_', child: Text(context.l10n.dicewareSeparatorUnderscore)),
+                    DropdownMenuItem(value: '.', child: Text(context.l10n.dicewareSeparatorDot)),
+                    DropdownMenuItem(value: '/', child: Text(context.l10n.dicewareSeparatorSlash)),
                   ],
                   onChanged: (val) {
                     if (val == null) return;
@@ -581,22 +592,22 @@ class _KeyfilePassphraseGeneratorScreenState
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Word Casing'),
+                Text(context.l10n.dicewareWordCasingLabel),
                 DropdownButton<PasswordCasing>(
                   value: _dicewareCasing,
                   underline: const SizedBox(),
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: PasswordCasing.lowercase,
-                      child: Text('lowercase'),
+                      child: Text(context.l10n.dicewareCasingLowercase),
                     ),
                     DropdownMenuItem(
                       value: PasswordCasing.titleCase,
-                      child: Text('Title Case'),
+                      child: Text(context.l10n.dicewareCasingTitleCase),
                     ),
                     DropdownMenuItem(
                       value: PasswordCasing.uppercase,
-                      child: Text('UPPERCASE'),
+                      child: Text(context.l10n.dicewareCasingUppercase),
                     ),
                   ],
                   onChanged: (val) {
@@ -612,7 +623,7 @@ class _KeyfilePassphraseGeneratorScreenState
 
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Append Random Digit (0-9)'),
+              title: Text(context.l10n.dicewareAppendDigitLabel),
               value: _dicewareIncludeNumber,
               onChanged: (val) {
                 setState(() {
@@ -623,7 +634,7 @@ class _KeyfilePassphraseGeneratorScreenState
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Append Random Symbol (!@#\$%)'),
+              title: Text(context.l10n.dicewareAppendSymbolLabel),
               value: _dicewareIncludeSymbol,
               onChanged: (val) {
                 setState(() {
@@ -655,19 +666,19 @@ class _KeyfilePassphraseGeneratorScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Custom Password Options',
+              context.l10n.customPasswordOptionsTitle,
               style: textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text('Length: $_customLength characters'),
+            Text(context.l10n.customPasswordLengthLabel(_customLength)),
             Slider(
               value: _customLength.toDouble(),
               min: 8,
               max: 128,
               divisions: 120,
-              label: '$_customLength chars',
+              label: context.l10n.customPasswordLengthSliderLabel(_customLength),
               onChanged: (val) {
                 setState(() {
                   _customLength = val.toInt();
@@ -678,7 +689,7 @@ class _KeyfilePassphraseGeneratorScreenState
             const Divider(),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Uppercase Letters (A-Z)'),
+              title: Text(context.l10n.customPasswordUppercaseLabel),
               value: _customUseUppercase,
               onChanged: (val) {
                 setState(() {
@@ -689,7 +700,7 @@ class _KeyfilePassphraseGeneratorScreenState
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Lowercase Letters (a-z)'),
+              title: Text(context.l10n.customPasswordLowercaseLabel),
               value: _customUseLowercase,
               onChanged: (val) {
                 setState(() {
@@ -700,7 +711,7 @@ class _KeyfilePassphraseGeneratorScreenState
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Numbers (0-9)'),
+              title: Text(context.l10n.customPasswordNumbersLabel),
               value: _customUseNumbers,
               onChanged: (val) {
                 setState(() {
@@ -711,7 +722,7 @@ class _KeyfilePassphraseGeneratorScreenState
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Symbols (!@#\$%^&*)'),
+              title: Text(context.l10n.customPasswordSymbolsLabel),
               value: _customUseSymbols,
               onChanged: (val) {
                 setState(() {
@@ -722,7 +733,7 @@ class _KeyfilePassphraseGeneratorScreenState
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Exclude Ambiguous (1, l, I, 0, O)'),
+              title: Text(context.l10n.customPasswordExcludeAmbiguousLabel),
               value: _customExcludeAmbiguous,
               onChanged: (val) {
                 setState(() {
@@ -786,8 +797,8 @@ class _KeyfilePassphraseGeneratorScreenState
               children: [
                 Text(
                   _keyfileType == KeyfileType.binary
-                      ? 'Binary Keyfile Size'
-                      : 'Noise Image Resolution',
+                      ? context.l10n.keyfileBinarySizeTitle
+                      : context.l10n.keyfileImageResolutionTitle,
                   style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -883,14 +894,16 @@ class _KeyfilePassphraseGeneratorScreenState
                     ),
                     IconButton(
                       icon: const Icon(Icons.refresh_rounded),
-                      tooltip: 'Generate New Keyfile',
+                      tooltip: context.l10n.keyfileGenerateNewTooltip,
                       onPressed: _regenerateKeyfile,
                     ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Size: ${formatBytes(_generatedKeyfileBytes?.length ?? 0)}',
+                  context.l10n.keyfileSizeLabel(
+                    formatBytes(_generatedKeyfileBytes?.length ?? 0),
+                  ),
                   style: textTheme.bodyMedium?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
@@ -899,7 +912,7 @@ class _KeyfilePassphraseGeneratorScreenState
                 Row(
                   children: [
                     Text(
-                      'SHA-256 Fingerprint',
+                      context.l10n.keyfileFingerprintLabel,
                       style: textTheme.labelMedium?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
@@ -907,7 +920,7 @@ class _KeyfilePassphraseGeneratorScreenState
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.copy_rounded, size: 18),
-                      tooltip: 'Copy Fingerprint',
+                      tooltip: context.l10n.keyfileCopyFingerprintTooltip,
                       onPressed: _copyFingerprint,
                     ),
                   ],

@@ -5479,6 +5479,453 @@
   "exportKeyfileToStorage": "Export to Device Storage",
   "@exportKeyfileToStorage": {
     "description": "Button to export keyfile to external device storage"
+  },
+  "keyfileNoOpenVaultsMessage": "No open vaults available. Please mount a vault first.",
+  "@keyfileNoOpenVaultsMessage": {
+    "description": "Warning shown when trying to save a keyfile to a vault but none are mounted"
+  },
+  "keyfileSelectDestinationVaultTitle": "Select Destination Vault",
+  "@keyfileSelectDestinationVaultTitle": {
+    "description": "Bottom sheet title for choosing which mounted vault to save a keyfile into"
+  },
+  "keyfileVolumeIdLabel": "Volume ID: {volId}",
+  "@keyfileVolumeIdLabel": {
+    "description": "Subtitle showing a mounted vault's volume id in the destination picker",
+    "placeholders": {
+      "volId": {}
+    }
+  },
+  "keyfileExportSuccessMessage": "Keyfile exported to {path}",
+  "@keyfileExportSuccessMessage": {
+    "description": "Snackbar shown after a keyfile is exported to device storage",
+    "placeholders": {
+      "path": {}
+    }
+  },
+  "keyfileExportFailedMessage": "Export failed: {error}",
+  "@keyfileExportFailedMessage": {
+    "description": "Snackbar shown when exporting a keyfile to device storage fails",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "keyfileSavedToVaultMessage": "Keyfile saved to {vaultName}: {path}",
+  "@keyfileSavedToVaultMessage": {
+    "description": "Snackbar shown after a keyfile is written into a mounted vault",
+    "placeholders": {
+      "vaultName": {},
+      "path": {}
+    }
+  },
+  "keyfileWriteFailedMessage": "Failed to write keyfile to vault",
+  "@keyfileWriteFailedMessage": {
+    "description": "Snackbar shown when writing a keyfile into a mounted vault fails"
+  },
+  "keyfileSaveErrorMessage": "Error saving to vault: {error}",
+  "@keyfileSaveErrorMessage": {
+    "description": "Snackbar shown when an exception is thrown while saving a keyfile to a vault",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "passphraseGeneratedSecretLabel": "Generated Secret",
+  "@passphraseGeneratedSecretLabel": {
+    "description": "Label above the generated passphrase/password output"
+  },
+  "copyToClipboardTooltip": "Copy to Clipboard",
+  "@copyToClipboardTooltip": {
+    "description": "Tooltip for the icon button that copies the generated secret to the clipboard"
+  },
+  "generateNewTooltip": "Generate New",
+  "@generateNewTooltip": {
+    "description": "Tooltip for the icon button that regenerates the passphrase/password"
+  },
+  "passphraseStrengthLabel": "Strength: {label}",
+  "@passphraseStrengthLabel": {
+    "description": "Label showing the qualitative strength rating of the generated passphrase",
+    "placeholders": {
+      "label": {}
+    }
+  },
+  "passphraseEntropyBitsLabel": "{bits} bits entropy",
+  "@passphraseEntropyBitsLabel": {
+    "description": "Label showing the entropy in bits of the generated passphrase",
+    "placeholders": {
+      "bits": {}
+    }
+  },
+  "passphraseCrackTimeLabel": "Estimated crack time: {crackTime}",
+  "@passphraseCrackTimeLabel": {
+    "description": "Label showing the estimated brute-force crack time of the generated passphrase",
+    "placeholders": {
+      "crackTime": {}
+    }
+  },
+  "dicewareOptionsTitle": "EFF Diceware Options",
+  "@dicewareOptionsTitle": {
+    "description": "Section title for the EFF Diceware passphrase configuration card"
+  },
+  "dicewareWordCountLabel": "Word Count: {count} words",
+  "@dicewareWordCountLabel": {
+    "description": "Label showing how many diceware words are currently configured",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "dicewareWordCountBitsLabel": "{bits} bits",
+  "@dicewareWordCountBitsLabel": {
+    "description": "Label showing the approximate entropy in bits contributed by the diceware word count",
+    "placeholders": {
+      "bits": {}
+    }
+  },
+  "dicewareWordCountSliderLabel": "{count} words",
+  "@dicewareWordCountSliderLabel": {
+    "description": "Compact slider thumb label for the diceware word count",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "dicewareWordSeparatorLabel": "Word Separator",
+  "@dicewareWordSeparatorLabel": {
+    "description": "Label for the diceware word separator dropdown"
+  },
+  "dicewareSeparatorHyphen": "Hyphen ( - )",
+  "@dicewareSeparatorHyphen": {
+    "description": "Diceware word separator option: a hyphen character"
+  },
+  "dicewareSeparatorSpace": "Space (   )",
+  "@dicewareSeparatorSpace": {
+    "description": "Diceware word separator option: a space character"
+  },
+  "dicewareSeparatorUnderscore": "Underscore ( _ )",
+  "@dicewareSeparatorUnderscore": {
+    "description": "Diceware word separator option: an underscore character"
+  },
+  "dicewareSeparatorDot": "Dot ( . )",
+  "@dicewareSeparatorDot": {
+    "description": "Diceware word separator option: a dot character"
+  },
+  "dicewareSeparatorSlash": "Slash ( / )",
+  "@dicewareSeparatorSlash": {
+    "description": "Diceware word separator option: a slash character"
+  },
+  "dicewareWordCasingLabel": "Word Casing",
+  "@dicewareWordCasingLabel": {
+    "description": "Label for the diceware word casing dropdown"
+  },
+  "dicewareCasingLowercase": "lowercase",
+  "@dicewareCasingLowercase": {
+    "description": "Diceware word casing option: all lowercase"
+  },
+  "dicewareCasingTitleCase": "Title Case",
+  "@dicewareCasingTitleCase": {
+    "description": "Diceware word casing option: Title Case"
+  },
+  "dicewareCasingUppercase": "UPPERCASE",
+  "@dicewareCasingUppercase": {
+    "description": "Diceware word casing option: ALL UPPERCASE"
+  },
+  "dicewareAppendDigitLabel": "Append Random Digit (0-9)",
+  "@dicewareAppendDigitLabel": {
+    "description": "Switch label to append a random digit to the diceware passphrase"
+  },
+  "dicewareAppendSymbolLabel": "Append Random Symbol (!@#$%)",
+  "@dicewareAppendSymbolLabel": {
+    "description": "Switch label to append a random symbol to the diceware passphrase"
+  },
+  "customPasswordOptionsTitle": "Custom Password Options",
+  "@customPasswordOptionsTitle": {
+    "description": "Section title for the custom random password configuration card"
+  },
+  "customPasswordLengthLabel": "Length: {length} characters",
+  "@customPasswordLengthLabel": {
+    "description": "Label showing the configured length of the custom password",
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "customPasswordLengthSliderLabel": "{length} chars",
+  "@customPasswordLengthSliderLabel": {
+    "description": "Compact slider thumb label for the custom password length",
+    "placeholders": {
+      "length": {}
+    }
+  },
+  "customPasswordUppercaseLabel": "Uppercase Letters (A-Z)",
+  "@customPasswordUppercaseLabel": {
+    "description": "Switch label to include uppercase letters in the custom password"
+  },
+  "customPasswordLowercaseLabel": "Lowercase Letters (a-z)",
+  "@customPasswordLowercaseLabel": {
+    "description": "Switch label to include lowercase letters in the custom password"
+  },
+  "customPasswordNumbersLabel": "Numbers (0-9)",
+  "@customPasswordNumbersLabel": {
+    "description": "Switch label to include numbers in the custom password"
+  },
+  "customPasswordSymbolsLabel": "Symbols (!@#$%^&*)",
+  "@customPasswordSymbolsLabel": {
+    "description": "Switch label to include symbols in the custom password"
+  },
+  "customPasswordExcludeAmbiguousLabel": "Exclude Ambiguous (1, l, I, 0, O)",
+  "@customPasswordExcludeAmbiguousLabel": {
+    "description": "Switch label to exclude visually ambiguous characters from the custom password"
+  },
+  "keyfileBinarySizeTitle": "Binary Keyfile Size",
+  "@keyfileBinarySizeTitle": {
+    "description": "Section title for the binary keyfile size preset picker"
+  },
+  "keyfileImageResolutionTitle": "Noise Image Resolution",
+  "@keyfileImageResolutionTitle": {
+    "description": "Section title for the noise image keyfile resolution preset picker"
+  },
+  "keyfileGenerateNewTooltip": "Generate New Keyfile",
+  "@keyfileGenerateNewTooltip": {
+    "description": "Tooltip for the icon button that regenerates the keyfile"
+  },
+  "keyfileSizeLabel": "Size: {size}",
+  "@keyfileSizeLabel": {
+    "description": "Label showing the size of the generated keyfile",
+    "placeholders": {
+      "size": {}
+    }
+  },
+  "keyfileFingerprintLabel": "SHA-256 Fingerprint",
+  "@keyfileFingerprintLabel": {
+    "description": "Label above the generated keyfile's SHA-256 fingerprint"
+  },
+  "keyfileCopyFingerprintTooltip": "Copy Fingerprint",
+  "@keyfileCopyFingerprintTooltip": {
+    "description": "Tooltip for the icon button that copies the keyfile fingerprint to the clipboard"
+  },
+  "duplicateFinderNoVaultsTitle": "No Mounted Vaults",
+  "@duplicateFinderNoVaultsTitle": {
+    "description": "Empty-state title when no vaults are mounted, shown on the Duplicate Finder screen"
+  },
+  "duplicateFinderNoVaultsMessage": "Unlock and mount at least one vault container to scan for duplicate files.",
+  "@duplicateFinderNoVaultsMessage": {
+    "description": "Empty-state message when no vaults are mounted, shown on the Duplicate Finder screen"
+  },
+  "duplicateFinderConfirmDeleteMessage": "Are you sure you want to permanently delete {count} duplicate file(s) ({size}) from your vault(s)? This action cannot be undone.",
+  "@duplicateFinderConfirmDeleteMessage": {
+    "description": "Confirmation dialog body before permanently deleting selected duplicate files",
+    "placeholders": {
+      "count": {},
+      "size": {}
+    }
+  },
+  "duplicateFinderDeletePermanentlyButton": "Delete Permanently",
+  "@duplicateFinderDeletePermanentlyButton": {
+    "description": "Destructive confirm button label in the delete-duplicates dialog"
+  },
+  "duplicateFinderDeleteSuccessMessage": "Successfully deleted {count} duplicate file(s).",
+  "@duplicateFinderDeleteSuccessMessage": {
+    "description": "Snackbar shown after duplicate files are successfully deleted",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "duplicateFinderIntroTitle": "3-Stage Byte-Equal Finder",
+  "@duplicateFinderIntroTitle": {
+    "description": "Title of the idle-state intro card explaining how the duplicate finder works"
+  },
+  "duplicateFinderIntroSubtitle": "Detect exact identical content regardless of filenames.",
+  "@duplicateFinderIntroSubtitle": {
+    "description": "Subtitle of the idle-state intro card explaining how the duplicate finder works"
+  },
+  "duplicateFinderStagesDescription": "\u2022 Stage 1: Size Grouping (Instant metadata walk)\n\u2022 Stage 2: Partial Header Check (16 KB SHA-256 header)\n\u2022 Stage 3: Full Hash Verification (Exact SHA-256 byte match)",
+  "@duplicateFinderStagesDescription": {
+    "description": "Bulleted description of the 3 scan stages shown on the idle card"
+  },
+  "duplicateFinderScanningVaultFallback": "Scanning vault...",
+  "@duplicateFinderScanningVaultFallback": {
+    "description": "Fallback stage label shown while scanning if no more specific stage label applies"
+  },
+  "duplicateFinderProcessingFileLabel": "Processing: {fileName}",
+  "@duplicateFinderProcessingFileLabel": {
+    "description": "Label showing the name of the file currently being processed during a scan",
+    "placeholders": {
+      "fileName": {}
+    }
+  },
+  "duplicateFinderScanStatsLabel": "Files scanned: {scanned} | Duplicates found: {groups} groups ({saved})",
+  "@duplicateFinderScanStatsLabel": {
+    "description": "Label showing running scan statistics: files scanned, duplicate groups found, and space that could be saved",
+    "placeholders": {
+      "scanned": {},
+      "groups": {},
+      "saved": {}
+    }
+  },
+  "duplicateFinderGroupsFoundLabel": "{count} Duplicate Groups Found",
+  "@duplicateFinderGroupsFoundLabel": {
+    "description": "Summary card title showing how many duplicate groups were found",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "duplicateFinderGroupsSummaryLabel": "{copies} copies found \u2022 Save {saved} storage space",
+  "@duplicateFinderGroupsSummaryLabel": {
+    "description": "Summary card subtitle showing total duplicate copies and space that could be saved",
+    "placeholders": {
+      "copies": {},
+      "saved": {}
+    }
+  },
+  "duplicateFinderVaultsSelectedLabel": "{count} vaults selected",
+  "@duplicateFinderVaultsSelectedLabel": {
+    "description": "Subtitle on the target picker showing how many vaults are currently selected",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "duplicateFinderGroupTitleLabel": "Group {groupIndex}: {size} ({count} copies found)",
+  "@duplicateFinderGroupTitleLabel": {
+    "description": "Title of a single duplicate group's expansion tile: group number, size, and copy count",
+    "placeholders": {
+      "groupIndex": {},
+      "size": {},
+      "count": {}
+    }
+  },
+  "duplicateFinderRecoverableSpaceLabel": "Recoverable space: {size}",
+  "@duplicateFinderRecoverableSpaceLabel": {
+    "description": "Subtitle of a duplicate group's expansion tile showing recoverable disk space",
+    "placeholders": {
+      "size": {}
+    }
+  },
+  "duplicateFinderPreviewFileTooltip": "Preview File",
+  "@duplicateFinderPreviewFileTooltip": {
+    "description": "Tooltip for the icon button that opens a file preview from a duplicate group listing"
+  },
+  "duplicateFinderPreviewFailedMessage": "Could not open file preview for {fileName}",
+  "@duplicateFinderPreviewFailedMessage": {
+    "description": "Snackbar shown when no viewer is available to preview the selected duplicate file",
+    "placeholders": {
+      "fileName": {}
+    }
+  },
+  "duplicateFinderPreviewErrorMessage": "Error previewing file: {error}",
+  "@duplicateFinderPreviewErrorMessage": {
+    "description": "Snackbar shown when an exception is thrown while opening a duplicate file preview",
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "duplicateFinderFilesSelectedLabel": "{count} files selected",
+  "@duplicateFinderFilesSelectedLabel": {
+    "description": "Bottom action bar label showing how many duplicate files are currently selected for deletion",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "duplicateFinderBytesToBeFreedLabel": "{size} to be freed",
+  "@duplicateFinderBytesToBeFreedLabel": {
+    "description": "Bottom action bar label showing how much space will be freed by the current selection",
+    "placeholders": {
+      "size": {}
+    }
+  },
+  "duplicateFinderDeleteSelectedButton": "Delete Selected ({count})",
+  "@duplicateFinderDeleteSelectedButton": {
+    "description": "Bottom action bar button to delete the currently selected duplicate files, with a count",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultBrowserSwitchVaultTooltip": "Switch Vault",
+  "@vaultBrowserSwitchVaultTooltip": {
+    "description": "Tooltip for the icon button that switches which mounted vault is being browsed"
+  },
+  "vaultBrowserRootFolderLabel": "Root Folder",
+  "@vaultBrowserRootFolderLabel": {
+    "description": "Breadcrumb label shown when browsing a vault's root folder"
+  },
+  "vaultFilePickerTitle": "Select Files ({vaultName})",
+  "@vaultFilePickerTitle": {
+    "description": "App bar title for the vault file picker, showing which vault is being browsed",
+    "placeholders": {
+      "vaultName": {}
+    }
+  },
+  "vaultFilePickerEmptyMessage": "Folder is empty",
+  "@vaultFilePickerEmptyMessage": {
+    "description": "Message shown when the current vault folder has no files or subfolders"
+  },
+  "vaultFilePickerConfirmButton": "Select {count} File(s)",
+  "@vaultFilePickerConfirmButton": {
+    "description": "Confirm button label showing how many files are currently selected in the vault file picker",
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "vaultFolderPickerTitle": "Select Folder ({vaultName})",
+  "@vaultFolderPickerTitle": {
+    "description": "App bar title for the vault folder picker, showing which vault is being browsed",
+    "placeholders": {
+      "vaultName": {}
+    }
+  },
+  "vaultFolderPickerEmptyMessage": "No subfolders here",
+  "@vaultFolderPickerEmptyMessage": {
+    "description": "Message shown when the current vault folder has no subfolders"
+  },
+  "vaultFolderPickerRootLabel": "Root",
+  "@vaultFolderPickerRootLabel": {
+    "description": "Folder name used to represent a vault's root folder in the destination display name"
+  },
+  "vaultFolderPickerConfirmRootButton": "Select Root Folder",
+  "@vaultFolderPickerConfirmRootButton": {
+    "description": "Confirm button label when the vault's root folder is the selected destination"
+  },
+  "vaultFolderPickerConfirmNamedButton": "Select \"{folderName}\"",
+  "@vaultFolderPickerConfirmNamedButton": {
+    "description": "Confirm button label showing the name of the selected destination subfolder",
+    "placeholders": {
+      "folderName": {}
+    }
+  },
+  "singleFileCryptoSelectInputTitle": "Select Input Files",
+  "@singleFileCryptoSelectInputTitle": {
+    "description": "Bottom sheet title for choosing where to add Single File Crypto input files from"
+  },
+  "singleFileCryptoFromDeviceTitle": "From Device Storage",
+  "@singleFileCryptoFromDeviceTitle": {
+    "description": "Option to add Single File Crypto input files from device storage"
+  },
+  "singleFileCryptoFromDeviceSubtitle": "Pick files from device using system file picker",
+  "@singleFileCryptoFromDeviceSubtitle": {
+    "description": "Subtitle explaining the device-storage input option"
+  },
+  "singleFileCryptoFromVaultTitle": "From Mounted Vault",
+  "@singleFileCryptoFromVaultTitle": {
+    "description": "Option to add Single File Crypto input files from a mounted vault"
+  },
+  "singleFileCryptoFromVaultSubtitle": "Pick files from an open encrypted container",
+  "@singleFileCryptoFromVaultSubtitle": {
+    "description": "Subtitle explaining the mounted-vault input option"
+  },
+  "singleFileCryptoSelectDestinationTitle": "Select Destination Folder",
+  "@singleFileCryptoSelectDestinationTitle": {
+    "description": "Bottom sheet title for choosing the Single File Crypto output destination"
+  },
+  "singleFileCryptoDeviceFolderTitle": "Device Storage Folder",
+  "@singleFileCryptoDeviceFolderTitle": {
+    "description": "Option to save Single File Crypto output to device storage"
+  },
+  "singleFileCryptoDeviceFolderSubtitle": "Save output to a folder on device storage",
+  "@singleFileCryptoDeviceFolderSubtitle": {
+    "description": "Subtitle explaining the device-storage destination option"
+  },
+  "singleFileCryptoVaultFolderTitle": "Mounted Vault Folder",
+  "@singleFileCryptoVaultFolderTitle": {
+    "description": "Option to save Single File Crypto output inside a mounted vault"
+  },
+  "singleFileCryptoVaultFolderSubtitle": "Save output inside an open encrypted container",
+  "@singleFileCryptoVaultFolderSubtitle": {
+    "description": "Subtitle explaining the mounted-vault destination option"
   }
 }
 

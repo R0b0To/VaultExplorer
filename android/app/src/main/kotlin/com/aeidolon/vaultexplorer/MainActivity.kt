@@ -12,6 +12,7 @@ import androidx.annotation.NonNull
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.EventChannel
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadPoolExecutor
 
@@ -148,6 +149,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val disguiseModeHandlers = DisguiseModeHandlers(this)
     private val secureStorageHandlers = SecureStorageHandlers(this)
     private val repairHandlers = RepairHandlers(this, ioExecutor)
+    private val nativePlayerManager by lazy { com.aeidolon.vaultexplorer.engine.NativePlayerManager(this) }
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
@@ -170,6 +172,7 @@ class MainActivity : FlutterFragmentActivity() {
         screenOffReceiver?.let { unregisterReceiver(it) }
         vaultCameraPlugin?.disposeAll()
         vaultCameraPlugin = null
+        nativePlayerManager.release()
         vaultUnlockHandlers.onActivityDestroyed()
         splitContainerMountHandlers.onActivityDestroyed()
         super.onDestroy()
@@ -219,6 +222,91 @@ class MainActivity : FlutterFragmentActivity() {
             com.aeidolon.vaultexplorer.htmlviewer.HTML_VIEWER_VIEW_TYPE,
             com.aeidolon.vaultexplorer.htmlviewer.HtmlViewerViewFactory(flutterEngine.dartExecutor.binaryMessenger),
         )
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            "com.aeidolon.vaultexplorer/native_player_view",
+            com.aeidolon.vaultexplorer.engine.NativePlayerViewFactory(nativePlayerManager),
+        )
+
+        val playerChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.aeidolon.vaultexplorer/player")
+        nativePlayerManager.methodChannel = playerChannel
+        playerChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "initialize" -> {
+                    val volId = call.argument<Int>("volId") ?: -1
+                    val filePath = call.argument<String>("filePath") ?: ""
+                    nativePlayerManager.initialize(volId, filePath)
+                    result.success(null)
+                }
+                "play" -> {
+                    nativePlayerManager.play()
+                    result.success(null)
+                }
+                "pause" -> {
+                    nativePlayerManager.pause()
+                    result.success(null)
+                }
+                "seekTo" -> {
+                    val pos = call.argument<Number>("positionMs")?.toLong() ?: 0L
+                    nativePlayerManager.seekTo(pos)
+                    result.success(null)
+                }
+                "setSpeed" -> {
+                    val speed = call.argument<Number>("speed")?.toFloat() ?: 1.0f
+                    nativePlayerManager.setSpeed(speed)
+                    result.success(null)
+                }
+                "setVolume" -> {
+                    val volume = call.argument<Number>("volume")?.toFloat() ?: 1.0f
+                    nativePlayerManager.setVolume(volume)
+                    result.success(null)
+                }
+                "setLooping" -> {
+                    val loop = call.argument<Boolean>("loop") ?: false
+                    nativePlayerManager.setLooping(loop)
+                    result.success(null)
+                }
+                "getAudioTracks" -> {
+                    result.success(nativePlayerManager.getAudioTracks())
+                }
+                "getSubtitleTracks" -> {
+                    result.success(nativePlayerManager.getSubtitleTracks())
+                }
+                "selectAudioTrack" -> {
+                    val groupIdx = call.argument<Int>("groupIndex") ?: -1
+                    val trackIdx = call.argument<Int>("trackIndex") ?: -1
+                    nativePlayerManager.selectAudioTrack(groupIdx, trackIdx)
+                    result.success(null)
+                }
+                "selectSubtitleTrack" -> {
+                    val groupIdx = call.argument<Int>("groupIndex") ?: -1
+                    val trackIdx = call.argument<Int>("trackIndex") ?: -1
+                    nativePlayerManager.selectSubtitleTrack(groupIdx, trackIdx)
+                    result.success(null)
+                }
+                "disableSubtitleTrack" -> {
+                    nativePlayerManager.disableSubtitleTrack()
+                    result.success(null)
+                }
+                "getDiagnostics" -> {
+                    result.success(nativePlayerManager.getDiagnosticsMap())
+                }
+                "release" -> {
+                    nativePlayerManager.release()
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        val playerEventChannel = EventChannel(flutterEngine.dartExecutor.binaryMessenger, "com.aeidolon.vaultexplorer/player_events")
+        playerEventChannel.setStreamHandler(object : EventChannel.StreamHandler {
+            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                nativePlayerManager.eventSink = events
+            }
+            override fun onCancel(arguments: Any?) {
+                nativePlayerManager.eventSink = null
+            }
+        })
 
         val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel = channel

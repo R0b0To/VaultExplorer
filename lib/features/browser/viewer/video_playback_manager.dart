@@ -25,7 +25,9 @@ class VideoPlaybackManager {
 
   Future<void> activate({
     required String fileName,
-    required String contentUriString,
+    int? volId,
+    String? filePath,
+    String? contentUriString,
     required bool autoPlay,
     required double playbackSpeed,
     bool looping = false,
@@ -63,15 +65,31 @@ class VideoPlaybackManager {
       }
       if (token != _activationToken) return;
       NativeVideoController controller;
-      if (_controllers.containsKey(fileName)) {
-        controller = _controllers[fileName]!;
-        if (controller.isDisposed || controller.value.hasError) {
-          _controllers.remove(fileName);
-          controller = NativeVideoController(
+
+      NativeVideoController createController() {
+        if (volId != null && filePath != null) {
+          return NativeVideoController(
+            volId: volId,
+            filePath: filePath,
+            autoPlay: autoPlay,
+            initialSpeed: playbackSpeed,
+          );
+        } else if (contentUriString != null) {
+          return NativeVideoController.fromUri(
             contentUriString: contentUriString,
             autoPlay: autoPlay,
             initialSpeed: playbackSpeed,
           );
+        } else {
+          throw ArgumentError('Either (volId, filePath) or contentUriString must be provided');
+        }
+      }
+
+      if (_controllers.containsKey(fileName)) {
+        controller = _controllers[fileName]!;
+        if (controller.isDisposed || controller.value.hasError) {
+          _controllers.remove(fileName);
+          controller = createController();
           _controllers[fileName] = controller;
           unawaited(controller.initialize().then((_) {
             controller.setLooping(looping);
@@ -82,11 +100,7 @@ class VideoPlaybackManager {
           if (autoPlay) await controller.play();
         }
       } else {
-        controller = NativeVideoController(
-          contentUriString: contentUriString,
-          autoPlay: autoPlay,
-          initialSpeed: playbackSpeed,
-        );
+        controller = createController();
         _controllers[fileName] = controller;
         unawaited(controller.initialize().then((_) {
           controller.setLooping(looping);

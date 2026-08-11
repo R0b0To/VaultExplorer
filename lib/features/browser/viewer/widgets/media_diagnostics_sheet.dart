@@ -1,36 +1,66 @@
 // File: lib/features/browser/viewer/widgets/media_diagnostics_sheet.dart
+
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
-
+import 'package:vaultexplorer/features/browser/viewer/native_media3_controller.dart';
 import '../native_video_controller.dart';
 
-class MediaDiagnosticsSheet extends StatelessWidget {
+/// Transparent glassmorphic dialog displaying real-time video diagnostics,
+/// hardware vs software decoder status, framerate, dropped frames, buffer health,
+/// and pipeline failure indicators.
+class MediaDiagnosticsDialog extends StatelessWidget {
   final String fileName;
   final NativeVideoController controller;
   final double playbackSpeed;
 
-  const MediaDiagnosticsSheet({
+  const MediaDiagnosticsDialog({
     super.key,
     required this.fileName,
     required this.controller,
     required this.playbackSpeed,
   });
 
-  Future<void> _copyDiagnostics(BuildContext context) async {
-    final value = controller.value;
-    final lines = <String>[
-      'File: $fileName',
-      'State: ${_stateLabel(context, value)}',
-      'Resolution: ${_formatResolution(context, value.size.width, value.size.height)}',
-      'Aspect Ratio: ${value.size.width > 0 ? value.aspectRatio.toStringAsFixed(3) : context.l10n.diagnosticsUnknownValue}',
-      'Position: ${_formatDuration(context, value.position)}',
-      'Duration: ${_formatDuration(context, value.duration)}',
-      'Playback Speed: ${playbackSpeed.toStringAsFixed(2)}x',
-      if (value.hasError) 'Error: ${value.errorDescription}',
-      'Engine: ${context.l10n.diagnosticsExoPlayerValue} (Android, ${context.l10n.diagnosticsHardwareAcceleratedValue})',
-    ];
-    await Clipboard.setData(ClipboardData(text: lines.join('\n')));
+  Future<void> _copyDiagnostics(
+    BuildContext context,
+    NativeVideoValue val,
+    MediaDiagnosticsInfo diag,
+  ) async {
+    final text = '''
+=== VAULTEXPLORER MEDIA DIAGNOSTICS ===
+File: $fileName
+Volume ID: ${diag.volId}
+Path: ${diag.filePath}
+
+-- VIDEO DECODER --
+Decoder Name: ${diag.videoDecoderName}
+Hardware Accelerated: ${diag.isVideoHardwareAccelerated ? "YES (HW)" : "NO (SW Software Fallback)"}
+Resolution: ${val.size.width.toInt()}x${val.size.height.toInt()}
+Aspect Ratio: ${val.size.width > 0 ? val.aspectRatio.toStringAsFixed(3) : "Unknown"}
+Framerate: ${diag.frameRate > 0 ? "${diag.frameRate.toStringAsFixed(2)} fps" : "Unknown"}
+Video MIME: ${diag.videoMimeType.isNotEmpty ? diag.videoMimeType : "Unknown"}
+Color Format: ${diag.colorInfo}
+Decoder Init Time: ${diag.decoderInitTimeMs} ms
+Dropped Frames: ${diag.droppedFrames}
+
+-- AUDIO DECODER --
+Audio Decoder: ${diag.audioDecoderName}
+Audio HW Accel: ${diag.isAudioHardwareAccelerated ? "YES" : "NO"}
+Audio MIME: ${diag.audioMimeType.isNotEmpty ? diag.audioMimeType : "Unknown"}
+
+-- PIPELINE & BUFFER --
+State: ${_stateLabel(context, val)}
+Position: ${_formatDuration(val.position)}
+Duration: ${_formatDuration(val.duration)}
+Buffered: ${(diag.bufferedMs / 1000.0).toStringAsFixed(1)} s
+Playback Speed: ${playbackSpeed.toStringAsFixed(2)}x
+Error: ${val.hasError ? val.errorDescription : "None"}
+Engine: Media3 ExoPlayer (Direct JNI C++ Stream)
+=======================================
+''';
+
+    await Clipboard.setData(ClipboardData(text: text));
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -43,127 +73,423 @@ class MediaDiagnosticsSheet extends StatelessWidget {
   String _stateLabel(BuildContext context, NativeVideoValue value) {
     if (value.hasError) return context.l10n.diagnosticsErrorLabel;
     if (value.isBuffering) return context.l10n.diagnosticsStateBuffering;
-    return value.isPlaying ? context.l10n.diagnosticsStatePlaying : context.l10n.diagnosticsStatePaused;
+    return value.isPlaying
+        ? context.l10n.diagnosticsStatePlaying
+        : context.l10n.diagnosticsStatePaused;
+  }
+
+  String _formatDuration(Duration d) {
+    if (d == Duration.zero) return '0:00';
+    final minutes = d.inMinutes;
+    final seconds = d.inSeconds % 60;
+    final ms = d.inMilliseconds % 1000;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}.${(ms / 100).floor()}';
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final maxSheetHeight = MediaQuery.of(context).size.height * 0.85;
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxSheetHeight),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 20, right: 12, top: 4, bottom: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildHeader(context, cs, textTheme),
-              const SizedBox(height: 4),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionLabel(cs, context.l10n.diagnosticsPlaybackSection),
-                        ValueListenableBuilder<NativeVideoValue>(
-                          valueListenable: controller,
-                          builder: (context, value, _) {
-                            return Column(
-                              children: [
-                                _buildStatRow(cs, context.l10n.diagnosticsStateLabel, _stateLabel(context, value)),
-                                _buildStatRow(cs, context.l10n.diagnosticsResolutionLabel, _formatResolution(context, value.size.width, value.size.height)),
-                                _buildStatRow(
-                                  cs,
-                                  context.l10n.diagnosticsAspectRatioLabel,
-                                  value.size.width > 0 ? value.aspectRatio.toStringAsFixed(3) : context.l10n.diagnosticsUnknownValue,
-                                ),
-                                _buildStatRow(cs, context.l10n.diagnosticsPositionLabel, _formatDuration(context, value.position)),
-                                _buildStatRow(cs, context.l10n.diagnosticsDurationLabel, _formatDuration(context, value.duration)),
-                                _buildStatRow(cs, context.l10n.playbackSpeedLabel, '${playbackSpeed.toStringAsFixed(2)}x'),
-                                if (value.hasError)
-                                  _buildStatRow(cs, context.l10n.diagnosticsErrorLabel, value.errorDescription),
-                              ],
-                            );
-                          },
-                        ),
-                        _buildSectionLabel(cs, context.l10n.diagnosticsEngineSection),
-                        _buildStatRow(cs, context.l10n.diagnosticsPlayerLabel, context.l10n.diagnosticsExoPlayerValue),
-                        _buildStatRow(cs, context.l10n.diagnosticsDecodingLabel, context.l10n.diagnosticsHardwareAcceleratedValue),
-                      ],
-                    ),
-                  ),
-                ),
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 480, maxHeight: 620),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.82),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: cs.primary.withValues(alpha: 0.35),
+                width: 1.5,
               ),
-            ],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  blurRadius: 24,
+                  spreadRadius: 4,
+                ),
+              ],
+            ),
+            child: ValueListenableBuilder<NativeVideoValue>(
+              valueListenable: controller,
+              builder: (context, videoVal, _) {
+                return ValueListenableBuilder<MediaDiagnosticsInfo>(
+                  valueListenable: controller.diagnosticsNotifier,
+                  builder: (context, diagInfo, _) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildHeader(context, cs, videoVal),
+                        const Divider(height: 1, color: Colors.white12),
+                        Flexible(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildBadgesBar(cs, videoVal, diagInfo),
+                                const SizedBox(height: 16),
+                                if (videoVal.hasError) ...[
+                                  _buildErrorAlert(cs, videoVal),
+                                  const SizedBox(height: 16),
+                                ],
+                                _buildSectionHeader(cs, 'VIDEO DECODER & HARDWARE'),
+                                _buildDetailRow(
+                                  cs,
+                                  'Decoder Name',
+                                  diagInfo.videoDecoderName,
+                                  highlight: true,
+                                ),
+                                _buildDetailRow(
+                                  cs,
+                                  'Acceleration',
+                                  diagInfo.isVideoHardwareAccelerated
+                                      ? 'Hardware (GPU Direct)'
+                                      : 'Software (CPU Fallback)',
+                                  valueColor: diagInfo.isVideoHardwareAccelerated
+                                      ? Colors.greenAccent
+                                      : Colors.orangeAccent,
+                                ),
+                                _buildDetailRow(
+                                  cs,
+                                  'Resolution',
+                                  videoVal.size.width > 0
+                                      ? '${videoVal.size.width.toInt()} × ${videoVal.size.height.toInt()} (${videoVal.aspectRatio.toStringAsFixed(2)}:1)'
+                                      : 'Unknown',
+                                ),
+                                _buildDetailRow(
+                                  cs,
+                                  'Framerate',
+                                  diagInfo.frameRate > 0
+                                      ? '${diagInfo.frameRate.toStringAsFixed(2)} fps'
+                                      : 'Variable / Unknown',
+                                ),
+                                _buildDetailRow(
+                                  cs,
+                                  'Video Codec',
+                                  diagInfo.videoMimeType.isNotEmpty
+                                      ? diagInfo.videoMimeType
+                                      : 'Auto-detected',
+                                ),
+                                _buildDetailRow(
+                                  cs,
+                                  'Color Format',
+                                  diagInfo.colorInfo,
+                                ),
+                                _buildDetailRow(
+                                  cs,
+                                  'Init Latency',
+                                  '${diagInfo.decoderInitTimeMs} ms',
+                                ),
+
+                                const SizedBox(height: 16),
+                                _buildSectionHeader(cs, 'AUDIO ENGINE'),
+                                _buildDetailRow(
+                                  cs,
+                                  'Audio Decoder',
+                                  diagInfo.audioDecoderName,
+                                ),
+                                _buildDetailRow(
+                                  cs,
+                                  'Audio Codec',
+                                  diagInfo.audioMimeType.isNotEmpty
+                                      ? diagInfo.audioMimeType
+                                      : 'Auto-detected',
+                                ),
+
+                                const SizedBox(height: 16),
+                                _buildSectionHeader(cs, 'PIPELINE & HEALTH'),
+                                _buildDetailRow(
+                                  cs,
+                                  'Playback State',
+                                  _stateLabel(context, videoVal),
+                                ),
+                                _buildDetailRow(
+                                  cs,
+                                  'Decrypted Buffer',
+                                  '${(diagInfo.bufferedMs / 1000.0).toStringAsFixed(1)} s cached',
+                                  valueColor: diagInfo.bufferedMs > 2000
+                                      ? Colors.greenAccent
+                                      : Colors.amberAccent,
+                                ),
+                                _buildDetailRow(
+                                  cs,
+                                  'Dropped Frames',
+                                  '${diagInfo.droppedFrames} frames',
+                                  valueColor: diagInfo.droppedFrames == 0
+                                      ? Colors.greenAccent
+                                      : Colors.orangeAccent,
+                                ),
+                                _buildDetailRow(
+                                  cs,
+                                  'Source Storage',
+                                  'Direct C++ JNI Stream (volId=${diagInfo.volId})',
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Divider(height: 1, color: Colors.white12),
+                        _buildFooterActions(context, cs, videoVal, diagInfo),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, ColorScheme cs, TextTheme textTheme) {
-    return Row(
-      children: [
-        const SizedBox(width: 8),
-        Icon(Icons.query_stats_rounded, size: 20, color: cs.onSurfaceVariant),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            context.l10n.diagnosticsTitle,
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+  Widget _buildHeader(BuildContext context, ColorScheme cs, NativeVideoValue value) {
+    final statusColor = value.hasError
+        ? Colors.redAccent
+        : (value.isBuffering
+            ? Colors.amberAccent
+            : (value.isPlaying ? Colors.greenAccent : Colors.white70));
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: statusColor.withValues(alpha: 0.6),
+                  blurRadius: 8,
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Media Diagnostics',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 22),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBadgesBar(
+    ColorScheme cs,
+    NativeVideoValue val,
+    MediaDiagnosticsInfo diag,
+  ) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _buildPill(
+          label: diag.isVideoHardwareAccelerated ? 'HW ACCELERATED' : 'SW DECODER',
+          icon: diag.isVideoHardwareAccelerated
+              ? Icons.memory_rounded
+              : Icons.computer_rounded,
+          color: diag.isVideoHardwareAccelerated ? Colors.greenAccent : Colors.amberAccent,
         ),
-        IconButton(
-          tooltip: context.l10n.copyDiagnosticsTooltip,
-          icon: Icon(Icons.copy_rounded, size: 20, color: cs.onSurfaceVariant),
-          onPressed: () => _copyDiagnostics(context),
+        if (diag.frameRate > 0)
+          _buildPill(
+            label: '${diag.frameRate.toStringAsFixed(1)} FPS',
+            icon: Icons.speed_rounded,
+            color: cs.primary,
+          ),
+        _buildPill(
+          label: diag.colorInfo,
+          icon: Icons.hdr_on_rounded,
+          color: diag.colorInfo != 'SDR' ? Colors.purpleAccent : Colors.white60,
         ),
-        IconButton(
-          tooltip: context.l10n.closeTooltip,
-          icon: Icon(Icons.close_rounded, color: cs.onSurfaceVariant),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
+        if (val.size.width > 0)
+          _buildPill(
+            label: '${val.size.width.toInt()}p',
+            icon: Icons.aspect_ratio_rounded,
+            color: Colors.lightBlueAccent,
+          ),
       ],
     );
   }
 
-  Widget _buildSectionLabel(ColorScheme cs, String label) {
+  Widget _buildPill({
+    required String label,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(100),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorAlert(ColorScheme cs, NativeVideoValue value) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.redAccent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              value.errorDescription,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(ColorScheme cs, String title) {
     return Padding(
-      padding: const EdgeInsets.only(top: 14, bottom: 4),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Text(
-        label.toUpperCase(),
+        title,
         style: TextStyle(
           color: cs.primary,
           fontSize: 11,
           fontWeight: FontWeight.bold,
-          letterSpacing: 0.6,
+          letterSpacing: 1.0,
         ),
       ),
     );
   }
 
-  Widget _buildStatRow(ColorScheme cs, String label, String value) {
+  Widget _buildDetailRow(
+    ColorScheme cs,
+    String label,
+    String value, {
+    bool highlight = false,
+    Color? valueColor,
+  }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.6),
+              fontSize: 12,
             ),
           ),
-          Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                color: valueColor ?? (highlight ? Colors.white : Colors.white70),
+                fontSize: 12,
+                fontWeight: highlight ? FontWeight.bold : FontWeight.normal,
+                fontFamily: highlight ? 'monospace' : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFooterActions(
+    BuildContext context,
+    ColorScheme cs,
+    NativeVideoValue value,
+    MediaDiagnosticsInfo diag,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              label: const Text('Copy Diagnostics'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: cs.primary,
+                side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onPressed: () => _copyDiagnostics(context, value, diag),
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            child: const Text('Close'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white70,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            onPressed: () => Navigator.of(context).pop(),
           ),
         ],
       ),
@@ -171,16 +497,5 @@ class MediaDiagnosticsSheet extends StatelessWidget {
   }
 }
 
-String _formatResolution(BuildContext context, double width, double height) {
-  if (width <= 0 || height <= 0) return context.l10n.diagnosticsUnknownValue;
-  return '${width.toInt()} × ${height.toInt()}';
-}
-
-String _formatDuration(BuildContext context, Duration d) {
-  if (d.isNegative) return context.l10n.diagnosticsDurationUnavailable;
-  final hours = d.inHours;
-  final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-  if (hours > 0) return '${hours.toString().padLeft(2, '0')}:$minutes:$seconds';
-  return '$minutes:$seconds';
-}
+/// Backward-compatibility alias for [MediaDiagnosticsDialog].
+typedef MediaDiagnosticsSheet = MediaDiagnosticsDialog;

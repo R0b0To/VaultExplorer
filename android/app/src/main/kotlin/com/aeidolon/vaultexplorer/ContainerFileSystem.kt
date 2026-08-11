@@ -139,6 +139,29 @@ object ContainerFileSystem {
     fun readStream(volId: Int, streamPtr: Long, offset: Long, out: ByteArray, length: Int): Int =
         withReadLock(volId) { ContainerEngine.readStream(streamPtr, offset, out, length, volId) }
 
+    private val readBufferPool = object : ThreadLocal<ByteArray>() {
+        override fun initialValue(): ByteArray = ByteArray(256 * 1024)
+    }
+
+    /**
+     * Overload that writes into [out] starting at [bufferOffset] rather than
+     * position 0. Required by Media3's `DataSource.read(buffer, offset, length)`
+     * contract. Uses a thread-local buffer to avoid heap allocations.
+     */
+    fun readStream(volId: Int, streamPtr: Long, offset: Long, out: ByteArray, length: Int, bufferOffset: Int): Int {
+        if (bufferOffset == 0) return readStream(volId, streamPtr, offset, out, length)
+        var tmp = readBufferPool.get()
+        if (tmp == null || tmp.size < length) {
+            tmp = ByteArray(length.coerceAtLeast(256 * 1024))
+            readBufferPool.set(tmp)
+        }
+        val bytesRead = readStream(volId, streamPtr, offset, tmp, length)
+        if (bytesRead > 0) {
+            System.arraycopy(tmp, 0, out, bufferOffset, bytesRead)
+        }
+        return bytesRead
+    }
+
     fun closeStream(volId: Int, streamPtr: Long) =
         withReadLock(volId) { ContainerEngine.closeStream(streamPtr, volId) }
 }

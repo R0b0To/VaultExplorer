@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
 import 'package:vaultexplorer/features/tools/models/tool_models.dart';
 
@@ -53,6 +57,28 @@ abstract class ContainerToolService {
   /// the first place).
   Future<bool> restoreBackupHeader(RepairTarget target, {String? password, void Function(String message)? onLogLine});
   Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine});
+
+  /// Runs [encryptFile]/[decryptFile] across a batch of [sources], staging
+  /// vault-sourced input through a temp file and vault-destined output
+  /// through a temp directory that gets written back via
+  /// [VaultExplorerApi.writeBackFile]. Temp files/dirs are always cleaned
+  /// up, even on failure.
+  ///
+  /// Per-file failures are collected into [BatchCryptoBatchResult.failedNames]
+  /// and the batch continues; an [UnimplementedError] or an `AUTH_FAIL`
+  /// [PlatformException] aborts the whole batch immediately (see
+  /// [BatchCryptoBatchResult.abortReason]).
+  Future<BatchCryptoBatchResult> runBatchFileCrypto({
+    required CryptoDirection direction,
+    required List<CryptoSourceItem> sources,
+    required CryptoDestination destination,
+    required StandaloneCipher cipher,
+    required String passphrase,
+    required List<String> keyfilePaths,
+    required bool deleteOriginal,
+    void Function(int currentIndex, int totalFiles)? onFileStart,
+    void Function(int bytesDone, int bytesTotal)? onFileProgress,
+  });
 }
 
 class DefaultContainerToolService implements ContainerToolService {
@@ -110,6 +136,156 @@ class DefaultContainerToolService implements ContainerToolService {
   @override
   Future<bool> runFilesystemCheck(MountedVolumeTarget target, {void Function(String message)? onLogLine}) =>
       throw UnimplementedError('runFilesystemCheck is not implemented yet.');
+
+  @override
+  Future<BatchCryptoBatchResult> runBatchFileCrypto({
+    required CryptoDirection direction,
+    required List<CryptoSourceItem> sources,
+    required CryptoDestination destination,
+    required StandaloneCipher cipher,
+    required String passphrase,
+    required List<String> keyfilePaths,
+    required bool deleteOriginal,
+    void Function(int currentIndex, int totalFiles)? onFileStart,
+    void Function(int bytesDone, int bytesTotal)? onFileProgress,
+  }) async {
+    final failedNames = <String>[];
+    var succeeded = 0;
+
+    for (var i = 0; i < sources.length; i++) {
+      final source = sources[i];
+      onFileStart?.call(i + 1, sources.length);
+
+      Directory? tempInDir;
+      Directory? tempOutDir;
+
+      try {
+        // 1. Prepare input file path/URI
+        String effectiveSourceUri;
+
+        if (source.isFromVault) {
+          tempInDir = await Directory.systemTemp.createTemp('vx_crypto_in_');
+          final tempInFile = File(p.join(tempInDir.path, source.displayName));
+          final extracted = await vaultExplorerApi.decryptFile(
+            source.container!,
+            source.relativePath!,
+            tempInFile.path,
+          );
+          if (!extracted || !tempInFile.existsSync()) {
+            throw Exception('Failed to extract file from source vault');
+          }
+          effectiveSourceUri = Uri.file(tempInFile.path).toString();
+        } else {
+          effectiveSourceUri = source.externalUri!;
+        }
+
+        // 2. Prepare destination path
+        String? effectiveDestPath;
+        String? effectiveTreeUri;
+
+        if (destination.isVault) {
+          tempOutDir = await Directory.systemTemp.createTemp('vx_crypto_out_');
+          effectiveDestPath = tempOutDir.path;
+          effectiveTreeUri = null;
+        } else {
+          effectiveDestPath = destination.externalPath;
+          effectiveTreeUri = destination.externalTreeUri;
+        }
+
+        // 3. Execute crypto operation
+        if (direction == CryptoDirection.encrypt) {
+          await encryptFile(
+            sourceUri: effectiveSourceUri,
+            cipher: cipher,
+            passphrase: passphrase,
+            keyfilePaths: keyfilePaths,
+            deleteOriginalAfter: source.isFromVault ? false : deleteOriginal,
+            destinationPath: effectiveDestPath,
+            destinationTreeUri: effectiveTreeUri,
+            onProgress: onFileProgress,
+          );
+        } else {
+          await decryptFile(
+            sourceUri: effectiveSourceUri,
+            passphrase: passphrase,
+            keyfilePaths: keyfilePaths,
+            destinationPath: effectiveDestPath,
+            destinationTreeUri: effectiveTreeUri,
+            onProgress: onFileProgress,
+          );
+        }
+
+        // 4. If destination is a vault, copy generated output file(s) into target vault
+        if (destination.isVault && tempOutDir != null) {
+          final generatedFiles = tempOutDir.listSync().whereType<File>().toList();
+          if (generatedFiles.isEmpty) {
+            throw Exception('No output file generated by crypto engine');
+          }
+          for (final outFile in generatedFiles) {
+            final outFileName = p.basename(outFile.path);
+            final vaultPath = destination.relativePath!.isEmpty
+                ? outFileName
+                : '${destination.relativePath!}/$outFileName';
+            final wroteBack = await vaultExplorerApi.writeBackFile(
+              destination.container!,
+              vaultPath,
+              outFile.path,
+            );
+            if (!wroteBack) {
+              throw Exception('Failed to write output file to target vault');
+            }
+            await vaultExplorerApi.finishWriteIfCryptomator(
+              destination.container!,
+              vaultPath,
+            );
+          }
+        }
+
+        // 5. Delete source from vault if requested
+        if (deleteOriginal && direction == CryptoDirection.encrypt && source.isFromVault) {
+          await vaultExplorerApi.deleteFile(source.container!, source.relativePath!);
+        }
+
+        succeeded++;
+      } on UnimplementedError {
+        return BatchCryptoBatchResult(
+          abortReason: BatchCryptoAbortReason.notImplemented,
+          succeeded: succeeded,
+          totalFiles: sources.length,
+          failedNames: failedNames,
+        );
+      } on PlatformException catch (e) {
+        if (e.code == 'AUTH_FAIL') {
+          return BatchCryptoBatchResult(
+            abortReason: BatchCryptoAbortReason.authFailure,
+            succeeded: succeeded,
+            totalFiles: sources.length,
+            failedNames: failedNames,
+          );
+        }
+        failedNames.add(source.displayName);
+      } catch (_) {
+        failedNames.add(source.displayName);
+      } finally {
+        if (tempInDir != null && tempInDir.existsSync()) {
+          try {
+            tempInDir.deleteSync(recursive: true);
+          } catch (_) {}
+        }
+        if (tempOutDir != null && tempOutDir.existsSync()) {
+          try {
+            tempOutDir.deleteSync(recursive: true);
+          } catch (_) {}
+        }
+      }
+    }
+
+    return BatchCryptoBatchResult(
+      succeeded: succeeded,
+      totalFiles: sources.length,
+      failedNames: failedNames,
+    );
+  }
 }
 
 class NativeContainerToolService extends DefaultContainerToolService {

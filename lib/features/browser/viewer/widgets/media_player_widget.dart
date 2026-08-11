@@ -514,7 +514,10 @@ class _MediaPlayerWidgetState extends State<MediaPlayerWidget> {
           alignment: Alignment.center,
           children: [
             _buildPoster(cs, isLoading: _isActive),
-            if (!widget.isAudio && controller != null && isVideoReady)
+            // Mount the native PlayerView early so its SurfaceView
+            // exists before ExoPlayer's first decoded frame. The view
+            // internally handles sizing/visibility.
+            if (!widget.isAudio && controller != null && _isActive)
               RotatedBox(
                 quarterTurns: widget.rotationQuarterTurns,
                 child: NativeVideoPlayerView(controller: controller),

@@ -138,6 +138,11 @@ flutter {
 
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
+    // Media3 — native ExoPlayer pipeline (bypasses SAF/ContentProvider IPC)
+    implementation("androidx.media3:media3-exoplayer:1.6.1")
+    implementation("androidx.media3:media3-ui:1.6.1")
+    implementation("androidx.media3:media3-session:1.6.1")
+    implementation("androidx.media3:media3-datasource:1.6.1")
     testImplementation("junit:junit:4.13.2")
 }
 

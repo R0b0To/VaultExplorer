@@ -21,6 +21,7 @@
 namespace { constexpr size_t kIoBufferSize = 262144; }
 
 #define EXT_LOGI(...) __android_log_print(ANDROID_LOG_INFO, "VaultExplorer_C++", __VA_ARGS__)
+#define EXT_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "VaultExplorer_C++", __VA_ARGS__)
 
 bool extResolvePath(ext2_filsys fs, const std::string& path, ext2_ino_t* inode) {
     std::string relative = path;
@@ -93,7 +94,11 @@ uint64_t recursiveExtFolderSize(int volumeId, const std::string& path) {
 bool extOpenFile(ext2_filsys fs, const std::string& path, bool write, bool create, ext2_file_t* out) {
     ext2_ino_t inodeNumber = 0;
     if (!extResolvePath(fs, path, &inodeNumber)) {
-        if (!create) return false;
+        if (!create) {
+            EXT_LOGE("extOpenFile: path resolution failed (directory entry missing or unreadable)",
+                     path.c_str());
+            return false;
+        }
         const size_t slash = path.find_last_of('/');
         const std::string parentPath = slash == std::string::npos ? "" : path.substr(0, slash);
         const std::string name = slash == std::string::npos ? path : path.substr(slash + 1);
@@ -107,7 +112,13 @@ bool extOpenFile(ext2_filsys fs, const std::string& path, bool write, bool creat
             ext2fs_link(fs, parent, name.c_str(), inodeNumber, EXT2_FT_REG_FILE) != 0) return false;
         ext2fs_inode_alloc_stats2(fs, inodeNumber, +1, 0);
     }
-    return ext2fs_file_open(fs, inodeNumber, write ? EXT2_FILE_WRITE : 0, out) == 0;
+    const errcode_t openErr = ext2fs_file_open(fs, inodeNumber, write ? EXT2_FILE_WRITE : 0, out);
+    if (openErr != 0) {
+        EXT_LOGE("extOpenFile: ext2fs_file_open failed for '%s' inode=%u err=%lu (%s)",
+                 path.c_str(), inodeNumber, (unsigned long)openErr, error_message(openErr));
+        return false;
+    }
+    return true;
 }
 
 bool extWriteFromHostFile(ext2_filsys fs, const std::string& path, const char* source) {
@@ -837,9 +848,17 @@ uint64_t extGetFileSize(int volumeId, const std::string& path) {
     uint64_t size = 0;
     ext2_ino_t ino = 0;
     struct ext2_inode inode{};
-    if (extResolvePath(v.extFs, path, &ino) &&
-        ext2fs_read_inode(v.extFs, ino, &inode) == 0)
-        size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
+    if (!extResolvePath(v.extFs, path, &ino)) {
+        EXT_LOGE("extGetFileSize: path resolution failed", path.c_str());
+        return 0;
+    }
+    const errcode_t readErr = ext2fs_read_inode(v.extFs, ino, &inode);
+    if (readErr != 0) {
+        EXT_LOGE("extGetFileSize: ext2fs_read_inode failed inode=%u err=%lu (%s)",
+                 path.c_str(), ino, (unsigned long)readErr, error_message(readErr));
+        return 0;
+    }
+    size = (static_cast<uint64_t>(inode.i_size_high) << 32) | inode.i_size;
     return size;
 }
 
@@ -1082,6 +1101,7 @@ void* extOpenStream(int volumeId, const std::string& path) {
         v.openExtStreams.push_back(stream);
         return stream;
     }
+    EXT_LOGE("extOpenStream: failed to open '%s' on volume %d", path.c_str(), volumeId);
     return nullptr;
 }
 
@@ -1091,10 +1111,19 @@ int32_t extReadStream(int volumeId, void* handle, uint64_t offset, uint8_t* dest
     if (std::find(v.openExtStreams.begin(), v.openExtStreams.end(), stream) == v.openExtStreams.end()) return -1;
     __u64 position = 0;
     unsigned int got = 0;
-    if (ext2fs_file_llseek(stream->file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position) == 0 &&
-        ext2fs_file_read(stream->file, dest, static_cast<unsigned int>(length), &got) == 0)
-        return static_cast<int32_t>(got);
-    return -1;
+    const errcode_t seekErr = ext2fs_file_llseek(stream->file, static_cast<__u64>(offset), EXT2_SEEK_SET, &position);
+    if (seekErr != 0) {
+        EXT_LOGE("extReadStream: llseek to offset=%llu failed err=%lu (%s)",
+                 (unsigned long long)offset, (unsigned long)seekErr, error_message(seekErr));
+        return -1;
+    }
+    const errcode_t readErr = ext2fs_file_read(stream->file, dest, static_cast<unsigned int>(length), &got);
+    if (readErr != 0) {
+        EXT_LOGE("extReadStream: read at offset=%llu length=%zu failed err=%lu (%s)",
+                 (unsigned long long)offset, length, (unsigned long)readErr, error_message(readErr));
+        return -1;
+    }
+    return static_cast<int32_t>(got);
 }
 
 void extCloseStream(int volumeId, void* handle) {

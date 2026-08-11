@@ -4259,4 +4259,344 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get exportKeyfileToStorage => 'Export to Device Storage';
+
+  @override
+  String get keyfileNoOpenVaultsMessage =>
+      'No open vaults available. Please mount a vault first.';
+
+  @override
+  String get keyfileSelectDestinationVaultTitle => 'Select Destination Vault';
+
+  @override
+  String keyfileVolumeIdLabel(Object volId) {
+    return 'Volume ID: $volId';
+  }
+
+  @override
+  String keyfileExportSuccessMessage(Object path) {
+    return 'Keyfile exported to $path';
+  }
+
+  @override
+  String keyfileExportFailedMessage(Object error) {
+    return 'Export failed: $error';
+  }
+
+  @override
+  String keyfileSavedToVaultMessage(Object vaultName, Object path) {
+    return 'Keyfile saved to $vaultName: $path';
+  }
+
+  @override
+  String get keyfileWriteFailedMessage => 'Failed to write keyfile to vault';
+
+  @override
+  String keyfileSaveErrorMessage(Object error) {
+    return 'Error saving to vault: $error';
+  }
+
+  @override
+  String get passphraseGeneratedSecretLabel => 'Generated Secret';
+
+  @override
+  String get copyToClipboardTooltip => 'Copy to Clipboard';
+
+  @override
+  String get generateNewTooltip => 'Generate New';
+
+  @override
+  String passphraseStrengthLabel(Object label) {
+    return 'Strength: $label';
+  }
+
+  @override
+  String passphraseEntropyBitsLabel(Object bits) {
+    return '$bits bits entropy';
+  }
+
+  @override
+  String passphraseCrackTimeLabel(Object crackTime) {
+    return 'Estimated crack time: $crackTime';
+  }
+
+  @override
+  String get dicewareOptionsTitle => 'EFF Diceware Options';
+
+  @override
+  String dicewareWordCountLabel(Object count) {
+    return 'Word Count: $count words';
+  }
+
+  @override
+  String dicewareWordCountBitsLabel(Object bits) {
+    return '$bits bits';
+  }
+
+  @override
+  String dicewareWordCountSliderLabel(Object count) {
+    return '$count words';
+  }
+
+  @override
+  String get dicewareWordSeparatorLabel => 'Word Separator';
+
+  @override
+  String get dicewareSeparatorHyphen => 'Hyphen ( - )';
+
+  @override
+  String get dicewareSeparatorSpace => 'Space (   )';
+
+  @override
+  String get dicewareSeparatorUnderscore => 'Underscore ( _ )';
+
+  @override
+  String get dicewareSeparatorDot => 'Dot ( . )';
+
+  @override
+  String get dicewareSeparatorSlash => 'Slash ( / )';
+
+  @override
+  String get dicewareWordCasingLabel => 'Word Casing';
+
+  @override
+  String get dicewareCasingLowercase => 'lowercase';
+
+  @override
+  String get dicewareCasingTitleCase => 'Title Case';
+
+  @override
+  String get dicewareCasingUppercase => 'UPPERCASE';
+
+  @override
+  String get dicewareAppendDigitLabel => 'Append Random Digit (0-9)';
+
+  @override
+  String get dicewareAppendSymbolLabel => 'Append Random Symbol (!@#\$%)';
+
+  @override
+  String get customPasswordOptionsTitle => 'Custom Password Options';
+
+  @override
+  String customPasswordLengthLabel(Object length) {
+    return 'Length: $length characters';
+  }
+
+  @override
+  String customPasswordLengthSliderLabel(Object length) {
+    return '$length chars';
+  }
+
+  @override
+  String get customPasswordUppercaseLabel => 'Uppercase Letters (A-Z)';
+
+  @override
+  String get customPasswordLowercaseLabel => 'Lowercase Letters (a-z)';
+
+  @override
+  String get customPasswordNumbersLabel => 'Numbers (0-9)';
+
+  @override
+  String get customPasswordSymbolsLabel => 'Symbols (!@#\$%^&*)';
+
+  @override
+  String get customPasswordExcludeAmbiguousLabel =>
+      'Exclude Ambiguous (1, l, I, 0, O)';
+
+  @override
+  String get keyfileBinarySizeTitle => 'Binary Keyfile Size';
+
+  @override
+  String get keyfileImageResolutionTitle => 'Noise Image Resolution';
+
+  @override
+  String get keyfileGenerateNewTooltip => 'Generate New Keyfile';
+
+  @override
+  String keyfileSizeLabel(Object size) {
+    return 'Size: $size';
+  }
+
+  @override
+  String get keyfileFingerprintLabel => 'SHA-256 Fingerprint';
+
+  @override
+  String get keyfileCopyFingerprintTooltip => 'Copy Fingerprint';
+
+  @override
+  String get duplicateFinderNoVaultsTitle => 'No Mounted Vaults';
+
+  @override
+  String get duplicateFinderNoVaultsMessage =>
+      'Unlock and mount at least one vault container to scan for duplicate files.';
+
+  @override
+  String duplicateFinderConfirmDeleteMessage(Object count, Object size) {
+    return 'Are you sure you want to permanently delete $count duplicate file(s) ($size) from your vault(s)? This action cannot be undone.';
+  }
+
+  @override
+  String get duplicateFinderDeletePermanentlyButton => 'Delete Permanently';
+
+  @override
+  String duplicateFinderDeleteSuccessMessage(Object count) {
+    return 'Successfully deleted $count duplicate file(s).';
+  }
+
+  @override
+  String get duplicateFinderIntroTitle => '3-Stage Byte-Equal Finder';
+
+  @override
+  String get duplicateFinderIntroSubtitle =>
+      'Detect exact identical content regardless of filenames.';
+
+  @override
+  String get duplicateFinderStagesDescription =>
+      '• Stage 1: Size Grouping (Instant metadata walk)\n• Stage 2: Partial Header Check (16 KB SHA-256 header)\n• Stage 3: Full Hash Verification (Exact SHA-256 byte match)';
+
+  @override
+  String get duplicateFinderScanningVaultFallback => 'Scanning vault...';
+
+  @override
+  String duplicateFinderProcessingFileLabel(Object fileName) {
+    return 'Processing: $fileName';
+  }
+
+  @override
+  String duplicateFinderScanStatsLabel(
+    Object scanned,
+    Object groups,
+    Object saved,
+  ) {
+    return 'Files scanned: $scanned | Duplicates found: $groups groups ($saved)';
+  }
+
+  @override
+  String duplicateFinderGroupsFoundLabel(Object count) {
+    return '$count Duplicate Groups Found';
+  }
+
+  @override
+  String duplicateFinderGroupsSummaryLabel(Object copies, Object saved) {
+    return '$copies copies found • Save $saved storage space';
+  }
+
+  @override
+  String duplicateFinderVaultsSelectedLabel(Object count) {
+    return '$count vaults selected';
+  }
+
+  @override
+  String duplicateFinderGroupTitleLabel(
+    Object groupIndex,
+    Object size,
+    Object count,
+  ) {
+    return 'Group $groupIndex: $size ($count copies found)';
+  }
+
+  @override
+  String duplicateFinderRecoverableSpaceLabel(Object size) {
+    return 'Recoverable space: $size';
+  }
+
+  @override
+  String get duplicateFinderPreviewFileTooltip => 'Preview File';
+
+  @override
+  String duplicateFinderPreviewFailedMessage(Object fileName) {
+    return 'Could not open file preview for $fileName';
+  }
+
+  @override
+  String duplicateFinderPreviewErrorMessage(Object error) {
+    return 'Error previewing file: $error';
+  }
+
+  @override
+  String duplicateFinderFilesSelectedLabel(Object count) {
+    return '$count files selected';
+  }
+
+  @override
+  String duplicateFinderBytesToBeFreedLabel(Object size) {
+    return '$size to be freed';
+  }
+
+  @override
+  String duplicateFinderDeleteSelectedButton(Object count) {
+    return 'Delete Selected ($count)';
+  }
+
+  @override
+  String get vaultBrowserSwitchVaultTooltip => 'Switch Vault';
+
+  @override
+  String get vaultBrowserRootFolderLabel => 'Root Folder';
+
+  @override
+  String vaultFilePickerTitle(Object vaultName) {
+    return 'Select Files ($vaultName)';
+  }
+
+  @override
+  String get vaultFilePickerEmptyMessage => 'Folder is empty';
+
+  @override
+  String vaultFilePickerConfirmButton(Object count) {
+    return 'Select $count File(s)';
+  }
+
+  @override
+  String vaultFolderPickerTitle(Object vaultName) {
+    return 'Select Folder ($vaultName)';
+  }
+
+  @override
+  String get vaultFolderPickerEmptyMessage => 'No subfolders here';
+
+  @override
+  String get vaultFolderPickerRootLabel => 'Root';
+
+  @override
+  String get vaultFolderPickerConfirmRootButton => 'Select Root Folder';
+
+  @override
+  String vaultFolderPickerConfirmNamedButton(Object folderName) {
+    return 'Select \"$folderName\"';
+  }
+
+  @override
+  String get singleFileCryptoSelectInputTitle => 'Select Input Files';
+
+  @override
+  String get singleFileCryptoFromDeviceTitle => 'From Device Storage';
+
+  @override
+  String get singleFileCryptoFromDeviceSubtitle =>
+      'Pick files from device using system file picker';
+
+  @override
+  String get singleFileCryptoFromVaultTitle => 'From Mounted Vault';
+
+  @override
+  String get singleFileCryptoFromVaultSubtitle =>
+      'Pick files from an open encrypted container';
+
+  @override
+  String get singleFileCryptoSelectDestinationTitle =>
+      'Select Destination Folder';
+
+  @override
+  String get singleFileCryptoDeviceFolderTitle => 'Device Storage Folder';
+
+  @override
+  String get singleFileCryptoDeviceFolderSubtitle =>
+      'Save output to a folder on device storage';
+
+  @override
+  String get singleFileCryptoVaultFolderTitle => 'Mounted Vault Folder';
+
+  @override
+  String get singleFileCryptoVaultFolderSubtitle =>
+      'Save output inside an open encrypted container';
 }

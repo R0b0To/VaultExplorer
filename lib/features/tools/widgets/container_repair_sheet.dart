@@ -196,7 +196,7 @@ class _ContainerRepairSheetState extends State<ContainerRepairSheet> {
           },
         );
       },
-    );
+    ).whenComplete(controller.dispose);
   }
 
   Future<void> _runFilesystemCheck() async {

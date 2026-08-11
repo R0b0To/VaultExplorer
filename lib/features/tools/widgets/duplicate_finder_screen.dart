@@ -182,8 +182,10 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
       builder: (ctx) => AlertDialog(
         title: Text(ctx.l10n.duplicateFinderConfirmDeleteTitle),
         content: Text(
-          'Are you sure you want to permanently delete ${itemsToDelete.length} duplicate file(s) '
-          '(${formatBytes(_selectedBytesTotal)}) from your vault(s)? This action cannot be undone.',
+          context.l10n.duplicateFinderConfirmDeleteMessage(
+            itemsToDelete.length,
+            formatBytes(_selectedBytesTotal),
+          ),
         ),
         actions: [
           TextButton(
@@ -196,7 +198,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               foregroundColor: ctx.colors.onError,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete Permanently'),
+            child: Text(ctx.l10n.duplicateFinderDeletePermanentlyButton),
           ),
         ],
       ),
@@ -226,7 +228,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Successfully deleted $deletedCount duplicate file(s).'),
+            content: Text(context.l10n.duplicateFinderDeleteSuccessMessage(deletedCount)),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -299,10 +301,20 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     try {
       final ok = await vaultExplorerApi.openWithApp(item.container, item.relativePath);
       if (!ok && mounted) {
-        showAppSnackBar(context, message: 'Could not open file preview for ${item.name}', tone: AppBannerTone.error);
+        showAppSnackBar(
+          context,
+          message: context.l10n.duplicateFinderPreviewFailedMessage(item.name),
+          tone: AppBannerTone.error,
+        );
       }
     } catch (e) {
-      if (mounted) showAppSnackBar(context, message: 'Error previewing file: $e', tone: AppBannerTone.error);
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: context.l10n.duplicateFinderPreviewErrorMessage(e),
+          tone: AppBannerTone.error,
+        );
+      }
     }
   }
 
@@ -341,34 +353,47 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           if (mountedList.isEmpty) {
             return AppEmptyState(
               icon: Icons.find_in_page_outlined,
-              title: 'No Mounted Vaults',
-              message: 'Unlock and mount at least one vault container to scan for duplicate files.',
+              title: context.l10n.duplicateFinderNoVaultsTitle,
+              message: context.l10n.duplicateFinderNoVaultsMessage,
             );
           }
 
           final filteredGroups = _getFilteredGroups();
+          final showGroupList =
+              !_isScanning && _progress.stage != DuplicateScanStage.idle && _groups.isNotEmpty;
 
-          return ListView(
+          return ListView.builder(
             padding: AppSpacing.pagePadding,
-            children: [
-              _buildTargetPicker(context, mountedList),
-              const SizedBox(height: AppSpacing.md),
-              if (_isScanning)
-                _buildScanProgressCard(context)
-              else if (_progress.stage == DuplicateScanStage.idle)
-                _buildIdleCard(context)
-              else if (_groups.isEmpty)
-                _buildNoDuplicatesCard(context)
-              else ...[
-                _buildSummaryCard(context),
-                const SizedBox(height: AppSpacing.md),
-                _buildSearchBar(context),
-                const SizedBox(height: AppSpacing.md),
-                ...filteredGroups.asMap().entries.map(
-                  (entry) => _buildGroupTile(context, entry.key + 1, entry.value, mountedList.length > 1),
-                ),
-              ],
-            ],
+            itemCount: 1 + (showGroupList ? filteredGroups.length : 0),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildTargetPicker(context, mountedList),
+                    const SizedBox(height: AppSpacing.md),
+                    if (_isScanning)
+                      _buildScanProgressCard(context)
+                    else if (_progress.stage == DuplicateScanStage.idle)
+                      _buildIdleCard(context)
+                    else if (_groups.isEmpty)
+                      _buildNoDuplicatesCard(context)
+                    else ...[
+                      _buildSummaryCard(context),
+                      const SizedBox(height: AppSpacing.md),
+                      _buildSearchBar(context),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                  ],
+                );
+              }
+              return _buildGroupTile(
+                context,
+                index,
+                filteredGroups[index - 1],
+                mountedList.length > 1,
+              );
+            },
           );
         },
       ),
@@ -392,7 +417,9 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
       label: context.l10n.duplicateFinderTargetLabel,
       value: _selectedTargetVolId,
       subtitle: _selectedTargetVolId == -1
-          ? (mountedList.length > 1 ? '${mountedList.length} vaults selected' : mountedList.first.displayName)
+          ? (mountedList.length > 1
+              ? context.l10n.duplicateFinderVaultsSelectedLabel(mountedList.length)
+              : mountedList.first.displayName)
           : mountedList.firstWhere((c) => c.volId == _selectedTargetVolId, orElse: () => mountedList.first).displayName,
       prefixIcon: Icons.lock_open_rounded,
       options: options,
@@ -434,11 +461,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '3-Stage Byte-Equal Finder',
+                          context.l10n.duplicateFinderIntroTitle,
                           style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          'Detect exact identical content regardless of filenames.',
+                          context.l10n.duplicateFinderIntroSubtitle,
                           style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                         ),
                       ],
@@ -448,9 +475,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                '• Stage 1: Size Grouping (Instant metadata walk)\n'
-                '• Stage 2: Partial Header Check (16 KB SHA-256 header)\n'
-                '• Stage 3: Full Hash Verification (Exact SHA-256 byte match)',
+                context.l10n.duplicateFinderStagesDescription,
                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.5),
               ),
               const SizedBox(height: 20),
@@ -485,7 +510,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
         stageLabel = context.l10n.duplicateFinderScanningStage3;
         break;
       default:
-        stageLabel = 'Scanning vault...';
+        stageLabel = context.l10n.duplicateFinderScanningVaultFallback;
     }
 
     return SectionCard(
@@ -519,14 +544,18 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               const SizedBox(height: 12),
               if (_progress.currentFileName != null)
                 Text(
-                  'Processing: ${_progress.currentFileName}',
+                  context.l10n.duplicateFinderProcessingFileLabel(_progress.currentFileName!),
                   style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               const SizedBox(height: 6),
               Text(
-                'Files scanned: ${_progress.totalFilesScanned} | Duplicates found: ${_progress.duplicateGroupCount} groups (${formatBytes(_progress.potentialSavedBytes)})',
+                context.l10n.duplicateFinderScanStatsLabel(
+                  _progress.totalFilesScanned,
+                  _progress.duplicateGroupCount,
+                  formatBytes(_progress.potentialSavedBytes),
+                ),
                 style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 16),
@@ -594,11 +623,14 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${_groups.length} Duplicate Groups Found',
+                          context.l10n.duplicateFinderGroupsFoundLabel(_groups.length),
                           style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         Text(
-                          '$totalDupFiles copies found • Save ${formatBytes(totalWaste)} storage space',
+                          context.l10n.duplicateFinderGroupsSummaryLabel(
+                            totalDupFiles,
+                            formatBytes(totalWaste),
+                          ),
                           style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, fontWeight: FontWeight.w600),
                         ),
                       ],
@@ -701,11 +733,15 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             ),
           ),
           title: Text(
-            'Group $groupIndex: ${formatBytes(group.sizeBytes)} (${group.files.length} copies found)',
+            context.l10n.duplicateFinderGroupTitleLabel(
+              groupIndex,
+              formatBytes(group.sizeBytes),
+              group.files.length,
+            ),
             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           subtitle: Text(
-            'Recoverable space: ${formatBytes(group.totalWasteBytes)}',
+            context.l10n.duplicateFinderRecoverableSpaceLabel(formatBytes(group.totalWasteBytes)),
             style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
           children: group.files.asMap().entries.map((e) {
@@ -772,7 +808,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                 ),
                 trailing: IconButton(
                   icon: const Icon(Icons.open_in_new_rounded, size: 20),
-                  tooltip: 'Preview File',
+                  tooltip: context.l10n.duplicateFinderPreviewFileTooltip,
                   onPressed: () => _previewFile(item),
                 ),
               ),
@@ -824,11 +860,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '$_selectedCount files selected',
+                    context.l10n.duplicateFinderFilesSelectedLabel(_selectedCount),
                     style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                   ),
                   Text(
-                    '${formatBytes(_selectedBytesTotal)} to be freed',
+                    context.l10n.duplicateFinderBytesToBeFreedLabel(formatBytes(_selectedBytesTotal)),
                     style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ],
@@ -843,7 +879,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               ),
               onPressed: _deleteSelected,
               icon: const Icon(Icons.delete_forever_rounded),
-              label: Text('Delete Selected ($_selectedCount)'),
+              label: Text(context.l10n.duplicateFinderDeleteSelectedButton(_selectedCount)),
             ),
           ],
         ),

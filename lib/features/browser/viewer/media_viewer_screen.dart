@@ -158,7 +158,8 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     if (isVid || isAud) {
       unawaited(_playbackManager.activate(
         fileName: file,
-        contentUriString: _contentUriFor(file),
+        volId: widget.container.volId,
+        filePath: file,
         autoPlay: _autoPlay,
         playbackSpeed: _playbackSpeed,
         looping: _videoPlaybackMode == VideoPlaybackMode.loop,
@@ -941,6 +942,7 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
           initialPlaybackSpeed: _playbackSpeed,
           hasSubtitles: _playbackManager.isSubtitleAvailable(_playlistController.currentFile),
           initialSubtitlesEnabled: _subtitlesEnabled,
+          videoController: _playbackManager.activeController,
           onRotationChanged: (rot) {
             _startHideTimer();
             setState(() {
@@ -983,11 +985,12 @@ class _MediaViewerScreenState extends State<MediaViewerScreen> {
     final controller = _playbackManager.activeController;
     if (controller == null) return;
     _menuOpened();
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
+      barrierDismissible: true,
       builder: (context) {
-        return MediaDiagnosticsSheet(
+        return MediaDiagnosticsDialog(
           fileName: _playlistController.currentFile,
           controller: controller,
           playbackSpeed: _playbackSpeed,

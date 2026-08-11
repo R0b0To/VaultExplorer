@@ -7175,6 +7175,530 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Export to Device Storage'**
   String get exportKeyfileToStorage;
+
+  /// Warning shown when trying to save a keyfile to a vault but none are mounted
+  ///
+  /// In en, this message translates to:
+  /// **'No open vaults available. Please mount a vault first.'**
+  String get keyfileNoOpenVaultsMessage;
+
+  /// Bottom sheet title for choosing which mounted vault to save a keyfile into
+  ///
+  /// In en, this message translates to:
+  /// **'Select Destination Vault'**
+  String get keyfileSelectDestinationVaultTitle;
+
+  /// Subtitle showing a mounted vault's volume id in the destination picker
+  ///
+  /// In en, this message translates to:
+  /// **'Volume ID: {volId}'**
+  String keyfileVolumeIdLabel(Object volId);
+
+  /// Snackbar shown after a keyfile is exported to device storage
+  ///
+  /// In en, this message translates to:
+  /// **'Keyfile exported to {path}'**
+  String keyfileExportSuccessMessage(Object path);
+
+  /// Snackbar shown when exporting a keyfile to device storage fails
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String keyfileExportFailedMessage(Object error);
+
+  /// Snackbar shown after a keyfile is written into a mounted vault
+  ///
+  /// In en, this message translates to:
+  /// **'Keyfile saved to {vaultName}: {path}'**
+  String keyfileSavedToVaultMessage(Object vaultName, Object path);
+
+  /// Snackbar shown when writing a keyfile into a mounted vault fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to write keyfile to vault'**
+  String get keyfileWriteFailedMessage;
+
+  /// Snackbar shown when an exception is thrown while saving a keyfile to a vault
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving to vault: {error}'**
+  String keyfileSaveErrorMessage(Object error);
+
+  /// Label above the generated passphrase/password output
+  ///
+  /// In en, this message translates to:
+  /// **'Generated Secret'**
+  String get passphraseGeneratedSecretLabel;
+
+  /// Tooltip for the icon button that copies the generated secret to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Copy to Clipboard'**
+  String get copyToClipboardTooltip;
+
+  /// Tooltip for the icon button that regenerates the passphrase/password
+  ///
+  /// In en, this message translates to:
+  /// **'Generate New'**
+  String get generateNewTooltip;
+
+  /// Label showing the qualitative strength rating of the generated passphrase
+  ///
+  /// In en, this message translates to:
+  /// **'Strength: {label}'**
+  String passphraseStrengthLabel(Object label);
+
+  /// Label showing the entropy in bits of the generated passphrase
+  ///
+  /// In en, this message translates to:
+  /// **'{bits} bits entropy'**
+  String passphraseEntropyBitsLabel(Object bits);
+
+  /// Label showing the estimated brute-force crack time of the generated passphrase
+  ///
+  /// In en, this message translates to:
+  /// **'Estimated crack time: {crackTime}'**
+  String passphraseCrackTimeLabel(Object crackTime);
+
+  /// Section title for the EFF Diceware passphrase configuration card
+  ///
+  /// In en, this message translates to:
+  /// **'EFF Diceware Options'**
+  String get dicewareOptionsTitle;
+
+  /// Label showing how many diceware words are currently configured
+  ///
+  /// In en, this message translates to:
+  /// **'Word Count: {count} words'**
+  String dicewareWordCountLabel(Object count);
+
+  /// Label showing the approximate entropy in bits contributed by the diceware word count
+  ///
+  /// In en, this message translates to:
+  /// **'{bits} bits'**
+  String dicewareWordCountBitsLabel(Object bits);
+
+  /// Compact slider thumb label for the diceware word count
+  ///
+  /// In en, this message translates to:
+  /// **'{count} words'**
+  String dicewareWordCountSliderLabel(Object count);
+
+  /// Label for the diceware word separator dropdown
+  ///
+  /// In en, this message translates to:
+  /// **'Word Separator'**
+  String get dicewareWordSeparatorLabel;
+
+  /// Diceware word separator option: a hyphen character
+  ///
+  /// In en, this message translates to:
+  /// **'Hyphen ( - )'**
+  String get dicewareSeparatorHyphen;
+
+  /// Diceware word separator option: a space character
+  ///
+  /// In en, this message translates to:
+  /// **'Space (   )'**
+  String get dicewareSeparatorSpace;
+
+  /// Diceware word separator option: an underscore character
+  ///
+  /// In en, this message translates to:
+  /// **'Underscore ( _ )'**
+  String get dicewareSeparatorUnderscore;
+
+  /// Diceware word separator option: a dot character
+  ///
+  /// In en, this message translates to:
+  /// **'Dot ( . )'**
+  String get dicewareSeparatorDot;
+
+  /// Diceware word separator option: a slash character
+  ///
+  /// In en, this message translates to:
+  /// **'Slash ( / )'**
+  String get dicewareSeparatorSlash;
+
+  /// Label for the diceware word casing dropdown
+  ///
+  /// In en, this message translates to:
+  /// **'Word Casing'**
+  String get dicewareWordCasingLabel;
+
+  /// Diceware word casing option: all lowercase
+  ///
+  /// In en, this message translates to:
+  /// **'lowercase'**
+  String get dicewareCasingLowercase;
+
+  /// Diceware word casing option: Title Case
+  ///
+  /// In en, this message translates to:
+  /// **'Title Case'**
+  String get dicewareCasingTitleCase;
+
+  /// Diceware word casing option: ALL UPPERCASE
+  ///
+  /// In en, this message translates to:
+  /// **'UPPERCASE'**
+  String get dicewareCasingUppercase;
+
+  /// Switch label to append a random digit to the diceware passphrase
+  ///
+  /// In en, this message translates to:
+  /// **'Append Random Digit (0-9)'**
+  String get dicewareAppendDigitLabel;
+
+  /// Switch label to append a random symbol to the diceware passphrase
+  ///
+  /// In en, this message translates to:
+  /// **'Append Random Symbol (!@#\$%)'**
+  String get dicewareAppendSymbolLabel;
+
+  /// Section title for the custom random password configuration card
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Password Options'**
+  String get customPasswordOptionsTitle;
+
+  /// Label showing the configured length of the custom password
+  ///
+  /// In en, this message translates to:
+  /// **'Length: {length} characters'**
+  String customPasswordLengthLabel(Object length);
+
+  /// Compact slider thumb label for the custom password length
+  ///
+  /// In en, this message translates to:
+  /// **'{length} chars'**
+  String customPasswordLengthSliderLabel(Object length);
+
+  /// Switch label to include uppercase letters in the custom password
+  ///
+  /// In en, this message translates to:
+  /// **'Uppercase Letters (A-Z)'**
+  String get customPasswordUppercaseLabel;
+
+  /// Switch label to include lowercase letters in the custom password
+  ///
+  /// In en, this message translates to:
+  /// **'Lowercase Letters (a-z)'**
+  String get customPasswordLowercaseLabel;
+
+  /// Switch label to include numbers in the custom password
+  ///
+  /// In en, this message translates to:
+  /// **'Numbers (0-9)'**
+  String get customPasswordNumbersLabel;
+
+  /// Switch label to include symbols in the custom password
+  ///
+  /// In en, this message translates to:
+  /// **'Symbols (!@#\$%^&*)'**
+  String get customPasswordSymbolsLabel;
+
+  /// Switch label to exclude visually ambiguous characters from the custom password
+  ///
+  /// In en, this message translates to:
+  /// **'Exclude Ambiguous (1, l, I, 0, O)'**
+  String get customPasswordExcludeAmbiguousLabel;
+
+  /// Section title for the binary keyfile size preset picker
+  ///
+  /// In en, this message translates to:
+  /// **'Binary Keyfile Size'**
+  String get keyfileBinarySizeTitle;
+
+  /// Section title for the noise image keyfile resolution preset picker
+  ///
+  /// In en, this message translates to:
+  /// **'Noise Image Resolution'**
+  String get keyfileImageResolutionTitle;
+
+  /// Tooltip for the icon button that regenerates the keyfile
+  ///
+  /// In en, this message translates to:
+  /// **'Generate New Keyfile'**
+  String get keyfileGenerateNewTooltip;
+
+  /// Label showing the size of the generated keyfile
+  ///
+  /// In en, this message translates to:
+  /// **'Size: {size}'**
+  String keyfileSizeLabel(Object size);
+
+  /// Label above the generated keyfile's SHA-256 fingerprint
+  ///
+  /// In en, this message translates to:
+  /// **'SHA-256 Fingerprint'**
+  String get keyfileFingerprintLabel;
+
+  /// Tooltip for the icon button that copies the keyfile fingerprint to the clipboard
+  ///
+  /// In en, this message translates to:
+  /// **'Copy Fingerprint'**
+  String get keyfileCopyFingerprintTooltip;
+
+  /// Empty-state title when no vaults are mounted, shown on the Duplicate Finder screen
+  ///
+  /// In en, this message translates to:
+  /// **'No Mounted Vaults'**
+  String get duplicateFinderNoVaultsTitle;
+
+  /// Empty-state message when no vaults are mounted, shown on the Duplicate Finder screen
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock and mount at least one vault container to scan for duplicate files.'**
+  String get duplicateFinderNoVaultsMessage;
+
+  /// Confirmation dialog body before permanently deleting selected duplicate files
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to permanently delete {count} duplicate file(s) ({size}) from your vault(s)? This action cannot be undone.'**
+  String duplicateFinderConfirmDeleteMessage(Object count, Object size);
+
+  /// Destructive confirm button label in the delete-duplicates dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Permanently'**
+  String get duplicateFinderDeletePermanentlyButton;
+
+  /// Snackbar shown after duplicate files are successfully deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Successfully deleted {count} duplicate file(s).'**
+  String duplicateFinderDeleteSuccessMessage(Object count);
+
+  /// Title of the idle-state intro card explaining how the duplicate finder works
+  ///
+  /// In en, this message translates to:
+  /// **'3-Stage Byte-Equal Finder'**
+  String get duplicateFinderIntroTitle;
+
+  /// Subtitle of the idle-state intro card explaining how the duplicate finder works
+  ///
+  /// In en, this message translates to:
+  /// **'Detect exact identical content regardless of filenames.'**
+  String get duplicateFinderIntroSubtitle;
+
+  /// Bulleted description of the 3 scan stages shown on the idle card
+  ///
+  /// In en, this message translates to:
+  /// **'• Stage 1: Size Grouping (Instant metadata walk)\n• Stage 2: Partial Header Check (16 KB SHA-256 header)\n• Stage 3: Full Hash Verification (Exact SHA-256 byte match)'**
+  String get duplicateFinderStagesDescription;
+
+  /// Fallback stage label shown while scanning if no more specific stage label applies
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning vault...'**
+  String get duplicateFinderScanningVaultFallback;
+
+  /// Label showing the name of the file currently being processed during a scan
+  ///
+  /// In en, this message translates to:
+  /// **'Processing: {fileName}'**
+  String duplicateFinderProcessingFileLabel(Object fileName);
+
+  /// Label showing running scan statistics: files scanned, duplicate groups found, and space that could be saved
+  ///
+  /// In en, this message translates to:
+  /// **'Files scanned: {scanned} | Duplicates found: {groups} groups ({saved})'**
+  String duplicateFinderScanStatsLabel(
+    Object scanned,
+    Object groups,
+    Object saved,
+  );
+
+  /// Summary card title showing how many duplicate groups were found
+  ///
+  /// In en, this message translates to:
+  /// **'{count} Duplicate Groups Found'**
+  String duplicateFinderGroupsFoundLabel(Object count);
+
+  /// Summary card subtitle showing total duplicate copies and space that could be saved
+  ///
+  /// In en, this message translates to:
+  /// **'{copies} copies found • Save {saved} storage space'**
+  String duplicateFinderGroupsSummaryLabel(Object copies, Object saved);
+
+  /// Subtitle on the target picker showing how many vaults are currently selected
+  ///
+  /// In en, this message translates to:
+  /// **'{count} vaults selected'**
+  String duplicateFinderVaultsSelectedLabel(Object count);
+
+  /// Title of a single duplicate group's expansion tile: group number, size, and copy count
+  ///
+  /// In en, this message translates to:
+  /// **'Group {groupIndex}: {size} ({count} copies found)'**
+  String duplicateFinderGroupTitleLabel(
+    Object groupIndex,
+    Object size,
+    Object count,
+  );
+
+  /// Subtitle of a duplicate group's expansion tile showing recoverable disk space
+  ///
+  /// In en, this message translates to:
+  /// **'Recoverable space: {size}'**
+  String duplicateFinderRecoverableSpaceLabel(Object size);
+
+  /// Tooltip for the icon button that opens a file preview from a duplicate group listing
+  ///
+  /// In en, this message translates to:
+  /// **'Preview File'**
+  String get duplicateFinderPreviewFileTooltip;
+
+  /// Snackbar shown when no viewer is available to preview the selected duplicate file
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open file preview for {fileName}'**
+  String duplicateFinderPreviewFailedMessage(Object fileName);
+
+  /// Snackbar shown when an exception is thrown while opening a duplicate file preview
+  ///
+  /// In en, this message translates to:
+  /// **'Error previewing file: {error}'**
+  String duplicateFinderPreviewErrorMessage(Object error);
+
+  /// Bottom action bar label showing how many duplicate files are currently selected for deletion
+  ///
+  /// In en, this message translates to:
+  /// **'{count} files selected'**
+  String duplicateFinderFilesSelectedLabel(Object count);
+
+  /// Bottom action bar label showing how much space will be freed by the current selection
+  ///
+  /// In en, this message translates to:
+  /// **'{size} to be freed'**
+  String duplicateFinderBytesToBeFreedLabel(Object size);
+
+  /// Bottom action bar button to delete the currently selected duplicate files, with a count
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Selected ({count})'**
+  String duplicateFinderDeleteSelectedButton(Object count);
+
+  /// Tooltip for the icon button that switches which mounted vault is being browsed
+  ///
+  /// In en, this message translates to:
+  /// **'Switch Vault'**
+  String get vaultBrowserSwitchVaultTooltip;
+
+  /// Breadcrumb label shown when browsing a vault's root folder
+  ///
+  /// In en, this message translates to:
+  /// **'Root Folder'**
+  String get vaultBrowserRootFolderLabel;
+
+  /// App bar title for the vault file picker, showing which vault is being browsed
+  ///
+  /// In en, this message translates to:
+  /// **'Select Files ({vaultName})'**
+  String vaultFilePickerTitle(Object vaultName);
+
+  /// Message shown when the current vault folder has no files or subfolders
+  ///
+  /// In en, this message translates to:
+  /// **'Folder is empty'**
+  String get vaultFilePickerEmptyMessage;
+
+  /// Confirm button label showing how many files are currently selected in the vault file picker
+  ///
+  /// In en, this message translates to:
+  /// **'Select {count} File(s)'**
+  String vaultFilePickerConfirmButton(Object count);
+
+  /// App bar title for the vault folder picker, showing which vault is being browsed
+  ///
+  /// In en, this message translates to:
+  /// **'Select Folder ({vaultName})'**
+  String vaultFolderPickerTitle(Object vaultName);
+
+  /// Message shown when the current vault folder has no subfolders
+  ///
+  /// In en, this message translates to:
+  /// **'No subfolders here'**
+  String get vaultFolderPickerEmptyMessage;
+
+  /// Folder name used to represent a vault's root folder in the destination display name
+  ///
+  /// In en, this message translates to:
+  /// **'Root'**
+  String get vaultFolderPickerRootLabel;
+
+  /// Confirm button label when the vault's root folder is the selected destination
+  ///
+  /// In en, this message translates to:
+  /// **'Select Root Folder'**
+  String get vaultFolderPickerConfirmRootButton;
+
+  /// Confirm button label showing the name of the selected destination subfolder
+  ///
+  /// In en, this message translates to:
+  /// **'Select \"{folderName}\"'**
+  String vaultFolderPickerConfirmNamedButton(Object folderName);
+
+  /// Bottom sheet title for choosing where to add Single File Crypto input files from
+  ///
+  /// In en, this message translates to:
+  /// **'Select Input Files'**
+  String get singleFileCryptoSelectInputTitle;
+
+  /// Option to add Single File Crypto input files from device storage
+  ///
+  /// In en, this message translates to:
+  /// **'From Device Storage'**
+  String get singleFileCryptoFromDeviceTitle;
+
+  /// Subtitle explaining the device-storage input option
+  ///
+  /// In en, this message translates to:
+  /// **'Pick files from device using system file picker'**
+  String get singleFileCryptoFromDeviceSubtitle;
+
+  /// Option to add Single File Crypto input files from a mounted vault
+  ///
+  /// In en, this message translates to:
+  /// **'From Mounted Vault'**
+  String get singleFileCryptoFromVaultTitle;
+
+  /// Subtitle explaining the mounted-vault input option
+  ///
+  /// In en, this message translates to:
+  /// **'Pick files from an open encrypted container'**
+  String get singleFileCryptoFromVaultSubtitle;
+
+  /// Bottom sheet title for choosing the Single File Crypto output destination
+  ///
+  /// In en, this message translates to:
+  /// **'Select Destination Folder'**
+  String get singleFileCryptoSelectDestinationTitle;
+
+  /// Option to save Single File Crypto output to device storage
+  ///
+  /// In en, this message translates to:
+  /// **'Device Storage Folder'**
+  String get singleFileCryptoDeviceFolderTitle;
+
+  /// Subtitle explaining the device-storage destination option
+  ///
+  /// In en, this message translates to:
+  /// **'Save output to a folder on device storage'**
+  String get singleFileCryptoDeviceFolderSubtitle;
+
+  /// Option to save Single File Crypto output inside a mounted vault
+  ///
+  /// In en, this message translates to:
+  /// **'Mounted Vault Folder'**
+  String get singleFileCryptoVaultFolderTitle;
+
+  /// Subtitle explaining the mounted-vault destination option
+  ///
+  /// In en, this message translates to:
+  /// **'Save output inside an open encrypted container'**
+  String get singleFileCryptoVaultFolderSubtitle;
 }
 
 class _AppLocalizationsDelegate

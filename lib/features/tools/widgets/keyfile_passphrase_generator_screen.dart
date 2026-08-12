@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:vaultexplorer/core/extensions/l10n_extension.dart';
 import 'package:vaultexplorer/core/theme/app_theme.dart';
 import 'package:vaultexplorer/core/utils/format_utils.dart';
+import 'package:vaultexplorer/core/utils/sensitive_clipboard.dart';
 import 'package:vaultexplorer/core/widgets/common_widgets.dart';
 import 'package:vaultexplorer/data/models/mounted_container.dart';
 import 'package:vaultexplorer/data/services/vault_engine/vault_explorer_api.dart';
@@ -142,7 +143,7 @@ class _KeyfilePassphraseGeneratorScreenState
   }
 
   Future<void> _copyPassphrase() async {
-    await vaultExplorerApi.setSensitiveClipboardText(_generatedPassphrase);
+    await SensitiveClipboard.copy(_generatedPassphrase);
     if (mounted) {
       showAppSnackBar(
         context,
